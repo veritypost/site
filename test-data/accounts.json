@@ -1,0 +1,496 @@
+{
+  "Test Accounts": [
+    {
+      "#": "1",
+      "Username": "test_owner",
+      "Email": "owner@test.veritypost.com",
+      "Password": "TestOwner1!",
+      "Role": "Owner",
+      "Plan": "Family",
+      "Email Verified": "Yes",
+      "Special State": "",
+      "What to Test": "Full system access. Everything."
+    },
+    {
+      "#": "2",
+      "Username": "test_superadmin",
+      "Email": "superadmin@test.veritypost.com",
+      "Password": "TestSuper1!",
+      "Role": "Superadmin",
+      "Plan": "Premium",
+      "Email Verified": "Yes",
+      "Special State": "",
+      "What to Test": "All admin except owner-only."
+    },
+    {
+      "#": "3",
+      "Username": "test_admin",
+      "Email": "admin@test.veritypost.com",
+      "Password": "TestAdmin1!",
+      "Role": "Admin",
+      "Plan": "Premium",
+      "Email Verified": "Yes",
+      "Special State": "",
+      "What to Test": "Full admin panel."
+    },
+    {
+      "#": "4",
+      "Username": "test_editor",
+      "Email": "editor@test.veritypost.com",
+      "Password": "TestEditor1!",
+      "Role": "Editor",
+      "Plan": "Premium",
+      "Email Verified": "Yes",
+      "Special State": "",
+      "What to Test": "Content management, pipeline."
+    },
+    {
+      "#": "5",
+      "Username": "test_moderator",
+      "Email": "moderator@test.veritypost.com",
+      "Password": "TestMod1!",
+      "Role": "Moderator",
+      "Plan": "Premium",
+      "Email Verified": "Yes",
+      "Special State": "",
+      "What to Test": "Moderation queue, reports."
+    },
+    {
+      "#": "6",
+      "Username": "test_anon",
+      "Email": "",
+      "Password": "",
+      "Role": "Anonymous",
+      "Plan": "",
+      "Email Verified": "",
+      "Special State": "",
+      "What to Test": "Use incognito. No DB row."
+    },
+    {
+      "#": "7",
+      "Username": "test_noemail",
+      "Email": "noemail@test.veritypost.com",
+      "Password": "TestNoEmail1!",
+      "Role": "User",
+      "Plan": "Free",
+      "Email Verified": "No",
+      "Special State": "Email unverified",
+      "What to Test": "Verify email banner, blocked features."
+    },
+    {
+      "#": "8",
+      "Username": "test_free",
+      "Email": "free@test.veritypost.com",
+      "Password": "TestFree1!",
+      "Role": "User",
+      "Plan": "Free",
+      "Email Verified": "Yes",
+      "Special State": "",
+      "What to Test": "Free tier limits, ads, 5 comments/day."
+    },
+    {
+      "#": "9",
+      "Username": "test_premium",
+      "Email": "premium@test.veritypost.com",
+      "Password": "TestPremium1!",
+      "Role": "User",
+      "Plan": "Premium",
+      "Email Verified": "Yes",
+      "Special State": "",
+      "What to Test": "Unlimited, ad-free, bookmarks, DMs."
+    },
+    {
+      "#": "10",
+      "Username": "test_family",
+      "Email": "family@test.veritypost.com",
+      "Password": "TestFamily1!",
+      "Role": "User",
+      "Plan": "Family",
+      "Email Verified": "Yes",
+      "Special State": "2 kid profiles",
+      "What to Test": "Kid profiles, PINs, parental dashboard."
+    },
+    {
+      "#": "11",
+      "Username": "test_kid_1 (Emma)",
+      "Email": "",
+      "Password": "",
+      "Role": "",
+      "Plan": "",
+      "Email Verified": "",
+      "Special State": "Kid profile",
+      "What to Test": "Kid-safe content, kid quizzes."
+    },
+    {
+      "#": "12",
+      "Username": "test_kid_2 (Liam)",
+      "Email": "",
+      "Password": "",
+      "Role": "",
+      "Plan": "",
+      "Email Verified": "",
+      "Special State": "Kid profile",
+      "What to Test": "Second kid, different age."
+    },
+    {
+      "#": "13",
+      "Username": "test_expert",
+      "Email": "expert@test.veritypost.com",
+      "Password": "TestExpert1!",
+      "Role": "Expert",
+      "Plan": "Premium",
+      "Email Verified": "Yes",
+      "Special State": "Verified expert",
+      "What to Test": "Expert badge, discussions, weighted votes."
+    },
+    {
+      "#": "14",
+      "Username": "test_educator",
+      "Email": "educator@test.veritypost.com",
+      "Password": "TestEdu1!",
+      "Role": "Educator",
+      "Plan": "Premium",
+      "Email Verified": "Yes",
+      "Special State": "Verified educator",
+      "What to Test": "Educator badge, discussions."
+    },
+    {
+      "#": "15",
+      "Username": "test_journalist",
+      "Email": "journalist@test.veritypost.com",
+      "Password": "TestJourn1!",
+      "Role": "Journalist",
+      "Plan": "Premium",
+      "Email Verified": "Yes",
+      "Special State": "Verified journalist",
+      "What to Test": "Journalist badge, submit articles."
+    },
+    {
+      "#": "16",
+      "Username": "test_banned",
+      "Email": "banned@test.veritypost.com",
+      "Password": "TestBanned1!",
+      "Role": "User",
+      "Plan": "Premium",
+      "Email Verified": "Yes",
+      "Special State": "Banned",
+      "What to Test": "Cannot post/comment. Ban UI."
+    },
+    {
+      "#": "17",
+      "Username": "test_muted",
+      "Email": "muted@test.veritypost.com",
+      "Password": "TestMuted1!",
+      "Role": "User",
+      "Plan": "Free",
+      "Email Verified": "Yes",
+      "Special State": "Muted 24h",
+      "What to Test": "Read-only. Muted banner."
+    },
+    {
+      "#": "18",
+      "Username": "test_shadow",
+      "Email": "shadow@test.veritypost.com",
+      "Password": "TestShadow1!",
+      "Role": "User",
+      "Plan": "Free",
+      "Email Verified": "Yes",
+      "Special State": "Shadow banned",
+      "What to Test": "Content invisible to others."
+    },
+    {
+      "#": "19",
+      "Username": "test_newbie",
+      "Email": "newbie@test.veritypost.com",
+      "Password": "TestNewbie1!",
+      "Role": "User",
+      "Plan": "Free",
+      "Email Verified": "Yes",
+      "Special State": "Brand new",
+      "What to Test": "Empty states, first actions."
+    },
+    {
+      "#": "20",
+      "Username": "test_veteran",
+      "Email": "veteran@test.veritypost.com",
+      "Password": "TestVet1!",
+      "Role": "User",
+      "Plan": "Premium",
+      "Email Verified": "Yes",
+      "Special State": "Luminary, 365 streak",
+      "What to Test": "Top leaderboard, all achievements."
+    }
+  ],
+  "Community Users": [
+    {
+      "#": "1",
+      "Username": "alex_reads",
+      "Email": "alex_reads@community.veritypost.com",
+      "Password": "Community1!0",
+      "Score": "",
+      "Tier": "",
+      "Streak": ""
+    },
+    {
+      "#": "2",
+      "Username": "jordan_writes",
+      "Email": "jordan_writes@community.veritypost.com",
+      "Password": "Community1!1",
+      "Score": "",
+      "Tier": "",
+      "Streak": ""
+    },
+    {
+      "#": "3",
+      "Username": "sam_thinks",
+      "Email": "sam_thinks@community.veritypost.com",
+      "Password": "Community1!2",
+      "Score": "",
+      "Tier": "",
+      "Streak": ""
+    },
+    {
+      "#": "4",
+      "Username": "taylor_explores",
+      "Email": "taylor_explores@community.veritypost.com",
+      "Password": "Community1!3",
+      "Score": "",
+      "Tier": "",
+      "Streak": ""
+    },
+    {
+      "#": "5",
+      "Username": "morgan_learns",
+      "Email": "morgan_learns@community.veritypost.com",
+      "Password": "Community1!4",
+      "Score": "",
+      "Tier": "",
+      "Streak": ""
+    },
+    {
+      "#": "6",
+      "Username": "casey_discovers",
+      "Email": "casey_discovers@community.veritypost.com",
+      "Password": "Community1!5",
+      "Score": "",
+      "Tier": "",
+      "Streak": ""
+    },
+    {
+      "#": "7",
+      "Username": "riley_reports",
+      "Email": "riley_reports@community.veritypost.com",
+      "Password": "Community1!6",
+      "Score": "",
+      "Tier": "",
+      "Streak": ""
+    },
+    {
+      "#": "8",
+      "Username": "quinn_shares",
+      "Email": "quinn_shares@community.veritypost.com",
+      "Password": "Community1!7",
+      "Score": "",
+      "Tier": "",
+      "Streak": ""
+    },
+    {
+      "#": "9",
+      "Username": "avery_watches",
+      "Email": "avery_watches@community.veritypost.com",
+      "Password": "Community1!8",
+      "Score": "",
+      "Tier": "",
+      "Streak": ""
+    },
+    {
+      "#": "10",
+      "Username": "blake_studies",
+      "Email": "blake_studies@community.veritypost.com",
+      "Password": "Community1!9",
+      "Score": "",
+      "Tier": "",
+      "Streak": ""
+    },
+    {
+      "#": "11",
+      "Username": "drew_reads",
+      "Email": "drew_reads@community.veritypost.com",
+      "Password": "Community1!10",
+      "Score": "",
+      "Tier": "",
+      "Streak": ""
+    },
+    {
+      "#": "12",
+      "Username": "charlie_writes",
+      "Email": "charlie_writes@community.veritypost.com",
+      "Password": "Community1!11",
+      "Score": "",
+      "Tier": "",
+      "Streak": ""
+    },
+    {
+      "#": "13",
+      "Username": "kai_thinks",
+      "Email": "kai_thinks@community.veritypost.com",
+      "Password": "Community1!12",
+      "Score": "",
+      "Tier": "",
+      "Streak": ""
+    },
+    {
+      "#": "14",
+      "Username": "rowan_explores",
+      "Email": "rowan_explores@community.veritypost.com",
+      "Password": "Community1!13",
+      "Score": "",
+      "Tier": "",
+      "Streak": ""
+    },
+    {
+      "#": "15",
+      "Username": "sage_learns",
+      "Email": "sage_learns@community.veritypost.com",
+      "Password": "Community1!14",
+      "Score": "",
+      "Tier": "",
+      "Streak": ""
+    },
+    {
+      "#": "16",
+      "Username": "river_discovers",
+      "Email": "river_discovers@community.veritypost.com",
+      "Password": "Community1!15",
+      "Score": "",
+      "Tier": "",
+      "Streak": ""
+    },
+    {
+      "#": "17",
+      "Username": "phoenix_reports",
+      "Email": "phoenix_reports@community.veritypost.com",
+      "Password": "Community1!16",
+      "Score": "",
+      "Tier": "",
+      "Streak": ""
+    },
+    {
+      "#": "18",
+      "Username": "harper_shares",
+      "Email": "harper_shares@community.veritypost.com",
+      "Password": "Community1!17",
+      "Score": "",
+      "Tier": "",
+      "Streak": ""
+    },
+    {
+      "#": "19",
+      "Username": "emery_watches",
+      "Email": "emery_watches@community.veritypost.com",
+      "Password": "Community1!18",
+      "Score": "",
+      "Tier": "",
+      "Streak": ""
+    },
+    {
+      "#": "20",
+      "Username": "dakota_studies",
+      "Email": "dakota_studies@community.veritypost.com",
+      "Password": "Community1!19",
+      "Score": "",
+      "Tier": "",
+      "Streak": ""
+    },
+    {
+      "#": "21",
+      "Username": "skyler_reads",
+      "Email": "skyler_reads@community.veritypost.com",
+      "Password": "Community1!20",
+      "Score": "",
+      "Tier": "",
+      "Streak": ""
+    },
+    {
+      "#": "22",
+      "Username": "jamie_writes",
+      "Email": "jamie_writes@community.veritypost.com",
+      "Password": "Community1!21",
+      "Score": "",
+      "Tier": "",
+      "Streak": ""
+    },
+    {
+      "#": "23",
+      "Username": "reese_thinks",
+      "Email": "reese_thinks@community.veritypost.com",
+      "Password": "Community1!22",
+      "Score": "",
+      "Tier": "",
+      "Streak": ""
+    },
+    {
+      "#": "24",
+      "Username": "finley_explores",
+      "Email": "finley_explores@community.veritypost.com",
+      "Password": "Community1!23",
+      "Score": "",
+      "Tier": "",
+      "Streak": ""
+    },
+    {
+      "#": "25",
+      "Username": "hayden_learns",
+      "Email": "hayden_learns@community.veritypost.com",
+      "Password": "Community1!24",
+      "Score": "",
+      "Tier": "",
+      "Streak": ""
+    },
+    {
+      "#": "26",
+      "Username": "lennon_discovers",
+      "Email": "lennon_discovers@community.veritypost.com",
+      "Password": "Community1!25",
+      "Score": "",
+      "Tier": "",
+      "Streak": ""
+    },
+    {
+      "#": "27",
+      "Username": "marley_reports",
+      "Email": "marley_reports@community.veritypost.com",
+      "Password": "Community1!26",
+      "Score": "",
+      "Tier": "",
+      "Streak": ""
+    },
+    {
+      "#": "28",
+      "Username": "eden_shares",
+      "Email": "eden_shares@community.veritypost.com",
+      "Password": "Community1!27",
+      "Score": "",
+      "Tier": "",
+      "Streak": ""
+    },
+    {
+      "#": "29",
+      "Username": "remy_watches",
+      "Email": "remy_watches@community.veritypost.com",
+      "Password": "Community1!28",
+      "Score": "",
+      "Tier": "",
+      "Streak": ""
+    },
+    {
+      "#": "30",
+      "Username": "aspen_studies",
+      "Email": "aspen_studies@community.veritypost.com",
+      "Password": "Community1!29",
+      "Score": "",
+      "Tier": "",
+      "Streak": ""
+    }
+  ]
+}

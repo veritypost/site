@@ -31,16 +31,40 @@ export default function ExpertQueuePage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setLoading(false); return; }
 
+    // Moderator+ sees the queue for oversight, even without an expert
+    // application. Mirrors the hierarchy map in src/lib/auth.js.
+    const hierarchy = { owner: 100, superadmin: 90, admin: 80, editor: 70, moderator: 60, expert: 50, educator: 50, journalist: 50, user: 10 };
+    const { data: roleRows } = await supabase
+      .from('user_roles')
+      .select('roles(name, hierarchy_level)')
+      .eq('user_id', user.id);
+    const roleLevels = (roleRows || [])
+      .map(r => r.roles?.hierarchy_level ?? hierarchy[r.roles?.name] ?? 0);
+    const maxLevel = Math.max(0, ...roleLevels);
+    const adminBypass = maxLevel >= 60;
+
     const { data: isExpert } = await supabase.rpc('is_user_expert', { p_user_id: user.id });
-    setAuthorized(!!isExpert);
-    if (!isExpert) { setLoading(false); return; }
+    const allowed = adminBypass || !!isExpert;
+    setAuthorized(allowed);
+    if (!allowed) { setLoading(false); return; }
 
     const { data: cats } = await supabase
       .from('expert_application_categories')
       .select('categories(id, name), expert_applications!inner(user_id, status)')
       .eq('expert_applications.user_id', user.id)
       .eq('expert_applications.status', 'approved');
-    const list = (cats || []).map(r => r.categories).filter(Boolean);
+    let list = (cats || []).map(r => r.categories).filter(Boolean);
+
+    // Admin-bypass users have no expert application, so the join returns
+    // empty. Fall back to every category so oversight isn't scoped out.
+    if (adminBypass && list.length === 0) {
+      const { data: allCats } = await supabase
+        .from('categories')
+        .select('id, name')
+        .order('name');
+      list = allCats || [];
+    }
+
     setCategories(list);
     if (list.length > 0) setActiveCategory(list[0].id);
 
@@ -167,7 +191,7 @@ export default function ExpertQueuePage() {
                 {it.articles?.title ? ` · ${it.articles.title}` : ''}
                 {' · '}{new Date(it.created_at).toLocaleDateString()}
               </div>
-              <div style={{ fontSize: 14, color: C.text, marginBottom: 10 }}>{it.comments?.body}</div>
+              <div style={{ fontSize: 14, color: C.text, marginBottom: 10, wordBreak: 'break-word' }}>{it.comments?.body}</div>
 
               {tab === 'pending' && (
                 <div style={{ display: 'flex', gap: 6 }}>
@@ -182,7 +206,7 @@ export default function ExpertQueuePage() {
                     onChange={e => setAnswerDraft(prev => ({ ...prev, [it.id]: e.target.value }))}
                     rows={3}
                     placeholder="Your answer…"
-                    style={{ width: '100%', padding: 8, borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, outline: 'none', fontFamily: 'inherit', marginBottom: 8 }}
+                    style={{ width: '100%', padding: 8, borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, outline: 'none', fontFamily: 'inherit', marginBottom: 8, boxSizing: 'border-box' }}
                   />
                   <button
                     onClick={() => handleAnswer(it.id)}
@@ -231,7 +255,7 @@ export default function ExpertQueuePage() {
                 <div style={{ fontSize: 11, color: C.dim, marginBottom: 2 }}>
                   {m.users?.username || 'user'} · {new Date(m.created_at).toLocaleString()}
                 </div>
-                <div style={{ fontSize: 13 }}>{m.body}</div>
+                <div style={{ fontSize: 13, wordBreak: 'break-word' }}>{m.body}</div>
               </div>
             ))}
             <textarea
@@ -239,7 +263,7 @@ export default function ExpertQueuePage() {
               onChange={e => setBackDraft(e.target.value)}
               rows={2}
               placeholder="Post to the back-channel…"
-              style={{ width: '100%', padding: 8, borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, outline: 'none', fontFamily: 'inherit', marginTop: 8 }}
+              style={{ width: '100%', padding: 8, borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, outline: 'none', fontFamily: 'inherit', marginTop: 8, boxSizing: 'border-box' }}
             />
             <button onClick={postBackMessage} disabled={!backDraft.trim()} style={{ ...btn(C.accent), marginTop: 6 }}>Post</button>
           </div>

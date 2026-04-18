@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Profile · Verity Post (UI mockup)</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --card: #f7f7f7;
+    --border: #222222;
+    --rule: #e5e5e5;
+    --white: #111111;
+    --dim: #5a5a5a;
+    --accent: #111111;
+    --success: #22c55e;
+    --wrong: #b91c1c;
+    --sans: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--white); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+
+  .page { max-width: 720px; margin: 0 auto; padding: 20px 16px 80px; }
+
+  .profile-card {
+    padding: 24px 20px; border-radius: 14px; margin-bottom: 20px;
+    border: 1px solid var(--border); background: var(--card);
+  }
+  .id-row { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+  .avatar {
+    width: 56px; height: 56px; border-radius: 50%;
+    background: #6366f1; color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; font-weight: 700; letter-spacing: 0.02em;
+    flex-shrink: 0;
+  }
+  .id-text { flex: 1; min-width: 0; }
+  .username {
+    font-size: 18px; font-weight: 700; color: var(--white);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .verified {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: var(--accent); color: #fff;
+    font-size: 10px; font-weight: 700;
+  }
+  .tier { font-size: 12px; color: var(--dim); margin-top: 2px; }
+
+  .stats {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 0;
+    border-radius: 8px; overflow: hidden; border: 1px solid var(--border);
+  }
+  .stat { padding: 10px 6px; text-align: center; background: var(--bg); }
+  .stat + .stat { border-left: 1px solid var(--border); }
+  .stat-val { font-size: 16px; font-weight: 700; color: var(--white); }
+  .stat-lbl { font-size: 9px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
+
+  .group { margin-bottom: 20px; }
+  .group-heading {
+    font-size: 11px; font-weight: 700; color: var(--dim);
+    text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px;
+  }
+  .row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px; border-radius: 10px; margin-bottom: 6px;
+    border: 1px solid var(--border); background: var(--card);
+    text-decoration: none; color: inherit;
+  }
+  .row-label { font-size: 14px; font-weight: 600; color: var(--white); }
+  .row-desc { font-size: 11px; color: var(--dim); margin-top: 2px; }
+  .chev { font-size: 16px; color: var(--dim); }
+
+  .logout {
+    margin-top: 32px; width: 100%; padding: 12px; border-radius: 10px;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--wrong); font-size: 13px; font-weight: 500;
+    cursor: pointer; font-family: var(--sans);
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+
+    <div class="profile-card">
+      <div class="id-row">
+        <div class="avatar">M</div>
+        <div class="id-text">
+          <div class="username">
+            maya.reads
+            <span class="verified" title="Verified">&#10003;</span>
+          </div>
+          <div class="tier">Pro · Member since October 2025</div>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-val">12,480</div>
+          <div class="stat-lbl">Verity Score</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val">42</div>
+          <div class="stat-lbl">Day Streak</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val">318</div>
+          <div class="stat-lbl">Articles Read</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val">96</div>
+          <div class="stat-lbl">Comments</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="group">
+      <a class="row" href="#">
+        <div>
+          <div class="row-label">Profile Card</div>
+          <div class="row-desc">Your shareable profile card</div>
+        </div>
+        <span class="chev">&rsaquo;</span>
+      </a>
+      <a class="row" href="#">
+        <div>
+          <div class="row-label">Activity</div>
+          <div class="row-desc">Reading history, quizzes, and comments</div>
+        </div>
+        <span class="chev">&rsaquo;</span>
+      </a>
+      <a class="row" href="#">
+        <div>
+          <div class="row-label">Categories</div>
+          <div class="row-desc">Progress across all categories</div>
+        </div>
+        <span class="chev">&rsaquo;</span>
+      </a>
+      <a class="row" href="#">
+        <div>
+          <div class="row-label">Achievements</div>
+          <div class="row-desc">Badges and milestones</div>
+        </div>
+        <span class="chev">&rsaquo;</span>
+      </a>
+      <a class="row" href="#">
+        <div>
+          <div class="row-label">Bookmarks</div>
+          <div class="row-desc">Saved articles and collections</div>
+        </div>
+        <span class="chev">&rsaquo;</span>
+      </a>
+      <a class="row" href="#">
+        <div>
+          <div class="row-label">Messages</div>
+          <div class="row-desc">Conversations and inbox</div>
+        </div>
+        <span class="chev">&rsaquo;</span>
+      </a>
+      <a class="row" href="#">
+        <div>
+          <div class="row-label">Kids</div>
+          <div class="row-desc">Kid profiles and activity</div>
+        </div>
+        <span class="chev">&rsaquo;</span>
+      </a>
+    </div>
+
+    <div class="group">
+      <div class="group-heading">Help &amp; Settings</div>
+      <a class="row" href="#">
+        <div>
+          <div class="row-label">Contact Us</div>
+          <div class="row-desc">Get help or send feedback</div>
+        </div>
+        <span class="chev">&rsaquo;</span>
+      </a>
+      <a class="row" href="#">
+        <div>
+          <div class="row-label">Settings</div>
+          <div class="row-desc">Profile, billing, security, privacy</div>
+        </div>
+        <span class="chev">&rsaquo;</span>
+      </a>
+    </div>
+
+    <button class="logout" type="button">Log out</button>
+
+  </div>
+</body>
+</html>
