@@ -592,6 +592,7 @@ export default function UsersAdmin() {
             <div>
               <SectionLabel>Actions</SectionLabel>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <a href={`/admin/users/${sel.id}/permissions`} style={{ padding: '10px 16px', borderRadius: 8, border: `1px solid ${C.border}`, background: 'none', color: C.white, fontSize: 12, fontWeight: 600, cursor: 'pointer', textAlign: 'left', textDecoration: 'none', display: 'block' }}>Permissions</a>
                 <button onClick={() => toggleBan(sel.id)} style={{ padding: '10px 16px', borderRadius: 8, border: `1px solid ${sel.is_banned ? C.success : C.danger}44`, background: 'none', color: sel.is_banned ? C.success : C.danger, fontSize: 12, fontWeight: 600, cursor: 'pointer', textAlign: 'left' }}>
                   {sel.is_banned ? 'Unban User' : 'Ban User'}
                 </button>

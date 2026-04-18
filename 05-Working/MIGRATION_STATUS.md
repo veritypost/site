@@ -31,7 +31,7 @@ Replace the current mixed-model (role-hierarchy gates + some permission-set plum
 |---|---|---|---|---|
 | 0 | Matrix cleanup (xlsx finalized) | **DONE** | — | 916 perms, 10 sets |
 | 1 | Import xlsx → Supabase DB | **DONE** | 2–4 hrs | Replaces old 81 perms + 11 sets |
-| 2 | Build user-centric admin page (/admin/users/:id/permissions) | NOT STARTED | 2–3 days | Search user → toggle perms |
+| 2 | Build user-centric admin page (/admin/users/:id/permissions) | **DONE** | 2–3 days | Search user → toggle perms |
 | 3 | Pilot feature migration (expert_queue) | NOT STARTED | 1–2 hrs | First feature proves the model |
 | 4 | Strangler migration of remaining gates | NOT STARTED | Weeks | One feature at a time as you touch them |
 | 5 | Cleanup (delete role hierarchy, dead code) | NOT STARTED | Later | Only after Phase 4 ~complete |
@@ -82,12 +82,35 @@ Open `http://localhost:3000/admin/permissions`. Expect to see new 916 keys + 10 
 
 ---
 
-## Phase 2 — outline (for when we get there)
+## Phase 2 — step by step
 
-- SQL function `compute_effective_perms(user_id)` — joins role+plan+direct grants + overrides
-- New page at `/admin/users/[id]/permissions` with search + toggle grid
-- `POST /api/admin/users/:id/permissions` endpoint with `users.perms_version` bump
-- Audit log on every write
+### 2.1 — SQL function compute_effective_perms
+**Status:** DONE (2026-04-18 11:52)
+- File: `01-Schema/064_compute_effective_perms.sql`
+- Applied as migration `compute_effective_perms`
+- Verified on test_expert: grants `expert.queue.view` via role(expert set), denies `admin.panel.enter`, denies `kids.profile.create`. ~15ms.
+- Edge cases logged: permission_scope_overrides schema uses override_action enum not granted boolean (agent adapted); plan attribution shadowed by role for user tier (correct by inheritance); user_permission_sets branches code-tested but data-untested (empty tables).
+
+### 2.2 — Admin page /admin/users/[id]/permissions
+**Status:** DONE (2026-04-18 11:58)
+- `site/src/app/admin/users/[id]/permissions/page.js` (653 lines)
+- Filters: surface / granted state / text search
+- Toggles: Grant, Block, Remove override, Assign/Remove set
+- Source detail resolution reads from `source_detail` jsonb
+- Link added from `/admin/users` detail panel
+- Persistence: filters + expanded sections in sessionStorage per-user
+
+### 2.3 — POST /api/admin/users/:id/permissions endpoint
+**Status:** DONE (2026-04-18 12:04)
+- `site/src/app/api/admin/users/[id]/permissions/route.js` (265 lines)
+- Uses service client; `requireRole('admin')` is the auth barrier
+- Actions: grant, block, remove_override, assign_set, remove_set — all verified end-to-end on test_free user
+- Bumps `users.perms_version` on every successful write
+- Writes to `admin_audit_log` with `actor_user_id`, action prefix `user_permissions.*`, new_value jsonb, ip, user_agent
+- Audit/version-bump failures are non-fatal (primary write is authoritative)
+
+### 2.4 — Audit logging on grant writes
+**Status:** DONE — folded into 2.3 above.
 
 ## Phase 3 — outline
 

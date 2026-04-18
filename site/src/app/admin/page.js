@@ -21,11 +21,11 @@ const PAGES = [
     { href: '/admin/expert-sessions', title: 'Kid Expert Sessions', desc: 'D9 — schedule live Q&A windows for kid profiles' },
   ]},
   { group: 'Users & Identity', desc: 'Who is on the platform, how they get in, and how trust is built', items: [
-    { href: '/admin/users', title: 'User Management', desc: 'Users, devices, manual actions, ban/unban, roles/plans' },
+    { href: '/admin/users', title: 'User Management', desc: 'Users, devices, manual actions, ban/unban, roles/plans. Each user row now opens a per-user Permissions console (effective grants + per-key grant/block overrides).' },
     { href: '/admin/access', title: 'Access Codes', desc: 'Signup gating codes, auto-requests, usage tracking' },
     { href: '/admin/verification', title: 'Expert Verification', desc: 'D3 — review expert applications, probation status, approve/reject, annual re-verification flags' },
     { href: '/admin/data-requests', title: 'Data Requests', desc: 'Review GDPR/CCPA export + deletion requests; identity verify to unblock the export cron, or reject with reason' },
-    { href: '/admin/permissions', title: 'Permissions & Access Control', desc: 'Canonical RBAC — full CRUD over permissions, sets, role/plan grants, and direct user grants' },
+    { href: '/admin/permissions', title: 'Permissions & Access Control', desc: 'Set-centric RBAC — full CRUD over permissions, sets, role/plan grants, and direct user grants. For a single-user effective-permission view, open any user from User Management.' },
   ]},
   { group: 'Configuration', desc: 'Platform-wide settings, categories, and content rules', items: [
     { href: '/admin/features', title: 'Settings & Features', desc: 'Auth, scoring, comments, moderation, notifications — all platform config' },
