@@ -1,0 +1,867 @@
+'use client';
+import { useState, useEffect, useMemo, useRef, Fragment } from 'react';
+import { createClient } from '../lib/supabase/client';
+import { useAuth } from './NavWrapper';
+import Ad from '../components/Ad';
+import RecapCard from '../components/RecapCard';
+
+const C = {
+  bg: '#ffffff',
+  card: '#f7f7f7',
+  border: '#e5e5e5',
+  text: '#111111',
+  dim: '#666666',
+  accent: '#111111',
+  success: '#22c55e',
+};
+
+// Full hardcoded category + subcategory map for layout review
+const FALLBACK_CATEGORIES = [
+  { id: 'fb-politics', name: 'Politics', slug: 'politics', kids_only: false, visible: true, sort_order: 0 },
+  { id: 'fb-world', name: 'World', slug: 'world', kids_only: false, visible: true, sort_order: 1 },
+  { id: 'fb-business', name: 'Business', slug: 'business', kids_only: false, visible: true, sort_order: 2 },
+  { id: 'fb-economy', name: 'Economy', slug: 'economy', kids_only: false, visible: true, sort_order: 3 },
+  { id: 'fb-technology', name: 'Technology', slug: 'technology', kids_only: false, visible: true, sort_order: 4 },
+  { id: 'fb-science', name: 'Science', slug: 'science', kids_only: false, visible: true, sort_order: 5 },
+  { id: 'fb-health', name: 'Health', slug: 'health', kids_only: false, visible: true, sort_order: 6 },
+  { id: 'fb-sports', name: 'Sports', slug: 'sports', kids_only: false, visible: true, sort_order: 7 },
+  { id: 'fb-entertainment', name: 'Entertainment', slug: 'entertainment', kids_only: false, visible: true, sort_order: 8 },
+  { id: 'fb-environment', name: 'Environment', slug: 'environment', kids_only: false, visible: true, sort_order: 9 },
+  { id: 'fb-climate', name: 'Climate', slug: 'climate', kids_only: false, visible: true, sort_order: 10 },
+  { id: 'fb-education', name: 'Education', slug: 'education', kids_only: false, visible: true, sort_order: 11 },
+  { id: 'fb-crime', name: 'Crime & Justice', slug: 'crime-justice', kids_only: false, visible: true, sort_order: 12 },
+  { id: 'fb-media', name: 'Media', slug: 'media', kids_only: false, visible: true, sort_order: 13 },
+  { id: 'fb-culture', name: 'Culture', slug: 'culture', kids_only: false, visible: true, sort_order: 14 },
+  { id: 'fb-finance', name: 'Finance', slug: 'finance', kids_only: false, visible: true, sort_order: 15 },
+  // Kids
+  { id: 'fb-kids-science', name: 'Science', slug: 'kids-science', kids_only: true, visible: true, sort_order: 100 },
+  { id: 'fb-kids-animals', name: 'Animals', slug: 'kids-animals', kids_only: true, visible: true, sort_order: 101 },
+  { id: 'fb-kids-world', name: 'World', slug: 'kids-world', kids_only: true, visible: true, sort_order: 102 },
+  { id: 'fb-kids-tech', name: 'Tech', slug: 'kids-tech', kids_only: true, visible: true, sort_order: 103 },
+  { id: 'fb-kids-sports', name: 'Sports', slug: 'kids-sports', kids_only: true, visible: true, sort_order: 104 },
+  { id: 'fb-kids-history', name: 'History', slug: 'kids-history', kids_only: true, visible: true, sort_order: 105 },
+  { id: 'fb-kids-health', name: 'Health', slug: 'kids-health', kids_only: true, visible: true, sort_order: 106 },
+  { id: 'fb-kids-arts', name: 'Arts', slug: 'kids-arts', kids_only: true, visible: true, sort_order: 107 },
+];
+
+const FALLBACK_SUBCATEGORIES = [
+  // Politics
+  { id: 'fb-sub-congress', name: 'Congress', slug: 'congress', parent_user_id: 'fb-politics' },
+  { id: 'fb-sub-scotus', name: 'Supreme Court', slug: 'supreme-court', parent_user_id: 'fb-politics' },
+  { id: 'fb-sub-whitehouse', name: 'White House', slug: 'white-house', parent_user_id: 'fb-politics' },
+  { id: 'fb-sub-elections', name: 'Elections', slug: 'elections', parent_user_id: 'fb-politics' },
+  // Technology
+  { id: 'fb-sub-ai', name: 'AI', slug: 'ai', parent_user_id: 'fb-technology' },
+  { id: 'fb-sub-social', name: 'Social Media', slug: 'social-media', parent_user_id: 'fb-technology' },
+  { id: 'fb-sub-cyber', name: 'Cybersecurity', slug: 'cybersecurity', parent_user_id: 'fb-technology' },
+  // Business
+  { id: 'fb-sub-markets', name: 'Markets', slug: 'markets', parent_user_id: 'fb-business' },
+  { id: 'fb-sub-economy', name: 'Economy', slug: 'economy', parent_user_id: 'fb-business' },
+  { id: 'fb-sub-startups', name: 'Startups', slug: 'startups', parent_user_id: 'fb-business' },
+];
+
+// Categories seeded with kid versions can be named "Science (kids)" /
+// "World (kids)" / "Kids Science" / "Science kids". Inside any view that
+// already filters by is_kids_safe, the marker is just visual noise — strip
+// every variant so the label stays clean.
+function stripKidsTag(name) {
+  if (!name) return '';
+  return String(name)
+    .replace(/\s*\(kids?\)\s*$/i, '')
+    .replace(/\s+kids?\s*$/i, '')
+    .replace(/^kids?\s+/i, '')
+    .trim();
+}
+
+function CategoryBadge({ name }) {
+  return (
+    <span style={{
+      fontSize: 11, fontWeight: 600, color: C.accent,
+      letterSpacing: '0.03em', textTransform: 'uppercase',
+    }}>
+      {stripKidsTag(name)}
+    </span>
+  );
+}
+
+const DATE_PRESETS = [
+  { label: 'Today', key: 'today' },
+  { label: 'Yesterday', key: 'yesterday' },
+  { label: 'This Week', key: 'week' },
+  { label: 'This Month', key: 'month' },
+  { label: 'Custom', key: 'custom' },
+];
+
+const SEARCH_MODES = [
+  { label: 'Headline', key: 'headline' },
+  { label: 'Keyword', key: 'keyword' },
+  { label: 'Slug', key: 'slug' },
+  { label: 'Quiz', key: 'quiz' },
+];
+
+function getDateRange(preset) {
+  const now = new Date();
+  const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+
+  switch (preset) {
+    case 'today':
+      return { from: startOfDay(now).toISOString(), to: null };
+    case 'yesterday': {
+      const y = new Date(now);
+      y.setDate(y.getDate() - 1);
+      return { from: startOfDay(y).toISOString(), to: startOfDay(now).toISOString() };
+    }
+    case 'week': {
+      const w = new Date(now);
+      w.setDate(w.getDate() - w.getDay());
+      return { from: startOfDay(w).toISOString(), to: null };
+    }
+    case 'month': {
+      const m = new Date(now.getFullYear(), now.getMonth(), 1);
+      return { from: m.toISOString(), to: null };
+    }
+    default:
+      return { from: null, to: null };
+  }
+}
+
+export default function HomePage() {
+  const supabase = useMemo(() => createClient(), []);
+  const { loggedIn, user: authUser } = useAuth();
+  const verified = loggedIn && authUser?.email_verified;
+
+  const [stories, setStories] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [subcategories, setSubcategories] = useState([]);
+  const [sources, setSources] = useState([]);
+  const [breakingStory, setBreakingStory] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Feed state
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [activeSubcategory, setActiveSubcategory] = useState(null);
+  const [visibleCount, setVisibleCount] = useState(50);
+
+  // Search panel state
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchVerifyPrompt, setSearchVerifyPrompt] = useState(false);
+  const [verifyResendBusy, setVerifyResendBusy] = useState(false);
+  const [verifyResendMsg, setVerifyResendMsg] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchMode, setSearchMode] = useState('headline');
+  const [datePreset, setDatePreset] = useState(null);
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+  const [selectedSource, setSelectedSource] = useState(null);
+  const [selectedCat, setSelectedCat] = useState(null);
+  const [selectedSubcat, setSelectedSubcat] = useState(null);
+  const [expandedSearchCat, setExpandedSearchCat] = useState(null);
+  const [searchResults, setSearchResults] = useState(null);
+  const [searching, setSearching] = useState(false);
+
+  const searchInputRef = useRef(null);
+
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true);
+
+      const [storiesRes, allCatsRes, sourcesRes] = await Promise.all([
+        supabase
+          .from('articles')
+          .select('id, title, slug, excerpt, category_id, subcategory_id, is_breaking, published_at')
+          .eq('status', 'published')
+          .order('published_at', { ascending: false })
+          .limit(100),
+        // Kids-only categories live with a `kids-` slug prefix and
+        // `metadata.audience = 'kids'` — exclude them from the adult feed
+        // per D9/D12. Note: `is_kids_safe` is "content appropriate for kids"
+        // (many adult categories have it true), not a kids-only flag, so
+        // filtering on it would drop adult categories like Science or
+        // Sports. Filter on slug prefix instead.
+        supabase
+          .from('categories')
+          .select('id, name, slug, is_active, is_kids_safe, parent_id, sort_order')
+          .not('slug', 'like', 'kids-%')
+          .order('sort_order', { ascending: true, nullsFirst: false }),
+        supabase
+          .from('sources')
+          .select('publisher'),
+      ]);
+
+      if (storiesRes.error) console.error('Stories fetch error:', storiesRes.error);
+      if (allCatsRes.error) console.error('Categories fetch error:', allCatsRes.error);
+      const storyList = storiesRes.data || [];
+      setStories(storyList);
+
+      const allCats = allCatsRes.data || [];
+      // Merge DB categories with fallbacks — DB wins by slug, fallbacks fill gaps
+      const dbParents = allCats.filter(c => !c.parent_id);
+      const dbSubs = allCats.filter(c => !!c.parent_id);
+      const dbParentSlugs = new Set(dbParents.map(c => c.slug));
+      const dbSubSlugs = new Set(dbSubs.map(c => c.slug));
+      const mergedParents = [
+        ...dbParents,
+        ...FALLBACK_CATEGORIES.filter(c => !dbParentSlugs.has(c.slug)),
+      ];
+      const mergedSubs = [
+        ...dbSubs,
+        ...FALLBACK_SUBCATEGORIES.filter(c => !dbSubSlugs.has(c.slug)),
+      ];
+      setCategories(mergedParents);
+      setSubcategories(mergedSubs);
+
+      // Dedupe source outlets
+      const uniqueSources = [...new Set((sourcesRes.data || []).map(s => s.publisher).filter(Boolean))].sort();
+      setSources(uniqueSources);
+
+      const breaking = storyList.find(s => s.is_breaking);
+      if (breaking) setBreakingStory(breaking);
+
+      setLoading(false);
+    }
+
+    fetchData();
+  }, []);
+
+  // Category map for display
+  const categoryMap = {};
+  categories.forEach(c => { categoryMap[c.id] = c; });
+
+  // Adult-feed category/subcategory id sets. Anything not in these is a
+  // kids-only row that must not surface on the adult home (D9/D12).
+  const adultCategoryIds = new Set(categories.map(c => c.id));
+  const adultSubcategoryIds = new Set(subcategories.map(sc => sc.id));
+
+  const categoryPills = ['All', ...categories.map(c => c.name)];
+
+  // Feed filtering (non-search)
+  const activeCatObj = categories.find(c => c.name === activeCategory);
+  const activeCatSubcats = activeCatObj
+    ? subcategories.filter(sc => sc.parent_id === activeCatObj.id)
+    : [];
+  const feedFiltered = stories.filter(s => {
+    // D9/D12 — drop articles whose category is a kids-only row.
+    if (s.category_id && !adultCategoryIds.has(s.category_id)) return false;
+    if (s.subcategory_id && !adultSubcategoryIds.has(s.subcategory_id)) return false;
+    if (activeCategory !== 'All' && s.category_id !== activeCatObj?.id) return false;
+    if (activeSubcategory && s.subcategory_id !== activeSubcategory) return false;
+    return true;
+  });
+  const feedVisible = feedFiltered.slice(0, visibleCount);
+
+  // Search execution
+  const runSearch = async () => {
+    setSearching(true);
+
+    let query = supabase
+      .from('articles')
+      .select('id, title, slug, excerpt, category_id, subcategory_id, published_at')
+      .eq('status', 'published')
+      .order('published_at', { ascending: false })
+      .limit(50);
+
+    // Date filter
+    let dateFrom = null;
+    let dateTo = null;
+
+    if (datePreset === 'custom') {
+      if (customFrom) dateFrom = new Date(customFrom).toISOString();
+      if (customTo) {
+        const to = new Date(customTo);
+        to.setHours(23, 59, 59, 999);
+        dateTo = to.toISOString();
+      }
+    } else if (datePreset) {
+      const range = getDateRange(datePreset);
+      dateFrom = range.from;
+      dateTo = range.to;
+    }
+
+    if (dateFrom) query = query.gte('published_at', dateFrom);
+    if (dateTo) query = query.lte('published_at', dateTo);
+
+    // Category / subcategory filter
+    if (selectedSubcat) {
+      query = query.eq('subcategory_id', selectedSubcat);
+    } else if (selectedCat) {
+      query = query.eq('category_id', selectedCat);
+    }
+
+    // Text search by mode — escape LIKE wildcards (%, _, \) so user input can't
+    // blow up queries with full-table wildcards.
+    if (searchQuery.trim()) {
+      const raw = searchQuery.trim();
+      const q = raw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+      switch (searchMode) {
+        case 'headline':
+          query = query.ilike('title', `%${q}%`);
+          break;
+        case 'keyword':
+          query = query.or(`title.ilike.%${q}%,summary.ilike.%${q}%,content.ilike.%${q}%`);
+          break;
+        case 'slug':
+          query = query.ilike('slug', `%${q}%`);
+          break;
+        case 'quiz':
+          // For quiz search, we need a different approach — search quizzes table
+          break;
+      }
+    }
+
+    const { data } = await query;
+    let results = data || [];
+
+    // Source filter — filter client-side since source_links is a separate table
+    if (selectedSource) {
+      const { data: sourceLinks } = await supabase
+        .from('sources')
+        .select('article_id')
+        .eq('publisher', selectedSource);
+
+      const sourceArticleIds = new Set((sourceLinks || []).map(s => s.article_id));
+      results = results.filter(s => sourceArticleIds.has(s.id));
+    }
+
+    // Quiz search — find stories whose quiz question matches the query
+    if (searchMode === 'quiz' && searchQuery.trim()) {
+      const raw = searchQuery.trim();
+      const q = raw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+      const { data: quizRows } = await supabase
+        .from('quizzes')
+        .select('article_id')
+        .ilike('question_text', `%${q}%`);
+
+      const quizArticleIds = new Set((quizRows || []).map(q => q.article_id));
+      results = results.filter(s => quizArticleIds.has(s.id));
+    }
+
+    setSearchResults(results);
+    setSearching(false);
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    setDatePreset(null);
+    setCustomFrom('');
+    setCustomTo('');
+    setSelectedSource(null);
+    setSelectedCat(null);
+    setSelectedSubcat(null);
+    setExpandedSearchCat(null);
+    setSearchResults(null);
+  };
+
+  const openSearch = () => {
+    // Pass 17 / UJ-505 + UJ-1100: unverified users no longer get bounced
+    // off the home page. Surface an inline banner that explains the gate
+    // and offers a resend action — kinder than a hard redirect and
+    // matches the spec's "banner not redirect" pattern.
+    if (!loggedIn) { window.location.href = '/login'; return; }
+    if (!verified) { setSearchVerifyPrompt(true); return; }
+    setSearchOpen(true);
+    setTimeout(() => searchInputRef.current?.focus(), 100);
+  };
+
+  const closeSearch = () => {
+    setSearchOpen(false);
+    clearSearch();
+  };
+
+  const subcatsForCat = (catId) => subcategories.filter(sc => sc.parent_id === catId);
+
+  const hasActiveFilters = searchQuery || datePreset || selectedSource || selectedCat;
+
+  const pillStyle = (active) => ({
+    padding: '6px 14px', borderRadius: 99, fontSize: 12, fontWeight: 600,
+    border: `1.5px solid ${active ? C.accent : C.border}`,
+    background: active ? C.accent : C.bg,
+    color: active ? '#fff' : C.dim,
+    cursor: 'pointer', whiteSpace: 'nowrap',
+  });
+
+  const chipStyle = (active) => ({
+    padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500,
+    border: `1px solid ${active ? C.accent : C.border}`,
+    background: active ? '#f0f0f0' : C.bg,
+    color: active ? C.accent : C.dim,
+    cursor: 'pointer', whiteSpace: 'nowrap',
+  });
+
+  return (
+    <div style={{ background: C.bg, minHeight: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', color: C.text }}>
+
+      {/* Nav */}
+      <nav style={{
+        position: 'sticky', top: 0, zIndex: 100,
+        background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(8px)',
+        borderBottom: `1px solid ${C.border}`, padding: '0 16px',
+      }}>
+        <div style={{ maxWidth: 680, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 12, height: 56 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+            <div style={{ width: 28, height: 28, background: C.text, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ color: '#fff', fontWeight: 900, fontSize: 12 }}>VP</span>
+            </div>
+            <span style={{ fontWeight: 800, fontSize: 16, letterSpacing: '-0.03em', color: C.text }}>Verity Post</span>
+          </div>
+
+          {/* Pass 17 / UJ-505 + UJ-1100: always show the search entry
+            * point. Unverified or anonymous callers get the inline
+            * verify banner below (not a redirect). */}
+          {loggedIn && (
+            <button onClick={openSearch} style={{
+              background: 'none', border: 'none', cursor: 'pointer', padding: 6,
+            }} aria-label="Search articles">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.dim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </button>
+          )}
+
+        </div>
+      </nav>
+
+      {searchVerifyPrompt && !verified && (
+        <div style={{ maxWidth: 680, margin: '12px auto', padding: '12px 16px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, color: '#92400e', fontSize: 13, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ fontWeight: 600, flex: 1, minWidth: 200 }}>
+            Verify your email to search articles.
+          </span>
+          <button
+            onClick={async () => {
+              if (verifyResendBusy) return;
+              setVerifyResendBusy(true);
+              setVerifyResendMsg('');
+              try {
+                const res = await fetch('/api/auth/resend-verification', { method: 'POST' });
+                if (res.status === 429) setVerifyResendMsg('Too many attempts. Try again in an hour.');
+                else if (res.ok) setVerifyResendMsg('Verification email sent.');
+                else setVerifyResendMsg('Could not send. Try again later.');
+              } finally { setVerifyResendBusy(false); }
+            }}
+            disabled={verifyResendBusy}
+            style={{ padding: '7px 12px', borderRadius: 7, border: '1px solid #92400e', background: 'transparent', color: '#92400e', fontSize: 12, fontWeight: 700, cursor: verifyResendBusy ? 'default' : 'pointer' }}
+          >
+            {verifyResendBusy ? 'Sending…' : 'Resend verification'}
+          </button>
+          <button onClick={() => { setSearchVerifyPrompt(false); setVerifyResendMsg(''); }} style={{ background: 'none', border: 'none', color: '#92400e', fontSize: 18, cursor: 'pointer', fontWeight: 700 }} aria-label="Dismiss">x</button>
+          {verifyResendMsg && <div style={{ width: '100%', fontSize: 12 }}>{verifyResendMsg}</div>}
+        </div>
+      )}
+
+      {/* ========== SEARCH OVERLAY ========== */}
+      {searchOpen && (
+        // DA-061 — dialog semantics: screen readers treat the overlay
+        // as a modal dialog and can jump straight to it. The sr-only
+        // heading at the top gives the dialog an accessible name.
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="search-dialog-title"
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            zIndex: 200, background: C.bg, overflowY: 'auto',
+          }}><h2 id="search-dialog-title" style={{ position: 'absolute', left: -9999, width: 1, height: 1, overflow: 'hidden' }}>Search articles</h2>
+          {/* Search header */}
+          <div style={{
+            position: 'sticky', top: 0, zIndex: 201, background: C.bg,
+            borderBottom: `1px solid ${C.border}`, padding: '12px 16px',
+          }}>
+            <div style={{ maxWidth: 680, margin: '0 auto' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                <button onClick={closeSearch} style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  fontSize: 14, fontWeight: 600, color: C.dim, padding: 0,
+                }}>
+                  Cancel
+                </button>
+                <div style={{ flex: 1, position: 'relative' }}>
+                  <input
+                    ref={searchInputRef}
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') runSearch(); }}
+                    placeholder="Search articles..."
+                    style={{
+                      width: '100%', height: 40, borderRadius: 10,
+                      border: `1.5px solid ${C.border}`, padding: '0 12px',
+                      fontSize: 14, background: C.card, color: C.text,
+                      outline: 'none', boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+                <button onClick={runSearch} style={{
+                  padding: '8px 16px', borderRadius: 8, border: 'none',
+                  background: C.accent, color: '#fff', fontSize: 13,
+                  fontWeight: 600, cursor: 'pointer',
+                }}>
+                  Search
+                </button>
+              </div>
+
+              {/* Search mode pills */}
+              <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                <span style={{ fontSize: 11, color: C.dim, fontWeight: 600, alignSelf: 'center', marginRight: 4 }}>Search by:</span>
+                {SEARCH_MODES.map(m => (
+                  <button key={m.key} onClick={() => setSearchMode(m.key)} style={pillStyle(searchMode === m.key)}>
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Date preset pills */}
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 11, color: C.dim, fontWeight: 600, alignSelf: 'center', marginRight: 4 }}>Date:</span>
+                {DATE_PRESETS.map(d => (
+                  <button
+                    key={d.key}
+                    onClick={() => setDatePreset(datePreset === d.key ? null : d.key)}
+                    style={pillStyle(datePreset === d.key)}
+                  >
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Custom date range — DA-070: aria-labels on the
+                  date inputs so screen readers announce them as
+                  "Start date" / "End date" rather than unlabeled. */}
+              {datePreset === 'custom' && (
+                <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
+                  <input
+                    type="date"
+                    aria-label="Start date"
+                    value={customFrom}
+                    onChange={e => setCustomFrom(e.target.value)}
+                    style={{
+                      flex: 1, height: 34, borderRadius: 8, border: `1px solid ${C.border}`,
+                      padding: '0 8px', fontSize: 13, color: C.text, background: C.card,
+                    }}
+                  />
+                  <span style={{ fontSize: 12, color: C.dim }}>to</span>
+                  <input
+                    type="date"
+                    aria-label="End date"
+                    value={customTo}
+                    onChange={e => setCustomTo(e.target.value)}
+                    style={{
+                      flex: 1, height: 34, borderRadius: 8, border: `1px solid ${C.border}`,
+                      padding: '0 8px', fontSize: 13, color: C.text, background: C.card,
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Source filter */}
+              {sources.length > 0 && (
+                <div style={{ marginTop: 10 }}>
+                  <span style={{ fontSize: 11, color: C.dim, fontWeight: 600, marginRight: 8 }}>Source:</span>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+                    {sources.map(s => (
+                      <button
+                        key={s}
+                        onClick={() => setSelectedSource(selectedSource === s ? null : s)}
+                        style={chipStyle(selectedSource === s)}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Active filter summary + clear */}
+              {hasActiveFilters && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
+                  <div style={{ fontSize: 11, color: C.dim }}>
+                    {[
+                      searchQuery && `"${searchQuery}" (${searchMode})`,
+                      datePreset && (datePreset === 'custom' ? `${customFrom || '...'} - ${customTo || '...'}` : datePreset),
+                      selectedSource,
+                      selectedCat && categories.find(c => c.id === selectedCat)?.name,
+                      selectedSubcat && subcategories.find(sc => sc.id === selectedSubcat)?.name,
+                    ].filter(Boolean).join(' / ')}
+                  </div>
+                  <button onClick={clearSearch} style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    fontSize: 12, fontWeight: 600, color: '#ef4444',
+                  }}>
+                    Clear all
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Categories + Subcategories — same horizontal pills as main feed */}
+          <div style={{ maxWidth: 680, margin: '0 auto', padding: '16px 16px 120px' }}>
+            {/* Category pills */}
+            <div style={{ display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 8 }}>
+              <button
+                onClick={() => { setSelectedCat(null); setSelectedSubcat(null); }}
+                style={{
+                  whiteSpace: 'nowrap', padding: '7px 16px', borderRadius: 99,
+                  border: `1.5px solid ${!selectedCat ? C.accent : C.border}`,
+                  background: !selectedCat ? C.accent : C.bg,
+                  color: !selectedCat ? '#fff' : C.dim,
+                  fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                }}
+              >All</button>
+              {categories.map(cat => {
+                const isSelected = selectedCat === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => { setSelectedCat(isSelected ? null : cat.id); setSelectedSubcat(null); }}
+                    style={{
+                      whiteSpace: 'nowrap', padding: '7px 16px', borderRadius: 99,
+                      border: `1.5px solid ${isSelected ? C.accent : C.border}`,
+                      background: isSelected ? C.accent : C.bg,
+                      color: isSelected ? '#fff' : C.dim,
+                      fontSize: 13, fontWeight: isSelected ? 600 : 500, cursor: 'pointer',
+                    }}
+                  >{stripKidsTag(cat.name)}</button>
+                );
+              })}
+            </div>
+
+            {/* Subcategory pills — show when a category is selected */}
+            {selectedCat && subcatsForCat(selectedCat).length > 0 && (
+              <div style={{ display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 12 }}>
+                <button
+                  onClick={() => setSelectedSubcat(null)}
+                  style={{
+                    whiteSpace: 'nowrap', padding: '4px 12px', borderRadius: 99,
+                    border: `1px solid ${!selectedSubcat ? C.accent : C.border}`,
+                    background: !selectedSubcat ? '#f0f0f0' : C.bg,
+                    color: !selectedSubcat ? C.accent : C.dim,
+                    fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                  }}
+                >All {categories.find(c => c.id === selectedCat)?.name}</button>
+                {subcatsForCat(selectedCat).map(sc => {
+                  const subActive = selectedSubcat === sc.id;
+                  return (
+                    <button
+                      key={sc.id}
+                      onClick={() => setSelectedSubcat(subActive ? null : sc.id)}
+                      style={{
+                        whiteSpace: 'nowrap', padding: '4px 12px', borderRadius: 99,
+                        border: `1px solid ${subActive ? C.accent : C.border}`,
+                        background: subActive ? '#f0f0f0' : C.bg,
+                        color: subActive ? C.accent : C.dim,
+                        fontSize: 12, fontWeight: subActive ? 600 : 400, cursor: 'pointer',
+                      }}
+                    >{sc.name}</button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Search results */}
+            {searchResults !== null && (
+              <div style={{ marginTop: 24 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
+                  {searching ? 'Searching...' : `${searchResults.length} result${searchResults.length !== 1 ? 's' : ''}`}
+                </div>
+
+                {!searching && searchResults.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '32px 0', color: C.dim, fontSize: 13 }}>
+                    No articles match your filters.
+                  </div>
+                )}
+
+                {!searching && searchResults.map(story => (
+                  <a
+                    key={story.id}
+                    href={`/story/${story.slug}`}
+                    style={{
+                      display: 'block', background: C.card, border: `1px solid ${C.border}`,
+                      borderRadius: 10, padding: '12px 14px', marginBottom: 8,
+                      textDecoration: 'none', color: 'inherit',
+                    }}
+                  >
+                    <CategoryBadge name={categoryMap[story.category_id]?.name || ''} />
+                    <p style={{ margin: '4px 0 0', fontWeight: 700, fontSize: 14, lineHeight: 1.4, color: C.text }}>
+                      {story.title}
+                    </p>
+                    {story.excerpt && (
+                      <p style={{ margin: '4px 0 0', fontSize: 12, color: C.dim, lineHeight: 1.4 }}>
+                        {story.excerpt}
+                      </p>
+                    )}
+                    {story.published_at && (
+                      <div style={{ marginTop: 6, fontSize: 11, color: C.dim }}>
+                        {new Date(story.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </div>
+                    )}
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========== MAIN FEED ========== */}
+
+      {/* Breaking News Banner */}
+      {breakingStory && (
+        <div style={{ background: '#ef4444', color: '#fff', padding: '10px 16px', overflow: 'hidden' }}>
+          <div style={{ maxWidth: 680, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontWeight: 800, fontSize: 11, letterSpacing: '0.1em', whiteSpace: 'nowrap', background: 'rgba(0,0,0,0.2)', padding: '2px 8px', borderRadius: 4 }}>
+              BREAKING
+            </span>
+            <span style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {breakingStory.title}
+            </span>
+          </div>
+        </div>
+      )}
+
+      <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 16px' }}>
+
+        {/* Category Pills */}
+        <div style={{
+          display: 'flex', gap: 8, overflowX: 'auto', padding: '14px 0',
+          scrollbarWidth: 'none',
+        }}>
+          {categoryPills.map(cat => (
+            <button
+              key={cat}
+              onClick={() => {
+                setActiveCategory(cat);
+                setActiveSubcategory(null);
+                setVisibleCount(6);
+              }}
+              style={{
+                whiteSpace: 'nowrap', padding: '6px 16px', borderRadius: 99,
+                border: `1.5px solid ${activeCategory === cat ? C.accent : C.border}`,
+                background: activeCategory === cat ? C.accent : C.bg,
+                color: activeCategory === cat ? '#fff' : C.dim,
+                fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        {/* Subcategory Pills (when a specific category is selected) */}
+        {verified && activeCategory !== 'All' && activeCatSubcats.length > 0 && (
+          <div style={{
+            display: 'flex', gap: 6, overflowX: 'auto', padding: '0 0 12px',
+            scrollbarWidth: 'none',
+          }}>
+            <button
+              onClick={() => { setActiveSubcategory(null); setVisibleCount(6); }}
+              style={{
+                whiteSpace: 'nowrap', padding: '4px 12px', borderRadius: 99,
+                border: `1px solid ${!activeSubcategory ? C.accent : C.border}`,
+                background: !activeSubcategory ? '#f0f0f0' : C.bg,
+                color: !activeSubcategory ? C.accent : C.dim,
+                fontSize: 12, fontWeight: 500, cursor: 'pointer',
+              }}
+            >
+              All {activeCategory}
+            </button>
+            {activeCatSubcats.map(sc => {
+              const isActive = activeSubcategory === sc.id;
+              return (
+                <button
+                  key={sc.id}
+                  onClick={() => {
+                    setActiveSubcategory(isActive ? null : sc.id);
+                    setVisibleCount(6);
+                  }}
+                  style={{
+                    whiteSpace: 'nowrap', padding: '4px 12px', borderRadius: 99,
+                    border: `1px solid ${isActive ? C.accent : C.border}`,
+                    background: isActive ? '#f0f0f0' : C.bg,
+                    color: isActive ? C.accent : C.dim,
+                    fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                  }}
+                >
+                  {sc.name}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Story Cards */}
+        <div style={{ paddingBottom: 32 }}>
+          {loading && (
+            <div style={{ textAlign: 'center', padding: '48px 0', color: C.dim, fontSize: 15 }}>
+              Loading articles...
+            </div>
+          )}
+          {!loading && feedVisible.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '48px 0', color: C.dim, fontSize: 15 }}>
+              No articles found.
+            </div>
+          )}
+          {!loading && feedVisible.length > 0 && loggedIn && (authUser?.streak_current || 0) > 0 && (
+            <div style={{ fontSize: 13, fontWeight: 600, color: C.text, margin: '0 0 12px' }}>
+              Day {authUser.streak_current}
+            </div>
+          )}
+          {!loading && feedVisible.length > 0 && <RecapCard />}
+          {!loading && feedVisible.map((story, idx) => (
+            <Fragment key={story.id}>
+              <a
+                href={`/story/${story.slug}`}
+                style={{
+                  background: C.card, border: `1px solid ${C.border}`,
+                  borderRadius: 12, marginBottom: 12, overflow: 'hidden',
+                  display: 'block', textDecoration: 'none', color: 'inherit',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{ padding: '14px 16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <CategoryBadge name={categoryMap[story.category_id]?.name || ''} />
+                    {story.is_breaking && (
+                      <span style={{
+                        fontSize: 10, fontWeight: 800, color: '#ffffff',
+                        background: '#ef4444', padding: '2px 6px', borderRadius: 4,
+                        letterSpacing: '0.05em', textTransform: 'uppercase',
+                      }}>
+                        BREAKING
+                      </span>
+                    )}
+                  </div>
+                  <p style={{ margin: '4px 0 0', fontWeight: 700, fontSize: 15, lineHeight: 1.4, color: C.text }}>
+                    {story.title}
+                  </p>
+                  <p style={{ margin: '4px 0 0', fontSize: 13, lineHeight: 1.5, color: C.dim }}>
+                    {story.excerpt}
+                  </p>
+                  {story.published_at && (
+                    <div style={{ marginTop: 6, fontSize: 11, color: C.dim }}>
+                      {new Date(story.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </div>
+                  )}
+                </div>
+              </a>
+              {(idx + 1) % 6 === 0 && idx !== feedVisible.length - 1 && (
+                <div style={{ marginBottom: 12 }}>
+                  <Ad placement="home_feed" page="home" position={`feed-${idx + 1}`} />
+                </div>
+              )}
+            </Fragment>
+          ))}
+
+          {!loading && visibleCount < feedFiltered.length && (
+            <button
+              onClick={() => setVisibleCount(v => v + 4)}
+              style={{
+                display: 'block', width: '100%', padding: '14px', marginTop: 8,
+                background: C.card, border: `1.5px solid ${C.border}`,
+                borderRadius: 12, cursor: 'pointer', fontSize: 14, fontWeight: 600,
+                color: C.accent,
+              }}
+            >
+              Load more articles
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

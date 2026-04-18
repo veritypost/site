@@ -1,0 +1,120 @@
+# ===========================================================================
+# Verity Post root .gitignore
+#
+# Scope: protects the whole repo tree. Individual sub-projects (site/,
+# VerityPost/, scripts/) inherit from this file. Do not remove the .env
+# patterns without auditing .env*.local contents first.
+# ===========================================================================
+
+# --- Secrets and environment -----------------------------------------------
+.env
+.env.*
+!.env.example
+site/.env
+site/.env.*
+!site/.env.example
+scripts/.env
+scripts/.env.*
+
+# --- Node / Next.js --------------------------------------------------------
+node_modules/
+**/node_modules/
+.next/
+**/.next/
+out/
+**/out/
+.turbo/
+**/.turbo/
+.vercel/
+**/.vercel/
+dist/
+build/
+coverage/
+**/coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# --- Package manager artifacts --------------------------------------------
+.npm/
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+.pnpm-store/
+.pnp.*
+
+# --- Logs ------------------------------------------------------------------
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+logs/
+
+# --- Claude Code session data ----------------------------------------------
+.claude/
+
+# --- macOS / editor / OS ---------------------------------------------------
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# --- IDE -------------------------------------------------------------------
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+.idea/
+*.swp
+*.swo
+*~
+
+# --- iOS repo (lives in its own git repo under VerityPost/) ---------------
+# The outer site repo does not track iOS sources; they have their own
+# github.com/veritypost/ios-app.git remote nested inside.
+/VerityPost/
+
+# --- iOS / Xcode (VerityPost/) --------------------------------------------
+build/
+DerivedData/
+**/DerivedData/
+*.xcuserstate
+*.xcuserdatad
+xcuserdata/
+**/xcuserdata/
+*.xcworkspace/xcuserdata/
+project.xcworkspace/xcuserdata/
+Pods/
+Carthage/Build/
+.build/
+Package.resolved
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# iOS config that may carry keys
+VerityPost/VerityPost/Secrets.xcconfig
+VerityPost/VerityPost/**/Secrets.xcconfig
+
+# --- Supabase local state --------------------------------------------------
+supabase/.temp/
+supabase/.branches/
+
+# --- Test output -----------------------------------------------------------
+playwright-report/
+test-results/
+.nyc_output/
+
+# --- Misc ------------------------------------------------------------------
+*.pem
+*.p8
+*.p12
+*.key
+*.cer
+*.mobileprovision
+.cache/
+tmp/
+temp/

@@ -1,0 +1,97 @@
+/* DA-030 — Fonts are self-hosted via next/font/google in layout.js;
+   the cross-origin @import was killing FCP with a DNS + TLS + fetch
+   round-trip per cold load. Tokens here point to CSS variables that
+   layout.js sets from the loaded next/font instances. */
+
+/* DA-060 — reduced-motion baseline. Respects OS preference; any
+   animation using the defined @keyframes degrades to a near-instant
+   transition instead of disorienting motion. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Admin/site shared palette — light theme, indigo accent. */
+:root {
+  --bg: #ffffff;
+  --card: #f7f7f7;
+  --border: #222222;
+  --rule: #e5e5e5;
+  --white: #111111;      /* primary text — named for parity with vp-views var names */
+  --text: #111111;
+  --soft: #444444;
+  /* DA-054 — `--dim` was `#666666`. Review recalculated contrast vs
+     `--card` (#f7f7f7) at ~5.13:1 (passes AA). The pre-fix audit
+     claim of a fail was wrong, but #5a5a5a still gives more headroom
+     for users with low-contrast displays and pushes the ratio to
+     ~5.95:1 without visible difference on modern screens. */
+  --dim: #5a5a5a;
+  --muted: #999999;
+  --accent: #111111;
+  --success: #22c55e;
+  --right: #22c55e;
+  --warn: #f59e0b;
+  --amber: #f59e0b;
+  /* DA-055 — `#ef4444` on a pale-red background (`#fef2f2`) falls
+     below 4.5:1 AA normal text. `#b91c1c` pushes the ratio above 7:1
+     on that background and keeps readable contrast on white too. */
+  --danger: #b91c1c;
+  --wrong: #b91c1c;
+  /* DA-068 — `--purple` was defined as black (#111111), which confused
+     cross-referencing. Token removed from this chunk; audit callers
+     before deleting entirely. */
+  --srcCard: #f7f7f7;
+  --vpCard: #f7f7f7;
+  --tlLine: #e5e5e5;
+  --tlDot: #d4d4d4;
+
+  --font-serif: var(--font-source-serif), Georgia, serif;
+  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Opt-in scope for the pages that adopt the vp-views layout so existing pages
+   with their own inline palettes stay untouched. */
+.vp-dark {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+}
+
+.vp-dark a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.vp-dark a:hover { opacity: 0.85; }
+
+.vp-dark ::selection { background: rgba(0, 0, 0, 0.15); }
+
+@keyframes vpFadeIn { from { opacity: 0 } to { opacity: 1 } }
+
+/* Kid-mode celebration motion. The baseline reduced-motion rule at
+   the top of this file collapses all animation to near-instant, so
+   these rules respect OS preferences automatically. */
+@keyframes kidStreakPulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.06); }
+}
+.kid-streak-pulse {
+  animation: kidStreakPulse 2.4s ease-in-out infinite;
+  transform-origin: center;
+  display: inline-block;
+}
+@keyframes kidCelebrateRise {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+.kid-celebrate-rise {
+  animation: kidCelebrateRise 220ms ease-out both;
+}

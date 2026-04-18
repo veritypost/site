@@ -1,0 +1,19 @@
+import { NextResponse } from 'next/server';
+import { requireRole } from '@/lib/auth';
+import { createServiceClient } from '@/lib/supabase/server';
+
+export async function POST(request, { params }) {
+  let user;
+  try { user = await requireRole('editor'); }
+  catch { return NextResponse.json({ error: 'Forbidden' }, { status: 403 }); }
+
+  const { review_notes } = await request.json().catch(() => ({}));
+  const service = createServiceClient();
+  const { error } = await service.rpc('approve_expert_application', {
+    p_reviewer_id: user.id,
+    p_application_id: params.id,
+    p_review_notes: review_notes || null,
+  });
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  return NextResponse.json({ ok: true });
+}
