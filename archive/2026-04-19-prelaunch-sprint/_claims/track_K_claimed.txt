@@ -1,0 +1,27 @@
+Track K — Components batch 2 lane A (A–M) — claim 2026-04-18
+
+Claimed: 0 files.
+
+Lane scan (site/src/components/**, letters A–M, excluding admin/**, L's N–Z lane, and J's 7 files).
+
+A–M files present in tree (16 total):
+  AccountStateBanner.tsx   — sealed (both markers: shared_components)
+  Ad.jsx                   — sealed (both markers: article_reading)
+  ArticleQuiz.tsx          — sealed (both markers: quiz)
+  Avatar.tsx               — sealed (both markers: profile_card)
+  CommentComposer.tsx      — sealed (both markers: comments)
+  CommentRow.tsx           — sealed (both markers: comments)
+  CommentThread.tsx        — sealed (both markers: comments)
+  ConfirmDialog.tsx        — sealed (both markers: shared_components)
+  DestructiveActionConfirm.jsx — EXCLUDED (J's lane per task brief)
+  FollowButton.tsx         — EXCLUDED (J's lane per task brief)
+  Interstitial.tsx         — sealed (both markers: article_reading)
+  LockModal.tsx            — sealed (both markers: shared_components)
+  kids/AskAGrownUp.tsx     — sealed (both markers: kids)
+  kids/Badge.tsx           — sealed (both markers: kids)
+  kids/EmptyState.tsx      — sealed (both markers: kids)
+  kids/KidTopChrome.tsx    — sealed (both markers: kids)
+
+Nothing left in lane. All 14 non-excluded A–M files already carry BOTH
+`@migrated-to-permissions 2026-04-18` and `@feature-verified <feature> 2026-04-18`
+markers from earlier parallel batches (E / F / G / H).

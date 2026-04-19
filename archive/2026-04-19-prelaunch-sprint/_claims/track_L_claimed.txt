@@ -1,0 +1,20 @@
+Track L — Components batch 2 lane B (N-Z) — claim 2026-04-18
+
+Discovery against glob site/src/components/**/*.{js,jsx,ts,tsx} (post-exclusions):
+- Excluded components/admin/** (LOCKED, 27 files)
+- Excluded files with BOTH markers already present
+- Excluded A-M (K's lane)
+- Excluded J's 7 files: VerifiedBadge.tsx, DestructiveActionConfirm.jsx, PermissionGate.jsx, PermissionsProvider.jsx, ObservabilityInit.js, QuizPoolEditor.tsx, AccountStateBanner.tsx, FollowButton.tsx
+- Excluded files listed in track_E/F/G/H_claimed.txt
+
+Root-level N-Z files after exclusions:
+- NotificationBell.tsx — has @migrated-to-permissions, missing @feature-verified notifications (per PERMISSION_MIGRATION.md line 266, expected) — CLAIM (marker completion only; file is already TS with hasPermission wiring)
+
+Kids-subfolder N-Z files after exclusions:
+- StreakRibbon.tsx — both markers present, SEALED (Track F)
+
+Ineligible in N-Z:
+- ObservabilityInit.js / PermissionGate.jsx / PermissionsProvider.jsx / QuizPoolEditor.tsx / VerifiedBadge.tsx — J's carve-out
+- RecapCard.tsx (Track E), StatRow.tsx / Toast.tsx (Track G), TTSButton.tsx (sealed Batch 1)
+
+Claim total: 1 file.

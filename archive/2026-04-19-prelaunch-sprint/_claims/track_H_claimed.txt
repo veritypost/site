@@ -1,0 +1,6 @@
+site/src/components/kids/AskAGrownUp.jsx
+site/src/components/kids/Badge.jsx
+site/src/components/kids/EmptyState.jsx
+site/src/components/kids/KidTopChrome.jsx
+site/src/components/kids/StreakRibbon.jsx
+site/src/components/QuizPoolEditor.jsx

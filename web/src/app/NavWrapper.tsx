@@ -1,0 +1,430 @@
+// @migrated-to-permissions 2026-04-18
+// @feature-verified admin_api 2026-04-18
+'use client';
+
+import { useState, useEffect, createContext, useContext, CSSProperties, ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
+import { createClient } from '../lib/supabase/client';
+import AccountStateBanner from '../components/AccountStateBanner';
+import { hasPermission, refreshAllPermissions, refreshIfStale } from '../lib/permissions';
+import type { Tables } from '@/types/database-helpers';
+
+type ProfileRow = Pick<
+  Tables<'users'>,
+  | 'username'
+  | 'avatar_url'
+  | 'avatar_color'
+  | 'verity_score'
+  | 'plan_status'
+  | 'email_verified'
+  | 'streak_current'
+  | 'is_banned'
+  | 'is_muted'
+  | 'muted_until'
+  | 'locked_until'
+  | 'frozen_at'
+  | 'plan_grace_period_ends_at'
+  | 'deletion_scheduled_for'
+>;
+
+interface AuthContextValue {
+  loggedIn: boolean;
+  user: ProfileRow | null;
+  authLoaded: boolean;
+}
+
+export const AuthContext = createContext<AuthContextValue>({ loggedIn: false, user: null, authLoaded: false });
+export const useAuth = () => useContext(AuthContext);
+
+const HIDE_NAV = ['/login', '/signup', '/signup/pick-username', '/signup/expert', '/forgot-password', '/reset-password', '/verify-email', '/api/auth/callback', '/logout', '/welcome'];
+const isAdmin = (p: string) => p.startsWith('/admin');
+const isKid = (p: string) => p === '/kids' || p.startsWith('/kids/');
+
+// Key used across the site to mark kid-mode as active. Written by /kids
+// when a profile is selected, cleared by /kids/profile on exit-PIN success.
+// Readers listen for the `vp:kid-mode-changed` window event to re-sync.
+const ACTIVE_KID_KEY = 'vp_active_kid_id';
+
+interface NavItem { label: string; href: string }
+
+export default function NavWrapper({ children }: { children: ReactNode }) {
+  const [loggedIn, setLoggedIn] = useState<boolean>(false);
+  const [user, setUser] = useState<ProfileRow | null>(null);
+  const [authLoaded, setAuthLoaded] = useState<boolean>(false);
+  // DA-038 — use Next's usePathname() instead of monkey-patching
+  // history.pushState. The old approach stacked wrappers on remount
+  // and broke Next's internal navigation hooks.
+  const path = usePathname() || '/';
+  const [mounted, setMounted] = useState<boolean>(false);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [activeKidId, setActiveKidId] = useState<string | null>(null);
+  const [canSeeAdmin, setCanSeeAdmin] = useState<boolean>(false);
+  // R13-T4 (Crew 7): `search.basic` gates the search icon in the top
+  // bar. Hydrated alongside `admin.dashboard.view` in the same profile
+  // load path so the top bar branches correctly on first paint after
+  // auth resolves.
+  const [canSearch, setCanSearch] = useState<boolean>(false);
+
+  useEffect(() => {
+    setMounted(true);
+    try { setActiveKidId(window.localStorage.getItem(ACTIVE_KID_KEY) || null); } catch {}
+
+    const onKidModeChanged = () => {
+      try { setActiveKidId(window.localStorage.getItem(ACTIVE_KID_KEY) || null); } catch {}
+    };
+    window.addEventListener('vp:kid-mode-changed', onKidModeChanged);
+    // Cross-tab sync.
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === ACTIVE_KID_KEY) setActiveKidId(e.newValue || null);
+    };
+    window.addEventListener('storage', onStorage);
+
+    return () => {
+      window.removeEventListener('vp:kid-mode-changed', onKidModeChanged);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, []);
+
+  useEffect(() => {
+    const supabase = createClient();
+    let cancelled = false;
+
+    async function loadProfile(authUser: { id: string } | null) {
+      if (!authUser) {
+        if (!cancelled) {
+          setUser(null);
+          setLoggedIn(false);
+          setAuthLoaded(true);
+          setCanSeeAdmin(false);
+          setCanSearch(false);
+        }
+        return;
+      }
+      const { data: profile } = await supabase
+        .from('users')
+        .select('username, avatar_url, avatar_color, verity_score, plan_status, email_verified, streak_current, is_banned, is_muted, muted_until, locked_until, frozen_at, plan_grace_period_ends_at, deletion_scheduled_for')
+        .eq('id', authUser.id)
+        .maybeSingle<ProfileRow>();
+
+      await refreshAllPermissions();
+      await refreshIfStale();
+
+      if (!cancelled) {
+        setUser(profile || null);
+        setLoggedIn(true);
+        setAuthLoaded(true);
+        setCanSeeAdmin(hasPermission('admin.dashboard.view'));
+        setCanSearch(hasPermission('search.basic'));
+      }
+    }
+
+    supabase.auth.getUser().then(({ data: { user: authUser } }) => loadProfile(authUser));
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      loadProfile(session?.user || null);
+    });
+
+    return () => {
+      cancelled = true;
+      sub?.subscription?.unsubscribe?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!loggedIn) { setUnreadCount(0); return; }
+    let cancelled = false;
+    async function poll() {
+      try {
+        const res = await fetch('/api/notifications?unread=1&limit=1');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setUnreadCount(data.unread_count || 0);
+      } catch (e) { console.error('[nav] notifications poll', e); }
+    }
+    poll();
+    const id = setInterval(poll, 60_000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [loggedIn]);
+
+  const onKidRoute = mounted && isKid(path);
+  const kidModeActive = onKidRoute && !!activeKidId;
+  // In kid-mode routes without a selected profile (picker / PIN states),
+  // hide nav entirely; Task 8 spec.
+  const showNav = mounted && !HIDE_NAV.includes(path) && !isAdmin(path)
+    && !(onKidRoute && !activeKidId);
+  const onAdminPage = mounted && isAdmin(path);
+  // UJ-200 (Pass 17): banner is strictly admin+ territory. Editor and
+  // moderator roles can reach the admin routes they're authorised for
+  // without the dark "Back to site" chrome — keeps the UI honest about
+  // who has full platform reach.
+  // LB-005: admin banner renders only on /admin/* routes. Elsewhere admins
+  // see the standard nav with no extra banner. Hiding on non-admin paths
+  // closes the inconsistency where the banner would vanish on /story/<slug>
+  // but show on /, /browse, /leaderboard, etc.
+  const showAdminBanner = authLoaded && canSeeAdmin && onAdminPage;
+
+  const C = {
+    bg: 'var(--bg)',
+    card: 'var(--card)',
+    border: 'var(--border)',
+    text: 'var(--text)',
+    dim: 'var(--muted)',
+    accent: 'var(--accent)',
+  } as const;
+
+  const adultNavItems: NavItem[] = [
+    { label: 'Home', href: '/' },
+    { label: 'Notifications', href: '/notifications' },
+    { label: 'Leaderboard', href: '/leaderboard' },
+    loggedIn
+      ? { label: 'Profile', href: '/profile' }
+      : { label: 'Sign in', href: '/login' },
+  ];
+
+  // Kid 3-tab bar per Task 8 spec. Matches the iOS KidTabBar pattern
+  // (Home / Leaderboard / Profile — no Notifications, no Messages).
+  const kidNavItems: NavItem[] = [
+    { label: 'Home', href: '/kids' },
+    { label: 'Leaderboard', href: '/kids/leaderboard' },
+    { label: 'Profile', href: '/kids/profile' },
+  ];
+
+  const navItems: NavItem[] = kidModeActive ? kidNavItems : adultNavItems;
+
+  const navStyle: CSSProperties = {
+    position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999,
+    background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(12px)',
+    borderTop: `1px solid ${C.border}`,
+    display: 'flex', justifyContent: 'space-around', alignItems: 'center',
+    height: 64, paddingBottom: 'max(4px, env(safe-area-inset-bottom))',
+  };
+
+  // R13-T3 — top-bar logo. Minimal v1: just "Verity Post" on the left
+  // routing to `/` (adult) or `/kids` (kid-mode active). Same lifecycle
+  // rules as the bottom nav, plus hidden on admin routes (the admin
+  // chrome already owns the top/bottom of the viewport there).
+  //
+  // R13-T4 (Crew 7): hide the global top bar entirely on kid routes —
+  // `KidTopChrome` owns the top on /kids/* and its own sticky header
+  // would otherwise stack underneath this one. Also hide on the kid
+  // picker/PIN pre-mode states (showNav already excludes those).
+  // Right side varies by user state: search icon for signed-in users
+  // with `search.basic`, subtle "Sign in" link for anon, nothing for
+  // kid mode (we've already hidden the whole bar above).
+  const TOP_BAR_HEIGHT = 44;
+  const showTopBar = showNav && !onKidRoute;
+  const topBarHomeHref = '/';
+  const topBarActive = path === topBarHomeHref;
+  // Bug 1 fix: `boxSizing: content-box` means the rendered height is
+  // `TOP_BAR_HEIGHT + env(safe-area-inset-top)`. The wrapper must reserve
+  // the same total, not just `TOP_BAR_HEIGHT`, or notched devices push
+  // page content under the bar by the safe-area amount.
+  const topBarReservedHeight = `calc(${TOP_BAR_HEIGHT}px + env(safe-area-inset-top))`;
+  const topBarStyle: CSSProperties = {
+    position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
+    background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(12px)',
+    borderBottom: `1px solid ${C.border}`,
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    height: TOP_BAR_HEIGHT,
+    padding: '0 16px',
+    paddingTop: 'env(safe-area-inset-top)',
+    boxSizing: 'content-box',
+  };
+  // Expose the total reserved height to children via a CSS custom
+  // property so per-page sticky chrome (story tab bar, etc.) can offset
+  // below the global top bar with a single source of truth.
+  const showTopBarVar: CSSProperties = showTopBar
+    ? ({ ['--vp-top-bar-h' as string]: topBarReservedHeight } as CSSProperties)
+    : ({ ['--vp-top-bar-h' as string]: '0px' } as CSSProperties);
+
+  return (
+    <AuthContext.Provider value={{ loggedIn, user, authLoaded }}>
+      {loggedIn && user && <AccountStateBanner user={user} />}
+      <div style={{
+        // Bug 1 fix: reserve the FULL rendered top-bar height
+        // (44 + safe-area-inset-top) so iPhone-notched devices don't
+        // push content under the bar.
+        paddingTop: showTopBar ? topBarReservedHeight : 0,
+        paddingBottom: showNav ? (showAdminBanner ? 104 : 68) : (showAdminBanner ? 44 : 0),
+        ...showTopBarVar,
+      }}>
+        {children}
+
+        {showNav && (
+          <footer style={{
+            maxWidth: 680, margin: '0 auto', padding: '32px 16px 24px',
+            borderTop: '1px solid var(--border)',
+          }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, justifyContent: 'center', marginBottom: 12 }}>
+              {[
+                { label: 'Help', href: '/help' },
+                { label: 'Contact', href: '/contact' },
+                { label: 'How it works', href: '/how-it-works' },
+                { label: 'Privacy', href: '/privacy' },
+                { label: 'Terms', href: '/terms' },
+                { label: 'Cookies', href: '/cookies' },
+                { label: 'Accessibility', href: '/accessibility' },
+                { label: 'DMCA', href: '/dmca' },
+              ].map((link) => (
+                <a key={link.label} href={link.href} style={{
+                  fontSize: 11, color: 'var(--muted)', textDecoration: 'none',
+                }}>{link.label}</a>
+              ))}
+            </div>
+            <div style={{ textAlign: 'center', fontSize: 10, color: 'var(--muted)' }}>
+              Verity Post
+            </div>
+          </footer>
+        )}
+      </div>
+
+      {showTopBar && (
+        // R13-T3 — fixed top bar with "Verity Post" logo on the left.
+        // Safe-area-inset-top padding keeps the brand below iPhone notches.
+        //
+        // R13-T4 (Crew 7): right side branches by user state.
+        //   Signed-in + has search.basic → magnifying-glass icon → /search
+        //   Anon                         → subtle "Sign in" text → /login
+        //   Otherwise                    → nothing
+        // Kid routes don't reach this render — `showTopBar` is false on
+        // /kids/*, so KidTopChrome owns the top there.
+        <header style={topBarStyle}>
+          <a
+            href={topBarHomeHref}
+            aria-label="Go to home"
+            aria-current={topBarActive ? 'page' : undefined}
+            style={{
+              fontSize: 15,
+              fontWeight: 800,
+              letterSpacing: '-0.01em',
+              color: C.text,
+              textDecoration: 'none',
+            }}
+          >
+            Verity Post
+          </a>
+          {/* Round D H-14 — search icon ungated from home-only. The former
+              `path === '/'` clause was a layout leftover from when `/` had
+              its own sticky search row; once the entry point moved into
+              this global top bar, restricting it to `/` left verified
+              users on `/story/<slug>`, `/browse`, `/category/*` without
+              a quick path back into search. Permission-level gating
+              (`search.basic`) already decides who can search; path-level
+              gating added nothing beyond friction. Kid routes are already
+              excluded because `showTopBar` is false under `/kids/*`. */}
+          {loggedIn && canSearch && (
+            <a
+              href="/search"
+              aria-label="Search"
+              style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                minWidth: 44, minHeight: 44,
+                // Pull into the 16px edge gutter so the visual centre of
+                // the icon aligns with the page's right margin.
+                marginRight: -8,
+                color: C.dim,
+                textDecoration: 'none',
+              }}
+            >
+              <svg
+                width="20" height="20" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor" strokeWidth="2"
+                strokeLinecap="round" strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+            </a>
+          )}
+          {authLoaded && !loggedIn && (
+            // M-10: anon top bar now shows both "Sign in" (subtle
+            // fallback) and a visible "Sign up" pill as the primary
+            // conversion CTA. Canonical copy only: Sign in / Sign up.
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8, marginRight: -4,
+            }}>
+              <a
+                href="/login"
+                aria-label="Sign in"
+                style={{
+                  display: 'inline-flex', alignItems: 'center',
+                  minHeight: 44, padding: '0 4px',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: C.dim,
+                  textDecoration: 'none',
+                }}
+              >
+                Sign in
+              </a>
+              <a
+                href="/signup"
+                aria-label="Sign up"
+                style={{
+                  display: 'inline-flex', alignItems: 'center',
+                  minHeight: 32, padding: '0 12px',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: '#fff',
+                  background: C.text,
+                  borderRadius: 8,
+                  textDecoration: 'none',
+                }}
+              >
+                Sign up
+              </a>
+            </div>
+          )}
+        </header>
+      )}
+
+      {showNav && (
+        // DA-185 — safe-area inset so the iPhone home-bar does not
+        // overlap bottom-nav tappable targets. `viewport-fit=cover`
+        // (layout.js) exposes the env() var; the padding grows only
+        // on devices that have a home bar.
+        <nav style={navStyle}>
+          {/* DA-062 — aria-current on the active nav link so screen
+              readers announce which route is current. */}
+          {navItems.map((item) => {
+            const active = path === item.href || (item.href !== '/' && path.startsWith(item.href));
+            const showDot = item.href === '/notifications' && unreadCount > 0;
+            return (
+              <a key={item.href} href={item.href}
+                aria-current={active ? 'page' : undefined}
+                style={{
+                  position: 'relative',
+                  textDecoration: 'none', padding: '12px 16px',
+                  minHeight: 44, minWidth: 44,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 13, fontWeight: active ? 700 : 500,
+                  color: active ? C.accent : C.dim,
+                }}>
+                {item.label}
+                {showDot && (
+                  <span aria-label={`${unreadCount} unread`} style={{
+                    position: 'absolute', top: 4, right: 8,
+                    width: 8, height: 8, borderRadius: 4, background: '#dc2626',
+                  }} />
+                )}
+              </a>
+            );
+          })}
+        </nav>
+      )}
+
+      {showAdminBanner && (
+        <div style={{
+          position: 'fixed', bottom: showNav ? 56 : 0, left: 0, right: 0, zIndex: 10000,
+          background: '#111', padding: '8px 16px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16,
+        }}>
+          <a href="/" style={{ color: '#fff', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>
+            Back to site
+          </a>
+        </div>
+      )}
+    </AuthContext.Provider>
+  );
+}

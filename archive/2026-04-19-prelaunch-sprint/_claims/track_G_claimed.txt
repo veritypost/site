@@ -1,0 +1,25 @@
+Track G — UI primitives — claim 2026-04-18 — COMPLETED
+
+Claimed + migrated by G (4 files, all marker-only, no gates):
+1. site/src/components/Toast.js             → Toast.tsx (ToastProvider + useToast)
+2. site/src/components/ConfirmDialog.jsx    → ConfirmDialog.tsx
+3. site/src/components/AccountStateBanner.jsx → AccountStateBanner.tsx
+4. site/src/components/StatRow.js           → StatRow.tsx
+
+Already migrated by parallel lane (left alone):
+- site/src/components/LockModal.tsx         — Track E (article_reading)
+- site/src/components/Interstitial.tsx      — Track E (article_reading)
+
+Skipped (not in G's lane or carved out):
+- components/admin/**                       (LOCKED)
+- components/kids/*                         (H's lane)
+- DestructiveActionConfirm.jsx              (admin-only consumer; belongs with sealed admin primitives)
+- PermissionGate.jsx / PermissionsProvider.jsx (permission infra, not UI primitive)
+- ObservabilityInit.js                      (observability infra, not UI primitive)
+- Ad.jsx                                    (Track E)
+- Avatar.tsx / FollowButton.tsx / VerifiedBadge.tsx (Track F)
+- RecapCard.tsx                             (Track E)
+- QuizPoolEditor.jsx                        (Track E flagged for cleanup)
+- NotificationBell.tsx / TTSButton.tsx / Comment*.tsx / ArticleQuiz.tsx (already sealed)
+
+tsc: exit=1; 8 errors, all in Track H files (kids/EmptyState.tsx + kids/AskAGrownUp.tsx). Zero errors in G's files.
