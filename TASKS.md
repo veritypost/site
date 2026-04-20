@@ -32,8 +32,8 @@ A fresh agent picks the top unchecked task, reads file:line, does the work, clos
 - `? UNCERTAIN` + tag `needs-live-check` = Agent 3 could not verify; re-verify before acting
 
 ## Task counts
-- P0: 8 · P1: 25 · P2: 30 · P3: 23 · P4: 6 · **Total: 92**
-- DB-DRIFT: 19 · SCHEMA: 6 · SECURITY: 11 · IOS: 11 · MIGRATION-DRIFT: 4 · A11Y: 3 · UX: 13 · CODE: 23
+- P0: 8 · P1: 25 · P2: 32 · P3: 26 · P4: 6 · **Total: 97**
+- DB-DRIFT: 24 · SCHEMA: 6 · SECURITY: 11 · IOS: 11 · MIGRATION-DRIFT: 4 · A11Y: 3 · UX: 13 · CODE: 23
 - Unverified (needs live-check): 22
 
 ---
@@ -357,6 +357,20 @@ A fresh agent picks the top unchecked task, reads file:line, does the work, clos
 **Priority**: P2  **Effort**: S  **Lens**: CODE  **Source**: A1:T-031,T-032,T-033
 **File**: `api/admin/stories/route.js:38-40` (add console.error); `admin/recap/page.tsx:80,118` (missing .ok/.catch); `lib/scoring.js:57` (RPC returns [])
 
+### T-102 — `admin/users` PLAN_OPTIONS hardcoded (9 plans in JS)
+**Priority**: P2  **Effort**: S  **Lens**: DB-DRIFT  **Source**: T-005 post-audit
+**File**: `web/src/app/admin/users/page.tsx:73-83`
+**Why**: Plan dropdown in the change-plan modal is a hardcoded 9-entry array of `{name, label}`. `plans` table is authoritative (already used everywhere else). New plan seeded in DB never appears in the UI until code ships.
+**Do**: Load `plans.name, display_name` in the same `init()` effect; cache via a helper mirroring `lib/scoreTiers.ts` (60s TTL). Delete `PLAN_OPTIONS`.
+**Accept**: Grep `PLAN_OPTIONS` = 0; new DB plan row shows up on next page load.
+
+### T-103 — `admin/users` ROLE_ORDER hardcoded hierarchy array
+**Priority**: P2  **Effort**: S  **Lens**: DB-DRIFT  **Source**: T-005 post-audit
+**File**: `web/src/app/admin/users/page.tsx:63` (`ROLE_ORDER`, `rolesUpTo`)
+**Why**: 9-entry role-order array duplicates `roles.hierarchy_level` (the DB source of truth used by `require_outranks`, `caller_can_assign_role`). If DB hierarchy changes, the admin "grant at or below your own role" UI drifts.
+**Do**: Load `roles.name, hierarchy_level` ordered by hierarchy; derive `rolesUpTo` from DB. 60s cache.
+**Accept**: Grep `ROLE_ORDER` = 0; changing `roles.hierarchy_level` in DB reorders the UI on next nav.
+
 ---
 
 ## P3 — Low / polish
@@ -445,6 +459,27 @@ A fresh agent picks the top unchecked task, reads file:line, does the work, clos
 ### T-093 — Migration numbering cleanup (007/008/052 gaps, 094 ts vs prefix, Verity+ copy drift)
 **Priority**: P3  **Effort**: S  **Lens**: MIGRATION-DRIFT  **Source**: A2:G-034,G-035,G-060
 **Do**: Document numbering scheme; place RESERVED stubs for gaps; fix `permission_sets` "Verity+" description.
+
+### T-104 — `admin/system` config metadata hardcoded (TRANSPARENCY + MONITORING)
+**Priority**: P3  **Effort**: M  **Lens**: DB-DRIFT  **Source**: T-005 post-audit
+**File**: `web/src/app/admin/system/page.tsx:42-60`
+**Why**: `TRANSPARENCY_SETTINGS` (8 entries) + `MONITORING_SETTINGS` (6 entries) hardcode `{key, label, desc}` for each toggle. Values persist to `settings`; labels/descriptions only exist in JS. Adding a new setting in DB never shows a UI row.
+**Do**: Extend `settings` (or add `settings_metadata`) with `display_name`, `description`, `category` columns; load in page init; render from DB. Same pattern for `admin/notifications` (T-105). Likely share a `getSettingGroup(category)` helper.
+**Accept**: Grep `TRANSPARENCY_SETTINGS|MONITORING_SETTINGS` = 0; new row in settings_metadata appears on next load.
+
+### T-105 — `admin/notifications` config metadata + defaults hardcoded
+**Priority**: P3  **Effort**: M  **Lens**: DB-DRIFT  **Source**: T-005 post-audit
+**File**: `web/src/app/admin/notifications/page.tsx:28-80` (`PUSH_CONFIG`, `COALESCING_CONFIG`, `EMAIL_CONFIG`, `DEFAULT_TOGGLE_STATE`, `DEFAULT_NUMS`)
+**Why**: 16 toggle `{key, label, desc}` entries + 8 numeric defaults hardcoded. Same drift class as T-104. Defaults should live as `settings.default_value`, not as a JS `DEFAULT_TOGGLE_STATE` map.
+**Do**: Migrate with T-104 as one pass; share helper. Ensure defaults read from `settings.default_value` (or equivalent column).
+**Accept**: Grep `PUSH_CONFIG|COALESCING_CONFIG|EMAIL_CONFIG|DEFAULT_TOGGLE_STATE|DEFAULT_NUMS` = 0.
+
+### T-106 — `admin/notifications` EMAIL_SEQUENCES hardcoded in JS
+**Priority**: P3  **Effort**: M  **Lens**: DB-DRIFT  **Source**: T-005 post-audit
+**File**: `web/src/app/admin/notifications/page.tsx:51-63`
+**Why**: Onboarding + re-engagement email sequences (day offsets, subjects, descriptions, status) are hardcoded. `email_templates` already holds individual emails; no schema for sequences-of-emails. Editing the sequence requires a code change.
+**Do**: Add `email_sequences` table (`id, name, status, created_at`) + `email_sequence_steps` (`sequence_id, day_offset, email_template_id, sort_order`). Migrate the two hardcoded sequences. Load from DB; admin UI becomes editable over time.
+**Accept**: Grep `EMAIL_SEQUENCES` = 0; sequences editable via DB.
 
 ---
 
