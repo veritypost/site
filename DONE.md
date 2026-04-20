@@ -211,6 +211,11 @@ Keep entries short. Full narrative belongs in session logs (e.g. `05-Working/BAT
 
 ## Admin surfaces
 
+### 2026-04-20 — rate_limits DB-backed, all 27 API call-sites pass a policyKey (T-003)
+- Files: `web/src/lib/rateLimit.js` (new `getRateLimit(policyKey, fallback)` + policyKey arg on `checkRateLimit`); 27 route files under `web/src/app/api/**` (31 calls total); `schema/101_seed_rate_limits.sql` (new, 31 seed rows, idempotent via ON CONFLICT).
+- Change: every `checkRateLimit` call now names a stable policy key. DB row overrides code default; missing row / lookup error falls through to the fallback (the seed SQL is non-gating). 60s in-memory cache per process. `is_active=false` disables the limit. `admin/system` edits propagate within one cache window.
+- Verify: `tsc --noEmit` exit 0; `grep 'policyKey:' web/src/app/api` = 31; `grep 'checkRateLimit(' web/src/app/api` = 31 (1:1). Owner still needs to run `schema/101_seed_rate_limits.sql` for the `rate_limits` table to be populated — until then, code defaults apply.
+
 ### 2026-04-20 — Admin direct-writes class closed — 16 pages now route through /api/admin (T-005)
 - Files: `web/src/lib/adminMutation.ts` (new shared helper), 16 new `/api/admin/**/route.ts` files, 13 migrated pages under `web/src/app/admin/**/page.tsx` (categories, email-templates, feeds, words, features, system, notifications, users, subscriptions, stories, promo, story-manager, kids-story-manager) plus 3 settings-upsert stragglers (streaks, comments, reader).
 - Change: every `supabase.from(X).{insert,update,upsert,delete}` call in `web/src/app/admin` removed. Routes follow the canonical shape: `requirePermission` → service client → (optional) `requireAdminOutranks` on user-targeted rows → mutation → `recordAdminAction` audit via the SECURITY DEFINER RPC on the cookie-scoped authed client. New unified `/api/admin/articles/save` route owns the 5-step cascade (article upsert → timelines → sources → quizzes → kids_summary) for story-manager + kids-story-manager.

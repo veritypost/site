@@ -32,20 +32,13 @@ A fresh agent picks the top unchecked task, reads file:line, does the work, clos
 - `? UNCERTAIN` + tag `needs-live-check` = Agent 3 could not verify; re-verify before acting
 
 ## Task counts
-- P0: 8 · P1: 25 · P2: 32 · P3: 26 · P4: 6 · **Total: 97**
-- DB-DRIFT: 24 · SCHEMA: 6 · SECURITY: 11 · IOS: 11 · MIGRATION-DRIFT: 4 · A11Y: 3 · UX: 13 · CODE: 23
+- P0: 7 · P1: 25 · P2: 32 · P3: 26 · P4: 6 · **Total: 96**
+- DB-DRIFT: 23 · SCHEMA: 6 · SECURITY: 11 · IOS: 11 · MIGRATION-DRIFT: 4 · A11Y: 3 · UX: 13 · CODE: 23
 - Unverified (needs live-check): 22
 
 ---
 
 ## P0 — Ship-blockers / critical
-
-### T-003 — Seed `rate_limits` + switch `lib/rateLimit.js` to DB-backed
-**Priority**: P0  **Effort**: M  **Lens**: DB-DRIFT  **Source**: A1:T-001 + A2:G-025
-**File**: `web/src/lib/rateLimit.js`, `web/src/app/admin/system/page.tsx:62-73`
-**Why**: `rate_limits` table has 0 rows; `admin/system` UI edits ghost data; ~10 routes use inline `{max, windowSec}`.
-**Do**: Seed 10 entries; add `getRateLimit(key)` w/ 60s cache; replace inline literals in `kids-verify-pin, follows, bookmarks, users-block, account-delete, stripe-checkout, appeals, resend-verify`, etc.
-**Accept**: `admin/system` edits take effect within 60s; `rate_limits` has ≥10 rows.
 
 ### T-004 — Reconcile migration disk↔live drift (repo bootstrap broken)
 **Priority**: P0  **Effort**: M  **Lens**: MIGRATION-DRIFT  **Source**: A1:T-014 + A2:G-033,G-036
