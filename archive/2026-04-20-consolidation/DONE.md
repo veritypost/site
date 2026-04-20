@@ -85,7 +85,11 @@ Keep entries short. Full narrative belongs in session logs (e.g. `05-Working/BAT
 
 ## Permissions & RLS
 
-### 2026-04-20 — permissions/route.js error.message leak sweep (T-030, scope expanded)
+### 2026-04-20 — superadmin role removed (T-107)
+- Files: `web/src/lib/roles.js:19-22,72`, `web/src/app/admin/moderation/page.tsx:29-38`, `web/src/app/admin/layout.tsx:18`, `web/src/app/api/admin/users/[id]/permissions/route.js:89`, `scripts/import-permissions.js:140`, `scripts/preflight.js:97`, `scripts/seed-test-accounts.js:46`, `schema/reset_and_rebuild_v2.sql` (7 sites), `schema/105_remove_superadmin_role.sql` (new), `test-data/accounts.json`, `test-data/ACCOUNTS.md`
+- Change: `superadmin` was vestigial — never in `permissions.xlsx`, mapped to identical sets as `admin` via `scripts/import-permissions.js`, only ever assigned to `test_superadmin` test account. Stripped from 4 role Sets in `lib/roles.js`, HIERARCHY map, role→set mapping, preflight check, seed ROLE_MAP, DR replay (7 sites). Applied migration 105 to live DB: deleted `test_superadmin` user (auth + public), 8 `role_permission_sets` rows, 1 `roles` row; bumped `perms_global_version`. `permissions.xlsx` required no edit (never listed superadmin). Test account count 20 → 19.
+- Verify: tsc pass; live DB post-check shows superadmin role gone, 8 roles remain (owner/admin/editor/moderator/expert/educator/journalist/user); `grep -r superadmin web/ scripts/` returns 0 matches
+
 - Files: `web/src/app/api/admin/users/[id]/permissions/route.js:55-61,127,148,162,174,187,201,212,229,240,248,252`
 - Change: task listed 1 site at :127, but the `serverError(\`...: ${err.message}\`)` pattern repeated 11× in this file (security of one site fixed while 10 siblings still leaked). Introduced `dbError(tag, err, publicMessage)` helper next to existing `serverError`; converted all 11 sites. `console.error` retains raw message for server-side debugging; response body is a generic static string. Broader T-013 (~100 remaining sites across codebase) stays open.
 - Verify: tsc pass; `grep 'return serverError(\`' <file>` → 0 matches; `grep 'return dbError(' <file>` → 11 matches

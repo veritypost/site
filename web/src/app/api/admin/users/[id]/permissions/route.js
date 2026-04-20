@@ -86,7 +86,7 @@ export async function POST(request, { params }) {
 
   // Rank guard — prevent a permission-override grant from being applied to
   // a user who outranks the caller (e.g. an admin overriding permissions on
-  // a superadmin/owner). Sibling routes (ban, roles, plan, role-set) all
+  // an owner). Sibling routes (ban, roles, plan, role-set) all
   // enforce this; this one was missed. Self-edits are allowed (skip the
   // check if actor == target).
   if (actor.id !== targetUserId) {

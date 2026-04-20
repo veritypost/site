@@ -15,8 +15,8 @@ import { ToastProvider } from '@/components/admin/Toast';
 // before any page in the segment renders, so the whole /admin tree
 // inherits a single authoritative check.
 //
-// Threshold: `MOD_ROLES` (owner / superadmin / admin / editor /
-// moderator). Per-page pages that need a stricter role (admin for
+// Threshold: `MOD_ROLES` (owner / admin / editor / moderator).
+// Per-page pages that need a stricter role (admin for
 // settings, etc.) still enforce that inside the page — defense in
 // depth. This layout blocks the broad case of "an unauthenticated
 // or fully-unprivileged user reaches /admin/anything".

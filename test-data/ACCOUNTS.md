@@ -11,25 +11,24 @@ Anonymous testing: open in incognito, no login needed.
 | # | Username | Email | Password | Role | Plan | Verified | Special | What to test |
 |---|---|---|---|---|---|---|---|---|
 | 1 | `test_owner` | `owner@test.veritypost.com` | `TestOwner1!` | Owner | Family | Yes |  | Full system access. Everything. |
-| 2 | `test_superadmin` | `superadmin@test.veritypost.com` | `TestSuper1!` | Superadmin | Premium | Yes |  | All admin except owner-only. |
-| 3 | `test_admin` | `admin@test.veritypost.com` | `TestAdmin1!` | Admin | Premium | Yes |  | Full admin panel. |
-| 4 | `test_editor` | `editor@test.veritypost.com` | `TestEditor1!` | Editor | Premium | Yes |  | Content management, pipeline. |
-| 5 | `test_moderator` | `moderator@test.veritypost.com` | `TestMod1!` | Moderator | Premium | Yes |  | Moderation queue, reports. |
-| 6 | `test_anon` | `` | `` | Anonymous |  |  |  | Use incognito. No DB row. |
-| 7 | `test_noemail` | `noemail@test.veritypost.com` | `TestNoEmail1!` | User | Free | No | Email unverified | Verify email banner, blocked features. |
-| 8 | `test_free` | `free@test.veritypost.com` | `TestFree1!` | User | Free | Yes |  | Free tier limits, ads, 5 comments/day. |
-| 9 | `test_premium` | `premium@test.veritypost.com` | `TestPremium1!` | User | Premium | Yes |  | Unlimited, ad-free, bookmarks, DMs. |
-| 10 | `test_family` | `family@test.veritypost.com` | `TestFamily1!` | User | Family | Yes | 2 kid profiles | Kid profiles, PINs, parental dashboard. |
-| 11 | `test_kid_1 (Emma)` | `` | `` |  |  |  | Kid profile | Kid-safe content, kid quizzes. |
-| 12 | `test_kid_2 (Liam)` | `` | `` |  |  |  | Kid profile | Second kid, different age. |
-| 13 | `test_expert` | `expert@test.veritypost.com` | `TestExpert1!` | Expert | Premium | Yes | Verified expert | Expert badge, discussions, weighted votes. |
-| 14 | `test_educator` | `educator@test.veritypost.com` | `TestEdu1!` | Educator | Premium | Yes | Verified educator | Educator badge, discussions. |
-| 15 | `test_journalist` | `journalist@test.veritypost.com` | `TestJourn1!` | Journalist | Premium | Yes | Verified journalist | Journalist badge, submit articles. |
-| 16 | `test_banned` | `banned@test.veritypost.com` | `TestBanned1!` | User | Premium | Yes | Banned | Cannot post/comment. Ban UI. |
-| 17 | `test_muted` | `muted@test.veritypost.com` | `TestMuted1!` | User | Free | Yes | Muted 24h | Read-only. Muted banner. |
-| 18 | `test_shadow` | `shadow@test.veritypost.com` | `TestShadow1!` | User | Free | Yes | Shadow banned | Content invisible to others. |
-| 19 | `test_newbie` | `newbie@test.veritypost.com` | `TestNewbie1!` | User | Free | Yes | Brand new | Empty states, first actions. |
-| 20 | `test_veteran` | `veteran@test.veritypost.com` | `TestVet1!` | User | Premium | Yes | Luminary, 365 streak | Top leaderboard, all achievements. |
+| 2 | `test_admin` | `admin@test.veritypost.com` | `TestAdmin1!` | Admin | Premium | Yes |  | Full admin panel. |
+| 3 | `test_editor` | `editor@test.veritypost.com` | `TestEditor1!` | Editor | Premium | Yes |  | Content management, pipeline. |
+| 4 | `test_moderator` | `moderator@test.veritypost.com` | `TestMod1!` | Moderator | Premium | Yes |  | Moderation queue, reports. |
+| 5 | `test_anon` | `` | `` | Anonymous |  |  |  | Use incognito. No DB row. |
+| 6 | `test_noemail` | `noemail@test.veritypost.com` | `TestNoEmail1!` | User | Free | No | Email unverified | Verify email banner, blocked features. |
+| 7 | `test_free` | `free@test.veritypost.com` | `TestFree1!` | User | Free | Yes |  | Free tier limits, ads, 5 comments/day. |
+| 8 | `test_premium` | `premium@test.veritypost.com` | `TestPremium1!` | User | Premium | Yes |  | Unlimited, ad-free, bookmarks, DMs. |
+| 9 | `test_family` | `family@test.veritypost.com` | `TestFamily1!` | User | Family | Yes | 2 kid profiles | Kid profiles, PINs, parental dashboard. |
+| 10 | `test_kid_1 (Emma)` | `` | `` |  |  |  | Kid profile | Kid-safe content, kid quizzes. |
+| 11 | `test_kid_2 (Liam)` | `` | `` |  |  |  | Kid profile | Second kid, different age. |
+| 12 | `test_expert` | `expert@test.veritypost.com` | `TestExpert1!` | Expert | Premium | Yes | Verified expert | Expert badge, discussions, weighted votes. |
+| 13 | `test_educator` | `educator@test.veritypost.com` | `TestEdu1!` | Educator | Premium | Yes | Verified educator | Educator badge, discussions. |
+| 14 | `test_journalist` | `journalist@test.veritypost.com` | `TestJourn1!` | Journalist | Premium | Yes | Verified journalist | Journalist badge, submit articles. |
+| 15 | `test_banned` | `banned@test.veritypost.com` | `TestBanned1!` | User | Premium | Yes | Banned | Cannot post/comment. Ban UI. |
+| 16 | `test_muted` | `muted@test.veritypost.com` | `TestMuted1!` | User | Free | Yes | Muted 24h | Read-only. Muted banner. |
+| 17 | `test_shadow` | `shadow@test.veritypost.com` | `TestShadow1!` | User | Free | Yes | Shadow banned | Content invisible to others. |
+| 18 | `test_newbie` | `newbie@test.veritypost.com` | `TestNewbie1!` | User | Free | Yes | Brand new | Empty states, first actions. |
+| 19 | `test_veteran` | `veteran@test.veritypost.com` | `TestVet1!` | User | Premium | Yes | Luminary, 365 streak | Top leaderboard, all achievements. |
 
 ## Kid profiles (under `test_family`)
 
@@ -91,10 +90,9 @@ All are `user` role, `free` plan, email-verified. Passwords follow `Community1!N
 8. **`test_moderator`** — moderation queue visible, comment hide/unhide works.
 9. **`test_editor`** — admin panel partially visible (stories + pipeline, not everything).
 10. **`test_admin`** — full admin panel.
-11. **`test_superadmin`** — everything except owner-only.
-12. **`test_owner`** — full system access.
-13. **`test_noemail`** — pre-verification state. Verify: verify-email banner, feature locks on unverified.
-14. **`test_banned`** — banned UI, cannot post/comment.
-15. **`test_muted`** — 24h mute banner, read-only.
-16. **`test_shadow`** — shadow-banned — content visible to self only.
-17. **`test_veteran`** — Luminary tier, 365-day streak, top leaderboard.
+11. **`test_owner`** — full system access.
+12. **`test_noemail`** — pre-verification state. Verify: verify-email banner, feature locks on unverified.
+13. **`test_banned`** — banned UI, cannot post/comment.
+14. **`test_muted`** — 24h mute banner, read-only.
+15. **`test_shadow`** — shadow-banned — content visible to self only.
+16. **`test_veteran`** — Luminary tier, 365-day streak, top leaderboard.

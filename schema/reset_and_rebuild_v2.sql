@@ -3040,7 +3040,6 @@ ALTER TABLE "feed_cluster_articles" ENABLE ROW LEVEL SECURITY;
 -- ============================================================
 INSERT INTO "roles" ("name", "display_name", "description", "hierarchy_level", "is_system") VALUES
   ('owner',       'Owner',       'Platform owner. Full system access.',                  100, true),
-  ('superadmin',  'Superadmin',  'Top admin. Everything except owner-only features.',    90,  true),
   ('admin',       'Admin',       'Full admin panel. User/content/settings management.',  80,  true),
   ('editor',      'Editor',      'Content management. Publish articles, run pipeline.',  70,  true),
   ('moderator',   'Moderator',   'Moderation queue. Comments, reports, community notes.',60,  true),
@@ -5306,7 +5305,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO "role_permission_sets" ("role_id", "permission_set_id")
 SELECT r.id, ps.id
 FROM roles r CROSS JOIN permission_sets ps
-WHERE r.name IN ('expert','educator','journalist','moderator','editor','admin','superadmin','owner')
+WHERE r.name IN ('expert','educator','journalist','moderator','editor','admin','owner')
   AND ps.key = 'expert_tools'
 ON CONFLICT DO NOTHING;
 
@@ -6533,7 +6532,7 @@ BEGIN
   SELECT id INTO v_family  FROM plans WHERE name='verity_family_monthly';
 
   FOREACH v_name IN ARRAY ARRAY[
-    'owner','superadmin','admin','editor','moderator',
+    'owner','admin','editor','moderator',
     'expert','educator','journalist','user',
     'premium','family','unverified','banned'
   ] LOOP
@@ -6581,37 +6580,37 @@ END $$;
 -- Verity scores + activity counts so the leaderboard has data
 UPDATE public.users SET
   verity_score = CASE username
-    WHEN 'owner' THEN 2000 WHEN 'superadmin' THEN 1800 WHEN 'admin' THEN 1500
+    WHEN 'owner' THEN 2000 WHEN 'admin' THEN 1500
     WHEN 'editor' THEN 1200 WHEN 'moderator' THEN 900 WHEN 'expert' THEN 800
     WHEN 'educator' THEN 700 WHEN 'journalist' THEN 650
     WHEN 'premium' THEN 400 WHEN 'user' THEN 250 WHEN 'family' THEN 150
     ELSE 0 END,
   articles_read_count = CASE username
-    WHEN 'owner' THEN 250 WHEN 'superadmin' THEN 220 WHEN 'admin' THEN 180
+    WHEN 'owner' THEN 250 WHEN 'admin' THEN 180
     WHEN 'editor' THEN 140 WHEN 'moderator' THEN 100 WHEN 'expert' THEN 90
     WHEN 'educator' THEN 80 WHEN 'journalist' THEN 70
     WHEN 'premium' THEN 40 WHEN 'user' THEN 25 WHEN 'family' THEN 15
     ELSE 0 END,
   quizzes_completed_count = CASE username
-    WHEN 'owner' THEN 80 WHEN 'superadmin' THEN 70 WHEN 'admin' THEN 60
+    WHEN 'owner' THEN 80 WHEN 'admin' THEN 60
     WHEN 'editor' THEN 45 WHEN 'moderator' THEN 35 WHEN 'expert' THEN 30
     WHEN 'educator' THEN 25 WHEN 'journalist' THEN 22
     WHEN 'premium' THEN 12 WHEN 'user' THEN 8 WHEN 'family' THEN 4
     ELSE 0 END,
   comment_count = CASE username
-    WHEN 'owner' THEN 120 WHEN 'superadmin' THEN 100 WHEN 'admin' THEN 80
+    WHEN 'owner' THEN 120 WHEN 'admin' THEN 80
     WHEN 'editor' THEN 60 WHEN 'moderator' THEN 50 WHEN 'expert' THEN 40
     WHEN 'educator' THEN 30 WHEN 'journalist' THEN 28
     WHEN 'premium' THEN 15 WHEN 'user' THEN 8 WHEN 'family' THEN 3
     ELSE 0 END,
   streak_current = CASE username
-    WHEN 'owner' THEN 45 WHEN 'superadmin' THEN 30 WHEN 'admin' THEN 21
+    WHEN 'owner' THEN 45 WHEN 'admin' THEN 21
     WHEN 'editor' THEN 14 WHEN 'moderator' THEN 9 WHEN 'expert' THEN 7
     WHEN 'educator' THEN 5 WHEN 'journalist' THEN 4
     WHEN 'premium' THEN 3 WHEN 'user' THEN 2 WHEN 'family' THEN 1
     ELSE 0 END,
   streak_best = CASE username
-    WHEN 'owner' THEN 90 WHEN 'superadmin' THEN 60 WHEN 'admin' THEN 40
+    WHEN 'owner' THEN 90 WHEN 'admin' THEN 40
     WHEN 'editor' THEN 30 WHEN 'moderator' THEN 20 WHEN 'expert' THEN 15
     WHEN 'educator' THEN 12 WHEN 'journalist' THEN 10
     WHEN 'premium' THEN 7 WHEN 'user' THEN 5 WHEN 'family' THEN 2

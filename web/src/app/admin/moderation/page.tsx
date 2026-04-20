@@ -28,7 +28,6 @@ const ROLES = ['moderator', 'editor', 'admin', 'expert', 'educator', 'journalist
 const PENALTY_LABELS: Record<number, string> = { 1: 'Warn', 2: '24h comment mute', 3: '7-day mute', 4: 'Ban' };
 const HIERARCHY: Record<string, number> = {
   owner: 100,
-  superadmin: 90,
   admin: 80,
   editor: 70,
   moderator: 60,

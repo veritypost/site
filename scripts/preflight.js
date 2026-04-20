@@ -94,7 +94,7 @@ async function checkPlanSeed() {
 async function checkRoleSeed() {
   const { data } = await db.from('roles').select('name');
   const names = (data || []).map(r => r.name);
-  const required = ['owner', 'superadmin', 'admin', 'editor', 'moderator', 'expert', 'educator', 'journalist', 'user'];
+  const required = ['owner', 'admin', 'editor', 'moderator', 'expert', 'educator', 'journalist', 'user'];
   return { ok: required.every(n => names.includes(n)), count: names.length };
 }
 

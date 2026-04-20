@@ -137,7 +137,6 @@ async function main() {
   // --- 4. Role → set mapping (canonical) ---
   const roleToSets = {
     owner:       ['owner','admin','editor','moderator','expert','family','pro','free','unverified','anon'],
-    superadmin:  ['admin','editor','moderator','expert','pro','free','unverified','anon'],
     admin:       ['admin','editor','moderator','expert','pro','free','unverified','anon'],
     editor:      ['editor','expert','pro','free','unverified','anon'],
     moderator:   ['moderator','expert','pro','free','unverified','anon'],

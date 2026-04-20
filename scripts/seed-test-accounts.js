@@ -43,7 +43,7 @@ const supa = createClient(URL, KEY, { auth: { persistSession: false, autoRefresh
 const accounts = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'test-data', 'accounts.json'), 'utf8'));
 
 const ROLE_MAP = {
-  owner: 'owner', superadmin: 'superadmin', admin: 'admin', editor: 'editor',
+  owner: 'owner', admin: 'admin', editor: 'editor',
   moderator: 'moderator', user: 'user', expert: 'expert', educator: 'educator',
   journalist: 'journalist',
 };

@@ -13,17 +13,6 @@
     },
     {
       "#": "2",
-      "Username": "test_superadmin",
-      "Email": "superadmin@test.veritypost.com",
-      "Password": "TestSuper1!",
-      "Role": "Superadmin",
-      "Plan": "Premium",
-      "Email Verified": "Yes",
-      "Special State": "",
-      "What to Test": "All admin except owner-only."
-    },
-    {
-      "#": "3",
       "Username": "test_admin",
       "Email": "admin@test.veritypost.com",
       "Password": "TestAdmin1!",
@@ -34,7 +23,7 @@
       "What to Test": "Full admin panel."
     },
     {
-      "#": "4",
+      "#": "3",
       "Username": "test_editor",
       "Email": "editor@test.veritypost.com",
       "Password": "TestEditor1!",
@@ -45,7 +34,7 @@
       "What to Test": "Content management, pipeline."
     },
     {
-      "#": "5",
+      "#": "4",
       "Username": "test_moderator",
       "Email": "moderator@test.veritypost.com",
       "Password": "TestMod1!",
@@ -56,7 +45,7 @@
       "What to Test": "Moderation queue, reports."
     },
     {
-      "#": "6",
+      "#": "5",
       "Username": "test_anon",
       "Email": "",
       "Password": "",
@@ -67,7 +56,7 @@
       "What to Test": "Use incognito. No DB row."
     },
     {
-      "#": "7",
+      "#": "6",
       "Username": "test_noemail",
       "Email": "noemail@test.veritypost.com",
       "Password": "TestNoEmail1!",
@@ -78,7 +67,7 @@
       "What to Test": "Verify email banner, blocked features."
     },
     {
-      "#": "8",
+      "#": "7",
       "Username": "test_free",
       "Email": "free@test.veritypost.com",
       "Password": "TestFree1!",
@@ -89,7 +78,7 @@
       "What to Test": "Free tier limits, ads, 5 comments/day."
     },
     {
-      "#": "9",
+      "#": "8",
       "Username": "test_premium",
       "Email": "premium@test.veritypost.com",
       "Password": "TestPremium1!",
@@ -100,7 +89,7 @@
       "What to Test": "Unlimited, ad-free, bookmarks, DMs."
     },
     {
-      "#": "10",
+      "#": "9",
       "Username": "test_family",
       "Email": "family@test.veritypost.com",
       "Password": "TestFamily1!",
@@ -111,7 +100,7 @@
       "What to Test": "Kid profiles, PINs, parental dashboard."
     },
     {
-      "#": "11",
+      "#": "10",
       "Username": "test_kid_1 (Emma)",
       "Email": "",
       "Password": "",
@@ -122,7 +111,7 @@
       "What to Test": "Kid-safe content, kid quizzes."
     },
     {
-      "#": "12",
+      "#": "11",
       "Username": "test_kid_2 (Liam)",
       "Email": "",
       "Password": "",
@@ -133,7 +122,7 @@
       "What to Test": "Second kid, different age."
     },
     {
-      "#": "13",
+      "#": "12",
       "Username": "test_expert",
       "Email": "expert@test.veritypost.com",
       "Password": "TestExpert1!",
@@ -144,7 +133,7 @@
       "What to Test": "Expert badge, discussions, weighted votes."
     },
     {
-      "#": "14",
+      "#": "13",
       "Username": "test_educator",
       "Email": "educator@test.veritypost.com",
       "Password": "TestEdu1!",
@@ -155,7 +144,7 @@
       "What to Test": "Educator badge, discussions."
     },
     {
-      "#": "15",
+      "#": "14",
       "Username": "test_journalist",
       "Email": "journalist@test.veritypost.com",
       "Password": "TestJourn1!",
@@ -166,7 +155,7 @@
       "What to Test": "Journalist badge, submit articles."
     },
     {
-      "#": "16",
+      "#": "15",
       "Username": "test_banned",
       "Email": "banned@test.veritypost.com",
       "Password": "TestBanned1!",
@@ -177,7 +166,7 @@
       "What to Test": "Cannot post/comment. Ban UI."
     },
     {
-      "#": "17",
+      "#": "16",
       "Username": "test_muted",
       "Email": "muted@test.veritypost.com",
       "Password": "TestMuted1!",
@@ -188,7 +177,7 @@
       "What to Test": "Read-only. Muted banner."
     },
     {
-      "#": "18",
+      "#": "17",
       "Username": "test_shadow",
       "Email": "shadow@test.veritypost.com",
       "Password": "TestShadow1!",
@@ -199,7 +188,7 @@
       "What to Test": "Content invisible to others."
     },
     {
-      "#": "19",
+      "#": "18",
       "Username": "test_newbie",
       "Email": "newbie@test.veritypost.com",
       "Password": "TestNewbie1!",
@@ -210,7 +199,7 @@
       "What to Test": "Empty states, first actions."
     },
     {
-      "#": "20",
+      "#": "19",
       "Username": "test_veteran",
       "Email": "veteran@test.veritypost.com",
       "Password": "TestVet1!",

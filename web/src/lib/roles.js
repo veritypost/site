@@ -16,10 +16,10 @@
 // see /admin at all") that still need an offline check before RPC.
 
 export const OWNER_ROLES = Object.freeze(new Set(['owner']));
-export const ADMIN_ROLES = Object.freeze(new Set(['owner', 'superadmin', 'admin']));
-export const EDITOR_ROLES = Object.freeze(new Set(['owner', 'superadmin', 'admin', 'editor']));
-export const MOD_ROLES = Object.freeze(new Set(['owner', 'superadmin', 'admin', 'editor', 'moderator']));
-export const EXPERT_ROLES = Object.freeze(new Set(['owner', 'superadmin', 'admin', 'editor', 'expert', 'journalist', 'educator']));
+export const ADMIN_ROLES = Object.freeze(new Set(['owner', 'admin']));
+export const EDITOR_ROLES = Object.freeze(new Set(['owner', 'admin', 'editor']));
+export const MOD_ROLES = Object.freeze(new Set(['owner', 'admin', 'editor', 'moderator']));
+export const EXPERT_ROLES = Object.freeze(new Set(['owner', 'admin', 'editor', 'expert', 'journalist', 'educator']));
 
 // ---- DB-live role hierarchy ----
 //
@@ -69,7 +69,7 @@ export async function rolesUpTo(supabase, topName) {
 // Every role at or above `minName` in hierarchy — used to build
 // coarse allowlists like "which roles can see this page" without
 // re-enumerating role names inline. Replaces the scattered literal
-// arrays like `['owner', 'superadmin', 'admin']` across admin pages.
+// arrays like `['owner', 'admin']` across admin pages.
 // The frozen Sets above (OWNER_ROLES, ADMIN_ROLES, etc.) remain the
 // zero-network-request option for layout-level gates where an async
 // call would block first render.
