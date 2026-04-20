@@ -13,8 +13,8 @@ Numbers reflect the 1–51 scheme from commit `b87925e` with 20 AUTONOMOUS items
 
 ## Progress snapshot (2026-04-20)
 
-- **Closed this session (30 autonomous items):** #10, #11, #12, #13, #14, #15, #17, #18, #19, #20, #21, #22, #23 (partial — critical gaps only), #25, #26, #27, #28, #30, #33, #34, #36, #42, #43, #44, #45, #47.
-- **Remaining:** 9 OWNER + ~13 AUTONOMOUS = **22 items**.
+- **Closed this session (33 autonomous items):** #10, #11, #12, #13, #14, #15, #17, #18, #19, #20, #21, #22, #23 (partial — critical gaps only), #24 (live-tested, not a bug), #25, #26, #27, #28, #30, #33, #34, #36, #37, #38, #39 (verified, no drift), #40 (false finding), #41, #42, #43, #44, #45, #47, #50 (false finding).
+- **Remaining:** 10 OWNER (adds #5c) + ~8 AUTONOMOUS = **18 items**.
 - **Bench last verified:** `tsc --noEmit` exit 0 · `xcodebuild VerityPost` SUCCEEDED · `xcodebuild VerityPostKids` SUCCEEDED · dev server 200 on `/`, `/login`, `/story/*` · preflight run against live DB passed except `streak.freeze_max_kids` setting missing (tracked as OWNER #5b).
 - **Items reclassified as non-issues after deeper look:** #48 (story.tsx console.error — the lines were on error paths, intentional logging, not normal-flow noise); #51 (unverified-logged-in story CTA — traced the code, logged-in users go to ArticleQuiz which has its own permission-gated "verify email" branch, not the anon sign-up CTA). Removed from active list.
 
@@ -57,6 +57,12 @@ VALUES ('streak.freeze_max_kids', '2', 'Max streak freezes per week for Family-p
 ON CONFLICT (key) DO NOTHING;
 ```
 
+### 5c — Apply schema/106_kid_trial_freeze_notification.sql to live DB
+New migration extends `freeze_kid_trial()` to call `create_notification('kid_trial_expired', ...)` so the parent sees a "trial ended" prompt. Idempotent via CREATE OR REPLACE.
+```bash
+psql "$DATABASE_URL" -f schema/106_kid_trial_freeze_notification.sql
+```
+
 ### 6 — Audit Supabase admin/owner seats
 ```sql
 select u.email, r.name, ur.granted_at
@@ -93,14 +99,23 @@ Gates all iOS publishing — App Store Connect products, APNs `.p8`, `apple-app-
 
 ## P1
 
-### 16 — Reconcile `schema/reset_and_rebuild_v2.sql` with live DB
-DR-replay from scratch produces a weaker DB than live:
-- Migrations 092 (RLS lockdown) + 093 (RPC actor lockdown) live in `archive/2026-04-19-prelaunch-sprint/round_{a,b}_migration.sql`, not in `schema/` as numbered files.
-- Several live-only migrations never hit disk (`grant_anon_free_comments_view`, `add_require_outranks_rpc`, etc.).
-- `resolve_username_to_email` RPC definition (hardened by migration 060) is missing from the DR replay.
-- `reset_and_rebuild_v2.sql:3384-3385` seeds settings keys `context_pin.min_tags` / `context_pin.threshold_pct`; live uses `context_pin_min_count` / `context_pin_percent`.
-- Migrations 100–105 missing from rebuild file entirely.
-**Done when:** a fresh Supabase project replayed from disk matches live shape.
+### 16 — Reconcile `schema/reset_and_rebuild_v2.sql` with live DB  *(BLOCKED on owner SQL)*
+PostgREST doesn't expose the `supabase_migrations` schema, so I can't diff live vs disk without raw SQL access.
+
+**Owner:** paste this into Supabase SQL Editor and hand me the output:
+```sql
+SELECT version, name FROM supabase_migrations.schema_migrations ORDER BY version;
+```
+Once I have the list, I'll:
+1. Diff against `ls schema/*.sql`.
+2. For each live-only migration, extract its SQL via `pg_get_functiondef` / `pg_dump`-style queries and commit as `schema/NNN_<name>.sql`.
+3. Patch `reset_and_rebuild_v2.sql` so a fresh replay reproduces live shape.
+
+Known gaps (from docs, pre-verification):
+- Migrations 092 + 093 in `archive/2026-04-19-prelaunch-sprint/round_{a,b}_migration.sql` — commit as `schema/092_*.sql` + `schema/093_*.sql`.
+- `resolve_username_to_email` RPC hardened by migration 060 — present on disk, absent from rebuild file.
+- `reset_and_rebuild_v2.sql:3384-3385` seeds keys `context_pin.min_tags` / `context_pin.threshold_pct`; live uses `context_pin_min_count` / `context_pin_percent`.
+- Migrations 100–106 not in rebuild file.
 
 ### 23 — Admin audit coverage (partial; high-risk closed)
 Original agent grep for "recordAdminAction|record_admin_action" missed routes that audit via direct `audit_log.insert(...)`. The real gap is ~12 admin routes, not 50.
@@ -119,10 +134,6 @@ admin/sponsors/route.js + [id]/route.js
 **Done when:** every admin mutation in those 12 files writes an audit_log row.
 
 Non-admin routes surfaced by the grep (bookmarks/account/kids/cron/etc.) don't need audit_log entries — they're user-scoped actions, not privileged admin changes. Out of scope for this item.
-
-### 24 — Family leaderboard may show only the paired kid
-`VerityPostKids/VerityPostKids/LeaderboardView.swift:218-229` — Family scope query on `kid_profiles` filters by `parent_user_id`. Under kid JWT, RLS returns only the paired kid's own row (migration 096). Siblings under the same parent won't appear.
-**Do:** verify with ≥2 kid profiles under one parent. If broken, either relax the SELECT policy (siblings-under-same-parent when `is_kid_delegated()=true`), or add a `kid_family_leaderboard(kid_profile_id)` SECDEF RPC.
 
 ## P2
 
@@ -200,7 +211,4 @@ Premise is retired, actively misleading:
 
 ### 49 — No lint/format config
 Repo has no `.eslintrc*` or `.prettierrc*`. Adopting a minimal config (`no-console`, `no-unused-vars`, `no-explicit-any` warn-level) would have caught several items in this audit. Pair with GitHub Action + pre-commit hook.
-
-### 50 — `/search` page doesn't render anon CTA in-place
-Anonymous visitors to `/search` should either redirect to `/login?next=/search` or render an in-place CTA (like `/notifications` does). Today it loads a blank search UI that won't return results.
 
