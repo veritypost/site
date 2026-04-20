@@ -5,11 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { requirePermission } from '@/lib/auth';
 import { assertKidOwnership } from '@/lib/kids';
 import { buildPbkdf2Credential } from '@/lib/kidPin';
-
-const WEAK_PINS = new Set([
-  '0000', '1111', '2222', '3333', '4444', '5555', '6666', '7777', '8888', '9999',
-  '1234', '4321', '0123', '9876',
-]);
+import { validatePin } from '@/lib/kidPinValidation';
 
 export async function POST(request) {
   try {
@@ -23,12 +19,8 @@ export async function POST(request) {
     if (!kid_profile_id) {
       return NextResponse.json({ error: 'kid_profile_id is required' }, { status: 400 });
     }
-    if (typeof pin !== 'string' || !/^\d{4}$/.test(pin)) {
-      return NextResponse.json({ error: 'PIN must be 4 digits' }, { status: 400 });
-    }
-    if (WEAK_PINS.has(pin)) {
-      return NextResponse.json({ error: 'Choose a less guessable PIN' }, { status: 400 });
-    }
+    const pinErr = validatePin(pin);
+    if (pinErr) return NextResponse.json({ error: pinErr }, { status: 400 });
 
     await assertKidOwnership(kid_profile_id, { client: supabase, userId: user.id });
 

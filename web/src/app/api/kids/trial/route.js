@@ -5,12 +5,8 @@ import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { validateConsentPayload, COPPA_CONSENT_VERSION } from '@/lib/coppaConsent';
 import { buildPbkdf2Credential } from '@/lib/kidPin';
+import { validatePin } from '@/lib/kidPinValidation';
 import { safeErrorResponse } from '@/lib/apiErrors';
-
-const WEAK_PINS = new Set([
-  '0000', '1111', '2222', '3333', '4444', '5555', '6666', '7777', '8888', '9999',
-  '1234', '4321', '0123', '9876',
-]);
 
 function clientIp(request) {
   const fwd = request.headers.get('x-forwarded-for');
@@ -62,12 +58,8 @@ export async function POST(request) {
 
   let pinCred = { pin_hash: null, pin_salt: null, pin_hash_algo: 'pbkdf2' };
   if (b.pin != null) {
-    if (typeof b.pin !== 'string' || !/^\d{4}$/.test(b.pin)) {
-      return NextResponse.json({ error: 'PIN must be 4 digits' }, { status: 400 });
-    }
-    if (WEAK_PINS.has(b.pin)) {
-      return NextResponse.json({ error: 'Choose a less guessable PIN' }, { status: 400 });
-    }
+    const pinErr = validatePin(b.pin);
+    if (pinErr) return NextResponse.json({ error: pinErr }, { status: 400 });
     pinCred = await buildPbkdf2Credential(b.pin);
   }
 

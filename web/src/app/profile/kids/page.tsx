@@ -6,10 +6,10 @@ import { createClient } from '../../../lib/supabase/client';
 import { COPPA_CONSENT_TEXT, COPPA_CONSENT_VERSION } from '../../../lib/coppaConsent';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
+import { isPinWeak } from '@/lib/kidPinValidation';
 import type { Tables } from '@/types/database-helpers';
 
 const COLOR_OPTIONS = ['#10b981', '#f59e0b', '#3b82f6', '#f43f5e', '#ec4899', '#14b8a6', '#a855f7'];
-const WEAK_PINS = new Set(['0000','1111','2222','3333','4444','5555','6666','7777','8888','9999','1234','4321']);
 
 function isDobValid(v: string): boolean {
   if (!v) return false;
@@ -131,7 +131,7 @@ export default function ParentKidsPage() {
     if (!form.display_name.trim()) { setError('Name required'); return; }
     if (!isDobValid(form.date_of_birth)) { setError('Date of birth required and must be in the past.'); return; }
     if (!isUnder13(form.date_of_birth)) { setError('Kid profiles are for children under 13.'); return; }
-    if (form.pin && (!/^\d{4}$/.test(form.pin) || WEAK_PINS.has(form.pin))) {
+    if (form.pin && isPinWeak(form.pin)) {
       setError('PIN must be 4 non-trivial digits'); return;
     }
     if (form.pin !== form.pinConfirm) { setError('PINs don\u2019t match'); return; }
