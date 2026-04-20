@@ -22,8 +22,10 @@ export async function isFlagEnabled(client, key, defaultValue = false) {
 export function clearFlagCache() { CACHE.clear(); }
 
 // Convenience wrapper for the master cutover switch.
+// Fail-closed: if the flag row is missing or the DB read fails, treat
+// v2 as NOT live so the guard returns 503 rather than silently opening.
 export async function isV2Live(client) {
-  return isFlagEnabled(client, 'v2_live', true);
+  return isFlagEnabled(client, 'v2_live', false);
 }
 
 // Route guard for the master cutover switch. Returns a 503 NextResponse

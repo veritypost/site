@@ -306,6 +306,19 @@ function PipelineAdminInner() {
         subtitle="Monitor article generation runs, prompts, and costs."
       />
 
+      {/* STEPS, PROMPTS, DEFAULT_CATEGORY_PROMPTS, and COST_TIPS in this file
+          are hardcoded constants, not live DB rows. The banner below makes
+          that explicit so admins don't treat the placeholder as live config. */}
+      <PageSection divider={false}>
+        <div style={{
+          padding: S[3], borderRadius: 8,
+          background: 'rgba(234,179,8,0.08)', border: `1px solid ${ADMIN_C.warn}`,
+          color: ADMIN_C.warn, fontSize: F.sm, fontWeight: 600,
+        }}>
+          Pipeline config below is placeholder. Step timings, prompt registry, per-category prompts, and cost tips are hardcoded in the page source — live prompt editing and real step telemetry are coming later. Recent runs and the top StatCards do read from the DB.
+        </div>
+      </PageSection>
+
       <PageSection>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: S[3] }}>
           <StatCard label="Stories today" value={storiesToday} />

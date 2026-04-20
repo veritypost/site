@@ -16,7 +16,11 @@ export async function POST(request) {
   try {
     user = await requirePermission('comments.post');
   } catch (err) {
-    if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
+    if (err.status) {
+      console.error('[comments.POST]', err);
+      return NextResponse.json({ error: 'Not allowed to post comments' }, { status: err.status });
+    }
+    console.error('[comments.POST]', err);
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
 
@@ -33,7 +37,10 @@ export async function POST(request) {
     p_parent_id: parent_id || null,
     p_mentions: Array.isArray(mentions) ? mentions : [],
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) {
+    console.error('[comments.POST]', error);
+    return NextResponse.json({ error: 'Could not post comment' }, { status: 400 });
+  }
 
   // Phase 14: award post_comment points + advance streak.
   const scoring = await scoreCommentPost(service, { userId: user.id, commentId: data.id });

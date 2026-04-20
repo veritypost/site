@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
+import { MOD_ROLES } from '@/lib/roles';
 import type { Tables } from '@/types/database-helpers';
 import Page, { PageHeader } from '@/components/admin/Page';
 import PageSection from '@/components/admin/PageSection';
@@ -91,6 +92,7 @@ export default function AdminHubPage() {
   const [featuredStories, setFeaturedStories] = useState<FeaturedStory[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [authorized, setAuthorized] = useState<boolean>(false);
+  const [restrictedRole, setRestrictedRole] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -113,9 +115,14 @@ export default function AdminHubPage() {
           return rel?.name;
         })
         .filter(Boolean) as string[];
-      if (!['owner', 'superadmin', 'admin'].some((r) => roleNames.includes(r))) {
+      const isAdmin = ['owner', 'superadmin', 'admin'].some((r) => roleNames.includes(r));
+      const isMod = roleNames.some((r) => MOD_ROLES.has(r));
+      if (!isAdmin && !isMod) {
         router.push('/');
         return;
+      }
+      if (!isAdmin && isMod) {
+        setRestrictedRole(roleNames.find((r) => MOD_ROLES.has(r)) || 'moderator');
       }
       setAuthorized(true);
 

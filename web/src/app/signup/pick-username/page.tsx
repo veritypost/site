@@ -134,7 +134,10 @@ export default function PickUsernamePage() {
         throw updateError;
       }
 
-      window.location.href = '/';
+      // Onboarding step 2 of 3 — send the user to /welcome (step 3).
+      // /welcome short-circuits to / if onboarding is already complete,
+      // so replay of this path stays safe.
+      window.location.href = '/welcome';
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to save username. Please try again.';
       setError(msg);
@@ -144,7 +147,7 @@ export default function PickUsernamePage() {
   };
 
   const handleSkip = () => {
-    window.location.href = '/';
+    window.location.href = '/welcome';
   };
 
   const borderColor = availability === 'available' ? C.success

@@ -164,9 +164,9 @@ struct KidsAppRoot: View {
     private var closeChrome: some View {
         Button { activeSheet = nil } label: {
             Image(systemName: "xmark")
-                .font(.system(size: 14, weight: .heavy))
+                .font(.system(.subheadline, weight: .heavy))
                 .foregroundStyle(K.text)
-                .frame(width: 36, height: 36)
+                .frame(width: 44, height: 44)
                 .background(.thinMaterial)
                 .clipShape(Circle())
                 .shadow(color: .black.opacity(0.15), radius: 8, y: 2)

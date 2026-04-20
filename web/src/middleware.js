@@ -132,11 +132,10 @@ export async function middleware(request) {
   });
   response.headers.set('x-request-id', requestId);
 
-  // H-05 — Content-Security-Policy.
-  // TODO(flip-2026-04-21): after 48h of clean /api/csp-report telemetry,
-  // flip the header name from `Content-Security-Policy-Report-Only` to
-  // `Content-Security-Policy` to move from monitor mode to enforce.
-  response.headers.set('Content-Security-Policy-Report-Only', csp);
+  // H-05 — Content-Security-Policy (enforce mode). Flipped 2026-04-21
+  // from Report-Only after the soak phase. `/api/csp-report` remains the
+  // violation sink via `report-uri` in the policy string.
+  response.headers.set('Content-Security-Policy', csp);
 
   // M-17 — CORS allow-list for /api/* on normal (non-preflight) requests.
   if (pathname.startsWith('/api/')) {
@@ -157,7 +156,7 @@ export async function middleware(request) {
             request: { headers: forwardedHeaders },
           });
           response.headers.set('x-request-id', requestId);
-          response.headers.set('Content-Security-Policy-Report-Only', csp);
+          response.headers.set('Content-Security-Policy', csp);
           if (pathname.startsWith('/api/')) applyCors(request, response);
           response.cookies.set({ name, value, ...options });
         },
@@ -167,7 +166,7 @@ export async function middleware(request) {
             request: { headers: forwardedHeaders },
           });
           response.headers.set('x-request-id', requestId);
-          response.headers.set('Content-Security-Policy-Report-Only', csp);
+          response.headers.set('Content-Security-Policy', csp);
           if (pathname.startsWith('/api/')) applyCors(request, response);
           response.cookies.set({ name, value: '', ...options });
         },
@@ -175,7 +174,17 @@ export async function middleware(request) {
     }
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
+  // Skip GoTrue call on public routes. Only the protected-route redirect
+  // and the /kids/* fork below branch on `user`, so every other request
+  // (home, story, /api/*, /login, etc.) can avoid a Supabase auth round-trip
+  // entirely. Cuts middleware p50 on public pages dramatically.
+  const needsUser =
+    isProtected(pathname) ||
+    pathname === '/kids' ||
+    pathname.startsWith('/kids/');
+  const user = needsUser
+    ? (await supabase.auth.getUser()).data.user
+    : null;
 
   if (!user && isProtected(pathname)) {
     const loginUrl = request.nextUrl.clone();
@@ -184,7 +193,7 @@ export async function middleware(request) {
     loginUrl.searchParams.set('next', pathname + request.nextUrl.search);
     const redirect = NextResponse.redirect(loginUrl, { status: 302 });
     redirect.headers.set('x-request-id', requestId);
-    redirect.headers.set('Content-Security-Policy-Report-Only', csp);
+    redirect.headers.set('Content-Security-Policy', csp);
     return redirect;
   }
 

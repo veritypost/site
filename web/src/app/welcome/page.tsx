@@ -48,9 +48,10 @@ export default function WelcomePage() {
       if (!user) { router.replace('/login'); return; }
       const { data: me } = await supabase
         .from('users')
-        .select('onboarding_completed_at')
+        .select('onboarding_completed_at, email_verified')
         .eq('id', user.id)
         .maybeSingle();
+      if (!me?.email_verified) { router.replace('/verify-email'); return; }
       if (me?.onboarding_completed_at) { router.replace('/'); return; }
       setLoading(false);
     })();

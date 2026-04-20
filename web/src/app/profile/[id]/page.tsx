@@ -76,7 +76,6 @@ const C = {
 const TABS = [
   { label: 'Overview', href: '/profile' },
   { label: 'Activity', href: '/profile/activity' },
-  { label: 'Quizzes', href: '/profile/quizzes' },
   { label: 'Milestones', href: '/profile/milestones' },
 ];
 

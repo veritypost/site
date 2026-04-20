@@ -35,16 +35,16 @@ struct PairCodeView: View {
                             .shadow(color: K.teal.opacity(0.3), radius: 16, y: 6)
 
                         Image(systemName: "qrcode.viewfinder")
-                            .font(.system(size: 32, weight: .bold))
+                            .font(.system(.largeTitle, weight: .bold))
                             .foregroundStyle(.white)
                     }
 
                     Text("Verity Post Kids")
-                        .font(.system(size: 26, weight: .black, design: .rounded))
+                        .font(.system(.title, design: .rounded, weight: .black))
                         .foregroundStyle(K.text)
 
                     Text("Ask a grown-up for a pair code.\nType it in below.")
-                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .font(.system(.subheadline, design: .rounded, weight: .medium))
                         .foregroundStyle(K.dim)
                         .multilineTextAlignment(.center)
                 }
@@ -53,7 +53,7 @@ struct PairCodeView: View {
                     codeField
                     if let err = errorMessage {
                         Text(err)
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .font(.system(.caption, design: .rounded, weight: .semibold))
                             .foregroundStyle(K.coralDark)
                             .multilineTextAlignment(.center)
                     }
@@ -65,7 +65,7 @@ struct PairCodeView: View {
                             ProgressView().tint(.white)
                         }
                         Text(isPairing ? "Pairing…" : "Pair")
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .font(.system(.body, design: .rounded, weight: .bold))
                     }
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity, minHeight: 52)
@@ -78,7 +78,7 @@ struct PairCodeView: View {
                 .opacity(canSubmit ? 1.0 : 0.6)
 
                 Text("The grown-up can make a code in the Verity Post app or on veritypost.com.")
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .font(.system(.caption, design: .rounded, weight: .medium))
                     .foregroundStyle(K.dim)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 8)
@@ -106,7 +106,7 @@ struct PairCodeView: View {
         .textInputAutocapitalization(.characters)
         .disableAutocorrection(true)
         .focused($focused)
-        .font(.system(size: 32, weight: .black, design: .rounded))
+        .font(.system(.largeTitle, design: .rounded, weight: .black))
         .foregroundStyle(K.text)
         .kerning(6)
         .multilineTextAlignment(.center)

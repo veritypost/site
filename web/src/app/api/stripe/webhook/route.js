@@ -41,9 +41,25 @@ import { verifyWebhook, retrieveSubscription } from '@/lib/stripe';
 export const runtime = 'nodejs';           // need node crypto
 export const dynamic = 'force-dynamic';
 
+// Belt-and-braces body-size cap. Stripe events are small (<100 KB in
+// practice); reject anything above 1 MiB so a malformed / hostile caller
+// can't force the Node runtime to buffer an unbounded body before the
+// HMAC check. Checked twice: once against the declared Content-Length
+// (cheap, pre-read) and once against the actual buffered length.
+const MAX_BODY_SIZE = 1024 * 1024;
+
 export async function POST(request) {
   const sig = request.headers.get('stripe-signature');
+
+  const declaredLen = Number(request.headers.get('content-length'));
+  if (Number.isFinite(declaredLen) && declaredLen > MAX_BODY_SIZE) {
+    return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
+  }
+
   const raw = await request.text();
+  if (raw.length > MAX_BODY_SIZE) {
+    return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
+  }
 
   let event;
   try { event = verifyWebhook(raw, sig); }

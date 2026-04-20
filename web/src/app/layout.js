@@ -62,6 +62,9 @@ export const metadata = {
     ],
     apple: [{ url: '/apple-touch-icon.png', sizes: '180x180' }],
   },
+  other: {
+    'mobile-web-app-capable': 'yes',
+  },
 };
 
 // DA-185 — viewport-fit=cover lets CSS env(safe-area-inset-*) work on

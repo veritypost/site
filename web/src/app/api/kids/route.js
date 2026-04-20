@@ -26,6 +26,7 @@ export async function GET() {
     .from('kid_profiles')
     .select('*')
     .eq('parent_user_id', user.id)
+    .eq('is_active', true)
     .order('created_at');
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ kids: data || [] });
@@ -49,8 +50,12 @@ export async function POST(request) {
   }
   const ageMs = now - dob;
   const maxAgeMs = 13 * 365.25 * 24 * 60 * 60 * 1000;
+  const minAgeMs = 3 * 365.25 * 24 * 60 * 60 * 1000;
   if (ageMs > maxAgeMs) {
     return NextResponse.json({ error: 'Kid profiles are for children under 13.' }, { status: 400 });
+  }
+  if (ageMs < minAgeMs) {
+    return NextResponse.json({ error: 'Kid must be at least 3 years old.' }, { status: 400 });
   }
 
   const consentErr = validateConsentPayload(b.consent);

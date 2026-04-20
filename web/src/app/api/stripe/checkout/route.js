@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { createCheckoutSession } from '@/lib/stripe';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 // POST /api/stripe/checkout — body: { plan_name }
 //
@@ -19,10 +20,22 @@ export async function POST(request) {
   try { user = await requirePermission('billing.upgrade.checkout'); }
   catch (err) { if (err.status) return NextResponse.json({ error: err.message }, { status: err.status }); return NextResponse.json({ error: 'Internal error' }, { status: 500 }); }
 
+  const service = createServiceClient();
+
+  // Rate-limit: 20 checkout sessions per hour per user. Stripe session
+  // creation is billable/observable on Stripe side; an abusive caller
+  // could spam this endpoint to rack up session noise.
+  const rate = await checkRateLimit(service, {
+    key: `stripe-checkout:${user.id}`,
+    max: 20,
+    windowSec: 3600,
+  });
+  if (rate.limited) {
+    return NextResponse.json({ error: 'Too many checkout attempts. Try again later.' }, { status: 429, headers: { 'Retry-After': '3600' } });
+  }
+
   const { plan_name } = await request.json().catch(() => ({}));
   if (!plan_name) return NextResponse.json({ error: 'plan_name required' }, { status: 400 });
-
-  const service = createServiceClient();
   const { data: plan } = await service
     .from('plans')
     .select('id, tier, stripe_price_id, display_name')

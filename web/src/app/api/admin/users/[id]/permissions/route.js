@@ -3,7 +3,7 @@
 // @feature-verified admin_api 2026-04-18
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
-import { createServiceClient } from '@/lib/supabase/server';
+import { createClient, createServiceClient } from '@/lib/supabase/server';
 
 // POST /api/admin/users/[id]/permissions
 //
@@ -79,6 +79,25 @@ export async function POST(request, { params }) {
 
   const targetUserId = params?.id;
   if (!targetUserId) return badRequest('user id required');
+
+  // Rank guard — prevent a permission-override grant from being applied to
+  // a user who outranks the caller (e.g. an admin overriding permissions on
+  // a superadmin/owner). Sibling routes (ban, roles, plan, role-set) all
+  // enforce this; this one was missed. Self-edits are allowed (skip the
+  // check if actor == target).
+  if (actor.id !== targetUserId) {
+    const authed = await createClient();
+    const { data: outranks, error: outranksErr } = await authed.rpc('require_outranks', {
+      target_user_id: targetUserId,
+    });
+    if (outranksErr) {
+      console.error('[user-perms] require_outranks failed:', outranksErr.message);
+      return serverError('rank check failed');
+    }
+    if (!outranks) {
+      return NextResponse.json({ error: 'Target user outranks you' }, { status: 403 });
+    }
+  }
 
   let body;
   try {

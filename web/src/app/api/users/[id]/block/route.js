@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 // POST /api/users/[id]/block — toggle block.
 // D39: available to all verified users.
@@ -21,6 +22,15 @@ export async function POST(request, { params }) {
 
   const { reason } = await request.json().catch(() => ({}));
   const service = createServiceClient();
+
+  const rate = await checkRateLimit(service, {
+    key: `users-block:${user.id}`,
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': '60' } });
+  }
 
   const { data: existing } = await service
     .from('blocked_users')

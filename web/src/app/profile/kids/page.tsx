@@ -172,7 +172,7 @@ export default function ParentKidsPage() {
     if (!pendingRemove) return;
     setRemoveBusy(true);
     try {
-      const res = await fetch(`/api/kids/${pendingRemove.id}`, { method: 'DELETE', credentials: 'include' });
+      const res = await fetch(`/api/kids/${pendingRemove.id}?confirm=1`, { method: 'DELETE', credentials: 'include' });
       if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d?.error || 'Delete failed'); return; }
       setPendingRemove(null);
       load();

@@ -32,7 +32,7 @@ struct KidReaderView: View {
                         ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
                     } else {
                         Text(body_)
-                            .font(.system(size: 16, weight: .regular, design: .rounded))
+                            .font(.system(.body, design: .rounded, weight: .regular))
                             .foregroundStyle(K.text)
                             .lineSpacing(5)
 
@@ -40,7 +40,7 @@ struct KidReaderView: View {
                     }
                     if let loadError {
                         Text(loadError)
-                            .font(.system(size: 12, design: .rounded))
+                            .font(.system(.caption, design: .rounded))
                             .foregroundStyle(K.coralDark)
                     }
                 }
@@ -74,21 +74,21 @@ struct KidReaderView: View {
                 .frame(height: 140)
                 .overlay(
                     Image(systemName: "newspaper.fill")
-                        .font(.system(size: 54, weight: .bold))
+                        .font(.system(.largeTitle, weight: .bold))
                         .foregroundStyle(categoryColor)
                 )
 
             Text(article.title ?? "Untitled")
-                .font(.system(size: 24, weight: .black, design: .rounded))
+                .font(.system(.title2, design: .rounded, weight: .black))
                 .foregroundStyle(K.text)
                 .multilineTextAlignment(.leading)
 
             if let mins = article.readingTimeMinutes {
                 HStack(spacing: 6) {
                     Image(systemName: "clock")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(.system(.caption, weight: .bold))
                     Text("\(mins) min read")
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .font(.system(.caption, design: .rounded, weight: .semibold))
                 }
                 .foregroundStyle(K.dim)
             }
@@ -98,7 +98,7 @@ struct KidReaderView: View {
     private var takeQuizButton: some View {
         VStack(spacing: 10) {
             Text("Ready to try the quiz?")
-                .font(.system(size: 15, weight: .heavy, design: .rounded))
+                .font(.system(.subheadline, design: .rounded, weight: .heavy))
                 .foregroundStyle(K.text)
 
             Button {
@@ -110,9 +110,9 @@ struct KidReaderView: View {
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "questionmark.circle.fill")
-                        .font(.system(size: 18, weight: .bold))
+                        .font(.system(.body, weight: .bold))
                     Text("Take the quiz")
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .font(.system(.body, design: .rounded, weight: .bold))
                 }
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity, minHeight: 54)
@@ -128,9 +128,9 @@ struct KidReaderView: View {
     private var dismissButton: some View {
         Button { dismiss() } label: {
             Image(systemName: "xmark")
-                .font(.system(size: 14, weight: .heavy))
+                .font(.system(.subheadline, weight: .heavy))
                 .foregroundStyle(K.text)
-                .frame(width: 36, height: 36)
+                .frame(width: 44, height: 44)
                 .background(.thinMaterial)
                 .clipShape(Circle())
                 .shadow(color: .black.opacity(0.15), radius: 8, y: 2)

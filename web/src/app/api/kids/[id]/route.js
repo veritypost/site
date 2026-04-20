@@ -5,8 +5,15 @@ import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 
 async function ownKid(service, userId, kidId) {
-  const { data } = await service.from('kid_profiles').select('id, parent_user_id').eq('id', kidId).maybeSingle();
-  return data && data.parent_user_id === userId ? data : null;
+  // Only treat kids that are is_active=true as owned. Soft-deleted
+  // (is_active=false) rows must not be PATCHable or re-DELETE-able.
+  const { data } = await service
+    .from('kid_profiles')
+    .select('id, parent_user_id, is_active')
+    .eq('id', kidId)
+    .maybeSingle();
+  if (!data || data.parent_user_id !== userId || data.is_active === false) return null;
+  return data;
 }
 
 export async function PATCH(request, { params }) {
@@ -36,16 +43,31 @@ export async function PATCH(request, { params }) {
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(_request, { params }) {
+export async function DELETE(request, { params }) {
   let user;
   try { user = await requirePermission('kids.profile.delete'); }
   catch (err) { return NextResponse.json({ error: err.message }, { status: err.status || 401 }); }
+
+  // Require explicit ?confirm=1 so an accidental DELETE fetch can't wipe a
+  // kid profile. Client passes confirm=1 after the user OKs the modal.
+  const url = new URL(request.url);
+  if (url.searchParams.get('confirm') !== '1') {
+    return NextResponse.json({ error: 'Confirmation required' }, { status: 400 });
+  }
 
   const service = createServiceClient();
   if (!await ownKid(service, user.id, params.id)) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
-  const { error } = await service.from('kid_profiles').delete().eq('id', params.id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  return NextResponse.json({ ok: true });
+  // Soft-delete: flip is_active so reading history, streaks, and achievements
+  // are preserved. A later cron can hard-purge after a retention window.
+  const { error } = await service
+    .from('kid_profiles')
+    .update({ is_active: false, updated_at: new Date().toISOString() })
+    .eq('id', params.id);
+  if (error) {
+    console.error('[kids.delete]', error);
+    return NextResponse.json({ error: 'Could not delete kid profile' }, { status: 400 });
+  }
+  return NextResponse.json({ ok: true, soft_deleted: true });
 }

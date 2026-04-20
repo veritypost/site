@@ -45,7 +45,8 @@ export async function POST(request) {
     p_time_taken_seconds: time_taken_seconds || null,
   });
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    console.error('[quiz.submit]', error);
+    return NextResponse.json({ error: 'Could not submit quiz' }, { status: 400 });
   }
 
   let scoring = null;

@@ -273,6 +273,21 @@ export default function UsersAdmin() {
       run: async () => {
         const { error } = await supabase.from('users').delete().eq('id', u.id);
         if (error) throw new Error(error.message);
+        // Belt-and-braces completion audit. DestructiveActionConfirm
+        // writes `user.delete` at intent time via record_admin_action;
+        // this second row records that the DB delete actually landed so
+        // the audit log isn't ambiguous if the delete throws.
+        // TODO (later batch): move this whole path to a server route
+        // with service-client + require_outranks, matching ban.
+        try {
+          await supabase.rpc('record_admin_action', {
+            p_action: 'user.delete.completed',
+            p_target_table: 'users',
+            p_target_id: u.id,
+            p_old_value: { username: u.username, email: u.email } as never,
+            p_new_value: null as never,
+          });
+        } catch { /* best-effort */ }
         setUsers((prev) => prev.filter((x) => x.id !== u.id));
         setSelectedId(null);
         toast.push({ message: `Deleted @${u.username}`, variant: 'success' });
@@ -806,40 +821,47 @@ function UserDetail(props: {
         ))}
       </div>
 
-      <SectionLabel>Linked devices</SectionLabel>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: S[2], marginBottom: S[6] }}>
-        {(user.devices || []).length === 0 && (
-          <div style={{ fontSize: F.sm, color: ADMIN_C.muted }}>No devices linked.</div>
-        )}
-        {(user.devices || []).map((d) => (
-          <div
-            key={d.id}
-            style={{
-              background: ADMIN_C.card,
-              border: `1px solid ${d.suspicious ? ADMIN_C.danger : ADMIN_C.divider}`,
-              borderRadius: 8,
-              padding: `${S[2]}px ${S[3]}px`,
-              display: 'flex',
-              alignItems: 'center',
-              gap: S[3],
-            }}
-          >
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: S[1], flexWrap: 'wrap' }}>
-                <span style={{ fontSize: F.sm, fontWeight: 600 }}>{d.device}</span>
-                {d.suspicious && <Badge variant="danger" size="xs">suspicious</Badge>}
-                {d.current && <Badge variant="success" size="xs">current</Badge>}
+      {/* Linked devices — hidden; the device fetch is not wired yet so this
+          section always showed "No devices linked." Will be re-enabled in a
+          later batch once the server-side device lookup exists. */}
+      {false && (
+        <>
+          <SectionLabel>Linked devices</SectionLabel>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: S[2], marginBottom: S[6] }}>
+            {(user.devices || []).length === 0 && (
+              <div style={{ fontSize: F.sm, color: ADMIN_C.muted }}>No devices linked.</div>
+            )}
+            {(user.devices || []).map((d) => (
+              <div
+                key={d.id}
+                style={{
+                  background: ADMIN_C.card,
+                  border: `1px solid ${d.suspicious ? ADMIN_C.danger : ADMIN_C.divider}`,
+                  borderRadius: 8,
+                  padding: `${S[2]}px ${S[3]}px`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: S[3],
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: S[1], flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: F.sm, fontWeight: 600 }}>{d.device}</span>
+                    {d.suspicious && <Badge variant="danger" size="xs">suspicious</Badge>}
+                    {d.current && <Badge variant="success" size="xs">current</Badge>}
+                  </div>
+                  <div style={{ fontSize: F.xs, color: ADMIN_C.dim, marginTop: 2 }}>
+                    {d.os} · {d.browser} · Last seen {d.lastSeen || d.last_seen}
+                  </div>
+                </div>
+                <Button size="sm" variant="secondary" onClick={() => onUnlinkDevice(d.id)}>
+                  Unlink
+                </Button>
               </div>
-              <div style={{ fontSize: F.xs, color: ADMIN_C.dim, marginTop: 2 }}>
-                {d.os} · {d.browser} · Last seen {d.lastSeen || d.last_seen}
-              </div>
-            </div>
-            <Button size="sm" variant="secondary" onClick={() => onUnlinkDevice(d.id)}>
-              Unlink
-            </Button>
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      )}
 
       <SectionLabel>Manual actions</SectionLabel>
       <div style={{ display: 'flex', flexDirection: 'column', gap: S[3], marginBottom: S[6] }}>

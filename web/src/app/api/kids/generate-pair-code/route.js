@@ -30,7 +30,7 @@ export async function POST(request) {
       windowSec: 60,
     });
     if (rate.limited) {
-      return NextResponse.json({ error: 'Too many codes generated. Wait a minute.' }, { status: 429 });
+      return NextResponse.json({ error: 'Too many codes generated. Wait a minute.' }, { status: 429, headers: { 'Retry-After': '60' } });
     }
 
     let body;

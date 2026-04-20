@@ -33,6 +33,7 @@ import {
   hasPermission,
   refreshAllPermissions,
   refreshIfStale,
+  invalidate,
 } from '@/lib/permissions';
 import {
   TIERS,
@@ -206,9 +207,15 @@ const ALERT_ROWS: { key: AlertType; label: string; desc: string }[] = [
   { key: 'appeal_outcome',        label: 'Appeal outcome',        desc: 'Moderator decisions on your appeals.' },
 ];
 
+// NOTE: web has no service worker / VAPID / PushSubscription wiring yet,
+// so the `channel_push` toggle here only affects iOS (APNs) delivery.
+// Keep the toggle rendered so preferences round-trip to the iOS app
+// identically, but surface an "iOS only" hint in the column label and
+// an explanatory note at the top of the Alerts card (see AlertsCard).
+// TODO(web-push): drop the hint once a web Push pipeline ships.
 const ALERT_CHANNELS: { key: AlertChannel; label: string }[] = [
   { key: 'channel_in_app', label: 'In-app' },
-  { key: 'channel_push',   label: 'Push' },
+  { key: 'channel_push',   label: 'Push (iOS only)' },
   { key: 'channel_email',  label: 'Email' },
 ];
 
@@ -406,6 +413,33 @@ function SettingsInner(): ReactElement {
     })();
     return () => { alive = false; };
   }, [router, supabase]);
+
+  // Post-Stripe-checkout landing. /profile/settings/billing preserves
+  // ?success=1 / ?canceled=1 through its server redirect. Fire a toast,
+  // invalidate the permission cache so the newly-unlocked tier takes
+  // effect without a reload, and strip the query so refresh doesn't
+  // re-fire the toast.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const sp = new URLSearchParams(window.location.search);
+    const success = sp.get('success');
+    const canceled = sp.get('canceled');
+    if (!success && !canceled) return;
+    if (success === '1') {
+      pushToast({ message: 'Subscription updated. Welcome aboard.', variant: 'success' });
+      invalidate();
+      void refreshAllPermissions();
+    } else if (canceled === '1') {
+      pushToast({ message: 'Checkout canceled.', variant: 'neutral' });
+    }
+    sp.delete('success');
+    sp.delete('canceled');
+    const next = sp.toString();
+    const url = `${window.location.pathname}${next ? `?${next}` : ''}${window.location.hash}`;
+    router.replace(url);
+    // Run once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ---------- user row (used by almost every section) ----------
   const [userRow, setUserRow] = useState<UserRow | null>(null);
@@ -2245,6 +2279,21 @@ function AlertsCard({
   return (
     <Card id="alerts" title="Alerts" highlight={highlight}
       description="Choose where each alert type shows up. In-app is on by default.">
+      {/* Web push is not yet wired (no SW/VAPID). Push preferences set
+          here are respected by the iOS app but are a no-op on web. */}
+      <div style={{
+        fontSize: F.xs,
+        color: C.dim,
+        background: C.bg,
+        border: `1px dashed ${C.border}`,
+        borderRadius: 6,
+        padding: S[2],
+        marginBottom: S[3],
+      }}>
+        Note: Push delivery is iOS-only for now. Enabling Push on web saves your
+        preference so the iOS app will honour it, but the web app itself does
+        not send push notifications yet.
+      </div>
       {loading ? (
         <SkeletonBar width={220} />
       ) : isMobile ? (

@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { verifyPinForRow, buildPbkdf2Credential } from '@/lib/kidPin';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 const MAX_ATTEMPTS = 3;
 const LOCKOUT_SECONDS = 60;
@@ -12,6 +13,17 @@ export async function POST(request) {
   let user;
   try { user = await requirePermission('kids.pin.verify'); }
   catch (err) { return NextResponse.json({ error: err.message }, { status: err.status || 401 }); }
+
+  // Outer guard over the DB-level per-kid lockout: 30 attempts/min per parent across all kids.
+  const rlSvc = createServiceClient();
+  const rate = await checkRateLimit(rlSvc, {
+    key: `kids-verify-pin:${user.id}`,
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json({ error: 'Too many attempts. Wait a minute.', retryAfter: 60 }, { status: 429, headers: { 'Retry-After': '60' } });
+  }
 
   try {
     const { kid_profile_id, pin } = await request.json();
@@ -42,7 +54,7 @@ export async function POST(request) {
         const retryAfter = Math.ceil((unlockAt - Date.now()) / 1000);
         return NextResponse.json(
           { error: 'Too many attempts', retryAfter },
-          { status: 429 }
+          { status: 429, headers: { 'Retry-After': String(retryAfter) } }
         );
       }
     }
@@ -85,7 +97,7 @@ export async function POST(request) {
     if (shouldLock) {
       return NextResponse.json(
         { error: 'Too many attempts', retryAfter: LOCKOUT_SECONDS },
-        { status: 429 }
+        { status: 429, headers: { 'Retry-After': String(LOCKOUT_SECONDS) } }
       );
     }
 

@@ -30,13 +30,18 @@ export async function POST(request) {
     p_other_user_id: other_user_id,
   });
   if (error) {
-    const msg = error.message || 'create failed';
+    const msg = error.message || '';
     const status = msg.includes('paid plan') ? 403
       : msg.includes('muted') || msg.includes('banned') ? 403
       : msg.includes('not found') ? 404
       : msg.includes('yourself') ? 400
       : 400;
-    return NextResponse.json({ error: msg }, { status });
+    const userMsg = status === 404 ? 'Recipient not found.'
+      : status === 403 ? 'You cannot start a conversation with this user.'
+      : msg.includes('yourself') ? 'You cannot message yourself.'
+      : 'Could not start conversation';
+    console.error('[conversations.post]', error);
+    return NextResponse.json({ error: userMsg }, { status });
   }
   return NextResponse.json({ conversation: data });
 }

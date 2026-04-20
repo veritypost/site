@@ -65,7 +65,7 @@ export async function GET(request) {
 
     const { data: existing } = await supabase
       .from('users')
-      .select('id, username')
+      .select('id, username, onboarding_completed_at')
       .eq('id', user.id)
       .maybeSingle();
 
@@ -144,6 +144,13 @@ export async function GET(request) {
 
     if (!existing.username) {
       return NextResponse.redirect(`${siteUrl}/signup/pick-username`);
+    }
+
+    // New-to-the-product user who already has a username (OAuth that
+    // auto-provisioned a handle, or re-login mid-onboarding): route
+    // them through the welcome carousel before anywhere else.
+    if (!existing.onboarding_completed_at) {
+      return NextResponse.redirect(`${siteUrl}/welcome`);
     }
 
     // DA-021 / DA-100 / F-029 — validate `next` server-side. Rejects

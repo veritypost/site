@@ -169,15 +169,10 @@ function AnalyticsInner() {
         title="Analytics"
         subtitle="Traffic, engagement, quiz quality, and resource usage."
         actions={
+          // TODO: 30d/90d options hidden — fetch currently hardcodes 7 days.
+          // Re-enable once the fetch reads the selected period.
           <div style={{ display: 'flex', gap: S[1] }}>
-            {(['7d', '30d', '90d'] as const).map((p) => (
-              <Button
-                key={p}
-                size="sm"
-                variant={period === p ? 'primary' : 'secondary'}
-                onClick={() => setPeriod(p)}
-              >{p}</Button>
-            ))}
+            <Button size="sm" variant="primary" onClick={() => setPeriod('7d')}>7d</Button>
           </div>
         }
       />
@@ -343,7 +338,8 @@ function AnalyticsInner() {
                     </div>
                     <div style={{ display: 'flex', gap: S[1], flexWrap: 'wrap' }}>
                       {!q.flagged && <Button size="sm" variant="secondary" onClick={() => flagQuestion(q.id)}>Flag for review</Button>}
-                      <Button size="sm" variant="ghost">Edit question</Button>
+                      {/* TODO: quiz edit UI not wired here — edit in /admin/story-manager */}
+                      <Button size="sm" variant="ghost" disabled title="Edit quiz questions in /admin/story-manager">Edit question</Button>
                     </div>
                   </div>
                 );
@@ -355,6 +351,13 @@ function AnalyticsInner() {
 
       {tab === 'resources' && (
         <PageSection title="Resource usage">
+          <div style={{
+            padding: S[3], marginBottom: S[3], borderRadius: 8,
+            background: 'rgba(234,179,8,0.08)', border: `1px solid ${C.warn}`,
+            color: C.warn, fontSize: F.sm, fontWeight: 600,
+          }}>
+            [Demo data] These figures are placeholders. Live Supabase / Vercel usage wiring is pending — do not use for capacity decisions.
+          </div>
           <div style={{
             display: 'flex', gap: S[4], alignItems: 'center', flexWrap: 'wrap',
             padding: S[3], marginBottom: S[3], borderRadius: 8, border: `1px solid ${C.divider}`, background: C.bg,

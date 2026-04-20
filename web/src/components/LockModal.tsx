@@ -53,14 +53,14 @@ function resolvePrompt(args: { lockReason?: string | null; lockMessage?: string 
       headline: 'Sign in to continue',
       body:     lockMessage || 'Create an account (or sign in) to unlock this.',
       ctaLabel: 'Sign up',
-      ctaHref:  '/auth',
+      ctaHref:  '/login',
     };
   }
   return {
     headline: 'Upgrade to unlock',
     body:     lockMessage || 'This feature is available on paid plans.',
     ctaLabel: 'See plans',
-    ctaHref:  '/plans',
+    ctaHref:  '/profile/settings#billing',
   };
 }
 

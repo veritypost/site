@@ -27,7 +27,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-const SITE_DIR = path.resolve(__dirname, '..', 'site');
+const SITE_DIR = path.resolve(__dirname, '..', 'web');
 const { createClient } = require(path.join(SITE_DIR, 'node_modules', '@supabase', 'supabase-js'));
 
 function loadEnv(p) {

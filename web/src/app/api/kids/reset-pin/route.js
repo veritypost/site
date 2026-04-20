@@ -1,9 +1,10 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified kids 2026-04-18
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { requirePermission } from '@/lib/auth';
 import { assertKidOwnership } from '@/lib/kids';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 export async function POST(request) {
   try {
@@ -11,6 +12,17 @@ export async function POST(request) {
     let user;
     try { user = await requirePermission('kids.pin.reset'); }
     catch (err) { return NextResponse.json({ error: err.message }, { status: err.status || 401 }); }
+
+    // Rate-limit parent-password brute-force: 5 reset attempts per hour per user.
+    const svc = createServiceClient();
+    const rate = await checkRateLimit(svc, {
+      key: `kids-reset-pin:${user.id}`,
+      max: 5,
+      windowSec: 3600,
+    });
+    if (rate.limited) {
+      return NextResponse.json({ error: 'Too many PIN reset attempts. Try again later.' }, { status: 429, headers: { 'Retry-After': '3600' } });
+    }
 
     const { kid_profile_id, password } = await request.json();
 

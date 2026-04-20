@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { createClient, createClientFromToken, createServiceClient } from '@/lib/supabase/server';
 import { hasPermissionServer } from '@/lib/auth';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 // Phase 19.2: user self-initiates account deletion. Schedules the
 // 30-day grace timer + writes a data_requests row. Cron anonymizes
@@ -63,9 +64,23 @@ export async function POST(request) {
   const allowed = await hasPermissionServer('settings.data.request_deletion', authClient);
   if (!allowed) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
+  const service = createServiceClient();
+
+  // Rate-limit: 5 schedule-deletion attempts per hour per user. Prevents
+  // an attacker with a stolen session cookie from thrashing the 30-day
+  // timer (repeatedly rescheduling/cancelling can confuse the
+  // grace-period state machine).
+  const rate = await checkRateLimit(service, {
+    key: `account-delete:${user.id}`,
+    max: 5,
+    windowSec: 3600,
+  });
+  if (rate.limited) {
+    return NextResponse.json({ error: 'Too many deletion requests. Try again later.' }, { status: 429, headers: { 'Retry-After': '3600' } });
+  }
+
   const { reason } = await request.json().catch(() => ({}));
 
-  const service = createServiceClient();
   const { data, error } = await service.rpc('schedule_account_deletion', {
     p_user_id: user.id,
     p_reason: reason || null,

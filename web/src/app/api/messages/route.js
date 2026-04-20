@@ -28,13 +28,17 @@ export async function POST(request) {
     p_body: body,
   });
   if (error) {
-    const msg = error.message || 'send failed';
+    const msg = error.message || '';
     const status = msg.includes('paid plan') ? 403
       : msg.includes('muted') || msg.includes('banned') ? 403
       : msg.includes('rate limit') ? 429
       : msg.includes('participant') ? 403
       : 400;
-    return NextResponse.json({ error: msg }, { status });
+    const userMsg = status === 429 ? 'Too many messages. Please slow down.'
+      : status === 403 ? 'You cannot send messages in this conversation.'
+      : 'Could not send message';
+    console.error('[messages.post]', error);
+    return NextResponse.json({ error: userMsg }, { status });
   }
 
   return NextResponse.json({ message: data });

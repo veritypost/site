@@ -875,7 +875,7 @@ export default function HomePage() {
             </div>
           )}
           {!loading && feedVisible.length > 0 && <RecapCard />}
-          {!loading && feedVisible.map((story, idx) => (
+          {!loading && feedVisible.filter(s => s.slug).map((story, idx) => (
             <Fragment key={story.id}>
               <a
                 href={`/story/${story.slug}`}

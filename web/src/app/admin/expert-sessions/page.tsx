@@ -193,13 +193,26 @@ function ExpertSessionsInner() {
         <div style={{ display: 'flex', alignItems: 'center', gap: S[2] }}>
           <Badge variant={statusVariant(row.status)} dot>{row.status || '—'}</Badge>
           {row.status === 'live' && (
-            // TODO: the web-side `/kids/expert-sessions/<id>` moderator
-            // viewer was retired with the rest of the kid web UI.
-            // Replace with an admin-facing moderator view or link out to
-            // the VerityPostKids iOS app once that flow exists.
-            <span style={{ fontSize: F.xs, color: ADMIN_C.dim }}>
-              Moderate in Kids app
-            </span>
+            // Kids is iOS-only (see kids_scope). The live moderator view
+            // lives inside the VerityPostKids app; this pill is a
+            // read-only affordance so admins understand the action
+            // isn't available on web.
+            <button
+              type="button"
+              disabled
+              title="The live kids expert session moderator view is in the iOS app"
+              style={{
+                fontSize: F.xs,
+                color: ADMIN_C.dim,
+                background: 'transparent',
+                border: `1px solid ${ADMIN_C.border}`,
+                borderRadius: 999,
+                padding: '2px 8px',
+                cursor: 'not-allowed',
+              }}
+            >
+              Live — moderated in iOS
+            </button>
           )}
         </div>
       ),

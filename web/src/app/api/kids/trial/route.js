@@ -48,8 +48,12 @@ export async function POST(request) {
   }
   const ageMs = now - dob;
   const maxAgeMs = 13 * 365.25 * 24 * 60 * 60 * 1000;
+  const minAgeMs = 3 * 365.25 * 24 * 60 * 60 * 1000;
   if (ageMs > maxAgeMs) {
     return NextResponse.json({ error: 'Kid profiles are for children under 13.' }, { status: 400 });
+  }
+  if (ageMs < minAgeMs) {
+    return NextResponse.json({ error: 'Kid must be at least 3 years old.' }, { status: 400 });
   }
 
   const consentErr = validateConsentPayload(b.consent);

@@ -218,9 +218,12 @@ export default function StoryPage() {
   const [userTier, setUserTier] = useState<string>('free');
   const [canBookmarkAdd, setCanBookmarkAdd] = useState<boolean>(false);
   const [canListenTts, setCanListenTts] = useState<boolean>(false);
-  const [canViewBody, setCanViewBody] = useState<boolean>(true);
-  const [canViewSources, setCanViewSources] = useState<boolean>(true);
-  const [canViewTimeline, setCanViewTimeline] = useState<boolean>(true);
+  // Default to false so paid-content flashes don't leak while permissions
+  // resolve. Anonymous path sets them true explicitly below (public
+  // gating is via regwall/quiz, not these per-article permission keys).
+  const [canViewBody, setCanViewBody] = useState<boolean>(false);
+  const [canViewSources, setCanViewSources] = useState<boolean>(false);
+  const [canViewTimeline, setCanViewTimeline] = useState<boolean>(false);
   const [canViewAdFree, setCanViewAdFree] = useState<boolean>(false);
 
   const [bookmarked, setBookmarked] = useState<boolean>(false);
@@ -232,6 +235,7 @@ export default function StoryPage() {
   const [reportCategory, setReportCategory] = useState<string>('');
   const [reportDetail, setReportDetail] = useState<string>('');
   const [reportSuccess, setReportSuccess] = useState<boolean>(false);
+  const [reportError, setReportError] = useState<string>('');
 
   const [showRegWall, setShowRegWall] = useState<boolean>(false);
   // R13-C5 Fix 5 — per-session dismissal of the regwall. The underlying
@@ -328,6 +332,12 @@ export default function StoryPage() {
         if (authUser) setCurrentUser(authUser as AuthUser);
 
         if (!authUser) {
+          // Anonymous readers: view gating runs through the regwall/quiz
+          // path, not per-article permission keys. Grant the view flags
+          // so the default-false init above doesn't hide public content.
+          setCanViewBody(true);
+          setCanViewSources(true);
+          setCanViewTimeline(true);
           // D23: anonymous gets a sign-up interstitial on the 2nd article open.
           // The registration wall (harder block) kicks in at the configured
           // free_article_limit.
@@ -413,6 +423,13 @@ export default function StoryPage() {
         }
       } catch (err) {
         console.error('Story load error:', err);
+        // On a transient perms/users fetch failure, fail-open so a
+        // logged-in reader with a valid article doesn't see the locked
+        // "Upgrade" panel from the default-false canView* flags above.
+        // RLS still gates the real body row server-side.
+        setCanViewBody(true);
+        setCanViewSources(true);
+        setCanViewTimeline(true);
       } finally {
         setLoading(false);
       }
@@ -526,6 +543,7 @@ export default function StoryPage() {
 
   const handleReport = async () => {
     if (!reportCategory || !story) return;
+    setReportError('');
     try {
       const res = await fetch('/api/reports', {
         method: 'POST',
@@ -540,9 +558,15 @@ export default function StoryPage() {
       if (res.ok) {
         setReportSuccess(true);
         setReportCategory(''); setReportDetail('');
-        setTimeout(() => { setShowReportModal(false); setReportSuccess(false); }, 2000);
+        setTimeout(() => { setShowReportModal(false); setReportSuccess(false); setReportError(''); }, 2000);
+      } else {
+        const data = await res.json().catch(() => ({} as { error?: string }));
+        setReportError(data?.error || 'Could not submit report. Please try again.');
       }
-    } catch (e) { console.error('[story] report submit', e); }
+    } catch (e) {
+      console.error('[story] report submit', e);
+      setReportError('Network error — please try again.');
+    }
   };
 
   if (loading) {
@@ -961,8 +985,13 @@ export default function StoryPage() {
                     outline: 'none', boxSizing: 'border-box', resize: 'vertical',
                   }}
                 />
+                {reportError && (
+                  <div role="alert" style={{ marginTop: 8, fontSize: 12, color: '#ef4444' }}>
+                    {reportError}
+                  </div>
+                )}
                 <div style={{ display: 'flex', gap: 6, marginTop: 12, justifyContent: 'flex-end' }}>
-                  <button onClick={() => setShowReportModal(false)} style={{
+                  <button onClick={() => { setShowReportModal(false); setReportError(''); }} style={{
                     padding: '6px 14px', borderRadius: 6, border: '1px solid var(--border)',
                     background: 'transparent', color: 'var(--dim)', fontSize: 12, cursor: 'pointer',
                   }}>Cancel</button>

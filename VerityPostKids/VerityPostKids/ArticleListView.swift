@@ -37,7 +37,7 @@ struct ArticleListView: View {
                     }
                     if let loadError {
                         Text(loadError)
-                            .font(.system(size: 12, design: .rounded))
+                            .font(.system(.caption, design: .rounded))
                             .foregroundStyle(K.coralDark)
                     }
                 }
@@ -52,9 +52,9 @@ struct ArticleListView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Button { onClose() } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .bold))
+                            .font(.system(.subheadline, weight: .bold))
                             .foregroundStyle(K.text)
-                            .frame(width: 32, height: 32)
+                            .frame(width: 44, height: 44)
                             .background(K.card)
                             .clipShape(Circle())
                             .overlay(Circle().strokeBorder(K.border, lineWidth: 1))
@@ -71,10 +71,10 @@ struct ArticleListView: View {
     private var emptyState: some View {
         VStack(spacing: 10) {
             Image(systemName: "newspaper")
-                .font(.system(size: 36, weight: .bold))
+                .font(.system(.largeTitle, weight: .bold))
                 .foregroundStyle(K.dim)
             Text("No articles here yet.\nCheck back soon!")
-                .font(.system(size: 14, weight: .medium, design: .rounded))
+                .font(.system(.subheadline, design: .rounded, weight: .medium))
                 .foregroundStyle(K.dim)
                 .multilineTextAlignment(.center)
         }
@@ -91,20 +91,20 @@ struct ArticleListView: View {
                 .frame(width: 72, height: 72)
                 .overlay(
                     Image(systemName: "newspaper.fill")
-                        .font(.system(size: 28, weight: .bold))
+                        .font(.system(.title2, weight: .bold))
                         .foregroundStyle(categoryColor)
                 )
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(article.title ?? "Untitled")
-                    .font(.system(size: 15, weight: .heavy, design: .rounded))
+                    .font(.system(.subheadline, design: .rounded, weight: .heavy))
                     .foregroundStyle(K.text)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
 
                 if let summary = article.kidsSummary ?? article.excerpt, !summary.isEmpty {
                     Text(summary)
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .font(.system(.caption, design: .rounded, weight: .medium))
                         .foregroundStyle(K.dim)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
@@ -113,9 +113,9 @@ struct ArticleListView: View {
                 if let mins = article.readingTimeMinutes {
                     HStack(spacing: 4) {
                         Image(systemName: "clock")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.system(.caption2, weight: .bold))
                         Text("\(mins) min")
-                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .font(.system(.caption, design: .rounded, weight: .semibold))
                     }
                     .foregroundStyle(K.dim)
                 }

@@ -571,7 +571,7 @@ function SubscriptionsInner() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: S[2] }}>
               {pausedAccounts.map((a: any) => {
-                const resumesAt = a.resumes_at || a.resumesAt;
+                const resumesAt = a.pause_end;
                 const dl = resumesAt ? Math.max(0, Math.ceil((new Date(resumesAt).getTime() - today.getTime()) / 86400000)) : 0;
                 return (
                   <div key={a.id} style={{
@@ -581,7 +581,7 @@ function SubscriptionsInner() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: F.md, fontWeight: 600 }}>{a.users?.username || a.user_id}</div>
                       <div style={{ fontSize: F.xs, color: C.dim }}>
-                        Paused {a.paused_at ? new Date(a.paused_at).toLocaleDateString() : '—'} · {a.pause_reason || 'no reason'}
+                        Paused {a.pause_start ? new Date(a.pause_start).toLocaleDateString() : '—'} · {a.cancel_reason || 'no reason'}
                       </div>
                     </div>
                     <div style={{ textAlign: 'center', minWidth: 70 }}>

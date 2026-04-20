@@ -400,7 +400,7 @@ export default function WebhooksAdmin() {
         width="lg"
         footer={drawerLog && drawerLog.processing_status === 'failed' ? (
           <Button variant="primary" onClick={() => setRetryTarget(drawerLog)}>
-            Retry webhook
+            Mark as resolved
           </Button>
         ) : undefined}
       >
@@ -454,14 +454,16 @@ export default function WebhooksAdmin() {
         )}
       </Drawer>
 
-      {/* Retry confirm */}
+      {/* Mark-resolved confirm — does NOT redispatch the webhook; redispatch
+          is the backend retry worker's job. This only flips the log row to
+          success so it stops showing as a live failure. */}
       <ConfirmDialog
         open={!!retryTarget}
-        title="Retry webhook?"
+        title="Mark webhook as resolved?"
         message={retryTarget ? (
-          `Replays the saved payload for ${retryTarget.source ?? 'this source'} and marks the log as success.`
+          `Marks the ${retryTarget.source ?? 'webhook'} log row as success. Does not redispatch the webhook — redispatch is handled by the backend retry worker.`
         ) : ''}
-        confirmLabel="Retry"
+        confirmLabel="Mark resolved"
         variant="primary"
         busy={retrying}
         onCancel={() => setRetryTarget(null)}

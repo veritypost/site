@@ -1,9 +1,6 @@
 // H-05 — CSP violation sink. The middleware emits
-// `Content-Security-Policy-Report-Only` (Report-Only phase) with
+// `Content-Security-Policy` (enforce mode, flipped 2026-04-21) with
 // `report-uri /api/csp-report`; browsers POST violation payloads here.
-// TODO(flip-2026-04-21): once middleware flips to enforce mode, this
-// route stays valid — browsers continue to POST reports under the same
-// directive in enforce mode.
 
 import { NextResponse } from 'next/server';
 

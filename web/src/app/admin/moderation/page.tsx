@@ -52,7 +52,7 @@ type TargetUser = Pick<
 >;
 
 type WarningRow = Tables<'user_warnings'>;
-type AppealRow = WarningRow & { users: { username: string | null; email: string | null } | null };
+type AppealRow = WarningRow & { users: { username: string | null } | null };
 
 type DestructiveState = {
   title: string;
@@ -93,7 +93,7 @@ function ModerationConsoleInner() {
   const loadAppeals = useCallback(async () => {
     const { data, error } = await supabase
       .from('user_warnings')
-      .select('*, users:users!fk_user_warnings_user_id(username, email)')
+      .select('*, users:users!fk_user_warnings_user_id(username)')
       .eq('appeal_status', 'pending')
       .order('created_at', { ascending: false });
     if (error) {
