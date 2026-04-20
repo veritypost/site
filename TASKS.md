@@ -40,13 +40,6 @@ A fresh agent picks the top unchecked task, reads file:line, does the work, clos
 
 ## P0 — Ship-blockers / critical
 
-### T-001 — Unify score_tiers; delete hardcoded TIER arrays
-**Priority**: P0  **Effort**: M  **Lens**: DB-DRIFT  **Source**: A2:G-001,G-002,G-030
-**File**: `web/src/app/profile/page.tsx:60-79`, `web/src/app/admin/users/page.tsx:53-70`
-**Why**: DB `score_tiers` has newcomer/reader/informed/analyst/scholar/luminary at 0/100/300/600/1000/1500; code hardcodes different keys (`contributor/trusted/distinguished`) at different thresholds (0/100/500/2000/5000/10000). User at score=300 is `contributor` in UI but `informed` in DB.
-**Do**: Build `lib/scoreTiers.js` with `getScoreTiers()` (60s cache); delete `TIER_META` + `TIERS` duplicates.
-**Accept**: Grep `contributor|trusted|distinguished` in `web/src/` = 0; both pages render from helper.
-
 ### T-003 — Seed `rate_limits` + switch `lib/rateLimit.js` to DB-backed
 **Priority**: P0  **Effort**: M  **Lens**: DB-DRIFT  **Source**: A1:T-001 + A2:G-025
 **File**: `web/src/lib/rateLimit.js`, `web/src/app/admin/system/page.tsx:62-73`
