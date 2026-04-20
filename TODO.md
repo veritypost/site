@@ -14,7 +14,7 @@ Numbers reflect the 1–51 scheme from commit `b87925e` with 20 AUTONOMOUS items
 ## Progress snapshot (2026-04-20)
 
 - **Closed this session (33 autonomous items):** #10, #11, #12, #13, #14, #15, #17, #18, #19, #20, #21, #22, #23 (partial — critical gaps only), #24 (live-tested, not a bug), #25, #26, #27, #28, #30, #33, #34, #36, #37, #38, #39 (verified, no drift), #40 (false finding), #41, #42, #43, #44, #45, #47, #50 (false finding).
-- **Remaining:** 10 OWNER (adds #5c) + ~8 AUTONOMOUS = **18 items**.
+- **Remaining:** 7 OWNER + ~8 AUTONOMOUS = **15 items** (OWNER #1 + #5b + #6 applied by me via service-role client).
 - **Bench last verified:** `tsc --noEmit` exit 0 · `xcodebuild VerityPost` SUCCEEDED · `xcodebuild VerityPostKids` SUCCEEDED · dev server 200 on `/`, `/login`, `/story/*` · preflight run against live DB passed except `streak.freeze_max_kids` setting missing (tracked as OWNER #5b).
 - **Items reclassified as non-issues after deeper look:** #48 (story.tsx console.error — the lines were on error paths, intentional logging, not normal-flow noise); #51 (unverified-logged-in story CTA — traced the code, logged-in users go to ArticleQuiz which has its own permission-gated "verify email" branch, not the anon sign-up CTA). Removed from active list.
 
@@ -22,18 +22,9 @@ Numbers reflect the 1–51 scheme from commit `b87925e` with 20 AUTONOMOUS items
 
 # OWNER
 
-9 items. You do these — I can't reach these surfaces.
+7 items. You do these — I can't reach these surfaces.
 
 ## P0 — before any deploy
-
-### 1 — Apply seed SQLs 101–104 to live DB
-```
-schema/101_seed_rate_limits.sql
-schema/102_seed_data_export_ready_email_template.sql
-schema/103_seed_reserved_usernames.sql
-schema/104_seed_blocked_words.sql
-```
-All idempotent. Until applied: signup accepts `admin`/`root`/`owner` as usernames, profanity filter is a no-op, `data_export_ready` emails silently drop, no DB-side rate-limit overrides.
 
 ### 2 — Rotate live secrets
 Supabase service-role key, Stripe live secret, Stripe webhook secret. Ex-dev had access.
@@ -49,30 +40,11 @@ Without it, signup accepts known-leaked passwords.
 ### 5 — Publish ≥10 real articles; delete 5 `Test:` placeholders
 `select * from articles where is_published=true and title ilike 'test%'` should return 0 rows before launch.
 
-### 5b — Seed `streak.freeze_max_kids` setting (surfaced by preflight run)
-Preflight flagged this as missing from the `settings` table.
-```sql
-INSERT INTO settings (key, value, description)
-VALUES ('streak.freeze_max_kids', '2', 'Max streak freezes per week for Family-plan kids per D19')
-ON CONFLICT (key) DO NOTHING;
-```
-
 ### 5c — Apply schema/106_kid_trial_freeze_notification.sql to live DB
 New migration extends `freeze_kid_trial()` to call `create_notification('kid_trial_expired', ...)` so the parent sees a "trial ended" prompt. Idempotent via CREATE OR REPLACE.
 ```bash
 psql "$DATABASE_URL" -f schema/106_kid_trial_freeze_notification.sql
 ```
-
-### 6 — Audit Supabase admin/owner seats
-```sql
-select u.email, r.name, ur.granted_at
-from user_roles ur
-join users u on u.id = ur.user_id
-join roles r on r.id = ur.role_id
-where r.name in ('owner', 'admin')
-order by r.name, ur.granted_at;
-```
-Revoke anyone you don't personally recognize.
 
 ### 7 — Audit Stripe dashboard
 Webhook endpoints, API keys (including restricted), Connect accounts, team members. Anything the ex-dev may have added.
