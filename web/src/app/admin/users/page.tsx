@@ -34,6 +34,8 @@ import StatCard from '@/components/admin/StatCard';
 import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C, F, S } from '@/lib/adminPalette';
 import { getScoreTiers, tierFor, type ScoreTier } from '@/lib/scoreTiers';
+import { getPlans } from '@/lib/plans';
+import { getRoleNames } from '@/lib/roles';
 import type { Tables } from '@/types/database-helpers';
 
 type UserRow = Tables<'users'> & {
@@ -57,30 +59,12 @@ type UserRow = Tables<'users'> & {
 // match the live DB (`informed`/`analyst`/`scholar` at 300/600/1000/
 // 1500). See T-001 in TASKS.md.
 
-// Role hierarchy: lower index = less privileged. Admin cannot grant a role
-// above their own. DB-side RLS on user_roles currently only checks
-// is_admin_or_above() — client guard is best-effort.
-const ROLE_ORDER = ['user', 'expert', 'educator', 'journalist', 'moderator', 'editor', 'admin', 'superadmin', 'owner'];
-function rolesUpTo(highestRole: string | null): string[] {
-  if (!highestRole) return [];
-  const idx = ROLE_ORDER.indexOf(highestRole);
-  if (idx < 0) return [];
-  return ROLE_ORDER.slice(0, idx + 1);
-}
-
-// 9 canonical plans.name values. Selecting writes users.plan_id to the
-// plan row whose `name` matches.
-const PLAN_OPTIONS = [
-  { name: 'free',                     label: 'Free' },
-  { name: 'verity_monthly',           label: 'Verity (monthly)' },
-  { name: 'verity_annual',            label: 'Verity (annual)' },
-  { name: 'verity_pro_monthly',       label: 'Verity Pro (monthly)' },
-  { name: 'verity_pro_annual',        label: 'Verity Pro (annual)' },
-  { name: 'verity_family_monthly',    label: 'Verity Family (monthly)' },
-  { name: 'verity_family_annual',     label: 'Verity Family (annual)' },
-  { name: 'verity_family_xl_monthly', label: 'Verity Family XL (monthly)' },
-  { name: 'verity_family_xl_annual',  label: 'Verity Family XL (annual)' },
-];
+// T-103: role hierarchy loaded from `roles.hierarchy_level` via
+// getRoleNames() in @/lib/roles. Prior code hardcoded a 9-entry array
+// here that drifted from the DB whenever a role was added.
+// T-102: plan options loaded from `plans` via getPlans() in @/lib/plans.
+// Prior code hardcoded 9 entries here that drifted from the DB whenever
+// a plan was added or renamed.
 
 interface DialogState {
   kind: 'role' | 'plan';
@@ -130,8 +114,16 @@ export default function UsersAdmin() {
   const [achievement, setAchievement] = useState<string>('');
   // score_tiers is loaded once per mount; getScoreTiers caches for 60s.
   const [scoreTiers, setScoreTiers] = useState<ScoreTier[]>([]);
+  // T-102 / T-103: DB-live plan + role ordering. Cached 60s in lib.
+  const [roleNamesOrdered, setRoleNamesOrdered] = useState<string[]>([]);
+  const [planChoices, setPlanChoices] = useState<Array<{ name: string; label: string }>>([]);
 
-  const ROLE_OPTIONS = rolesUpTo(currentUserRole);
+  const ROLE_OPTIONS = (() => {
+    if (!currentUserRole || roleNamesOrdered.length === 0) return [];
+    const idx = roleNamesOrdered.indexOf(currentUserRole);
+    if (idx < 0) return [];
+    return roleNamesOrdered.slice(0, idx + 1);
+  })();
 
   useEffect(() => {
     const init = async () => {
@@ -150,8 +142,24 @@ export default function UsersAdmin() {
         return;
       }
       setCurrentUserId(user.id);
-      const highest = ROLE_ORDER.slice().reverse().find((r) => roleNames.includes(r)) || null;
+      // T-103: hierarchy comes from DB. Load it before computing `highest`
+      // so the reverse-scan finds the actor's top role against the live
+      // order, not a hardcoded JS array.
+      const hierarchyNames = await getRoleNames(supabase);
+      setRoleNamesOrdered(hierarchyNames);
+      const highest = [...hierarchyNames].reverse().find((r) => roleNames.includes(r)) || null;
       setCurrentUserRole(highest);
+
+      // T-102: plan options come from DB (plans table).
+      const plans = await getPlans(supabase);
+      setPlanChoices(
+        (plans || [])
+          .filter((p: { is_active?: boolean | null }) => p.is_active !== false)
+          .map((p: { name: string; display_name?: string | null }) => ({
+            name: p.name,
+            label: p.display_name || p.name,
+          })),
+      );
 
       const { data, error } = await supabase
         .from('users')
@@ -640,7 +648,7 @@ export default function UsersAdmin() {
             <Select
               value={dialog.value}
               onChange={(e) => setDialog({ ...dialog, value: e.target.value })}
-              options={PLAN_OPTIONS.map((p) => ({ value: p.name, label: p.label }))}
+              options={planChoices.map((p) => ({ value: p.name, label: p.label }))}
             />
           </Field>
         )}
