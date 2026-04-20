@@ -48,7 +48,31 @@ Settings → Environment Variables → "View History" on each row. Look for unex
 ### 9. Full Stripe audit
 Developers → Webhooks (enabled endpoints), API keys (including restricted keys), Connect accounts, team members. Anything the ex-dev may have added that a key rotation didn't cover.
 
-### 10. Enable Sentry error tracking
+### 10. Reserved-username claim + review flow (design approved, not built)
+
+Landed design — subtle UX, invisible taxonomy. User only ever sees "looks good" / "not available." Behind the scenes, three modes on `reserved_usernames.claim_mode`:
+
+- `blocked` — system / route / brand / slur. Can never be claimed. (Current 76 seeded rows backfill here.)
+- `instant` — first names + diminutives. Verified user types the name → silent commit, reservation deleted. No "claim!" button.
+- `review` — public figures, competitor brands, trademark-risky. Verified user submits → soft modal "we're double-checking this one, pick something else for now, we'll email if it's yours" → admin decides from `/admin/username-requests` queue → email on approve/deny.
+
+**What needs your input before build:**
+- Scale of first-name seed list (top 1k / 2k / 5k / 10k from SSA baby-names dataset). Tradeoff: more names reserved = stronger protection for real-name holders, fewer free handles for new signups. My read: **top 2-3k + diminutives** is the sweet spot.
+- Match policy: exact vs bounded-substring. Bounded ("block if reserved name appears as a complete token") blocks `john`, `john_`, `real_john`; allows `johnny`, `john_smith`. My read: **bounded**.
+- Whether to surface a 1-line optional "anything to add?" input in the review modal, or keep it truly silent (no text field at all; admin decides purely from account signals).
+
+**What gets built when you say go:**
+1. Migration: `claim_mode` column on `reserved_usernames`; new `username_claim_requests` table with RLS.
+2. `claim_reserved_username(user_id, name)` Postgres RPC — atomic `SELECT FOR UPDATE` on the reserved row, commit + delete + audit, so two simultaneous claims don't both win.
+3. API: `check-username` (single ok/not-ok response), `claim-username` (instant path via RPC), `request-username` (review path).
+4. Admin page `/admin/username-requests` — queue, approve/deny/more-info actions, email hooks.
+5. Three email templates (request received, approved, denied) + one admin-notify template.
+6. Data load script `scripts/load-first-names.js` that reads SSA txt → runs diminutive expander → dedupes → upserts with `claim_mode='instant'`.
+7. Hand-curated public-figure list (~500 rows) with `claim_mode='review'`.
+
+**Ties into:** the "random handles for unverified, choose freely when verified" flow that's also queued (see TODO item #12 if added, or pick-username refactor). Both should land together — they share the claim plumbing.
+
+### 11. Enable Sentry error tracking
 1. Create Sentry project at sentry.io; copy DSN.
 2. Vercel env → set `SENTRY_DSN` + `NEXT_PUBLIC_SENTRY_DSN` (same value) in production + preview.
 3. Optional: `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` for source-map upload.
