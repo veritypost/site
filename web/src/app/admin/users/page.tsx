@@ -205,29 +205,19 @@ export default function UsersAdmin() {
 
   // --- Mutations -----------------------------------------------------------
 
-  // Bump the target's perms_version so their client refetches capabilities
-  // on next nav. Non-fatal — logged if it fails but doesn't surface an
-  // error toast, because the primary write already succeeded.
-  //
-  // Atomic SQL-level increment via RPC (bump_user_perms_version) — avoids
-  // the TOCTOU race where two admin writes against one user could lose
-  // a bump under the prior read-modify-write pattern.
-  const bumpPermsVersion = async (userId: string) => {
-    const { error } = await supabase.rpc('bump_user_perms_version', {
-      p_user_id: userId,
-    });
-    if (error) console.error('[users] perms_version bump failed:', error.message);
-  };
-
   const toggleBan = (u: UserRow) => {
     if (u.is_banned) {
       (async () => {
-        const { error } = await supabase.from('users').update({ is_banned: false }).eq('id', u.id);
-        if (error) {
-          toast.push({ message: `Unban failed: ${error.message}`, variant: 'danger' });
+        const res = await fetch(`/api/admin/users/${u.id}/ban`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ banned: false }),
+        });
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          toast.push({ message: `Unban failed: ${j.error || 'unknown error'}`, variant: 'danger' });
           return;
         }
-        await bumpPermsVersion(u.id);
         setUsers((prev) => prev.map((x) => x.id === u.id ? { ...x, is_banned: false } : x));
         toast.push({ message: `Unbanned @${u.username}`, variant: 'success' });
       })();
@@ -246,7 +236,6 @@ export default function UsersAdmin() {
       oldValue: { is_banned: false },
       newValue: { is_banned: true },
       run: async () => {
-        // Round A (C-05 / trigger block): route through service-role API.
         const res = await fetch(`/api/admin/users/${u.id}/ban`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -275,23 +264,11 @@ export default function UsersAdmin() {
       oldValue: { username: u.username, email: u.email },
       newValue: null,
       run: async () => {
-        const { error } = await supabase.from('users').delete().eq('id', u.id);
-        if (error) throw new Error(error.message);
-        // Belt-and-braces completion audit. DestructiveActionConfirm
-        // writes `user.delete` at intent time via record_admin_action;
-        // this second row records that the DB delete actually landed so
-        // the audit log isn't ambiguous if the delete throws.
-        // TODO (later batch): move this whole path to a server route
-        // with service-client + require_outranks, matching ban.
-        try {
-          await supabase.rpc('record_admin_action', {
-            p_action: 'user.delete.completed',
-            p_target_table: 'users',
-            p_target_id: u.id,
-            p_old_value: { username: u.username, email: u.email } as never,
-            p_new_value: null as never,
-          });
-        } catch { /* best-effort */ }
+        const res = await fetch(`/api/admin/users/${u.id}`, { method: 'DELETE' });
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          throw new Error(j.error || 'Delete failed');
+        }
         setUsers((prev) => prev.filter((x) => x.id !== u.id));
         setSelectedId(null);
         toast.push({ message: `Deleted @${u.username}`, variant: 'success' });
@@ -300,12 +277,10 @@ export default function UsersAdmin() {
   };
 
   const handleExportData = async (u: UserRow) => {
-    const { error } = await supabase.from('data_requests').insert({
-      user_id: u.id,
-      type: 'export',
-    });
-    if (error) {
-      toast.push({ message: error.message, variant: 'danger' });
+    const res = await fetch(`/api/admin/users/${u.id}/data-export`, { method: 'POST' });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      toast.push({ message: j.error || 'Export failed', variant: 'danger' });
       return;
     }
     toast.push({
@@ -315,13 +290,10 @@ export default function UsersAdmin() {
   };
 
   const unlinkDevice = async (userId: string, deviceId: string) => {
-    const { error } = await supabase
-      .from('user_sessions')
-      .delete()
-      .eq('id', deviceId)
-      .eq('user_id', userId);
-    if (error) {
-      toast.push({ message: error.message, variant: 'danger' });
+    const res = await fetch(`/api/admin/users/${userId}/sessions/${deviceId}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      toast.push({ message: j.error || 'Unlink failed', variant: 'danger' });
       return;
     }
     setUsers((prev) => prev.map((u) =>
@@ -334,22 +306,14 @@ export default function UsersAdmin() {
 
   const handleMarkRead = async (u: UserRow) => {
     if (!readSlug.trim()) return;
-    const { data: story } = await supabase
-      .from('articles')
-      .select('id')
-      .eq('slug', readSlug.trim())
-      .maybeSingle();
-    if (!story) {
-      toast.push({ message: `No story with slug "${readSlug.trim()}"`, variant: 'danger' });
-      return;
-    }
-    const { error } = await supabase.from('reading_log').insert({
-      user_id: u.id,
-      article_id: (story as { id: string }).id,
-      completed: true,
+    const res = await fetch(`/api/admin/users/${u.id}/mark-read`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug: readSlug.trim() }),
     });
-    if (error) {
-      toast.push({ message: error.message, variant: 'danger' });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      toast.push({ message: j.error || 'Mark-read failed', variant: 'danger' });
       return;
     }
     setReadSlug('');
@@ -358,40 +322,15 @@ export default function UsersAdmin() {
 
   const handleMarkQuiz = async (u: UserRow) => {
     if (!quizSlug.trim() || !quizScore.trim()) return;
-    const { data: story } = await supabase
-      .from('articles')
-      .select('id')
-      .eq('slug', quizSlug.trim())
-      .maybeSingle();
-    if (!story) {
-      toast.push({ message: `No article with slug "${quizSlug.trim()}"`, variant: 'danger' });
-      return;
-    }
-    const { data: poolRows } = await supabase
-      .from('quizzes')
-      .select('id')
-      .eq('article_id', (story as { id: string }).id)
-      .eq('is_active', true);
-    const pool = (poolRows || []) as Array<{ id: string }>;
-    const total = pool.length;
-    if (total === 0) {
-      toast.push({ message: `No active quiz questions for "${quizSlug.trim()}"`, variant: 'danger' });
-      return;
-    }
     const score = Number(quizScore);
-    // quiz_attempts stores one row per question attempt. This admin action
-    // logs a single aggregate attempt against the first quiz question.
-    const { error } = await supabase.from('quiz_attempts').insert({
-      user_id: u.id,
-      article_id: (story as { id: string }).id,
-      quiz_id: pool[0].id,
-      is_correct: total > 0 && score >= Math.ceil(total * 0.6),
-      selected_answer: `admin_manual:${score}/${total}`,
-      attempt_number: 1,
-      points_earned: score,
+    const res = await fetch(`/api/admin/users/${u.id}/mark-quiz`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug: quizSlug.trim(), score }),
     });
-    if (error) {
-      toast.push({ message: error.message, variant: 'danger' });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      toast.push({ message: j.error || 'Mark-quiz failed', variant: 'danger' });
       return;
     }
     setQuizSlug(''); setQuizScore('');
@@ -399,26 +338,14 @@ export default function UsersAdmin() {
   };
 
   const handleAwardAchievement = async (u: UserRow) => {
-    // user_achievements.achievement_id is a uuid FK to achievements.id.
-    // Resolve the human-readable label to the row id before insert.
-    const { data: achievementRow, error: lookupErr } = await supabase
-      .from('achievements')
-      .select('id')
-      .eq('name', achievement)
-      .maybeSingle();
-    if (lookupErr) {
-      toast.push({ message: lookupErr.message, variant: 'danger' });
-      return;
-    }
-    if (!achievementRow) {
-      toast.push({ message: `No achievement named "${achievement}"`, variant: 'danger' });
-      return;
-    }
-    const { error } = await supabase
-      .from('user_achievements')
-      .insert({ user_id: u.id, achievement_id: (achievementRow as { id: string }).id });
-    if (error) {
-      toast.push({ message: error.message, variant: 'danger' });
+    const res = await fetch(`/api/admin/users/${u.id}/achievements`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ achievement_name: achievement }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      toast.push({ message: j.error || 'Award failed', variant: 'danger' });
       return;
     }
     toast.push({ message: `Awarded "${achievement}"`, variant: 'success' });

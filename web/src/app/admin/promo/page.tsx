@@ -190,14 +190,19 @@ function PromoInner() {
 
     setSaving(true);
     try {
-      const { data, error: err } = await supabase.from('promo_codes').insert(row).select().single();
-      if (err) {
-        setError(`Create failed: ${err.message}`);
-        push({ message: `Create failed: ${err.message}`, variant: 'danger' });
+      const res = await fetch('/api/admin/promo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(row),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.row) {
+        setError(`Create failed: ${json.error || 'unknown error'}`);
+        push({ message: `Create failed: ${json.error || 'unknown error'}`, variant: 'danger' });
         return;
       }
       push({ message: 'Promo created', variant: 'success' });
-      setPromos((prev) => [data as Promo, ...prev]);
+      setPromos((prev) => [json.row as Promo, ...prev]);
       resetForm();
       setShowCreate(false);
     } finally { setSaving(false); }
@@ -206,23 +211,15 @@ function PromoInner() {
   const toggleActive = async (id: string, current: boolean | null) => {
     // Optimistic
     setPromos((prev) => prev.map((p) => p.id === id ? { ...p, is_active: !current } : p));
-    const { error: auditErr } = await supabase.rpc('record_admin_action', {
-      p_action: 'promo.toggle',
-      p_target_table: 'promo_codes',
-      p_target_id: id,
-      p_reason: null,
-      p_old_value: { is_active: !!current },
-      p_new_value: { is_active: !current },
+    const res = await fetch(`/api/admin/promo/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: !current }),
     });
-    if (auditErr) {
+    if (!res.ok) {
       setPromos((prev) => prev.map((p) => p.id === id ? { ...p, is_active: !!current } : p));
-      push({ message: `Audit log failed: ${auditErr.message}`, variant: 'danger' });
-      return;
-    }
-    const { error: err } = await supabase.from('promo_codes').update({ is_active: !current }).eq('id', id);
-    if (err) {
-      setPromos((prev) => prev.map((p) => p.id === id ? { ...p, is_active: !!current } : p));
-      push({ message: `Toggle failed: ${err.message}`, variant: 'danger' });
+      const json = await res.json().catch(() => ({ error: 'toggle failed' }));
+      push({ message: `Toggle failed: ${json.error || 'unknown error'}`, variant: 'danger' });
       return;
     }
     push({ message: !current ? 'Promo enabled' : 'Promo disabled', variant: 'success' });
@@ -241,8 +238,11 @@ function PromoInner() {
       oldValue: { code: promo.code, discount_type: promo.discount_type, discount_value: promo.discount_value },
       newValue: null,
       run: async () => {
-        const { error: err } = await supabase.from('promo_codes').delete().eq('id', promo.id);
-        if (err) throw new Error(err.message);
+        const res = await fetch(`/api/admin/promo/${promo.id}`, { method: 'DELETE' });
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          throw new Error(j.error || 'Delete failed');
+        }
         push({ message: 'Promo deleted', variant: 'success' });
         setPromos((prev) => prev.filter((p) => p.id !== promo.id));
       },

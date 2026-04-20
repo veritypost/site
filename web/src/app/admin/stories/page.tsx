@@ -156,8 +156,11 @@ function StoriesAdminInner() {
       oldValue: { title: story.title, status: story.status, slug: story.slug },
       newValue: null,
       run: async () => {
-        const { error } = await supabase.from('articles').delete().eq('id', story.id);
-        if (error) throw new Error(error.message);
+        const res = await fetch(`/api/admin/articles/${story.id}`, { method: 'DELETE' });
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          throw new Error(j.error || 'Delete failed');
+        }
         setStories((prev) => prev.filter((s) => s.id !== story.id));
         toast.push({ message: 'Article deleted', variant: 'success' });
       },
@@ -165,13 +168,18 @@ function StoriesAdminInner() {
   };
 
   const setStatus = async (story: ArticleRow, next: 'published' | 'draft') => {
-    const payload: { status: 'published' | 'draft'; published_at?: string | null } = { status: next };
-    if (next === 'published') payload.published_at = new Date().toISOString();
-    const { error } = await supabase.from('articles').update(payload).eq('id', story.id);
-    if (error) {
-      toast.push({ message: `Status change failed: ${error.message}`, variant: 'danger' });
+    const res = await fetch(`/api/admin/articles/${story.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: next }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      toast.push({ message: `Status change failed: ${j.error || 'unknown error'}`, variant: 'danger' });
       return;
     }
+    const payload: { status: 'published' | 'draft'; published_at?: string | null } = { status: next };
+    if (next === 'published') payload.published_at = new Date().toISOString();
     setStories((prev) =>
       prev.map((s) => (s.id === story.id ? { ...s, ...payload } : s)),
     );

@@ -126,16 +126,14 @@ function SubscriptionsInner() {
   const totalUsers = plansWithCounts.reduce((a, p) => a + p.users, 0);
 
   const extendGrace = async (id: string, days: number) => {
-    const account = graceAccounts.find((a) => a.id === id);
-    if (!account) return;
-    const newEnd = new Date(account.grace_period_ends_at || Date.now());
-    newEnd.setDate(newEnd.getDate() + days);
-    const { error } = await supabase
-      .from('subscriptions')
-      .update({ grace_period_ends_at: newEnd.toISOString() })
-      .eq('id', id);
-    if (error) { push({ message: `Failed: ${error.message}`, variant: 'danger' }); return; }
-    setGraceAccounts((prev) => prev.map((a) => a.id === id ? { ...a, grace_period_ends_at: newEnd.toISOString() } : a));
+    const res = await fetch(`/api/admin/subscriptions/${id}/extend-grace`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ days }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) { push({ message: `Failed: ${json.error || 'unknown error'}`, variant: 'danger' }); return; }
+    setGraceAccounts((prev) => prev.map((a) => a.id === id ? { ...a, grace_period_ends_at: json.grace_period_ends_at } : a));
     push({ message: `Grace extended by ${days} days`, variant: 'success' });
   };
 
@@ -189,15 +187,19 @@ function SubscriptionsInner() {
   };
 
   const processRefund = async (id: string, action: 'approved' | 'denied' | 'partial') => {
-    const statusMarker = action === 'approved' ? 'approved_pending_stripe' : action === 'denied' ? 'rejected' : action;
-    const current = invoices.find((i) => i.id === id) || refundRequests.find((i) => i.id === id);
-    const nextMetadata = { ...((current?.metadata as any) || {}), refund_status: statusMarker, refund_decided_at: new Date().toISOString() };
-    const { error } = await supabase.from('invoices').update({ metadata: nextMetadata }).eq('id', id);
-    if (error) { push({ message: `Failed: ${error.message}`, variant: 'danger' }); return; }
-    await insertBillingAudit('billing:refund_decision_db_only', 'invoice', id, {
-      decision: action,
-      note: 'Local DB only. Issue refund in Stripe Dashboard if approved.',
+    const res = await fetch('/api/admin/billing/refund-decision', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ invoice_id: id, decision: action }),
     });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) { push({ message: `Failed: ${json.error || 'unknown error'}`, variant: 'danger' }); return; }
+    const current = invoices.find((i) => i.id === id) || refundRequests.find((i) => i.id === id);
+    const nextMetadata = {
+      ...((current?.metadata as Record<string, unknown>) || {}),
+      refund_status: json.refund_status,
+      refund_decided_at: new Date().toISOString(),
+    };
     setRefundRequests((prev) => prev.map((r) => r.id === id ? { ...r, metadata: nextMetadata } : r));
     setInvoices((prev) => prev.map((r) => r.id === id ? { ...r, metadata: nextMetadata } : r));
     push({ message: `Refund ${action}`, variant: 'success' });
@@ -282,9 +284,14 @@ function SubscriptionsInner() {
   };
 
   const saveSettings = async (field: string, value: number) => {
-    const { error } = await supabase.from('settings').upsert({ key: field, value: String(value) }, { onConflict: 'key' });
-    if (error) {
-      push({ message: `Save failed: ${error.message}`, variant: 'danger' });
+    const res = await fetch('/api/admin/settings/upsert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: field, value: String(value) }),
+    });
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({ error: 'save failed' }));
+      push({ message: `Save failed: ${json.error || 'unknown error'}`, variant: 'danger' });
       return;
     }
     fetch('/api/admin/settings/invalidate', { method: 'POST' }).catch(() => {});

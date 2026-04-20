@@ -1,0 +1,43 @@
+// T-005 — server route for admin/users unlink device action.
+// Replaces direct `supabase.from('user_sessions').delete()` from the
+// admin user drawer.
+import { NextResponse } from 'next/server';
+import { requirePermission } from '@/lib/auth';
+import { createServiceClient } from '@/lib/supabase/server';
+import { permissionError, recordAdminAction } from '@/lib/adminMutation';
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: { id: string; sessionId: string } },
+) {
+  const targetId = params?.id;
+  const sessionId = params?.sessionId;
+  if (!targetId || !sessionId) {
+    return NextResponse.json({ error: 'user id and session id required' }, { status: 400 });
+  }
+
+  let actor;
+  try { actor = await requirePermission('admin.users.devices.unlink'); }
+  catch (err) { return permissionError(err); }
+  void actor;
+
+  const service = createServiceClient();
+  const { error } = await service
+    .from('user_sessions')
+    .delete()
+    .eq('id', sessionId)
+    .eq('user_id', targetId);
+  if (error) {
+    console.error('[admin.users.sessions.delete]', error.message);
+    return NextResponse.json({ error: 'Could not unlink device' }, { status: 500 });
+  }
+
+  await recordAdminAction({
+    action: 'user.session.unlink',
+    targetTable: 'user_sessions',
+    targetId: sessionId,
+    newValue: { user_id: targetId },
+  });
+
+  return NextResponse.json({ ok: true });
+}
