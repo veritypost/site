@@ -1,7 +1,7 @@
 # Next session handoff
 
-**Last session closed:** 2026-04-20 late-evening extended. Twenty-one commits landed locally, **not pushed**.
-**Pick up from:** local `main` at commit whatever this doc lands as. `origin/main` is still at `4d3f7bc`.
+**Last session closed:** 2026-04-20 late-evening extended (second pass).
+**Pick up from:** local `main`, 25 commits ahead of `origin/main` (`4d3f7bc`). **NOT pushed.**
 
 Owner explicitly held off on `git push` pending smoke-test. Do not push without asking.
 
@@ -12,159 +12,156 @@ Owner explicitly held off on `git push` pending smoke-test. Do not push without 
 1. Read CLAUDE.md. Then STATUS.md. Then **this file**. Then top of TASKS.md.
 2. Verify the state:
    ```
-   git log --oneline origin/main..HEAD | head -25
+   git log --oneline origin/main..HEAD | head -30
    git status
    ```
-   Working tree clean. 21 commits ahead of origin.
-3. **Owner-side work is documented** in `docs/runbooks/DEPLOY_PREP.md` — point them at it when they're ready to prep the deploy.
-4. Dev side has one clean next-up pick: **T-019 consumer sweep** (19 admin pages with inline role arrays → frozen Sets from `lib/roles.js`). Mechanical, 1 session.
+   Working tree clean. 25 commits ahead.
+3. Owner-side work is documented in `docs/runbooks/DEPLOY_PREP.md` — point them at it when ready.
+4. Cleanest dev pick: **T-019 residual (12 two-wide cases, product decision needed)** — see §"What's next" below.
 
 ---
 
-## What shipped across the 2026-04-20 late-evening extended session
+## What shipped in the 2026-04-20 late-evening extended session
 
-10+ tasks closed across 4 batches. Total progress: P0 9→6, P1 25→21, total 93→86. SECURITY 12→9, CODE 23→20, DB-DRIFT 19→17.
+15+ tasks closed across 5 batches. Counts: P0 9→6, P1 25→21, P2 33→29, Total 93→86. SECURITY 12→9, CODE 23→20, DB-DRIFT 19→17.
 
 | Commit range | Batch | Tasks |
 |---|---|---|
-| `c015c46` … `92af650` + `7a1764d` | T-005 (7 sub-commits) | T-005 admin direct-writes class (16 pages, 20+ new /api/admin routes, shared lib/adminMutation.ts, reviewer-APPROVED) |
-| `3089b9d` | T-005 follow-ups | T-102..T-106 filed (hardcoded-drift discoveries from T-005) |
-| `3f60ed1` `24f2e9e` | T-003 | rate_limits DB-backed via `policyKey` arg on checkRateLimit (27 files, 31 sites) + schema/101 seed |
-| `412b4b7` | Seed batch | T-012 + T-014 + T-015 as 3 idempotent SQL files (schema/102, 103, 104) |
-| `a3713e1` `309d259` `949a899` | Batch A — error hygiene | T-010 dev half (lib/siteUrl.js) + T-013 (115-site err.message sweep → safeErrorResponse) + T-070 (admin silent errors) + T-073 (featureFlags TTL + errors fail-closed) + T-076 (requireVerifiedEmail .status) |
-| `61b0d3b` `36386a9` `e08fcdb` `053716b` | Batch B — hardcoded drift | T-017 FALLBACK_CATEGORIES + T-018 admin/story-manager CATEGORIES + T-056 help prices + T-102 PLAN_OPTIONS + T-103 ROLE_ORDER (T-016/T-018/T-019 helpers shipped, consumer sweeps remaining) |
-| _this commit_ | Batch D — owner runbook | `docs/runbooks/DEPLOY_PREP.md` written |
+| `c015c46` → `7a1764d` | T-005 (7 sub-commits) | Admin direct-writes class closed (16 pages, 20+ new /api/admin routes, shared lib/adminMutation.ts, reviewer-APPROVED) |
+| `3089b9d` | T-005 follow-ups | T-102..T-106 filed |
+| `3f60ed1` `24f2e9e` | T-003 | rate_limits DB-backed via `policyKey` arg (27 files, 31 sites) + schema/101 seed |
+| `412b4b7` | Seed batch | T-012 + T-014 + T-015 (schema/102, 103, 104) |
+| `a3713e1` `309d259` `949a899` | Batch A — error hygiene | T-010 dev half + T-013 (115-site err.message sweep) + T-070 + T-073 + T-076 |
+| `61b0d3b` `36386a9` `e08fcdb` `053716b` | Batch B — hardcoded drift | T-017 + T-018 (partial) + T-056 + T-102 + T-103 + T-019 (helpers) |
+| `c38aed5` | Batch D — owner runbook | `docs/runbooks/DEPLOY_PREP.md` |
+| `ba2bc1c` `f944551` | T-019 partial sweep | 16 admin pages migrated to frozen Sets; 2 mislabeled local `MOD_ROLES` consts renamed (one was ADMIN_ROLES, one was EDITOR_ROLES); 14 residuals remain (12 two-wide + 2 bespoke) |
 
-**Helpers shipped this session:**
-- `web/src/lib/adminMutation.ts` — `requireAdminOutranks`, `recordAdminAction`, `permissionError`
-- `web/src/lib/siteUrl.js` — `getSiteUrl`, `getSiteUrlOrNull` (throws in prod if env missing)
-- `web/src/lib/plans.js` — extended with `getPlanLimit`, `getPlanLimitValue` (plan_features-backed, 60s cache)
-- `web/src/lib/roles.js` — extended with `getRoles`, `getRoleNames`, `rolesUpTo`, `rolesAtLeast`, `clearRolesCache`
-- `web/src/lib/rateLimit.js` — extended with `getRateLimit` + `policyKey` support on `checkRateLimit`
-- `web/src/lib/apiErrors.js` — pre-existing `safeErrorResponse` now used at 113 call-sites
+**Helpers shipped:**
+- `web/src/lib/adminMutation.ts` — canonical admin-mutation shape
+- `web/src/lib/siteUrl.js` — prod-throw fallback
+- `web/src/lib/plans.js` — `getPlanLimit`, `getPlanLimitValue` (plan_features-backed)
+- `web/src/lib/roles.js` — `getRoles`, `getRoleNames`, `rolesUpTo`, `rolesAtLeast`
+- `web/src/lib/rateLimit.js` — `policyKey` arg + `getRateLimit`
+- `web/src/lib/apiErrors.js` — now adopted at 113 call-sites
 
-**Seed SQLs awaiting owner:**
-- `schema/101_seed_rate_limits.sql`
-- `schema/102_seed_data_export_ready_email_template.sql`
-- `schema/103_seed_reserved_usernames.sql`
-- `schema/104_seed_blocked_words.sql`
-
-Verify every commit: `tsc --noEmit` green, no iOS touched, no DB state changed (pure code + new SQL files on disk).
+**Seed SQLs awaiting owner:** `schema/101..104`. All idempotent.
 
 ---
 
 ## What's next — priority order
 
-### Pure dev engineering wins
+### #1 — T-019 residual (12 two-wide cases) — THE CLEANEST NEXT PICK
 
-Ranked by impact-per-hour:
+12 files use `['owner', 'admin']` (2-wide, missing superadmin). Everywhere else in the codebase, superadmin is treated as a strict superset of admin (`ADMIN_ROLES` = 3 wide). The consistent exclusion across 12 files is statistically a copy-paste bug, not 12 independent intentional decisions — but confirming that is a **product decision** the owner should make.
 
-- **T-019 consumer sweep** — 19 admin pages still enumerate role arrays inline (`['owner', 'admin']`, `['moderator', 'editor', 'admin', 'superadmin', 'owner']`, etc.). `lib/roles.js` already exports the correct frozen Sets. Replace the inline arrays with `ADMIN_ROLES.has(x)` / `MOD_ROLES.has(x)` / `EDITOR_ROLES.has(x)`. Mechanical, good fit for a Python sweep script. **Closes T-019.** See TASKS.md:101 for the file list.
-- **T-018 residual** — admin/pipeline + admin/cohorts still hardcode categories. Same pattern as admin/story-manager which I migrated this session — load from DB on mount. **Closes T-018.** ~30 min.
-- **T-016 residual** — admin/subscriptions + profile/settings read PRICING/TIERS/maxKids from lib/plans.js. The upgrade-UI copy in those consts (feature-bullet strings, taglines) is marketing text; moving it to DB means either extending plans.metadata or adding feature-list columns. profile/settings is 3800 lines. **Do this one last** — bigger than it looks. Plausibly split further into "move PRICING to DB reads" (small) and "move copy to DB" (bigger).
+**Files:**
+```
+admin/reader/page.tsx:106
+admin/words/page.tsx:57
+admin/plans/page.tsx:100
+admin/email-templates/page.tsx:63
+admin/features/page.tsx:159
+admin/cohorts/page.tsx:157
+admin/stories/page.tsx:87    (const allowed = new Set([...]))
+admin/support/page.tsx:215
+admin/story-manager/page.tsx:162
+admin/streaks/page.tsx:83
+admin/webhooks/page.tsx:95
+admin/promo/page.tsx:89
+```
 
-### Batch E — auth surface small wins (1 session)
+**Approach:**
+- Ask the owner first: "Should superadmin have access to {reader config, word lists, plan editing, email templates, feature flags, cohorts, stories, support, story-manager, streaks, webhooks, promos}?" If yes → swap all 12 to `ADMIN_ROLES.has()` in one commit. If mixed → per-file review.
+- Default assumption (if owner says "yes to all"): mechanical swap, ~15 min, closes T-019 fully.
 
-- T-025 Retry-After header on 13 auth routes (partial; T-003 touched some)
-- T-068 auth/callback + pick-username drop rawNext on first-login
-- T-077 apply-to-expert confirmation strands user
-- T-080 sanitizeIlikeTerm strips `%` instead of escaping
+### #2 — T-018 residual (2 files, refactor not swap)
 
-### Batch C — Kid iOS hardening (1 session, needs xcodebuild)
+- `admin/pipeline/page.tsx:42` — `ALL_CATEGORIES` module-scope const, used 5× in the component. Needs refactor to load from `categories` table into state.
+- `admin/cohorts/page.tsx:95` — inline `options: ['Any', 'Technology', ...]` inside a module-scope `FILTER_CATEGORIES` const. Needs restructuring or lazy-evaluation.
 
-- T-043 Dynamic Type across 11 kids files
-- T-044 KidsAppState vs DB dual-source
-- T-045 PIN brute-force resistance
-- T-046 Kid-pair JWT re-verify parent_user_id
+Each ~30-45 min (not purely mechanical). Pattern: mirror admin/story-manager which loaded categories on mount (see commit `e08fcdb`).
 
-Deferred because it needs xcodebuild verification and this session was web-only.
+### #3 — T-016 residual (profile/settings + admin/subscriptions)
+
+Both pages still read `PRICING`, `TIERS`, `maxKids`, `TIER_ORDER`, `formatCents` from `lib/plans.js`. profile/settings is 3800 lines. admin/subscriptions has a complex upgrade UI. Save for fresh context.
+
+### Batch E — Auth surface small wins (1 session)
+
+T-025 Retry-After header sweep, T-068 auth/callback rawNext, T-077 apply-to-expert confirmation, T-080 sanitizeIlikeTerm escape. Small and bounded.
+
+### Batch C — Kid iOS hardening (needs xcodebuild)
+
+T-043 Dynamic Type, T-044 KidsAppState dual-source, T-045 PIN brute-force, T-046 kid-pair JWT verify. All require xcodebuild verification.
 
 ### Owner-side
 
-All owner-side P0s are now consolidated in `docs/runbooks/DEPLOY_PREP.md`. Hand that doc to the owner; they can work through it in one sitting (~45-60 min including verification).
+Everything in `docs/runbooks/DEPLOY_PREP.md`. One sitting, ~45-60 min.
 
 ---
 
-## Operational discipline — what tightened this session
+## Operational discipline — what tightened
 
-### What worked
+1. **Targeted reads** (offset + limit on big files).
+2. **Scripts for N-across-files edits** — T-003 did 31 sites, T-013 did 113 sites in single Python invocations.
+3. **Typecheck after every batch** — not just at the end. Caught collisions + `@ts-expect-error` placement errors before commit.
+4. **Scope-gated agent use** — Explore + reviewer on T-005 only.
+5. **Self-assessment at batch boundaries** — introduced at owner's request near session end; helped cap the T-019 sweep at clean swaps only.
 
-1. **Targeted reads.** offset + limit on big files (admin/system 650, admin/users 960, permissions.xlsx, profile/settings 3800). Kept context surface tight.
-2. **Scripts for N-across-files edits.** T-003 did 31 call-sites in one Python invocation; T-013 did 113 call-sites in one Python sweep. Would have been hundreds of Edit tool calls otherwise.
-3. **Typecheck after every batch** — not at the end. Caught two `@ts-expect-error` placement errors in T-005 before commit, a variable collision in T-102.
-4. **Scope-gated agent use.** Explore + reviewer agent on T-005 (architectural, >20 files). No agents on T-003 / T-013 / Batch A / Batch B — surgical or mechanical enough that tsc + anti-hallucination greps gave full coverage.
-5. **Close-as-you-go docs.** Each batch commit included the TASKS.md removal + DONE.md append + count bump in the same push. Task state never drifted from commit state for more than one commit.
+### Where slack remains
 
-### What still slacks
-
-- Commit-message bodies got long on T-005 sub-commits. Could trim.
-- Had one typecheck cycle fail because `planOptions` collided with a local var — would've caught via grep before commit.
-- DONE.md entries are getting quite long. A concise-format-switch might help when we hit 100+ entries.
-
-### Per-task gameplan (unchanged — still the right shape)
-
-1. Pre-flight: re-read task block, grep file:line, grep DONE.md for regression.
-2. Scope-check: grep the pattern across the whole target dir. Named scope often understates.
-3. Implement: targeted reads, scripts for repetitive changes.
-4. Verify: `cd web && npx tsc --noEmit` exit 0; `xcodebuild` if iOS.
-5. Close loop: remove block from TASKS.md, append DONE.md, bump counts, commit `T-<id>: <title>` with HEREDOC + Co-Authored-By.
-6. Anti-hallucination grep: the pattern the task targeted should now return 0.
-7. Agent review (>5 files / architectural only): APPROVE / REVISE / BLOCK.
-
-### Safety nets still on disk
-
-- Tarball at `~/Desktop/verity-post-snapshot-20260420-0933.tgz` (6.8MB).
-- `git stash list` — old prelaunch stash, safe to drop.
+- Sometimes skip the pre-check grep before an Edit, assume surrounding imports. When it fails, re-read. Not shipping broken, but wasted turns.
+- Proposed T-018 residual, started, pivoted when scope revealed. Should have grep-checked first.
+- Commit message bodies long on big sub-commits.
 
 ---
 
-## Gotchas that still apply
+## Gotchas
 
-All prior-handoff gotchas plus:
+All prior gotchas plus:
 
-1. **Python edit scripts break formatting.** T-003 needed a second pass to rejoin split inline calls and realign indent. Budget a cleanup pass if you script edits; verify with `grep -B1 -A1 <inserted-symbol>` on a sample.
+1. **Mislabeled-local-const pattern:** two files had `const MOD_ROLES = [...]` whose contents were actually ADMIN_ROLES or EDITOR_ROLES. Fixed this session. Watch for the general pattern (local const named one thing but contents are a different canonical Set).
 
-2. **`@ts-expect-error` placement is picky.** TypeScript requires the directive immediately before the offending expression. Mass-inserting before a wrapping `await service.from(...)` can miss the specific line the error fires on — I hit this twice in T-005's cascade endpoint. Always tsc after inserting `@ts-expect-error`.
+2. **Two-wide `['owner', 'admin']` — product decision, not mechanical.** See T-019 residual above. Don't just swap to ADMIN_ROLES — ask first.
 
-3. **`planOptions` was already a local variable in admin/users.** My new state var collided. Grep before introducing a new state name in an existing file.
+3. **`admin/moderation/page.tsx` has 3 role arrays, only ONE is the standard pattern.** Line 27 (specialty assignable-moderator) and line 121 (moderator-only subset, no admins) are bespoke and correct. Only line 120 was the standard ADMIN_ROLES case — already migrated.
 
-4. **`plan_features` table IS seeded via `reset_and_rebuild_v2.sql:3090-3250`.** The bookmarks limit (10 for free), breaking_alerts (1/day for free), kid_profiles (2/4 for family plans), and streak_freeze (2/week for Pro+Family) are all there. `getPlanLimit()` reads them directly.
+4. **Hand-edits happen in parallel.** During the T-019 sweep this session, several files I hadn't yet touched (admin/ad-campaigns, admin/sponsors, admin/page, admin/permissions, admin/settings, admin/moderation line 120) were hand-edited by the user with the same pattern. Commit them together; don't silently revert. The `git status` after my work showed 20 modified files, of which I'd touched 13.
 
-5. **`permissions.xlsx` has 308 admin.* keys.** Extractable via the unzip-and-regex one-liner in the previous handoff. Use before picking a permission key for a new route.
+5. **`admin/pipeline` and `admin/cohorts` categories are module-scope consts, not simple arrays.** T-018 residual needs a refactor, not a swap. I learned this the hard way this session (started, then pivoted).
 
-6. **No dedicated `admin.notifications.broadcast` permission key yet.** The T-005 broadcast route uses `admin.settings.edit` as a restrictive stopgap. If you ship a new admin feature that needs a dedicated key, seed it in the xlsx + `scripts/import-permissions.js --apply` + migration file.
+6. **Python edit scripts break formatting.** T-003 needed a cleanup pass; T-013 passed cleanly because all patterns were self-contained. If you script, budget a formatting re-pass.
 
-7. **`require_outranks` + `record_admin_action` RPCs aren't in the generated `database.ts`.** The pattern for calling them from .ts is in `lib/adminMutation.ts` (`authed.rpc as unknown as ...` cast).
+7. **`@ts-expect-error` placement is picky.** Has to be immediately before the offending line, not the enclosing statement. tsc after each insertion.
 
-8. **`DestructiveActionConfirm` component writes its own audit client-side.** 8 admin pages now have dual-audit (component + new server route). Not a bug; just noise in admin_audit_log. Rip-out-the-component-audit is a follow-up.
+8. **`DestructiveActionConfirm` component writes its own audit client-side.** 8 admin pages now dual-audit. Not a bug, just noise in admin_audit_log. Rip-out-the-component-audit is a follow-up.
 
-9. **Legacy `.js` admin routes leak err.message verbatim.** `ban/route.js`, `manual-sync/route.js`, `plan/route.js` still return `upErr.message` / `rankErr.message`. Not in T-013 scope (T-013 was specifically the `error: error.message` pattern); upgrade them to `safeErrorResponse` as a follow-up.
+9. **Legacy `.js` admin routes still leak err.message verbatim.** ban/route.js, manual-sync/route.js, plan/route.js. Not in T-013 scope (different pattern — catch-block err.message vs. destructure `{error}`). Upgrade as follow-up.
 
-10. **T-019 has two patterns that look interchangeable but aren't.** `['owner', 'superadmin', 'admin']` (3-wide ADMIN_ROLES) vs `['owner', 'admin']` (missing superadmin — probably a bug). Review each hit before normalizing.
+10. **`require_outranks` + `record_admin_action` RPCs not in generated `database.ts`.** Cast pattern in `lib/adminMutation.ts`.
+
+11. **`permissions.xlsx` is the source of truth for permission KEYS, not role→set or plan→set mappings** (those are hardcoded in scripts/import-permissions.js).
 
 ---
 
 ## Task state at handoff
 
-**Counts:** P0 6 · P1 21 · P2 29 · P3 24 · P4 6 · Total 86.
+**Counts:** P0 6 · P1 21 · P2 29 · P3 24 · P4 6 · **Total 86.**
 Lens: DB-DRIFT 17 · SCHEMA 5 · SECURITY 9 · IOS 11 · MIGRATION-DRIFT 4 · A11Y 3 · UX 13 · CODE 20.
 
 **All remaining P0 is owner-side.** See `docs/runbooks/DEPLOY_PREP.md`.
 
-**Crucial owner decisions still outstanding:**
-1. **Push to origin/main.** 21 commits ahead. Smoke-test first or push first — owner's call.
-2. **Apply the 4 seed SQLs** — from DEPLOY_PREP.md §1.
-3. **Set NEXT_PUBLIC_SITE_URL + SENTRY_DSN in Vercel** — §2.
-4. **HIBP toggle + secret rotation + migration reconcile + publish real articles** — §3-§6.
-
-Every step is documented in `docs/runbooks/DEPLOY_PREP.md` with verify commands inline.
+**Crucial owner decisions outstanding:**
+1. **Push the 25 commits** or smoke-test first.
+2. **Apply the 4 seed SQLs** (101..104).
+3. **T-019 residual:** should superadmin have access to reader/words/plans/email-templates/features/cohorts/stories/support/story-manager/streaks/webhooks/promos? (Yes → 15-min commit. No → per-file.)
+4. **Dashboard / env setup** from DEPLOY_PREP.md §2-§7.
 
 ---
 
 ## Memory file check
 
-`/Users/veritypost/.claude/projects/-Users-veritypost-Desktop-verity-post/memory/MEMORY.md` — updated this session to reflect T-003/T-005/T-010/T-012/T-013/T-014/T-015/T-017/T-056/T-070/T-073/T-076/T-102/T-103 closures, 21-commits-unpushed state, and the no-push-without-asking hold.
+`/Users/veritypost/.claude/projects/-Users-veritypost-Desktop-verity-post/memory/MEMORY.md` — refreshed at session end to reflect the T-019 partial sweep and 25-commits-unpushed state.
 
 ---
 
-*Doc written 2026-04-20 late-evening extended at end of session. Author: Claude Opus 4.7 (1M context).*
+*Doc written 2026-04-20 late-evening extended (second pass) at end of session. Author: Claude Opus 4.7 (1M context).*
