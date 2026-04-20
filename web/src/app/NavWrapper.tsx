@@ -36,7 +36,7 @@ interface AuthContextValue {
 export const AuthContext = createContext<AuthContextValue>({ loggedIn: false, user: null, authLoaded: false });
 export const useAuth = () => useContext(AuthContext);
 
-const HIDE_NAV = ['/login', '/signup', '/signup/pick-username', '/signup/expert', '/forgot-password', '/reset-password', '/verify-email', '/api/auth/callback', '/logout', '/welcome'];
+const HIDE_NAV = ['/', '/login', '/signup', '/signup/pick-username', '/signup/expert', '/forgot-password', '/reset-password', '/verify-email', '/api/auth/callback', '/logout', '/welcome'];
 const isAdmin = (p: string) => p.startsWith('/admin');
 
 interface NavItem { label: string; href: string }
@@ -215,7 +215,6 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
               {[
                 { label: 'Help', href: '/help' },
                 { label: 'Contact', href: '/contact' },
-                { label: 'How it works', href: '/how-it-works' },
                 { label: 'Privacy', href: '/privacy' },
                 { label: 'Terms', href: '/terms' },
                 { label: 'Cookies', href: '/cookies' },

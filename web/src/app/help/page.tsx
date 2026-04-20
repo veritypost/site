@@ -56,8 +56,7 @@ export default async function HelpPage() {
       q: 'What is Verity Post?',
       a: (
         <span>
-          Verity Post is a news app built around a four-step loop: read curated articles, take a short comprehension quiz, join a moderated discussion, and track your Verity Score over time.{' '}
-          <a href="/how-it-works" style={linkStyle}>See how it works.</a>
+          Verity Post is a news app built around a four-step loop: read curated articles, take a short comprehension quiz, join a moderated discussion, and track your Verity Score over time.
         </span>
       ),
     },
