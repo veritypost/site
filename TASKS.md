@@ -32,8 +32,8 @@ A fresh agent picks the top unchecked task, reads file:line, does the work, clos
 - `? UNCERTAIN` + tag `needs-live-check` = Agent 3 could not verify; re-verify before acting
 
 ## Task counts
-- P0: 7 · P1: 25 · P2: 32 · P3: 26 · P4: 6 · **Total: 96**
-- DB-DRIFT: 23 · SCHEMA: 6 · SECURITY: 11 · IOS: 11 · MIGRATION-DRIFT: 4 · A11Y: 3 · UX: 13 · CODE: 23
+- P0: 6 · P1: 23 · P2: 32 · P3: 26 · P4: 6 · **Total: 93**
+- DB-DRIFT: 21 · SCHEMA: 5 · SECURITY: 11 · IOS: 11 · MIGRATION-DRIFT: 4 · A11Y: 3 · UX: 13 · CODE: 23
 - Unverified (needs live-check): 22
 
 ---
@@ -73,13 +73,6 @@ A fresh agent picks the top unchecked task, reads file:line, does the work, clos
 **Priority**: P0  **Effort**: OWNER  **Lens**: UX  **Source**: A1:T-071
 **Accept**: `articles WHERE title ILIKE 'test%'` = 0 published; ≥10 real published.
 
-### T-012 — `data_export_ready` email template missing (silent cron drop)
-**Priority**: P0  **Effort**: S  **Lens**: SCHEMA  **Source**: A2:G-029 (A3 escalated from P3)
-**File**: `web/src/app/api/cron/send-emails/route.js:17-25`; `email_templates` table
-**Why**: Cron maps 7 types; DB has 6 rows; `data_export_ready` key absent. Export emails silently dropped.
-**Do**: Seed `data_export_ready` in `email_templates`.
-**Accept**: Test data-export sends email.
-
 ---
 
 ## P1 — High
@@ -90,19 +83,6 @@ A fresh agent picks the top unchecked task, reads file:line, does the work, clos
 **Why**: 115 routes return raw PostgREST/Stripe/Apple error strings; leaks columns, customer IDs, RLS reasons. Stripe/auth leaks most sensitive.
 **Do**: Replace every `NextResponse.json({ error: error.message })` with `apiError(err, 'domain.action.failed', status)`; Sentry keeps detail.
 **Accept**: `grep 'error: error.message' web/src/app/api` = 0.
-
-### T-014 — Seed `reserved_usernames` (signup can claim admin/root today)
-**Priority**: P1  **Effort**: 1L  **Lens**: DB-DRIFT  **Source**: A2:G-027
-**File**: `reserved_usernames` table (0 rows)
-**Why**: Signup accepts `admin`, `support`, `root`, `system`, `owner`, `verity`, `veritypost`.
-**Do**: Seed ~50 reserved names.
-**Accept**: Signup with `admin` rejected.
-
-### T-015 — Seed `blocked_words` (profanity filter empty)
-**Priority**: P1  **Effort**: 1L  **Lens**: DB-DRIFT  **Source**: A2:G-026
-**File**: `blocked_words` table (0 rows); `admin/comments/page.tsx:92`
-**Do**: Ship starter list; confirm comment path queries `blocked_words`.
-**Accept**: Seeded word rejects test comment.
 
 ### T-016 — `lib/plans.js` PRICING/limits hardcoded — build `planLimit()`
 **Priority**: P1  **Effort**: M  **Lens**: DB-DRIFT  **Source**: A1:T-022 + A2:G-003..G-010

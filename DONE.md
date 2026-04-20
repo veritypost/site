@@ -339,6 +339,21 @@ Keep entries short. Full narrative belongs in session logs (e.g. `05-Working/BAT
 - Session: pre-this-session
 - Note: file is a backfill-of-live-state; migration table entry is separate (see T-042)
 
+### 2026-04-20 — Seed `data_export_ready` email template (T-012)
+- Files: `schema/102_seed_data_export_ready_email_template.sql` (new)
+- Change: added the missing `data_export_ready` row in `email_templates`. Before this, the send-emails cron mapped the `data_export_ready` notification type but the template lookup returned nothing, so the notification was silently skipped via the ineligible branch at `api/cron/send-emails/route.js:67-76`. Subject + body_html + body_text + variables ([username, action_url]); idempotent via `ON CONFLICT (key) DO UPDATE`.
+- Verify: file content matches `email_templates` schema columns; variables line up with what `renderTemplate` receives at `send-emails/route.js:78-84`. Live verification pending owner-applied SQL.
+
+### 2026-04-20 — Seed `reserved_usernames` with 76 system/brand/route names (T-014)
+- Files: `schema/103_seed_reserved_usernames.sql` (new)
+- Change: table was empty; signup accepted `admin`, `root`, `system`, `owner`, `verity`, `veritypost`, and every URL-route name. Seed covers 3 buckets: system roles (admin, root, support, ...), brand (verity, veritypost, editorial, ...), URL routes that would collide (www, login, signup, kids, story, ...). Idempotent via `ON CONFLICT (username) DO NOTHING`. Admin can extend via `/admin/words`.
+- Verify: live verification pending owner-applied SQL.
+
+### 2026-04-20 — Seed `blocked_words` starter profanity list (T-015)
+- Files: `schema/104_seed_blocked_words.sql` (new)
+- Change: table was empty; profanity filter did nothing. Seed covers ~35 common English terms with severity + action classifications: high-severity slurs default to `deny`, general profanity defaults to `flag` per the column default. Admin extends via `/admin/words`. Idempotent via `ON CONFLICT (word) DO NOTHING`.
+- Verify: live verification pending owner-applied SQL.
+
 ---
 
 *Log started 2026-04-20 with back-fill of 2026-04-20 session. Future entries added on close.*
