@@ -82,78 +82,37 @@ function BreakingInner() {
     if (!isValid) return;
     setSending(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { error: auditErr } = await supabase.rpc('record_admin_action', {
-        p_action: 'breaking_news.send',
-        p_target_table: 'articles',
-        p_target_id: null,
-        p_reason: null,
-        p_old_value: null,
-        p_new_value: { text: text.trim(), story: story.trim() || null, target },
+      // T-012 — single-call server route owns article creation + audit +
+      // push fan-out. Client no longer touches articles / record_admin_action
+      // directly.
+      const res = await fetch('/api/admin/broadcasts/alert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: text.trim(),
+          story: story.trim() || undefined,
+          target,
+        }),
       });
-      if (auditErr) { push({ message: `Audit log failed: ${auditErr.message}`, variant: 'danger' }); return; }
-
-      const now = new Date().toISOString();
-      const title = text.trim().slice(0, 300);
-      const body = story.trim() || title;
-      // articles has NOT NULL constraints on body, category_id, slug.
-      // Resolve the "news" category (or fall back to the first category)
-      // so the insert doesn't blow up on breaking-news-only rows.
-      const { data: breakingCat } = await supabase
-        .from('categories')
-        .select('id')
-        .eq('slug', 'news')
-        .maybeSingle();
-      let categoryId: string | null = (breakingCat as { id: string } | null)?.id ?? null;
-      if (!categoryId) {
-        const { data: anyCat } = await supabase
-          .from('categories')
-          .select('id')
-          .order('sort_order', { ascending: true })
-          .limit(1)
-          .maybeSingle();
-        categoryId = (anyCat as { id: string } | null)?.id ?? null;
-      }
-      if (!categoryId) {
-        push({ message: 'No categories configured — cannot create breaking article', variant: 'danger' });
+      const payload = await res.json().catch(() => ({} as Record<string, unknown>));
+      if (!res.ok) {
+        const msg = typeof payload.error === 'string' ? payload.error : 'Send failed';
+        push({ message: msg, variant: 'danger' });
         return;
       }
-      const slug = `breaking-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const newAlert = {
-        title,
-        body,
-        slug,
-        category_id: categoryId,
-        author_id: user?.id ?? null,
-        is_breaking: true,
-        status: 'published',
-        visibility: 'public',
-        published_at: now,
-        metadata: { target },
-      };
-      const { data, error } = await supabase
-        .from('articles')
-        .insert(newAlert as any)
-        .select('*, categories!fk_articles_category_id(name)')
-        .single();
-      if (error) { push({ message: `Insert failed: ${error.message}`, variant: 'danger' }); return; }
 
-      if (data) {
-        setHistory((prev) => [data as unknown as ArticleRow, ...prev]);
-        try {
-          await fetch('/api/admin/broadcasts/breaking', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              article_id: data.id,
-              title: text.trim().slice(0, 300),
-              body: story.trim() || null,
-            }),
-          });
-        } catch { /* best-effort */ }
+      const article = (payload as { article?: ArticleRow }).article;
+      if (article) {
+        setHistory((prev) => [article, ...prev]);
       }
       setText(''); setStory(''); setTarget('all'); setShowConfirm(false);
-      push({ message: 'Breaking alert sent', variant: 'success' });
+      const pushError = (payload as { push_error?: boolean }).push_error;
+      push({
+        message: pushError
+          ? 'Alert saved, but push fan-out failed — retry via the history row.'
+          : 'Breaking alert sent',
+        variant: pushError ? 'warn' : 'success',
+      });
     } finally { setSending(false); }
   };
 
