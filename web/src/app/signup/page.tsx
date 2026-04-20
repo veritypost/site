@@ -18,7 +18,7 @@ const C = {
   success: '#22c55e',
 } as const;
 
-type FocusField = 'name' | 'email' | 'pw' | 'cpw' | null;
+type FocusField = 'email' | 'pw' | 'cpw' | null;
 
 type EmailCheck =
   | { status: 'idle' }
@@ -39,7 +39,6 @@ interface PasswordRule {
 }
 
 export default function SignupPage() {
-  const [fullName, setFullName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
@@ -96,7 +95,7 @@ export default function SignupPage() {
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, fullName, ageConfirmed, agreedToTerms, keepSignedIn }),
+        body: JSON.stringify({ email, password, ageConfirmed, agreedToTerms, keepSignedIn }),
       });
 
       const data = (await res.json()) as { error?: string; needsEmailConfirmation?: boolean };
@@ -166,12 +165,6 @@ export default function SignupPage() {
         )}
 
         <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '14px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: C.text, marginBottom: '7px' }}>Full name</label>
-            <input type="text" placeholder="Jane Doe" value={fullName} onChange={(e) => setFullName(e.target.value)}
-              onFocus={() => setFocused('name')} onBlur={() => setFocused(null)} style={field('name')} autoComplete="name" />
-          </div>
-
           <div style={{ marginBottom: '14px' }}>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: C.text, marginBottom: '7px' }}>Email address</label>
             <input type="email" placeholder="jane@example.com" value={email} onChange={(e) => { setEmail(e.target.value); setEmailCheck({ status: 'idle' }); }}
