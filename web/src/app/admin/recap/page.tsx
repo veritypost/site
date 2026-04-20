@@ -77,7 +77,12 @@ function RecapInner() {
       if (!ok) { router.push('/'); return; }
       setAuthorized(true);
       const [recRes, catRes] = await Promise.all([
-        fetch('/api/admin/recap').then((r) => r.json()),
+        // T-070 — prior code did `fetch().then(r => r.json())` with no
+        // `.ok` check and no `.catch`, so a transient 5xx surfaced as
+        // an unhandled `undefined.recaps` read. Guard both paths.
+        fetch('/api/admin/recap')
+          .then(async (r) => (r.ok ? r.json() : { recaps: [] }))
+          .catch((err) => { console.error('[admin/recap] list fetch', err); return { recaps: [] }; }),
         supabase.from('categories').select('id, name').order('name'),
       ]);
       setRecaps(recRes.recaps || []);
@@ -115,11 +120,21 @@ function RecapInner() {
   };
 
   const selectRecap = async (id: string) => {
-    const res = await fetch(`/api/admin/recap/${id}`);
-    const data = await res.json();
-    setSelected(data.recap);
-    setQuestions(data.questions || []);
-    setQEditing(null); setQForm(null);
+    try {
+      const res = await fetch(`/api/admin/recap/${id}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        push({ message: `Could not load recap: ${body.error || res.statusText}`, variant: 'danger' });
+        return;
+      }
+      const data = await res.json();
+      setSelected(data.recap);
+      setQuestions(data.questions || []);
+      setQEditing(null); setQForm(null);
+    } catch (err) {
+      console.error('[admin/recap] selectRecap', err);
+      push({ message: 'Could not load recap', variant: 'danger' });
+    }
   };
 
   const startNewQuestion = () => {

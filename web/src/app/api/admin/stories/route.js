@@ -36,6 +36,9 @@ export async function POST(request) {
       .single();
 
     if (error) {
+      // T-070 — was silently returning 500 with no server-side trace,
+      // making ingestion failures invisible in logs.
+      console.error('[admin.stories.create]', error.message);
       return NextResponse.json({ error: 'Could not create article' }, { status: 500 });
     }
 

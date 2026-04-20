@@ -1,9 +1,15 @@
-// Lightweight feature-flag reader. Caches for 30s per process.
+// Lightweight feature-flag reader. Caches for 10s per process.
 // Flags are the single source of truth in feature_flags. Use this
 // from server routes; client code gets flags via an API endpoint.
-
+//
+// T-073 — TTL was 30s with no cross-process invalidation mechanism;
+// an admin flag toggle could take up to 30s to propagate across
+// serverless instances. 10s halves the staleness window without
+// making the DB-read rate noticeable. True invalidation across
+// instances requires pub/sub (Supabase realtime or similar) and is a
+// separate project.
 const CACHE = new Map();     // key -> { value, ts }
-const TTL_MS = 30_000;
+const TTL_MS = 10_000;
 
 export async function isFlagEnabled(client, key, defaultValue = false) {
   const cached = CACHE.get(key);

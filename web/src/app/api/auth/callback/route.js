@@ -3,6 +3,7 @@
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { resolveNextForRedirect } from '@/lib/authRedirect';
+import { getSiteUrl } from '@/lib/siteUrl';
 
 // F-038 — IdP-supplied `display_name` and `avatar_url` used to flow
 // straight into users/auth_providers. A hostile IdP (or a malicious
@@ -43,7 +44,7 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
   const rawNext = searchParams.get('next');
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3333';
+  const siteUrl = getSiteUrl();
 
   if (!code) {
     return NextResponse.redirect(`${siteUrl}/login?error=missing_code`);

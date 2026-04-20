@@ -35,10 +35,15 @@ export async function POST(request) {
       return NextResponse.json({ ok: true, dropped: true });
     }
   } catch (err) {
-    console.error('[api/errors] rate limit check failed:', err?.message || err);
-    // Fall through — dropping the body would lose genuine signal. The
-    // rate limiter already fail-closes per Chunk 4; reaching here
-    // means something unusual; still accept the error report but log.
+    // T-073 — prior code fell through on catch, meaning a
+    // `createServiceClient()` throw or a misconfigured env let an
+    // unbounded request through. Fail closed here: drop the report.
+    // The rate limiter itself already fail-closes on RPC errors, so
+    // reaching this catch implies a bootstrap-level defect and
+    // letting traffic through is worse than losing a few client
+    // errors until the helper is restored.
+    console.error('[api/errors] rate limit bootstrap failed, dropping:', err?.message || err);
+    return NextResponse.json({ ok: true, dropped: true });
   }
 
   let body;

@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { getSiteUrl } from '@/lib/siteUrl';
 
 export async function POST(request) {
   try {
@@ -29,7 +30,7 @@ export async function POST(request) {
       return NextResponse.json({ ok: true });
     }
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3333';
+    const siteUrl = getSiteUrl();
     await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${siteUrl}/reset-password`,
     });

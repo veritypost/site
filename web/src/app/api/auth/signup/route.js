@@ -4,6 +4,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import { validatePasswordServer } from '@/lib/password';
+import { getSiteUrl } from '@/lib/siteUrl';
 
 export async function POST(request) {
   try {
@@ -30,7 +31,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Too many signup attempts' }, { status: 429 });
     }
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3333';
+    const siteUrl = getSiteUrl();
     const nowIso = new Date().toISOString();
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,

@@ -69,15 +69,28 @@ export async function requireAuth(client) {
 
 export async function requireVerifiedEmail(client) {
   const user = await requireAuth(client);
-  if (!user.email_verified) throw new Error('EMAIL_NOT_VERIFIED');
+  if (!user.email_verified) {
+    // T-076 — prior code threw without a `.status`, breaking the
+    // idiomatic `if (err.status) return NextResponse.json(...)` branch
+    // that `requireAuth` callers rely on. 403 matches the semantics.
+    const err = new Error('EMAIL_NOT_VERIFIED');
+    err.status = 403;
+    throw err;
+  }
   return user;
 }
 
 export async function requireNotBanned(client) {
   const user = await requireAuth(client);
-  if (user.is_banned) throw new Error('BANNED');
+  if (user.is_banned) {
+    const err = new Error('BANNED');
+    err.status = 403;
+    throw err;
+  }
   if (user.is_muted && user.muted_until && new Date(user.muted_until) > new Date()) {
-    throw new Error('MUTED');
+    const err = new Error('MUTED');
+    err.status = 403;
+    throw err;
   }
   return user;
 }

@@ -54,7 +54,13 @@ export async function advanceStreak(service, { userId, kidProfileId }) {
 export async function checkAchievements(service, { userId }) {
   if (!userId) return [];
   const { data, error } = await service.rpc('check_user_achievements', { p_user_id: userId });
-  if (error) return [];
+  if (error) {
+    // T-070 — prior code silently returned [] on RPC error. An
+    // achievement-check failure doesn't break the caller's flow, but
+    // it's a real signal worth surfacing in logs.
+    console.error('[scoring.checkAchievements]', error.message);
+    return [];
+  }
   return data || [];
 }
 
