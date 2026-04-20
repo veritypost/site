@@ -5,7 +5,7 @@ const supabaseHostname = (() => {
 })();
 
 // H-05 / L-02 — Content-Security-Policy is emitted from
-// `site/src/middleware.js` on every request so a per-request nonce can
+// `web/src/middleware.js` on every request so a per-request nonce can
 // be interpolated into `script-src`. The rest of the security header
 // block still ships here as static headers (no per-request data).
 const securityHeaders = [

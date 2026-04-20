@@ -134,7 +134,7 @@ export async function middleware(request) {
   });
   response.headers.set('x-request-id', requestId);
 
-  // H-05 — Content-Security-Policy (enforce mode). Flipped 2026-04-21
+  // H-05 — Content-Security-Policy (enforce mode). Flipped 2026-04-20
   // from Report-Only after the soak phase. `/api/csp-report` remains the
   // violation sink via `report-uri` in the policy string.
   response.headers.set('Content-Security-Policy', csp);

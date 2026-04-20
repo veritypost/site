@@ -13,7 +13,7 @@
 //
 // No external Apple API call. No APPLE_SHARED_SECRET (that's for legacy
 // StoreKit 1 /verifyReceipt). The root cert is immutable and vendored at
-// site/src/lib/certs/apple-root-ca-g3.der (see certs/README.md) or provided
+// web/src/lib/certs/apple-root-ca-g3.der (see certs/README.md) or provided
 // via APPLE_ROOT_CA_DER_BASE64.
 
 import crypto from 'node:crypto';
@@ -41,7 +41,7 @@ function loadRootCert() {
   } catch {
     throw new Error(
       'Apple Root CA - G3 cert not found. Run:\n' +
-      '  curl -o site/src/lib/certs/apple-root-ca-g3.der \\\n' +
+      '  curl -o web/src/lib/certs/apple-root-ca-g3.der \\\n' +
       '    https://www.apple.com/certificateauthority/AppleRootCA-G3.cer\n' +
       'or set APPLE_ROOT_CA_DER_BASE64.'
     );

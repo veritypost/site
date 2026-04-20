@@ -1,7 +1,7 @@
 # Secret Rotation Checklist — F-001 (owner-driven)
 
 Triggered by Fresh Audit finding F-001 and Deep Audit cross-ref. Live secret
-material was found in `site/.env.local` on disk (plaintext, 4,261 bytes, last
+material was found in `web/.env.local` on disk (plaintext, 4,261 bytes, last
 modified 2026-04-17 06:49). No git history exists in this tree yet (no `.git/`
 at root and no `.gitignore` prior to Chunk 1). The file has not been pushed
 anywhere from this tree, but the values must still be treated as disclosed
@@ -24,9 +24,9 @@ Supabase key during launch (F-027).
 
 - Supabase dashboard → Project settings → API → **Reset service role key**.
 - New value goes into Vercel env (Production / Preview / Development) for
-  `SUPABASE_SERVICE_ROLE_KEY`. Do NOT place it back in `site/.env.local`.
+  `SUPABASE_SERVICE_ROLE_KEY`. Do NOT place it back in `web/.env.local`.
 - For local dev use a separate dev project's service key, kept in
-  `site/.env.local` only on machines that need it; never the prod key.
+  `web/.env.local` only on machines that need it; never the prod key.
 - After rotation: Vercel "Redeploy" latest production deployment so functions
   pick up the new key. Crons will begin using the new key on the next fire.
 - Verify: hit `/api/health` (or another service-role route) post-deploy.
@@ -49,9 +49,9 @@ Supabase key during launch (F-027).
   (`checkout.session.completed`); confirm 200 at `/api/stripe/webhook` and
   that the event row appears in `webhook_log`.
 
-### 4. Any other secrets in `site/.env.local`
+### 4. Any other secrets in `web/.env.local`
 
-Open `site/.env.local` and rotate every credential present. Candidates to
+Open `web/.env.local` and rotate every credential present. Candidates to
 audit:
 
 - `RESEND_API_KEY` — Resend dashboard → API keys.
@@ -67,12 +67,11 @@ unless you have a policy against reusing it.
 
 ## After rotation
 
-1. Delete `site/.env.local` from disk (or truncate it to only non-secret
+1. Delete `web/.env.local` from disk (or truncate it to only non-secret
    local-dev values).
-2. Create `site/.env.example` with variable names and placeholder comments
+2. Create `web/.env.example` with variable names and placeholder comments
    but no values. This is the onboarding reference.
-3. Confirm `.gitignore` at repo root lists `.env*` and `site/.env.*` — done
-   in Chunk 1.
+3. Confirm `.gitignore` at repo root lists `.env*` and `web/.env.*` — covered.
 4. Before `git init`, run `grep -R "sb_secret\|sk_live\|whsec_" .` from repo
    root to sanity-check no other plaintext secrets remain.
 5. Re-deploy to Vercel and run the full auth + checkout + webhook smoke path
@@ -91,7 +90,7 @@ unless you have a policy against reusing it.
 - [ ] Stripe live secret rotated
 - [ ] Stripe webhook secret rotated
 - [ ] Resend / OpenAI / APNs / CRON secrets rotated (or confirmed not in file)
-- [ ] `site/.env.local` deleted (or reduced to dev-only values)
+- [ ] `web/.env.local` deleted (or reduced to dev-only values)
 - [ ] `site/.env.example` created
 - [ ] Vercel redeployed; smoke test passed
 - [ ] `grep` for old prefixes returns empty across repo

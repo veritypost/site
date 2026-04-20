@@ -9,7 +9,7 @@ This file is **not** checked in. Populate once per deployment.
 ### Fetch
 
 ```sh
-curl -o site/src/lib/certs/apple-root-ca-g3.der \
+curl -o web/src/lib/certs/apple-root-ca-g3.der \
   https://www.apple.com/certificateauthority/AppleRootCA-G3.cer
 ```
 
@@ -18,7 +18,7 @@ curl -o site/src/lib/certs/apple-root-ca-g3.der \
 Apple publishes fingerprints at <https://www.apple.com/certificateauthority/>. After download:
 
 ```sh
-openssl x509 -in site/src/lib/certs/apple-root-ca-g3.der -inform der -noout -fingerprint -sha256
+openssl x509 -in web/src/lib/certs/apple-root-ca-g3.der -inform der -noout -fingerprint -sha256
 ```
 
 Compare the output to Apple's published SHA-256 fingerprint for Apple Root CA — G3.

@@ -495,7 +495,6 @@ Only paid users (Verity, Verity Pro, Verity Family) can follow other users.
 - Experts
 - Editors
 - Admins
-- Superadmins
 - Owners
 
 **Not visible to:** Regular users of any tier, moderators, or Category Supervisors

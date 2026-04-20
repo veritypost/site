@@ -13,7 +13,7 @@ Permission-driven news discussion platform. Web + iOS, shared Supabase backend.
 |---|---|
 | [`web/`](web/) | Next.js 14 adult web app (desktop + mobile). Also serves `/admin`. |
 | [`VerityPost/`](VerityPost/) | SwiftUI iOS app (currently unified: adult + kid mode). |
-| [`VerityPostKids/`](VerityPostKids/) | Placeholder for the kids iOS build once split from VerityPost. |
+| [`VerityPostKids/`](VerityPostKids/) | SwiftUI Kids iOS app — pair-code auth via custom JWT, kid-safe reader, expert sessions. |
 | [`schema/`](schema/) | Supabase schema + migrations (005–094) + `reset_and_rebuild_v2.sql`. |
 | [`supabase/`](supabase/) | Supabase CLI config. |
 | [`scripts/`](scripts/) | Dev scripts: seed accounts, import permissions, preflight, smoke tests. |
