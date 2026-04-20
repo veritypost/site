@@ -57,14 +57,14 @@ struct QuizPassScene: View {
                         .padding(.top, 70)
 
                     Text("Question \(questionNumber) of \(totalQuestions)")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(.scaledSystem(size: 12, weight: .bold, design: .rounded))
                         .kerning(1)
                         .foregroundStyle(K.dim)
                         .textCase(.uppercase)
                         .padding(.top, 14)
 
                     Text(question)
-                        .font(.system(size: 18, weight: .heavy, design: .rounded))
+                        .font(.scaledSystem(size: 18, weight: .heavy, design: .rounded))
                         .foregroundStyle(K.text)
                         .multilineTextAlignment(.center)
                         .lineSpacing(3)
@@ -137,14 +137,14 @@ struct QuizPassScene: View {
 
             HStack {
                 Text(ans.text)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .font(.scaledSystem(size: 15, weight: .semibold, design: .rounded))
                     .foregroundStyle(K.text)
                 Spacer()
                 if highlighted && chipCheckVisible {
                     ZStack {
                         Circle().fill(K.teal).frame(width: 26, height: 26)
                         Image(systemName: "checkmark")
-                            .font(.system(size: 12, weight: .heavy))
+                            .font(.scaledSystem(size: 12, weight: .heavy))
                             .foregroundStyle(.white)
                     }
                     .transition(.scale(scale: 0).combined(with: .opacity))
@@ -168,7 +168,7 @@ struct QuizPassScene: View {
     private var resultCard: some View {
         VStack(spacing: 18) {
             Text("Quiz Passed")
-                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                .font(.scaledSystem(size: 12, weight: .heavy, design: .rounded))
                 .kerning(1.5)
                 .textCase(.uppercase)
                 .foregroundStyle(K.teal)
@@ -191,12 +191,12 @@ struct QuizPassScene: View {
                         to: newScore,
                         duration: 0.55,
                         trigger: scoreTrigger,
-                        font: .system(size: 38, weight: .black, design: .rounded)
+                        font: .scaledSystem(size: 38, weight: .black, design: .rounded)
                     )
                     .foregroundStyle(K.text)
 
                     Text("Verity Score")
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .font(.scaledSystem(size: 11, weight: .semibold, design: .rounded))
                         .foregroundStyle(K.dim)
                         .padding(.top, 2)
                 }
@@ -209,7 +209,7 @@ struct QuizPassScene: View {
             }
 
             Text(insight)
-                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .font(.scaledSystem(size: 15, weight: .semibold, design: .rounded))
                 .foregroundStyle(K.text)
                 .multilineTextAlignment(.center)
                 .lineSpacing(2)
@@ -217,7 +217,7 @@ struct QuizPassScene: View {
 
             Button(action: { onShare?() }) {
                 Text("Share result")
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .font(.scaledSystem(size: 16, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity, minHeight: 50)
                     .background(K.teal)
@@ -242,10 +242,10 @@ struct QuizPassScene: View {
     private func statChip(label: String, value: String, color: Color) -> some View {
         VStack(spacing: 2) {
             Text(value)
-                .font(.system(size: 18, weight: .black, design: .rounded))
+                .font(.scaledSystem(size: 18, weight: .black, design: .rounded))
                 .foregroundStyle(color)
             Text(label)
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .font(.scaledSystem(size: 11, weight: .semibold, design: .rounded))
                 .foregroundStyle(K.dim)
         }
         .frame(maxWidth: .infinity)

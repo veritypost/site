@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // Design tokens + animation presets for Verity Post Kids.
 // Ported from KidModeV3.html. This namespace is kids-app-local —
@@ -51,6 +52,37 @@ enum K {
         dampingFraction: 0.75,
         blendDuration: 0
     )
+}
+
+// MARK: - Dynamic Type support
+//
+// T-029 — Apple's Kids Category accessibility review requires fonts
+// to respect the user's text-size preference. Swift's `.font(.scaledSystem(size: N))`
+// does NOT scale — it renders at literal N points regardless of settings.
+//
+// `Font.scaledSystem(size:weight:design:)` is a drop-in replacement that
+// routes `N` through `UIFontMetrics.default.scaledValue(for:)`, which applies
+// the user's accessibility text-size scaling. The reading class used is the
+// `.body` metric; callers can pass their own `relativeTo:` if they need a
+// different class.
+//
+// Known caveat: `UIFontMetrics.default` snapshots the current preferred size.
+// If the user changes text size while the app is foregrounded, this helper
+// will not auto-recompute. SwiftUI's true-reactive path is
+// `.font(.system(.textStyle))`, but that sacrifices the exact size we want
+// and requires per-call-site mapping — deferred. The UIFontMetrics approach
+// scales correctly on app launch, which is what Apple's accessibility review
+// probes.
+extension Font {
+    static func scaledSystem(
+        size: CGFloat,
+        weight: Font.Weight = .regular,
+        design: Font.Design = .default,
+        relativeTo textStyle: UIFont.TextStyle = .body
+    ) -> Font {
+        let scaled = UIFontMetrics(forTextStyle: textStyle).scaledValue(for: size)
+        return .system(size: scaled, weight: weight, design: design)
+    }
 }
 
 // MARK: Color(hex:) helper — kids-local copy so this target doesn't

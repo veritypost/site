@@ -80,14 +80,14 @@ struct StreakScene: View {
                         to: current,
                         duration: 0.55,
                         trigger: numberTrigger,
-                        font: .system(size: 72, weight: .black, design: .rounded)
+                        font: .scaledSystem(size: 72, weight: .black, design: .rounded)
                     )
                     .foregroundStyle(K.text)
                     .frame(height: 76)
                     .padding(.top, 8)
 
                     Text("day streak")
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .font(.scaledSystem(size: 16, weight: .bold, design: .rounded))
                         .foregroundStyle(K.dim)
                         .padding(.top, 4)
 
@@ -133,26 +133,26 @@ struct StreakScene: View {
                     .shadow(color: K.teal.opacity(0.3), radius: 8, y: 4)
 
                 Image(systemName: "shield.fill")
-                    .font(.system(size: 24, weight: .bold))
+                    .font(.scaledSystem(size: 24, weight: .bold))
                     .foregroundStyle(.white)
             }
 
             VStack(spacing: 4) {
                 Text(m.headline)
-                    .font(.system(size: 20, weight: .black, design: .rounded))
+                    .font(.scaledSystem(size: 20, weight: .black, design: .rounded))
                     .foregroundStyle(K.text)
                     .multilineTextAlignment(.center)
                     .lineSpacing(2)
 
                 Text(m.subhead)
-                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .font(.scaledSystem(size: 14, weight: .medium, design: .rounded))
                     .foregroundStyle(K.dim)
             }
 
             HStack(spacing: 10) {
                 Button(action: { onShare?() }) {
                     Text("Share this")
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .font(.scaledSystem(size: 15, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity, minHeight: 48)
                         .background(K.teal)
@@ -163,7 +163,7 @@ struct StreakScene: View {
 
                 Button(action: { onDone?() }) {
                     Text("Done")
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .font(.scaledSystem(size: 15, weight: .semibold, design: .rounded))
                         .foregroundStyle(K.dim)
                         .frame(minWidth: 80, minHeight: 48)
                         .padding(.horizontal, 20)

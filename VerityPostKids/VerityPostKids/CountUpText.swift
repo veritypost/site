@@ -10,7 +10,7 @@ struct CountUpText: View, Animatable {
 
     init(
         value: Double,
-        font: Font = .system(size: 72, weight: .black, design: .rounded),
+        font: Font = .scaledSystem(size: 72, weight: .black, design: .rounded),
         formatter: @escaping (Int) -> String = { "\($0)" }
     ) {
         self.value = value
@@ -45,7 +45,7 @@ struct AnimatedCountUp: View {
         to: Int,
         duration: Double = 0.6,
         trigger: Bool = true,
-        font: Font = .system(size: 72, weight: .black, design: .rounded)
+        font: Font = .scaledSystem(size: 72, weight: .black, design: .rounded)
     ) {
         self.from = from
         self.to = to

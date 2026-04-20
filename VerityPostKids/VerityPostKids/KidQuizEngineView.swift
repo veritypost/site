@@ -42,7 +42,7 @@ struct KidQuizEngineView: View {
 
             Button { onDone() } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 14, weight: .heavy))
+                    .font(.scaledSystem(size: 14, weight: .heavy))
                     .foregroundStyle(K.text)
                     .frame(width: 36, height: 36)
                     .background(.thinMaterial)
@@ -99,13 +99,13 @@ struct KidQuizEngineView: View {
             }
 
             Text("Question \(index + 1) of \(questions.count)")
-                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                .font(.scaledSystem(size: 12, weight: .heavy, design: .rounded))
                 .kerning(1)
                 .textCase(.uppercase)
                 .foregroundStyle(K.dim)
 
             Text(q.questionText)
-                .font(.system(size: 22, weight: .black, design: .rounded))
+                .font(.scaledSystem(size: 22, weight: .black, design: .rounded))
                 .foregroundStyle(K.text)
                 .lineSpacing(4)
 
@@ -117,7 +117,7 @@ struct KidQuizEngineView: View {
 
             if revealed, let explanation = q.explanation, !explanation.isEmpty {
                 Text(explanation)
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .font(.scaledSystem(size: 13, weight: .medium, design: .rounded))
                     .foregroundStyle(K.dim)
                     .padding(14)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -130,7 +130,7 @@ struct KidQuizEngineView: View {
             if revealed {
                 Button { next() } label: {
                     Text(index + 1 < questions.count ? "Next question" : "See result")
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .font(.scaledSystem(size: 16, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity, minHeight: 54)
                         .background(K.teal)
@@ -166,7 +166,7 @@ struct KidQuizEngineView: View {
         } label: {
             HStack {
                 Text(opt.text)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .font(.scaledSystem(size: 15, weight: .semibold, design: .rounded))
                     .foregroundStyle(K.text)
                     .multilineTextAlignment(.leading)
                 Spacer()
@@ -253,23 +253,23 @@ struct KidQuizEngineView: View {
                     .fill(passed ? K.teal.opacity(0.15) : K.coral.opacity(0.15))
                     .frame(width: 120, height: 120)
                 Image(systemName: passed ? "checkmark.seal.fill" : "arrow.counterclockwise.circle.fill")
-                    .font(.system(size: 60, weight: .bold))
+                    .font(.scaledSystem(size: 60, weight: .bold))
                     .foregroundStyle(passed ? K.teal : K.coral)
             }
 
             Text(passed ? "Great job!" : "Give it another go?")
-                .font(.system(size: 28, weight: .black, design: .rounded))
+                .font(.scaledSystem(size: 28, weight: .black, design: .rounded))
                 .foregroundStyle(K.text)
 
             Text("You got \(correctCount) of \(total) right.")
-                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .font(.scaledSystem(size: 15, weight: .semibold, design: .rounded))
                 .foregroundStyle(K.dim)
 
             Spacer()
 
             Button { onDone() } label: {
                 Text("Done")
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .font(.scaledSystem(size: 16, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity, minHeight: 54)
                     .background(K.teal)
@@ -285,15 +285,15 @@ struct KidQuizEngineView: View {
     private var emptyState: some View {
         VStack(spacing: 14) {
             Image(systemName: "questionmark.folder")
-                .font(.system(size: 36, weight: .bold))
+                .font(.scaledSystem(size: 36, weight: .bold))
                 .foregroundStyle(K.dim)
             Text("No quiz yet for this article.")
-                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .font(.scaledSystem(size: 15, weight: .semibold, design: .rounded))
                 .foregroundStyle(K.dim)
                 .multilineTextAlignment(.center)
             Button { onDone() } label: {
                 Text("Back")
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .font(.scaledSystem(size: 14, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 22)
                     .padding(.vertical, 12)

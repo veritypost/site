@@ -13,10 +13,10 @@ struct StatBubble: View {
     var body: some View {
         VStack(spacing: 4) {
             Text("\(value)")
-                .font(.system(size: 32, weight: .black, design: .rounded))
+                .font(.scaledSystem(size: 32, weight: .black, design: .rounded))
                 .foregroundStyle(color)
             Text(label)
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .font(.scaledSystem(size: 11, weight: .semibold, design: .rounded))
                 .foregroundStyle(K.dim)
                 .textCase(.uppercase)
                 .kerning(0.5)
@@ -49,12 +49,12 @@ struct BadgeTile: View {
                     )
 
                 Image(systemName: iconFor(achievement.achievements?.iconName))
-                    .font(.system(size: 24, weight: .bold))
+                    .font(.scaledSystem(size: 24, weight: .bold))
                     .foregroundStyle(color)
             }
 
             Text(achievement.achievements?.name ?? "Badge")
-                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .font(.scaledSystem(size: 11, weight: .bold, design: .rounded))
                 .foregroundStyle(K.text)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
@@ -104,13 +104,13 @@ struct LeaderRow: View {
                     .fill(rankBackground)
                     .frame(width: 32, height: 32)
                 Text("\(rank)")
-                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .font(.scaledSystem(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(rankForeground)
             }
 
             // Name
             Text(entry.name)
-                .font(.system(size: 15, weight: isSelf ? .heavy : .semibold, design: .rounded))
+                .font(.scaledSystem(size: 15, weight: isSelf ? .heavy : .semibold, design: .rounded))
                 .foregroundStyle(K.text)
                 .lineLimit(1)
 
@@ -118,7 +118,7 @@ struct LeaderRow: View {
 
             // Score
             Text("\(entry.score)")
-                .font(.system(size: 15, weight: .black, design: .rounded))
+                .font(.scaledSystem(size: 15, weight: .black, design: .rounded))
                 .foregroundStyle(accent)
                 .monospacedDigit()
         }

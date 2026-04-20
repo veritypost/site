@@ -29,7 +29,7 @@ struct ExpertSessionsView: View {
                 }
                 if let loadError {
                     Text(loadError)
-                        .font(.system(size: 12, design: .rounded))
+                        .font(.scaledSystem(size: 12, design: .rounded))
                         .foregroundStyle(K.coralDark)
                 }
             }
@@ -44,10 +44,10 @@ struct ExpertSessionsView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Upcoming sessions")
-                .font(.system(size: 26, weight: .black, design: .rounded))
+                .font(.scaledSystem(size: 26, weight: .black, design: .rounded))
                 .foregroundStyle(K.text)
             Text("Live conversations with experts on topics you care about.")
-                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .font(.scaledSystem(size: 13, weight: .medium, design: .rounded))
                 .foregroundStyle(K.dim)
         }
     }
@@ -55,10 +55,10 @@ struct ExpertSessionsView: View {
     private var emptyState: some View {
         VStack(spacing: 10) {
             Image(systemName: "person.2")
-                .font(.system(size: 36, weight: .bold))
+                .font(.scaledSystem(size: 36, weight: .bold))
                 .foregroundStyle(K.dim)
             Text("No sessions scheduled right now. Check back soon.")
-                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .font(.scaledSystem(size: 13, weight: .medium, design: .rounded))
                 .foregroundStyle(K.dim)
                 .multilineTextAlignment(.center)
         }
@@ -72,21 +72,21 @@ struct ExpertSessionsView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Image(systemName: "dot.radiowaves.left.and.right")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.scaledSystem(size: 11, weight: .bold))
                     .foregroundStyle(statusColor(s.status))
                 Text((s.status ?? "").uppercased())
-                    .font(.system(size: 10, weight: .black, design: .rounded))
+                    .font(.scaledSystem(size: 10, weight: .black, design: .rounded))
                     .kerning(1)
                     .foregroundStyle(statusColor(s.status))
             }
 
             Text(s.title ?? "Session")
-                .font(.system(size: 18, weight: .heavy, design: .rounded))
+                .font(.scaledSystem(size: 18, weight: .heavy, design: .rounded))
                 .foregroundStyle(K.text)
 
             if let desc = s.description, !desc.isEmpty {
                 Text(desc)
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .font(.scaledSystem(size: 13, weight: .medium, design: .rounded))
                     .foregroundStyle(K.dim)
                     .lineLimit(3)
             }
@@ -113,9 +113,9 @@ struct ExpertSessionsView: View {
     private func metaLabel(icon: String, text: String) -> some View {
         HStack(spacing: 5) {
             Image(systemName: icon)
-                .font(.system(size: 11, weight: .bold))
+                .font(.scaledSystem(size: 11, weight: .bold))
             Text(text)
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .font(.scaledSystem(size: 11, weight: .semibold, design: .rounded))
         }
         .foregroundStyle(K.dim)
     }

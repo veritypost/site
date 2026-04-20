@@ -131,7 +131,7 @@ struct BadgeUnlockScene: View {
                 )
                 .overlay(
                     Image(systemName: iconName)
-                        .font(.system(size: 62, weight: .heavy))
+                        .font(.scaledSystem(size: 62, weight: .heavy))
                         .foregroundStyle(.white)
                         .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
                 )
@@ -145,20 +145,20 @@ struct BadgeUnlockScene: View {
     private var textBlock: some View {
         VStack(spacing: 8) {
             Text(tierLabel)
-                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                .font(.scaledSystem(size: 12, weight: .heavy, design: .rounded))
                 .kerning(1.5)
                 .textCase(.uppercase)
                 .foregroundStyle(tint)
 
             Text(headline)
-                .font(.system(size: 24, weight: .black, design: .rounded))
+                .font(.scaledSystem(size: 24, weight: .black, design: .rounded))
                 .foregroundStyle(.white)
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)
                 .frame(maxWidth: 280)
 
             Text(subhead)
-                .font(.system(size: 14, weight: .medium, design: .rounded))
+                .font(.scaledSystem(size: 14, weight: .medium, design: .rounded))
                 .foregroundStyle(Color.white.opacity(0.45))
         }
         .opacity(textOpacity)
@@ -171,7 +171,7 @@ struct BadgeUnlockScene: View {
         HStack(spacing: 10) {
             Button(action: { onShare?() }) {
                 Text("Share")
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .font(.scaledSystem(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
                     .padding(.vertical, 14)
                     .padding(.horizontal, 32)
@@ -183,7 +183,7 @@ struct BadgeUnlockScene: View {
 
             Button(action: { onDone?() }) {
                 Text("Done")
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .font(.scaledSystem(size: 15, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.white.opacity(0.6))
                     .padding(.vertical, 14)
                     .padding(.horizontal, 24)

@@ -53,7 +53,7 @@ struct ParentalGateModal: View {
 
                 Button { timer?.invalidate(); onCancel() } label: {
                     Text("Not now")
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .font(.scaledSystem(size: 14, weight: .semibold, design: .rounded))
                         .foregroundStyle(K.dim)
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .background(K.card)
@@ -87,16 +87,16 @@ struct ParentalGateModal: View {
                     .overlay(Circle().strokeBorder(K.teal.opacity(0.25), lineWidth: 1.5))
                     .frame(width: 64, height: 64)
                 Image(systemName: "checkmark.shield.fill")
-                    .font(.system(size: 28, weight: .bold))
+                    .font(.scaledSystem(size: 28, weight: .bold))
                     .foregroundStyle(K.teal)
             }
 
             Text("Grown-up check")
-                .font(.system(size: 22, weight: .black, design: .rounded))
+                .font(.scaledSystem(size: 22, weight: .black, design: .rounded))
                 .foregroundStyle(K.text)
 
             Text("A grown-up answers one math question to keep going.")
-                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .font(.scaledSystem(size: 13, weight: .medium, design: .rounded))
                 .foregroundStyle(K.dim)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 12)
@@ -108,13 +108,13 @@ struct ParentalGateModal: View {
     private var challengeView: some View {
         VStack(spacing: 20) {
             Text("What is \(n1) + \(n2)?")
-                .font(.system(size: 28, weight: .black, design: .rounded))
+                .font(.scaledSystem(size: 28, weight: .black, design: .rounded))
                 .foregroundStyle(K.text)
 
             HStack(spacing: 12) {
                 TextField("", text: $answer)
                     .keyboardType(.numberPad)
-                    .font(.system(size: 32, weight: .heavy, design: .rounded))
+                    .font(.scaledSystem(size: 32, weight: .heavy, design: .rounded))
                     .foregroundStyle(K.text)
                     .multilineTextAlignment(.center)
                     .frame(height: 60)
@@ -135,7 +135,7 @@ struct ParentalGateModal: View {
 
                 Button { checkAnswer() } label: {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 18, weight: .heavy))
+                        .font(.scaledSystem(size: 18, weight: .heavy))
                         .foregroundStyle(.white)
                         .frame(width: 60, height: 60)
                         .background(answer.isEmpty ? K.dim : K.teal)
@@ -149,7 +149,7 @@ struct ParentalGateModal: View {
                 Text(showError
                      ? "That's not quite right. (\(attempts)/\(maxAttempts))"
                      : "Attempts: \(attempts)/\(maxAttempts)")
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .font(.scaledSystem(size: 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(showError ? K.coralDark : K.dim)
             }
         }
@@ -160,13 +160,13 @@ struct ParentalGateModal: View {
     private var lockedView: some View {
         VStack(spacing: 16) {
             Image(systemName: "hourglass")
-                .font(.system(size: 40, weight: .bold))
+                .font(.scaledSystem(size: 40, weight: .bold))
                 .foregroundStyle(K.dim)
             Text("Too many tries. Try again in:")
-                .font(.system(size: 14, weight: .medium, design: .rounded))
+                .font(.scaledSystem(size: 14, weight: .medium, design: .rounded))
                 .foregroundStyle(K.dim)
             Text(formatCountdown(lockRemaining))
-                .font(.system(size: 40, weight: .black, design: .rounded))
+                .font(.scaledSystem(size: 40, weight: .black, design: .rounded))
                 .foregroundStyle(K.teal)
                 .monospacedDigit()
         }

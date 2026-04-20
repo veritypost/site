@@ -58,7 +58,7 @@ struct LeaderboardView: View {
 
                 if let loadError {
                     Text(loadError)
-                        .font(.system(size: 12, design: .rounded))
+                        .font(.scaledSystem(size: 12, design: .rounded))
                         .foregroundStyle(K.coralDark)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 20)
@@ -84,7 +84,7 @@ struct LeaderboardView: View {
                     withAnimation(K.springSnap) { scope = s }
                 } label: {
                     Text(s.label)
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(.scaledSystem(size: 13, weight: .bold, design: .rounded))
                         .foregroundStyle(active ? .white : K.text)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 10)
@@ -112,7 +112,7 @@ struct LeaderboardView: View {
                         }
                     } label: {
                         Text(cat.name)
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .font(.scaledSystem(size: 12, weight: .semibold, design: .rounded))
                             .foregroundStyle(active ? .white : K.text)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
@@ -129,10 +129,10 @@ struct LeaderboardView: View {
     private var emptyState: some View {
         VStack(spacing: 10) {
             Image(systemName: "trophy")
-                .font(.system(size: 36, weight: .bold))
+                .font(.scaledSystem(size: 36, weight: .bold))
                 .foregroundStyle(K.dim)
             Text(scope == .global ? "No one's on the global leaderboard yet." : "No one here yet.")
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .font(.scaledSystem(size: 14, weight: .semibold, design: .rounded))
                 .foregroundStyle(K.dim)
         }
         .frame(maxWidth: .infinity)

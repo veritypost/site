@@ -49,17 +49,17 @@ struct ProfileView: View {
                     ))
                     .frame(width: 80, height: 80)
                 Text(String((auth.kid?.name ?? "?").prefix(1)).uppercased())
-                    .font(.system(size: 36, weight: .black, design: .rounded))
+                    .font(.scaledSystem(size: 36, weight: .black, design: .rounded))
                     .foregroundStyle(.white)
             }
 
             Text(auth.kid?.name ?? "Reader")
-                .font(.system(size: 22, weight: .black, design: .rounded))
+                .font(.scaledSystem(size: 22, weight: .black, design: .rounded))
                 .foregroundStyle(K.text)
 
             Button { showUnpairGate = true } label: {
                 Text("Unpair this device")
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .font(.scaledSystem(size: 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(K.dim)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 7)
@@ -90,7 +90,7 @@ struct ProfileView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Badges")
-                    .font(.system(size: 13, weight: .heavy, design: .rounded))
+                    .font(.scaledSystem(size: 13, weight: .heavy, design: .rounded))
                     .kerning(1)
                     .textCase(.uppercase)
                     .foregroundStyle(K.dim)
@@ -101,7 +101,7 @@ struct ProfileView: View {
                 ProgressView().frame(maxWidth: .infinity, minHeight: 80)
             } else if badges.isEmpty {
                 Text("Take quizzes and build streaks to earn your first badge.")
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .font(.scaledSystem(size: 13, weight: .medium, design: .rounded))
                     .foregroundStyle(K.dim)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
@@ -127,7 +127,7 @@ struct ProfileView: View {
 
             if let loadError {
                 Text(loadError)
-                    .font(.system(size: 11, design: .rounded))
+                    .font(.scaledSystem(size: 11, design: .rounded))
                     .foregroundStyle(K.coralDark)
             }
         }

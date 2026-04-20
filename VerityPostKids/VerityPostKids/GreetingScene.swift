@@ -147,7 +147,7 @@ struct GreetingScene: View {
                         .shadow(color: .black.opacity(0.15), radius: 8, y: 3)
 
                     Image(systemName: timeIcon)
-                        .font(.system(size: 26, weight: .bold))
+                        .font(.scaledSystem(size: 26, weight: .bold))
                         .foregroundStyle(.white)
                 }
                 .scaleEffect(orbScale)
@@ -155,7 +155,7 @@ struct GreetingScene: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(greetingText)
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .font(.scaledSystem(size: 14, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color.white.opacity(0.55))
                         .opacity(greetingOpacity)
                         .offset(y: greetingOffset)
@@ -184,7 +184,7 @@ struct GreetingScene: View {
             ZStack(alignment: .leading) {
                 // Full name (invisible) reserves the final frame width
                 Text(name)
-                    .font(.system(size: 38, weight: .black, design: .rounded))
+                    .font(.scaledSystem(size: 38, weight: .black, design: .rounded))
                     .kerning(-1)
                     .opacity(0)
                     .background(
@@ -198,7 +198,7 @@ struct GreetingScene: View {
                     )
 
                 Text(String(name.prefix(typedCharCount)))
-                    .font(.system(size: 38, weight: .black, design: .rounded))
+                    .font(.scaledSystem(size: 38, weight: .black, design: .rounded))
                     .foregroundStyle(.white)
                     .kerning(-1)
             }
@@ -234,23 +234,23 @@ struct GreetingScene: View {
                     .shadow(color: K.coral.opacity(0.25), radius: 16, y: 4)
 
                 Image(systemName: "flame.fill")
-                    .font(.system(size: 26, weight: .bold))
+                    .font(.scaledSystem(size: 26, weight: .bold))
                     .foregroundStyle(.white)
             }
 
             VStack(alignment: .leading, spacing: 3) {
                 Text("\(streakDays) day streak")
-                    .font(.system(size: 26, weight: .black, design: .rounded))
+                    .font(.scaledSystem(size: 26, weight: .black, design: .rounded))
                     .foregroundStyle(K.text)
                 Text(streakSubtext)
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .font(.scaledSystem(size: 13, weight: .medium, design: .rounded))
                     .foregroundStyle(K.dim)
             }
 
             Spacer(minLength: 0)
 
             Image(systemName: "chevron.right")
-                .font(.system(size: 14, weight: .bold))
+                .font(.scaledSystem(size: 14, weight: .bold))
                 .foregroundStyle(K.dim)
         }
         .padding(.horizontal, 20)
@@ -309,7 +309,7 @@ struct GreetingScene: View {
             }
 
             Text(cat.name)
-                .font(.system(size: 14, weight: .heavy, design: .rounded))
+                .font(.scaledSystem(size: 14, weight: .heavy, design: .rounded))
                 .foregroundStyle(K.text)
 
             HStack(spacing: 4) {
