@@ -79,10 +79,15 @@ final class SupabaseKidsClient {
         return SupabaseClient(supabaseURL: url, supabaseKey: anonKey, options: options)
     }
 
+    // Hard-coded fallback is the prod marketing origin — used only when
+    // `VP_SITE_URL` isn't set (dev/test builds mostly). `URL(string:)` on a
+    // literal constant can never return nil, so the nil-coalesce branch
+    // never fires, but avoiding the force-unwrap keeps the file crash-free
+    // under static analysis.
     lazy var siteURL: URL = {
         if let raw = SupabaseKidsClient.resolve("VP_SITE_URL"), let url = URL(string: raw) {
             return url
         }
-        return URL(string: "https://veritypost.com")!
+        return URL(string: "https://veritypost.com") ?? URL(fileURLWithPath: "/")
     }()
 }

@@ -3,15 +3,11 @@ import Supabase
 
 // Live app state backed by Supabase. Scoped to the paired kid's kid_profile_id.
 //
-// Reads today:
-//   - Kid name + streak from kid_profiles
-//   - Categories from the categories table
-//
-// Writes today:
-//   - Local-only (completeQuiz mutates in-memory)
-//   - Real writes to reading_log + quiz_attempts are stubbed with TODO
-//     markers — they need real article_id + question_id context from a
-//     quiz engine (P3c work)
+// Reads: kid name + streak from kid_profiles; categories from the categories
+// table. Writes: in-memory only here. Durable writes to reading_log +
+// quiz_attempts happen at the edges — KidReaderView logs reads, KidQuizEngineView
+// logs attempts. Streak is recomputed server-side via trigger on reading_log
+// insert, so this file just mirrors the result.
 
 @MainActor
 final class KidsAppState: ObservableObject {
@@ -185,9 +181,6 @@ final class KidsAppState: ObservableObject {
                 )
             }
         }
-
-        // TODO (P3c): persist via quiz_attempts + reading_log inserts.
-        // Streak server-side via trigger on reading_log insert.
 
         return QuizOutcome(
             previousStreak: oldStreak,
