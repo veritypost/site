@@ -136,6 +136,36 @@ Keep entries short. Full narrative belongs in session logs (e.g. `05-Working/BAT
 
 ## Error hygiene
 
+### 2026-04-20 — error.message leak sweep: 115 sites routed through safeErrorResponse (T-013)
+- Files: `web/src/app/api/**` — 86 route files, 115 call-sites. Helper: `web/src/lib/apiErrors.js` (pre-existing).
+- Change: every `NextResponse.json({ error: error.message }, { status: N })` where `error` came from a Supabase `.from()` or `.rpc()` destructure now routes through `safeErrorResponse(NextResponse, error, { route: '<tag>', fallbackStatus: N })`. The helper logs the raw Postgres payload server-side (code + message + hint + details) and maps known SQLSTATEs (23505/23503/42501/PGRST116/...) to stable client copy. Catch-block `err.message` sentinel patterns (from `requireAuth`/`requirePermission`) were deliberately NOT touched — those return stable API-contract codes (`UNAUTHENTICATED`, `PERMISSION_DENIED:<key>`, `EMAIL_NOT_VERIFIED`, etc.). Two edge cases hand-migrated: `admin/users/[id]/roles` (internal helper returns bare object) and `account/login-cancel-deletion` (extra field in error payload).
+- Verify: `grep 'error: error.message' web/src/app/api` = 0; `tsc --noEmit` exit 0; 85 files got a new `safeErrorResponse` import.
+
+### 2026-04-20 — api/errors rate-limit bootstrap fails closed (T-073)
+- Files: `web/src/app/api/errors/route.js`
+- Change: prior code caught `createServiceClient()` or bootstrap failures in the rate-limit block and fell through, silently accepting the request body. Now drops the report + logs. The rate-limit helper itself already fail-closes on RPC errors; this catch fires only for bootstrap-level defects where dropping is strictly safer.
+- Verify: tsc pass
+
+### 2026-04-20 — featureFlags TTL 30s → 10s (T-073, partial)
+- Files: `web/src/lib/featureFlags.js`
+- Change: reduced per-process cache TTL from 30s to 10s to halve the admin-flag-toggle staleness window. True cross-process invalidation would require pub/sub; deferred as a separate project (noted inline).
+- Verify: tsc pass
+
+### 2026-04-20 — admin/stories + scoring.js + admin/recap silent-error hardening (T-070)
+- Files: `web/src/app/api/admin/stories/route.js:38`; `web/src/lib/scoring.js:57`; `web/src/app/admin/recap/page.tsx:80,118`
+- Change: `admin/stories/route.js` now `console.error`s the DB error before returning the generic 500 (prior code returned 500 with no trace). `scoring.js/checkAchievements` logs the RPC error before returning `[]` (prior silent-return masked genuine signal). `admin/recap/page.tsx` list fetch now guards with `.ok` + `.catch`; `selectRecap` wraps its fetch in try/catch + toast (prior code crashed on transient 5xx).
+- Verify: tsc pass
+
+### 2026-04-20 — requireVerifiedEmail + requireNotBanned now throw with .status (T-076)
+- Files: `web/src/lib/auth.js`
+- Change: prior code threw plain `Error('EMAIL_NOT_VERIFIED')` without a `.status`, so the idiomatic `if (err.status) return NextResponse.json(...)` branch (used by every `requireAuth` caller) fell through to the generic 500. Now both helpers throw with `err.status = 403`. Same fix for `requireNotBanned`'s `BANNED`/`MUTED` throws.
+- Verify: tsc pass
+
+### 2026-04-20 — NEXT_PUBLIC_SITE_URL fallback hardened in prod (T-010 dev half)
+- Files: `web/src/lib/siteUrl.js` (new); `web/src/app/api/auth/{signup,reset-password,callback}/route.js`
+- Change: new `getSiteUrl()` helper throws in prod-like environments when `NEXT_PUBLIC_SITE_URL` is missing. The three auth email-link routes now call the helper; missing env turns into a 500 that Sentry catches instead of delivering a password-reset or verification email with `http://localhost:3333` in the link. Dev falls back to localhost as before. `account/delete/route.js` kept the localhost entry in its CORS allow-list (dev-only match, harmless in prod). Owner still has to set the env var in Vercel (T-010 remains open for that half).
+- Verify: tsc pass; residual grep for `localhost:3333` in route files = 1 (the intentional CORS allow-list entry).
+
 ### 2026-04-20 — /api/auth/resend-verification stopped leaking IP (T-026)
 - Files: `web/src/app/api/auth/resend-verification/route.js:6,18-23,33`
 - Change: response body no longer carries caller `ip` (was a debug leftover). Unused `getClientIp` import dropped. 429 now emits `Retry-After: 3600`. `auth.resend` error logged server-side with `[resend-verify]` tag, generic copy returned to client.

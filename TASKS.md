@@ -32,9 +32,9 @@ A fresh agent picks the top unchecked task, reads file:line, does the work, clos
 - `? UNCERTAIN` + tag `needs-live-check` = Agent 3 could not verify; re-verify before acting
 
 ## Task counts
-- P0: 6 · P1: 23 · P2: 32 · P3: 26 · P4: 6 · **Total: 93**
-- DB-DRIFT: 21 · SCHEMA: 5 · SECURITY: 11 · IOS: 11 · MIGRATION-DRIFT: 4 · A11Y: 3 · UX: 13 · CODE: 23
-- Unverified (needs live-check): 22
+- P0: 6 · P1: 22 · P2: 31 · P3: 24 · P4: 6 · **Total: 89**
+- DB-DRIFT: 21 · SCHEMA: 5 · SECURITY: 9 · IOS: 11 · MIGRATION-DRIFT: 4 · A11Y: 3 · UX: 13 · CODE: 20
+- Unverified (needs live-check): 19
 
 ---
 
@@ -62,12 +62,12 @@ A fresh agent picks the top unchecked task, reads file:line, does the work, clos
 **File**: `web/next.config.js:61-68` (hard-fails build without)
 **Accept**: Next build succeeds; test error reaches Sentry.
 
-### T-010 — Confirm `NEXT_PUBLIC_SITE_URL` (localhost:3333 fallback risk)
-**Priority**: P0  **Effort**: OWNER+1L  **Lens**: SECURITY  **Source**: A1:T-070,T-013 + A2:G-055 + A3:NEW-007
-**File**: Vercel env; `api/auth/{signup,reset-password,callback}/route.js`, `api/account/delete/route.js`
-**Why**: Fallback `http://localhost:3333` in 4 routes; if env missing, email links point at user's machine.
-**Do**: Set env; harden fallbacks to throw in prod.
-**Accept**: Missing env throws 500, not localhost URL.
+### T-010 — Set `NEXT_PUBLIC_SITE_URL` in Vercel (dev hardening landed)
+**Priority**: P0  **Effort**: OWNER  **Lens**: SECURITY  **Source**: A1:T-070,T-013 + A2:G-055 + A3:NEW-007
+**File**: Vercel env
+**Why**: `lib/siteUrl.js` (T-010 dev half) now throws in prod when `NEXT_PUBLIC_SITE_URL` is missing. Three email-URL routes call it; a missing env turns into a 500 instead of a localhost link. Owner still has to set the env var in Vercel for the routes to work.
+**Do**: Set `NEXT_PUBLIC_SITE_URL=https://veritypost.com` in Vercel (production + preview).
+**Accept**: Signup, password-reset, and OAuth callback return a successful response (not 500) in prod.
 
 ### T-011 — Replace 5 `Test:` articles; publish ≥10 real
 **Priority**: P0  **Effort**: OWNER  **Lens**: UX  **Source**: A1:T-071
@@ -76,13 +76,6 @@ A fresh agent picks the top unchecked task, reads file:line, does the work, clos
 ---
 
 ## P1 — High
-
-### T-013 — Error.message leak sweep (115 occurrences, 87 API files)
-**Priority**: P1  **Effort**: M  **Lens**: SECURITY  **Source**: A1:T-002,T-097 + A2:G-037..G-041 (A3 corrected count; was 290)
-**File**: `web/src/app/api/**`; helper at `web/src/lib/apiErrors.js`
-**Why**: 115 routes return raw PostgREST/Stripe/Apple error strings; leaks columns, customer IDs, RLS reasons. Stripe/auth leaks most sensitive.
-**Do**: Replace every `NextResponse.json({ error: error.message })` with `apiError(err, 'domain.action.failed', status)`; Sentry keeps detail.
-**Accept**: `grep 'error: error.message' web/src/app/api` = 0.
 
 ### T-016 — `lib/plans.js` PRICING/limits hardcoded — build `planLimit()`
 **Priority**: P1  **Effort**: M  **Lens**: DB-DRIFT  **Source**: A1:T-022 + A2:G-003..G-010
@@ -326,10 +319,6 @@ A fresh agent picks the top unchecked task, reads file:line, does the work, clos
 **Priority**: P2  **Effort**: 1L  **Lens**: A11Y  **Source**: A3:NEW-005
 **File**: `web/src/app/card/[username]/page.js`
 
-### T-070 — `admin/stories` + `admin/recap` + scoring.js silent errors `needs-live-check`
-**Priority**: P2  **Effort**: S  **Lens**: CODE  **Source**: A1:T-031,T-032,T-033
-**File**: `api/admin/stories/route.js:38-40` (add console.error); `admin/recap/page.tsx:80,118` (missing .ok/.catch); `lib/scoring.js:57` (RPC returns [])
-
 ### T-102 — `admin/users` PLAN_OPTIONS hardcoded (9 plans in JS)
 **Priority**: P2  **Effort**: S  **Lens**: DB-DRIFT  **Source**: T-005 post-audit
 **File**: `web/src/app/admin/users/page.tsx:73-83`
@@ -356,10 +345,6 @@ A fresh agent picks the top unchecked task, reads file:line, does the work, clos
 ### T-072 — profile/settings hash-scroll 1500ms retry fragile
 **Priority**: P3  **Effort**: S  **Lens**: UX  **Source**: A1:T-038
 
-### T-073 — featureFlags 30s TTL no invalidation + errors/route fail-open `needs-live-check`
-**Priority**: P3  **Effort**: S  **Lens**: CODE+SECURITY  **Source**: A1:T-040,T-042
-**File**: `web/src/lib/featureFlags.js:5-22`; `api/errors/route.js:36-41`
-
 ### T-074 — iOS dead/silent-catch cleanup
 **Priority**: P3  **Effort**: S  **Lens**: IOS  **Source**: A1:T-043..T-046 + A2:G-050
 **File**: `ProfileView.swift:1169-1176` (`#if false`); `StoryDetailView.swift:1278-1305,1261` (expert Q&A `#if false`, vote silent catch); `LeaderboardView.swift:358` (silent catch)
@@ -369,10 +354,6 @@ A fresh agent picks the top unchecked task, reads file:line, does the work, clos
 ### T-075 — Stripe UTC-day idempotency edge `needs-live-check`
 **Priority**: P3  **Effort**: S  **Lens**: CODE  **Source**: A1:T-051
 **File**: `web/src/lib/stripe.js:73-75`
-
-### T-076 — `requireVerifiedEmail` throws without `.status` `needs-live-check`
-**Priority**: P3  **Effort**: 1L  **Lens**: CODE  **Source**: A1:T-052
-**File**: `web/src/lib/auth.js:72-73`
 
 ### T-077 — `apply-to-expert` confirmation strands user (LB-010) `needs-live-check`
 **Priority**: P3  **Effort**: S  **Lens**: UX  **Source**: A1:T-056
