@@ -129,11 +129,13 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
   // moderator roles can reach the admin routes they're authorised for
   // without the dark "Back to site" chrome — keeps the UI honest about
   // who has full platform reach.
-  // LB-005: admin banner renders only on /admin/* routes. Elsewhere admins
-  // see the standard nav with no extra banner. Hiding on non-admin paths
-  // closes the inconsistency where the banner would vanish on /story/<slug>
-  // but show on /, /browse, /leaderboard, etc.
-  const showAdminBanner = authLoaded && canSeeAdmin && onAdminPage;
+  // LB-005 revised: banner renders everywhere for admins so the entry
+  // into /admin is always reachable. Copy flips based on context:
+  //   - On /admin/*  → "Back to site" → /
+  //   - Elsewhere    → "Admin"        → /admin
+  // This matters on routes where the global nav is suppressed (home,
+  // auth pages) — without this, admins had no visible path into /admin.
+  const showAdminBanner = authLoaded && canSeeAdmin;
 
   const C = {
     bg: 'var(--bg)',
@@ -333,8 +335,11 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
           background: '#111', padding: '8px 16px',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16,
         }}>
-          <a href="/" style={{ color: '#fff', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>
-            Back to site
+          <a
+            href={onAdminPage ? '/' : '/admin'}
+            style={{ color: '#fff', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}
+          >
+            {onAdminPage ? 'Back to site' : 'Admin'}
           </a>
         </div>
       )}

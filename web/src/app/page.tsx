@@ -718,35 +718,37 @@ export default function HomePage() {
 
       <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 16px' }}>
 
-        {/* Category Pills */}
-        <div style={{
-          display: 'flex', gap: 8, overflowX: 'auto', padding: '14px 0',
-          scrollbarWidth: 'none',
-        }}>
-          {categoryPills.map(cat => (
-            <button
-              key={cat}
-              onClick={() => {
-                setActiveCategory(cat);
-                setActiveSubcategory(null);
-                setVisibleCount(6);
-              }}
-              style={{
-                whiteSpace: 'nowrap', padding: '6px 16px', borderRadius: 99,
-                border: `1.5px solid ${activeCategory === cat ? C.accent : C.border}`,
-                background: activeCategory === cat ? C.accent : C.bg,
-                color: activeCategory === cat ? '#fff' : C.dim,
-                fontSize: 13, fontWeight: 600, cursor: 'pointer',
-              }}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
+        {/* Category + subcategory pill rows intentionally hidden for
+            launch. Filter state (`activeCategory` defaults to 'All')
+            still drives the feed — we just don't render the pills. */}
+        {false && (
+          <div style={{
+            display: 'flex', gap: 8, overflowX: 'auto', padding: '14px 0',
+            scrollbarWidth: 'none',
+          }}>
+            {categoryPills.map(cat => (
+              <button
+                key={cat}
+                onClick={() => {
+                  setActiveCategory(cat);
+                  setActiveSubcategory(null);
+                  setVisibleCount(6);
+                }}
+                style={{
+                  whiteSpace: 'nowrap', padding: '6px 16px', borderRadius: 99,
+                  border: `1.5px solid ${activeCategory === cat ? C.accent : C.border}`,
+                  background: activeCategory === cat ? C.accent : C.bg,
+                  color: activeCategory === cat ? '#fff' : C.dim,
+                  fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        )}
 
-        {/* Subcategory Pills (when a specific category is selected) —
-            Wave 1 permission: `home.subcategories` (was: `verified`). */}
-        {canSubcategories && activeCategory !== 'All' && activeCatSubcats.length > 0 && (
+        {false && canSubcategories && activeCategory !== 'All' && activeCatSubcats.length > 0 && (
           <div style={{
             display: 'flex', gap: 6, overflowX: 'auto', padding: '0 0 12px',
             scrollbarWidth: 'none',
