@@ -211,6 +211,11 @@ Keep entries short. Full narrative belongs in session logs (e.g. `05-Working/BAT
 
 ## Admin surfaces
 
+### 2026-04-20 — Unified score tiers — DB-live helper, zero hardcoded mapping (T-001)
+- Files: `web/src/lib/scoreTiers.ts` (new), `web/src/app/admin/users/page.tsx:53-65,140,183-186,511-513,762-773,803`, `web/src/app/profile/page.tsx:36,55-63,159-161,207-210,403-405,426-428,457-461,526-535,569,590-592,634-642,789-,820-,824-825,1206-1229,1244-1255`
+- Change: prior code carried TWO hardcoded tier tables with different keys and thresholds than the DB (`contributor/trusted/distinguished` at 500/2000/5000 vs DB's `informed/analyst/scholar` at 300/600/1000). A user at score=300 was "contributor" in UI but "informed" in DB. Built `scoreTiers.ts` helper (60s cache) exporting `getScoreTiers()`, `tierFor(score, tiers)`, `nextTier(current, tiers)`, `ScoreTier` type. Deleted `TIER_META`, `TIERS`, local `tierFor` bodies, and `nextTierKey` across both pages. Progress-bar math rewritten to use `nextTier().min_score` as the upper bound instead of the hardcoded `next` field. All tier UI (chip color, label, progress ring, "progress to X" copy, "N points to Y") now sources from the live `score_tiers` table.
+- Verify: tsc --noEmit exit 0; grep `TIER_META|TierKey|nextTierKey|TIERS\[` across both files returns 0 matches.
+
 ### 2026-04-20 — Admin achievement-award dropdown now DB-live (T-002)
 - Files: `web/src/app/admin/users/page.tsx:83-86,144-148,173-184,680-682,755-762,897-913`
 - Change: removed hardcoded 8-label `ACHIEVEMENTS` const (none overlapped the 26 live DB rows; awarding silently failed). Added `achievementsList` state loaded from `achievements` table (ordered by `name`, `is_active=true`) in the same `init()` effect; dropdown options, initial value, and disabled-guards all feed from the live list. Handler's `name → id` lookup path unchanged (still correct); now always resolves because dropdown labels are real `achievements.name` values.

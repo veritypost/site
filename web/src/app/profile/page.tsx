@@ -33,6 +33,7 @@ import { SkeletonBar } from '@/components/admin/SkeletonRow';
 import { ADMIN_C, F, S } from '@/lib/adminPalette';
 import { createClient } from '@/lib/supabase/client';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
+import { getScoreTiers, tierFor, nextTier, type ScoreTier } from '@/lib/scoreTiers';
 import type { Tables } from '@/types/database-helpers';
 
 // ---------------------------------------------------------------
@@ -54,29 +55,13 @@ function parseTab(raw: string | null): TabId {
 }
 
 // ---------------------------------------------------------------
-// Tier derivation — mirrors /admin/users tier chip so a reader who
-// sees a peer's tier in admin moderation also sees their own here.
+// Tier data is DB-backed via `@/lib/scoreTiers`. Prior code carried
+// six hardcoded tiers (newcomer/reader/contributor/trusted/distinguished/
+// luminary at 0/100/500/2000/5000/10000) — the live `score_tiers` table
+// uses newcomer/reader/informed/analyst/scholar/luminary at
+// 0/100/300/600/1000/1500. A user at score=300 was "contributor" in
+// this page and "informed" in the DB. See T-001 in TASKS.md.
 // ---------------------------------------------------------------
-type TierKey = 'newcomer' | 'reader' | 'contributor' | 'trusted' | 'distinguished' | 'luminary';
-
-const TIER_META: Record<TierKey, { label: string; color: string; threshold: number; next: number | null }> = {
-  newcomer:      { label: 'Newcomer',      color: ADMIN_C.muted, threshold: 0,     next: 100 },
-  reader:        { label: 'Reader',        color: '#64748b',     threshold: 100,   next: 500 },
-  contributor:   { label: 'Contributor',   color: '#3b82f6',     threshold: 500,   next: 2000 },
-  trusted:       { label: 'Trusted',       color: '#0d9488',     threshold: 2000,  next: 5000 },
-  distinguished: { label: 'Distinguished', color: '#d97706',     threshold: 5000,  next: 10000 },
-  luminary:      { label: 'Luminary',      color: '#fbbf24',     threshold: 10000, next: null },
-};
-
-function tierFor(score: number | null | undefined): TierKey {
-  const n = Number(score) || 0;
-  if (n >= 10000) return 'luminary';
-  if (n >= 5000)  return 'distinguished';
-  if (n >= 2000)  return 'trusted';
-  if (n >= 500)   return 'contributor';
-  if (n >= 100)   return 'reader';
-  return 'newcomer';
-}
 
 // ---------------------------------------------------------------
 // Types for joined rows — Supabase typed relationships return
@@ -171,6 +156,10 @@ export default function ProfilePage() {
   const [earnedMap, setEarnedMap] = useState<Record<string, string>>({});
   const [milestonesLoaded, setMilestonesLoaded] = useState(false);
 
+  // Tier data — DB-backed via `score_tiers` (see @/lib/scoreTiers). 60s
+  // cache in the helper means most navs don't hit the DB here.
+  const [scoreTiers, setScoreTiers] = useState<ScoreTier[]>([]);
+
   // Keyboard nav buffer for chord shortcuts (g + letter)
   const chordRef = useRef<{ awaitG: boolean; timer: ReturnType<typeof setTimeout> | null }>({
     awaitG: false,
@@ -219,6 +208,10 @@ export default function ProfilePage() {
       await refreshAllPermissions();
       await refreshIfStale();
       if (cancelled) return;
+
+      const tiers = await getScoreTiers(supabase);
+      if (cancelled) return;
+      setScoreTiers(tiers);
 
       setPerms({
         viewOwn:       hasPermission('profile.header_stats'),
@@ -409,8 +402,7 @@ export default function ProfilePage() {
     );
   }
 
-  const tierKey = tierFor(user.verity_score);
-  const tierInfo = TIER_META[tierKey];
+  const tierInfo = tierFor(user.verity_score, scoreTiers);
 
   return (
     <Page maxWidth={960}>
@@ -431,6 +423,7 @@ export default function ProfilePage() {
         <OverviewTab
           user={user}
           tierInfo={tierInfo}
+          scoreTiers={scoreTiers}
           cardShare={perms.cardShare}
           messagesInbox={perms.messagesInbox}
           bookmarksList={perms.bookmarksList}
@@ -466,7 +459,8 @@ export default function ProfilePage() {
             loaded={milestonesLoaded}
             achievements={achievements}
             earnedMap={earnedMap}
-            tierKey={tierKey}
+            tierInfo={tierInfo}
+            scoreTiers={scoreTiers}
             verityScore={user.verity_score}
           />
         ) : <LockedTab name="Milestones" />
@@ -532,17 +526,24 @@ function Tabs({ tab, onChange }: { tab: TabId; onChange: (t: TabId) => void }) {
 // Overview tab
 // ===============================================================
 function OverviewTab({
-  user, tierInfo, cardShare, messagesInbox, bookmarksList,
+  user, tierInfo, scoreTiers, cardShare, messagesInbox, bookmarksList,
 }: {
   user: UserRow;
-  tierInfo: (typeof TIER_META)[TierKey];
+  tierInfo: ScoreTier | null;
+  scoreTiers: ScoreTier[];
   cardShare: boolean;
   messagesInbox: boolean;
   bookmarksList: boolean;
 }) {
   const score = user.verity_score || 0;
-  const range = tierInfo.next == null ? 0 : tierInfo.next - tierInfo.threshold;
-  const progress = tierInfo.next == null ? 1 : Math.min(1, Math.max(0, (score - tierInfo.threshold) / range));
+  const tierColor = tierInfo?.color_hex || ADMIN_C.muted;
+  const tierLabel = tierInfo?.display_name || 'Newcomer';
+  const nextT = nextTier(tierInfo, scoreTiers);
+  const minScore = tierInfo?.min_score ?? 0;
+  const range = nextT ? nextT.min_score - minScore : 0;
+  const progress = nextT && range > 0
+    ? Math.min(1, Math.max(0, (score - minScore) / range))
+    : 1;
   const memberSince = user.created_at
     ? new Date(user.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
     : '';
@@ -582,7 +583,7 @@ function OverviewTab({
             style={{
               padding: 3,
               borderRadius: '50%',
-              background: `conic-gradient(${tierInfo.color} 0deg, ${tierInfo.color} ${progress * 360}deg, ${ADMIN_C.divider} ${progress * 360}deg 360deg)`,
+              background: `conic-gradient(${tierColor} 0deg, ${tierColor} ${progress * 360}deg, ${ADMIN_C.divider} ${progress * 360}deg 360deg)`,
               flexShrink: 0,
             }}
           >
@@ -602,8 +603,8 @@ function OverviewTab({
               <div style={{ fontSize: F.xl, fontWeight: 600, color: ADMIN_C.white, letterSpacing: '-0.01em' }}>
                 {user.display_name || user.username || 'Reader'}
               </div>
-              <Badge variant="neutral" dot style={{ borderColor: tierInfo.color, color: tierInfo.color }}>
-                {tierInfo.label}
+              <Badge variant="neutral" dot style={{ borderColor: tierColor, color: tierColor }}>
+                {tierLabel}
               </Badge>
               {roleBadges.map((b) => (
                 <Badge key={b.label} variant={b.variant}>{b.label}</Badge>
@@ -647,13 +648,13 @@ function OverviewTab({
         )}
 
         {/* Tier progress */}
-        {tierInfo.next != null && (
+        {nextT && (
           <div style={{ marginTop: S[4] }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: F.xs, color: ADMIN_C.dim, marginBottom: S[1] }}>
-              <span>Progress to {TIER_META[nextTierKey(tierInfo)].label}</span>
-              <span>{score.toLocaleString()} / {tierInfo.next.toLocaleString()}</span>
+              <span>Progress to {nextT.display_name}</span>
+              <span>{score.toLocaleString()} / {nextT.min_score.toLocaleString()}</span>
             </div>
-            <ProgressBar value={progress} color={tierInfo.color} />
+            <ProgressBar value={progress} color={tierColor} />
           </div>
         )}
       </PageSection>
@@ -801,17 +802,6 @@ function QuickLink({
   );
 }
 
-function nextTierKey(tierInfo: (typeof TIER_META)[TierKey]): TierKey {
-  // Find the tier whose threshold equals this tier's `next`.
-  const nextThreshold = tierInfo.next;
-  if (nextThreshold == null) return 'luminary';
-  const entries = Object.entries(TIER_META) as [TierKey, typeof tierInfo][];
-  for (const [k, meta] of entries) {
-    if (meta.threshold === nextThreshold) return k;
-  }
-  return 'luminary';
-}
-
 function ProgressBar({ value, color }: { value: number; color: string }) {
   return (
     <div
@@ -843,8 +833,10 @@ function ProfileCardPreview({
   user, tierInfo,
 }: {
   user: UserRow;
-  tierInfo: (typeof TIER_META)[TierKey];
+  tierInfo: ScoreTier | null;
 }) {
+  const tierColor = tierInfo?.color_hex || ADMIN_C.muted;
+  const tierLabel = tierInfo?.display_name || 'Newcomer';
   return (
     <div
       style={{
@@ -864,7 +856,7 @@ function ProfileCardPreview({
           {user.display_name || user.username}
         </div>
         <div style={{ fontSize: F.sm, color: ADMIN_C.dim }}>
-          @{user.username} · <span style={{ color: tierInfo.color, fontWeight: 600 }}>{tierInfo.label}</span>
+          @{user.username} · <span style={{ color: tierColor, fontWeight: 600 }}>{tierLabel}</span>
         </div>
         <div style={{ display: 'flex', gap: S[3], marginTop: S[2], fontSize: F.xs, color: ADMIN_C.soft }}>
           <span><strong style={{ color: ADMIN_C.white }}>{(user.verity_score ?? 0).toLocaleString()}</strong> score</span>
@@ -1218,18 +1210,24 @@ function CategoryDrillModal({
 // Milestones tab
 // ===============================================================
 function MilestonesTab({
-  loaded, achievements, earnedMap, tierKey, verityScore,
+  loaded, achievements, earnedMap, tierInfo, scoreTiers, verityScore,
 }: {
   loaded: boolean;
   achievements: AchievementRow[];
   earnedMap: Record<string, string>;
-  tierKey: TierKey;
+  tierInfo: ScoreTier | null;
+  scoreTiers: ScoreTier[];
   verityScore: number | null | undefined;
 }) {
-  const tierInfo = TIER_META[tierKey];
   const score = verityScore ?? 0;
-  const range = tierInfo.next == null ? 0 : tierInfo.next - tierInfo.threshold;
-  const progress = tierInfo.next == null ? 1 : Math.min(1, Math.max(0, (score - tierInfo.threshold) / range));
+  const tierColor = tierInfo?.color_hex || ADMIN_C.muted;
+  const tierLabel = tierInfo?.display_name || 'Newcomer';
+  const nextT = nextTier(tierInfo, scoreTiers);
+  const minScore = tierInfo?.min_score ?? 0;
+  const range = nextT ? nextT.min_score - minScore : 0;
+  const progress = nextT && range > 0
+    ? Math.min(1, Math.max(0, (score - minScore) / range))
+    : 1;
 
   const grouped = useMemo(() => {
     const buckets: Record<string, AchievementRow[]> = {};
@@ -1256,18 +1254,18 @@ function MilestonesTab({
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: S[2] }}>
             <div>
-              <div style={{ fontSize: F.lg, fontWeight: 600, color: ADMIN_C.white }}>{tierInfo.label}</div>
+              <div style={{ fontSize: F.lg, fontWeight: 600, color: ADMIN_C.white }}>{tierLabel}</div>
               <div style={{ fontSize: F.xs, color: ADMIN_C.dim, marginTop: 2 }}>
-                {tierInfo.next == null
+                {!nextT
                   ? 'Top tier reached'
-                  : `${(tierInfo.next - score).toLocaleString()} points to ${TIER_META[nextTierKey(tierInfo)].label}`}
+                  : `${(nextT.min_score - score).toLocaleString()} points to ${nextT.display_name}`}
               </div>
             </div>
-            <Badge dot style={{ borderColor: tierInfo.color, color: tierInfo.color }}>
+            <Badge dot style={{ borderColor: tierColor, color: tierColor }}>
               {score.toLocaleString()} pts
             </Badge>
           </div>
-          <ProgressBar value={progress} color={tierInfo.color} />
+          <ProgressBar value={progress} color={tierColor} />
         </div>
       </PageSection>
 

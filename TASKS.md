@@ -32,8 +32,8 @@ A fresh agent picks the top unchecked task, reads file:line, does the work, clos
 - `? UNCERTAIN` + tag `needs-live-check` = Agent 3 could not verify; re-verify before acting
 
 ## Task counts
-- P0: 10 · P1: 25 · P2: 30 · P3: 23 · P4: 6 · **Total: 94**
-- DB-DRIFT: 20 · SCHEMA: 6 · SECURITY: 12 · IOS: 11 · MIGRATION-DRIFT: 4 · A11Y: 3 · UX: 13 · CODE: 23
+- P0: 9 · P1: 25 · P2: 30 · P3: 23 · P4: 6 · **Total: 93**
+- DB-DRIFT: 19 · SCHEMA: 6 · SECURITY: 12 · IOS: 11 · MIGRATION-DRIFT: 4 · A11Y: 3 · UX: 13 · CODE: 23
 - Unverified (needs live-check): 22
 
 ---
