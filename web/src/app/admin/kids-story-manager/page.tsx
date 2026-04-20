@@ -354,9 +354,6 @@ function KidsStoryManagerInner() {
   const saveAll = async () => {
     setSaving(true);
     try {
-      let savedStoryId = storyId;
-      const { data: { user } } = await supabase.auth.getUser();
-
       let categoryId = story.category_id;
       if (!categoryId && story.category) {
         const { data: catData } = await supabase.from('categories').select('id').eq('name', story.category).single();
@@ -365,85 +362,61 @@ function KidsStoryManagerInner() {
 
       const slug = story.slug || (story.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now());
 
-      const storyPayload: Record<string, unknown> = {
-        title: story.title,
-        slug,
-        excerpt: story.summary || '',
-        status: story.status,
-        category_id: categoryId,
-        is_breaking: story.is_breaking || false,
-        is_kids_safe: true,
-        kids_summary: story.summary || '',
-      };
-
-      if (storyId) {
-        storyPayload.updated_at = new Date().toISOString();
-        const { error } = await supabase.from('articles').update(storyPayload as never).eq('id', storyId);
-        if (error) throw new Error(error.message);
-      } else {
-        storyPayload.author_id = user?.id;
-        const { data, error } = await supabase.from('articles').insert(storyPayload as never).select().single();
-        if (error) throw new Error(error.message);
-        if (data) { savedStoryId = data.id; setStoryId(data.id); }
-      }
-
-      if (!savedStoryId) return;
-
-      for (const entry of entries) {
-        const eventPayload: Record<string, unknown> = {
-          article_id: savedStoryId,
-          event_date: entry.type === 'story' ? (entry.timeline_date || entry.event_date) : entry.event_date,
-          event_label: entry.type === 'story' ? (entry.timeline_headline || entry.title) : entry.title,
-          event_body: entry.summary || null,
-          sort_order: entry.sort_order || 0,
-          type: entry.type,
-          content: entry.type === 'story' ? (entry.content || null) : null,
-        };
-        if (entry._isNew) {
-          const { data: newEvent } = await supabase.from('timelines').insert(eventPayload as never).select().single();
-          if (newEvent) {
-            setQuizzes((prev) => prev.map((q) => (q.entry_id === entry.id ? { ...q, entry_id: newEvent.id } : q)));
-            setEntries((prev) => prev.map((e) => (e.id === entry.id ? { ...e, id: newEvent.id, _isNew: false } : e)));
-          }
-        } else {
-          await supabase.from('timelines').update(eventPayload as never).eq('id', entry.id);
-        }
-      }
-
-      await supabase.from('sources').delete().eq('article_id', savedStoryId);
-      const sourcesToInsert = (story.sources || [])
-        .filter((s) => s.outlet || s.url || s.headline)
-        .map((s, i) => ({
-          article_id: savedStoryId!,
-          publisher: s.outlet || '',
-          url: s.url || '',
-          title: s.headline || '',
-          sort_order: i,
-        }));
-      if (sourcesToInsert.length > 0) {
-        await supabase.from('sources').insert(sourcesToInsert as never[]);
-      }
-
-      // v2 schema: each quiz question is its own row in the quizzes table.
-      // Delete existing questions for this article, then re-insert.
-      const validQuestions = quizzes.filter((q) => q.question);
-      await supabase.from('quizzes').delete().eq('article_id', savedStoryId);
-      if (validQuestions.length > 0) {
-        const rows = validQuestions.map((q, i) => ({
-          article_id: savedStoryId!,
-          title: story.title + ' Q' + (i + 1),
-          question_text: q.question,
-          options: q.options || [],
-          explanation: q.explanation || '',
-          difficulty: 'standard',
-          points: 10,
-        }));
-        await supabase.from('quizzes').insert(rows as never[]);
-      }
-
       const currentEntry = entries.find((e) => e.is_current && e.type === 'story') || entries.filter((e) => e.type === 'story').pop();
-      if (currentEntry) {
-        await supabase.from('articles').update({ kids_summary: currentEntry.summary || story.summary || '' } as never).eq('id', savedStoryId);
+
+      const res = await fetch('/api/admin/articles/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          article_id: storyId || null,
+          article: {
+            title: story.title,
+            slug,
+            excerpt: story.summary || '',
+            status: story.status,
+            category_id: categoryId,
+            is_breaking: story.is_breaking || false,
+            is_kids_safe: true,
+            kids_summary: story.summary || '',
+          },
+          timeline_entries: entries.map((entry) => ({
+            id: entry.id,
+            _isNew: entry._isNew,
+            event_date: entry.type === 'story' ? (entry.timeline_date || entry.event_date) : entry.event_date,
+            event_label: entry.type === 'story' ? (entry.timeline_headline || entry.title) : entry.title,
+            event_body: entry.summary || null,
+            sort_order: entry.sort_order || 0,
+            type: entry.type,
+            content: entry.type === 'story' ? (entry.content || null) : null,
+          })),
+          sources: (story.sources || []).map((s, i) => ({
+            publisher: s.outlet || '',
+            url: s.url || '',
+            title: s.headline || '',
+            sort_order: i,
+          })),
+          quizzes: quizzes.filter((q) => q.question).map((q, i) => ({
+            title: story.title + ' Q' + (i + 1),
+            question_text: q.question,
+            options: q.options || [],
+            explanation: q.explanation || '',
+            difficulty: 'standard',
+            points: 10,
+          })),
+          kids_summary_stamp: currentEntry ? (currentEntry.summary || story.summary || '') : null,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.article_id) {
+        throw new Error(json.error || 'Save failed');
+      }
+
+      const savedStoryId: string = json.article_id;
+      const remap = (json.entry_id_remap || {}) as Record<string, string>;
+      if (!storyId) setStoryId(savedStoryId);
+      if (Object.keys(remap).length > 0) {
+        setEntries((prev) => prev.map((e) => (remap[e.id] ? { ...e, id: remap[e.id], _isNew: false } : e)));
+        setQuizzes((prev) => prev.map((q) => (q.entry_id && remap[q.entry_id] ? { ...q, entry_id: remap[q.entry_id] } : q)));
       }
 
       setIsDirty(false);
@@ -483,8 +456,11 @@ function KidsStoryManagerInner() {
       oldValue: { id: storyId, title: story.title, slug: story.slug, status: story.status },
       newValue: null,
       run: async () => {
-        const { error } = await supabase.from('articles').delete().eq('id', storyId);
-        if (error) throw new Error(error.message);
+        const res = await fetch(`/api/admin/articles/${storyId}`, { method: 'DELETE' });
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          throw new Error(j.error || 'Delete failed');
+        }
         toast.push({ message: 'Kids article deleted', variant: 'success' });
         newStory();
         const { data: refreshed } = await supabase

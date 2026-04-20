@@ -172,19 +172,25 @@ function CommentsAdminInner() {
     if (saveTimeout.current) clearTimeout(saveTimeout.current);
     saveTimeout.current = setTimeout(async () => {
       const payload: Record<string, boolean | number> = { ...newSettings, ...newNums };
-      const rows = Object.entries(payload).map(([key, value]) => ({
-        key,
-        value: value as never,
-        updated_at: new Date().toISOString(),
-      }));
-      if (rows.length > 0) {
-        const { error } = await supabase.from('settings').upsert(rows, { onConflict: 'key' });
-        if (error) {
-          toastApi.push({ message: `Save failed: ${error.message}`, variant: 'danger' });
-        } else {
-          toastApi.push({ message: 'Saved', variant: 'success', duration: 1500 });
-          fetch('/api/admin/settings/invalidate', { method: 'POST' }).catch(() => {});
+      const entries = Object.entries(payload);
+      if (entries.length === 0) return;
+      const errors: string[] = [];
+      for (const [key, value] of entries) {
+        const res = await fetch('/api/admin/settings/upsert', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key, value: String(value) }),
+        });
+        if (!res.ok) {
+          const json = await res.json().catch(() => ({ error: 'save failed' }));
+          errors.push(`${key}: ${json.error || 'unknown'}`);
         }
+      }
+      if (errors.length > 0) {
+        toastApi.push({ message: `Save failed: ${errors[0]}`, variant: 'danger' });
+      } else {
+        toastApi.push({ message: 'Saved', variant: 'success', duration: 1500 });
+        fetch('/api/admin/settings/invalidate', { method: 'POST' }).catch(() => {});
       }
     }, 800);
   };

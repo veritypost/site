@@ -140,10 +140,15 @@ function ReaderInner() {
       push({ message: `Audit log failed: ${auditErr.message}`, variant: 'danger' });
       return;
     }
-    const { error } = await supabase.from('settings').upsert({ key: settingKey, value: String(next) }, { onConflict: 'key' });
-    if (error) {
+    const res = await fetch('/api/admin/settings/upsert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: settingKey, value: String(next) }),
+    });
+    if (!res.ok) {
       setConfig((p) => ({ ...p, [k]: prev }));
-      push({ message: `Save failed: ${error.message}`, variant: 'danger' });
+      const json = await res.json().catch(() => ({ error: 'save failed' }));
+      push({ message: `Save failed: ${json.error || 'unknown error'}`, variant: 'danger' });
       return;
     }
     fetch('/api/admin/settings/invalidate', { method: 'POST' }).catch(err => { console.error('[admin/reader] settings invalidate', err); });
@@ -154,10 +159,15 @@ function ReaderInner() {
     const prev = nums[k];
     setNums((p) => ({ ...p, [k]: val }));
     const settingKey = 'reader_num_' + k;
-    const { error } = await supabase.from('settings').upsert({ key: settingKey, value: String(val) }, { onConflict: 'key' });
-    if (error) {
+    const res = await fetch('/api/admin/settings/upsert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: settingKey, value: String(val) }),
+    });
+    if (!res.ok) {
       setNums((p) => ({ ...p, [k]: prev }));
-      push({ message: `Save failed: ${error.message}`, variant: 'danger' });
+      const json = await res.json().catch(() => ({ error: 'save failed' }));
+      push({ message: `Save failed: ${json.error || 'unknown error'}`, variant: 'danger' });
       return;
     }
     fetch('/api/admin/settings/invalidate', { method: 'POST' }).catch(err => { console.error('[admin/reader] settings invalidate', err); });

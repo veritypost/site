@@ -432,9 +432,6 @@ function StoryEditorInner() {
   const saveAll = async () => {
     setSaving(true);
     try {
-      let savedStoryId = storyId;
-      const { data: { user } } = await supabase.auth.getUser();
-
       let categoryId = story.category_id;
       if (!categoryId && story.category) {
         const { data: catData } = await supabase.from('categories').select('id').eq('name', story.category).single();
@@ -457,33 +454,57 @@ function StoryEditorInner() {
         ? new Date(drivingDate + 'T00:00:00Z').toISOString()
         : null;
 
-      const storyPayload: Record<string, unknown> = {
-        title: drivingTitle,
-        slug,
-        excerpt: drivingSummary,
-        body: drivingBody,
-        status: story.status,
-        category_id: categoryId,
-        is_breaking: story.is_breaking || false,
-        is_developing: story.is_developing || false,
-        published_at: publishedAtIso,
-      };
-
-      if (storyId) {
-        storyPayload.updated_at = new Date().toISOString();
-        const { error } = await supabase.from('articles').update(storyPayload as never).eq('id', storyId);
-        if (error) throw new Error(error.message);
-      } else {
-        storyPayload.author_id = user?.id;
-        const { data, error } = await supabase.from('articles').insert(storyPayload as never).select().single();
-        if (error) throw new Error(error.message);
-        if (data) { savedStoryId = data.id; }
+      const res = await fetch('/api/admin/articles/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          article_id: storyId || null,
+          article: {
+            title: drivingTitle,
+            slug,
+            excerpt: drivingSummary,
+            body: drivingBody,
+            status: story.status,
+            category_id: categoryId,
+            is_breaking: story.is_breaking || false,
+            is_developing: story.is_developing || false,
+            published_at: publishedAtIso,
+          },
+          timeline_entries: entries.map((entry) => ({
+            id: entry.id,
+            _isNew: entry._isNew,
+            event_date: entry.type === 'story' ? (entry.timeline_date || entry.event_date) : entry.event_date,
+            event_label: entry.type === 'story' ? (entry.timeline_headline || entry.title) : entry.title,
+            event_body: entry.summary || null,
+            sort_order: entry.sort_order || 0,
+          })),
+          sources: (story.sources || []).filter((s) => s.outlet || s.url || s.headline).map((s, i) => ({
+            publisher: s.outlet || '',
+            url: s.url || '',
+            title: s.headline || '',
+            sort_order: i,
+          })),
+          quizzes: quizzes.filter((q) => !q._deleted && q.question_text.trim().length > 0).map((q, i) => ({
+            title: q.question_text.slice(0, 200),
+            question_text: q.question_text,
+            question_type: q.question_type,
+            options: q.options.map((o) => ({ text: o.text, is_correct: o.is_correct })),
+            explanation: q.explanation || '',
+            sort_order: i,
+            is_active: true,
+            points: 10,
+          })),
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.article_id) {
+        throw new Error(json.error || 'Save failed');
       }
 
-      if (!savedStoryId) throw new Error('Article id missing after save');
+      const savedStoryId: string = json.article_id;
+      const remap = (json.entry_id_remap || {}) as Record<string, string>;
 
-      // Keep the local `story` state in sync with what we just persisted so
-      // the header, picker, and delete dialog reflect the latest headline.
+      // Keep the local `story` state in sync with what we just persisted.
       setStory((prev) => ({
         ...prev,
         title: drivingTitle,
@@ -493,85 +514,15 @@ function StoryEditorInner() {
         published_at: drivingDate,
       }));
 
-      // Timeline entries (preserved as-is) — collect id remaps so quizzes
-      // whose entry_id references a pre-save temp id can follow along.
-      const entryIdRemap: Record<string, string> = {};
-      for (const entry of entries) {
-        const eventPayload: Record<string, unknown> = {
-          article_id: savedStoryId,
-          event_date: entry.type === 'story' ? (entry.timeline_date || entry.event_date) : entry.event_date,
-          event_label: entry.type === 'story' ? (entry.timeline_headline || entry.title) : entry.title,
-          event_body: entry.summary || null,
-          sort_order: entry.sort_order || 0,
-        };
-        if (entry._isNew) {
-          const { data: newEvent } = await supabase.from('timelines').insert(eventPayload as never).select().single();
-          if (newEvent) {
-            entryIdRemap[entry.id] = newEvent.id;
-            setEntries((prev) => prev.map((e) => (e.id === entry.id ? { ...e, id: newEvent.id, _isNew: false } : e)));
-          }
-        } else {
-          await supabase.from('timelines').update(eventPayload as never).eq('id', entry.id);
-        }
+      if (Object.keys(remap).length > 0) {
+        setEntries((prev) => prev.map((e) => (remap[e.id] ? { ...e, id: remap[e.id], _isNew: false } : { ...e, _isNew: false })));
+        setQuizzes((prev) => prev.map((q) => (remap[q.entry_id] ? { ...q, entry_id: remap[q.entry_id] } : q)));
+      } else {
+        setEntries((prev) => prev.map((e) => ({ ...e, _isNew: false })));
       }
-      if (Object.keys(entryIdRemap).length > 0) {
-        setQuizzes((prev) =>
-          prev.map((q) => (entryIdRemap[q.entry_id] ? { ...q, entry_id: entryIdRemap[q.entry_id] } : q)),
-        );
-      }
+      setQuizzes((prev) => prev.filter((q) => !q._deleted).map((q) => ({ ...q, _isNew: false })));
 
-      // Sources: delete-all-then-reinsert (pragmatic; lists are small)
-      {
-        const { error: delErr } = await supabase.from('sources').delete().eq('article_id', savedStoryId);
-        if (delErr) throw new Error(delErr.message);
-        const sourcesToInsert = (story.sources || [])
-          .filter((s) => s.outlet || s.url || s.headline)
-          .map((s, i) => ({
-            article_id: savedStoryId!,
-            publisher: s.outlet || '',
-            url: s.url || '',
-            title: s.headline || '',
-            sort_order: i,
-          }));
-        if (sourcesToInsert.length > 0) {
-          const { error: insErr } = await supabase.from('sources').insert(sourcesToInsert as never[]);
-          if (insErr) throw new Error(insErr.message);
-        }
-      }
-
-      // Quizzes: delete-all-then-reinsert per article.
-      {
-        const { error: delErr } = await supabase.from('quizzes').delete().eq('article_id', savedStoryId);
-        if (delErr) throw new Error(delErr.message);
-        const liveQuizzes = quizzes.filter((q) => !q._deleted);
-        const quizzesToInsert = liveQuizzes
-          .filter((q) => q.question_text.trim().length > 0)
-          .map((q, i) => ({
-            article_id: savedStoryId!,
-            // quizzes.title is NOT NULL — use the question text as the
-            // per-quiz title when no explicit title is set.
-            title: q.question_text.slice(0, 200),
-            question_text: q.question_text,
-            question_type: q.question_type,
-            options: q.options.map((o) => ({ text: o.text, is_correct: o.is_correct })),
-            explanation: q.explanation || '',
-            sort_order: i,
-            is_active: true,
-            points: 10,
-          }));
-        if (quizzesToInsert.length > 0) {
-          const { error: insErr } = await supabase.from('quizzes').insert(quizzesToInsert as never[]);
-          if (insErr) throw new Error(insErr.message);
-        }
-        setQuizzes((prev) =>
-          prev
-            .filter((q) => !q._deleted)
-            .map((q) => ({ ...q, _isNew: false })),
-        );
-      }
-
-      // If this was a new article, swap URL so subsequent Saves target it.
-      if (!storyId && savedStoryId) {
+      if (!storyId) {
         setStoryId(savedStoryId);
         try {
           router.replace(`/admin/story-manager?article=${savedStoryId}`);
@@ -614,8 +565,11 @@ function StoryEditorInner() {
       oldValue: { id: storyId, title: story.title, slug: story.slug, status: story.status },
       newValue: null,
       run: async () => {
-        const { error } = await supabase.from('articles').delete().eq('id', storyId);
-        if (error) throw new Error(error.message);
+        const res = await fetch(`/api/admin/articles/${storyId}`, { method: 'DELETE' });
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          throw new Error(j.error || 'Delete failed');
+        }
         toast.push({ message: 'Article deleted', variant: 'success' });
         newStory();
         const { data: refreshed } = await supabase

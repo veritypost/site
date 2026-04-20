@@ -106,25 +106,35 @@ function StreaksInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const saveSetting = async (key: string, value: string) => {
+    const res = await fetch('/api/admin/settings/upsert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, value }),
+    });
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({ error: 'save failed' }));
+      return json.error || 'save failed';
+    }
+    fetch('/api/admin/settings/invalidate', { method: 'POST' }).catch(() => {});
+    return null;
+  };
   const toggle = (k: string) => {
     const next = !config[k];
     setConfig((prev) => ({ ...prev, [k]: next }));
     (async () => {
-      const { error } = await supabase.from('settings').upsert({ key: 'streak_config_' + k, value: String(next) }, { onConflict: 'key' });
-      if (error) {
+      const err = await saveSetting('streak_config_' + k, String(next));
+      if (err) {
         setConfig((prev) => ({ ...prev, [k]: !next }));
-        push({ message: `Save failed: ${error.message}`, variant: 'danger' });
-        return;
+        push({ message: `Save failed: ${err}`, variant: 'danger' });
       }
-      fetch('/api/admin/settings/invalidate', { method: 'POST' }).catch(() => {});
     })();
   };
   const updateNum = async (k: string, v: string | number) => {
     const val = typeof v === 'number' ? v : parseFloat(v as string) || 0;
     setNums((prev) => ({ ...prev, [k]: val }));
-    const { error } = await supabase.from('settings').upsert({ key: 'streak_num_' + k, value: String(val) }, { onConflict: 'key' });
-    if (error) { push({ message: `Save failed: ${error.message}`, variant: 'danger' }); return; }
-    fetch('/api/admin/settings/invalidate', { method: 'POST' }).catch(() => {});
+    const err = await saveSetting('streak_num_' + k, String(val));
+    if (err) { push({ message: `Save failed: ${err}`, variant: 'danger' }); }
   };
 
   if (loading) {
