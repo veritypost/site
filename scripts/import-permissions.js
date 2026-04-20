@@ -54,7 +54,21 @@ const MODE = APPLY ? 'APPLY' : 'DRY-RUN';
 // ---- Parse xlsx via python (openpyxl, already available) -------------------
 
 function parseXlsx() {
-  const xlsxPath = '/Users/veritypost/Desktop/verity post/permissions.xlsx';
+  // T-034 — path resolution order:
+  //   1. PERMISSIONS_XLSX_PATH env var (CI / alt machines)
+  //   2. matrix/permissions.xlsx inside the repo (preferred canonical location)
+  //   3. ~/Desktop/verity post/permissions.xlsx (legacy owner workflow)
+  const repoPath = path.resolve(__dirname, '..', 'matrix', 'permissions.xlsx');
+  const legacyPath = '/Users/veritypost/Desktop/verity post/permissions.xlsx';
+  const candidates = [process.env.PERMISSIONS_XLSX_PATH, repoPath, legacyPath].filter(Boolean);
+  const xlsxPath = candidates.find(p => fs.existsSync(p));
+  if (!xlsxPath) {
+    console.error('permissions.xlsx not found. Tried:');
+    for (const c of candidates) console.error('  -', c);
+    console.error('Set PERMISSIONS_XLSX_PATH or move the file into matrix/.');
+    process.exit(1);
+  }
+  console.log(`using xlsx: ${xlsxPath}`);
   const script = `
 import json, openpyxl
 wb = openpyxl.load_workbook('${xlsxPath}', data_only=True)

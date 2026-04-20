@@ -14,6 +14,8 @@ if (dsn) {
   // not yet installed. Post-`npm install` this resolves.
   // eslint-disable-next-line global-require
   const Sentry = require('@sentry/nextjs');
+  // eslint-disable-next-line global-require
+  const { scrubPII } = require('./sentry.shared');
   Sentry.init({
     dsn,
     environment: process.env.NEXT_PUBLIC_VERCEL_ENV || process.env.NODE_ENV || 'development',
@@ -30,5 +32,7 @@ if (dsn) {
       'Non-Error promise rejection captured',
       'ResizeObserver loop',
     ],
+    // T-033 — strip emails, Authorization headers, request-body secrets.
+    beforeSend: scrubPII,
   });
 }
