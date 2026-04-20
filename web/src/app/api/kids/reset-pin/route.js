@@ -17,6 +17,7 @@ export async function POST(request) {
     const svc = createServiceClient();
     const rate = await checkRateLimit(svc, {
       key: `kids-reset-pin:${user.id}`,
+      policyKey: 'kids_reset_pin',
       max: 5,
       windowSec: 3600,
     });

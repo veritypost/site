@@ -43,17 +43,88 @@ const IS_PROD =
   process.env.NODE_ENV === 'production';
 const DEV_FAIL_OPEN = !IS_PROD;
 
-export async function checkRateLimit(supabase, { key, max, windowSec }) {
+// T-003 — DB-backed rate-limit policy lookup with 60s in-memory cache.
+// Routes name a `policyKey` + supply code defaults; a matching row in
+// `rate_limits` (by `key`) overrides the defaults at runtime. When the
+// table has no row for the key (bootstrap) or lookup errors, we fall
+// back to the code defaults so the route keeps working — this was the
+// whole point of landing the helper before the seed SQL runs.
+//
+// Cache is per-process + 60s TTL. An `admin/system` edit takes effect
+// within one TTL window.
+const POLICY_CACHE = new Map(); // policyKey -> { max, windowSec, scope, isActive, expiresAt }
+const POLICY_TTL_MS = 60_000;
+
+export async function getRateLimit(supabase, policyKey, fallback) {
+  const now = Date.now();
+  const cached = POLICY_CACHE.get(policyKey);
+  if (cached && cached.expiresAt > now) {
+    if (cached.isActive === false) return { max: Infinity, windowSec: fallback.windowSec, disabled: true };
+    return { max: cached.max, windowSec: cached.windowSec };
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('rate_limits')
+      .select('max_requests, window_seconds, scope, is_active')
+      .eq('key', policyKey)
+      .maybeSingle();
+    if (error) {
+      console.warn('[rateLimit.getRateLimit] lookup error, using fallback:', error.message);
+      return fallback;
+    }
+    if (!data) {
+      // No row — cache the fallback so we don't hammer the DB until the seed lands.
+      POLICY_CACHE.set(policyKey, {
+        max: fallback.max,
+        windowSec: fallback.windowSec,
+        scope: null,
+        isActive: true,
+        expiresAt: now + POLICY_TTL_MS,
+      });
+      return fallback;
+    }
+    POLICY_CACHE.set(policyKey, {
+      max: data.max_requests,
+      windowSec: data.window_seconds,
+      scope: data.scope,
+      isActive: data.is_active,
+      expiresAt: now + POLICY_TTL_MS,
+    });
+    if (data.is_active === false) {
+      return { max: Infinity, windowSec: fallback.windowSec, disabled: true };
+    }
+    return { max: data.max_requests, windowSec: data.window_seconds };
+  } catch (err) {
+    console.warn('[rateLimit.getRateLimit] threw, using fallback:', err?.message || err);
+    return fallback;
+  }
+}
+
+export async function checkRateLimit(supabase, { key, policyKey, max, windowSec }) {
+  // T-003 — when `policyKey` is supplied, consult `rate_limits` for a
+  // DB override of the code-supplied `max`/`windowSec`. Cached per
+  // process for 60s. If the row is missing or errored we fall through
+  // to the code defaults, so routes keep working before the seed SQL
+  // lands. is_active=false disables the limit entirely for that policy.
+  let effectiveMax = max;
+  let effectiveWindow = windowSec;
+  if (policyKey) {
+    const policy = await getRateLimit(supabase, policyKey, { max, windowSec });
+    if (policy.disabled) return { limited: false, remaining: Infinity, reason: 'policy_disabled' };
+    effectiveMax = policy.max;
+    effectiveWindow = policy.windowSec;
+  }
   try {
     const { data, error } = await supabase.rpc('check_rate_limit', {
       p_key: key,
-      p_max: max,
-      p_window_sec: windowSec,
+      p_max: effectiveMax,
+      p_window_sec: effectiveWindow,
     });
     if (error) {
       if (DEV_FAIL_OPEN) {
         console.warn('[rateLimit] RPC error in dev, failing open:', error.message);
-        return { limited: false, remaining: max, reason: 'dev_fail_open' };
+        return { limited: false, remaining: effectiveMax, reason: 'dev_fail_open' };
       }
       console.error('[rateLimit] RPC error, failing closed:', error.message);
       return { limited: true, remaining: 0, reason: 'rpc_error' };
@@ -61,7 +132,7 @@ export async function checkRateLimit(supabase, { key, max, windowSec }) {
     if (!data || typeof data !== 'object') {
       if (DEV_FAIL_OPEN) {
         console.warn('[rateLimit] malformed RPC response in dev, failing open');
-        return { limited: false, remaining: max, reason: 'dev_fail_open' };
+        return { limited: false, remaining: effectiveMax, reason: 'dev_fail_open' };
       }
       console.error('[rateLimit] malformed RPC response, failing closed');
       return { limited: true, remaining: 0, reason: 'malformed' };
@@ -73,7 +144,7 @@ export async function checkRateLimit(supabase, { key, max, windowSec }) {
   } catch (err) {
     if (DEV_FAIL_OPEN) {
       console.warn('[rateLimit] threw in dev, failing open:', err?.message || err);
-      return { limited: false, remaining: max, reason: 'dev_fail_open' };
+      return { limited: false, remaining: effectiveMax, reason: 'dev_fail_open' };
     }
     console.error('[rateLimit] threw, failing closed:', err?.message || err);
     return { limited: true, remaining: 0, reason: 'threw' };

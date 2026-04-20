@@ -25,7 +25,7 @@ export async function POST(request) {
     }
 
     const ip = await getClientIp();
-    const hit = await checkRateLimit(supabase, { key: `signup:ip:${ip}`, max: 5, windowSec: 3600 });
+    const hit = await checkRateLimit(supabase, { key: `signup:ip:${ip}`, policyKey: 'signup_ip', max: 5, windowSec: 3600 });
     if (hit.limited) {
       return NextResponse.json({ error: 'Too many signup attempts' }, { status: 429 });
     }

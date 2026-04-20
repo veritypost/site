@@ -25,6 +25,7 @@ export async function POST(request, { params }) {
 
   const rate = await checkRateLimit(service, {
     key: `users-block:${user.id}`,
+    policyKey: 'users_block',
     max: 30,
     windowSec: 60,
   });

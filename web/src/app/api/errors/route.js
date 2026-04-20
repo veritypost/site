@@ -25,6 +25,7 @@ export async function POST(request) {
     const service = createServiceClient();
     const rl = await checkRateLimit(service, {
       key: `errors:ip:${ip}`,
+      policyKey: 'errors',
       max: 60,
       windowSec: 60,
     });

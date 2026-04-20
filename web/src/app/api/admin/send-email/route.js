@@ -65,6 +65,7 @@ export async function POST(request) {
   const ip = await getClientIp();
   const rl = await checkRateLimit(service, {
     key: `admin_send_email:user:${user.id}`,
+    policyKey: 'admin_send_email',
     max: 5,
     windowSec: 3600,
   });

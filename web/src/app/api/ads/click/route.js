@@ -29,6 +29,7 @@ export async function POST(request) {
   const ip = await getClientIp();
   const rl = await checkRateLimit(service, {
     key: `ads_click:ip:${ip}`,
+    policyKey: 'ads_click',
     max: 120,
     windowSec: 60,
   });

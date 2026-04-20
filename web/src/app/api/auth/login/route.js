@@ -14,7 +14,7 @@ export async function POST(request) {
     const supabase = await createClient();
 
     const ip = await getClientIp();
-    const hit = await checkRateLimit(supabase, { key: `login:ip:${ip}`, max: 10, windowSec: 900 });
+    const hit = await checkRateLimit(supabase, { key: `login:ip:${ip}`, policyKey: 'login_ip', max: 10, windowSec: 900 });
     if (hit.limited) {
       return NextResponse.json({ error: 'Too many login attempts' }, { status: 429 });
     }

@@ -26,6 +26,7 @@ export async function POST(request) {
     const svc = createServiceClient();
     const rate = await checkRateLimit(svc, {
       key: `kids-generate:${user.id}`,
+      policyKey: 'kids_generate_pair_code',
       max: 10,
       windowSec: 60,
     });

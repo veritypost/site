@@ -24,6 +24,7 @@ export async function GET(request) {
     // signup-flow typos and well below a useful enumeration rate.
     const ipHit = await checkRateLimit(supabase, {
       key: `check_email:ip:${ip}`,
+      policyKey: 'check_email_ip',
       max: 30,
       windowSec: 3600,
     });
@@ -32,6 +33,7 @@ export async function GET(request) {
     }
     const emailHit = await checkRateLimit(supabase, {
       key: `check_email:addr:${email}`,
+      policyKey: 'check_email_addr',
       max: 10,
       windowSec: 86400,
     });

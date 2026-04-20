@@ -30,6 +30,7 @@ export async function POST(request) {
     const ip = await getClientIp();
     const rate = await checkRateLimit(svc, {
       key: `kids-pair:${ip}`,
+      policyKey: 'kids_pair',
       max: 10,
       windowSec: 60,
     });

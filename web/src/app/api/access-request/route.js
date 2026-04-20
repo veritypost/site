@@ -27,6 +27,7 @@ export async function POST(request) {
 
   const rl = await checkRateLimit(service, {
     key: `access_request:ip:${ip}`,
+    policyKey: 'access_request',
     max: 3,
     windowSec: 3600,
   });

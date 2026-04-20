@@ -33,6 +33,7 @@ export async function POST(request) {
   const ip = await getClientIp();
   const hit = await checkRateLimit(service, {
     key: `resolve_username:ip:${ip}`,
+    policyKey: 'resolve_username',
     max: 10,
     windowSec: 60,
   });

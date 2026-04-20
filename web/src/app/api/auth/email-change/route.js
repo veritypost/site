@@ -24,7 +24,7 @@ export async function POST(request) {
 
   const supabase = await createClient();
   const ip = await getClientIp();
-  const hit = await checkRateLimit(supabase, { key: `email_change:user:${user.id}:${ip}`, max: 3, windowSec: 3600 });
+  const hit = await checkRateLimit(supabase, { key: `email_change:user:${user.id}:${ip}`, policyKey: 'email_change', max: 3, windowSec: 3600 });
   if (hit.limited) {
     return NextResponse.json({ error: 'Too many email-change attempts. Try again later.' }, { status: 429 });
   }

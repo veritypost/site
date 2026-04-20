@@ -25,6 +25,7 @@ export async function POST(request) {
 
   const rate = await checkRateLimit(service, {
     key: `follows:${user.id}`,
+    policyKey: 'follows',
     max: 60,
     windowSec: 60,
   });

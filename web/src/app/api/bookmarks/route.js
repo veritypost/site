@@ -27,6 +27,7 @@ export async function POST(request) {
 
   const rate = await checkRateLimit(service, {
     key: `bookmarks:${user.id}`,
+    policyKey: 'bookmarks',
     max: 60,
     windowSec: 60,
   });

@@ -20,6 +20,7 @@ export async function POST(request) {
   // Rate-limit: 10 appeal submissions per hour per user.
   const rate = await checkRateLimit(service, {
     key: `appeals:${user.id}`,
+    policyKey: 'appeals',
     max: 10,
     windowSec: 3600,
   });

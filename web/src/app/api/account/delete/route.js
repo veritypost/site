@@ -72,6 +72,7 @@ export async function POST(request) {
   // grace-period state machine).
   const rate = await checkRateLimit(service, {
     key: `account-delete:${user.id}`,
+    policyKey: 'account_delete',
     max: 5,
     windowSec: 3600,
   });

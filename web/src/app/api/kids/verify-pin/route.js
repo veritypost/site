@@ -18,6 +18,7 @@ export async function POST(request) {
   const rlSvc = createServiceClient();
   const rate = await checkRateLimit(rlSvc, {
     key: `kids-verify-pin:${user.id}`,
+    policyKey: 'kids_verify_pin',
     max: 30,
     windowSec: 60,
   });

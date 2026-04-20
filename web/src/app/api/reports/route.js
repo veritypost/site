@@ -15,6 +15,7 @@ export async function POST(request) {
     // user is comfortably above legitimate use while closing that vector.
     const rate = await checkRateLimit(supabase, {
       key: `reports:user:${user.id}`,
+      policyKey: 'reports',
       max: 10,
       windowSec: 3600,
     });

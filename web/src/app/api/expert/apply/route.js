@@ -23,6 +23,7 @@ export async function POST(request) {
   // hour is almost certainly abuse (and inflates the moderator queue).
   const rate = await checkRateLimit(service, {
     key: `expert-apply:user:${user.id}`,
+    policyKey: 'expert_apply',
     max: 5,
     windowSec: 3600,
   });

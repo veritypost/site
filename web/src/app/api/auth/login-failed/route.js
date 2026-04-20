@@ -41,12 +41,12 @@ export async function POST(request) {
   // path, which itself rate-limits per email; defense-in-depth.
   try {
     const service = createServiceClient();
-    const ipHit = await checkRateLimit(service, { key: `login_failed:ip:${ip}`, max: 30, windowSec: 3600 });
+    const ipHit = await checkRateLimit(service, { key: `login_failed:ip:${ip}`, policyKey: 'login_failed_ip', max: 30, windowSec: 3600 });
     if (ipHit.limited) return NextResponse.json({ locked: false });
 
     // Layer 1: per-email — normal users retry 2-3 times before asking
     // for a reset, so 3/hour does not impact the happy path.
-    const emailHit = await checkRateLimit(service, { key: `login_failed:email:${email}`, max: 3, windowSec: 3600 });
+    const emailHit = await checkRateLimit(service, { key: `login_failed:email:${email}`, policyKey: 'login_failed_email', max: 3, windowSec: 3600 });
     if (emailHit.limited) return NextResponse.json({ locked: false });
 
     // Layer 3: proof-of-failure. Ephemeral client means this auth call

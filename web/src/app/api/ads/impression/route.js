@@ -42,6 +42,7 @@ export async function POST(request) {
   const ip = await getClientIp();
   const rl = await checkRateLimit(service, {
     key: `ads_impression:ip:${ip}`,
+    policyKey: 'ads_impression',
     max: 300,
     windowSec: 60,
   });

@@ -16,6 +16,7 @@ export async function POST() {
   const supabase = await createClient();
   const hit = await checkRateLimit(supabase, {
     key: `resend_verify:user:${user.id}`,
+    policyKey: 'resend_verify',
     max: 3,
     windowSec: 3600,
   });

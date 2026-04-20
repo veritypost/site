@@ -37,6 +37,7 @@ export async function POST(request) {
 
     const ipHit = await checkRateLimit(service, {
       key: `login_precheck:ip:${ip}`,
+      policyKey: 'login_precheck_ip',
       max: 30,
       windowSec: 3600,
     });
@@ -47,6 +48,7 @@ export async function POST(request) {
     }
     const emailHit = await checkRateLimit(service, {
       key: `login_precheck:email:${email}`,
+      policyKey: 'login_precheck_email',
       max: 3,
       windowSec: 3600,
     });

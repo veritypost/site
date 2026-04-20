@@ -27,6 +27,7 @@ export async function POST(request) {
   // could spam this endpoint to rack up session noise.
   const rate = await checkRateLimit(service, {
     key: `stripe-checkout:${user.id}`,
+    policyKey: 'stripe_checkout',
     max: 20,
     windowSec: 3600,
   });
