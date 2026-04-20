@@ -245,17 +245,18 @@ export default function FeatureFlagsAdmin() {
     const built = buildRowFromForm(true);
     if (built.ok === false) { toast.push({ message: built.error, variant: 'danger' }); return; }
     setSaving(true);
-    const { data, error } = await supabase
-      .from('feature_flags')
-      .upsert(built.row as FeatureFlag, { onConflict: 'key' })
-      .select()
-      .single();
+    const res = await fetch('/api/admin/features', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(built.row),
+    });
+    const json = await res.json().catch(() => ({}));
     setSaving(false);
-    if (error) {
-      toast.push({ message: `Create failed: ${error.message}`, variant: 'danger' });
+    if (!res.ok || !json.row) {
+      toast.push({ message: `Create failed: ${json.error || 'unknown error'}`, variant: 'danger' });
       return;
     }
-    const row = data as FeatureFlag;
+    const row = json.row as FeatureFlag;
     setFlags((prev) => {
       const existing = prev.findIndex((f) => f.key === row.key);
       if (existing >= 0) {
@@ -278,18 +279,18 @@ export default function FeatureFlagsAdmin() {
     const built = buildRowFromForm(false);
     if (built.ok === false) { toast.push({ message: built.error, variant: 'danger' }); return; }
     setSaving(true);
-    const { data, error } = await supabase
-      .from('feature_flags')
-      .update(built.row as FeatureFlag)
-      .eq('id', editingId)
-      .select()
-      .single();
+    const res = await fetch(`/api/admin/features/${editingId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(built.row),
+    });
+    const json = await res.json().catch(() => ({}));
     setSaving(false);
-    if (error) {
-      toast.push({ message: `Save failed: ${error.message}`, variant: 'danger' });
+    if (!res.ok || !json.row) {
+      toast.push({ message: `Save failed: ${json.error || 'unknown error'}`, variant: 'danger' });
       return;
     }
-    const row = data as FeatureFlag;
+    const row = json.row as FeatureFlag;
     setFlags((prev) => prev.map((f) => f.id === editingId ? row : f));
     toast.push({ message: `Saved flag "${row.key}"`, variant: 'success' });
     cancelForm();
@@ -301,25 +302,16 @@ export default function FeatureFlagsAdmin() {
     // Optimistic.
     setFlags((prev) => prev.map((f) => f.id === flag.id ? { ...f, is_enabled: next } : f));
 
-    const { error: auditErr } = await supabase.rpc('record_admin_action', {
-      p_action: 'feature.toggle',
-      p_target_table: 'feature_flags',
-      p_target_id: flag.id,
-      p_reason: null,
-      p_old_value: { is_enabled: !!flag.is_enabled, key: flag.key },
-      p_new_value: { is_enabled: next, key: flag.key },
+    const res = await fetch(`/api/admin/features/${flag.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'toggle_enabled', is_enabled: next }),
     });
-    if (auditErr) {
-      setTogglingKey(null);
-      setFlags((prev) => prev.map((f) => f.id === flag.id ? { ...f, is_enabled: !next } : f));
-      toast.push({ message: `Audit log write failed: ${auditErr.message}`, variant: 'danger' });
-      return;
-    }
-    const { error } = await supabase.from('feature_flags').update({ is_enabled: next }).eq('id', flag.id);
     setTogglingKey(null);
-    if (error) {
+    if (!res.ok) {
       setFlags((prev) => prev.map((f) => f.id === flag.id ? { ...f, is_enabled: !next } : f));
-      toast.push({ message: `Toggle failed: ${error.message}`, variant: 'danger' });
+      const json = await res.json().catch(() => ({ error: 'toggle failed' }));
+      toast.push({ message: `Toggle failed: ${json.error || 'unknown error'}`, variant: 'danger' });
       return;
     }
     toast.push({ message: next ? `Enabled ${flag.key}` : `Disabled ${flag.key}`, variant: 'success' });
@@ -329,25 +321,16 @@ export default function FeatureFlagsAdmin() {
     const next = !flag.is_killswitch;
     setTogglingKey(flag.key);
     setFlags((prev) => prev.map((f) => f.id === flag.id ? { ...f, is_killswitch: next } : f));
-    const { error: auditErr } = await supabase.rpc('record_admin_action', {
-      p_action: 'feature.killswitch',
-      p_target_table: 'feature_flags',
-      p_target_id: flag.id,
-      p_reason: null,
-      p_old_value: { is_killswitch: !!flag.is_killswitch, key: flag.key },
-      p_new_value: { is_killswitch: next, key: flag.key },
+    const res = await fetch(`/api/admin/features/${flag.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'toggle_killswitch', is_killswitch: next }),
     });
-    if (auditErr) {
-      setTogglingKey(null);
-      setFlags((prev) => prev.map((f) => f.id === flag.id ? { ...f, is_killswitch: !next } : f));
-      toast.push({ message: `Audit log write failed: ${auditErr.message}`, variant: 'danger' });
-      return;
-    }
-    const { error } = await supabase.from('feature_flags').update({ is_killswitch: next }).eq('id', flag.id);
     setTogglingKey(null);
-    if (error) {
+    if (!res.ok) {
       setFlags((prev) => prev.map((f) => f.id === flag.id ? { ...f, is_killswitch: !next } : f));
-      toast.push({ message: `Killswitch toggle failed: ${error.message}`, variant: 'danger' });
+      const json = await res.json().catch(() => ({ error: 'toggle failed' }));
+      toast.push({ message: `Killswitch toggle failed: ${json.error || 'unknown error'}`, variant: 'danger' });
       return;
     }
     toast.push({ message: next ? 'Killswitch armed' : 'Killswitch off', variant: 'success' });
@@ -374,8 +357,11 @@ export default function FeatureFlagsAdmin() {
       },
       newValue: null,
       run: async () => {
-        const { error } = await supabase.from('feature_flags').delete().eq('id', flag.id);
-        if (error) throw new Error(error.message);
+        const res = await fetch(`/api/admin/features/${flag.id}`, { method: 'DELETE' });
+        if (!res.ok) {
+          const json = await res.json().catch(() => ({ error: 'delete failed' }));
+          throw new Error(json.error || 'Delete failed');
+        }
         setFlags((prev) => prev.filter((f) => f.id !== flag.id));
         toast.push({ message: `Deleted ${flag.key}`, variant: 'success' });
       },

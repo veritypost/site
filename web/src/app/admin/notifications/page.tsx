@@ -135,8 +135,15 @@ function NotificationsInner() {
   }, []);
 
   const saveSetting = async (key: string, value: unknown) => {
-    const { error } = await supabase.from('settings').upsert({ key, value: String(value) }, { onConflict: 'key' });
-    if (error) return error;
+    const res = await fetch('/api/admin/settings/upsert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, value: String(value) }),
+    });
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({ error: 'save failed' }));
+      return new Error(json.error || 'save failed');
+    }
     fetch('/api/admin/settings/invalidate', { method: 'POST' }).catch(() => {});
     return null;
   };
@@ -180,27 +187,20 @@ function NotificationsInner() {
   const sendNotification = async () => {
     setCompSending(true);
     try {
-      let targetUserIds: string[] = [];
-      if (compRecipient === 'all') {
-        const { data: allUsers } = await supabase.from('users').select('id');
-        targetUserIds = (allUsers || []).map((u: any) => u.id);
-      } else {
-        const { data: foundUser } = await supabase
-          .from('users').select('id').eq('username', compUsername.trim()).single();
-        if (!foundUser) { push({ message: 'User not found', variant: 'danger' }); return; }
-        targetUserIds = [foundUser.id];
-      }
-      if (targetUserIds.length === 0) { push({ message: 'No users found', variant: 'warn' }); return; }
-
-      const rows = targetUserIds.map((uid) => ({
-        user_id: uid,
-        title: compTitle.trim(),
-        body: compBody.trim(),
-        type: compType,
-      }));
-      const { error } = await supabase.from('notifications').insert(rows as any);
-      if (error) { push({ message: `Error: ${error.message}`, variant: 'danger' }); return; }
-      push({ message: `Sent to ${targetUserIds.length} user${targetUserIds.length > 1 ? 's' : ''}`, variant: 'success' });
+      const res = await fetch('/api/admin/notifications/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipient: compRecipient,
+          username: compUsername.trim() || undefined,
+          title: compTitle.trim(),
+          body: compBody.trim(),
+          type: compType,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) { push({ message: `Error: ${json.error || 'unknown error'}`, variant: 'danger' }); return; }
+      push({ message: `Sent to ${json.sent_count} user${json.sent_count === 1 ? '' : 's'}`, variant: 'success' });
       setCompTitle(''); setCompBody(''); setCompUsername('');
       setShowConfirm(false);
       const { data: notifs } = await supabase

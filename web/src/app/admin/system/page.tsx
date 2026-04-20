@@ -104,15 +104,18 @@ export default function SystemAdmin() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const saveSetting = useCallback(async (key: string, value: string | boolean | number) => {
-    const { error } = await supabase
-      .from('settings')
-      .upsert({ key, value: String(value) }, { onConflict: 'key' });
-    if (error) {
-      push({ message: `Could not save: ${error.message}`, variant: 'danger' });
+    const res = await fetch('/api/admin/settings/upsert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, value: String(value) }),
+    });
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({ error: 'save failed' }));
+      push({ message: `Could not save: ${json.error || 'unknown error'}`, variant: 'danger' });
       return;
     }
     fetch('/api/admin/settings/invalidate', { method: 'POST' }).catch(() => {});
-  }, [supabase, push]);
+  }, [push]);
 
   useEffect(() => {
     async function init() {
@@ -213,26 +216,25 @@ export default function SystemAdmin() {
 
   // --- Persist helpers -------------------------------------------------------
   const persistLimit = async (l: UILimit) => {
-    const payload = {
-      display_name:   l.endpoint,
-      max_requests:   l.count,
-      window_seconds: windowToSeconds(l.window, l.windowUnit),
-      scope:          l.per,
-      is_active:      !!l.enabled,
-    };
-    if (l.id) {
-      const { error } = await supabase.from('rate_limits').update(payload).eq('id', l.id);
-      if (error) { push({ message: `Could not save: ${error.message}`, variant: 'danger' }); return; }
-    } else {
-      const { data, error } = await supabase
-        .from('rate_limits')
-        .upsert({ ...payload, key: l.key }, { onConflict: 'key' })
-        .select()
-        .single();
-      if (error) { push({ message: `Could not save: ${error.message}`, variant: 'danger' }); return; }
-      if (data?.id) {
-        setLimits((prev) => prev.map((x) => (x.endpoint === l.endpoint ? { ...x, id: data.id } : x)));
-      }
+    const res = await fetch('/api/admin/rate-limits', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        key: l.key,
+        display_name: l.endpoint,
+        max_requests: l.count,
+        window_seconds: windowToSeconds(l.window, l.windowUnit),
+        scope: l.per,
+        is_active: !!l.enabled,
+      }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      push({ message: `Could not save: ${json.error || 'unknown error'}`, variant: 'danger' });
+      return;
+    }
+    if (json.id && !l.id) {
+      setLimits((prev) => prev.map((x) => (x.endpoint === l.endpoint ? { ...x, id: json.id } : x)));
     }
     push({ message: `${l.endpoint} saved`, variant: 'success' });
   };
