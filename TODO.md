@@ -37,7 +37,10 @@ All idempotent. Until applied: signup accepts `admin`/`root`/`owner` as username
 Supabase service-role key, Stripe live secret, Stripe webhook secret. Ex-dev had access.
 
 ### 7 — (OWNER) Vercel env vars
-Set in production + preview scopes: `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, `NEXT_PUBLIC_SITE_URL=https://veritypost.com`. Build fails hard without the Sentry DSNs. Password-reset + verification emails point at `localhost:3333` without `NEXT_PUBLIC_SITE_URL`.
+Set in production + preview scopes:
+- `SENTRY_DSN` + `NEXT_PUBLIC_SENTRY_DSN` — build fails hard without these.
+- `NEXT_PUBLIC_SITE_URL=https://veritypost.com` — password-reset + verification emails point at `localhost:3333` without it.
+- `SUPABASE_JWT_SECRET` — required to sign the custom kid JWT at `/api/kids/pair`. Copy from Supabase dashboard → Settings → API → JWT Secret. Without it, kids iOS pairing returns 500.
 
 ### 8 — (OWNER) Enable HIBP in Supabase Auth dashboard
 Without it, signup accepts known-leaked passwords.
@@ -125,9 +128,51 @@ Concentrated in `web/src/app/admin/subscriptions/page.tsx:48,49,51,109,194,298,3
 
 ---
 
+## P2
+
+### 22 — Rewrite or archive `docs/runbooks/CUTOVER.md`
+Currently dangerous if followed. Stale claims:
+- Lists 3 Vercel crons; actual `web/vercel.json` has 9.
+- Migration sequence stops at `020_phase12_cutover.sql`; actual disk reaches 105.
+- All paths reference deleted `site/` folder.
+- "Pre-flight verifies every RPC…" — references the broken preflight from #1.
+**Do:** either rewrite top-to-bottom matching current state (crons, migrations, paths, 9 env vars from TODO #7), OR archive to `archive/2026-04-20-consolidation/` and write a short new `CUTOVER.md` with: backup prod → apply disk migrations → `node scripts/preflight.js` → `vercel --prod` → smoke test.
+
+### 23 — Rewrite or archive `docs/runbooks/TEST_WALKTHROUGH.md`
+References `01-Schema/032_seed_test_articles.sql` (wrong path — it's `schema/032_...`), test accounts `<username>@vp.test` with shared password `password` (actual seeds use `<username>@test.veritypost.com` with tier-specific passwords like `TestOwner1!`). Steps would fail for anyone running them today.
+**Do:** rewrite against current seed data from `test-data/accounts.json`, OR archive and write a thinner smoke-test walkthrough matching `scripts/smoke-v2.js`.
+
+### 24 — Verify `plans.apple_product_id` matches `APP_STORE_METADATA.md` IAP ids
+8 IAP product IDs listed in `docs/product/APP_STORE_METADATA.md` §11 (e.g., `com.veritypost.verity.monthly`, `com.veritypost.verity_pro.annual`, etc.). If the live `plans.apple_product_id` column doesn't match verbatim, `/api/ios/subscriptions/sync` breaks after launch — Apple receipts won't resolve to a plan row.
+**Do:** `select name, apple_product_id from plans where apple_product_id is not null;` and diff against the 8 IDs in the metadata doc. Reconcile whichever is wrong.
+
+---
+
 ## P3
 
-### 21 — Doc drift sweep
-- `README.md:16` — "VerityPostKids is a placeholder" — wrong, it's a real 25-file SwiftUI app.
+### 25 — Doc drift sweep
+Grouped cleanups. One commit.
+
+**Code/config comments:**
 - `web/src/middleware.js:137` — comment dates CSP enforce flip as `2026-04-21` (future).
 - `web/src/lib/apiErrors.js`, `web/src/lib/appleReceipt.js:17,45`, `web/next.config.js:8` — comments still reference the deleted `site/` path.
+
+**Root-level docs:**
+- `README.md:16` — "VerityPostKids is a placeholder" — wrong, it's a real 25-file SwiftUI app.
+
+**Design Decisions:**
+- `docs/reference/Verity_Post_Design_Decisions.md` D33 — lists `Superadmins` in expert back-channel visibility. Superadmin was removed (the functional access via admin is preserved; only doc is stale). Strip the word.
+
+**Runbook nits:**
+- `docs/runbooks/ROTATE_SECRETS.md` — references `site/.env.local` in the post-rotation cleanup block. Change to `web/.env.local`.
+
+### 26 — Archive obsolete planning/history docs
+These actively mislead because their premise is retired:
+- `docs/planning/FUTURE_DEDICATED_KIDS_APP.md` — plans a fork that already happened (VerityPostKids exists).
+- `docs/history/PROFILE_FULL_FLOW.md` — references community notes (cut per D15), reactions (cut per D29), "Premium" tier name (renamed per D10), `superadmin` role (removed).
+- `kidsactionplan.md` at repo root — marks "Pass 4 DONE" but admits the parental-gate-wrap was deferred; #4 in this TODO captures the real remaining work.
+
+**Do:** `git mv` all three to `archive/2026-04-20-consolidation/`.
+
+### 27 — Pre-launch holding page
+`docs/planning/PRELAUNCH_HOME_SCREEN.md` blueprint is a 30-min task: new `middleware.ts` + `/preview` bypass route + env toggle `NEXT_PUBLIC_SITE_MODE=coming_soon`. Implement when you want a public-facing "coming soon" screen during final QA. Optional.
