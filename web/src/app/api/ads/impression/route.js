@@ -46,7 +46,7 @@ export async function POST(request) {
     max: 300,
     windowSec: 60,
   });
-  if (rl.limited) return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+  if (rl.limited) return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': '60' } });
 
   const { data, error } = await service.rpc('log_ad_impression', {
     p_ad_unit_id: adUnitId,

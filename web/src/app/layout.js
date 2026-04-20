@@ -43,10 +43,9 @@ export const metadata = {
     title: 'Verity Post — Read. Prove it. Discuss.',
     description: 'News with a quiz-gated comment section. Score 3/5 on the article quiz to join the discussion.',
   },
-  // DA-183 — theme-color + apple mobile PWA hints. Without these,
-  // iOS Add-to-Home-Screen installs with a blurred screenshot icon
-  // and a default status bar color.
-  themeColor: '#ffffff',
+  // DA-183 — apple mobile PWA hints. Without these, iOS Add-to-Home-Screen
+  // installs with a blurred screenshot icon. `themeColor` moved to the
+  // viewport export below per Next 14 deprecation.
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
@@ -74,6 +73,7 @@ export const viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
+  themeColor: '#ffffff',
 };
 
 export default function RootLayout({ children }) {

@@ -4,6 +4,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // PATCH /api/admin/users/[id]/plan  { plan_name }
 //
@@ -36,7 +37,7 @@ export async function PATCH(request, { params }) {
     const { data: outranks, error: rankErr } = await authed.rpc('require_outranks', {
       target_user_id: targetId,
     });
-    if (rankErr) return NextResponse.json({ error: rankErr.message }, { status: 500 });
+    if (rankErr) return safeErrorResponse(NextResponse, rankErr, { route: 'admin.users.plan', fallbackStatus: 500, fallbackMessage: 'Rank check failed' });
     if (!outranks) {
       return NextResponse.json(
         { error: 'Cannot act on a user whose rank meets or exceeds your own' },
@@ -56,7 +57,7 @@ export async function PATCH(request, { params }) {
       .select('id')
       .eq('name', plan_name)
       .maybeSingle();
-    if (planErr) return NextResponse.json({ error: planErr.message }, { status: 500 });
+    if (planErr) return safeErrorResponse(NextResponse, planErr, { route: 'admin.users.plan', fallbackStatus: 500, fallbackMessage: 'Plan lookup failed' });
     if (!planRow) return NextResponse.json({ error: 'Plan not found' }, { status: 404 });
     update = { plan_id: planRow.id, plan_status: 'active' };
   }
@@ -65,7 +66,7 @@ export async function PATCH(request, { params }) {
     .from('users')
     .update(update)
     .eq('id', targetId);
-  if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
+  if (upErr) return safeErrorResponse(NextResponse, upErr, { route: 'admin.users.plan', fallbackStatus: 500, fallbackMessage: 'Could not update plan' });
 
   try {
     await service.from('audit_log').insert({

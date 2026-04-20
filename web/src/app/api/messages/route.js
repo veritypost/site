@@ -38,7 +38,8 @@ export async function POST(request) {
       : status === 403 ? 'You cannot send messages in this conversation.'
       : 'Could not send message';
     console.error('[messages.post]', error);
-    return NextResponse.json({ error: userMsg }, { status });
+    const headers = status === 429 ? { 'Retry-After': '60' } : undefined;
+    return NextResponse.json({ error: userMsg }, { status, headers });
   }
 
   return NextResponse.json({ message: data });

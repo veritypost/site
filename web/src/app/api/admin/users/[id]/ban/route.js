@@ -4,6 +4,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // POST /api/admin/users/[id]/ban  { banned: boolean, reason?: string }
 //
@@ -35,7 +36,7 @@ export async function POST(request, { params }) {
     const { data: outranks, error: rankErr } = await authed.rpc('require_outranks', {
       target_user_id: targetId,
     });
-    if (rankErr) return NextResponse.json({ error: rankErr.message }, { status: 500 });
+    if (rankErr) return safeErrorResponse(NextResponse, rankErr, { route: 'admin.users.ban', fallbackStatus: 500, fallbackMessage: 'Rank check failed' });
     if (!outranks) {
       return NextResponse.json(
         { error: 'Cannot act on a user whose rank meets or exceeds your own' },
@@ -54,7 +55,7 @@ export async function POST(request, { params }) {
     .from('users')
     .update(update)
     .eq('id', targetId);
-  if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
+  if (upErr) return safeErrorResponse(NextResponse, upErr, { route: 'admin.users.ban', fallbackStatus: 500, fallbackMessage: 'Could not update ban state' });
 
   try {
     await service.from('audit_log').insert({
