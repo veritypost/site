@@ -15,6 +15,7 @@ import Interstitial from '../../../components/Interstitial';
 import { bumpArticleViewCount } from '../../../lib/session';
 import { useFocusTrap } from '../../../lib/useFocusTrap';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
+import { getPlanLimitValue } from '@/lib/plans';
 import type { Tables } from '@/types/database-helpers';
 
 // ------- Local shape helpers -------
@@ -229,6 +230,9 @@ export default function StoryPage() {
   const [bookmarked, setBookmarked] = useState<boolean>(false);
   const [bookmarkId, setBookmarkId] = useState<string | null>(null);
   const [bookmarkTotal, setBookmarkTotal] = useState<number | null>(null);
+  // T-016: free-plan bookmark cap is DB-driven via plan_features.bookmarks.
+  // Fallback to 10 preserves prior behaviour when the row is unreachable.
+  const [bookmarkCap, setBookmarkCap] = useState<number>(10);
   const [shareMsg, setShareMsg] = useState<string>('');
 
   const [showReportModal, setShowReportModal] = useState<boolean>(false);
@@ -414,12 +418,17 @@ export default function StoryPage() {
             .from('bookmarks').select('id').eq('user_id', authUser.id).eq('article_id', storyId).maybeSingle();
           if (bookmarkRes) { setBookmarked(true); setBookmarkId(bookmarkRes.id); }
           // Pass 17 / UJ-608 + UJ-613: pre-fetch the user's total bookmark
-          // count so the button can pre-disable at the D13 free-tier cap
-          // (10 bookmarks). Cheap query — `count: 'exact', head: true`
-          // returns just the row count.
+          // count so the button can pre-disable at the free-tier cap
+          // (DB-driven via plan_features.bookmarks — see T-016). Cheap
+          // query — `count: 'exact', head: true` returns just the row count.
           const { count: bookmarkCount } = await supabase
             .from('bookmarks').select('id', { count: 'exact', head: true }).eq('user_id', authUser.id);
           if (typeof bookmarkCount === 'number') setBookmarkTotal(bookmarkCount);
+          // T-016: resolve the DB-side bookmark cap for the user's plan.
+          const { data: planProfile } = await supabase
+            .from('users').select('plan_id').eq('id', authUser.id).maybeSingle();
+          const cap = await getPlanLimitValue(supabase, planProfile?.plan_id ?? null, 'bookmarks', 10);
+          if (typeof cap === 'number') setBookmarkCap(cap);
         }
       } catch (err) {
         console.error('Story load error:', err);
@@ -803,11 +812,11 @@ export default function StoryPage() {
                   {canListenTts && (
                     <TTSButton text={`${story.title}. ${story.body || ''}`} />
                   )}
-                  {/* Pass 17 / UJ-608 + UJ-613 + UJ-1103: free users cap
-                    * at 10 bookmarks. Pre-disable the button and surface
-                    * an inline at-cap banner above the article body. */}
+                  {/* T-016: free-plan bookmark cap is DB-driven. Previously
+                    * hardcoded `>= 10` and "10 of 10"; bookmarkCap now
+                    * comes from plan_features.bookmarks for the user's plan. */}
                   {(() => {
-                    const atCap = !bookmarked && !canBookmarkAdd && typeof bookmarkTotal === 'number' && bookmarkTotal >= 10;
+                    const atCap = !bookmarked && !canBookmarkAdd && typeof bookmarkTotal === 'number' && bookmarkTotal >= bookmarkCap;
                     return (
                       <button onClick={toggleBookmark} disabled={atCap} title={atCap ? 'Upgrade for unlimited bookmarks' : undefined} style={{
                         padding: '10px 14px', borderRadius: 8, minHeight: 44,
@@ -816,13 +825,13 @@ export default function StoryPage() {
                         fontSize: 13, cursor: atCap ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-sans)',
                         opacity: atCap ? 0.6 : 1,
                       }}>
-                        {bookmarked ? 'Saved' : atCap ? 'At cap (10)' : 'Save'}
+                        {bookmarked ? 'Saved' : atCap ? `At cap (${bookmarkCap})` : 'Save'}
                       </button>
                     );
                   })()}
-                  {!canBookmarkAdd && typeof bookmarkTotal === 'number' && bookmarkTotal >= 10 && !bookmarked && (
+                  {!canBookmarkAdd && typeof bookmarkTotal === 'number' && bookmarkTotal >= bookmarkCap && !bookmarked && (
                     <div style={{ fontSize: 13, color: '#b45309', marginLeft: 8 }}>
-                      You&apos;ve used 10 of 10 free bookmarks. <a href="/profile/settings/billing" style={{ color: '#b45309', fontWeight: 700 }}>Upgrade for unlimited</a>
+                      You&apos;ve used {bookmarkCap} of {bookmarkCap} free bookmarks. <a href="/profile/settings/billing" style={{ color: '#b45309', fontWeight: 700 }}>Upgrade for unlimited</a>
                     </div>
                   )}
                   <button onClick={handleShare} style={{

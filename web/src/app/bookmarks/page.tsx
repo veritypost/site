@@ -5,13 +5,14 @@ import { useState, useEffect, CSSProperties, ReactNode } from 'react';
 import { createClient } from '../../lib/supabase/client';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
+import { getPlanLimitValue } from '@/lib/plans';
 import type { Tables } from '@/types/database-helpers';
 
-// D13: free = 10-cap flat list, Verity+ = unlimited + collections + notes + export.
-// The cap itself is still hard-coded UI copy; the gate on "can add more" is now
-// expressed through `bookmarks.unlimited` (paid) vs `article.bookmark.add` (cap
-// still applies) rather than reading `plans.tier` directly.
-const FREE_BOOKMARK_CAP = 10;
+// T-016: bookmark cap is now DB-driven via plan_features.bookmarks
+// (limit_value=10 for free, NULL=unlimited for paid). The hard-coded
+// `FREE_BOOKMARK_CAP = 10` is gone; the value below is only a safety
+// fallback if the plan_features row is missing.
+const FALLBACK_BOOKMARK_CAP = 10;
 
 // Shape of a row returned by the bookmarks list query: Row + nested article
 // projection + nested category name. Kept local because this is the only place
@@ -65,6 +66,7 @@ export default function BookmarksPage() {
   const [canCollections, setCanCollections] = useState<boolean>(false);
   const [canNote, setCanNote] = useState<boolean>(false);
   const [canExport, setCanExport] = useState<boolean>(false);
+  const [bookmarkCap, setBookmarkCap] = useState<number>(FALLBACK_BOOKMARK_CAP);
 
   const [editingNotes, setEditingNotes] = useState<string | null>(null);            // bookmark id
   const [noteDraft, setNoteDraft] = useState<string>('');
@@ -74,7 +76,7 @@ export default function BookmarksPage() {
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [deleteBusy, setDeleteBusy] = useState<boolean>(false);
 
-  const atCap = !canUnlimited && items.length >= FREE_BOOKMARK_CAP;
+  const atCap = !canUnlimited && items.length >= bookmarkCap;
 
   async function load() {
     setLoading(true); setError('');
@@ -94,6 +96,18 @@ export default function BookmarksPage() {
     setCanCollections(collectionsOk);
     setCanNote(noteOk);
     setCanExport(exportOk);
+
+    // T-016: resolve bookmark cap for the user's plan. getPlanLimitValue
+    // returns null when unlimited; we only care about it for capped users.
+    if (!unlimited) {
+      const { data: profile } = await supabase
+        .from('users')
+        .select('plan_id')
+        .eq('id', authUser.id)
+        .maybeSingle();
+      const cap = await getPlanLimitValue(supabase, profile?.plan_id ?? null, 'bookmarks', FALLBACK_BOOKMARK_CAP);
+      if (typeof cap === 'number') setBookmarkCap(cap);
+    }
 
     const { data: bms, error: bmsErr } = await supabase
       .from('bookmarks')
@@ -197,7 +211,7 @@ export default function BookmarksPage() {
       <div style={{ maxWidth: 900, margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
           <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>
-            Bookmarks · {canUnlimited ? items.length : `${items.length} of ${FREE_BOOKMARK_CAP}`}
+            Bookmarks · {canUnlimited ? items.length : `${items.length} of ${bookmarkCap}`}
           </h1>
           {(canExport || canCollections) && (
             <div style={{ display: 'flex', gap: 8 }}>

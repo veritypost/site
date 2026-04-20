@@ -5,6 +5,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { withApnsSession, resolveApnsEnv } from '@/lib/apns';
 import { verifyCronAuth } from '@/lib/cronAuth';
 import { withCronLog } from '@/lib/cronLog';
+import { getPlanLimitValue } from '@/lib/plans';
 
 // Auth: CRON_SECRET via verifyCronAuth. Fail-closed 403.
 // Push delivery worker. Mirrors /api/cron/send-emails in shape: picks
@@ -85,12 +86,17 @@ async function run(request) {
     return s < e ? (now >= s && now < e) : (now >= s || now < e);
   }
 
-  // D14: free Verified users get ONE breaking-news push per day. Count
-  // today's delivered breaking-news pushes per user so the cron can cap
-  // additional queued breaking-news notifications for free callers.
+  // D14: free Verified users get a capped number of breaking-news
+  // pushes per day. The cap itself is now DB-driven via
+  // plan_features.breaking_alerts (limit_value=1, limit_type='per_day'
+  // for the free plan). T-016 — the `>= 1` hardcode lower down reads
+  // this resolved value.
   const freeUserIds = (planRows || [])
     .filter(u => !u.plans?.tier || u.plans.tier === 'free')
     .map(u => u.id);
+  const freePlanRow = (planRows || []).find(u => u.plans?.tier === 'free' && u.plans)?.plans;
+  const freePlanId = (planRows || []).find(u => u.plan_id && u.plans?.tier === 'free')?.plan_id ?? null;
+  const breakingDailyCap = (await getPlanLimitValue(service, freePlanId, 'breaking_alerts', 1)) ?? 1;
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const breakingSentToday = {};
@@ -142,12 +148,13 @@ async function run(request) {
       skipped++;
       continue;
     }
-    // D14 cap: free users get 1 breaking-news push per day. Each time
-    // we drop a queued breaking-news push against the day's cap, bump
+    // D14 cap: free users get a capped number of breaking-news pushes
+    // per day (DB-driven — see plan_features.breaking_alerts and the
+    // `breakingDailyCap` resolution above). Each drop bumps
     // breakingSentToday so same-batch duplicates also honour the cap.
     if (n.type === 'breaking_news' && freeSet.has(n.user_id)) {
       const already = breakingSentToday[n.user_id] || 0;
-      if (already >= 1) {
+      if (already >= breakingDailyCap) {
         await service.from('notifications').update({
           channel: 'in_app',
           push_sent: true,

@@ -165,6 +165,78 @@ export async function getPlans(supabase) {
   return _cache;
 }
 
+// ---- plan_features limit lookup ----
+//
+// T-016 — route callers that need a per-plan numeric limit (bookmark
+// cap, breaking-news alerts per day, quiz attempts per article, kid
+// profiles, streak freezes) through this helper instead of hardcoding
+// the limit in the consumer. Reads `plan_features` with a 60s cache
+// keyed by (plan_id, feature_key). Anon/no-plan_id callers fall back
+// to the free plan's limit via a name lookup.
+//
+// Returns: { enabled, limitValue, limitType } — `limitValue` null means
+// "unlimited" (feature enabled with no numeric cap). `enabled=false`
+// means the feature is off for this plan entirely.
+
+const _featureCache = new Map(); // `${planId}:${featureKey}` -> { enabled, limitValue, limitType, ts }
+const FEATURE_TTL = 60_000;
+
+async function _resolveFreePlanId(supabase) {
+  const plans = await getPlans(supabase);
+  const free = plans.find((p) => p.tier === 'free' || p.name === 'free');
+  return free?.id || null;
+}
+
+export async function getPlanLimit(supabase, planId, featureKey) {
+  if (!supabase || !featureKey) {
+    return { enabled: false, limitValue: null, limitType: null };
+  }
+  let effectivePlanId = planId;
+  if (!effectivePlanId) {
+    effectivePlanId = await _resolveFreePlanId(supabase);
+  }
+  if (!effectivePlanId) {
+    return { enabled: false, limitValue: null, limitType: null };
+  }
+
+  const cacheKey = `${effectivePlanId}:${featureKey}`;
+  const cached = _featureCache.get(cacheKey);
+  if (cached && Date.now() - cached.ts < FEATURE_TTL) {
+    return { enabled: cached.enabled, limitValue: cached.limitValue, limitType: cached.limitType };
+  }
+
+  const { data, error } = await supabase
+    .from('plan_features')
+    .select('is_enabled, limit_value, limit_type')
+    .eq('plan_id', effectivePlanId)
+    .eq('feature_key', featureKey)
+    .maybeSingle();
+
+  if (error) {
+    console.warn('[plans.getPlanLimit]', featureKey, error.message);
+    return { enabled: false, limitValue: null, limitType: null };
+  }
+  const row = data || { is_enabled: false, limit_value: null, limit_type: null };
+  const result = {
+    enabled: !!row.is_enabled,
+    limitValue: row.limit_value ?? null,
+    limitType: row.limit_type ?? null,
+  };
+  _featureCache.set(cacheKey, { ...result, ts: Date.now() });
+  return result;
+}
+
+// Convenience: resolve an integer limit for a feature-key. Falls back
+// to `defaultValue` when the feature is disabled or the row is missing.
+// Useful for "how many bookmarks?" / "how many breaking alerts per
+// day?" queries where the caller just wants a number.
+export async function getPlanLimitValue(supabase, planId, featureKey, defaultValue) {
+  const { enabled, limitValue } = await getPlanLimit(supabase, planId, featureKey);
+  if (!enabled) return defaultValue;
+  if (limitValue === null || limitValue === undefined) return null; // null = unlimited
+  return limitValue;
+}
+
 export async function getPlanByName(supabase, planRowName) {
   const plans = await getPlans(supabase);
   return plans.find(p => p.name === planRowName) || null;
