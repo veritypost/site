@@ -4,7 +4,7 @@
 
 Single source of truth for **where we stand**. What the product is, what's deployed, what's shipped, what's locked. Read top-to-bottom in under 3 minutes.
 
-Active work / open items → see **`WORKING.md`** at repo root.
+Active work / open items → see **`TASKS.md`** at repo root (101 tasks, IDs T-001…T-101, prioritized, file:line specific).
 
 ---
 
@@ -45,7 +45,7 @@ All 6 Criticals + 22 Highs from the 9-round pre-launch hardening sprint (Rounds 
 5. CSP Report-Only → Enforce flip in `web/src/middleware.js` (after 48h Report-Only soak)
 6. Commit migrations 092/093 to `schema/` from `archive/2026-04-19-prelaunch-sprint/round_{a,b}_migration.sql` (live DB has them; disk doesn't)
 
-Full blocker list with detail → **`WORKING.md`**.
+Full blocker list with detail → **`TASKS.md`** (P0 section).
 
 ## What's done per area
 
