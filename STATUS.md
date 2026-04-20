@@ -1,6 +1,6 @@
 # STATUS
 
-**Last refreshed:** 2026-04-19
+**Last refreshed:** 2026-04-20
 
 Single source of truth for **where we stand**. What the product is, what's deployed, what's shipped, what's locked. Read top-to-bottom in under 3 minutes.
 
@@ -42,8 +42,7 @@ All 6 Criticals + 22 Highs from the 9-round pre-launch hardening sprint (Rounds 
 2. Rotate live secrets per `ROTATE_SECRETS.md` (Supabase service-role, Stripe live secret, Stripe webhook secret)
 3. `SENTRY_DSN` + `NEXT_PUBLIC_SENTRY_DSN` in Vercel env (build fails in prod without)
 4. Publish 10+ real articles replacing 5× `Test:` headlines
-5. CSP Report-Only → Enforce flip in `web/src/middleware.js` (after 48h Report-Only soak)
-6. Commit migrations 092/093 to `schema/` from `archive/2026-04-19-prelaunch-sprint/round_{a,b}_migration.sql` (live DB has them; disk doesn't)
+5. Commit migrations 092/093 to `schema/` from `archive/2026-04-19-prelaunch-sprint/round_{a,b}_migration.sql` (live DB has them; disk doesn't)
 
 Full blocker list with detail → **`TASKS.md`** (P0 section).
 
@@ -51,7 +50,7 @@ Full blocker list with detail → **`TASKS.md`** (P0 section).
 
 ### Sprint 2026-04-19 — 9-round hardening (CLOSED)
 Three reviewer passes (deploy / flow / security) each filed NO. 87 raw issues deduped → 59 (6 Critical, 22 High, 20 Medium, 11 Low) → organized into Rounds A–I in the attack plan → all 6 Criticals + 22 Highs verified resolved in capstone.
-- **A** — RLS lockdown (migration 092 on disk gap — see WORKING.md)
+- **A** — RLS lockdown (migration 092 on disk gap — tracked as T-041 in TASKS.md)
 - **B** — RPC actor-spoof sweep (migration 093 on disk gap)
 - **C** — Money-path UX (`/billing` shim, DM regwall, quiz dead-ends)
 - **D** — Public surface (`/status` removed, `/contact`, Stripe URL hardening, sitemap)
@@ -92,7 +91,7 @@ Six rounds of incremental hardening preceding the capstone sprint — admin RPC 
 | Supabase CLI | linked to `fyiwulqphgmoqullmrfn` |
 | Stripe | live prices set, `plans.stripe_price_id` populated |
 | Sentry | code wired (throws loud in prod if module fails); DSN still pending in Vercel env |
-| CSP | Report-Only mode, enforce flip pending |
+| CSP | Enforce mode (flipped 2026-04-20 via T-006) |
 | Rate limits | active, production-only |
 | Cron | 3 Vercel crons (`/api/cron/freeze-grace`, `/api/cron/sweep-kid-trials`, `/api/cron/send-emails`) |
 
@@ -114,14 +113,14 @@ Six rounds of incremental hardening preceding the capstone sprint — admin RPC 
 | `schema/064_compute_effective_perms.sql` | Permission resolver RPC |
 | `docs/reference/Verity_Post_Design_Decisions.md` | D1–D44 canonical product rules |
 | `VerityPost/VerityPost/PermissionService.swift` | iOS equivalent of `permissions.js` |
-| `web/middleware.js` | Auth gates, CORS allow-list, CSP (Report-Only currently) |
+| `web/src/middleware.js` | Auth gates, CORS allow-list, CSP (enforce mode) |
 
 ## Where things live
 
 | What you need | Where |
 |---|---|
 | Live status (this doc) | `STATUS.md` (repo root) |
-| Active work / open items | `WORKING.md` (repo root) |
+| Active work / open items | `TASKS.md` (repo root) |
 | Schema + migrations | `schema/` (005–094) |
 | Web app code | `web/` |
 | iOS app code | `VerityPost/` |
@@ -136,7 +135,7 @@ Six rounds of incremental hardening preceding the capstone sprint — admin RPC 
 
 ## Related (at root)
 
-- `WORKING.md` — active to-do / blockers / decisions
+- `TASKS.md` — active work (T-001…T-101), prioritized P0–P4
 - `README.md` — repo intro (not yet written; placeholder)
 - `00-Folder Structure.md` — legacy folder map (may be stale)
 - `archive/restructure-2026-04-19/` — audit + structure-synthesis docs from today's reorg
@@ -146,6 +145,6 @@ Six rounds of incremental hardening preceding the capstone sprint — admin RPC 
 ## How to keep this file current
 
 - **Refresh** on any phase close, sprint close, or major capability shipped. Bump the "Last refreshed" date.
-- **Never add TODOs here** — those belong in `WORKING.md`. This doc describes what IS, not what's next.
+- **Never add TODOs here** — those belong in `TASKS.md`. This doc describes what IS, not what's next.
 - **Never add narrative history** — that belongs in `archive/<date-scope>/`. Link from here.
 - **Never duplicate** — if you find yourself restating a fact from another doc, delete the restating and link instead.
