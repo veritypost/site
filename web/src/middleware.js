@@ -9,8 +9,11 @@ import { createServerClient } from '@supabase/ssr';
 // renders its own anon CTA in-place (see notifications/page.tsx) instead
 // of redirecting to /login, which was jarring when the tab is one of the
 // primary bottom-nav destinations.
+// /admin intentionally NOT in this list. The admin segment layout
+// (app/admin/layout.tsx) handles its own auth + role check and returns
+// a 404 for anon or non-staff callers. Putting /admin here would redirect
+// anon to /login?next=/admin, disclosing that /admin is a real surface.
 const PROTECTED_PREFIXES = [
-  '/admin',
   '/profile',
   '/messages',
   '/bookmarks',
