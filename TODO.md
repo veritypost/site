@@ -165,6 +165,26 @@ Swap to `.font(.title)` / `.font(.headline)` / `@ScaledMetric var size: CGFloat 
 ### 20 — Admin `as any` cleanup (~20 sites)
 Concentrated in `web/src/app/admin/subscriptions/page.tsx:48,49,51,109,194,298,374,607`; smaller counts in `admin/breaking`, `cohorts`, `notifications`, `promo`, `analytics`, `streaks`, `reader`, `ad-placements`. Replace each with proper types from `web/src/types/database.ts` or named local interfaces.
 
+### 20b — Turn on TypeScript strict mode
+`web/tsconfig.json` currently has `strict: false`. Codebase typechecks clean today (`npx tsc --noEmit` exits 0), so flipping strict-on will surface real gaps — `any`-typed values, implicit-any params, unused locals.
+**Do:** set `"strict": true`. Also add `"noUnusedLocals": true`, `"noUnusedParameters": true`, `"noFallthroughCasesInSwitch": true`. Fix (or explicitly `// @ts-expect-error` with reason) whatever surfaces.
+
+### 20c — Sentry configs missing `beforeSend` PII stripping
+`web/sentry.client.config.js`, `sentry.server.config.js`, `sentry.edge.config.js` send raw error payloads — which can include user emails (from auth flows), IPs, request bodies — to Sentry. No `beforeSend` hook strips these.
+**Do:** add a `beforeSend(event) { /* scrub emails, IPs, body.password, body.token */ return event; }` hook to each config. Verify in Sentry project settings that PII retention is off.
+
+### 20d — `scripts/import-permissions.js` hardcodes desktop path
+Line 57 points at `/Users/veritypost/Desktop/verity post/permissions.xlsx`. Works only on the owner's machine; breaks CI and every other developer.
+**Do:** accept the path via `process.env.PERMISSIONS_XLSX_PATH` with a default fallback, OR copy the xlsx to a stable location (`matrix/permissions.xlsx` or `test-data/permissions.xlsx`) and update the script + any references in `CLAUDE.md`.
+
+### 20e — ParentalGate lockout stored in `UserDefaults`
+`VerityPostKids/VerityPostKids/ParentalGateModal.swift:203` — the 5-min lockout after 3 failed attempts persists in `UserDefaults`. A kid can bypass by: uninstalling and reinstalling, device restore, or dev tools.
+**Do:** move the lockout timestamp to Keychain (survives reinstalls via iCloud Keychain and isn't user-writable from outside the app).
+
+### 20f — Call `StoreManager.checkEntitlements()` on app foreground
+Cross-device purchases (Stripe checkout on web while iOS backgrounded, or switching devices) leave the iOS app with stale entitlements until manual restore.
+**Do:** in `VerityPostApp.swift`, observe `ScenePhase.active` transitions and trigger `await StoreManager.shared.sync()` + `checkEntitlements()`.
+
 ---
 
 ## P2
