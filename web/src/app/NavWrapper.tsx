@@ -290,45 +290,6 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
               </svg>
             </a>
           )}
-          {authLoaded && !loggedIn && (
-            // M-10: anon top bar now shows both "Sign in" (subtle
-            // fallback) and a visible "Sign up" pill as the primary
-            // conversion CTA. Canonical copy only: Sign in / Sign up.
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 8, marginRight: -4,
-            }}>
-              <a
-                href="/login"
-                aria-label="Sign in"
-                style={{
-                  display: 'inline-flex', alignItems: 'center',
-                  minHeight: 44, padding: '0 4px',
-                  fontSize: 13,
-                  fontWeight: 500,
-                  color: C.dim,
-                  textDecoration: 'none',
-                }}
-              >
-                Sign in
-              </a>
-              <a
-                href="/signup"
-                aria-label="Sign up"
-                style={{
-                  display: 'inline-flex', alignItems: 'center',
-                  minHeight: 32, padding: '0 12px',
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: '#fff',
-                  background: C.text,
-                  borderRadius: 8,
-                  textDecoration: 'none',
-                }}
-              >
-                Sign up
-              </a>
-            </div>
-          )}
         </header>
       )}
 
