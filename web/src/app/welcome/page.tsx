@@ -5,9 +5,46 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '../../lib/supabase/client';
 
-// This page has no role/plan/tier/verify gates — it's a first-login
-// onboarding carousel that redirects on `onboarding_completed_at` (a UX
-// state flag, not a permission). Permission migration adds types only.
+// Dual-purpose page:
+//   - When NEXT_PUBLIC_SITE_MODE=coming_soon → renders the holding card
+//     (no auth, no carousel, no nav). The middleware redirects every
+//     non-exempt public path here while holding mode is on.
+//   - Otherwise → first-login onboarding carousel that redirects on
+//     `onboarding_completed_at` (a UX state flag, not a permission).
+
+const IS_COMING_SOON = process.env.NEXT_PUBLIC_SITE_MODE === 'coming_soon';
+
+function HoldingCard() {
+  return (
+    <main
+      style={{
+        minHeight: '100vh',
+        background: '#ffffff',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '24px',
+      }}
+    >
+      <h1
+        style={{
+          fontSize: 'clamp(64px, 14vw, 180px)',
+          fontWeight: 800,
+          letterSpacing: '-0.04em',
+          color: '#111111',
+          margin: 0,
+          lineHeight: 1,
+          fontFamily:
+            'var(--font-source-serif), Georgia, "Times New Roman", serif',
+          textAlign: 'center',
+          userSelect: 'none',
+        }}
+      >
+        Verity Post
+      </h1>
+    </main>
+  );
+}
 
 const C = {
   bg: '#ffffff', card: '#f7f7f7', border: '#e5e5e5',
@@ -35,6 +72,8 @@ const SCREENS: Screen[] = [
 ];
 
 export default function WelcomePage() {
+  if (IS_COMING_SOON) return <HoldingCard />;
+
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [index, setIndex] = useState<number>(0);

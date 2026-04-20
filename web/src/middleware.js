@@ -147,6 +147,38 @@ export async function middleware(request) {
     applyCors(request, response);
   }
 
+  // T-046 — pre-launch holding mode. When NEXT_PUBLIC_SITE_MODE=coming_soon,
+  // redirect every public request to /welcome (which renders a minimal brand
+  // card). Owner bypass: hit /preview?token=PREVIEW_BYPASS_TOKEN once and a
+  // long-lived `vp_preview=ok` cookie passes the check.
+  //
+  // Exempts: /welcome itself, /preview, /api/*, /admin/* (still 404s for
+  // non-staff via its own layout), /_next/*, and standard public files.
+  if (process.env.NEXT_PUBLIC_SITE_MODE === 'coming_soon') {
+    const allowed =
+      pathname === '/welcome' ||
+      pathname === '/preview' ||
+      pathname.startsWith('/api/') ||
+      pathname.startsWith('/admin') ||
+      pathname.startsWith('/_next/') ||
+      pathname === '/favicon.ico' ||
+      pathname === '/robots.txt' ||
+      pathname === '/sitemap.xml';
+    const hasBypass = request.cookies.get('vp_preview')?.value === 'ok';
+    if (!allowed && !hasBypass) {
+      const dest = request.nextUrl.clone();
+      dest.pathname = '/welcome';
+      dest.search = '';
+      const redirect = NextResponse.redirect(dest, { status: 307 });
+      redirect.headers.set('x-request-id', requestId);
+      redirect.headers.set('Content-Security-Policy', csp);
+      redirect.headers.set('X-Robots-Tag', 'noindex, nofollow');
+      return redirect;
+    }
+    // Still serving — tell crawlers not to index anything while in coming_soon.
+    response.headers.set('X-Robots-Tag', 'noindex, nofollow');
+  }
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
