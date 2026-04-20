@@ -1,219 +1,168 @@
 # Next session handoff
 
-**Last session closed:** 2026-04-20 evening. Eight tasks landed and pushed.
-**Pick up from:** `origin/main` at commit `dab828e`.
+**Last session closed:** 2026-04-20 late-evening. Ten commits landed locally, **not pushed**.
+**Pick up from:** local `main` at commit `24f2e9e`. `origin/main` is at `4d3f7bc` — you are 10 commits ahead.
+
+Owner explicitly held off on `git push` — do not push without asking.
 
 ---
 
 ## TL;DR — do this first
 
-1. Read CLAUDE.md (the agent profile). Then STATUS.md. Then **this file**. Then top of TASKS.md (the P0 section at lines 41-96 post-close-out). Then the lib/ layer.
-2. Verify the state: `git log --oneline -10` — you should see the 8 commits from 2026-04-20 ending at `dab828e`. Working tree clean. If not clean, stop and ask.
-3. Pick **T-005** (admin direct-writes class, 13 pages). Everything else is either owner-side (T-007..T-011) or MCP-gated for the owner to run the seed (T-003, T-004, T-012).
-4. Before touching T-005: run the Bucket C safety sequence (backup tarball + stash), then spawn an agent pre-audit of the 13 pages. Don't go in blind.
+1. Read CLAUDE.md. Then STATUS.md. Then **this file**. Then top of TASKS.md.
+2. Verify the state:
+   ```
+   git log --oneline -12
+   git status
+   git rev-list --count origin/main..HEAD   # should be 10
+   ```
+   You should see `24f2e9e` at the top, working tree clean, 10 commits ahead of origin.
+3. Every remaining P0 is owner-gated (see below). First engineering task is a P1 — pick up **T-013** (error.message leak sweep) or a trivial P1 seed like **T-014** / **T-015**, or the dev **T-012** data_export_ready template.
 
 ---
 
-## What shipped last session (2026-04-20, in commit order)
+## What shipped last session (2026-04-20 late-evening, in commit order)
 
 | Commit | What | Files |
 |---|---|---|
-| `d202c08` | Canonical docs landed in git (CLAUDE.md, TASKS.md, DONE.md, 05-Working/, schema/100, STATUS.md refresh, WORKING.md retired, permissions_matrix.xlsx deleted) | 11 |
-| `c7af18a` | T-006 CSP enforce flip + BATCH_FIXES_2026_04_20 (51 fixes + 5 post-audit urgent fixes) | 49 |
-| `b0e0ded` | STATUS.md catch-up (7 stale refs to CSP-pending + WORKING.md fixed) | 1 |
-| `9c58118` | Bucket A security one-liners: T-022, T-023, T-026, T-027, T-030 | 7 |
-| `cab642f` | T-002 admin achievement dropdown → DB-live | 3 |
-| `2c409c4` | T-001 score_tiers unified via new `lib/scoreTiers.ts` helper | 5 |
-| `dab828e` | T-001 TASKS.md block cleanup (my earlier Edit used a stale anchor) | 1 |
+| `c015c46` | T-005(a): `lib/adminMutation.ts` helper + `/api/admin/categories` routes + client migration | 4 |
+| `943517b` | T-005(b): words + email-templates + feeds (4 new routes, 3 client migrations) | 7 |
+| `e3f6b83` | T-005(c): features + system + notifications (5 new routes incl. `/api/admin/settings/upsert`, `/api/admin/rate-limits`, `/api/admin/notifications/broadcast`) | 8 |
+| `2e71c30` | T-005(d): users + subscriptions + stories + promo (10 new routes under `/api/admin/users/[id]/**`, `articles/[id]`, `promo`, `subscriptions/[id]/extend-grace`, `billing/refund-decision`) | 15 |
+| `4a7a160` | T-005(e): story-manager + kids-story-manager (unified `/api/admin/articles/save` cascade) + 3 settings-upsert stragglers (streaks, comments, reader) | 6 |
+| `7a1764d` | T-005(f): reviewer-agent fixes — broadcast perm key swapped off `admin.broadcasts.breaking.send` to `admin.settings.edit`; rank guards added to `achievements`, `sessions/[sessionId]`, `mark-read`, `mark-quiz`; kids quiz payload now explicit on `question_type/sort_order/is_active` | 6 |
+| `92af650` | T-005 close — TASKS.md block removed, DONE.md appended, counts bumped | 2 |
+| `3089b9d` | Filed T-102..T-106 (hardcoded config surfaced during T-005): PLAN_OPTIONS, ROLE_ORDER, system config metadata, notifications config metadata, EMAIL_SEQUENCES | 1 |
+| `3f60ed1` | T-003: rate_limits DB-backed. `lib/rateLimit.js` gets `getRateLimit(policyKey, fallback)` + `checkRateLimit(..., policyKey)`. All 31 call-sites in 27 files migrated. `schema/101_seed_rate_limits.sql` idempotent seed (31 rows). | 29 |
+| `24f2e9e` | T-003 close — docs/counts | 2 |
 
-All verified: `tsc --noEmit` exit 0 (warm + cold), `xcodebuild VerityPostKids` BUILD SUCCEEDED, CSP header confirmed as `Content-Security-Policy` (not `-Report-Only`) via dev-server curl on `/` + `/login`, secret scans clean on every commit, reviewer agents approved commits 2, 4, 6.
+All verified: `tsc --noEmit` exit 0 at every commit. No iOS touched this session. Reviewer agent APPROVED T-005 after the (f) revisions. Anti-hallucination greps: `grep "supabase\.from\([^)]*\)\.(insert|update|upsert|delete)" web/src/app/admin` = 0; `grep "policyKey:" web/src/app/api` = 31 = `grep "checkRateLimit("` call count.
 
-**Task counts as of handoff:** P0: 9 · P1: 25 · P2: 30 · P3: 23 · P4: 6 · **Total: 93**
-**Closed this session:** T-001, T-002, T-006, T-022, T-023, T-026, T-027, T-030.
+**Tasks closed this session:** T-003, T-005.
+**Tasks filed this session:** T-102, T-103, T-104, T-105, T-106.
+
+**Task counts as of handoff:** P0 7 · P1 25 · P2 32 · P3 26 · P4 6 · **Total 96**.
+DB-DRIFT 23 · SCHEMA 6 · SECURITY 11 · IOS 11 · MIGRATION-DRIFT 4 · A11Y 3 · UX 13 · CODE 23.
 
 ---
 
 ## What's next — priority order
 
-### T-005 — admin direct-writes class (the big one)
+### Remaining P0s — ALL owner-gated
 
-**TASKS.md says one file (`admin/users/page.tsx:273-290`). Reality: 13 pages.** I audited this personally last session and found these 13 admin pages calling `supabase.from(...).delete()/update()/insert()` directly from the client, bypassing `requirePermission` → `service client` → `require_outranks` → `record_admin_action`:
+None of the open P0s are pure engineering anymore. Owner has to run SQL or flip dashboard toggles:
 
-- admin/categories/page.tsx
-- admin/email-templates/page.tsx
-- admin/features/page.tsx
-- admin/feeds/page.tsx
-- admin/kids-story-manager/page.tsx
-- admin/notifications/page.tsx
-- admin/promo/page.tsx
-- admin/stories/page.tsx
-- admin/story-manager/page.tsx
-- admin/subscriptions/page.tsx
-- admin/system/page.tsx
-- admin/users/page.tsx (the one flagged by T-005)
-- admin/words/page.tsx
+- **T-004** — migration disk↔live reconcile. Needs Supabase Studio or MCP. Runbook-ready if you want to draft one under `docs/runbooks/RECONCILE_MIGRATIONS.md`.
+- **T-007** — HIBP toggle (Supabase Auth settings).
+- **T-008** — Rotate live secrets (Supabase service-role, Stripe live, Stripe webhook).
+- **T-009** — `SENTRY_DSN` + `NEXT_PUBLIC_SENTRY_DSN` Vercel env vars.
+- **T-010** — `NEXT_PUBLIC_SITE_URL` Vercel env var (plus harden 4 routes to throw if env missing — this half is engineering, ~15 min).
+- **T-011** — Publish 10+ real articles, retire the `Test:` placeholders.
+- **T-012** — Seed `data_export_ready` email template. Write `schema/102_seed_data_export_ready_email_template.sql` (dev work, owner runs). ~15 min.
 
-**Structural fix:**
-1. For each, there's typically no server-side API route yet — need to create one that does `requirePermission → createServiceClient → require_outranks → checkRateLimit → mutation → record_admin_action → response`.
-2. Migrate the client to `fetch('/api/admin/...')` instead of the direct Supabase call.
-3. Delete the direct-write path on the client.
+**T-010 fallback hardening and T-012 SQL** are the two dev tasks inside the P0 pool. Everything else is owner-gated.
 
-**This is one logical change (close a class of security bugs), one PR, reviewed as a unit.** Don't split — partial migration leaves half the attack surface open.
+### First non-P0 engineering wins
 
-**Suggested approach:**
-- Spawn an Explore agent to map EXACT write-call-sites per page (method, table, shape of payload) before you touch anything. The 13-page list above is from my audit; per-page write operations need cataloguing.
-- Build the canonical admin-mutation API shape once in a new `web/src/lib/adminMutation.js` helper (or similar) that codifies the pattern.
-- Migrate pages in small groups (3-4 per commit) with tsc between. 3-4 commits total.
-- Post-audit agent each commit.
-- Reviewer agent on the final set before push.
+- **T-013** (P1) — `error.message` leak sweep. 115 occurrences across 87 API files. `web/src/lib/apiErrors.js` helper exists. The new T-005 routes I added don't leak (all generic). Pattern: `NextResponse.json({ error: err.message }, ...)` → `apiError(err, 'domain.action.failed', status)`. Grep it: `grep "error: error\.message\|error: err\.message" web/src/app/api` — current count is the scope. Bigger than it sounds because some of those are intentional sentinel codes (`UNAUTHENTICATED`, `PERMISSION_DENIED:*`) — need to distinguish.
+- **T-014** (P1) — Seed `reserved_usernames`. 1L, trivial. Write SQL.
+- **T-015** (P1) — Seed `blocked_words`. 1L, trivial. Write SQL.
 
-**Effort estimate: 4-8 hours focused. Enough for a full session.** Don't try to stack other P0s on top.
+### Behavior watch — nothing live-breaking changed today
 
-### T-003 — rate_limits DB-backed (MCP-gated partially; can land code without)
+T-005 is behaviorally invisible — pages work the same for users; server handles what the client used to. T-003 falls back to code defaults until `schema/101_seed_rate_limits.sql` runs, so no change visible to users.
 
-Safe to do WITHOUT owner running SQL first: write `getRateLimit(key)` helper in `lib/rateLimit.js` that **falls back to route-supplied defaults** when the table has 0 rows. Migrate the ~10 inline-literal routes to use it. Ship. When owner later runs a seed SQL against `rate_limits`, the routes pick up DB values automatically (60s cache).
-
-Then write `schema/101_seed_rate_limits.sql` with 10 seed rows for owner to apply at their leisure.
-
-Scope: 1 helper file + ~10 route edits + 1 new SQL file. ~2 hours.
-
-### T-012 — data_export_ready email template (MCP-gated, code-free)
-
-Write `schema/102_seed_data_export_ready_email_template.sql` with one INSERT into `email_templates`. Owner runs it.
-
-**Template shape** — confirm via `git show 2c409c4 -- schema/100_backfill_admin_rank_rpcs_2026_04_19.sql` for formatting style. The `email_templates` columns are in `schema/reset_and_rebuild_v2.sql` — grep it. Needed fields: `type` (the cron key, `data_export_ready`), subject, body_html, body_text.
-
-Scope: 1 SQL file. 15 min.
-
-### T-004 — migration disk↔live reconcile (MCP-gated, owner-driven)
-
-I can't pull live migrations without Supabase MCP. Owner runs via Supabase Studio:
-
-```sql
-SELECT version, name, statements FROM supabase_migrations.schema_migrations ORDER BY version;
-```
-
-Then for each applied-but-no-disk-file migration, they copy the statements into a new numbered file under `schema/`. Also: the duplicate `096_function_search_path_hygiene` at two timestamps needs a rename of one to `_v2`.
-
-This is owner work. I can write the instructions as a runbook under `docs/runbooks/RECONCILE_MIGRATIONS.md` if you want to draft it before handing over.
-
-### Owner-side P0s (not engineering)
-
-T-007 HIBP toggle, T-008 secret rotation, T-009 Sentry DSN env, T-010 SITE_URL env, T-011 publish real articles. These are the remaining hard blockers for adult-web launch.
+**Owner still needs to run `schema/101_seed_rate_limits.sql`** to populate the `rate_limits` table. Until then the admin/system UI shows the hardcoded defaults (it merges DB rows when present). No rush — the fallback path works identically.
 
 ---
 
-## Operational discipline that worked last session
+## Operational discipline that worked this session (update vs. last session)
 
-### Per-task gameplan
+### What tightened
 
-1. **Pre-flight** — re-read the task in TASKS.md, grep the claimed file:line to verify current state matches (task descriptions go stale). Grep DONE.md by file:line — did we already ship this?
-2. **Scope-check** — grep the pattern across the target directory. If the task says 1 site but there are 11 (like T-030), expand scope consciously and document in the commit message.
-3. **Implement** — Edit tool, keep related edits in same session since context has the file hot.
-4. **Verify** — `cd web && npx tsc --noEmit`. Exit code 0 before committing. If iOS touched: `xcodebuild -scheme VerityPostKids build`.
+1. **Targeted reads.** Big files (admin/system 650 lines, admin/users 960 lines, permissions.xlsx) read with `offset + limit` only where needed. Cut a lot of context waste vs. prior session.
+2. **Bash/Python scripts for N-across-files edits.** T-003 migrated 31 call-sites across 27 files in one Python invocation. Would have been 31 `Edit` round-trips under the old approach.
+3. **Scope-gated agent use.** Explore agent used once (T-005 pre-audit of 13 pages). Reviewer agent used once (T-005 post-audit). Both times it caught real things. T-003 didn't warrant an agent — surgical change, single helper + fan-out.
+4. **Skip the tarball for surgical changes.** T-005 got a tarball (architectural, 20+ files). T-003 got none (1 helper + seed SQL + mechanical fan-out). No regret.
+5. **Typecheck after every batch** not just at the end. Caught two `@ts-expect-error` placement errors in T-005's cascade endpoint before they reached commit.
+
+### What still slacks
+
+- I still sometimes re-read a file I already have in context. Context checker pass before each Read.
+- Commit message bodies ran long on T-005(d)+(e) — could trim to 6 lines + a link to DONE.md.
+
+### Per-task gameplan (unchanged, still works)
+
+1. **Pre-flight** — re-read the task in TASKS.md, grep the file:line, grep DONE.md by file:line for regression check.
+2. **Scope-check** — grep the pattern across the whole target dir. T-005 named 13 pages but the full grep showed 16.
+3. **Implement** — targeted reads, minimal context surface, scripts for repetitive changes.
+4. **Verify** — `cd web && npx tsc --noEmit` exit 0 before committing. iOS touched → `xcodebuild`.
 5. **Close the loop**:
    - Remove the task block from TASKS.md (not checkmarked — removed).
    - Append entry to DONE.md in the matching area section.
    - Update the task counts at top of TASKS.md.
    - Commit `T-<id>: <title>` with HEREDOC message + Co-Authored-By line.
-6. **Run the anti-hallucination check** — grep for the pattern the task described. Should return 0 matches.
-7. **Agent review** (optional but recommended for commits that touch >5 files) — spawn an independent auditor, feed it the commit SHA, ask for APPROVE/REVISE/BLOCK. Pattern that worked: explicit per-check list in the prompt.
+6. **Anti-hallucination grep** — grep for the pattern the task described. Should return 0 matches. Commit-msg verify counts should match reality.
+7. **Agent review** (>5 files or architectural changes only) — spawn an independent auditor, feed it the commit SHA, ask for APPROVE/REVISE/BLOCK.
 
-### Safety nets that worked
+### Safety nets that are still there
 
-Before any multi-file commit sequence:
-- **Tarball backup**: `tar czf ~/Desktop/verity-post-snapshot-$(date +%Y%m%d-%H%M).tgz -C /Users/veritypost/Desktop verity-post --exclude='verity-post/node_modules' --exclude='verity-post/.next' --exclude='verity-post/web/node_modules' --exclude='verity-post/web/.next' --exclude='verity-post/VerityPost/build' --exclude='verity-post/VerityPostKids/build'` — takes ~1 second, sits outside git, total-loss recovery.
-- **Git stash**: `git stash push -u -m "pre-commit-safety"` then `git stash apply` to restore. In-git restore point.
-- Only push to `origin/main` after reviewer approve. NEVER force push. NEVER use `--no-verify`.
-
-### Commit message template
-
-```
-<type>(<scope>): <short description> (T-<id>)
-
-Context / why (1-3 lines).
-
-Files / what (2-5 lines, focus on pattern, not per-file enumeration).
-
-Verification: tsc --noEmit exit 0; <other checks>
-
-Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
-```
-
-Style matches existing commits on main. Reference the task ID explicitly.
+- Tarball at `~/Desktop/verity-post-snapshot-20260420-0933.tgz` (6.8MB). Still on disk as of session end.
+- `git stash list` has the old prelaunch stash — safe to drop.
 
 ---
 
-## Gotchas learned the hard way
+## Gotchas learned this session
 
-1. **CWD drift in bash sessions.** `cd web` persists across Bash invocations. Use absolute paths or be aware that `git status` from `web/` shows `../STATUS.md` for repo-root files. I wasted turns confused by this early on.
+1. **`require_outranks` and related RPCs aren't in the generated `database.ts`.** The `.js` admin routes use them freely; in `.ts` you must cast. The pattern is in `lib/adminMutation.ts` (`authed.rpc as unknown as ...`). Don't regenerate types unless you have a reason — it's a lot of diff for one RPC.
 
-2. **Port 3000 check needs content test.** `if lsof -i :3000 -sTCP:LISTEN -t | head -1; then` is WRONG — `head -1` on empty input still exits 0. Correct: `if [ -n "$(lsof -i :3000 -sTCP:LISTEN -t)" ]; then`.
+2. **DestructiveActionConfirm component writes its own audit.** From the client, via `supabase.rpc('record_admin_action')`. After T-005, 8 pages still use it and the new server routes ALSO audit. That's a dual-audit pattern (not a security bug but noise). Don't fix by removing the server-side audit — the component audit will be ripped out in a future pass.
 
-3. **No Supabase MCP available.** Only Gmail/Calendar/Drive OAuth MCPs are in the tool list. Any DB read/write requires SQL files for the owner to run.
+3. **Permissions xlsx has 308 `admin.*` keys.** Extractable via `unzip -p "/Users/veritypost/Desktop/verity post/permissions.xlsx" xl/worksheets/sheet1.xml | python3 -c 'import sys,re; print("\n".join(sorted(set(re.findall(r"<t>(admin\.[^<]+)</t>", sys.stdin.read())))))'`. Use this before picking a permission key for a new route.
 
-4. **`@admin-verified 2026-04-18` marker is stale on every admin page.** Don't trust the marker — `git log --since=2026-04-18 <file>` shows post-marker edits on all 39 admin pages. Treat the marker as "was verified then; not necessarily now."
+4. **No dedicated `admin.notifications.broadcast` key yet.** T-005(c) landed `admin.broadcasts.breaking.send` as a first pass, reviewer rejected it (too article-bound), T-005(f) swapped to `admin.settings.edit` as a restrictive stopgap. Follow-up is to seed the correct key and swap.
 
-5. **`permissions.xlsx` is the canonical source for permission keys, BUT** `scripts/import-permissions.js` hardcodes role→set and plan→set mappings in JS literals (lines 138-148, 157-167) AND hardcodes `category: 'ui'` for every permission (line 213-216). These are not in xlsx. CLAUDE.md's "xlsx is 1:1 with DB" claim is false for those three things. Don't rely on xlsx edits landing role/plan/category changes.
+5. **`checkRateLimit` now takes optional `policyKey`** alongside `key`. The `key` is the per-caller counter partition (`login:ip:${ip}`). The `policyKey` is the stable DB lookup name (`login_ip`). Don't conflate them.
 
-6. **Build fails without SENTRY_DSN in prod env.** `npm run build` hard-fails per `next.config.js:61-68` unless `SENTRY_DSN` + `NEXT_PUBLIC_SENTRY_DSN` are set. `tsc --noEmit` works fine without. For local verification, tsc is enough for code correctness; `npm run build` needs env setup.
+6. **Python inline-edit scripts don't always produce clean formatting** — they split inline JS calls across lines weirdly. T-003 needed a second pass to rejoin and realign. If you use the pattern, budget a formatting cleanup pass and verify with `grep -B1 -A1 policyKey:` (or equivalent) on a sample.
 
-7. **`requireAuth / requirePermission` error envelope is intentional.** The pattern `if (err.status) return NextResponse.json({ error: err.message }, { status: err.status })` is in dozens of routes and returns sentinel codes like `UNAUTHENTICATED`, `EMAIL_NOT_VERIFIED`, `PERMISSION_DENIED:<key>`. These are NOT DB-error leaks; don't "fix" them.
+7. **`scripts/import-permissions.js` hardcodes role→set, plan→set, and `category:'ui'`** in JS literals. The xlsx is canonical for permission keys but NOT for those three mappings. CLAUDE.md's "xlsx is 1:1" claim is false for these. Don't rely on xlsx edits landing role/plan/category changes.
 
-8. **Edit tool `old_string` must match EXACTLY.** If you edited a file earlier in the session, your next Edit must account for prior changes (I bit this twice — once with UserDetail prop threading on T-002, once with a now-gone `### T-002` anchor on T-001 cleanup).
-
-9. **Score tiers behavior change is LIVE.** Users who were "contributor" now render as "informed". Users who were "trusted" at 2000 now are "analyst" at a LOWER threshold (600). This is the entire point of T-001 — code now agrees with DB — but it's a visible change to any existing user. If someone reports "my tier changed", this is why.
-
-10. **`tierFor`/`ScoreTier` now come from `@/lib/scoreTiers`.** The old local `tierFor` in profile/page.tsx + admin/users/page.tsx are gone. Any future tier UI needs to import from the helper.
+8. **Previously-flagged: `scripts/import-permissions.js`, score-tier behavior change, `@admin-verified` marker staleness, sentinel-code err.message responses, Apple DUNS block, Supabase MCP unavailability.** All still apply. See previous handoff content in commit history (`4d3f7bc`).
 
 ---
 
 ## Findings I surfaced that are NOT yet in TASKS.md
 
-These are things I noticed during the session but didn't have time to task-ify. Next session should either file them or include them in adjacent sweeps.
-
-1. **NavWrapper.tsx runs 3 DB round-trips on every page load.** `auth.getUser()` + `users.select(16 cols)` + `refreshAllPermissions()` + 60s-polling `/api/notifications?unread=1&limit=1`. Under load this is meaningful. Not in TASKS.md. Consider: does NavWrapper need to re-fetch the user row on every mount, or could middleware inject it?
-
-2. **`story/[slug]/page.tsx:424-435` fail-open leaks paid body.** On transient perms-fetch error, `canViewBody/Sources/Timeline` all flip to `true`. The comment claims "RLS still gates server-side" but the body is fetched via `.select('*')` at :317-321 and `articles` RLS is published-status only, NOT paid-tier. So transient fail means free users can see paid body content briefly. Not in TASKS.md.
-
-3. **`CommentThread.tsx:136` has hardcoded role array `['moderator', 'editor', 'admin', 'superadmin', 'owner']`.** T-019 captures this pattern but names other files; `CommentThread.tsx` is not listed. Add to T-019 scope or file as new.
-
-4. **`scoring.js` (every RPC wrapper) returns `{ error: error.message }`.** 5 call sites. T-013 covers the broader class; `scoring.js` is not specifically named. Routes that call `scoreQuizSubmit` etc. may pass the raw error through to clients.
-
-5. **`profile/settings/page.tsx:105-108`** has an inline TODO admitting that permission keys `settings.profile.edit.own` and `settings.expert.edit` don't exist in DB. No TASKS.md entry for seeding these.
-
-6. **`search/page.tsx:61`** has defensive OR of three permission keys (`search.view` || `search.basic` || `search.articles.free`) — suggests key-rename drift. Whichever resolver path won't break first was unclear.
-
-7. **`lib/scoreTiers.ts` fallback label `'Newcomer'` is hardcoded in 3 places** (profile OverviewTab, MilestonesTab, ProfileCardPreview, admin/users UserDetail). Only visible when DB load fails, but if score_tiers is ever reseeded without a `newcomer` row this mislabels. Cosmetic.
-
-8. **DONE.md T-001 entry** has two malformed file:line anchors: `789-,820-` (trailing dash, missing end). Cosmetic, my typo. Fix it if you touch DONE.md next.
+- **`DestructiveActionConfirm` audits client-side.** See gotcha #2. Consider: rip out the audit, update all 8 callers so their backing route owns it. That's a multi-file refactor. Not yet filed — tracked implicitly under the T-005 follow-up list in DONE.md.
+- **Legacy `.js` admin routes still leak `err.message`.** `api/admin/users/[id]/ban/route.js` returns `upErr.message`, `bumpErr.message`, etc. verbatim. Same for `manual-sync/route.js`, `plan/route.js`. T-013 covers this broadly; these specific files should be upgraded to use the helper. Mention in T-013's acceptance criteria.
+- **`admin.features.edit` key missing.** Reviewer noted: `features/[id]/route.ts` full-edit uses `admin.features.create` as a stopgap. Not a security risk (create is stricter than edit) but a mis-mapping. Follow-up: seed `admin.features.edit` and swap.
+- **Audit-failure observability.** `recordAdminAction` soft-fails to `console.error`. If audit is ever silent-dropped in prod, nobody will know. Wire to Sentry.
 
 ---
 
 ## Files still not personally read (if you need depth)
 
-I surveyed these via agents last session but did NOT read them line-by-line myself. If your T-005 work doesn't require deep knowledge of them, skip. If it does, budget time for personal reads:
+Mostly unchanged from previous handoff. This session added:
 
-- Most of the 39 admin pages (only read admin/users/page.tsx + admin/layout.tsx personally)
-- Most of the 149 API routes (read auth, kids/pair-adjacent, admin/users/permissions, reports, expert/apply, resend-verification personally; rest via agent)
-- Both iOS apps (surveyed, not personally read)
-- Schema SQL migrations (surveyed, not personally read; did grep for specific tables like score_tiers)
-- Profile settings page lines 500-3800 (only read first 500)
-- Story/home pages beyond what I read for T-001 work
-
----
-
-## State of safety nets (possibly still there, possibly cleaned up)
-
-- Tarball at `~/Desktop/verity-post-snapshot-20260420-0820.tgz` (6.3MB). May still be there — check with `ls ~/Desktop/verity-post-snapshot-*` before relying on it. If gone, make a fresh one before T-005.
-- Stash `stash@{0}` "pre-commit-split-safety-net-20260420-0828" — may still be there, `git stash list` to check. Probably safe to drop now that everything is pushed.
+- I personally read most of `web/src/app/admin/**/page.tsx` for the 16 migrated pages. Outside that set, still surveyed only.
+- Cascade editor route (`api/admin/articles/save/route.ts`) is the most complex new file I wrote — review if you touch that area.
+- `admin/reader/page.tsx`, `admin/streaks/page.tsx`, `admin/comments/page.tsx` — touched the settings-upsert lines only, did not read the full files.
 
 ---
 
 ## Memory file check
 
-`/Users/veritypost/.claude/projects/-Users-veritypost-Desktop-verity-post/memory/MEMORY.md` — my auto-memory. Still valid as of session end. If you find something that contradicts current state during Phase 1 reading, fix the memory file entry.
+`/Users/veritypost/.claude/projects/-Users-veritypost-Desktop-verity-post/memory/MEMORY.md` — my auto-memory. Updated at end of this session to reflect the new commit (`24f2e9e`), counts, and the no-push hold.
 
 ---
 
-*Doc written 2026-04-20 at end of session. Author: previous Claude instance. Commit: whatever this file lands as.*
+## Crucial owner-level decisions still outstanding
+
+1. **Push to origin/main.** Ten commits ahead. Owner held off pending smoke-test. Next engineer should ask before pushing.
+2. **Seed `rate_limits`** by running `schema/101_seed_rate_limits.sql`. Gives admin/system the DB-backed tuning that T-003 wired up.
+3. **Whether to file follow-ups from the T-005 DONE.md list.** Several (dedicated notifications broadcast key, admin.features.edit key, Sentry for audit failures, legacy .js route upgrade) are called out in DONE.md but not filed as T-IDs. Ask owner before spending a session on any.
+
+---
+
+*Doc written 2026-04-20 late-evening at end of session. Author: Claude Opus 4.7 (1M context). Commit: whatever this file lands as.*
