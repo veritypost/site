@@ -10,6 +10,7 @@
 
 import type { CSSProperties } from 'react';
 import { createClient } from '@/lib/supabase/server';
+import { formatCents } from '@/lib/plans';
 
 interface FAQ {
   q: string;
@@ -18,10 +19,28 @@ interface FAQ {
 
 export default async function HelpPage() {
   let isAuthed = false;
+  // T-056: tier prices for the pricing FAQ line used to be hardcoded
+  // ($3.99/$9.99/$14.99). Load from the `plans` table so a Stripe
+  // price change flows through without a deploy. Fallback values only
+  // apply if the DB fetch fails — prior behaviour.
+  let verityMonthly = '$3.99';
+  let proMonthly = '$9.99';
+  let familyMonthly = '$14.99';
   try {
     const supabase = createClient();
     const { data } = await supabase.auth.getUser();
     isAuthed = Boolean(data?.user);
+    const { data: plans } = await supabase
+      .from('plans')
+      .select('name, price_cents, billing_period')
+      .in('name', ['verity_monthly', 'verity_pro_monthly', 'verity_family_monthly']);
+    const byName: Record<string, number> = {};
+    for (const p of plans || []) {
+      if (p?.name && typeof p.price_cents === 'number') byName[p.name] = p.price_cents;
+    }
+    if (byName.verity_monthly != null) verityMonthly = formatCents(byName.verity_monthly);
+    if (byName.verity_pro_monthly != null) proMonthly = formatCents(byName.verity_pro_monthly);
+    if (byName.verity_family_monthly != null) familyMonthly = formatCents(byName.verity_family_monthly);
   } catch {
     // Page must render for anon visitors even if Supabase is misconfigured.
     isAuthed = false;
@@ -54,7 +73,7 @@ export default async function HelpPage() {
       q: 'What is the difference between free, Verity, Pro, and Family?',
       a: (
         <span>
-          Reading is free. Verity ($3.99/mo) adds reduced ads, unlimited bookmarks, quiz retakes, text-to-speech, DMs, and follows. Pro ($9.99/mo) is ad-free and adds Ask-an-Expert and streak freezes. Family ($14.99/mo) covers two adults and up to two kid profiles with age-tiered content and a family leaderboard.
+          Reading is free. Verity ({verityMonthly}/mo) adds reduced ads, unlimited bookmarks, quiz retakes, text-to-speech, DMs, and follows. Pro ({proMonthly}/mo) is ad-free and adds Ask-an-Expert and streak freezes. Family ({familyMonthly}/mo) covers two adults and up to two kid profiles with age-tiered content and a family leaderboard.
         </span>
       ),
     },

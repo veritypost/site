@@ -32,8 +32,8 @@ A fresh agent picks the top unchecked task, reads file:line, does the work, clos
 - `? UNCERTAIN` + tag `needs-live-check` = Agent 3 could not verify; re-verify before acting
 
 ## Task counts
-- P0: 6 · P1: 22 · P2: 31 · P3: 24 · P4: 6 · **Total: 89**
-- DB-DRIFT: 21 · SCHEMA: 5 · SECURITY: 9 · IOS: 11 · MIGRATION-DRIFT: 4 · A11Y: 3 · UX: 13 · CODE: 20
+- P0: 6 · P1: 21 · P2: 29 · P3: 24 · P4: 6 · **Total: 86**
+- DB-DRIFT: 17 · SCHEMA: 5 · SECURITY: 9 · IOS: 11 · MIGRATION-DRIFT: 4 · A11Y: 3 · UX: 13 · CODE: 20
 - Unverified (needs live-check): 19
 
 ---
@@ -77,33 +77,26 @@ A fresh agent picks the top unchecked task, reads file:line, does the work, clos
 
 ## P1 — High
 
-### T-016 — `lib/plans.js` PRICING/limits hardcoded — build `planLimit()`
+### T-016 — `lib/plans.js` PRICING/TIERS hardcoded (residual consumers)
 **Priority**: P1  **Effort**: M  **Lens**: DB-DRIFT  **Source**: A1:T-022 + A2:G-003..G-010
-**File**: `web/src/lib/plans.js:20-128`; `web/src/app/bookmarks/page.tsx:14`; `web/src/components/ArticleQuiz.tsx:316`; `web/src/app/api/cron/send-push/route.js:88,145,148`; `web/src/app/admin/users/page.tsx:90-100`
-**Why**: Cents, `maxKids`, `FREE_BOOKMARK_CAP=10`, `streak_freeze=2/week`, `quiz_attempts=2/article`, `breaking_alerts=1/day`, feature bullets all duplicate `plans`(9) + `plan_features`(215). `/admin/plans` edits don't reflect.
-**Do**: `planLimit(planKey, feature)` reading `plan_features` (cached); render price/bullets from `plans` + `plans.metadata`.
-**Accept**: 0 `cents:` literals in `lib/plans.js`; grep `maxKids` = 0.
+**File**: `web/src/lib/plans.js` (PRICING + TIERS + maxKids constants); `web/src/app/admin/subscriptions/page.tsx`; `web/src/app/profile/settings/page.tsx`
+**Why**: `getPlanLimit()` helper shipped; bookmarks cap + breaking-news daily cap now read from DB via `plan_features`. PRICING const still hardcoded and read by admin/subscriptions (plans grid) + profile/settings (upgrade modal); TIERS const with feature-bullet strings + maxKids also still there. 2 big consumers remaining.
+**Do**: Migrate admin/subscriptions + profile/settings to render price from `plans.price_cents` and feature bullets from DB (or move copy to `plans.metadata`). Delete PRICING + TIERS + maxKids.
+**Accept**: 0 `cents:` literals in `lib/plans.js`; grep `maxKids` = 0; admin/plans edits reflect in subscriptions + settings UI within 60s.
 
-### T-017 — `FALLBACK_CATEGORIES` hardcoded with fake `fb-*` UUIDs
-**Priority**: P1  **Effort**: S  **Lens**: DB-DRIFT  **Source**: A1:T-023,T-106 + A2:G-014
-**File**: `web/src/app/page.tsx:83-125`
-**Why**: 24 categories w/ made-up `fb-*` IDs; `categories` has 69 rows; footgun on any join.
-**Do**: Drop fallback; SSR-fetch `categories`.
-**Accept**: No `fb-*` ids in `web/src/`.
-
-### T-018 — `CATEGORIES` hardcoded in admin story/pipeline/cohorts
+### T-018 — `CATEGORIES` hardcoded in admin pipeline/cohorts (residual)
 **Priority**: P1  **Effort**: S  **Lens**: DB-DRIFT  **Source**: A2:G-015,G-016,G-017
-**File**: `admin/story-manager/page.tsx:25-31,58,205`; `admin/pipeline/page.tsx:42`; `admin/cohorts/page.tsx:95`
-**Why**: 3 separate handmade category lists; editors see a subset of the 69 DB rows; defaults fallback to `'Politics'` string.
-**Do**: DB-sourced dropdown from `categories` where `is_kids=false`.
-**Accept**: All active adult categories selectable in 3 pages.
+**File**: `admin/pipeline/page.tsx:42`; `admin/cohorts/page.tsx:95`
+**Why**: admin/story-manager migrated (DB-live categories + subcategories). admin/pipeline + admin/cohorts still have handmade lists.
+**Do**: Load categories from DB on mount; replace the hardcoded arrays.
+**Accept**: All active adult categories selectable in both pages.
 
-### T-019 — Role Sets duplicated; build `rolesAtLeast()` helper
+### T-019 — Role arrays duplicated in admin pages (helper shipped; consumer sweep pending)
 **Priority**: P1  **Effort**: S  **Lens**: DB-DRIFT  **Source**: A1:T-024 + A2:G-011,G-012,G-013
-**File**: `web/src/app/admin/users/page.tsx:75`; `web/src/lib/roles.js:18-22`; `admin/moderation/page.tsx:26`; `api/expert-sessions/questions/[id]/answer/route.js:17`; `admin/users/[id]/permissions/page.tsx:38`
-**Why**: `ROLE_ORDER` + `OWNER_ROLES/ADMIN_ROLES/EDITOR_ROLES/MOD_ROLES/EXPERT_ROLES` re-enumerate 9 DB roles; custom role at hierarchy_level=65 breaks index math.
-**Do**: `rolesAtLeast(level)` helper reading `roles.hierarchy_level`; remove duplicates.
-**Accept**: Grep `MOD_ROLES|ADMIN_ROLES|EDITOR_ROLES|ROLE_ORDER` outside helper = 0.
+**File**: `components/CommentThread.tsx:136`; `admin/moderation/page.tsx:26,119-120`; `admin/reports/page.tsx:85`; `admin/recap/page.tsx:76`; `admin/verification/page.tsx:100`; `admin/categories/page.tsx:91`; `admin/data-requests/page.tsx:84`; `admin/comments/page.tsx:132`; `admin/kids-story-manager/page.tsx:133`; `admin/expert-sessions/page.tsx:80`; `admin/email-templates/page.tsx:63`; `admin/promo/page.tsx:89`; `admin/plans/page.tsx:100`; `admin/features/page.tsx:159`; `admin/settings/page.tsx:64`; `admin/ad-campaigns/page.tsx:64`; `admin/ad-placements/page.tsx:65`; `admin/support/page.tsx:215`; `admin/page.tsx:118`
+**Why**: `lib/roles.js` now exports `getRoleNames()` + `rolesUpTo()` + `rolesAtLeast()` + the frozen role Sets; admin/users migrated off its hardcoded ROLE_ORDER. The 19 other admin pages still re-enumerate `['owner', 'admin']`/`['owner', 'superadmin', 'admin']`/etc. inline — subtly inconsistent between pages.
+**Do**: Replace each inline array with the matching frozen Set from `lib/roles.js` (or `rolesAtLeast()` for async paths).
+**Accept**: Grep `\['owner', 'superadmin'|'owner', 'admin'\]` outside lib/roles.js ≤ 5.
 
 ### T-020 — Silent kid `quiz_attempts` insert failure (score drift) `needs-live-check`
 **Priority**: P1  **Effort**: S  **Lens**: IOS  **Source**: A1:T-018
@@ -265,11 +258,6 @@ A fresh agent picks the top unchecked task, reads file:line, does the work, clos
 **Why**: 12 invented strings don't match `categories` slugs; `expert_application_categories` rows un-joinable.
 **Do**: Map to `categories.id`.
 
-### T-056 — `how-it-works` + `help` hardcoded price strings
-**Priority**: P2  **Effort**: S  **Lens**: DB-DRIFT  **Source**: A2:G-058
-**File**: `web/src/app/help/page.tsx:57`
-**Do**: Template from `plans.price_cents`.
-
 ### T-057 — `achievements` threshold + kind columns
 **Priority**: P2  **Effort**: M  **Lens**: SCHEMA  **Source**: A2:G-057 + A3:NEW-001
 **File**: `achievements` table; `web/src/lib/scoring.js`
@@ -318,20 +306,6 @@ A fresh agent picks the top unchecked task, reads file:line, does the work, clos
 ### T-069 — New a11y: empty alt on non-decorative image
 **Priority**: P2  **Effort**: 1L  **Lens**: A11Y  **Source**: A3:NEW-005
 **File**: `web/src/app/card/[username]/page.js`
-
-### T-102 — `admin/users` PLAN_OPTIONS hardcoded (9 plans in JS)
-**Priority**: P2  **Effort**: S  **Lens**: DB-DRIFT  **Source**: T-005 post-audit
-**File**: `web/src/app/admin/users/page.tsx:73-83`
-**Why**: Plan dropdown in the change-plan modal is a hardcoded 9-entry array of `{name, label}`. `plans` table is authoritative (already used everywhere else). New plan seeded in DB never appears in the UI until code ships.
-**Do**: Load `plans.name, display_name` in the same `init()` effect; cache via a helper mirroring `lib/scoreTiers.ts` (60s TTL). Delete `PLAN_OPTIONS`.
-**Accept**: Grep `PLAN_OPTIONS` = 0; new DB plan row shows up on next page load.
-
-### T-103 — `admin/users` ROLE_ORDER hardcoded hierarchy array
-**Priority**: P2  **Effort**: S  **Lens**: DB-DRIFT  **Source**: T-005 post-audit
-**File**: `web/src/app/admin/users/page.tsx:63` (`ROLE_ORDER`, `rolesUpTo`)
-**Why**: 9-entry role-order array duplicates `roles.hierarchy_level` (the DB source of truth used by `require_outranks`, `caller_can_assign_role`). If DB hierarchy changes, the admin "grant at or below your own role" UI drifts.
-**Do**: Load `roles.name, hierarchy_level` ordered by hierarchy; derive `rolesUpTo` from DB. 60s cache.
-**Accept**: Grep `ROLE_ORDER` = 0; changing `roles.hierarchy_level` in DB reorders the UI on next nav.
 
 ---
 
