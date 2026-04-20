@@ -12,9 +12,16 @@ struct PairCodeView: View {
     @State private var code: String = ""
     @State private var isPairing = false
     @State private var errorMessage: String? = nil
+    // T-043 — countdown display for the 60s rate-limit cooldown so kids
+    // don't spam-tap Pair during the server-side lockout.
+    @State private var cooldownSeconds: Int = 0
+    @State private var cooldownTimer: Timer? = nil
     @FocusState private var focused: Bool
 
     private let codeLength = 8
+    private let cooldownWindow = 60
+
+    private var isLockedOut: Bool { cooldownSeconds > 0 }
 
     var body: some View {
         ZStack {
@@ -51,7 +58,12 @@ struct PairCodeView: View {
 
                 VStack(spacing: 12) {
                     codeField
-                    if let err = errorMessage {
+                    if isLockedOut {
+                        Text("Too many tries. Retry in \(cooldownSeconds)s")
+                            .font(.system(.caption, design: .rounded, weight: .semibold))
+                            .foregroundStyle(K.coralDark)
+                            .multilineTextAlignment(.center)
+                    } else if let err = errorMessage {
                         Text(err)
                             .font(.system(.caption, design: .rounded, weight: .semibold))
                             .foregroundStyle(K.coralDark)
@@ -74,8 +86,8 @@ struct PairCodeView: View {
                     .shadow(color: K.teal.opacity(0.3), radius: 12, y: 4)
                 }
                 .buttonStyle(.plain)
-                .disabled(!canSubmit || isPairing)
-                .opacity(canSubmit ? 1.0 : 0.6)
+                .disabled(!canSubmit || isPairing || isLockedOut)
+                .opacity((canSubmit && !isLockedOut) ? 1.0 : 0.6)
 
                 Text("The grown-up can make a code in the Verity Post app or on veritypost.com.")
                     .font(.system(.caption, design: .rounded, weight: .medium))
@@ -137,6 +149,9 @@ struct PairCodeView: View {
                 await auth.adoptPair(success)
             } catch let err as PairError {
                 errorMessage = err.errorDescription
+                // T-043 — start visible countdown on rate-limit so the UI
+                // matches the server-side 60s lockout window.
+                if case .rateLimited = err { startCooldown(cooldownWindow) }
             } catch {
                 // T-042 — don't leak raw Swift errors to a child's UI.
                 // Log the real error for debugging; show a friendly line.
@@ -144,6 +159,24 @@ struct PairCodeView: View {
                 errorMessage = "Something went wrong. Please try again."
             }
             isPairing = false
+        }
+    }
+
+    // T-043 — 1Hz countdown timer. Clears error + count on expiry so the
+    // UI returns to the idle state automatically.
+    private func startCooldown(_ seconds: Int) {
+        cooldownTimer?.invalidate()
+        cooldownSeconds = seconds
+        cooldownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { t in
+            Task { @MainActor in
+                if cooldownSeconds > 0 {
+                    cooldownSeconds -= 1
+                } else {
+                    t.invalidate()
+                    cooldownTimer = nil
+                    errorMessage = nil
+                }
+            }
         }
     }
 }
