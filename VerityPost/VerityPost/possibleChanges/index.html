@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Kid Mode Delight — VerityPost Mockups</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<style>
+*{margin:0;box-sizing:border-box}
+body{background:#F0FDFA;font-family:'SF Pro Rounded','SF Pro Display',-apple-system,system-ui,sans-serif}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.02)}}
+@keyframes dotPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.6)}}
+@keyframes radialFill{from{transform:scale(0);opacity:.8}to{transform:scale(3);opacity:0}}
+@keyframes shimmerSpin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+@keyframes ringPulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.08);opacity:.6}}
+@keyframes currentPulse{0%,100%{box-shadow:0 0 0 0 rgba(45,212,191,.25)}50%{box-shadow:0 0 0 6px rgba(45,212,191,0)}}
+@keyframes expertRing{0%,100%{opacity:.3}50%{opacity:.8}}
+@keyframes dotBreathe{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.3);opacity:.7}}
+@keyframes fadeSlideUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+@keyframes flashKid{from{opacity:1}to{opacity:0}}
+@keyframes dissolveIn{from{opacity:0}to{opacity:1}}
+@keyframes pulseGlow{0%,100%{box-shadow:0 0 0 0 transparent}50%{box-shadow:0 0 30px 10px rgba(204,251,241,.6)}}
+@keyframes burstBar{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-80px)}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef}=React;
+const T={bg:"#FAFAFA",card:"#FFFFFF",text:"#1A1A1A",dim:"#8E8E93",border:"#E5E5EA",accent:"#000",kid:"#2DD4BF",kidWarm:"#5EEAD4",kidLight:"#CCFBF1",kidDark:"#0D9488",success:"#22C55E",error:"#EF4444",gold:"#F59E0B"};
+const SPR="cubic-bezier(0.34,1.56,0.64,1)";
+const EO="cubic-bezier(0.16,1,0.3,1)";
+const RND="'SF Pro Rounded','SF Pro Display',-apple-system,system-ui,sans-serif";
+
+function ReplayBtn({onReplay,light}){
+  return <button onClick={onReplay} style={{position:"absolute",bottom:72,right:16,width:40,height:40,borderRadius:20,background:light?"rgba(255,255,255,.2)":T.bg,border:`1px solid ${light?"rgba(255,255,255,.3)":T.border}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",zIndex:10}}>
+    <svg width="18" height="18" viewBox="0 0 24 24"><path d="M3 12a9 9 0 019-9m0 0l-3 3m3-3l3 3" stroke={light?"#FFF":T.dim} strokeWidth="2" fill="none" strokeLinecap="round"/><path d="M21 12a9 9 0 01-9 9" stroke={light?"#FFF":T.dim} strokeWidth="2" fill="none" strokeLinecap="round"/></svg>
+  </button>;
+}
+
+function IdleState(){
+  return <div style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:40,textAlign:"center"}}>
+    <div style={{width:80,height:80,borderRadius:20,background:T.kidLight,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:20}}>
+      <svg width="40" height="40" viewBox="0 0 24 24"><path d="M12 2C12 2 7 8 7 13a5 5 0 0010 0c0-5-5-11-5-11z" fill={T.kid}/></svg>
+    </div>
+    <p style={{fontSize:17,fontWeight:700,color:T.text}}>Pick a moment above</p>
+    <p style={{fontSize:13,color:T.dim,marginTop:6,fontWeight:500}}>Each one shows the proposed choreography</p>
+  </div>;
+}
+
+// ── GREETING BAND ──
+function GreetingBandDemo(){
+  const[phase,setPhase]=useState(0);
+  const[ci,setCi]=useState(0);
+  const name="Lila";
+  function fire(){setPhase(0);setCi(0);setTimeout(()=>setPhase(1),300);setTimeout(()=>setPhase(2),700);setTimeout(()=>setPhase(3),900);}
+  useEffect(()=>{fire();},[]);
+  useEffect(()=>{if(phase>=3&&ci<name.length){const t=setTimeout(()=>setCi(i=>i+1),50);return()=>clearTimeout(t);}},[phase,ci]);
+  return <div style={{height:"100%",background:T.bg}}>
+    <div style={{background:`linear-gradient(135deg,${T.kid},${T.kidDark})`,padding:"28px 24px 24px",transform:`translateY(${phase>=1?0:-100}px)`,transition:`transform .6s ${SPR}`,borderRadius:"0 0 24px 24px"}}>
+      <div style={{display:"flex",alignItems:"center",gap:12}}>
+        <div style={{width:44,height:44,borderRadius:22,background:"rgba(255,255,255,.2)",display:"flex",alignItems:"center",justifyContent:"center",transform:`scale(${phase>=2?1:0})`,transition:`transform .5s ${SPR}`}}>
+          <svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" fill="#FFF"/>{[0,45,90,135,180,225,270,315].map(a=><line key={a} x1="12" y1="3" x2="12" y2="1" stroke="#FFF" strokeWidth="2" strokeLinecap="round" transform={`rotate(${a} 12 12)`}/>)}</svg>
+        </div>
+        <div>
+          <p style={{fontSize:13,fontWeight:600,color:"rgba(255,255,255,.7)",margin:0,opacity:phase>=2?1:0,transition:"opacity .3s ease"}}>Good morning</p>
+          <div style={{position:"relative"}}>
+            <p style={{fontSize:28,fontWeight:800,color:"#FFF",margin:0,letterSpacing:-.5}}>
+              {name.slice(0,ci)}{ci<name.length&&<span style={{display:"inline-block",width:2,height:28,background:"#FFF",marginLeft:1,animation:"blink .8s infinite"}}/>}
+            </p>
+            <div style={{height:3,borderRadius:2,background:"rgba(255,255,255,.5)",width:phase>=3?"100%":"0%",transition:"width .4s ease-out",marginTop:4}}/>
+          </div>
+        </div>
+      </div>
+    </div>
+    {phase>=3&&<div style={{display:"flex",justifyContent:"center",marginTop:40}}>
+      <div style={{padding:"12px 20px",background:T.kidLight,borderRadius:12,display:"flex",alignItems:"center",gap:8,animation:"breathe 3s ease-in-out infinite"}}>
+        <svg width="16" height="16" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" fill={T.kid}/></svg>
+        <span style={{fontSize:13,fontWeight:600,color:T.kidDark}}>Icon breathes while on screen</span>
+      </div>
+    </div>}
+    <ReplayBtn onReplay={()=>{fire();}}/>
+  </div>;
+}
+
+// ── STREAK +1 ──
+function StreakDemo(){
+  const[sv,setSv]=useState(6);
+  const[phase,setPhase]=useState(0);
+  const[particles,setParticles]=useState([]);
+  function fire(){setPhase(0);setSv(6);setParticles([]);
+    setTimeout(()=>{setPhase(1);setSv(7);},300);
+    setTimeout(()=>setPhase(2),500);
+    setTimeout(()=>{setPhase(3);setParticles(Array.from({length:8},(_,i)=>({id:i,angle:i*45,color:[T.kid,T.kidWarm,T.gold,"#FFF"][i%4]})));},700);
+    setTimeout(()=>setPhase(4),2000);
+  }
+  useEffect(()=>{fire();},[]);
+  return <div style={{height:"100%",background:T.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",position:"relative",overflow:"hidden"}}>
+    {phase>=3&&<div style={{position:"absolute",inset:0,background:`radial-gradient(circle at center,${T.kidLight} 0%,${T.bg} 70%)`,opacity:1,transition:"opacity .6s ease"}}/>}
+    <div style={{position:"relative",display:"flex",flexDirection:"column",alignItems:"center",zIndex:2}}>
+      <div style={{width:80,height:80,display:"flex",alignItems:"center",justifyContent:"center",transform:phase>=2?"scale(1)":"scale(.6)",transition:`transform .5s ${SPR}`,position:"relative"}}>
+        <svg width="64" height="64" viewBox="0 0 24 24"><defs><linearGradient id="fg" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stopColor={T.kidDark}/><stop offset="50%" stopColor={T.kid}/><stop offset="100%" stopColor="#FFF"/></linearGradient></defs><path d="M12 2C12 2 6 9 6 14a6 6 0 0012 0c0-5-6-12-6-12z" fill="url(#fg)"/></svg>
+        {phase>=2&&<div style={{position:"absolute",inset:0,borderRadius:"50%",animation:"pulseGlow .5s ease-in-out 3"}}/>}
+      </div>
+      <div style={{fontSize:56,fontWeight:900,color:T.text,position:"relative",overflow:"hidden",height:68,lineHeight:"68px"}}>
+        <div style={{transform:phase>=1?"translateY(0)":"translateY(68px)",transition:`transform .4s ${SPR}`}}>{sv}</div>
+      </div>
+      <p style={{fontSize:15,fontWeight:700,color:T.dim,margin:"4px 0 0"}}>day streak</p>
+    </div>
+    {phase>=3&&particles.map(p=><div key={p.id} style={{position:"absolute",left:"50%",top:"45%",width:4,height:20,borderRadius:2,background:p.color,transform:`rotate(${p.angle}deg) translateY(-60px)`,opacity:phase>=4?0:1,transition:"opacity .8s ease-out",animation:`burstBar .6s ${SPR} forwards`,animationDelay:`${p.id*30}ms`}}/>)}
+    {phase>=3&&<div style={{marginTop:32,background:T.card,borderRadius:20,padding:"20px 28px",textAlign:"center",boxShadow:"0 8px 30px rgba(0,0,0,.08)",transform:phase>=3?"translateY(0) scale(1)":"translateY(20px) scale(.95)",opacity:1,transition:`all .5s ${SPR}`,transitionDelay:".3s",zIndex:2}}>
+      <div style={{width:48,height:48,margin:"0 auto 12px",background:T.kidLight,borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",border:`2px solid ${T.kid}`}}>
+        <svg width="24" height="24" viewBox="0 0 24 24"><path d="M12 2l-8 4v5c0 5.5 3.4 10.7 8 12 4.6-1.3 8-6.5 8-12V6l-8-4z" fill={T.kid}/><path d="M12 8c0 0-2 3-2 5a2 2 0 004 0c0-2-2-5-2-5z" fill="#FFF"/></svg>
+      </div>
+      <p style={{fontSize:17,fontWeight:800,color:T.text,margin:0}}>You've read news for seven days straight.</p>
+      <p style={{fontSize:13,fontWeight:500,color:T.dim,margin:"8px 0 0"}}>That's a real habit.</p>
+      <button style={{marginTop:16,padding:"10px 24px",background:T.kid,color:"#FFF",border:"none",borderRadius:100,fontFamily:RND,fontWeight:700,fontSize:14,cursor:"pointer"}}>Share this</button>
+    </div>}
+    <ReplayBtn onReplay={()=>fire()}/>
+  </div>;
+}
+
+// ── QUIZ PASS ──
+function QuizPassDemo(){
+  const[phase,setPhase]=useState(0);
+  const[score,setScore]=useState(72);
+  const[ringPct,setRingPct]=useState(0);
+  function fire(){setPhase(0);setScore(72);setRingPct(0);
+    setTimeout(()=>setPhase(1),400);
+    setTimeout(()=>setPhase(2),900);
+    setTimeout(()=>{setPhase(3);let c=72;const s=()=>{c++;if(c<=84){setScore(c);requestAnimationFrame(s);}};requestAnimationFrame(s);let r=0;const rs=()=>{r+=.8;setRingPct(Math.min(r,84));if(r<84)requestAnimationFrame(rs);};setTimeout(rs,300);},1400);
+  }
+  useEffect(()=>{fire();},[]);
+  const answers=[{text:'"City announces new park plans"',correct:false},{text:'"Mayor slams opposition in heated debate"',correct:true},{text:'"School board reviews budget proposal"',correct:false},{text:'"Weather expected to change this week"',correct:false}];
+  return <div style={{height:"100%",background:T.bg,position:"relative",overflow:"hidden"}}>
+    <div style={{padding:"24px 20px",opacity:phase>=3?.15:1,transition:"opacity .4s ease",filter:phase>=2?"saturate(.97)":"none"}}>
+      <div style={{display:"flex",gap:6,marginBottom:16,justifyContent:"center"}}>
+        {[1,2,3,4,5].map(i=><div key={i} style={{width:8,height:8,borderRadius:4,background:i<=4?T.kid:(i===5&&phase>=0?T.kid:T.border),transition:"all .3s ease",animation:i===5&&phase===0?"dotPulse .6s ease-in-out 3":"none"}}/>)}
+      </div>
+      <p style={{fontSize:13,fontWeight:600,color:T.dim,textAlign:"center",margin:"0 0 8px",textTransform:"uppercase",letterSpacing:.8}}>Question 5 of 5</p>
+      <p style={{fontSize:17,fontWeight:700,color:T.text,textAlign:"center",margin:"0 0 20px",lineHeight:1.4}}>Which headline uses a loaded word to influence the reader?</p>
+      {answers.map((a,i)=><div key={i} style={{padding:"14px 16px",background:a.correct&&phase>=1?T.kidLight:T.card,border:`2px solid ${a.correct&&phase>=1?T.kid:T.border}`,borderRadius:14,marginBottom:8,fontSize:15,fontWeight:600,color:T.text,transform:a.correct&&phase===1?"scale(1.03)":"scale(1)",transition:`all .35s ${SPR}`,position:"relative",overflow:"hidden"}}>
+        {a.text}
+        {a.correct&&phase>=2&&<div style={{position:"absolute",inset:0,background:`radial-gradient(circle at center,${T.kidLight} 0%,transparent 70%)`,animation:"radialFill .5s ease-out forwards",borderRadius:12}}/>}
+      </div>)}
+    </div>
+    {phase>=3&&<div style={{position:"absolute",bottom:0,left:0,right:0,background:T.card,borderRadius:"24px 24px 0 0",padding:"32px 24px 40px",boxShadow:"0 -8px 40px rgba(0,0,0,.1)",textAlign:"center"}}>
+      <p style={{fontSize:13,fontWeight:700,color:T.kid,textTransform:"uppercase",letterSpacing:1,margin:"0 0 16px"}}>Quiz passed</p>
+      <div style={{position:"relative",width:120,height:120,margin:"0 auto 20px"}}>
+        <svg width="120" height="120" viewBox="0 0 120 120" style={{transform:"rotate(-90deg)"}}><circle cx="60" cy="60" r="52" fill="none" stroke={T.border} strokeWidth="8"/><circle cx="60" cy="60" r="52" fill="none" stroke={T.kid} strokeWidth="8" strokeLinecap="round" strokeDasharray={`${2*Math.PI*52}`} strokeDashoffset={`${2*Math.PI*52*(1-ringPct/100)}`} style={{transition:"stroke-dashoffset .05s linear"}}/></svg>
+        <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+          <span style={{fontSize:32,fontWeight:900,color:T.text}}>{score}</span>
+          <span style={{fontSize:11,fontWeight:600,color:T.dim}}>Verity Score</span>
+        </div>
+      </div>
+      <div style={{display:"flex",gap:12,justifyContent:"center",marginBottom:20}}>
+        {[{l:"Correct",v:"5/5",c:T.kid},{l:"Time",v:"42s",c:T.dim},{l:"Delta",v:"+12",c:T.success}].map(s=><div key={s.l} style={{flex:1,padding:"10px 8px",background:T.bg,borderRadius:10,textAlign:"center"}}><p style={{fontSize:17,fontWeight:800,color:s.c,margin:0}}>{s.v}</p><p style={{fontSize:11,fontWeight:600,color:T.dim,margin:"2px 0 0"}}>{s.l}</p></div>)}
+      </div>
+      <p style={{fontSize:15,fontWeight:600,color:T.text,margin:"0 0 16px"}}>You spotted a loaded headline on the first try.</p>
+      <button style={{padding:"12px 32px",background:T.kid,color:"#FFF",border:"none",borderRadius:100,fontFamily:RND,fontWeight:700,fontSize:15,cursor:"pointer"}}>Share result</button>
+    </div>}
+    <ReplayBtn onReplay={()=>fire()}/>
+  </div>;
+}
+
+// ── BADGE UNLOCK ──
+function BadgeUnlockDemo(){
+  const[phase,setPhase]=useState(0);
+  function fire(){setPhase(0);setTimeout(()=>setPhase(1),300);setTimeout(()=>setPhase(2),500);setTimeout(()=>setPhase(3),1000);setTimeout(()=>setPhase(4),1600);}
+  useEffect(()=>{fire();},[]);
+  return <div style={{height:"100%",position:"relative",display:"flex",alignItems:"center",justifyContent:"center"}}>
+    <div style={{position:"absolute",inset:0,background:T.bg}}>{[0,1,2,3].map(i=><div key={i} style={{margin:"12px 20px",height:60,borderRadius:12,background:T.card,border:`1px solid ${T.border}`}}/>)}</div>
+    <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,.5)",opacity:phase>=1?1:0,transition:"opacity .3s ease"}}/>
+    <div style={{position:"relative",zIndex:2,display:"flex",flexDirection:"column",alignItems:"center",transform:phase>=2?"scale(1)":"scale(.3)",opacity:phase>=2?1:0,transition:`transform .6s ${SPR}, opacity .3s ease`}}>
+      <div style={{width:120,height:120,borderRadius:28,background:`linear-gradient(135deg,${T.gold},#FDE68A)`,display:"flex",alignItems:"center",justifyContent:"center",position:"relative",overflow:"hidden",boxShadow:"0 12px 40px rgba(245,158,11,.3)"}}>
+        {phase>=3&&<div style={{position:"absolute",inset:-60,background:"conic-gradient(from 0deg,transparent 0%,rgba(255,255,255,.4) 10%,transparent 20%)",animation:"shimmerSpin .9s linear 1"}}/>}
+        <svg width="56" height="56" viewBox="0 0 24 24" style={{position:"relative",zIndex:1}}><path d="M12 2l2.9 6.3L22 9.2l-5 4.8L18.2 22 12 18.3 5.8 22 7 14l-5-4.8 7.1-.9z" fill="#FFF"/></svg>
+        <div style={{position:"absolute",inset:-3,borderRadius:31,border:`3px solid ${T.gold}`,opacity:phase>=3?1:0,animation:phase>=3?"ringPulse .4s ease-in-out 2":"none"}}/>
+      </div>
+      <div style={{marginTop:24,textAlign:"center",opacity:phase>=4?1:0,transform:phase>=4?"translateY(0)":"translateY(10px)",transition:`all .4s ${EO}`,transitionDelay:".1s"}}>
+        <p style={{fontSize:11,fontWeight:700,color:T.gold,textTransform:"uppercase",letterSpacing:1.2,margin:"0 0 6px"}}>Gold badge</p>
+        <p style={{fontSize:20,fontWeight:800,color:"#FFF",margin:"0 0 8px"}}>You spotted a biased headline five times.</p>
+        <p style={{fontSize:13,fontWeight:500,color:"rgba(255,255,255,.6)",margin:0}}>Bias Detection — Level 3</p>
+      </div>
+      <div style={{display:"flex",gap:12,marginTop:24,opacity:phase>=4?1:0,transform:phase>=4?"translateY(0)":"translateY(15px)",transition:`all .4s ${EO}`,transitionDelay:".25s"}}>
+        <button style={{padding:"12px 28px",background:T.kid,color:"#FFF",border:"none",borderRadius:100,fontFamily:RND,fontWeight:700,fontSize:14,cursor:"pointer"}}>Share</button>
+        <button style={{padding:"12px 28px",background:"rgba(255,255,255,.15)",color:"#FFF",border:"1px solid rgba(255,255,255,.3)",borderRadius:100,fontFamily:RND,fontWeight:600,fontSize:14,cursor:"pointer"}}>Dismiss</button>
+      </div>
+    </div>
+    <ReplayBtn onReplay={()=>fire()} light/>
+  </div>;
+}
+
+// ── CATEGORY TRAIL ──
+function CategoryTrailDemo(){
+  const[phase,setPhase]=useState(0);
+  const[filled,setFilled]=useState(2);
+  function fire(){setPhase(0);setFilled(2);setTimeout(()=>setPhase(1),400);setTimeout(()=>{setPhase(2);let c=2;const iv=setInterval(()=>{c++;setFilled(c);if(c>=4)clearInterval(iv);},150);},800);setTimeout(()=>setPhase(3),1400);}
+  useEffect(()=>{fire();},[]);
+  const cats=[{name:"Science",p:4,t:5,c:"#8B5CF6"},{name:"World News",p:2,t:5,c:T.kid},{name:"Sports",p:0,t:5,c:"#F59E0B"},{name:"Technology",p:3,t:5,c:"#3B82F6"}];
+  return <div style={{height:"100%",background:T.bg,padding:"20px 16px"}}>
+    <p style={{fontSize:13,fontWeight:700,color:T.dim,textTransform:"uppercase",letterSpacing:.8,margin:"0 0 16px 4px"}}>Categories</p>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+      {cats.map((cat,i)=>{const isA=i===1;const cp=isA?filled:cat.p;return <div key={cat.name} style={{background:T.card,borderRadius:16,padding:16,border:`2px solid ${isA&&phase>=1?cat.c+"40":T.border}`,transform:isA&&phase===1?"scale(1.03)":"scale(1)",transition:`all .4s ${SPR}`}}>
+        <div style={{width:40,height:40,borderRadius:12,background:cat.c+"20",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:10}}>
+          <div style={{width:20,height:20,borderRadius:6,background:cat.c,transform:isA&&phase===1?"scale(1.2) rotate(10deg)":"scale(1)",transition:`transform .5s ${SPR}`}}/>
+        </div>
+        <p style={{fontSize:15,fontWeight:700,color:T.text,margin:"0 0 10px"}}>{cat.name}</p>
+        <div style={{display:"flex",gap:4}}>{Array.from({length:cat.t},(_,j)=><div key={j} style={{flex:1,height:4,borderRadius:2,background:j<cp?cat.c:T.border,transition:`background .15s ease ${j*100}ms, transform .15s ease ${j*100}ms`,transform:isA&&phase===2&&j>=2&&j<cp?"scaleY(1.8)":"scaleY(1)"}}/>)}</div>
+        <p style={{fontSize:11,fontWeight:600,color:T.dim,margin:"6px 0 0"}}>{cp} of {cat.t}</p>
+      </div>;})}
+    </div>
+    {phase>=3&&<div style={{marginTop:20,padding:16,background:T.card,borderRadius:16,border:`1px solid ${T.border}`}}>
+      <p style={{fontSize:13,fontWeight:700,color:T.dim,textTransform:"uppercase",letterSpacing:.8,margin:"0 0 12px"}}>Inside category: wayfinding trail</p>
+      <div style={{display:"flex",alignItems:"center"}}>{[1,2,3,4,5].map(n=><div key={n} style={{display:"flex",alignItems:"center"}}>
+        <div style={{width:28,height:28,borderRadius:14,background:n<=4?T.kid:T.border,display:"flex",alignItems:"center",justifyContent:"center",border:n===4?`2px solid ${T.kidDark}`:"none",animation:n===4?"currentPulse 2s ease-in-out infinite":"none"}}>
+          {n<=3&&<svg width="12" height="12" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke="#FFF" strokeWidth="3" fill="none" strokeLinecap="round"/></svg>}
+          {n===4&&<div style={{width:8,height:8,borderRadius:4,background:"#FFF"}}/>}
+        </div>
+        {n<5&&<div style={{width:24,height:3,borderRadius:1.5,background:n<=3?T.kid:T.border}}/>}
+      </div>)}</div>
+    </div>}
+    <ReplayBtn onReplay={()=>fire()}/>
+  </div>;
+}
+
+// ── EXPERT SESSION ──
+function ExpertSessionDemo(){
+  const[hasNew,setHasNew]=useState(false);
+  const[expanded,setExpanded]=useState(false);
+  useEffect(()=>{setTimeout(()=>setHasNew(true),800);},[]);
+  return <div style={{height:"100%",background:T.bg,padding:"20px 16px"}}>
+    <p style={{fontSize:13,fontWeight:700,color:T.dim,textTransform:"uppercase",letterSpacing:.8,margin:"0 0 16px 4px"}}>Expert Q&A</p>
+    <div onClick={()=>{if(hasNew)setExpanded(!expanded);}} style={{background:T.card,borderRadius:16,padding:16,border:`2px solid ${hasNew?T.kid:T.border}`,cursor:hasNew?"pointer":"default",transition:"all .3s ease",position:"relative",overflow:"hidden"}}>
+      {hasNew&&!expanded&&<div style={{position:"absolute",inset:-2,borderRadius:18,border:`2px solid ${T.kid}`,animation:"expertRing 2s ease-in-out infinite"}}/>}
+      <div style={{display:"flex",alignItems:"center",gap:12,position:"relative"}}>
+        <div style={{width:44,height:44,borderRadius:12,background:hasNew?T.kidLight:T.bg,display:"flex",alignItems:"center",justifyContent:"center",transition:"background .3s ease"}}>
+          <svg width="22" height="22" viewBox="0 0 24 24">{hasNew?<><rect x="2" y="4" width="9" height="10" rx="3" fill={T.kid}/><rect x="13" y="6" width="9" height="10" rx="3" fill={T.kidDark}/><path d="M7 14l-2 3 4-3" fill={T.kid}/><path d="M18 16l2 3-4-3" fill={T.kidDark}/></>:<><circle cx="12" cy="10" r="6" fill={T.dim} opacity=".3"/><text x="12" y="14" textAnchor="middle" fontSize="10" fill={T.dim}>?</text></>}</svg>
+        </div>
+        <div style={{flex:1}}>
+          <p style={{fontSize:15,fontWeight:700,color:T.text,margin:0}}>Dr. Sarah Chen</p>
+          <p style={{fontSize:13,fontWeight:500,color:hasNew?T.kid:T.dim,margin:"2px 0 0"}}>{hasNew?"New answer waiting":"Waiting for response..."}</p>
+        </div>
+        {hasNew&&!expanded&&<div style={{width:10,height:10,borderRadius:5,background:T.kid,animation:"dotBreathe 1.5s ease-in-out infinite"}}/>}
+      </div>
+      {expanded&&<div style={{marginTop:16,paddingTop:16,borderTop:`1px solid ${T.border}`,animation:"fadeSlideUp .3s ease-out"}}>
+        <p style={{fontSize:13,fontWeight:600,color:T.dim,margin:"0 0 6px"}}>Your question:</p>
+        <p style={{fontSize:14,fontWeight:500,color:T.text,margin:"0 0 12px"}}>"Why do some news sites use different headlines for the same story?"</p>
+        <p style={{fontSize:13,fontWeight:600,color:T.kid,margin:"0 0 6px"}}>Dr. Chen's answer:</p>
+        <p style={{fontSize:14,fontWeight:500,color:T.text,margin:0,lineHeight:1.5}}>Great question! Different news organizations choose headlines based on what they think their readers care about most. One paper might focus on the "who" while another emphasizes the "why." This is called editorial framing...</p>
+      </div>}
+    </div>
+    <div style={{marginTop:16,padding:12,background:T.kidLight,borderRadius:12,fontSize:12,fontWeight:600,color:T.kidDark,lineHeight:1.5}}>
+      The "new answer" cue persists until tapped. It survives scroll-past. The icon swaps from a question mark to a conversation bubble. The ring pulses at half speed.
+    </div>
+  </div>;
+}
+
+// ── PIN HANDOFF ──
+function PinHandoffDemo(){
+  const[phase,setPhase]=useState(0);
+  const[dots,setDots]=useState([false,false,false,false]);
+  const[error,setError]=useState(false);
+  const[success,setSuccess]=useState(false);
+  function fire(){setPhase(0);setDots([false,false,false,false]);setError(false);setSuccess(false);
+    setTimeout(()=>setPhase(1),500);
+    setTimeout(()=>setDots([true,false,false,false]),1500);
+    setTimeout(()=>setDots([true,true,false,false]),1800);
+    setTimeout(()=>setDots([true,true,true,false]),2100);
+    setTimeout(()=>{setDots([true,true,true,true]);
+      setTimeout(()=>{setError(true);setTimeout(()=>{setError(false);setDots([false,false,false,false]);
+        setTimeout(()=>setDots([true,false,false,false]),400);
+        setTimeout(()=>setDots([true,true,false,false]),600);
+        setTimeout(()=>setDots([true,true,true,false]),800);
+        setTimeout(()=>{setDots([true,true,true,true]);setTimeout(()=>setSuccess(true),300);},1000);
+      },600);},400);
+    },2400);
+  }
+  useEffect(()=>{fire();},[]);
+  return <div style={{height:"100%",position:"relative",background:T.bg}}>
+    <div style={{padding:20,opacity:phase>=1?.3:1,transition:"opacity .45s ease",filter:phase>=1?`saturate(${success?0:.5})`:"none"}}>
+      <div style={{background:`linear-gradient(135deg,${T.kid},${T.kidDark})`,borderRadius:20,padding:20,marginBottom:12}}>
+        <p style={{fontSize:20,fontWeight:800,color:"#FFF",margin:0}}>Lila's space</p>
+      </div>
+      {[0,1].map(i=><div key={i} style={{height:60,borderRadius:12,background:T.card,marginBottom:8,border:`1px solid ${T.border}`}}/>)}
+    </div>
+    {success&&<div style={{position:"absolute",inset:0,background:T.bg,animation:"dissolveIn .6s ease-out forwards",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:40,zIndex:5}}>
+      <div style={{width:56,height:56,borderRadius:14,background:T.bg,border:`2px solid ${T.border}`,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:16}}>
+        <svg width="24" height="24" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke={T.text} strokeWidth="2.5" fill="none" strokeLinecap="round"/></svg>
+      </div>
+      <p style={{fontSize:20,fontWeight:800,color:T.text,margin:0}}>Welcome back</p>
+      <p style={{fontSize:13,fontWeight:500,color:T.dim,marginTop:4}}>Parent mode</p>
+    </div>}
+    {phase>=1&&!success&&<div style={{position:"absolute",bottom:0,left:0,right:0,background:T.card,borderRadius:"24px 24px 0 0",padding:"32px 24px 48px",boxShadow:"0 -8px 40px rgba(0,0,0,.1)",transition:`transform .45s ${EO}`,textAlign:"center",zIndex:3}}>
+      <p style={{fontSize:17,fontWeight:800,color:T.text,margin:"0 0 6px"}}>Pass the phone to a grown-up</p>
+      <p style={{fontSize:13,fontWeight:500,color:T.dim,margin:"0 0 28px"}}>Enter your family PIN to continue</p>
+      <div style={{display:"flex",gap:16,justifyContent:"center",marginBottom:32}}>
+        {dots.map((f,i)=><div key={i} style={{width:16,height:16,borderRadius:8,background:f?(error?T.error:T.text):"transparent",border:`2px solid ${error?T.error:(f?T.text:T.border)}`,transition:`all .2s ${SPR}`,transform:error?`translateX(${i%2===0?-4:4}px)`:"translateX(0)"}}/>)}
+      </div>
+      {error&&<div style={{padding:"8px 16px",background:T.error+"15",borderRadius:8,border:`1px solid ${T.kid}20`,marginBottom:16,animation:"shake .4s ease-in-out"}}>
+        <p style={{fontSize:13,fontWeight:600,color:T.error,margin:0}}>That's not right. Try again.</p>
+      </div>}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,maxWidth:240,margin:"0 auto"}}>
+        {[1,2,3,4,5,6,7,8,9,null,0,null].map((n,i)=><div key={i} style={{height:48,borderRadius:12,background:n!==null?T.bg:"transparent",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,fontWeight:700,color:T.text}}>{n!==null?n:""}</div>)}
+      </div>
+      {error&&<div style={{position:"absolute",top:0,left:0,right:0,height:3,background:T.kid,borderRadius:"24px 24px 0 0",animation:"flashKid .6s ease-out forwards"}}/>}
+    </div>}
+    <ReplayBtn onReplay={()=>fire()}/>
+  </div>;
+}
+
+// ── KID TAB BAR ──
+function KidTabBar({activeTab,onTabChange}){
+  const tabs=[{l:"Home",i:"house"},{l:"Explore",i:"search"},{l:"Profile",i:"person"}];
+  const icons={house:<path d="M3 12l9-8 9 8v8a1 1 0 01-1 1h-4v-5h-8v5H4a1 1 0 01-1-1v-8z"/>,search:<><circle cx="10" cy="10" r="6" strokeWidth="2" fill="none"/><line x1="14.5" y1="14.5" x2="20" y2="20" strokeWidth="2" strokeLinecap="round"/></>,person:<><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></>};
+  return <div style={{height:66,display:"flex",alignItems:"center",justifyContent:"center",background:T.bg,borderTop:`1px solid ${T.border}`,padding:"0 24px",gap:8}}>
+    {tabs.map((t,i)=><button key={t.l} onClick={()=>onTabChange(i)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3,background:activeTab===i?T.kid:"transparent",border:"none",borderRadius:100,padding:"8px 0",cursor:"pointer",transition:`all .3s ${SPR}`}}>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill={activeTab===i?"#FFF":T.dim} stroke={activeTab===i?"#FFF":T.dim}>{icons[t.i]}</svg>
+      <span style={{fontSize:10,fontWeight:700,color:activeTab===i?"#FFF":T.dim}}>{t.l}</span>
+    </button>)}
+  </div>;
+}
+
+// ── MAIN APP ──
+function App(){
+  const[activeDemo,setActiveDemo]=useState(null);
+  const[tabIndex,setTabIndex]=useState(0);
+  const demos=[{id:"greeting",label:"Greeting Band"},{id:"streak",label:"Streak +1"},{id:"quiz",label:"Quiz Pass"},{id:"badge",label:"Badge Unlock"},{id:"category",label:"Category Trail"},{id:"expert",label:"Expert Session"},{id:"pin",label:"PIN Handoff"}];
+
+  return <div style={{fontFamily:RND,background:"#F0FDFA",minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",padding:"24px 16px"}}>
+    <div style={{textAlign:"center",marginBottom:24}}>
+      <h1 style={{fontSize:28,fontWeight:800,color:T.text,margin:0,letterSpacing:-.5}}>Kid Mode Delight</h1>
+      <p style={{fontSize:15,color:T.dim,margin:"6px 0 0",fontWeight:500}}>Tap a moment to see the choreography</p>
+    </div>
+    <div style={{display:"flex",flexWrap:"wrap",gap:8,justifyContent:"center",maxWidth:500,marginBottom:24}}>
+      {demos.map(d=><button key={d.id} onClick={()=>setActiveDemo(d.id)} style={{background:activeDemo===d.id?T.kid:T.card,color:activeDemo===d.id?"#FFF":T.text,border:`2px solid ${activeDemo===d.id?T.kid:T.border}`,borderRadius:100,padding:"10px 18px",cursor:"pointer",fontFamily:RND,fontWeight:700,fontSize:13,transition:"all .2s ease"}}>{d.label}</button>)}
+    </div>
+    <div style={{width:375,height:700,background:T.bg,borderRadius:40,border:`3px solid ${T.border}`,overflow:"hidden",position:"relative",boxShadow:"0 25px 60px rgba(0,0,0,.12), 0 8px 20px rgba(0,0,0,.06)"}}>
+      <div style={{height:54,background:T.kidLight,display:"flex",alignItems:"flex-end",justifyContent:"center",paddingBottom:6}}>
+        <div style={{width:120,height:28,borderRadius:14,background:T.text,opacity:.9}}/>
+      </div>
+      <div style={{height:580,overflow:"hidden",position:"relative"}}>
+        {!activeDemo&&<IdleState/>}
+        {activeDemo==="greeting"&&<GreetingBandDemo key="g"/>}
+        {activeDemo==="streak"&&<StreakDemo key="s"/>}
+        {activeDemo==="quiz"&&<QuizPassDemo key="q"/>}
+        {activeDemo==="badge"&&<BadgeUnlockDemo key="b"/>}
+        {activeDemo==="category"&&<CategoryTrailDemo key="c"/>}
+        {activeDemo==="expert"&&<ExpertSessionDemo key="e"/>}
+        {activeDemo==="pin"&&<PinHandoffDemo key="p"/>}
+      </div>
+      <KidTabBar activeTab={tabIndex} onTabChange={setTabIndex}/>
+    </div>
+  </div>;
+}
+
+ReactDOM.render(<App/>,document.getElementById("root"));
+</script>
+</body>
+</html>

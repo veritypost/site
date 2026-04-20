@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Typography & Token System — VerityPost</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<style>
+*{margin:0;box-sizing:border-box}
+body{background:#F5F5F5;font-family:-apple-system,'SF Pro Display',system-ui,sans-serif}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect}=React;
+const T={bg:"#FAFAFA",card:"#FFF",text:"#1A1A1A",dim:"#8E8E93",border:"#E5E5EA",accent:"#000",teal:"#2DD4BF",tealDark:"#0D9488",tealLight:"#CCFBF1"};
+
+function App(){
+  const[tab,setTab]=useState("type");
+  const[mode,setMode]=useState("adult");
+  const tabs=[{id:"type",label:"Typography"},{id:"radii",label:"Radii"},{id:"spacing",label:"Spacing"},{id:"preview",label:"Card Preview"}];
+
+  return <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",padding:"24px 16px"}}>
+    <div style={{textAlign:"center",marginBottom:20}}>
+      <h1 style={{fontSize:28,fontWeight:800,color:T.text,margin:0,letterSpacing:-.5}}>Design Token System</h1>
+      <p style={{fontSize:14,color:T.dim,margin:"6px 0 0",fontWeight:500}}>From 47 combinations to 11 roles</p>
+    </div>
+
+    {/* Mode toggle */}
+    <div style={{display:"flex",gap:4,padding:4,background:"#F3F4F6",borderRadius:100,marginBottom:16}}>
+      <button onClick={()=>setMode("adult")} style={{padding:"8px 20px",borderRadius:100,border:"none",background:mode==="adult"?T.accent:"transparent",color:mode==="adult"?"#FFF":T.dim,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit",transition:"all .2s ease"}}>Adult</button>
+      <button onClick={()=>setMode("kid")} style={{padding:"8px 20px",borderRadius:100,border:"none",background:mode==="kid"?T.teal:"transparent",color:mode==="kid"?"#FFF":T.dim,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit",transition:"all .2s ease"}}>Kid</button>
+    </div>
+
+    <div style={{display:"flex",flexWrap:"wrap",gap:8,justifyContent:"center",marginBottom:24}}>
+      {tabs.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{background:tab===t.id?T.accent:T.card,color:tab===t.id?"#FFF":T.text,border:`2px solid ${tab===t.id?T.accent:T.border}`,borderRadius:100,padding:"10px 18px",cursor:"pointer",fontWeight:700,fontSize:13,transition:"all .2s ease",fontFamily:"inherit"}}>{t.label}</button>)}
+    </div>
+
+    <div style={{width:"100%",maxWidth:700}}>
+      {tab==="type"&&<TypeScale mode={mode}/>}
+      {tab==="radii"&&<RadiiScale mode={mode}/>}
+      {tab==="spacing"&&<SpacingScale mode={mode}/>}
+      {tab==="preview"&&<CardPreview mode={mode}/>}
+    </div>
+  </div>;
+}
+
+// ── TYPOGRAPHY SCALE ───────────────────────────────────────────────────
+function TypeScale({mode}){
+  const isKid=mode==="kid";
+  const ff=isKid?"'SF Pro Rounded',-apple-system,system-ui,sans-serif":"-apple-system,'SF Pro Display',system-ui,sans-serif";
+  // Weight map: kid bumps one step
+  const wMap={400:isKid?700:400,500:isKid?700:500,600:isKid?700:600,700:isKid?800:700,800:isKid?900:800,900:isKid?900:900};
+
+  const roles=[
+    {name:"display",size:34,weight:900,lh:1.1,tracking:-1,transform:"none",desc:"Home wordmark, section fronts",apple:".largeTitle"},
+    {name:"headline.lg",size:28,weight:700,lh:1.2,tracking:-0.5,transform:"none",desc:"Feature story titles",apple:".title1"},
+    {name:"headline",size:22,weight:700,lh:1.25,tracking:-0.3,transform:"none",desc:"Standard headlines",apple:".title2"},
+    {name:"deck",size:20,weight:400,lh:1.35,tracking:-0.2,transform:"none",desc:"Article deck / subtitle",apple:".title3"},
+    {name:"body.emphasis",size:17,weight:600,lh:1.5,tracking:0,transform:"none",desc:"Card titles, list row titles",apple:".body"},
+    {name:"body",size:17,weight:400,lh:1.5,tracking:0,transform:"none",desc:"Article body text",apple:".body"},
+    {name:"meta",size:15,weight:400,lh:1.4,tracking:0,transform:"none",desc:"Secondary info, timestamps",apple:".subheadline"},
+    {name:"byline",size:13,weight:500,lh:1.3,tracking:0.2,transform:"none",desc:"Author names, attributions",apple:".footnote"},
+    {name:"caption",size:13,weight:400,lh:1.3,tracking:0,transform:"none",desc:"Photo credits, helper text",apple:".footnote"},
+    {name:"eyebrow",size:11,weight:600,lh:1.2,tracking:0.8,transform:"uppercase",desc:"Section labels, category tags",apple:".caption2"},
+    {name:"micro",size:11,weight:400,lh:1.2,tracking:0,transform:"none",desc:"Badges, counts, timestamps",apple:".caption2"},
+  ];
+
+  return <div>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:16}}>
+      <div>
+        <p style={{fontSize:17,fontWeight:800,color:T.text,margin:0}}>11 Typography Roles</p>
+        <p style={{fontSize:13,color:T.dim,margin:"4px 0 0"}}>~1.18 modular ratio  ·  Scale: 11/13/15/17/20/22/28/34</p>
+      </div>
+      <div style={{fontSize:11,fontWeight:700,color:isKid?T.teal:T.accent,background:isKid?T.tealLight:"#F3F4F6",padding:"4px 10px",borderRadius:100}}>{isKid?"Rounded + Bold":"Default"}</div>
+    </div>
+    {roles.map(r=><div key={r.name} style={{background:T.card,borderRadius:isKid?16:12,padding:"16px 20px",marginBottom:8,border:`1px solid ${T.border}`,display:"flex",alignItems:"baseline",gap:16}}>
+      <div style={{minWidth:90}}>
+        <p style={{fontSize:11,fontWeight:700,color:isKid?T.teal:T.accent,fontFamily:"monospace",margin:0}}>.{r.name}</p>
+        <p style={{fontSize:10,color:T.dim,margin:"2px 0 0",fontFamily:"monospace"}}>{r.size}pt / {wMap[r.weight]}</p>
+      </div>
+      <div style={{flex:1}}>
+        <p style={{
+          fontSize:r.size,fontWeight:wMap[r.weight],fontFamily:ff,
+          lineHeight:r.lh,letterSpacing:r.tracking,
+          textTransform:r.transform==="uppercase"?"uppercase":"none",
+          color:T.text,margin:0,
+        }}>
+          {r.transform==="uppercase"?"World News":"The quick brown fox"}
+        </p>
+        <p style={{fontSize:11,color:T.dim,margin:"4px 0 0"}}>{r.desc}  ·  <span style={{fontFamily:"monospace"}}>{r.apple}</span></p>
+      </div>
+    </div>)}
+    <div style={{background:isKid?T.tealLight:"#F9FAFB",borderRadius:12,padding:16,marginTop:12}}>
+      <p style={{fontSize:12,fontWeight:700,color:isKid?T.tealDark:T.dim}}>
+        {isKid
+          ?"Kid mode transform: font design .default \u2192 .rounded, weight index +1, same sizes. No fork \u2014 one rule."
+          :"Each role bundles size + weight + line-height + tracking into a single token. 47 combinations \u2192 11 roles."
+        }
+      </p>
+    </div>
+  </div>;
+}
+
+// ── RADII SCALE ────────────────────────────────────────────────────────
+function RadiiScale({mode}){
+  const isKid=mode==="kid";
+  const radii=[
+    {name:"none",val:0,kidVal:0,use:"Dividers, full-bleed images"},
+    {name:"sm",val:4,kidVal:8,use:"Chips, inline highlights, small badges"},
+    {name:"md",val:8,kidVal:12,use:"Buttons, inputs, form fields"},
+    {name:"lg",val:12,kidVal:16,use:"Cards, list rows, content containers"},
+    {name:"xl",val:20,kidVal:24,use:"Sheets, modals, bottom cards"},
+    {name:"capsule",val:999,kidVal:999,use:"Primary CTAs, filter pills, tab indicators"},
+  ];
+  return <div>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:16}}>
+      <div>
+        <p style={{fontSize:17,fontWeight:800,color:T.text,margin:0}}>5 Radii + Capsule</p>
+        <p style={{fontSize:13,color:T.dim,margin:"4px 0 0"}}>Down from 13 distinct values  ·  All .continuous (squircle)</p>
+      </div>
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
+      {radii.map(r=>{
+        const v=isKid?r.kidVal:r.val;
+        return <div key={r.name} style={{background:T.card,borderRadius:isKid?16:12,padding:16,border:`1px solid ${T.border}`,textAlign:"center"}}>
+          <div style={{
+            width:80,height:56,borderRadius:r.name==="capsule"?28:v,
+            background:isKid?T.tealLight:"#F3F4F6",
+            border:`2px solid ${isKid?T.teal:T.accent}`,
+            margin:"0 auto 12px",display:"flex",alignItems:"center",justifyContent:"center",
+          }}>
+            <span style={{fontSize:14,fontWeight:800,color:isKid?T.tealDark:T.accent}}>{v===999?"pill":v}</span>
+          </div>
+          <p style={{fontSize:12,fontWeight:700,color:T.text,margin:0,fontFamily:"monospace"}}>.{r.name}</p>
+          <p style={{fontSize:11,color:T.dim,margin:"4px 0 0"}}>{r.use}</p>
+          {isKid&&r.val!==r.kidVal&&r.name!=="capsule"&&<p style={{fontSize:10,color:T.teal,fontWeight:600,margin:"4px 0 0"}}>{r.val} \u2192 {r.kidVal}</p>}
+        </div>;
+      })}
+    </div>
+    <div style={{background:isKid?T.tealLight:"#F9FAFB",borderRadius:12,padding:16,marginTop:12}}>
+      <p style={{fontSize:12,fontWeight:700,color:isKid?T.tealDark:T.dim}}>
+        {isKid
+          ?"Kid mode: each radius steps up one level. An 8pt button becomes 12pt. Softer feel, same system."
+          :"Eliminated: 2pt, 6pt, 9pt, 14pt, 16pt, 18pt, 22pt, 24pt. Those were bugs dressed as decisions."
+        }
+      </p>
+    </div>
+  </div>;
+}
+
+// ── SPACING SCALE ──────────────────────────────────────────────────────
+function SpacingScale({mode}){
+  const isKid=mode==="kid";
+  const spaces=[
+    {name:"xxs",val:2,kidVal:3},
+    {name:"xs",val:4,kidVal:5},
+    {name:"sm",val:8,kidVal:10},
+    {name:"md",val:12,kidVal:15},
+    {name:"lg",val:16,kidVal:20},
+    {name:"xl",val:24,kidVal:28},
+    {name:"xxl",val:32,kidVal:36},
+    {name:"page",val:48,kidVal:52},
+  ];
+  return <div>
+    <div style={{marginBottom:16}}>
+      <p style={{fontSize:17,fontWeight:800,color:T.text,margin:0}}>8-Step Spacing Scale</p>
+      <p style={{fontSize:13,color:T.dim,margin:"4px 0 0"}}>4pt base  ·  Kid mode ~25% wider at small end, ~15% at large</p>
+    </div>
+    <div style={{background:T.card,borderRadius:isKid?16:12,padding:20,border:`1px solid ${T.border}`}}>
+      {spaces.map(s=>{
+        const v=isKid?s.kidVal:s.val;
+        return <div key={s.name} style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
+          <span style={{fontSize:12,fontWeight:700,color:T.dim,fontFamily:"monospace",width:50,textAlign:"right"}}>.{s.name}</span>
+          <div style={{
+            width:v*2.5,height:20,borderRadius:4,
+            background:isKid?`linear-gradient(90deg,${T.teal},${T.tealDark})`:`linear-gradient(90deg,${T.accent},#555)`,
+            transition:"width .3s ease",
+            display:"flex",alignItems:"center",justifyContent:"flex-end",paddingRight:6,
+          }}>
+            <span style={{fontSize:10,fontWeight:700,color:"#FFF"}}>{v}</span>
+          </div>
+          <span style={{fontSize:11,color:T.dim}}>{s.val}pt{isKid?` \u2192 ${s.kidVal}pt`:""}</span>
+        </div>;
+      })}
+    </div>
+    {/* Button sizes */}
+    <p style={{fontSize:15,fontWeight:800,color:T.text,margin:"20px 0 12px"}}>3 Button Sizes</p>
+    <div style={{display:"flex",gap:10,alignItems:"flex-end"}}>
+      {[
+        {name:"Small",h:32,px:12,fs:12,r:isKid?10:8},
+        {name:"Default",h:44,px:16,fs:14,r:isKid?12:8},
+        {name:"Primary",h:52,px:24,fs:16,r:isKid?16:12},
+      ].map(b=><div key={b.name} style={{flex:1,textAlign:"center"}}>
+        <button style={{
+          width:"100%",height:b.h,
+          background:b.name==="Primary"?(isKid?T.teal:T.accent):T.card,
+          color:b.name==="Primary"?"#FFF":T.text,
+          border:b.name==="Primary"?"none":`1.5px solid ${T.border}`,
+          borderRadius:b.r,fontWeight:700,fontSize:b.fs,cursor:"pointer",fontFamily:isKid?"'SF Pro Rounded',system-ui":"inherit",
+        }}>{b.name}</button>
+        <p style={{fontSize:10,color:T.dim,marginTop:6,fontFamily:"monospace"}}>{b.h}h / {b.px}px / r{b.r}</p>
+      </div>)}
+    </div>
+  </div>;
+}
+
+// ── CARD PREVIEW ───────────────────────────────────────────────────────
+function CardPreview({mode}){
+  const isKid=mode==="kid";
+  const ff=isKid?"'SF Pro Rounded',-apple-system,system-ui,sans-serif":"-apple-system,'SF Pro Display',system-ui,sans-serif";
+  const r=isKid?20:12;
+
+  return <div>
+    <p style={{fontSize:17,fontWeight:800,color:T.text,margin:"0 0 16px"}}>Story Card — Token System Applied</p>
+    <div style={{display:"flex",gap:16}}>
+      {/* Dense card */}
+      <div style={{flex:1,background:T.card,borderRadius:r,padding:isKid?18:14,border:`1px solid ${T.border}`,fontFamily:ff}}>
+        <p style={{fontSize:11,fontWeight:isKid?700:600,letterSpacing:0.8,textTransform:"uppercase",color:isKid?T.teal:T.dim,margin:"0 0 6px"}}>{isKid?"Science":"WORLD NEWS"}</p>
+        <p style={{fontSize:17,fontWeight:isKid?800:600,color:T.text,lineHeight:1.35,margin:"0 0 6px"}}>Climate Summit Reaches Historic Agreement</p>
+        <p style={{fontSize:13,fontWeight:isKid?600:500,color:T.dim,margin:"0 0 8px",letterSpacing:0.2}}>By Sarah Mitchell  ·  4 min</p>
+        <div style={{display:"flex",gap:6}}>
+          <span style={{fontSize:11,fontWeight:isKid?700:600,color:isKid?T.teal:T.accent,background:isKid?T.tealLight:"#F3F4F6",padding:"3px 8px",borderRadius:isKid?8:4}}>Quiz</span>
+          <span style={{fontSize:11,fontWeight:isKid?700:600,color:T.dim,background:"#F3F4F6",padding:"3px 8px",borderRadius:isKid?8:4}}>3 min ago</span>
+        </div>
+      </div>
+      {/* Feature card */}
+      <div style={{flex:1,background:T.card,borderRadius:isKid?24:16,padding:isKid?22:18,border:`1px solid ${T.border}`,fontFamily:ff,boxShadow:"0 2px 12px rgba(0,0,0,.04)"}}>
+        <p style={{fontSize:11,fontWeight:isKid?700:600,letterSpacing:0.8,textTransform:"uppercase",color:isKid?T.teal:T.dim,margin:"0 0 8px"}}>{isKid?"World":"INVESTIGATIONS"}</p>
+        <p style={{fontSize:22,fontWeight:isKid?900:700,color:T.text,lineHeight:1.2,margin:"0 0 8px",letterSpacing:-0.3}}>Inside the Carbon Credit Market</p>
+        <p style={{fontSize:15,fontWeight:isKid?500:400,color:T.dim,lineHeight:1.4,margin:"0 0 10px"}}>A three-month investigation into how carbon offsets are traded and verified.</p>
+        <p style={{fontSize:13,fontWeight:isKid?600:500,color:T.dim,letterSpacing:0.2}}>By Sarah Mitchell  ·  12 min read</p>
+      </div>
+    </div>
+    <div style={{background:isKid?T.tealLight:"#F9FAFB",borderRadius:12,padding:16,marginTop:16}}>
+      <p style={{fontSize:12,fontWeight:700,color:isKid?T.tealDark:T.dim}}>
+        {isKid
+          ?"Same content, same sizes. Just .rounded font, bolder weights, softer radii. One transformation rule."
+          :"Eyebrow \u2192 headline \u2192 byline \u2192 chips. Each using a named token. No ad-hoc font sizes."
+        }
+      </p>
+    </div>
+  </div>;
+}
+
+ReactDOM.render(<App/>,document.getElementById("root"));
+</script>
+</body>
+</html>

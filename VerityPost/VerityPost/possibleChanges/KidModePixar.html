@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Kid Mode — Pixar Level</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<style>
+*{margin:0;box-sizing:border-box}
+body{background:#0D1117;font-family:'SF Pro Rounded','SF Pro Display',-apple-system,system-ui,sans-serif;overflow-x:hidden}
+canvas{position:absolute;top:0;left:0;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef,useCallback}=React;
+
+// ── PHYSICS ENGINE (mini) ──────────────────────────────────────────────
+class Particle{
+  constructor(x,y,vx,vy,color,size,life,gravity,drag,shape){
+    this.x=x;this.y=y;this.vx=vx;this.vy=vy;this.color=color;
+    this.size=size;this.life=life;this.maxLife=life;this.gravity=gravity||0;
+    this.drag=drag||0.98;this.shape=shape||"circle";this.rotation=Math.random()*Math.PI*2;
+    this.rotSpeed=(Math.random()-0.5)*0.3;
+  }
+  update(){
+    this.vy+=this.gravity;this.vx*=this.drag;this.vy*=this.drag;
+    this.x+=this.vx;this.y+=this.vy;this.life--;this.rotation+=this.rotSpeed;
+  }
+  draw(ctx){
+    const alpha=Math.max(0,this.life/this.maxLife);
+    const s=this.size*(0.5+0.5*alpha);
+    ctx.save();ctx.globalAlpha=alpha;ctx.translate(this.x,this.y);ctx.rotate(this.rotation);
+    ctx.fillStyle=this.color;
+    if(this.shape==="circle"){ctx.beginPath();ctx.arc(0,0,s,0,Math.PI*2);ctx.fill();}
+    else if(this.shape==="star"){drawStar(ctx,0,0,5,s,s*0.4);}
+    else if(this.shape==="bar"){ctx.fillRect(-s*0.3,-s,s*0.6,s*2);}
+    else if(this.shape==="diamond"){ctx.beginPath();ctx.moveTo(0,-s);ctx.lineTo(s,0);ctx.lineTo(0,s);ctx.lineTo(-s,0);ctx.closePath();ctx.fill();}
+    ctx.restore();
+  }
+}
+
+function drawStar(ctx,cx,cy,spikes,outerR,innerR){
+  let rot=Math.PI/2*3,step=Math.PI/spikes;
+  ctx.beginPath();ctx.moveTo(cx,cy-outerR);
+  for(let i=0;i<spikes;i++){
+    ctx.lineTo(cx+Math.cos(rot)*outerR,cy+Math.sin(rot)*outerR);rot+=step;
+    ctx.lineTo(cx+Math.cos(rot)*innerR,cy+Math.sin(rot)*innerR);rot+=step;
+  }
+  ctx.closePath();ctx.fill();
+}
+
+function useParticleCanvas(){
+  const canvasRef=useRef(null);
+  const particlesRef=useRef([]);
+  const animRef=useRef(null);
+  const running=useRef(false);
+
+  const start=useCallback(()=>{
+    if(running.current)return;running.current=true;
+    const loop=()=>{
+      const canvas=canvasRef.current;if(!canvas){running.current=false;return;}
+      const ctx=canvas.getContext("2d");
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      particlesRef.current=particlesRef.current.filter(p=>{p.update();p.draw(ctx);return p.life>0;});
+      if(particlesRef.current.length>0)animRef.current=requestAnimationFrame(loop);
+      else running.current=false;
+    };
+    animRef.current=requestAnimationFrame(loop);
+  },[]);
+
+  const emit=(particles)=>{particlesRef.current.push(...particles);start();};
+  return {canvasRef,emit};
+}
+
+// ── COLOR PALETTE ──────────────────────────────────────────────────────
+const KID={
+  teal:"#2DD4BF",tealDark:"#0D9488",tealLight:"#CCFBF1",tealGlow:"rgba(45,212,191,0.3)",
+  coral:"#FB7185",coralDark:"#E11D48",
+  purple:"#A78BFA",purpleDark:"#7C3AED",
+  gold:"#FBBF24",goldDark:"#D97706",
+  sky:"#38BDF8",
+  mint:"#34D399",
+  bg:"#FAFAFA",card:"#FFFFFF",text:"#1A1A1A",dim:"#8E8E93",border:"#E5E5EA",
+};
+const SPR="cubic-bezier(0.34,1.56,0.64,1)";
+const BOUNCE="cubic-bezier(0.22,1.5,0.36,1)";
+const SOFT="cubic-bezier(0.16,1,0.3,1)";
+
+// ── APP ────────────────────────────────────────────────────────────────
+function App(){
+  const[demo,setDemo]=useState(null);
+  const demos=[
+    {id:"greeting",label:"Morning Ritual",emoji:null},
+    {id:"streak",label:"Streak Blaze",emoji:null},
+    {id:"quiz",label:"Quiz Triumph",emoji:null},
+    {id:"badge",label:"Badge Moment",emoji:null},
+    {id:"explore",label:"Category World",emoji:null},
+  ];
+
+  return <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",padding:"32px 16px",background:"linear-gradient(180deg,#0D1117 0%,#1A1A2E 100%)"}}>
+    <div style={{textAlign:"center",marginBottom:28}}>
+      <h1 style={{fontSize:32,fontWeight:900,color:"#FFF",margin:0,letterSpacing:-1}}>Kid Mode</h1>
+      <p style={{fontSize:14,color:"rgba(255,255,255,.5)",margin:"6px 0 0",fontWeight:500}}>Every moment, crafted</p>
+    </div>
+    <div style={{display:"flex",flexWrap:"wrap",gap:8,justifyContent:"center",maxWidth:500,marginBottom:28}}>
+      {demos.map(d=><button key={d.id} onClick={()=>setDemo(d.id)} style={{
+        background:demo===d.id?KID.teal:"rgba(255,255,255,.08)",
+        color:demo===d.id?"#000":"rgba(255,255,255,.7)",
+        border:`1.5px solid ${demo===d.id?KID.teal:"rgba(255,255,255,.12)"}`,
+        borderRadius:100,padding:"10px 20px",cursor:"pointer",
+        fontWeight:700,fontSize:13,transition:"all .25s ease",fontFamily:"inherit",
+        backdropFilter:"blur(10px)",
+      }}>{d.label}</button>)}
+    </div>
+    {/* Phone */}
+    <div style={{width:375,height:740,background:KID.bg,borderRadius:44,border:"3px solid rgba(255,255,255,.12)",overflow:"hidden",position:"relative",boxShadow:"0 30px 80px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.06) inset"}}>
+      {/* Dynamic Island */}
+      <div style={{height:58,background:"linear-gradient(180deg,#F0FDFA,#FAFAFA)",display:"flex",alignItems:"flex-end",justifyContent:"center",paddingBottom:6}}>
+        <div style={{width:126,height:32,borderRadius:16,background:"#111",boxShadow:"0 2px 8px rgba(0,0,0,.2)"}}/>
+      </div>
+      <div style={{height:616,overflow:"hidden",position:"relative"}}>
+        {!demo&&<Idle/>}
+        {demo==="greeting"&&<GreetingRitual key={"g"+Date.now()}/>}
+        {demo==="streak"&&<StreakBlaze key={"s"+Date.now()}/>}
+        {demo==="quiz"&&<QuizTriumph key={"q"+Date.now()}/>}
+        {demo==="badge"&&<BadgeMoment key={"b"+Date.now()}/>}
+        {demo==="explore"&&<CategoryWorld key={"e"+Date.now()}/>}
+      </div>
+      {/* Tab bar */}
+      <KidTab/>
+    </div>
+  </div>;
+}
+
+function Idle(){
+  return <div style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:40,textAlign:"center",background:KID.bg}}>
+    <div style={{width:100,height:100,borderRadius:28,background:`linear-gradient(135deg,${KID.teal},${KID.purple})`,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:24,boxShadow:`0 12px 40px ${KID.tealGlow}`,animation:"idleFloat 3s ease-in-out infinite"}}>
+      <svg width="48" height="48" viewBox="0 0 24 24"><path d="M12 2C12 2 7 8 7 13a5 5 0 0010 0c0-5-5-11-5-11z" fill="#FFF"/></svg>
+    </div>
+    <p style={{fontSize:20,fontWeight:800,color:KID.text}}>Pick a moment</p>
+    <p style={{fontSize:14,color:KID.dim,marginTop:6,fontWeight:500}}>Watch the choreography</p>
+    <style>{`@keyframes idleFloat{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(-8px) rotate(2deg)}}`}</style>
+  </div>;
+}
+
+// ── 1. GREETING RITUAL ─────────────────────────────────────────────────
+function GreetingRitual(){
+  const{canvasRef,emit}=useParticleCanvas();
+  const[phase,setPhase]=useState(0);
+  const[charIdx,setCharIdx]=useState(0);
+  const[timeIcon,setTimeIcon]=useState("sun");
+  const name="Lila";
+
+  useEffect(()=>{
+    const h=new Date().getHours();
+    setTimeIcon(h<12?"sun":h<17?"cloud":"moon");
+    setTimeout(()=>setPhase(1),200);
+    setTimeout(()=>setPhase(2),500);
+    setTimeout(()=>setPhase(3),800);
+    setTimeout(()=>{
+      setPhase(4);
+      // Sparkle burst on name reveal
+      emit(Array.from({length:20},()=>new Particle(
+        187+Math.random()*40-20,130,
+        (Math.random()-0.5)*4,(Math.random()-0.5)*4-2,
+        [KID.teal,KID.gold,KID.coral,KID.purple,KID.sky][Math.floor(Math.random()*5)],
+        Math.random()*4+2, Math.floor(Math.random()*40+30), 0.05, 0.97,
+        ["circle","star","diamond"][Math.floor(Math.random()*3)]
+      )));
+    },1100);
+  },[]);
+
+  useEffect(()=>{
+    if(phase>=4&&charIdx<name.length){
+      const t=setTimeout(()=>setCharIdx(i=>i+1),80);
+      return()=>clearTimeout(t);
+    }
+  },[phase,charIdx]);
+
+  const bandStyle={
+    background:`linear-gradient(135deg,${KID.teal} 0%,${KID.tealDark} 50%,${KID.purple} 100%)`,
+    padding:"32px 24px 28px",
+    transform:`translateY(${phase>=1?0:-120}px) scale(${phase>=1?1:0.95})`,
+    transition:`transform .7s ${BOUNCE}`,
+    borderRadius:"0 0 28px 28px",
+    position:"relative",overflow:"hidden",
+  };
+
+  return <div style={{height:"100%",background:KID.bg,position:"relative"}}>
+    <canvas ref={canvasRef} width={375} height={616} style={{position:"absolute",zIndex:10,pointerEvents:"none"}}/>
+    {/* Animated gradient band */}
+    <div style={bandStyle}>
+      {/* Shimmer overlay */}
+      <div style={{position:"absolute",inset:0,background:"linear-gradient(110deg,transparent 30%,rgba(255,255,255,.12) 50%,transparent 70%)",animation:phase>=2?"greetShimmer 2s ease-in-out 1":"none",backgroundSize:"200% 100%"}}/>
+      <div style={{display:"flex",alignItems:"center",gap:14,position:"relative"}}>
+        {/* Time-of-day orb */}
+        <div style={{
+          width:52,height:52,borderRadius:26,
+          background:"rgba(255,255,255,.15)",backdropFilter:"blur(8px)",
+          display:"flex",alignItems:"center",justifyContent:"center",
+          transform:`scale(${phase>=2?1:0}) rotate(${phase>=2?0:-90}deg)`,
+          transition:`transform .6s ${BOUNCE}`,
+          boxShadow:"0 4px 20px rgba(0,0,0,.1)",
+        }}>
+          <svg width="28" height="28" viewBox="0 0 24 24">
+            {timeIcon==="sun"&&<React.Fragment><circle cx="12" cy="12" r="5" fill="#FFF"/>{[0,45,90,135,180,225,270,315].map(a=><line key={a} x1="12" y1="3" x2="12" y2="1" stroke="#FFF" strokeWidth="2" strokeLinecap="round" transform={`rotate(${a} 12 12)`}/>)}</React.Fragment>}
+            {timeIcon==="cloud"&&<React.Fragment><circle cx="9" cy="12" r="5" fill="#FFF"/><circle cx="14" cy="11" r="4" fill="#FFF"/><circle cx="12" cy="14" r="3" fill="#FFF"/></React.Fragment>}
+            {timeIcon==="moon"&&<path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" fill="#FFF"/>}
+          </svg>
+        </div>
+        <div>
+          <p style={{
+            fontSize:14,fontWeight:600,color:"rgba(255,255,255,.6)",margin:0,
+            opacity:phase>=3?1:0,transform:`translateY(${phase>=3?0:8}px)`,
+            transition:`all .4s ${SOFT}`,
+          }}>Good {timeIcon==="sun"?"morning":timeIcon==="cloud"?"afternoon":"evening"}</p>
+          <div style={{position:"relative",height:40,overflow:"hidden"}}>
+            <p style={{fontSize:34,fontWeight:900,color:"#FFF",margin:0,letterSpacing:-1,lineHeight:"40px"}}>
+              {name.slice(0,charIdx)}
+              {charIdx<name.length&&<span style={{display:"inline-block",width:2,height:32,background:"rgba(255,255,255,.7)",marginLeft:2,animation:"cursor .7s step-end infinite",verticalAlign:"middle"}}/>}
+            </p>
+          </div>
+          {/* Underline with glow */}
+          <div style={{position:"relative",marginTop:6}}>
+            <div style={{height:3,borderRadius:2,background:"rgba(255,255,255,.3)",width:phase>=4?"100%":"0%",transition:"width .5s ease-out"}}/>
+            <div style={{position:"absolute",top:-2,left:0,height:7,borderRadius:4,background:"rgba(255,255,255,.15)",width:phase>=4?"100%":"0%",transition:"width .5s ease-out",filter:"blur(4px)"}}/>
+          </div>
+        </div>
+      </div>
+      {/* Floating dots decoration */}
+      {phase>=3&&[0,1,2,3,4].map(i=><div key={i} style={{
+        position:"absolute",
+        right:20+i*18,bottom:8,
+        width:4+i*1.5,height:4+i*1.5,borderRadius:10,
+        background:"rgba(255,255,255,"+(0.1+i*0.05)+")",
+        animation:`floatDot ${2+i*0.3}s ease-in-out ${i*0.15}s infinite`,
+      }}/>)}
+    </div>
+
+    {/* Streak preview card */}
+    {phase>=4&&<div style={{margin:"20px 20px 0",animation:"fadeUp .5s ease-out .3s both"}}>
+      <div style={{background:KID.card,borderRadius:20,padding:18,boxShadow:"0 2px 16px rgba(0,0,0,.04)",border:`1px solid ${KID.border}`,display:"flex",alignItems:"center",gap:14}}>
+        <div style={{width:48,height:48,borderRadius:14,background:`linear-gradient(135deg,${KID.coral},${KID.gold})`,display:"flex",alignItems:"center",justifyContent:"center",animation:"breatheSmall 3s ease-in-out infinite"}}>
+          <svg width="24" height="24" viewBox="0 0 24 24"><path d="M12 2C12 2 6 9 6 14a6 6 0 0012 0c0-5-6-12-6-12z" fill="#FFF"/></svg>
+        </div>
+        <div>
+          <p style={{fontSize:24,fontWeight:900,color:KID.text,margin:0}}>6 day streak</p>
+          <p style={{fontSize:13,fontWeight:500,color:KID.dim,margin:"2px 0 0"}}>Read one story to keep it going</p>
+        </div>
+      </div>
+    </div>}
+
+    {/* Category peek */}
+    {phase>=4&&<div style={{margin:"14px 20px 0",animation:"fadeUp .5s ease-out .5s both"}}>
+      <div style={{display:"flex",gap:10}}>
+        {[{name:"Science",color:KID.purple,prog:4},{name:"World",color:KID.teal,prog:2},{name:"Sports",color:KID.coral,prog:0}].map((c,i)=>
+          <div key={c.name} style={{flex:1,background:KID.card,borderRadius:16,padding:14,border:`1px solid ${KID.border}`,animation:`popIn .4s ${BOUNCE} ${0.6+i*0.1}s both`}}>
+            <div style={{width:32,height:32,borderRadius:10,background:c.color+"20",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:8}}>
+              <div style={{width:14,height:14,borderRadius:4,background:c.color}}/>
+            </div>
+            <p style={{fontSize:12,fontWeight:700,color:KID.text,margin:"0 0 8px"}}>{c.name}</p>
+            <div style={{display:"flex",gap:3}}>
+              {[0,1,2,3,4].map(j=><div key={j} style={{flex:1,height:3,borderRadius:2,background:j<c.prog?c.color:KID.border}}/>)}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>}
+
+    <style>{`
+      @keyframes cursor{0%,100%{opacity:1}50%{opacity:0}}
+      @keyframes greetShimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+      @keyframes floatDot{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+      @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+      @keyframes popIn{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:scale(1)}}
+      @keyframes breatheSmall{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+    `}</style>
+  </div>;
+}
+
+// ── 2. STREAK BLAZE ────────────────────────────────────────────────────
+function StreakBlaze(){
+  const{canvasRef,emit}=useParticleCanvas();
+  const[num,setNum]=useState(6);
+  const[phase,setPhase]=useState(0);
+  const[ringScale,setRingScale]=useState(0);
+
+  useEffect(()=>{
+    setTimeout(()=>setPhase(1),300);
+    setTimeout(()=>{setPhase(2);setNum(7);},600);
+    setTimeout(()=>{
+      setPhase(3);
+      // BIG burst — 40 particles, multiple shapes
+      const cx=187,cy=260;
+      emit(Array.from({length:50},(_,i)=>{
+        const angle=(i/50)*Math.PI*2;
+        const speed=3+Math.random()*5;
+        return new Particle(cx,cy,
+          Math.cos(angle)*speed,Math.sin(angle)*speed-1,
+          [KID.teal,KID.tealLight,KID.gold,KID.coral,KID.purple,"#FFF"][Math.floor(Math.random()*6)],
+          Math.random()*5+2,Math.floor(Math.random()*50+40),0.08,0.96,
+          ["circle","star","bar","diamond"][Math.floor(Math.random()*4)]
+        );
+      }));
+      // Ring expansion
+      let r=0;const ri=setInterval(()=>{r+=0.04;setRingScale(r);if(r>=1)clearInterval(ri);},16);
+    },900);
+    setTimeout(()=>setPhase(4),2200);
+  },[]);
+
+  return <div style={{height:"100%",background:KID.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",position:"relative",overflow:"hidden"}}>
+    <canvas ref={canvasRef} width={375} height={616} style={{position:"absolute",zIndex:5,pointerEvents:"none"}}/>
+
+    {/* Radial glow */}
+    {phase>=3&&<div style={{position:"absolute",width:300,height:300,borderRadius:"50%",background:`radial-gradient(circle,${KID.tealGlow} 0%,transparent 70%)`,opacity:phase>=3?1:0,transition:"opacity .8s ease",zIndex:0}}/>}
+
+    {/* Expanding ring */}
+    {phase>=3&&<div style={{position:"absolute",width:200,height:200,borderRadius:"50%",border:`2px solid ${KID.teal}`,opacity:Math.max(0,1-ringScale),transform:`scale(${0.5+ringScale*2})`,transition:"none",zIndex:1}}/>}
+
+    {/* Flame stack */}
+    <div style={{position:"relative",zIndex:2,display:"flex",flexDirection:"column",alignItems:"center"}}>
+      <div style={{
+        width:100,height:100,position:"relative",
+        transform:phase>=2?"scale(1)":"scale(0.5)",
+        transition:`transform .6s ${BOUNCE}`,
+      }}>
+        {/* Outer glow flame */}
+        <svg width="100" height="100" viewBox="0 0 24 24" style={{position:"absolute",filter:"blur(8px)",opacity:0.3}}>
+          <path d="M12 1C12 1 5 9 5 15a7 7 0 0014 0c0-6-7-14-7-14z" fill={KID.coral}/>
+        </svg>
+        {/* Main flame */}
+        <svg width="100" height="100" viewBox="0 0 24 24" style={{position:"relative",zIndex:1}}>
+          <defs>
+            <linearGradient id="blaze" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stopColor={KID.tealDark}/>
+              <stop offset="40%" stopColor={KID.teal}/>
+              <stop offset="70%" stopColor={KID.gold}/>
+              <stop offset="100%" stopColor="#FFF"/>
+            </linearGradient>
+          </defs>
+          <path d="M12 1C12 1 5 9 5 15a7 7 0 0014 0c0-6-7-14-7-14z" fill="url(#blaze)">
+            <animate attributeName="d" values="M12 1C12 1 5 9 5 15a7 7 0 0014 0c0-6-7-14-7-14z;M12 0C12 0 4 9 4 15a8 8 0 0016 0c0-6-8-15-8-15z;M12 1C12 1 5 9 5 15a7 7 0 0014 0c0-6-7-14-7-14z" dur="1.5s" repeatCount="indefinite"/>
+          </path>
+          {/* Inner flame */}
+          <path d="M12 10C12 10 9 14 9 16.5a3 3 0 006 0c0-2.5-3-6.5-3-6.5z" fill="rgba(255,255,255,.6)">
+            <animate attributeName="d" values="M12 10C12 10 9 14 9 16.5a3 3 0 006 0c0-2.5-3-6.5-3-6.5z;M12 9C12 9 8.5 14 8.5 17a3.5 3.5 0 007 0c0-3-3.5-8-3.5-8z;M12 10C12 10 9 14 9 16.5a3 3 0 006 0c0-2.5-3-6.5-3-6.5z" dur="1.2s" repeatCount="indefinite"/>
+          </path>
+        </svg>
+      </div>
+
+      {/* Rolling number */}
+      <div style={{height:72,overflow:"hidden",marginTop:4}}>
+        <div style={{
+          fontSize:64,fontWeight:900,color:KID.text,lineHeight:"72px",textAlign:"center",
+          transform:phase>=2?"translateY(0)":"translateY(72px)",
+          transition:`transform .5s ${BOUNCE}`,
+        }}>{num}</div>
+      </div>
+      <p style={{fontSize:16,fontWeight:700,color:KID.dim,marginTop:2}}>day streak</p>
+    </div>
+
+    {/* Milestone card */}
+    {phase>=4&&<div style={{
+      position:"absolute",bottom:80,left:20,right:20,zIndex:6,
+      background:KID.card,borderRadius:24,padding:24,textAlign:"center",
+      boxShadow:"0 12px 40px rgba(0,0,0,.1)",
+      animation:`slideUpBounce .6s ${BOUNCE} both`,
+    }}>
+      <div style={{
+        width:56,height:56,borderRadius:16,margin:"0 auto 14px",
+        background:`linear-gradient(135deg,${KID.teal},${KID.purple})`,
+        display:"flex",alignItems:"center",justifyContent:"center",
+        boxShadow:`0 8px 24px ${KID.tealGlow}`,
+      }}>
+        <svg width="28" height="28" viewBox="0 0 24 24">
+          <path d="M12 2l-8 4v5c0 5.5 3.4 10.7 8 12 4.6-1.3 8-6.5 8-12V6l-8-4z" fill="rgba(255,255,255,.3)"/>
+          <path d="M12 7c0 0-2.5 3.5-2.5 6a2.5 2.5 0 005 0c0-2.5-2.5-6-2.5-6z" fill="#FFF"/>
+        </svg>
+      </div>
+      <p style={{fontSize:20,fontWeight:900,color:KID.text,margin:"0 0 4px"}}>You've read news for seven days straight.</p>
+      <p style={{fontSize:14,fontWeight:500,color:KID.dim,margin:"0 0 18px"}}>That's a real habit. Keep going.</p>
+      <div style={{display:"flex",gap:10}}>
+        <button style={{flex:1,padding:"14px 0",background:KID.teal,color:"#FFF",border:"none",borderRadius:14,fontWeight:700,fontSize:15,cursor:"pointer",fontFamily:"inherit",boxShadow:`0 4px 16px ${KID.tealGlow}`}}>Share this</button>
+        <button style={{flex:0,padding:"14px 20px",background:KID.bg,color:KID.dim,border:`1.5px solid ${KID.border}`,borderRadius:14,fontWeight:600,fontSize:15,cursor:"pointer",fontFamily:"inherit"}}>Done</button>
+      </div>
+    </div>}
+
+    <style>{`
+      @keyframes slideUpBounce{from{opacity:0;transform:translateY(40px) scale(.95)}to{opacity:1;transform:translateY(0) scale(1)}}
+    `}</style>
+  </div>;
+}
+
+// ── 3. QUIZ TRIUMPH ────────────────────────────────────────────────────
+function QuizTriumph(){
+  const{canvasRef,emit}=useParticleCanvas();
+  const[phase,setPhase]=useState(0);
+  const[score,setScore]=useState(72);
+  const[ring,setRing]=useState(0);
+
+  useEffect(()=>{
+    setTimeout(()=>setPhase(1),500);   // correct answer
+    setTimeout(()=>setPhase(2),1000);  // radial sweep
+    setTimeout(()=>{
+      setPhase(3);  // result card
+      // Score roll
+      let c=72;const si=setInterval(()=>{c++;setScore(c);if(c>=84)clearInterval(si);},40);
+      // Ring fill
+      let r=0;const ri=setInterval(()=>{r+=1;setRing(Math.min(r,84));if(r>=84)clearInterval(ri);},15);
+      // Confetti at peak
+      setTimeout(()=>{
+        const cx=187,cy=350;
+        emit(Array.from({length:60},()=>new Particle(cx,cy,
+          (Math.random()-0.5)*8,-(Math.random()*6+2),
+          [KID.teal,KID.gold,KID.coral,KID.purple,KID.sky,KID.mint,"#FFF"][Math.floor(Math.random()*7)],
+          Math.random()*5+2,Math.floor(Math.random()*60+50),0.12,0.97,
+          ["circle","star","bar","diamond"][Math.floor(Math.random()*4)]
+        )));
+      },600);
+    },1500);
+  },[]);
+
+  const answers=[
+    {t:"City announces new park plans",ok:false},
+    {t:"Mayor slams opposition in heated debate",ok:true},
+    {t:"School board reviews budget proposal",ok:false},
+    {t:"Weather expected to change this week",ok:false},
+  ];
+
+  return <div style={{height:"100%",background:KID.bg,position:"relative",overflow:"hidden"}}>
+    <canvas ref={canvasRef} width={375} height={616} style={{position:"absolute",zIndex:10,pointerEvents:"none"}}/>
+
+    {/* Question area */}
+    <div style={{padding:"20px 20px 0",opacity:phase>=3?0.1:1,transition:"opacity .5s ease",filter:phase>=2?"saturate(.95)":"none"}}>
+      {/* Progress dots */}
+      <div style={{display:"flex",gap:8,justifyContent:"center",marginBottom:14}}>
+        {[1,2,3,4,5].map(i=><div key={i} style={{
+          width:i===5?12:8,height:i===5?12:8,borderRadius:10,
+          background:KID.teal,
+          boxShadow:i===5&&phase<1?`0 0 0 4px ${KID.tealGlow}`:"none",
+          animation:i===5&&phase<1?"dotPulse .6s ease-in-out 3":"none",
+          transition:"all .3s ease",
+        }}/>)}
+      </div>
+      <p style={{fontSize:12,fontWeight:700,color:KID.dim,textAlign:"center",textTransform:"uppercase",letterSpacing:1,margin:"0 0 8px"}}>Question 5 of 5</p>
+      <p style={{fontSize:18,fontWeight:800,color:KID.text,textAlign:"center",lineHeight:1.35,margin:"0 0 18px"}}>Which headline uses a loaded word?</p>
+      {answers.map((a,i)=><div key={i} style={{
+        padding:"15px 18px",marginBottom:8,borderRadius:16,fontSize:15,fontWeight:600,color:KID.text,
+        background:a.ok&&phase>=1?KID.tealLight:KID.card,
+        border:`2px solid ${a.ok&&phase>=1?KID.teal:KID.border}`,
+        transform:a.ok&&phase===1?"scale(1.04)":"scale(1)",
+        transition:`all .4s ${BOUNCE}`,
+        position:"relative",overflow:"hidden",
+      }}>
+        "{a.t}"
+        {a.ok&&phase>=2&&<div style={{position:"absolute",inset:0,background:`radial-gradient(circle at 50% 50%,${KID.tealLight} 0%,transparent 70%)`,animation:"radialPop .5s ease-out",borderRadius:14}}/>}
+        {a.ok&&phase>=1&&<div style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",width:24,height:24,borderRadius:12,background:KID.teal,display:"flex",alignItems:"center",justifyContent:"center",animation:`checkPop .4s ${BOUNCE}`}}>
+          <svg width="14" height="14" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke="#FFF" strokeWidth="3" fill="none" strokeLinecap="round"/></svg>
+        </div>}
+      </div>)}
+    </div>
+
+    {/* Result card */}
+    {phase>=3&&<div style={{
+      position:"absolute",bottom:0,left:0,right:0,zIndex:6,
+      background:KID.card,borderRadius:"28px 28px 0 0",padding:"28px 24px 36px",
+      boxShadow:"0 -12px 50px rgba(0,0,0,.12)",textAlign:"center",
+      animation:`slideUpBig .6s ${BOUNCE} both`,
+    }}>
+      <p style={{fontSize:12,fontWeight:800,color:KID.teal,textTransform:"uppercase",letterSpacing:1.5,margin:"0 0 18px"}}>Quiz Passed</p>
+      {/* Ring */}
+      <div style={{position:"relative",width:130,height:130,margin:"0 auto 18px"}}>
+        <svg width="130" height="130" viewBox="0 0 130 130" style={{transform:"rotate(-90deg)"}}>
+          <circle cx="65" cy="65" r="56" fill="none" stroke={KID.border} strokeWidth="8"/>
+          <circle cx="65" cy="65" r="56" fill="none" stroke={KID.teal} strokeWidth="8" strokeLinecap="round"
+            strokeDasharray={`${2*Math.PI*56}`} strokeDashoffset={`${2*Math.PI*56*(1-ring/100)}`}/>
+        </svg>
+        <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+          <span style={{fontSize:36,fontWeight:900,color:KID.text}}>{score}</span>
+          <span style={{fontSize:11,fontWeight:600,color:KID.dim}}>Verity Score</span>
+        </div>
+      </div>
+      {/* Stats */}
+      <div style={{display:"flex",gap:10,marginBottom:18}}>
+        {[{l:"Correct",v:"5/5",c:KID.teal},{l:"Time",v:"42s",c:KID.dim},{l:"Delta",v:"+12",c:KID.mint}].map(s=>
+          <div key={s.l} style={{flex:1,padding:"10px 8px",background:KID.bg,borderRadius:12,textAlign:"center"}}>
+            <p style={{fontSize:18,fontWeight:900,color:s.c,margin:0}}>{s.v}</p>
+            <p style={{fontSize:11,fontWeight:600,color:KID.dim,margin:"2px 0 0"}}>{s.l}</p>
+          </div>
+        )}
+      </div>
+      <p style={{fontSize:15,fontWeight:600,color:KID.text,margin:"0 0 16px",lineHeight:1.4}}>You spotted a loaded headline on the first try.</p>
+      <button style={{width:"100%",padding:"15px 0",background:KID.teal,color:"#FFF",border:"none",borderRadius:14,fontWeight:700,fontSize:16,cursor:"pointer",fontFamily:"inherit",boxShadow:`0 4px 16px ${KID.tealGlow}`}}>Share result</button>
+    </div>}
+
+    <style>{`
+      @keyframes dotPulse{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(45,212,191,.3)}50%{transform:scale(1.4);box-shadow:0 0 0 6px rgba(45,212,191,0)}}
+      @keyframes radialPop{from{transform:scale(0);opacity:.6}to{transform:scale(2.5);opacity:0}}
+      @keyframes checkPop{from{transform:translateY(-50%) scale(0)}60%{transform:translateY(-50%) scale(1.2)}to{transform:translateY(-50%) scale(1)}}
+      @keyframes slideUpBig{from{transform:translateY(100%)}to{transform:translateY(0)}}
+    `}</style>
+  </div>;
+}
+
+// ── 4. BADGE MOMENT ────────────────────────────────────────────────────
+function BadgeMoment(){
+  const{canvasRef,emit}=useParticleCanvas();
+  const[phase,setPhase]=useState(0);
+
+  useEffect(()=>{
+    setTimeout(()=>setPhase(1),300);
+    setTimeout(()=>setPhase(2),600);
+    setTimeout(()=>{
+      setPhase(3);
+      // Circular burst
+      const cx=187,cy=280;
+      emit(Array.from({length:40},(_,i)=>{
+        const a=(i/40)*Math.PI*2;const sp=2+Math.random()*3;
+        return new Particle(cx,cy,Math.cos(a)*sp,Math.sin(a)*sp,
+          [KID.gold,"#FDE68A",KID.coral,"#FFF"][Math.floor(Math.random()*4)],
+          Math.random()*4+2,Math.floor(Math.random()*50+30),0.04,0.97,
+          ["star","circle","diamond"][Math.floor(Math.random()*3)]
+        );
+      }));
+    },1100);
+    setTimeout(()=>setPhase(4),1800);
+  },[]);
+
+  return <div style={{height:"100%",position:"relative",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
+    <canvas ref={canvasRef} width={375} height={616} style={{position:"absolute",zIndex:10,pointerEvents:"none"}}/>
+    {/* Dim bg */}
+    <div style={{position:"absolute",inset:0,background:KID.bg}}>
+      {[0,1,2,3].map(i=><div key={i} style={{margin:"12px 20px",height:60,borderRadius:14,background:KID.card,border:`1px solid ${KID.border}`}}/>)}
+    </div>
+    <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,.6)",backdropFilter:"blur(8px)",opacity:phase>=1?1:0,transition:"opacity .4s ease"}}/>
+
+    <div style={{position:"relative",zIndex:5,display:"flex",flexDirection:"column",alignItems:"center",
+      transform:phase>=2?"scale(1) translateY(0)":"scale(0.2) translateY(40px)",opacity:phase>=2?1:0,
+      transition:`transform .7s ${BOUNCE}, opacity .3s ease`}}>
+      {/* Badge */}
+      <div style={{
+        width:140,height:140,borderRadius:36,position:"relative",
+        background:`linear-gradient(135deg,${KID.gold} 0%,#FDE68A 50%,${KID.coral} 100%)`,
+        display:"flex",alignItems:"center",justifyContent:"center",
+        boxShadow:`0 16px 50px rgba(251,191,36,.4)`,
+        overflow:"hidden",
+      }}>
+        {phase>=3&&<div style={{position:"absolute",inset:-80,background:"conic-gradient(from 0deg,transparent 0%,rgba(255,255,255,.5) 8%,transparent 16%)",animation:"shimmerSpin 1s linear 1"}}/>}
+        <svg width="64" height="64" viewBox="0 0 24 24" style={{position:"relative",zIndex:1,filter:"drop-shadow(0 2px 4px rgba(0,0,0,.15))"}}>
+          <path d="M12 2l2.9 6.3L22 9.2l-5 4.8L18.2 22 12 18.3 5.8 22 7 14l-5-4.8 7.1-.9z" fill="#FFF"/>
+        </svg>
+        {/* Breathing ring */}
+        {phase>=3&&<div style={{position:"absolute",inset:-4,borderRadius:40,border:`3px solid rgba(255,255,255,.5)`,animation:"badgeRing .5s ease-in-out 2"}}/>}
+      </div>
+
+      {/* Text */}
+      <div style={{marginTop:28,textAlign:"center",maxWidth:280,
+        opacity:phase>=4?1:0,transform:phase>=4?"translateY(0)":"translateY(12px)",
+        transition:`all .5s ${SOFT}`,transitionDelay:".1s"}}>
+        <p style={{fontSize:12,fontWeight:800,color:KID.gold,textTransform:"uppercase",letterSpacing:1.5,margin:"0 0 8px"}}>Gold Badge</p>
+        <p style={{fontSize:22,fontWeight:900,color:"#FFF",margin:"0 0 8px",lineHeight:1.3}}>You spotted a biased headline five times.</p>
+        <p style={{fontSize:14,fontWeight:500,color:"rgba(255,255,255,.5)",margin:0}}>Bias Detection — Level 3</p>
+      </div>
+
+      {/* Buttons */}
+      <div style={{display:"flex",gap:10,marginTop:28,
+        opacity:phase>=4?1:0,transform:phase>=4?"translateY(0)":"translateY(16px)",
+        transition:`all .5s ${SOFT}`,transitionDelay:".25s"}}>
+        <button style={{padding:"14px 32px",background:KID.teal,color:"#FFF",border:"none",borderRadius:14,fontWeight:700,fontSize:15,cursor:"pointer",fontFamily:"inherit",boxShadow:`0 4px 16px ${KID.tealGlow}`}}>Share</button>
+        <button style={{padding:"14px 24px",background:"rgba(255,255,255,.1)",color:"rgba(255,255,255,.7)",border:"1px solid rgba(255,255,255,.2)",borderRadius:14,fontWeight:600,fontSize:15,cursor:"pointer",fontFamily:"inherit"}}>Done</button>
+      </div>
+    </div>
+
+    <style>{`
+      @keyframes shimmerSpin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+      @keyframes badgeRing{0%,100%{transform:scale(1);opacity:.8}50%{transform:scale(1.06);opacity:.3}}
+    `}</style>
+  </div>;
+}
+
+// ── 5. CATEGORY WORLD ──────────────────────────────────────────────────
+function CategoryWorld(){
+  const{canvasRef,emit}=useParticleCanvas();
+  const[phase,setPhase]=useState(0);
+  const[filled,setFilled]=useState(2);
+
+  useEffect(()=>{
+    setTimeout(()=>setPhase(1),300);
+    setTimeout(()=>setPhase(2),600);
+    setTimeout(()=>{
+      setPhase(3);
+      let c=2;const iv=setInterval(()=>{c++;setFilled(c);
+        // Mini sparkle per node fill
+        emit(Array.from({length:6},()=>new Particle(
+          120+c*30,178,(Math.random()-0.5)*2,-(Math.random()*2+1),
+          KID.teal,Math.random()*3+1,Math.floor(Math.random()*20+15),0.06,0.96,"circle"
+        )));
+        if(c>=4)clearInterval(iv);
+      },200);
+    },900);
+    setTimeout(()=>setPhase(4),1600);
+  },[]);
+
+  const cats=[
+    {name:"Science",color:KID.purple,icon:"atom",prog:4,total:5},
+    {name:"World News",color:KID.teal,icon:"globe",prog:2,total:5,active:true},
+    {name:"Sports",color:KID.coral,icon:"ball",prog:0,total:5},
+    {name:"Tech",color:KID.sky,icon:"chip",prog:3,total:5},
+  ];
+
+  return <div style={{height:"100%",background:KID.bg,position:"relative"}}>
+    <canvas ref={canvasRef} width={375} height={616} style={{position:"absolute",zIndex:5,pointerEvents:"none"}}/>
+    <div style={{padding:"16px 16px 0"}}>
+      <p style={{fontSize:12,fontWeight:800,color:KID.dim,textTransform:"uppercase",letterSpacing:1,margin:"0 0 14px 4px"}}>Explore Topics</p>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+        {cats.map((cat,i)=>{
+          const isA=cat.active;const cp=isA?filled:cat.prog;
+          return <div key={cat.name} style={{
+            background:KID.card,borderRadius:20,padding:16,
+            border:`2px solid ${isA&&phase>=2?cat.color+"50":KID.border}`,
+            transform:isA&&phase===2?`scale(1.04) rotate(${1}deg)`:"scale(1) rotate(0deg)",
+            transition:`all .5s ${BOUNCE}`,
+            animation:`popIn .4s ${BOUNCE} ${0.2+i*0.08}s both`,
+            boxShadow:isA&&phase>=2?`0 4px 20px ${cat.color}20`:"none",
+          }}>
+            <div style={{
+              width:44,height:44,borderRadius:14,
+              background:`linear-gradient(135deg,${cat.color}20,${cat.color}10)`,
+              display:"flex",alignItems:"center",justifyContent:"center",marginBottom:10,
+              border:`1.5px solid ${cat.color}30`,
+            }}>
+              <div style={{
+                width:22,height:22,borderRadius:7,background:cat.color,
+                transform:isA&&phase===2?"scale(1.15) rotate(8deg)":"scale(1) rotate(0deg)",
+                transition:`transform .5s ${BOUNCE}`,
+              }}/>
+            </div>
+            <p style={{fontSize:14,fontWeight:800,color:KID.text,margin:"0 0 10px"}}>{cat.name}</p>
+            <div style={{display:"flex",gap:4}}>
+              {Array.from({length:cat.total},(_,j)=><div key={j} style={{
+                flex:1,height:4,borderRadius:2,
+                background:j<cp?cat.color:KID.border,
+                transition:`background .2s ease ${j*120}ms, transform .2s ease ${j*120}ms`,
+                transform:isA&&phase===3&&j>=2&&j<cp?"scaleY(2.5)":"scaleY(1)",
+              }}/>)}
+            </div>
+            <p style={{fontSize:11,fontWeight:600,color:KID.dim,margin:"6px 0 0"}}>{cp} of {cat.total}</p>
+          </div>;
+        })}
+      </div>
+
+      {/* Wayfinding trail */}
+      {phase>=4&&<div style={{
+        marginTop:16,padding:18,background:KID.card,borderRadius:20,
+        border:`1px solid ${KID.border}`,animation:`fadeUp .5s ${SOFT} both`,
+        boxShadow:"0 2px 12px rgba(0,0,0,.03)",
+      }}>
+        <p style={{fontSize:11,fontWeight:800,color:KID.dim,textTransform:"uppercase",letterSpacing:1,margin:"0 0 14px"}}>Your path in World News</p>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"center"}}>
+          {[1,2,3,4,5].map(n=><div key={n} style={{display:"flex",alignItems:"center"}}>
+            <div style={{
+              width:32,height:32,borderRadius:16,
+              background:n<=4?`linear-gradient(135deg,${KID.teal},${KID.tealDark})`:KID.border,
+              display:"flex",alignItems:"center",justifyContent:"center",
+              boxShadow:n===4?`0 0 0 3px ${KID.tealGlow}`:"none",
+              animation:n===4?"nodePulse 2s ease-in-out infinite":"none",
+              transition:"all .3s ease",
+            }}>
+              {n<=3&&<svg width="14" height="14" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke="#FFF" strokeWidth="3" fill="none" strokeLinecap="round"/></svg>}
+              {n===4&&<div style={{width:8,height:8,borderRadius:4,background:"#FFF"}}/>}
+            </div>
+            {n<5&&<div style={{width:20,height:3,borderRadius:2,background:n<=3?KID.teal:KID.border,transition:"background .3s ease"}}/>}
+          </div>)}
+        </div>
+      </div>}
+    </div>
+
+    <style>{`
+      @keyframes popIn{from{opacity:0;transform:scale(.75)}to{opacity:1;transform:scale(1)}}
+      @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+      @keyframes nodePulse{0%,100%{box-shadow:0 0 0 3px rgba(45,212,191,.2)}50%{box-shadow:0 0 0 6px rgba(45,212,191,0)}}
+    `}</style>
+  </div>;
+}
+
+// ── TAB BAR ────────────────────────────────────────────────────────────
+function KidTab(){
+  const[active,setActive]=useState(0);
+  const tabs=[{l:"Home"},{l:"Explore"},{l:"Profile"}];
+  return <div style={{height:66,display:"flex",alignItems:"center",justifyContent:"center",background:KID.bg,borderTop:`1px solid ${KID.border}`,padding:"0 20px",gap:6}}>
+    {tabs.map((t,i)=><button key={t.l} onClick={()=>setActive(i)} style={{
+      flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,
+      background:active===i?KID.teal:"transparent",
+      border:"none",borderRadius:100,padding:"10px 0",cursor:"pointer",
+      transition:`all .35s ${BOUNCE}`,fontFamily:"inherit",
+      boxShadow:active===i?`0 2px 12px ${KID.tealGlow}`:"none",
+    }}>
+      <span style={{fontSize:12,fontWeight:700,color:active===i?"#FFF":KID.dim}}>{t.l}</span>
+    </button>)}
+  </div>;
+}
+
+ReactDOM.render(<App/>,document.getElementById("root"));
+</script>
+</body>
+</html>

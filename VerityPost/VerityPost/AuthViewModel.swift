@@ -1,0 +1,488 @@
+import Foundation
+import Supabase
+
+// @migrated-to-permissions 2026-04-18
+// @feature-verified system_auth 2026-04-18
+
+@MainActor
+final class AuthViewModel: ObservableObject {
+    @Published var isLoggedIn = false
+    @Published var isLoading = true
+    @Published var currentUser: VPUser?
+    @Published var authError: String?
+
+    /// True when signup completed but the email has not yet been verified.
+    /// ContentView uses this to show VerifyEmailView instead of the tab bar.
+    @Published var needsEmailVerification = false
+
+    /// Email the user signed up with, surfaced on the verify screen so they
+    /// know which inbox to check.
+    @Published var pendingVerificationEmail: String?
+
+    /// True when a Supabase password-recovery deep link has been opened and
+    /// a recovery session is active. ContentView uses this to present the
+    /// ResetPasswordView.
+    @Published var isRecoveringPassword = false
+
+    /// Set to true when the session listener reports an unexpected signout
+    /// (e.g., token refresh failure). MainTabView uses this to show a
+    /// "session expired" banner so the user knows why they were bounced.
+    @Published var sessionExpired = false
+    /// If the splash stalls (network down, Supabase unreachable), expose this
+    /// so the UI can offer a retry rather than spinning forever.
+    @Published var splashTimedOut = false
+
+    private let client = SupabaseManager.shared.client
+    private var authStateTask: Task<Void, Never>?
+    private var subscriptionObserver: NSObjectProtocol?
+    private var wasLoggedIn = false
+
+    init() {
+        // Refresh the cached user row whenever StoreKit / restore posts a
+        // change notification so the UI's plan badge and tier gates
+        // update immediately after purchase.
+        subscriptionObserver = NotificationCenter.default.addObserver(
+            forName: .vpSubscriptionDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { [weak self] in
+                guard let self, let uid = self.currentUser?.id else { return }
+                await self.loadUser(id: uid)
+            }
+        }
+    }
+
+    deinit {
+        authStateTask?.cancel()
+        if let subscriptionObserver {
+            NotificationCenter.default.removeObserver(subscriptionObserver)
+        }
+    }
+
+    // MARK: - Check session on launch
+
+    func checkSession() async {
+        // Guarantee the splash never hangs forever. After 10s we drop the
+        // loading state and let the UI render (anon mode), exposing a flag
+        // the caller can use to surface a retry affordance.
+        let timeoutTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 10 * 1_000_000_000)
+            guard let self else { return }
+            await MainActor.run {
+                if self.isLoading {
+                    self.splashTimedOut = true
+                    self.isLoading = false
+                }
+            }
+        }
+
+        do {
+            let session = try await client.auth.session
+            await loadUser(id: session.user.id.uuidString)
+            isLoggedIn = true
+            wasLoggedIn = true
+        } catch {
+            isLoggedIn = false
+        }
+        timeoutTask.cancel()
+        isLoading = false
+        splashTimedOut = false
+        startAuthStateListener()
+    }
+
+    /// Called from the splash-timeout UI to retry session resolution.
+    func retrySession() async {
+        isLoading = true
+        splashTimedOut = false
+        await checkSession()
+    }
+
+    // MARK: - Auth state listener
+
+    /// Listens for token expiry / remote signout / refresh so UI reflects server-side changes.
+    private func startAuthStateListener() {
+        guard authStateTask == nil else { return }
+        let client = self.client
+        authStateTask = Task { [weak self] in
+            for await (event, session) in client.auth.authStateChanges {
+                guard let self else { return }
+                switch event {
+                case .signedOut, .userDeleted:
+                    // If we were previously signed in and didn't request this
+                    // (e.g., token expired, remote signout), surface an
+                    // expiration banner. The logout() method clears this by
+                    // setting currentUser/isLoggedIn itself before the event
+                    // fires.
+                    let wasSignedIn = self.wasLoggedIn
+                    self.currentUser = nil
+                    self.isLoggedIn = false
+                    self.wasLoggedIn = false
+                    if wasSignedIn {
+                        self.sessionExpired = true
+                    }
+                case .tokenRefreshed, .signedIn, .initialSession:
+                    if let uid = session?.user.id.uuidString {
+                        await self.loadUser(id: uid)
+                        self.isLoggedIn = true
+                        self.wasLoggedIn = true
+                        self.sessionExpired = false
+                    }
+                default:
+                    break
+                }
+            }
+        }
+    }
+
+    // MARK: - Login
+
+    func login(email: String, password: String) async {
+        authError = nil
+        do {
+            let session = try await client.auth.signIn(email: email, password: password)
+
+            // Round 5 Item 2: best-effort last_login_at update via the
+            // update_own_profile SECDEF RPC (replaces direct users.update).
+            // Still best-effort; failure does not block login.
+            do {
+                struct Args: Encodable { let p_fields: Patch }
+                struct Patch: Encodable { let last_login_at: String }
+                try await client.rpc(
+                    "update_own_profile",
+                    params: Args(p_fields: Patch(last_login_at: ISO8601DateFormatter().string(from: Date())))
+                ).execute()
+            } catch {
+                Log.d("last_login_at update failed: \(error)")
+            }
+
+            // D40: silent welcome-back — if the account is still inside the
+            // 30-day deletion grace window, clear the timer. POST the session
+            // access token to the web hook endpoint (which uses the service
+            // role to call cancel_account_deletion). Best-effort; no UI.
+            await cancelDeletionOnLogin(accessToken: session.accessToken)
+
+            await loadUser(id: session.user.id.uuidString)
+            isLoggedIn = true
+        } catch {
+            // Distinguish network errors from bad credentials.
+            let nsError = error as NSError
+            if nsError.domain == NSURLErrorDomain {
+                authError = "Network error. Check your connection and try again."
+            } else {
+                authError = "Invalid email or password"
+            }
+        }
+    }
+
+    // MARK: - Signup
+
+    func signup(
+        email: String,
+        password: String,
+        username: String,
+        ageConfirmed: Bool,
+        termsAccepted: Bool
+    ) async {
+        authError = nil
+
+        // Web parity: both checkboxes must be true before we create an
+        // account. COPPA age gate + explicit terms acceptance (Bug 7).
+        guard ageConfirmed else {
+            authError = "Please confirm you are 13 or older to continue."
+            return
+        }
+        guard termsAccepted else {
+            authError = "Please accept the Terms of Service and Privacy Policy."
+            return
+        }
+
+        // Normalize + validate username client-side before touching auth.
+        let normalized = username
+            .lowercased()
+            .trimmingCharacters(in: .whitespaces)
+            .filter { $0.isLetter || $0.isNumber || $0 == "_" }
+        guard normalized.count >= 3 else {
+            authError = "Username must be at least 3 characters (letters, numbers, underscores)."
+            return
+        }
+
+        do {
+            // Reject if username is reserved OR already taken.
+            struct Row: Decodable { let username: String? }
+            let reserved: [Row] = (try? await client.from("reserved_usernames")
+                .select("username")
+                .eq("username", value: normalized)
+                .limit(1)
+                .execute().value) ?? []
+            if !reserved.isEmpty {
+                authError = "That username is reserved. Try a different one."
+                return
+            }
+            struct UserRow: Decodable { let username: String? }
+            let taken: [UserRow] = (try? await client.from("users")
+                .select("username")
+                .eq("username", value: normalized)
+                .limit(1)
+                .execute().value) ?? []
+            if !taken.isEmpty {
+                authError = "That username is already taken."
+                return
+            }
+
+            let result = try await client.auth.signUp(email: email, password: password)
+            let userId = result.user.id.uuidString
+
+            // Insert user row. v2 schema: users.plan_id is FK to plans
+            // (defaults to free server-side); users has no `role` column —
+            // roles live in the `user_roles` junction — and no bare `streak`
+            // column (streak_current/_best/_freeze_remaining exist instead,
+            // all defaulted server-side).
+            struct UserUpsert: Encodable {
+                let id: String
+                let email: String
+                let username: String
+            }
+
+            try await client.from("users")
+                .upsert(UserUpsert(id: userId, email: email, username: normalized), onConflict: "id")
+                .execute()
+
+            // The default 'user' role and plan_id=free are seeded by the
+            // on_auth_user_created trigger (handle_new_auth_user function).
+            // user_roles has admin-only INSERT RLS, so the client cannot
+            // write here — and does not need to.
+
+            // When Supabase has email confirmation enabled, signUp returns a
+            // user but no active session — the UI must hold on VerifyEmailView
+            // until the confirmation link is clicked. If confirmation is off,
+            // the session is already active and we can treat signup like login.
+            let hasSession = (try? await client.auth.session) != nil
+            if hasSession {
+                await loadUser(id: userId)
+                isLoggedIn = true
+            } else {
+                needsEmailVerification = true
+                pendingVerificationEmail = email
+            }
+        } catch {
+            authError = Self.friendlyAuthError(error)
+        }
+    }
+
+    /// Resend the email verification link. Called from VerifyEmailView when
+    /// the user didn't receive the first email.
+    func resendVerificationEmail() async -> Bool {
+        guard let email = pendingVerificationEmail else { return false }
+        do {
+            try await client.auth.resend(email: email, type: .signup)
+            return true
+        } catch {
+            authError = "Could not resend verification email."
+            return false
+        }
+    }
+
+    /// Handle a deep-link URL that Supabase sent for password recovery or
+    /// email verification. The URL fragment contains access_token,
+    /// refresh_token, and type (e.g., "recovery" or "signup").
+    func handleDeepLink(_ url: URL) async {
+        guard let fragment = url.fragment ?? url.query else { return }
+        var params: [String: String] = [:]
+        for pair in fragment.split(separator: "&") {
+            let kv = pair.split(separator: "=", maxSplits: 1).map(String.init)
+            if kv.count == 2 {
+                params[kv[0]] = kv[1].removingPercentEncoding ?? kv[1]
+            }
+        }
+        guard let access = params["access_token"],
+              let refresh = params["refresh_token"] else { return }
+        do {
+            let session = try await client.auth.setSession(
+                accessToken: access,
+                refreshToken: refresh
+            )
+            let type = params["type"] ?? ""
+            if type == "recovery" {
+                // Present the reset-password screen; do NOT mark
+                // isLoggedIn true — the user has a scoped recovery session,
+                // not a full sign-in. They'll land on the main app once the
+                // password is updated.
+                isRecoveringPassword = true
+            } else {
+                // Signup confirmation or magic link — treat as a normal login.
+                await loadUser(id: session.user.id.uuidString)
+                isLoggedIn = true
+                needsEmailVerification = false
+                pendingVerificationEmail = nil
+            }
+        } catch {
+            Log.d("Deep link session failed: \(error)")
+        }
+    }
+
+    /// Submit a new password after the user followed a recovery link.
+    /// Returns true on success; UI clears `isRecoveringPassword` and
+    /// transitions to the main app.
+    func updatePassword(_ newPassword: String) async -> Bool {
+        do {
+            _ = try await client.auth.update(user: UserAttributes(password: newPassword))
+            isRecoveringPassword = false
+            // Session is active from the recovery link — load the user row
+            // so the app state reflects a full sign-in.
+            if let session = try? await client.auth.session {
+                await loadUser(id: session.user.id.uuidString)
+                isLoggedIn = true
+            }
+            return true
+        } catch {
+            authError = "Could not update your password. Try again."
+            return false
+        }
+    }
+
+    /// Map the handful of common Supabase / network errors onto short,
+    /// human-readable strings. Anything we don't recognize falls back to a
+    /// generic "couldn't create account" copy so we never leak raw SDK text.
+    private static func friendlyAuthError(_ error: Error) -> String {
+        let nsError = error as NSError
+        if nsError.domain == NSURLErrorDomain {
+            return "Network error. Check your connection and try again."
+        }
+        let msg = error.localizedDescription.lowercased()
+        if msg.contains("already registered") || msg.contains("already exists") || msg.contains("duplicate") {
+            return "That email is already registered. Try signing in instead."
+        }
+        if msg.contains("invalid email") {
+            return "That email doesn\u{2019}t look right. Double-check it and try again."
+        }
+        if msg.contains("password") && (msg.contains("short") || msg.contains("weak") || msg.contains("at least")) {
+            return "Password is too short. Use at least 8 characters."
+        }
+        if msg.contains("rate limit") {
+            return "Too many attempts. Wait a minute and try again."
+        }
+        return "Couldn\u{2019}t create your account. Please try again."
+    }
+
+    // MARK: - Logout
+
+    func logout() async {
+        // Always clear local state — user intent is unambiguous.
+        // But surface signOut failures so the server-side session isn't silently left alive.
+        wasLoggedIn = false
+        sessionExpired = false
+        do {
+            try await client.auth.signOut()
+        } catch {
+            Log.d("signOut failed: \(error)")
+            authError = "Signed out locally, but the server session may still be active."
+        }
+        // Reset every @Published auth-adjacent field so a subsequent login
+        // as a different account doesn't inherit stale state (Bug 27).
+        currentUser = nil
+        isLoggedIn = false
+        needsEmailVerification = false
+        pendingVerificationEmail = nil
+        isRecoveringPassword = false
+    }
+
+    // MARK: - Login hooks
+
+    /// POST to /api/account/login-cancel-deletion with the current session
+    /// access token so the server's service-role client can call
+    /// cancel_account_deletion for us. Idempotent — no-op when no deletion
+    /// is scheduled. Best-effort: a failure here must never block login.
+    private func cancelDeletionOnLogin(accessToken: String) async {
+        let url = SupabaseManager.shared.siteURL.appendingPathComponent("api/account/login-cancel-deletion")
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        do {
+            _ = try await URLSession.shared.data(for: req)
+        } catch {
+            Log.d("login cancel-deletion hook failed: \(error)")
+        }
+    }
+
+    // MARK: - Sign in with Apple
+
+    /// Sign in via Apple's OAuth provider. Launches `ASWebAuthenticationSession`
+    /// and hands the callback back to the Swift SDK, which resolves a session.
+    /// App Store Review Guideline 4.8 requires Sign in with Apple when any
+    /// third-party login is offered, so this is the minimum iOS OAuth surface.
+    func signInWithApple() async {
+        authError = nil
+        do {
+            _ = try await client.auth.signInWithOAuth(
+                provider: .apple,
+                redirectTo: URL(string: "verity://login")
+            )
+            // signInWithOAuth resolves a Session — let the auth state listener
+            // and loadUser path populate `currentUser` / `isLoggedIn`.
+            if let session = try? await client.auth.session {
+                await loadUser(id: session.user.id.uuidString)
+                isLoggedIn = true
+            }
+        } catch {
+            authError = "Sign in with Apple failed. Try again."
+        }
+    }
+
+    /// Sign in via Google's OAuth provider. Same `ASWebAuthenticationSession`
+    /// path as Apple. Matches web signup's Google option (Bug 21 parity).
+    func signInWithGoogle() async {
+        authError = nil
+        do {
+            _ = try await client.auth.signInWithOAuth(
+                provider: .google,
+                redirectTo: URL(string: "verity://login")
+            )
+            if let session = try? await client.auth.session {
+                await loadUser(id: session.user.id.uuidString)
+                isLoggedIn = true
+            }
+        } catch {
+            authError = "Sign in with Google failed. Try again."
+        }
+    }
+
+    // MARK: - Reset password
+
+    func resetPassword(email: String) async -> Bool {
+        do {
+            // Deep-link back into the iOS app so the recovery session is
+            // handled by `handleDeepLink`, not opened in Safari against the
+            // web reset-password page (Bug 11). The `verity://` scheme is
+            // registered via `project.yml` -> CFBundleURLTypes.
+            try await client.auth.resetPasswordForEmail(
+                email,
+                redirectTo: URL(string: "verity://reset-password")
+            )
+            return true
+        } catch {
+            authError = "Could not send reset email"
+            return false
+        }
+    }
+
+    // MARK: - Load user profile
+
+    func loadUser(id: String) async {
+        // v2: tier lives on the joined plans table — without the join,
+        // every user shows up as "free" and tier-gated UI (Kids row,
+        // Messages, Recap, etc.) never appears.
+        do {
+            let response: VPUser = try await client.from("users")
+                .select("*, plans(tier)")
+                .eq("id", value: id)
+                .single()
+                .execute()
+                .value
+            currentUser = response
+        } catch {
+            Log.d("Failed to load user: \(error)")
+        }
+    }
+}
