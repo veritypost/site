@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { ADMIN_ROLES } from '@/lib/roles';
 import DestructiveActionConfirm from '@/components/admin/DestructiveActionConfirm';
 
 import Page, { PageHeader } from '@/components/admin/Page';
@@ -116,7 +117,7 @@ function ModerationConsoleInner() {
         .map((r) => (r as { roles: { name: string | null; hierarchy_level: number | null } | null }).roles)
         .filter((r): r is { name: string | null; hierarchy_level: number | null } => Boolean(r));
       const names = roleRows.map((r) => r.name).filter((n): n is string => Boolean(n));
-      const admin = names.some((n) => ['admin', 'superadmin', 'owner'].includes(n));
+      const admin = names.some((n) => ADMIN_ROLES.has(n));
       const mod = admin || names.some((n) => ['moderator', 'editor'].includes(n));
       const maxLevel = Math.max(
         0,

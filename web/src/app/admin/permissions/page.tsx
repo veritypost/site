@@ -15,6 +15,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { ADMIN_ROLES } from '@/lib/roles';
 import DestructiveActionConfirm from '@/components/admin/DestructiveActionConfirm';
 
 import Page, { PageHeader } from '@/components/admin/Page';
@@ -136,7 +137,7 @@ export default function AdminPermissionsPage() {
         .eq('user_id', user.id);
       const names = ((userRoles || []) as Array<{ roles: { name: string } | null }>)
         .map((r) => r.roles?.name).filter(Boolean) as string[];
-      if (!names.some((n) => ['owner', 'superadmin', 'admin'].includes(n))) {
+      if (!names.some((n) => ADMIN_ROLES.has(n))) {
         router.push('/');
         return;
       }

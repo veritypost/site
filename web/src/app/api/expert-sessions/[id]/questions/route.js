@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { requirePermission, getUserRoles } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { MOD_ROLES } from '@/lib/roles';
 
 // GET  — list approved questions for the session. kid_profiles identity
 //        is attached only for privileged viewers: the assigned expert for
@@ -28,7 +29,7 @@ export async function GET(_request, { params }) {
 
   const roleRows = await getUserRoles(null, user.id);
   const roleNames = roleRows.map((r) => r.name);
-  const isAdmin = roleNames.some((n) => ['admin', 'superadmin', 'owner', 'editor', 'moderator'].includes(n));
+  const isAdmin = roleNames.some((n) => MOD_ROLES.has(n));
   const isAssignedExpert = session?.expert_id === user.id;
 
   const { data, error } = await service

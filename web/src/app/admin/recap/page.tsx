@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/client';
+import { EDITOR_ROLES } from '@/lib/roles';
 import DestructiveActionConfirm from '@/components/admin/DestructiveActionConfirm';
 import Page, { PageHeader } from '@/components/admin/Page';
 import PageSection from '@/components/admin/PageSection';
@@ -73,7 +74,7 @@ function RecapInner() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/'); return; }
       const { data: r } = await supabase.from('user_roles').select('roles(name)').eq('user_id', user.id);
-      const ok = (r || []).some((x: any) => ['editor', 'admin', 'superadmin', 'owner'].includes(x.roles?.name));
+      const ok = (r || []).some((x: any) => EDITOR_ROLES.has(x.roles?.name));
       if (!ok) { router.push('/'); return; }
       setAuthorized(true);
       const [recRes, catRes] = await Promise.all([

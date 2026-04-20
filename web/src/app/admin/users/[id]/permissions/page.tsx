@@ -33,9 +33,8 @@ import Spinner from '@/components/admin/Spinner';
 import EmptyState from '@/components/admin/EmptyState';
 import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C, F, S } from '@/lib/adminPalette';
+import { ADMIN_ROLES } from '@/lib/roles';
 import type { Tables } from '@/types/database-helpers';
-
-const MOD_ROLES = ['owner', 'superadmin', 'admin'];
 
 // Color map used inline for the granted_via Badge fallback palette.
 // The shared Badge variants handle neutral/success/warn/danger/info —
@@ -128,7 +127,7 @@ export default function UserPermissionsPage() {
         .eq('user_id', user.id);
       const names = ((userRoles || []) as Array<{ roles: { name: string } | null }>)
         .map((r) => r.roles?.name).filter(Boolean) as string[];
-      if (!names.some((n) => MOD_ROLES.includes(n))) {
+      if (!names.some((n) => ADMIN_ROLES.has(n))) {
         router.push('/');
         return;
       }

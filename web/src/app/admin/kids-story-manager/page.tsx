@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { EDITOR_ROLES } from '@/lib/roles';
 import DestructiveActionConfirm from '@/components/admin/DestructiveActionConfirm';
 import type { Tables } from '@/types/database-helpers';
 
@@ -130,7 +131,7 @@ function KidsStoryManagerInner() {
       const roleNames = (userRoles || [])
         .map((r) => (r as { roles?: { name?: string | null } | null }).roles?.name)
         .filter((n): n is string => Boolean(n));
-      if (!profile || !['editor', 'admin', 'owner', 'superadmin'].some((r) => roleNames.includes(r))) {
+      if (!profile || !roleNames.some((r) => EDITOR_ROLES.has(r))) {
         router.push('/');
         return;
       }

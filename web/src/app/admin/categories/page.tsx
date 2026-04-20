@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { EDITOR_ROLES } from '@/lib/roles';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 import type { Tables } from '@/types/database-helpers';
 import Page, { PageHeader } from '@/components/admin/Page';
@@ -88,8 +89,7 @@ export default function CategoriesAdmin() {
           return rel?.name;
         })
         .filter(Boolean) as string[];
-      const allowed = ['owner', 'superadmin', 'admin', 'editor'];
-      if (!allowed.some((r) => roleNames.includes(r))) {
+      if (!roleNames.some((r) => EDITOR_ROLES.has(r))) {
         router.push('/');
         return;
       }

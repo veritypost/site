@@ -10,6 +10,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { ADMIN_ROLES } from '@/lib/roles';
 
 import Page, { PageHeader } from '@/components/admin/Page';
 import PageSection from '@/components/admin/PageSection';
@@ -61,7 +62,7 @@ export default function SettingsAdminPage() {
         .eq('user_id', user.id);
       const names = ((roleRows || []) as Array<{ roles: { name: string } | null }>)
         .map((r) => r.roles?.name).filter(Boolean) as string[];
-      if (!names.some((n) => ['admin', 'superadmin', 'owner'].includes(n))) {
+      if (!names.some((n) => ADMIN_ROLES.has(n))) {
         router.push('/'); return;
       }
       setAuthorized(true);

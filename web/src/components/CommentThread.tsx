@@ -7,6 +7,7 @@ import CommentComposer from './CommentComposer';
 import CommentRow, { EnrichedComment } from './CommentRow';
 import { useFocusTrap } from '../lib/useFocusTrap';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
+import { MOD_ROLES } from '@/lib/roles';
 import type { Database } from '@/types/database';
 
 type CommentDb = Database['public']['Tables']['comments']['Row'];
@@ -133,7 +134,7 @@ export default function CommentThread({
         .from('user_roles').select('roles(name)').eq('user_id', currentUserId);
       const names = ((roleRows || []) as Array<{ roles: { name?: string } | null }>)
         .map((r) => r.roles?.name).filter((n): n is string => !!n);
-      setViewerIsModerator(names.some((n) => ['moderator', 'editor', 'admin', 'superadmin', 'owner'].includes(n)));
+      setViewerIsModerator(names.some((n) => MOD_ROLES.has(n)));
     }
 
     if (canViewScore && articleCategoryId && userIds.length > 0) {

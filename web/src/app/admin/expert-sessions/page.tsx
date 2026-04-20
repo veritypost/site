@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { EDITOR_ROLES } from '@/lib/roles';
 import type { Tables } from '@/types/database-helpers';
 
 import Page, { PageHeader } from '@/components/admin/Page';
@@ -77,7 +78,7 @@ function ExpertSessionsInner() {
       const names = (userRoles || [])
         .map((r) => (r as { roles?: { name?: string | null } | null }).roles?.name)
         .filter((n): n is string => Boolean(n));
-      if (!names.some((n) => ['editor', 'admin', 'superadmin', 'owner'].includes(n))) {
+      if (!names.some((n) => EDITOR_ROLES.has(n))) {
         router.push('/');
         return;
       }

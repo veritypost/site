@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
-import { MOD_ROLES } from '@/lib/roles';
+import { ADMIN_ROLES, MOD_ROLES } from '@/lib/roles';
 import type { Tables } from '@/types/database-helpers';
 import Page, { PageHeader } from '@/components/admin/Page';
 import PageSection from '@/components/admin/PageSection';
@@ -115,7 +115,7 @@ export default function AdminHubPage() {
           return rel?.name;
         })
         .filter(Boolean) as string[];
-      const isAdmin = ['owner', 'superadmin', 'admin'].some((r) => roleNames.includes(r));
+      const isAdmin = roleNames.some((r) => ADMIN_ROLES.has(r));
       const isMod = roleNames.some((r) => MOD_ROLES.has(r));
       if (!isAdmin && !isMod) {
         router.push('/');

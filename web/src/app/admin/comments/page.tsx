@@ -13,6 +13,7 @@ import Spinner from '@/components/admin/Spinner';
 import { confirm, ConfirmDialogHost } from '@/components/admin/ConfirmDialog';
 import { ToastProvider, useToast } from '@/components/admin/Toast';
 import { ADMIN_C, F, S } from '@/lib/adminPalette';
+import { EDITOR_ROLES } from '@/lib/roles';
 
 // Discussion settings page. All toggles map to rows in the `settings`
 // key/value table. `quiz_required` is the canonical platform-wide
@@ -129,7 +130,7 @@ function CommentsAdminInner() {
       const roleNames = (userRoles || [])
         .map((r) => (r as { roles?: { name?: string | null } | null }).roles?.name)
         .filter((n): n is string => Boolean(n));
-      if (!profile || !['owner', 'superadmin', 'admin', 'editor'].some((r) => roleNames.includes(r))) {
+      if (!profile || !roleNames.some((r) => EDITOR_ROLES.has(r))) {
         router.push('/');
         return;
       }

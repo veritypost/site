@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { requirePermission, getUserRoles } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { EDITOR_ROLES } from '@/lib/roles';
 
 // POST — expert answers a kid question (approves it at the same time).
 // Editor/admin can also answer/approve for moderation purposes.
@@ -15,7 +16,9 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // platform. The fix scopes the write to (a) the expert assigned to the
 // question's session, or (b) an editor/admin acting in a moderation
 // capacity.
-const MOD_ROLES = new Set(['editor', 'admin', 'superadmin', 'owner']);
+// T-019: previously a mis-labeled local `MOD_ROLES` Set whose contents
+// were actually EDITOR_ROLES (no moderator role). Using the canonical
+// EDITOR_ROLES export preserves behaviour and names it correctly.
 
 export async function POST(request, { params }) {
   let user;
@@ -50,7 +53,7 @@ export async function POST(request, { params }) {
   const isOwnSession = session.expert_id === user.id;
   if (!isOwnSession) {
     const roles = await getUserRoles(null, user.id);
-    const isMod = (roles || []).some((r) => MOD_ROLES.has(r.name?.toLowerCase?.()));
+    const isMod = (roles || []).some((r) => EDITOR_ROLES.has(r.name?.toLowerCase?.()));
     if (!isMod) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

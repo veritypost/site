@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { MOD_ROLES } from '@/lib/roles';
 import DestructiveActionConfirm from '@/components/admin/DestructiveActionConfirm';
 
 import Page, { PageHeader } from '@/components/admin/Page';
@@ -82,7 +83,7 @@ function ReportsAdminInner() {
       const names = (userRoles || [])
         .map((r) => (r as { roles?: { name?: string | null } | null }).roles?.name)
         .filter((n): n is string => Boolean(n));
-      if (!names.some((n) => ['moderator', 'editor', 'admin', 'superadmin', 'owner'].includes(n))) {
+      if (!names.some((n) => MOD_ROLES.has(n))) {
         router.push('/');
         return;
       }
