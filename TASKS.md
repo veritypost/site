@@ -32,8 +32,8 @@ A fresh agent picks the top unchecked task, reads file:line, does the work, clos
 - `? UNCERTAIN` + tag `needs-live-check` = Agent 3 could not verify; re-verify before acting
 
 ## Task counts
-- P0: 9 · P1: 25 · P2: 30 · P3: 23 · P4: 6 · **Total: 93**
-- DB-DRIFT: 19 · SCHEMA: 6 · SECURITY: 12 · IOS: 11 · MIGRATION-DRIFT: 4 · A11Y: 3 · UX: 13 · CODE: 23
+- P0: 8 · P1: 25 · P2: 30 · P3: 23 · P4: 6 · **Total: 92**
+- DB-DRIFT: 19 · SCHEMA: 6 · SECURITY: 11 · IOS: 11 · MIGRATION-DRIFT: 4 · A11Y: 3 · UX: 13 · CODE: 23
 - Unverified (needs live-check): 22
 
 ---
@@ -53,13 +53,6 @@ A fresh agent picks the top unchecked task, reads file:line, does the work, clos
 **Why**: 7–11 applied migrations have no disk file (grant_anon_free_comments_view, create_banners_storage_bucket, deactivate_unused_ios_keys, drop_ticket_messages_body_html, add_require_outranks_rpc, 092_rls_lockdown, 092b_rls_lockdown_followup, 093_rpc_actor_lockdown, 095_banners_bucket_lockdown, 096_function_search_path_hygiene ×2). Clean bootstrap diverges from live. Duplicate `096_function_search_path_hygiene` at two timestamps (DR blocker).
 **Do**: Pull SQL via `schema_migrations.statements`; commit to `schema/` w/ matching numbers; rename dup 096 → `_v2`.
 **Accept**: Every `list_migrations` row has disk twin; unique names.
-
-### T-005 — Admin user DELETE is client-side, bypasses `require_outranks`
-**Priority**: P0  **Effort**: L  **Lens**: SECURITY  **Source**: A1:T-015 + A2:G-049 + A3:NEW-006
-**File**: `web/src/app/admin/users/page.tsx:273-290` (TODO at :280)
-**Why**: Client calls `supabase.from('users').delete()` with user JWT; `require_outranks(target_user_id uuid)` RPC exists but never invoked. Lower-ranked admin could delete higher-ranked user.
-**Do**: New `/api/admin/users/[id]` DELETE route w/ service-client; call `require_outranks` + `record_admin_action` audit.
-**Accept**: No direct `users.delete()` in `admin/`; delete path audited.
 
 ### T-007 — HIBP compromised-password toggle
 **Priority**: P0  **Effort**: OWNER  **Lens**: SECURITY  **Source**: A1:T-067
