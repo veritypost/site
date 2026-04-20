@@ -3,7 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
-import { permissionError, recordAdminAction } from '@/lib/adminMutation';
+import { permissionError, recordAdminAction, requireAdminOutranks } from '@/lib/adminMutation';
 
 type Body = { achievement_name?: string };
 
@@ -14,7 +14,11 @@ export async function POST(request: Request, { params }: { params: { id: string 
   let actor;
   try { actor = await requirePermission('admin.users.award_achievement'); }
   catch (err) { return permissionError(err); }
-  void actor;
+
+  // Rank guard: achievements appear on the profile + leaderboard, so
+  // griefing a higher-ranked admin with spurious awards is visible UX.
+  const rankErr = await requireAdminOutranks(targetId, actor.id);
+  if (rankErr) return rankErr;
 
   const body = (await request.json().catch(() => ({}))) as Body;
   const name = typeof body.achievement_name === 'string' ? body.achievement_name.trim() : '';

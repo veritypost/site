@@ -4,7 +4,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
-import { permissionError, recordAdminAction } from '@/lib/adminMutation';
+import { permissionError, recordAdminAction, requireAdminOutranks } from '@/lib/adminMutation';
 
 export async function DELETE(
   _request: Request,
@@ -19,7 +19,11 @@ export async function DELETE(
   let actor;
   try { actor = await requirePermission('admin.users.devices.unlink'); }
   catch (err) { return permissionError(err); }
-  void actor;
+
+  // Rank guard: unlinking a device force-signs-out the target, which
+  // is a real escalation surface against a higher-ranked admin.
+  const rankErr = await requireAdminOutranks(targetId, actor.id);
+  if (rankErr) return rankErr;
 
   const service = createServiceClient();
   const { error } = await service

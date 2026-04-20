@@ -4,10 +4,14 @@
 // notification row for every user in one click. Gating this with a
 // permission + service-role + audit is the whole point of T-005.
 //
-// Permission: `admin.broadcasts.breaking.send` — nearest existing key.
-// Follow-up: seed a dedicated `admin.notifications.broadcast` key and
-// swap in here; the current choice is semantically close enough that
-// existing admin sets already grant it.
+// Permission: `admin.settings.edit`. A dedicated
+// `admin.notifications.broadcast` key is the right long-term fit but
+// doesn't exist yet; `admin.settings.edit` is restrictive (admin+) and
+// semantically close — "admin controls platform-wide config" maps to
+// "admin sends platform-wide notifications" better than
+// `admin.broadcasts.breaking.send` (which we previously considered but
+// is article-bound and would over-grant to breaking-news-only roles).
+// Seed the dedicated key in a follow-up and swap here.
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
@@ -25,7 +29,7 @@ const ALLOWED_TYPES = new Set(['system', 'breaking', 'achievement', 'streak', 'a
 
 export async function POST(request: Request) {
   let actor;
-  try { actor = await requirePermission('admin.broadcasts.breaking.send'); }
+  try { actor = await requirePermission('admin.settings.edit'); }
   catch (err) { return permissionError(err); }
 
   const body = (await request.json().catch(() => ({}))) as Body;

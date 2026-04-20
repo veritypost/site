@@ -398,9 +398,12 @@ function KidsStoryManagerInner() {
           quizzes: quizzes.filter((q) => q.question).map((q, i) => ({
             title: story.title + ' Q' + (i + 1),
             question_text: q.question,
+            question_type: 'multiple_choice',
             options: q.options || [],
             explanation: q.explanation || '',
             difficulty: 'standard',
+            sort_order: i,
+            is_active: true,
             points: 10,
           })),
           kids_summary_stamp: currentEntry ? (currentEntry.summary || story.summary || '') : null,
