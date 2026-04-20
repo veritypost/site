@@ -55,6 +55,10 @@ function notFound(msg) {
 function serverError(msg) {
   return NextResponse.json({ error: msg }, { status: 500 });
 }
+function dbError(tag, err, publicMessage) {
+  console.error(`[user-perms] ${tag}:`, err?.message || err);
+  return serverError(publicMessage);
+}
 
 function validExpires(v) {
   if (v === null || v === undefined || v === '') return { ok: true, value: null };
@@ -124,7 +128,7 @@ export async function POST(request, { params }) {
     .select('id')
     .eq('id', targetUserId)
     .maybeSingle();
-  if (targetErr) return serverError(`failed to lookup target user: ${targetErr.message}`);
+  if (targetErr) return dbError('target lookup', targetErr, 'user lookup failed');
   if (!targetUser) return notFound('user not found');
 
   const ip = getRequestIp(request);
@@ -145,7 +149,7 @@ export async function POST(request, { params }) {
         .select('key')
         .eq('key', permission_key)
         .maybeSingle();
-      if (permErr) return serverError(`failed to lookup permission: ${permErr.message}`);
+      if (permErr) return dbError('permission lookup', permErr, 'permission lookup failed');
       if (!permRow) return notFound(`permission not found: ${permission_key}`);
 
       const overrideAction = action === 'grant' ? 'allow' : 'block';
@@ -159,7 +163,7 @@ export async function POST(request, { params }) {
         .eq('scope_id', targetUserId)
         .eq('permission_key', permission_key)
         .maybeSingle();
-      if (exErr) return serverError(`failed to lookup existing override: ${exErr.message}`);
+      if (exErr) return dbError('override lookup', exErr, 'override lookup failed');
 
       if (existing) {
         const { error: updErr } = await service
@@ -171,7 +175,7 @@ export async function POST(request, { params }) {
             created_by: actor.id,
           })
           .eq('id', existing.id);
-        if (updErr) return serverError(`failed to update override: ${updErr.message}`);
+        if (updErr) return dbError('override update', updErr, 'override update failed');
       } else {
         const { error: insErr } = await service
           .from('permission_scope_overrides')
@@ -184,7 +188,7 @@ export async function POST(request, { params }) {
             expires_at: expiresIso,
             created_by: actor.id,
           });
-        if (insErr) return serverError(`failed to insert override: ${insErr.message}`);
+        if (insErr) return dbError('override insert', insErr, 'override insert failed');
       }
 
       auditNewValue = { permission_key, override_action: overrideAction, expires_at: expiresIso };
@@ -198,7 +202,7 @@ export async function POST(request, { params }) {
         .eq('scope_type', 'user')
         .eq('scope_id', targetUserId)
         .eq('permission_key', permission_key);
-      if (delErr) return serverError(`failed to delete override: ${delErr.message}`);
+      if (delErr) return dbError('override delete', delErr, 'override delete failed');
       auditNewValue = { permission_key };
     } else if (action === 'assign_set') {
       if (!set_key || typeof set_key !== 'string') {
@@ -209,7 +213,7 @@ export async function POST(request, { params }) {
         .select('id, key')
         .eq('key', set_key)
         .maybeSingle();
-      if (setErr) return serverError(`failed to lookup set: ${setErr.message}`);
+      if (setErr) return dbError('set lookup', setErr, 'permission set lookup failed');
       if (!setRow) return notFound(`permission_set not found: ${set_key}`);
 
       // Upsert on the composite PK (user_id, permission_set_id).
@@ -226,7 +230,7 @@ export async function POST(request, { params }) {
           },
           { onConflict: 'user_id,permission_set_id' }
         );
-      if (upErr) return serverError(`failed to upsert user_permission_set: ${upErr.message}`);
+      if (upErr) return dbError('set upsert', upErr, 'permission set assignment failed');
       auditNewValue = { set_key, permission_set_id: setRow.id, expires_at: expiresIso };
     } else if (action === 'remove_set') {
       if (!set_key || typeof set_key !== 'string') {
@@ -237,7 +241,7 @@ export async function POST(request, { params }) {
         .select('id, key')
         .eq('key', set_key)
         .maybeSingle();
-      if (setErr) return serverError(`failed to lookup set: ${setErr.message}`);
+      if (setErr) return dbError('set lookup', setErr, 'permission set lookup failed');
       if (!setRow) return notFound(`permission_set not found: ${set_key}`);
 
       const { error: delErr } = await service
@@ -245,11 +249,11 @@ export async function POST(request, { params }) {
         .delete()
         .eq('user_id', targetUserId)
         .eq('permission_set_id', setRow.id);
-      if (delErr) return serverError(`failed to delete user_permission_set: ${delErr.message}`);
+      if (delErr) return dbError('set delete', delErr, 'permission set removal failed');
       auditNewValue = { set_key, permission_set_id: setRow.id };
     }
   } catch (err) {
-    return serverError(`write failed: ${err?.message || String(err)}`);
+    return dbError('write catch', err, 'write failed');
   }
 
   // Bump perms_version so the client re-fetches capabilities.

@@ -90,6 +90,8 @@ function buildCsp(nonce) {
 const PROD_ORIGIN = process.env.NEXT_PUBLIC_SITE_URL || 'https://veritypost.com';
 const ALLOWED_ORIGINS = new Set([
   PROD_ORIGIN,
+  'https://veritypost.com',
+  'https://www.veritypost.com',
   'http://localhost:3000',
   'http://localhost:3333',
 ]);

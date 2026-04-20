@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 // POST /api/expert/apply
 // Body: { application_type, full_name, organization, title, bio,
@@ -16,8 +17,23 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
 
-  const b = await request.json().catch(() => ({}));
   const service = createServiceClient();
+
+  // 5/hr per user — application review is manual; more than a handful an
+  // hour is almost certainly abuse (and inflates the moderator queue).
+  const rate = await checkRateLimit(service, {
+    key: `expert-apply:user:${user.id}`,
+    max: 5,
+    windowSec: 3600,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many applications. Try again later.' },
+      { status: 429, headers: { 'Retry-After': '3600' } },
+    );
+  }
+
+  const b = await request.json().catch(() => ({}));
   const { data, error } = await service.rpc('submit_expert_application', {
     p_user_id: user.id,
     p_application_type: b.application_type,
@@ -33,6 +49,9 @@ export async function POST(request) {
     p_sample_responses: b.sample_responses || [],
     p_category_ids: b.category_ids || [],
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) {
+    console.error('[expert-apply] RPC failed:', error.message);
+    return NextResponse.json({ error: 'Could not submit application.' }, { status: 400 });
+  }
   return NextResponse.json({ application_id: data });
 }

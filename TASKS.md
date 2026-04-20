@@ -32,8 +32,8 @@ A fresh agent picks the top unchecked task, reads file:line, does the work, clos
 - `? UNCERTAIN` + tag `needs-live-check` = Agent 3 could not verify; re-verify before acting
 
 ## Task counts
-- P0: 11 · P1: 30 · P2: 30 · P3: 23 · P4: 6 · **Total: 100**
-- DB-DRIFT: 21 · SCHEMA: 6 · SECURITY: 17 · IOS: 11 · MIGRATION-DRIFT: 4 · A11Y: 3 · UX: 13 · CODE: 23
+- P0: 11 · P1: 25 · P2: 30 · P3: 23 · P4: 6 · **Total: 95**
+- DB-DRIFT: 21 · SCHEMA: 6 · SECURITY: 12 · IOS: 11 · MIGRATION-DRIFT: 4 · A11Y: 3 · UX: 13 · CODE: 23
 - Unverified (needs live-check): 22
 
 ---
@@ -172,18 +172,6 @@ A fresh agent picks the top unchecked task, reads file:line, does the work, clos
 **File**: `VerityPostKids/VerityPostKids/KidReaderView.swift:183-190`
 **Do**: Same as T-020.
 
-### T-022 — `reports/route.js` has no rate limit (comment auto-hide flood)
-**Priority**: P1  **Effort**: 1L  **Lens**: SECURITY  **Source**: A1:T-004
-**File**: `web/src/app/api/reports/route.js`
-**Why**: Authed user can flood reports → auto-hide comments at threshold 3.
-**Do**: Add 10/hr + Retry-After.
-**Accept**: 11th report in hr → 429.
-
-### T-023 — `expert/apply/route.js` has no rate limit
-**Priority**: P1  **Effort**: 1L  **Lens**: SECURITY  **Source**: A1:T-005
-**File**: `web/src/app/api/expert/apply/route.js`
-**Do**: Add 5/hr.
-
 ### T-024 — `kids/[id]` PATCH/DELETE unbounded + accepts DOB without 3–13y bounds
 **Priority**: P1  **Effort**: S  **Lens**: SECURITY  **Source**: A1:T-006,T-009
 **File**: `web/src/app/api/kids/[id]/route.js:30`
@@ -196,18 +184,6 @@ A fresh agent picks the top unchecked task, reads file:line, does the work, clos
 **Why**: Inconsistent ceilings; 13 routes lack Retry-After header.
 **Do**: Pick 5/hr default; emit Retry-After.
 **Accept**: All 13 routes emit header; auth routes share vocabulary.
-
-### T-026 — `resend-verification` response leaks caller IP
-**Priority**: P1  **Effort**: 1L  **Lens**: SECURITY  **Source**: A1:T-008
-**File**: `web/src/app/api/auth/resend-verification/route.js:34`
-**Do**: Drop `ip` from response body.
-**Accept**: Response = `{ok:true}` only.
-
-### T-027 — `ALLOWED_ORIGINS` missing `https://www.veritypost.com`
-**Priority**: P1  **Effort**: 1L  **Lens**: SECURITY  **Source**: A1:T-012
-**File**: `web/src/middleware.js:91-95`; drift with `api/account/delete/route.js:24-32`
-**Do**: Add www to origins; or redirect apex↔www at edge.
-**Accept**: Admin works on both hosts.
 
 ### T-028 — `admin/page.tsx` `restrictedRole` state never consumed
 **Priority**: P1  **Effort**: S  **Lens**: UX  **Source**: A1:T-010
@@ -222,12 +198,6 @@ A fresh agent picks the top unchecked task, reads file:line, does the work, clos
 **Why**: `reason ?? null` + nullable expires → admin grants without audit.
 **Do**: Require both; wrap insert + audit in transaction; only outranked targets.
 **Accept**: Missing reason/expires → 400.
-
-### T-030 — `permissions/route.js` leaks `targetErr.message` at :127
-**Priority**: P1  **Effort**: 1L  **Lens**: SECURITY  **Source**: A1:T-050 (A3 corrected line, was 108)
-**File**: `web/src/app/api/admin/users/[id]/permissions/route.js:127`
-**Do**: Replace with `serverError('perm.lookup.failed')` + `console.error`.
-**Accept**: Response body has no DB error string.
 
 ### T-031 — `page_access` table + `canAccess(key)` for 33 admin pages
 **Priority**: P1  **Effort**: L  **Lens**: DB-DRIFT  **Source**: A1:T-021

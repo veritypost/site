@@ -3,7 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
-import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 // Pass 17 / UJ-719 — server-side resend for the email verification
 // message. Enforces a real rate limit (max 3/hour per user) so the
@@ -14,14 +14,16 @@ export async function POST() {
   catch { return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 }); }
 
   const supabase = await createClient();
-  const ip = await getClientIp();
   const hit = await checkRateLimit(supabase, {
     key: `resend_verify:user:${user.id}`,
     max: 3,
     windowSec: 3600,
   });
   if (hit.limited) {
-    return NextResponse.json({ error: 'Too many verification resends. Try again in an hour.' }, { status: 429 });
+    return NextResponse.json(
+      { error: 'Too many verification resends. Try again in an hour.' },
+      { status: 429, headers: { 'Retry-After': '3600' } },
+    );
   }
 
   const { data: { user: authUser } } = await supabase.auth.getUser();
@@ -29,7 +31,10 @@ export async function POST() {
   if (!email) return NextResponse.json({ error: 'Session has no email' }, { status: 400 });
 
   const { error } = await supabase.auth.resend({ type: 'signup', email });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) {
+    console.error('[resend-verify] auth.resend failed:', error.message);
+    return NextResponse.json({ error: 'Could not resend verification email.' }, { status: 400 });
+  }
 
-  return NextResponse.json({ ok: true, ip });
+  return NextResponse.json({ ok: true });
 }

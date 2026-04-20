@@ -85,6 +85,11 @@ Keep entries short. Full narrative belongs in session logs (e.g. `05-Working/BAT
 
 ## Permissions & RLS
 
+### 2026-04-20 — permissions/route.js error.message leak sweep (T-030, scope expanded)
+- Files: `web/src/app/api/admin/users/[id]/permissions/route.js:55-61,127,148,162,174,187,201,212,229,240,248,252`
+- Change: task listed 1 site at :127, but the `serverError(\`...: ${err.message}\`)` pattern repeated 11× in this file (security of one site fixed while 10 siblings still leaked). Introduced `dbError(tag, err, publicMessage)` helper next to existing `serverError`; converted all 11 sites. `console.error` retains raw message for server-side debugging; response body is a generic static string. Broader T-013 (~100 remaining sites across codebase) stays open.
+- Verify: tsc pass; `grep 'return serverError(\`' <file>` → 0 matches; `grep 'return dbError(' <file>` → 11 matches
+
 ### 2026-04-20 — `profile.follow` now requires verified email
 - Files: Live DB `public.permissions`
 - Change: `UPDATE permissions SET requires_verified=true WHERE key='profile.follow'` (was `false`; now matches `social.follow` pattern)
@@ -106,6 +111,16 @@ Keep entries short. Full narrative belongs in session logs (e.g. `05-Working/BAT
 
 ## Rate limits & Retry-After
 
+### 2026-04-20 — /api/reports rate-limited (T-022)
+- Files: `web/src/app/api/reports/route.js:7,16-26`
+- Change: 10/hr per user + Retry-After header on 429. Closes the auth'd-user comment-auto-hide flood vector (reports at threshold auto-hide a comment; an attacker could flood-trigger this).
+- Verify: tsc pass
+
+### 2026-04-20 — /api/expert/apply rate-limited + error sanitized (T-023)
+- Files: `web/src/app/api/expert/apply/route.js:6,17-30,53-56`
+- Change: 5/hr per user + Retry-After. RPC error now `console.error`'d server-side and returns generic client copy ("Could not submit application").
+- Verify: tsc pass
+
 ### 2026-04-20 — Rate limits added to 6 unprotected mutation routes
 - Files: `api/kids/reset-pin`, `kids/verify-pin`, `users/[id]/block`, `follows`, `bookmarks`, `appeals`
 - Change: per-user `checkRateLimit` with tuned `{max, windowSec}` ceilings
@@ -120,6 +135,11 @@ Keep entries short. Full narrative belongs in session logs (e.g. `05-Working/BAT
 ---
 
 ## Error hygiene
+
+### 2026-04-20 — /api/auth/resend-verification stopped leaking IP (T-026)
+- Files: `web/src/app/api/auth/resend-verification/route.js:6,18-23,33`
+- Change: response body no longer carries caller `ip` (was a debug leftover). Unused `getClientIp` import dropped. 429 now emits `Retry-After: 3600`. `auth.resend` error logged server-side with `[resend-verify]` tag, generic copy returned to client.
+- Verify: tsc pass; grep `{ ok: true, ip }` → 0 matches
 
 ### 2026-04-20 — `error.message` sweep on 7 routes
 - Files: `api/comments`, `follows`, `bookmarks`, `appeals`, `messages`, `conversations`, `quiz/submit`
@@ -247,6 +267,11 @@ Keep entries short. Full narrative belongs in session logs (e.g. `05-Working/BAT
 ---
 
 ## Middleware & infra
+
+### 2026-04-20 — CORS ALLOWED_ORIGINS now covers www variant (T-027)
+- Files: `web/src/middleware.js:91-97`
+- Change: added explicit `https://www.veritypost.com` + apex `https://veritypost.com` alongside `PROD_ORIGIN`. Closes drift with `api/account/delete/route.js:25-32` which already listed both. `Set` dedupes when `PROD_ORIGIN` matches one of the two explicits.
+- Verify: tsc pass
 
 ### 2026-04-20 — Middleware skips `auth.getUser()` on public paths
 - Files: `web/src/middleware.js:178`

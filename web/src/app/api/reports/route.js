@@ -4,11 +4,26 @@ import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { getSettings } from '@/lib/settings';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 export async function POST(request) {
   try {
     const supabase = await createClient();
     const user = await requirePermission('article.report');
+
+    // Auth'd users can flood reports → auto-hide at threshold. 10/hr per
+    // user is comfortably above legitimate use while closing that vector.
+    const rate = await checkRateLimit(supabase, {
+      key: `reports:user:${user.id}`,
+      max: 10,
+      windowSec: 3600,
+    });
+    if (rate.limited) {
+      return NextResponse.json(
+        { error: 'Too many reports. Try again in an hour.' },
+        { status: 429, headers: { 'Retry-After': '3600' } },
+      );
+    }
 
     const { targetType, targetId, reason, description } = await request.json();
 
