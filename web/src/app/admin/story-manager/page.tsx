@@ -22,12 +22,10 @@ import { ADMIN_C, F, S } from '@/lib/adminPalette';
 
 const C = { ...ADMIN_C, now: '#c2410c', nowBg: '#fff3e0' };
 
-const CATEGORIES = ['Politics', 'Technology', 'Business', 'Science', 'Health', 'World', 'Environment'];
-const SUBCATEGORIES: Record<string, string[]> = {
-  Politics: ['Congress', 'Supreme Court', 'White House', 'Elections'],
-  Technology: ['AI', 'Social Media', 'Cybersecurity'],
-  Business: ['Markets', 'Economy', 'Startups'],
-};
+// T-018: categories + subcategories load from the `categories` table
+// on mount. Prior code hardcoded a 7-entry CATEGORIES array and a
+// 3-key SUBCATEGORIES map; editors couldn't pick newly-seeded
+// categories without a deploy.
 
 type StorySource = { id: string; outlet: string; url: string; headline: string };
 
@@ -144,6 +142,10 @@ function StoryEditorInner() {
   const [destructive, setDestructive] = useState<DestructiveState>(null);
   const [saving, setSaving] = useState(false);
 
+  // T-018: DB-loaded category + subcategory dropdowns.
+  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
+  const [subcategoriesByParent, setSubcategoriesByParent] = useState<Record<string, string[]>>({});
+
   useEffect(() => {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -162,12 +164,40 @@ function StoryEditorInner() {
         return;
       }
 
-      const { data: stories } = await supabase
-        .from('articles')
-        .select('*, categories!fk_articles_category_id(name)')
-        .order('created_at', { ascending: false })
-        .limit(200);
-      setStoryList((stories as unknown as ArticleRow[]) || []);
+      const [storiesRes, categoriesRes] = await Promise.all([
+        supabase
+          .from('articles')
+          .select('*, categories!fk_articles_category_id(name)')
+          .order('created_at', { ascending: false })
+          .limit(200),
+        supabase
+          .from('categories')
+          .select('id, name, parent_id, is_active, is_kids_safe, sort_order')
+          .eq('is_active', true)
+          .eq('is_kids_safe', false)
+          .order('sort_order', { ascending: true, nullsFirst: false })
+          .order('name'),
+      ]);
+      setStoryList((storiesRes.data as unknown as ArticleRow[]) || []);
+
+      // T-018: load parents + subs, group subs by parent name for the
+      // dependent-Select. Matches the shape the old SUBCATEGORIES const
+      // had so downstream lookup keys are unchanged.
+      const catRows = (categoriesRes.data || []) as Array<{
+        id: string; name: string; parent_id: string | null;
+      }>;
+      const idToName: Record<string, string> = {};
+      catRows.forEach((c) => { idToName[c.id] = c.name; });
+      const parents = catRows.filter((c) => !c.parent_id);
+      const subs = catRows.filter((c) => !!c.parent_id);
+      const subMap: Record<string, string[]> = {};
+      subs.forEach((s) => {
+        const parentName = s.parent_id ? idToName[s.parent_id] : null;
+        if (!parentName) return;
+        (subMap[parentName] ||= []).push(s.name);
+      });
+      setCategories(parents.map((c) => ({ id: c.id, name: c.name })));
+      setSubcategoriesByParent(subMap);
 
       const requestedId = searchParams?.get('article');
       if (requestedId) {
@@ -762,7 +792,7 @@ function StoryEditorInner() {
             <Select
               value={story.category}
               onChange={(e) => updateStory('category', e.target.value)}
-              options={CATEGORIES.map((c) => ({ value: c, label: c }))}
+              options={categories.map((c) => ({ value: c.name, label: c.name }))}
             />
           </div>
           <div>
@@ -772,7 +802,7 @@ function StoryEditorInner() {
               onChange={(e) => updateStory('subcategory', e.target.value)}
               options={[
                 { value: '', label: 'Select...' },
-                ...(SUBCATEGORIES[story.category] || []).map((s) => ({ value: s, label: s })),
+                ...(subcategoriesByParent[story.category] || []).map((s) => ({ value: s, label: s })),
               ]}
             />
           </div>

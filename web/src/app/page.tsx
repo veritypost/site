@@ -51,22 +51,6 @@ type CategoryRow = Pick<Tables<'categories'>, 'id' | 'name' | 'slug'> & {
   parent_user_id?: string | null;
 };
 
-interface FallbackCategory {
-  id: string;
-  name: string;
-  slug: string;
-  kids_only: boolean;
-  visible: boolean;
-  sort_order: number;
-}
-
-interface FallbackSubcategory {
-  id: string;
-  name: string;
-  slug: string;
-  parent_user_id: string;
-}
-
 interface ModeOption {
   label: string;
   key: string;
@@ -78,51 +62,6 @@ type AuthUserLike = {
   email_verified?: boolean | null;
   streak_current?: number | null;
 } | null | undefined;
-
-// Full hardcoded category + subcategory map for layout review
-const FALLBACK_CATEGORIES: FallbackCategory[] = [
-  { id: 'fb-politics', name: 'Politics', slug: 'politics', kids_only: false, visible: true, sort_order: 0 },
-  { id: 'fb-world', name: 'World', slug: 'world', kids_only: false, visible: true, sort_order: 1 },
-  { id: 'fb-business', name: 'Business', slug: 'business', kids_only: false, visible: true, sort_order: 2 },
-  { id: 'fb-economy', name: 'Economy', slug: 'economy', kids_only: false, visible: true, sort_order: 3 },
-  { id: 'fb-technology', name: 'Technology', slug: 'technology', kids_only: false, visible: true, sort_order: 4 },
-  { id: 'fb-science', name: 'Science', slug: 'science', kids_only: false, visible: true, sort_order: 5 },
-  { id: 'fb-health', name: 'Health', slug: 'health', kids_only: false, visible: true, sort_order: 6 },
-  { id: 'fb-sports', name: 'Sports', slug: 'sports', kids_only: false, visible: true, sort_order: 7 },
-  { id: 'fb-entertainment', name: 'Entertainment', slug: 'entertainment', kids_only: false, visible: true, sort_order: 8 },
-  { id: 'fb-environment', name: 'Environment', slug: 'environment', kids_only: false, visible: true, sort_order: 9 },
-  { id: 'fb-climate', name: 'Climate', slug: 'climate', kids_only: false, visible: true, sort_order: 10 },
-  { id: 'fb-education', name: 'Education', slug: 'education', kids_only: false, visible: true, sort_order: 11 },
-  { id: 'fb-crime', name: 'Crime & Justice', slug: 'crime-justice', kids_only: false, visible: true, sort_order: 12 },
-  { id: 'fb-media', name: 'Media', slug: 'media', kids_only: false, visible: true, sort_order: 13 },
-  { id: 'fb-culture', name: 'Culture', slug: 'culture', kids_only: false, visible: true, sort_order: 14 },
-  { id: 'fb-finance', name: 'Finance', slug: 'finance', kids_only: false, visible: true, sort_order: 15 },
-  // Kids
-  { id: 'fb-kids-science', name: 'Science', slug: 'kids-science', kids_only: true, visible: true, sort_order: 100 },
-  { id: 'fb-kids-animals', name: 'Animals', slug: 'kids-animals', kids_only: true, visible: true, sort_order: 101 },
-  { id: 'fb-kids-world', name: 'World', slug: 'kids-world', kids_only: true, visible: true, sort_order: 102 },
-  { id: 'fb-kids-tech', name: 'Tech', slug: 'kids-tech', kids_only: true, visible: true, sort_order: 103 },
-  { id: 'fb-kids-sports', name: 'Sports', slug: 'kids-sports', kids_only: true, visible: true, sort_order: 104 },
-  { id: 'fb-kids-history', name: 'History', slug: 'kids-history', kids_only: true, visible: true, sort_order: 105 },
-  { id: 'fb-kids-health', name: 'Health', slug: 'kids-health', kids_only: true, visible: true, sort_order: 106 },
-  { id: 'fb-kids-arts', name: 'Arts', slug: 'kids-arts', kids_only: true, visible: true, sort_order: 107 },
-];
-
-const FALLBACK_SUBCATEGORIES: FallbackSubcategory[] = [
-  // Politics
-  { id: 'fb-sub-congress', name: 'Congress', slug: 'congress', parent_user_id: 'fb-politics' },
-  { id: 'fb-sub-scotus', name: 'Supreme Court', slug: 'supreme-court', parent_user_id: 'fb-politics' },
-  { id: 'fb-sub-whitehouse', name: 'White House', slug: 'white-house', parent_user_id: 'fb-politics' },
-  { id: 'fb-sub-elections', name: 'Elections', slug: 'elections', parent_user_id: 'fb-politics' },
-  // Technology
-  { id: 'fb-sub-ai', name: 'AI', slug: 'ai', parent_user_id: 'fb-technology' },
-  { id: 'fb-sub-social', name: 'Social Media', slug: 'social-media', parent_user_id: 'fb-technology' },
-  { id: 'fb-sub-cyber', name: 'Cybersecurity', slug: 'cybersecurity', parent_user_id: 'fb-technology' },
-  // Business
-  { id: 'fb-sub-markets', name: 'Markets', slug: 'markets', parent_user_id: 'fb-business' },
-  { id: 'fb-sub-economy', name: 'Economy', slug: 'economy', parent_user_id: 'fb-business' },
-  { id: 'fb-sub-startups', name: 'Startups', slug: 'startups', parent_user_id: 'fb-business' },
-];
 
 // Categories seeded with kid versions can be named "Science (kids)" /
 // "World (kids)" / "Kids Science" / "Science kids". Inside any view that
@@ -292,27 +231,18 @@ export default function HomePage() {
       // `metadata.audience === 'kids'` — defensive in case an editor
       // seeds a category with the audience flag but without the
       // `kids-` slug prefix.
+      // T-017: categories load straight from the DB. Prior code merged in
+      // a hardcoded FALLBACK_CATEGORIES array with fake `fb-*` string IDs
+      // to fill gaps, which rendered category tiles that didn't link to
+      // real articles (the fake ID never matched any article.category_id).
+      // Owner seeds the categories table; admin/categories lets them add
+      // more. An empty DB now shows an empty category bar, not a facade.
       const allCats = ((allCatsRes.data as CategoryRow[] | null) || [])
         .filter(c => c.metadata?.audience !== 'kids');
-      // Merge DB categories with fallbacks — DB wins by slug, fallbacks fill gaps
       const dbParents = allCats.filter(c => !c.parent_id);
       const dbSubs = allCats.filter(c => !!c.parent_id);
-      const dbParentSlugs = new Set(dbParents.map(c => c.slug));
-      const dbSubSlugs = new Set(dbSubs.map(c => c.slug));
-      const mergedParents: CategoryRow[] = [
-        ...dbParents,
-        ...FALLBACK_CATEGORIES
-          .filter(c => !dbParentSlugs.has(c.slug))
-          .map(c => ({ ...c } as CategoryRow)),
-      ];
-      const mergedSubs: CategoryRow[] = [
-        ...dbSubs,
-        ...FALLBACK_SUBCATEGORIES
-          .filter(c => !dbSubSlugs.has(c.slug))
-          .map(c => ({ ...c } as unknown as CategoryRow)),
-      ];
-      setCategories(mergedParents);
-      setSubcategories(mergedSubs);
+      setCategories(dbParents);
+      setSubcategories(dbSubs);
 
       // Dedupe source outlets
       const uniqueSources = [...new Set(((sourcesRes.data as { publisher: string | null }[] | null) || []).map(s => s.publisher).filter((p): p is string => !!p))].sort();
