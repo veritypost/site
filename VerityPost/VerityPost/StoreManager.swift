@@ -16,6 +16,12 @@ extension Notification.Name {
     /// server. AuthViewModel observes this to refresh the cached user row so
     /// the UI reflects the new plan without requiring app relaunch.
     static let vpSubscriptionDidChange = Notification.Name("vpSubscriptionDidChange")
+
+    /// T-021 — posted when the server sync returned non-2xx or threw.
+    /// Listeners can surface "your purchase didn't fully register, try
+    /// Restore Purchases" UI. userInfo may carry `statusCode` or `error`
+    /// plus `productID`.
+    static let vpSubscriptionSyncFailed = Notification.Name("vpSubscriptionSyncFailed")
 }
 
 /// StoreKit 2 subscription manager.
@@ -239,16 +245,38 @@ final class StoreManager: ObservableObject {
             priceCents: priceCents
         ))
 
+        // T-021 — verify 2xx before posting the subscription-changed
+        // notification. Prior code swallowed non-2xx as debug-only;
+        // a 4xx/5xx means the server never recorded entitlement, and
+        // the local app would flip to "paid" while the DB stayed stale.
+        var syncedOk = false
         do {
             let (_, response) = try await URLSession.shared.data(for: req)
-            if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-                Log.d("StoreManager: server sync returned", http.statusCode)
+            if let http = response as? HTTPURLResponse {
+                let code = http.statusCode
+                if (200..<300).contains(code) {
+                    syncedOk = true
+                } else {
+                    Log.d("StoreManager: server sync returned non-2xx", code)
+                    NotificationCenter.default.post(
+                        name: .vpSubscriptionSyncFailed,
+                        object: nil,
+                        userInfo: ["statusCode": code, "productID": productID]
+                    )
+                }
             }
         } catch {
             Log.d("StoreManager: server sync failed:", error)
+            NotificationCenter.default.post(
+                name: .vpSubscriptionSyncFailed,
+                object: nil,
+                userInfo: ["error": "\(error)", "productID": productID]
+            )
         }
 
-        NotificationCenter.default.post(name: .vpSubscriptionDidChange, object: nil)
+        if syncedOk {
+            NotificationCenter.default.post(name: .vpSubscriptionDidChange, object: nil)
+        }
     }
 
     // MARK: - Restore Purchases

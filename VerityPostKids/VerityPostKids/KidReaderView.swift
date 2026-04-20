@@ -152,10 +152,15 @@ struct KidReaderView: View {
         }
 
         do {
+            // T-026 — belt-and-suspenders: don't just trust RLS. If the
+            // kid-JWT RLS policy on articles drifts, kids could fetch an
+            // adult article by known UUID. Explicit is_kids_safe=true
+            // filter catches both cases.
             let row: Row = try await client
                 .from("articles")
                 .select("body, kids_summary")
                 .eq("id", value: article.id)
+                .eq("is_kids_safe", value: true)
                 .single()
                 .execute()
                 .value

@@ -129,7 +129,18 @@ final class PairingClient {
             return nil
         }
 
-        try? await applySession(token: token)
+        // T-022 — surface applySession failures. Prior code silently
+        // swallowed via `try?`, leaving the kid with a restored token
+        // but no active Supabase session → anon browsing without any
+        // signal to parent. Clear local state + return nil so the UI
+        // drops back to the pair screen.
+        do {
+            try await applySession(token: token)
+        } catch {
+            print("[PairingClient] restore: applySession failed —", error)
+            clear()
+            return nil
+        }
         return StoredPair(token: token, kidProfileId: kidId, kidName: kidName)
     }
 

@@ -138,7 +138,10 @@ struct PairCodeView: View {
             } catch let err as PairError {
                 errorMessage = err.errorDescription
             } catch {
-                errorMessage = error.localizedDescription
+                // T-042 — don't leak raw Swift errors to a child's UI.
+                // Log the real error for debugging; show a friendly line.
+                print("[PairCodeView] pair failed:", error)
+                errorMessage = "Something went wrong. Please try again."
             }
             isPairing = false
         }

@@ -264,9 +264,12 @@ async function main() {
         '/api/cron/freeze-grace',
         '/api/cron/sweep-kid-trials',
         '/api/cron/send-emails',
+        '/api/cron/send-push',
         '/api/cron/recompute-family-achievements',
+        '/api/cron/check-user-achievements',
         '/api/cron/process-deletions',
         '/api/cron/process-data-exports',
+        '/api/cron/flag-expert-reverifications',
       ];
       const paths = crons.map(c => c.path);
       const missing = expected.filter(p => !paths.includes(p));
