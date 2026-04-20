@@ -139,6 +139,24 @@ function LoginPageInner() {
       const { data: { user: authUser }, error: authError } = await supabase.auth.signInWithPassword({ email, password });
 
       if (authError) {
+        // Distinguish a real credentials failure from a network /
+        // DNS failure. Supabase-js surfaces network errors with
+        // name="AuthRetryableFetchError" or messages containing
+        // "fetch" / "network" / "NetworkError". Don't record those
+        // against the lockout counter — the user didn't type
+        // anything wrong, and flagging the account for 5 retries
+        // on flaky wifi would lock them out for 15 minutes.
+        const msg = String(authError.message || '').toLowerCase();
+        const isNetwork =
+          authError.name === 'AuthRetryableFetchError' ||
+          msg.includes('failed to fetch') ||
+          msg.includes('networkerror') ||
+          msg.includes('network request');
+        if (isNetwork) {
+          setError('Network error. Check your connection and try again.');
+          setLoading(false);
+          return;
+        }
         // Record the failed attempt so the server can start the countdown.
         // Best-effort — if this fails the next attempt just counts normally.
         // F-012: send password so the server can verify the failure is

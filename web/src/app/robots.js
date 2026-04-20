@@ -9,6 +9,8 @@ export default function robots() {
           '/admin',
           '/admin/',
           '/api/',
+          '/logout',
+          '/preview',
           '/profile/settings',
           '/reset-password',
           '/verify-email',
