@@ -13,25 +13,9 @@ export default function manifest() {
     orientation: 'portrait',
     background_color: '#ffffff',
     theme_color: '#ffffff',
-    icons: [
-      {
-        src: '/icon-192.png',
-        sizes: '192x192',
-        type: 'image/png',
-        purpose: 'any',
-      },
-      {
-        src: '/icon-512.png',
-        sizes: '512x512',
-        type: 'image/png',
-        purpose: 'any',
-      },
-      {
-        src: '/icon-512-maskable.png',
-        sizes: '512x512',
-        type: 'image/png',
-        purpose: 'maskable',
-      },
-    ],
+    // Icons omitted until owner drops PNGs into web/public/. Listing
+    // missing files here made every Android / iOS install attempt 404
+    // on icon download and fall back to the default browser glyph.
+    icons: [],
   };
 }

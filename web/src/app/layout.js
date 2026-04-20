@@ -51,16 +51,11 @@ export const metadata = {
     statusBarStyle: 'default',
     title: 'Verity Post',
   },
-  // DA-184 — apple-touch-icon. Owner must create the 180×180 PNG at
-  // public/apple-touch-icon.png. Next emits the <link> automatically
-  // from this metadata entry.
-  icons: {
-    icon: [
-      { url: '/favicon.ico', sizes: 'any' },
-      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
-    ],
-    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180' }],
-  },
+  // DA-184 — icons deliberately omitted until the owner drops PNGs into
+  // web/public/. The folder doesn't exist yet, so referencing files
+  // here just emitted 404s on every page load. Re-add icon + apple
+  // entries once /favicon.ico, /icon-192.png, and /apple-touch-icon.png
+  // are present.
   other: {
     'mobile-web-app-capable': 'yes',
   },

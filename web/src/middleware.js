@@ -137,10 +137,15 @@ export async function middleware(request) {
   });
   response.headers.set('x-request-id', requestId);
 
-  // H-05 — Content-Security-Policy (enforce mode). Flipped 2026-04-20
-  // from Report-Only after the soak phase. `/api/csp-report` remains the
-  // violation sink via `report-uri` in the policy string.
-  response.headers.set('Content-Security-Policy', csp);
+  // H-05 — Content-Security-Policy (Report-Only). The enforce flip on
+  // 2026-04-20 broke statically-prerendered pages: `'strict-dynamic'`
+  // requires the nonce on Next.js's own inline bootstrap scripts, but
+  // pages pre-rendered at build time ship without any nonce. Until the
+  // nonce is read in the root layout (which opts the whole tree into
+  // dynamic rendering), or pages that need the nonce add
+  // `export const dynamic = 'force-dynamic'`, we keep CSP in Report-Only
+  // so violations still surface via /api/csp-report without blocking.
+  response.headers.set('Content-Security-Policy-Report-Only', csp);
 
   // M-17 — CORS allow-list for /api/* on normal (non-preflight) requests.
   if (pathname.startsWith('/api/')) {
@@ -171,7 +176,7 @@ export async function middleware(request) {
       dest.search = '';
       const redirect = NextResponse.redirect(dest, { status: 307 });
       redirect.headers.set('x-request-id', requestId);
-      redirect.headers.set('Content-Security-Policy', csp);
+      redirect.headers.set('Content-Security-Policy-Report-Only', csp);
       redirect.headers.set('X-Robots-Tag', 'noindex, nofollow');
       return redirect;
     }
@@ -193,7 +198,7 @@ export async function middleware(request) {
             request: { headers: forwardedHeaders },
           });
           response.headers.set('x-request-id', requestId);
-          response.headers.set('Content-Security-Policy', csp);
+          response.headers.set('Content-Security-Policy-Report-Only', csp);
           if (pathname.startsWith('/api/')) applyCors(request, response);
           response.cookies.set({ name, value, ...options });
         },
@@ -203,7 +208,7 @@ export async function middleware(request) {
             request: { headers: forwardedHeaders },
           });
           response.headers.set('x-request-id', requestId);
-          response.headers.set('Content-Security-Policy', csp);
+          response.headers.set('Content-Security-Policy-Report-Only', csp);
           if (pathname.startsWith('/api/')) applyCors(request, response);
           response.cookies.set({ name, value: '', ...options });
         },
@@ -230,7 +235,7 @@ export async function middleware(request) {
     loginUrl.searchParams.set('next', pathname + request.nextUrl.search);
     const redirect = NextResponse.redirect(loginUrl, { status: 302 });
     redirect.headers.set('x-request-id', requestId);
-    redirect.headers.set('Content-Security-Policy', csp);
+    redirect.headers.set('Content-Security-Policy-Report-Only', csp);
     return redirect;
   }
 
