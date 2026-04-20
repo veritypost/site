@@ -9,8 +9,9 @@
 // ownership and invalidates any other live codes for the same kid.
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { requireAuth } from '@/lib/auth';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 export async function POST(request) {
   try {
@@ -19,6 +20,18 @@ export async function POST(request) {
     let user;
     try { user = await requireAuth(); }
     catch (err) { return NextResponse.json({ error: err.message }, { status: err.status || 401 }); }
+
+    // Rate-limit: 10 codes per minute per authenticated parent (NOT per-IP,
+    // so parents behind shared NAT don't compete with each other).
+    const svc = createServiceClient();
+    const rate = await checkRateLimit(svc, {
+      key: `kids-generate:${user.id}`,
+      max: 10,
+      windowSec: 60,
+    });
+    if (rate.limited) {
+      return NextResponse.json({ error: 'Too many codes generated. Wait a minute.' }, { status: 429 });
+    }
 
     let body;
     try { body = await request.json(); }
@@ -36,7 +49,8 @@ export async function POST(request) {
       if (error.message && error.message.toLowerCase().includes('not owned')) {
         return NextResponse.json({ error: 'Kid profile not owned by you' }, { status: 403 });
       }
-      return NextResponse.json({ error: error.message || 'Could not generate code' }, { status: 500 });
+      console.error('[kids-generate-pair-code]', error);
+      return NextResponse.json({ error: 'Could not generate a pair code. Try again.' }, { status: 500 });
     }
 
     return NextResponse.json({
