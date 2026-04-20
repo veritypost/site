@@ -106,10 +106,15 @@ export default function CategoriesAdmin() {
   const toggleVisibility = async (id: string, next: boolean) => {
     // Optimistic local update; rollback on failure.
     setCats((prev) => prev.map((c) => (c.id === id ? { ...c, is_active: next } : c)));
-    const { error } = await supabase.from('categories').update({ is_active: next }).eq('id', id);
-    if (error) {
+    const res = await fetch(`/api/admin/categories/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: next }),
+    });
+    if (!res.ok) {
       setCats((prev) => prev.map((c) => (c.id === id ? { ...c, is_active: !next } : c)));
-      push({ message: `Could not update: ${error.message}`, variant: 'danger' });
+      const body = await res.json().catch(() => ({ error: 'Update failed' }));
+      push({ message: `Could not update: ${body.error || 'unknown error'}`, variant: 'danger' });
     } else {
       push({ message: next ? 'Category enabled' : 'Category hidden', variant: 'success' });
     }
@@ -117,9 +122,14 @@ export default function CategoriesAdmin() {
 
   const updateSortOrder = async (id: string, next: number) => {
     setCats((prev) => prev.map((c) => (c.id === id ? { ...c, sort_order: next } : c)));
-    const { error } = await supabase.from('categories').update({ sort_order: next }).eq('id', id);
-    if (error) {
-      push({ message: `Sort-order save failed: ${error.message}`, variant: 'danger' });
+    const res = await fetch(`/api/admin/categories/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sort_order: next }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: 'save failed' }));
+      push({ message: `Sort-order save failed: ${body.error || 'unknown error'}`, variant: 'danger' });
     }
   };
 
@@ -130,17 +140,17 @@ export default function CategoriesAdmin() {
     const isKids = tab === 'kids';
     const sort_order = cats.length;
 
-    const { data, error } = await supabase
-      .from('categories')
-      .insert({ name, slug, is_active: true, is_kids_safe: isKids, sort_order })
-      .select()
-      .single();
-
-    if (error || !data) {
-      push({ message: `Could not add category: ${error?.message ?? 'unknown error'}`, variant: 'danger' });
+    const res = await fetch('/api/admin/categories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, slug, is_active: true, is_kids_safe: isKids, sort_order }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json.row) {
+      push({ message: `Could not add category: ${json.error || 'unknown error'}`, variant: 'danger' });
       return;
     }
-    setCats((prev) => [...prev, { ...data, subs: [] }]);
+    setCats((prev) => [...prev, { ...json.row, subs: [] }]);
     setNewCat('');
     push({ message: `Added "${name}"`, variant: 'success' });
   };
@@ -149,41 +159,33 @@ export default function CategoriesAdmin() {
     const trimmed = name.trim();
     if (!trimmed) return;
     const slug = slugify(trimmed);
-    const { data, error } = await supabase
-      .from('categories')
-      .insert({ name: trimmed, slug, parent_id: catId, is_active: true, is_kids_safe: tab === 'kids' })
-      .select()
-      .single();
-
-    if (error || !data) {
-      push({ message: `Could not add subcategory: ${error?.message ?? 'unknown error'}`, variant: 'danger' });
+    const res = await fetch('/api/admin/categories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: trimmed,
+        slug,
+        parent_id: catId,
+        is_active: true,
+        is_kids_safe: tab === 'kids',
+      }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json.row) {
+      push({ message: `Could not add subcategory: ${json.error || 'unknown error'}`, variant: 'danger' });
       return;
     }
-    setCats((prev) => prev.map((c) => (c.id === catId ? { ...c, subs: [...c.subs, data] } : c)));
-    setDrawerRow((prev) => (prev && prev.id === catId ? { ...prev, subs: [...prev.subs, data] } : prev));
+    setCats((prev) => prev.map((c) => (c.id === catId ? { ...c, subs: [...c.subs, json.row] } : c)));
+    setDrawerRow((prev) => (prev && prev.id === catId ? { ...prev, subs: [...prev.subs, json.row] } : prev));
     setNewSub('');
     push({ message: `Added "${trimmed}"`, variant: 'success' });
   };
 
   const removeSub = async (catId: string, subId: string) => {
-    const sub = cats.find((c) => c.id === catId)?.subs.find((s) => s.id === subId);
-    const { error: auditErr } = await supabase.rpc('record_admin_action', {
-      p_action: 'category.delete',
-      p_target_table: 'categories',
-      p_target_id: subId,
-      p_reason: null,
-      p_old_value: sub
-        ? { id: subId, name: sub.name, slug: sub.slug, parent_id: catId }
-        : { id: subId, parent_id: catId },
-      p_new_value: null,
-    });
-    if (auditErr) {
-      push({ message: `Audit log write failed: ${auditErr.message}`, variant: 'danger' });
-      return;
-    }
-    const { error } = await supabase.from('categories').delete().eq('id', subId);
-    if (error) {
-      push({ message: `Could not delete: ${error.message}`, variant: 'danger' });
+    const res = await fetch(`/api/admin/categories/${subId}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: 'delete failed' }));
+      push({ message: `Could not delete: ${body.error || 'unknown error'}`, variant: 'danger' });
       return;
     }
     setCats((prev) =>
