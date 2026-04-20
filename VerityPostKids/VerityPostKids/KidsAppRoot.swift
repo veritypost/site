@@ -1,14 +1,18 @@
 import SwiftUI
 
-// Live root. Gated flow:
-//   - Not paired AND no dev adult session   → PairCodeView (primary entry)
-//   - Dev adult session AND kid unpicked    → KidPickerView (DEBUG only)
-//   - kid set                                → home (Greeting + scene flow)
+// Live root. Pair-only entry.
+//   - Not paired → PairCodeView
+//   - Paired     → tab-bar app (Home | Ranks | Experts | Me) + scene full-screens
+//
+// Scene flow (from home):
+//   - Tap streak card  → StreakScene
+//   - Tap a category   → QuizPassScene → completeQuiz → StreakScene → BadgeUnlockScene
 
 struct KidsAppRoot: View {
     @StateObject private var auth = KidsAuth()
     @StateObject private var state = KidsAppState()
 
+    @State private var selectedTab: KidTab = .home
     @State private var activeSheet: ActiveSheet? = nil
     @State private var queuedBadge: BadgeUnlockScene? = nil
     @State private var sceneKey = UUID()
@@ -30,10 +34,9 @@ struct KidsAppRoot: View {
     var body: some View {
         Group {
             if auth.kid != nil {
-                home
-            } else if auth.adultSession != nil {
-                KidPickerView()
+                tabbedApp
                     .environmentObject(auth)
+                    .environmentObject(state)
             } else {
                 PairCodeView()
                     .environmentObject(auth)
@@ -45,10 +48,42 @@ struct KidsAppRoot: View {
         }
     }
 
-    // MARK: Home
+    // MARK: Tab-bar app
+
+    private var tabbedApp: some View {
+        ZStack(alignment: .bottom) {
+            tabContent
+                .padding(.bottom, 80)   // space for tab bar
+
+            KidTabBar(selected: $selectedTab)
+        }
+        .ignoresSafeArea(.container, edges: .bottom)
+        .fullScreenCover(item: $activeSheet, onDismiss: handleDismiss) { sheet in
+            ZStack(alignment: .topLeading) {
+                sceneBody(sheet)
+                closeChrome
+            }
+            .id(sceneKey)
+        }
+    }
 
     @ViewBuilder
-    private var home: some View {
+    private var tabContent: some View {
+        switch selectedTab {
+        case .home:
+            homeScreen
+        case .leaderboard:
+            LeaderboardView()
+        case .expert:
+            ExpertSessionsView()
+        case .profile:
+            ProfileView()
+        }
+    }
+
+    // MARK: Home
+
+    private var homeScreen: some View {
         GreetingScene(
             name: state.kidName.isEmpty ? (auth.kid?.name ?? "Reader") : state.kidName,
             streakDays: state.streakDays,
@@ -61,29 +96,6 @@ struct KidsAppRoot: View {
                 present(.quiz)
             }
         )
-        .overlay(alignment: .topTrailing) {
-            Button {
-                Task { await auth.signOut() }
-            } label: {
-                Image(systemName: "rectangle.portrait.and.arrow.right")
-                    .font(.system(size: 14, weight: .heavy))
-                    .foregroundStyle(.white)
-                    .frame(width: 36, height: 36)
-                    .background(.thinMaterial)
-                    .clipShape(Circle())
-                    .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
-            }
-            .buttonStyle(.plain)
-            .padding(.trailing, 20)
-            .padding(.top, 60)
-        }
-        .fullScreenCover(item: $activeSheet, onDismiss: handleDismiss) { sheet in
-            ZStack(alignment: .topLeading) {
-                sceneBody(sheet)
-                closeChrome
-            }
-            .id(sceneKey)
-        }
     }
 
     @ViewBuilder
