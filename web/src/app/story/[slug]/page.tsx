@@ -746,13 +746,12 @@ export default function StoryPage() {
         </div>
       )}
 
-      {/* Mobile tab bar */}
-      {!isDesktop && (
-      // R13-T4 (Crew 7): offset below the global top bar so the tab
-      // bar doesn't slide underneath it while scrolling. `--vp-top-bar-h`
-      // is set by NavWrapper and resolves to
-      // `calc(44px + env(safe-area-inset-top))` when the bar is shown,
-      // or `0px` on surfaces that hide it.
+      {/* Mobile tab bar — launch-phase hide. Timeline + Discussion
+          tabs are currently gated off below, so the bar would only
+          have "Article" on it. Hide the whole bar until the other
+          tabs come back online. Flip `false` → original condition
+          to unhide. */}
+      {false && !isDesktop && (
       <div style={{
         display: 'flex',
         borderBottom: '1px solid var(--border)',
@@ -893,7 +892,8 @@ export default function StoryPage() {
             </div>
             )}
 
-            {showMobileTimeline && canViewTimeline && (
+            {/* Timeline (mobile) — launch-phase hide. */}
+            {false && showMobileTimeline && canViewTimeline && (
               <div>
                 <div style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, color: 'var(--dim)', marginBottom: 16, letterSpacing: '0.04em' }}>Timeline</div>
                 <Timeline events={timeline} />
@@ -901,7 +901,8 @@ export default function StoryPage() {
             )}
           </div>
 
-          {isDesktop && canViewTimeline && (
+          {/* Timeline (desktop aside) — launch-phase hide. */}
+          {false && isDesktop && canViewTimeline && (
           <aside style={{
             width: 260, flexShrink: 0, position: 'sticky', top: 60, alignSelf: 'flex-start',
           }}>
@@ -911,10 +912,10 @@ export default function StoryPage() {
           )}
         </div>
 
-        {/* Quiz + Discussion — single mount. D6 keeps it hidden until the
-            quiz has been passed. Rendered here on desktop (below the
-            two-column) and on mobile when the Discussion tab is active. */}
-        {(isDesktop || showMobileDiscussion) && (
+        {/* Quiz + Discussion — launch-phase hide. Flip `false` → original
+            `(isDesktop || showMobileDiscussion)` to unhide. All state,
+            data fetches, and child components stay mounted upstream. */}
+        {false && (isDesktop || showMobileDiscussion) && (
           <div style={{ marginTop: isDesktop ? 48 : 0 }}>
             {quizNode}
             {discussionSection}
