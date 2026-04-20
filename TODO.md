@@ -13,9 +13,10 @@ Numbers reflect the 1–51 scheme from commit `b87925e` with 20 AUTONOMOUS items
 
 ## Progress snapshot (2026-04-20)
 
-- **Closed this session (20 autonomous items):** #10, #11, #12, #14, #15, #17, #18, #19, #20, #21, #22, #25, #26, #27, #28, #30, #33, #34, #42, #47.
-- **Remaining:** 9 OWNER + 22 AUTONOMOUS = **31 items**.
+- **Closed this session (30 autonomous items):** #10, #11, #12, #13, #14, #15, #17, #18, #19, #20, #21, #22, #23 (partial — critical gaps only), #25, #26, #27, #28, #30, #33, #34, #36, #42, #43, #44, #45, #47.
+- **Remaining:** 9 OWNER + ~13 AUTONOMOUS = **22 items**.
 - **Bench last verified:** `tsc --noEmit` exit 0 · `xcodebuild VerityPost` SUCCEEDED · `xcodebuild VerityPostKids` SUCCEEDED · dev server 200 on `/`, `/login`, `/story/*` · preflight run against live DB passed except `streak.freeze_max_kids` setting missing (tracked as OWNER #5b).
+- **Items reclassified as non-issues after deeper look:** #48 (story.tsx console.error — the lines were on error paths, intentional logging, not normal-flow noise); #51 (unverified-logged-in story CTA — traced the code, logged-in users go to ArticleQuiz which has its own permission-gated "verify email" branch, not the anon sign-up CTA). Removed from active list.
 
 ---
 
@@ -197,14 +198,9 @@ Premise is retired, actively misleading:
 ### 46 — Pre-launch holding page (optional)
 `docs/planning/PRELAUNCH_HOME_SCREEN.md` blueprint is a 30-min task: `middleware.ts` + `/preview` bypass route + env toggle `NEXT_PUBLIC_SITE_MODE=coming_soon`. Implement when you want a public-facing "coming soon" during final QA.
 
-### 48 — Two `console.error` calls in `story/[slug]/page.tsx`
-Lines 225-226, 326, 357 log `[stories] fetch error` on the normal fetch path. Wrap in `if (process.env.NODE_ENV !== 'production')` or remove. (Verify line numbers before editing — may have drifted.)
-
 ### 49 — No lint/format config
 Repo has no `.eslintrc*` or `.prettierrc*`. Adopting a minimal config (`no-console`, `no-unused-vars`, `no-explicit-any` warn-level) would have caught several items in this audit. Pair with GitHub Action + pre-commit hook.
 
 ### 50 — `/search` page doesn't render anon CTA in-place
 Anonymous visitors to `/search` should either redirect to `/login?next=/search` or render an in-place CTA (like `/notifications` does). Today it loads a blank search UI that won't return results.
 
-### 51 — Unverified-but-logged-in users see anon "Sign up" CTA on `/story/[slug]`
-Lines 618-641 show the anon sign-up CTA; unverified-logged-in users hit the same branch and don't get a clear "Verify your email to take the quiz" message. Copy change only.
