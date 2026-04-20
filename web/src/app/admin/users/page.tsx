@@ -80,11 +80,6 @@ function rolesUpTo(highestRole: string | null): string[] {
   return ROLE_ORDER.slice(0, idx + 1);
 }
 
-const ACHIEVEMENTS = [
-  'Early Adopter', 'Streak Master', 'Quiz Champion', 'Top Contributor',
-  'Fact Checker', 'Community Pillar', 'News Hound', 'Deep Diver',
-];
-
 // 9 canonical plans.name values. Selecting writes users.plan_id to the
 // plan row whose `name` matches.
 const PLAN_OPTIONS = [
@@ -141,7 +136,10 @@ export default function UsersAdmin() {
   const [readSlug, setReadSlug] = useState('');
   const [quizSlug, setQuizSlug] = useState('');
   const [quizScore, setQuizScore] = useState('');
-  const [achievement, setAchievement] = useState(ACHIEVEMENTS[0]);
+  // Achievements are DB-driven (column is `achievements.name`, NOT a hardcoded
+  // label list — prior hardcoded 8 didn't overlap any of the 26 DB rows).
+  const [achievementsList, setAchievementsList] = useState<{ id: string; name: string; key: string }[]>([]);
+  const [achievement, setAchievement] = useState<string>('');
 
   const ROLE_OPTIONS = rolesUpTo(currentUserRole);
 
@@ -172,6 +170,18 @@ export default function UsersAdmin() {
 
       if (!error && data) setUsers(data as unknown as UserRow[]);
       setLoading(false);
+
+      // Load DB-live achievements for the "Award achievement" dropdown.
+      // Must be called AFTER the admin check — anon/non-admin clients
+      // shouldn't hit this table (RLS will block anyway).
+      const { data: achRows } = await supabase
+        .from('achievements')
+        .select('id, name, key')
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+      const rows = (achRows || []) as { id: string; name: string; key: string }[];
+      setAchievementsList(rows);
+      if (rows.length > 0) setAchievement(rows[0].name);
     };
     init();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -678,6 +688,7 @@ export default function UsersAdmin() {
           quizSlug={quizSlug} setQuizSlug={setQuizSlug}
           quizScore={quizScore} setQuizScore={setQuizScore}
           achievement={achievement} setAchievement={setAchievement}
+          achievementsList={achievementsList}
         />}
       </Drawer>
 
@@ -753,12 +764,13 @@ function UserDetail(props: {
   quizSlug: string; setQuizSlug: (v: string) => void;
   quizScore: string; setQuizScore: (v: string) => void;
   achievement: string; setAchievement: (v: string) => void;
+  achievementsList: { id: string; name: string; key: string }[];
 }) {
   const {
     user, onToggleBan, onDelete, onExport, onChangeRole, onChangePlan,
     onUnlinkDevice, onMarkRead, onMarkQuiz, onAwardAchievement,
     readSlug, setReadSlug, quizSlug, setQuizSlug, quizScore, setQuizScore,
-    achievement, setAchievement,
+    achievement, setAchievement, achievementsList,
   } = props;
 
   const tier = tierFor(user.verity_score);
@@ -899,10 +911,17 @@ function UserDetail(props: {
             <Select
               value={achievement}
               onChange={(e) => setAchievement(e.target.value)}
-              options={ACHIEVEMENTS.map((a) => ({ value: a, label: a }))}
+              options={achievementsList.length > 0
+                ? achievementsList.map((a) => ({ value: a.name, label: a.name }))
+                : [{ value: '', label: 'No achievements available' }]}
               style={{ flex: '1 1 160px', minWidth: 160 }}
+              disabled={achievementsList.length === 0}
             />
-            <Button variant="secondary" onClick={onAwardAchievement}>Award</Button>
+            <Button
+              variant="secondary"
+              onClick={onAwardAchievement}
+              disabled={!achievement || achievementsList.length === 0}
+            >Award</Button>
           </div>
         </Field>
       </div>

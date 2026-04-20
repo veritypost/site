@@ -211,6 +211,11 @@ Keep entries short. Full narrative belongs in session logs (e.g. `05-Working/BAT
 
 ## Admin surfaces
 
+### 2026-04-20 — Admin achievement-award dropdown now DB-live (T-002)
+- Files: `web/src/app/admin/users/page.tsx:83-86,144-148,173-184,680-682,755-762,897-913`
+- Change: removed hardcoded 8-label `ACHIEVEMENTS` const (none overlapped the 26 live DB rows; awarding silently failed). Added `achievementsList` state loaded from `achievements` table (ordered by `name`, `is_active=true`) in the same `init()` effect; dropdown options, initial value, and disabled-guards all feed from the live list. Handler's `name → id` lookup path unchanged (still correct); now always resolves because dropdown labels are real `achievements.name` values.
+- Verify: tsc pass; dropdown renders live names instead of stubs
+
 ### 2026-04-20 — Admin hub allows MOD_ROLES
 - See Permissions & RLS section (same fix, cross-cut).
 

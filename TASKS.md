@@ -32,8 +32,8 @@ A fresh agent picks the top unchecked task, reads file:line, does the work, clos
 - `? UNCERTAIN` + tag `needs-live-check` = Agent 3 could not verify; re-verify before acting
 
 ## Task counts
-- P0: 11 · P1: 25 · P2: 30 · P3: 23 · P4: 6 · **Total: 95**
-- DB-DRIFT: 21 · SCHEMA: 6 · SECURITY: 12 · IOS: 11 · MIGRATION-DRIFT: 4 · A11Y: 3 · UX: 13 · CODE: 23
+- P0: 10 · P1: 25 · P2: 30 · P3: 23 · P4: 6 · **Total: 94**
+- DB-DRIFT: 20 · SCHEMA: 6 · SECURITY: 12 · IOS: 11 · MIGRATION-DRIFT: 4 · A11Y: 3 · UX: 13 · CODE: 23
 - Unverified (needs live-check): 22
 
 ---
@@ -46,13 +46,6 @@ A fresh agent picks the top unchecked task, reads file:line, does the work, clos
 **Why**: DB `score_tiers` has newcomer/reader/informed/analyst/scholar/luminary at 0/100/300/600/1000/1500; code hardcodes different keys (`contributor/trusted/distinguished`) at different thresholds (0/100/500/2000/5000/10000). User at score=300 is `contributor` in UI but `informed` in DB.
 **Do**: Build `lib/scoreTiers.js` with `getScoreTiers()` (60s cache); delete `TIER_META` + `TIERS` duplicates.
 **Accept**: Grep `contributor|trusted|distinguished` in `web/src/` = 0; both pages render from helper.
-
-### T-002 — ACHIEVEMENTS admin dropdown labels don't exist in DB
-**Priority**: P0  **Effort**: S  **Lens**: DB-DRIFT  **Source**: A2:G-019 (A3 escalated)
-**File**: `web/src/app/admin/users/page.tsx:83-86`
-**Why**: Dropdown lists 8 labels (`Early Adopter`…); live `achievements` has 26 rows (`bookworm_10`, `first_read`…). No overlap — awarding inserts names that don't match any `achievements.key`.
-**Do**: Query `achievements` ordered by `name` (column is `name`, NOT `display_name`); render `name` with `key` values.
-**Accept**: Admin "award achievement" writes FK-joinable row.
 
 ### T-003 — Seed `rate_limits` + switch `lib/rateLimit.js` to DB-backed
 **Priority**: P0  **Effort**: M  **Lens**: DB-DRIFT  **Source**: A1:T-001 + A2:G-025
