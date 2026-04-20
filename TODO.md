@@ -30,9 +30,10 @@ Numbers reflect the 1–51 scheme from commit `b87925e` with 20 AUTONOMOUS items
 Supabase service-role key, Stripe live secret, Stripe webhook secret. Ex-dev had access.
 
 ### 3 — Set Vercel env vars (production + preview scopes)
-- `SENTRY_DSN` + `NEXT_PUBLIC_SENTRY_DSN` — build fails hard without these.
 - `NEXT_PUBLIC_SITE_URL=https://veritypost.com` — password-reset + verification emails point at `localhost:3333` without it.
 - `SUPABASE_JWT_SECRET` — required to sign the custom kid JWT at `/api/kids/pair`. Copy from Supabase dashboard → Settings → API → JWT Secret. Without it, kids iOS pairing returns 500.
+
+Sentry intentionally deferred — see Post-launch section.
 
 ### 4 — Enable HIBP in Supabase Auth dashboard
 Without it, signup accepts known-leaked passwords.
@@ -56,6 +57,24 @@ Remove ex-dev from team. Scan env-var changes for unexpected entries.
 
 ### 9 — Apple Developer account
 Gates all iOS publishing — App Store Connect products, APNs `.p8`, `apple-app-site-association` upload, TestFlight. Code is ready; single owner step.
+
+---
+
+## Post-launch (not blocking launch)
+
+### PL-1 — Enable Sentry error tracking
+Sentry is fully wired and dormant. To activate:
+1. Create Sentry project at sentry.io; copy DSN.
+2. Vercel env → set `SENTRY_DSN` + `NEXT_PUBLIC_SENTRY_DSN` (same value) in production + preview.
+3. Optional: `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` for source-map upload.
+4. Redeploy.
+
+**Why deferred:**
+- Error-tracking value scales with traffic. Pre-launch + soft-launch traffic is small enough that client crashes surface via direct use rather than aggregated dashboards.
+- The app already has `/api/errors` to receive client error uploads server-side — that's in place.
+- Code path is DSN-guarded: missing DSN = silent no-op, no build break, no runtime cost.
+- PII scrubber (`web/sentry.shared.js`) is pre-built so Day-1 activation doesn't leak user emails / auth tokens / Stripe signatures to Sentry.
+- When you do flip it on, no code changes required — just the env vars + a redeploy.
 
 ---
 
