@@ -244,3 +244,69 @@ Lines 225-226, 326, 357 log `[stories] fetch error` on the normal fetch path; ev
 
 ### 30 — No lint/format config
 Repo has no `.eslintrc*` or `.prettierrc*`. Adopting even a minimal config (`no-console`, `no-unused-vars`, `no-explicit-any` warn-level) would have caught several items from this audit. Low priority but valuable long-term. GitHub Action + pre-commit hook would pair well.
+
+---
+
+## P1 — from end-to-end user-simulation pass
+
+### 31 — `record_admin_action` audit coverage gap (~50 of 73 admin routes skip audit)
+Grep finds only **23 of 73** admin API routes calling `recordAdminAction` or `record_admin_action`. Everything under `/api/admin/**` that mutates state should audit per `docs/product/FEATURE_LEDGER.md` + prior T-005 reviewer requirement. The missing ~50 are concentrated in: ad-campaigns/placements/units, appeals, data-requests, expert/applications, moderation/comments+reports, permission-sets, permissions, plans, recap, sponsors, subscriptions, users/[id]/{ban,data-export,mark-quiz,mark-read,plan,role-set,roles}.
+**Do:** sweep every admin route; where the mutation has a meaningful before/after state, add `await recordAdminAction({ action, targetTable, targetId, oldValue, newValue, reason })` from `lib/adminMutation.ts`. Where the mutation is idempotent bookkeeping (e.g., pagination tweaks), document why no audit is needed.
+**Done when:** `grep -rln 'recordAdminAction\|record_admin_action' web/src/app/api/admin/ | wc -l` = 73, or a documented exception list exists.
+
+### 32 — Family leaderboard may show only the paired kid
+`VerityPostKids/VerityPostKids/LeaderboardView.swift:218-229` — the Family scope query on `kid_profiles` filters by `parent_user_id = <my parent>`. Under kid JWT, RLS for `kid_profiles` returns only the paired kid's own row (migration 096 — `is_kid_delegated()` SELECT policy). If siblings exist under the same parent, they won't appear on the Family leaderboard.
+**Do:** verify against live DB with ≥2 kid profiles under one parent. If broken, either (a) relax the SELECT policy to allow siblings-under-same-parent when `is_kid_delegated()=true` and `parent_user_id matches`, or (b) add a server-only `kid_family_leaderboard(kid_profile_id)` SECDEF RPC that returns sibling rows.
+**Done when:** 2-kid household test shows both kids on Family leaderboard in the iOS app.
+
+### 33 — Kid PIN weak-pattern check is incomplete + client-side only
+`web/src/app/profile/kids/page.tsx:12` — `WEAK_PINS` currently blocks only specific strings like `'0000'`, `'1111'`. Sequential (`1234`, `2345`), reverse (`4321`), doubles (`1212`), repeats across the list (`2222`, `3333`, etc.) may slip through. Bigger concern: the check is React-only. `/api/kids/route.js` + `/api/kids/set-pin/route.js` don't appear to validate PIN weakness server-side, so a POST bypasses the check.
+**Do:** extend the weak list (programmatic patterns: all-same, sequential ±1, mirrored halves). Move the check to a shared helper + enforce on the server in `/api/kids` POST + `/api/kids/set-pin` POST.
+
+### 34 — Kid article fetch trusts RLS only
+`VerityPostKids/VerityPostKids/KidReaderView.swift:156` — `.from("articles").select(...).eq("id", id)` has no explicit `.eq("is_kids_safe", true)` filter. Relies on RLS policy to block adult articles for kid JWT. If any article's RLS falls through (e.g., policy shape drift), a kid could fetch an adult article by known UUID.
+**Do:** add `.eq("is_kids_safe", true)` belt-and-suspenders filter in `KidReaderView.loadArticle()`. Verify live DB's RLS policy on `articles` explicitly requires `is_kids_safe=true` when `is_kid_delegated()=true`.
+
+### 35 — Sentry SDK using deprecated config pattern
+Dev server boot logs:
+```
+[@sentry/nextjs] It appears you've configured a `sentry.server.config.js`...
+Please ensure to put this file's content into the `register()` function of
+a Next.js instrumentation hook...
+```
+Also emitted for `sentry.edge.config.js`. Next 13.4+ wants `instrumentation.ts` at the root of `web/src/` with `Sentry.init` inside `register()`. Current pattern works but is deprecated; a future Next upgrade will break it.
+**Do:** create `web/src/instrumentation.ts` per Sentry's Next.js App Router guide. Keep `sentry.client.config.js` (client side is unchanged).
+
+### 36 — `themeColor` metadata deprecation warning
+Dev server emits `⚠ Unsupported metadata themeColor is configured in metadata export in /. Please move it to viewport export instead.` per Next 14 change.
+**Do:** move `themeColor` from the `metadata` export in `app/layout.js` (or wherever it's set) to a new `viewport` export.
+
+---
+
+## P2 — from end-to-end user-simulation pass
+
+### 37 — Path / API mismatches surfaced by walkthrough
+- **`/profile/settings/notifications`** referenced in FEATURE_LEDGER but actual route is `/profile/settings/alerts`. Either rename or add a redirect shell.
+- **`/api/family/weekly-report`** referenced by `profile/family/page.tsx` vs `/api/reports/weekly-reading-report` referenced in FEATURE_LEDGER. Confirm which is canonical + collapse duplicates.
+- `apply-to-expert` vs `signup/expert` vs `profile/settings/expert` — three entrypoints to the same application form. Confirm all three converge correctly.
+**Do:** one sweep, reconcile the names, delete the shells that no longer make sense.
+
+### 38 — No kid-trial auto-freeze cron observed
+D44 says a kid profile created from the 7-day trial should freeze automatically at day 7 if the parent doesn't convert. `scripts/preflight.js:263-270` lists `/api/cron/sweep-kid-trials` and `web/vercel.json` schedules it daily at 03:00 UTC — so the cron exists. Agent couldn't find the auto-freeze call path; worth tracing end-to-end to confirm the cron actually freezes (not just expires).
+**Do:** read `web/src/app/api/cron/sweep-kid-trials/route.js` end-to-end; confirm it calls the freeze RPC on trial expiry, bumps kid status, and sends parent notification.
+
+### 39 — `PairCodeView.swift:138-142` unclassified errors surface to kid UI
+Generic `catch` block shows raw Swift error descriptions to the kid. Only typed `PairError` cases should reach the UI layer; everything else should log via `Log.e` and show a friendly "Something went wrong, try again."
+
+### 40 — Missing countdown UI during pair-code cooldown
+`PairCodeView` shows "Too many tries. Wait a minute" but no countdown timer. Kids may tap retry during the 60s lockout. Add a simple `Text("Retry in \(seconds)s")` bound to a `@State` timer.
+
+---
+
+## P3 — from end-to-end user-simulation pass
+
+### 41 — `/search` page doesn't render anon CTA in-place
+Anonymous visitors to `/search` should see either a redirect to `/login?next=/search` (like other protected paths) or an in-place CTA (like `/notifications` does). Today it loads a blank search UI that won't return results. Per middleware, `/search` isn't in `PROTECTED_PREFIXES`, which is intentional for the basic-search D26 gate — but the anon fallback is inconsistent.
+
+### 42 — Unverified-but-logged-in users see "Sign up" CTA on `/story/[slug]` instead of "Verify your email"
+Lines 618-641 show the anon sign-up CTA; unverified-logged-in users hit the same branch and don't get a clear "Verify your email to take the quiz" message. Copy change only.
