@@ -35,8 +35,6 @@ Supabase service-role key, Stripe live secret, Stripe webhook secret. Ex-dev had
 
 Sentry intentionally deferred — see Post-launch section.
 
-### 4 — Enable HIBP in Supabase Auth dashboard
-Without it, signup accepts known-leaked passwords.
 
 ### 5 — Publish ≥10 real articles; delete 5 `Test:` placeholders
 `select * from articles where is_published=true and title ilike 'test%'` should return 0 rows before launch.
@@ -61,6 +59,11 @@ Gates all iOS publishing — App Store Connect products, APNs `.p8`, `apple-app-
 ---
 
 ## Post-launch (not blocking launch)
+
+### PL-0 — Enable HIBP (leaked-password check) in Supabase Auth
+One-click toggle: Authentication → Policies → "Leaked password protection" → on.
+
+**Why deferred:** small pre-launch user pool (mostly test accounts + owner), so the credential-stuffing risk is low. Flip on before opening signups broadly.
 
 ### PL-1 — Enable Sentry error tracking
 Sentry is fully wired and dormant. To activate:
