@@ -225,10 +225,19 @@ struct KidQuizEngineView: View {
             points_earned: chosen.isCorrect ? (q.points ?? 0) : 0,
             time_taken_seconds: Int(Date().timeIntervalSince(startedAt))
         )
+        // T-018 — single retry then log. Prior code swallowed silently,
+        // causing leaderboard + streak drift on transient network blips.
+        // Parent-visible telemetry path: follow-up when /api/kids/errors lands.
         do {
             try await client.from("quiz_attempts").insert(attempt).execute()
         } catch {
-            // Non-fatal; local state still tracks the answer.
+            print("[KidQuizEngineView] quiz_attempts insert failed:", error)
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            do {
+                try await client.from("quiz_attempts").insert(attempt).execute()
+            } catch {
+                print("[KidQuizEngineView] quiz_attempts insert failed on retry:", error)
+            }
         }
     }
 

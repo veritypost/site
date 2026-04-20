@@ -185,13 +185,24 @@ struct KidReaderView: View {
             source: "kids-ios",
             device_type: "ios"
         )
+        // T-018 — single retry then log. Prior empty catch swallowed
+        // failures silently; kid saw their streak "tick" locally while
+        // the DB trigger never fired. Retry + log closes the loudest
+        // data-loss vector. Parent-visible telemetry TBD.
         do {
             try await client
                 .from("reading_log")
                 .insert(row)
                 .execute()
         } catch {
-            // Non-fatal; quiz can still be taken. Logged locally in future.
+            print("[KidReaderView] reading_log insert failed:", error)
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            do {
+                try await client.from("reading_log").insert(row).execute()
+            } catch {
+                print("[KidReaderView] reading_log insert failed on retry:", error)
+            }
+            // Quiz can still be taken. Logged locally in future.
         }
     }
 }
