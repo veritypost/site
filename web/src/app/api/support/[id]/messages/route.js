@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { requireAuth } from '@/lib/auth';
 import { NextResponse } from 'next/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 export async function GET(request, { params }) {
   try {
@@ -64,7 +65,7 @@ export async function POST(request, { params }) {
       .eq('id', params.id)
       .in('status', ['resolved', 'closed']);
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return safeErrorResponse(NextResponse, error, { route: 'support.id.messages', fallbackStatus: 500 });
     return NextResponse.json({ message: data });
   } catch (err) {
     if (err && err.status) return NextResponse.json({ error: err.message }, { status: err.status });

@@ -4,6 +4,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // F-034 — the pre-fix handler only checked that the target role being
 // granted/revoked was at-or-below the actor's level. That blocks a
@@ -25,7 +26,10 @@ async function assertActorOutranksTarget(authed, actorId, targetUserId) {
   const { data: outranks, error } = await authed.rpc('require_outranks', {
     target_user_id: targetUserId,
   });
-  if (error) return { error: error.message };
+  if (error) {
+    console.error('[admin.users.roles.outranks]', error.message);
+    return { error: 'Rank check failed' };
+  }
   if (!outranks) return { blocked: true };
   return null;
 }
@@ -73,7 +77,7 @@ export async function POST(request, { params }) {
     p_user_id: params.id,
     p_role_name: role_name,
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.users.id.roles', fallbackStatus: 400 });
 
   // Bump perms_version so the target's client refetches capabilities on
   // next navigation. Without this, moderation console grants/revokes
@@ -130,7 +134,7 @@ export async function DELETE(request, { params }) {
     p_user_id: params.id,
     p_role_name: role_name,
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.users.id.roles', fallbackStatus: 400 });
 
   // Bump perms_version so the revoked user's client refetches on next
   // navigation (see POST handler above for rationale). Non-fatal.

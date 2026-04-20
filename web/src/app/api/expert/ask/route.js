@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { v2LiveGuard } from '@/lib/featureFlags';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // POST /api/expert/ask — D20 Ask an Expert.
 // Body: { article_id, body, target_type, target_id }
@@ -29,6 +30,6 @@ export async function POST(request) {
     p_target_type: target_type,
     p_target_id: target_id,
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'expert.ask', fallbackStatus: 400 });
   return NextResponse.json(data);
 }

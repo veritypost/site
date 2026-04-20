@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission, getUserRoles } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // GET  — list approved questions for the session. kid_profiles identity
 //        is attached only for privileged viewers: the assigned expert for
@@ -35,7 +36,7 @@ export async function GET(_request, { params }) {
     .select('*, kid_profiles(id, parent_user_id, display_name, avatar_color)')
     .eq('session_id', params.id)
     .order('created_at');
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'expert_sessions.id.questions', fallbackStatus: 400 });
 
   const questions = (data || []).map((row) => {
     const isParentOfKid = row.kid_profiles?.parent_user_id === user.id;
@@ -85,6 +86,6 @@ export async function POST(request, { params }) {
     })
     .select('id')
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'expert_sessions.id.questions', fallbackStatus: 400 });
   return NextResponse.json({ id: data.id });
 }

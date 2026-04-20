@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { v2LiveGuard } from '@/lib/featureFlags';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // POST /api/comments/[id]/vote
 // Body: { type: 'upvote' | 'downvote' | 'clear' }
@@ -29,6 +30,6 @@ export async function POST(request, { params }) {
     p_comment_id: id,
     p_vote_type: type,
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'comments.id.vote', fallbackStatus: 400 });
   return NextResponse.json(data);
 }

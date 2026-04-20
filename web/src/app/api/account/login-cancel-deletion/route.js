@@ -36,7 +36,8 @@ export async function POST(request) {
       p_user_id: user.id,
     });
     if (error) {
-      return NextResponse.json({ cancelled: false, error: error.message }, { status: 500 });
+      console.error('[account.login-cancel-deletion]', error.message);
+      return NextResponse.json({ cancelled: false, error: 'Could not cancel deletion' }, { status: 500 });
     }
     return NextResponse.json({ cancelled: !!data });
   } catch {

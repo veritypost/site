@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // GET /api/expert/queue — list queue items visible to the caller.
 // Experts see pending items in their categories + directed at them,
@@ -47,6 +48,6 @@ export async function GET(request) {
   }
 
   const { data, error } = await q;
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'expert.queue', fallbackStatus: 400 });
   return NextResponse.json({ items: data || [] });
 }

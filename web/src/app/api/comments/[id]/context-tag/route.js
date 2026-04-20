@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { v2LiveGuard } from '@/lib/featureFlags';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // POST /api/comments/[id]/context-tag
 // D15/D16: toggle an "Article Context" tag. Any user who passed the
@@ -23,6 +24,6 @@ export async function POST(_request, { params }) {
     p_user_id: user.id,
     p_comment_id: params.id,
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'comments.id.context_tag', fallbackStatus: 400 });
   return NextResponse.json(data);
 }

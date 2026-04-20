@@ -4,6 +4,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // PATCH /api/admin/permissions/[id]   — update permission row
 // DELETE /api/admin/permissions/[id]  — delete permission row
@@ -36,7 +37,7 @@ export async function PATCH(request, { params }) {
 
   const service = createServiceClient();
   const { error } = await service.from('permissions').update(patch).eq('id', id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.permissions.id', fallbackStatus: 400 });
 
   try {
     await service.from('audit_log').insert({
@@ -64,7 +65,7 @@ export async function DELETE(_request, { params }) {
 
   const service = createServiceClient();
   const { error } = await service.from('permissions').delete().eq('id', id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.permissions.id', fallbackStatus: 400 });
 
   try {
     await service.from('audit_log').insert({

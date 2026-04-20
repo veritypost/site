@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { verifyCronAuth } from '@/lib/cronAuth';
 import { withCronLog } from '@/lib/cronLog';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // Auth: CRON_SECRET via verifyCronAuth. Fail-closed 403.
 // Phase 17.1: sweeps every active verity_family / verity_family_xl owner,
@@ -18,7 +19,7 @@ async function run(request) {
   }
   const service = createServiceClient();
   const { data, error } = await service.rpc('recompute_family_achievements');
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'cron.recompute_family_achievements', fallbackStatus: 500 });
   return NextResponse.json({ ...data, ran_at: new Date().toISOString() });
 }
 

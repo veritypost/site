@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // Phase 18.3: admin early-completes an expert's 30-day probation.
 // Normally probation auto-closes when probation_ends_at passes.
@@ -23,7 +24,7 @@ export async function POST(request, { params }) {
     p_admin_id: user.id,
     p_application_id: params.id,
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.expert.applications.id.mark_probation_complete', fallbackStatus: 400 });
 
   await service.from('audit_log').insert({
     actor_id: user.id,

@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // Admin-triggered cancellation. D40 flow: DMs off immediately,
 // 7-day grace, then freeze.
@@ -42,6 +43,6 @@ export async function POST(request) {
     p_user_id: user_id,
     p_reason: reason || 'admin cancel',
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.billing.cancel', fallbackStatus: 400 });
   return NextResponse.json(data);
 }

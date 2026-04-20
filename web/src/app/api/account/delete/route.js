@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { createClient, createClientFromToken, createServiceClient } from '@/lib/supabase/server';
 import { hasPermissionServer } from '@/lib/auth';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // Phase 19.2: user self-initiates account deletion. Schedules the
 // 30-day grace timer + writes a data_requests row. Cron anonymizes
@@ -86,7 +87,7 @@ export async function POST(request) {
     p_user_id: user.id,
     p_reason: reason || null,
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'account.delete', fallbackStatus: 400 });
   return NextResponse.json(data);
 }
 
@@ -101,6 +102,6 @@ export async function DELETE(request) {
   const { data, error } = await service.rpc('cancel_account_deletion', {
     p_user_id: user.id,
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'account.delete', fallbackStatus: 400 });
   return NextResponse.json({ cancelled: !!data });
 }

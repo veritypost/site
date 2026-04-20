@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // Bug 82: DM search — single server round-trip with user_roles join so
 // role-filtered searches return up to 20 real matches instead of filtering
@@ -42,7 +43,7 @@ export async function GET(request) {
   }
 
   const { data, error } = await builder;
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'messages.search', fallbackStatus: 400 });
 
   return NextResponse.json({
     users: (data || []).map(u => ({

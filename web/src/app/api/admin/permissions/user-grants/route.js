@@ -4,6 +4,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // POST   /api/admin/permissions/user-grants   { user_id, permission_set_id, expires_at?, reason? }
 // DELETE /api/admin/permissions/user-grants?user_id=...&permission_set_id=...
@@ -51,7 +52,7 @@ export async function POST(request) {
     .insert(row)
     .select()
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.permissions.user_grants', fallbackStatus: 400 });
 
   try {
     await service.from('audit_log').insert({
@@ -106,7 +107,7 @@ export async function DELETE(request) {
     .delete()
     .eq('user_id', user_id)
     .eq('permission_set_id', permission_set_id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.permissions.user_grants', fallbackStatus: 400 });
 
   try {
     await service.from('audit_log').insert({

@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 const ALLOWED = ['name', 'slug', 'description', 'logo_url', 'website_url',
   'contact_name', 'contact_email', 'billing_email',
@@ -19,7 +20,7 @@ export async function PATCH(request, { params }) {
   for (const k of ALLOWED) if (b[k] !== undefined) update[k] = b[k];
   const service = createServiceClient();
   const { error } = await service.from('sponsors').update(update).eq('id', params.id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.sponsors.id', fallbackStatus: 400 });
   return NextResponse.json({ ok: true });
 }
 
@@ -31,6 +32,6 @@ export async function DELETE(_request, { params }) {
   }
   const service = createServiceClient();
   const { error } = await service.from('sponsors').delete().eq('id', params.id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.sponsors.id', fallbackStatus: 400 });
   return NextResponse.json({ ok: true });
 }

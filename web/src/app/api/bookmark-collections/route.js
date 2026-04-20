@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // GET  — list the caller's collections.
 // POST — create one (paid-only; RPC enforces).
@@ -18,7 +19,7 @@ export async function GET() {
     .eq('user_id', user.id)
     .order('sort_order')
     .order('created_at');
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'bookmark_collections', fallbackStatus: 400 });
   return NextResponse.json({ collections: data || [] });
 }
 
@@ -34,6 +35,6 @@ export async function POST(request) {
     p_name: name,
     p_description: description || null,
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'bookmark_collections', fallbackStatus: 400 });
   return NextResponse.json({ id: data });
 }

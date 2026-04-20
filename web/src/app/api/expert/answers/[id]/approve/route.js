@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // Editor approves a probation-state expert answer, flipping it
 // to visible. D3: 30-day probation.
@@ -19,6 +20,6 @@ export async function POST(_request, { params }) {
     p_editor_id: user.id,
     p_comment_id: params.id,
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'expert.answers.id.approve', fallbackStatus: 400 });
   return NextResponse.json({ ok: true });
 }

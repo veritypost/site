@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // GET — list the caller's alert_preferences rows.
 // PATCH — upsert one row. Body: { alert_type, channel_push?, channel_email?,
@@ -18,7 +19,7 @@ export async function GET() {
     .from('alert_preferences')
     .select('*')
     .eq('user_id', user.id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'notifications.preferences', fallbackStatus: 400 });
   return NextResponse.json({ preferences: data || [] });
 }
 
@@ -55,6 +56,6 @@ export async function PATCH(request) {
   const { error } = existing
     ? await service.from('alert_preferences').update(payload).eq('id', existing.id)
     : await service.from('alert_preferences').insert(payload);
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'notifications.preferences', fallbackStatus: 400 });
   return NextResponse.json({ ok: true });
 }

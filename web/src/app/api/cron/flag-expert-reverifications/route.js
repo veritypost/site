@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { verifyCronAuth } from '@/lib/cronAuth';
 import { withCronLog } from '@/lib/cronLog';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // Auth: CRON_SECRET via verifyCronAuth. Fail-closed 403.
 // Blueprint 2.4: annual expert re-verification. Weekly sweep flags
@@ -17,7 +18,7 @@ async function run(request) {
   if (!verifyCronAuth(request).ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   const service = createServiceClient();
   const { data, error } = await service.rpc('flag_expert_reverifications_due', { p_warning_days: 30 });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'cron.flag_expert_reverifications', fallbackStatus: 500 });
   return NextResponse.json({ flagged_count: data, ran_at: new Date().toISOString() });
 }
 

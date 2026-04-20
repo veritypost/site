@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // GET /api/admin/moderation/reports?status=pending&supervisor=true
 export async function GET(request) {
@@ -27,6 +28,6 @@ export async function GET(request) {
   if (supervisorOnly) q = q.eq('is_supervisor_flag', true);
 
   const { data, error } = await q;
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.moderation.reports', fallbackStatus: 400 });
   return NextResponse.json({ reports: data || [] });
 }

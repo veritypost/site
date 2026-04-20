@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // PATCH /api/bookmarks/[id] — update notes / move between collections.
 // Notes + collections are paid-only (D13) — we refuse on the server
@@ -40,7 +41,7 @@ export async function PATCH(request, { params }) {
   if (Object.keys(update).length === 0) return NextResponse.json({ ok: true });
 
   const { error } = await service.from('bookmarks').update(update).eq('id', params.id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'bookmarks.id', fallbackStatus: 400 });
   return NextResponse.json({ ok: true });
 }
 
@@ -59,6 +60,6 @@ export async function DELETE(_request, { params }) {
     .delete()
     .eq('id', params.id)
     .eq('user_id', user.id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'bookmarks.id', fallbackStatus: 400 });
   return NextResponse.json({ ok: true });
 }

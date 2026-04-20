@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // GET — all non-sensitive settings, ordered by category + key.
 // PATCH — body: { key, value } (value as serialized string already in
@@ -23,7 +24,7 @@ export async function GET() {
     .eq('is_sensitive', false)
     .order('category')
     .order('key');
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.settings', fallbackStatus: 400 });
   return NextResponse.json({ settings: data || [] });
 }
 
@@ -66,7 +67,7 @@ export async function PATCH(request) {
     .from('settings')
     .update({ value, updated_by: user.id, updated_at: new Date().toISOString() })
     .eq('id', existing.id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.settings', fallbackStatus: 400 });
 
   await service.from('audit_log').insert({
     actor_id: user.id,

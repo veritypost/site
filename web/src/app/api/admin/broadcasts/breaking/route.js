@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // POST /api/admin/broadcasts/breaking
 // Body: { article_id, title, body }
@@ -25,6 +26,6 @@ export async function POST(request) {
     p_title: title,
     p_body: body || null,
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.broadcasts.breaking', fallbackStatus: 400 });
   return NextResponse.json({ sent_count: data });
 }

@@ -4,6 +4,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // D40: user cancels → DMs revoked immediately, 7-day grace for
 // everything else, freeze on day 7. This endpoint flips the DB
@@ -30,7 +31,7 @@ export async function POST(request) {
   });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return safeErrorResponse(NextResponse, error, { route: 'billing.cancel', fallbackStatus: 400 });
   }
   return NextResponse.json(data);
 }

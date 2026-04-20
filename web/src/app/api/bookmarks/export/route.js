@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // GET /api/bookmarks/export — JSON download (D13, paid-only).
 export async function GET() {
@@ -20,7 +21,7 @@ export async function GET() {
     .select('id, notes, created_at, collection_id, bookmark_collections!fk_bookmarks_collection_id(name), articles!fk_bookmarks_article_id(title, slug, excerpt, published_at, categories!fk_articles_category_id(name))')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'bookmarks.export', fallbackStatus: 400 });
 
   const payload = {
     exported_at: new Date().toISOString(),

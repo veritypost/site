@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // POST /api/admin/data-requests/[id]/approve
 // Marks the requester's identity as verified so the export cron
@@ -29,6 +30,6 @@ export async function POST(request, { params }) {
       updated_at: now,
     })
     .eq('id', params.id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.data_requests.id.approve', fallbackStatus: 400 });
   return NextResponse.json({ ok: true });
 }

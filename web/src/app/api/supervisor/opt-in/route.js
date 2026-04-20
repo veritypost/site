@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 export async function POST(request) {
   let user;
@@ -17,6 +18,6 @@ export async function POST(request) {
     p_user_id: user.id,
     p_category_id: category_id,
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'supervisor.opt_in', fallbackStatus: 400 });
   return NextResponse.json({ ok: true });
 }

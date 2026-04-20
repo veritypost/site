@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // GET /api/admin/expert/applications?status=pending
 export async function GET(request) {
@@ -21,6 +22,6 @@ export async function GET(request) {
     .select('*, users!fk_expert_applications_user_id(id, username, email, avatar_color), expert_application_categories(categories(id, name))')
     .eq('status', status)
     .order('created_at', { ascending: false });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.expert.applications', fallbackStatus: 400 });
   return NextResponse.json({ applications: data || [] });
 }

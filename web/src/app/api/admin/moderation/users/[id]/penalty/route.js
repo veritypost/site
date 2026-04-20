@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // Blueprint §10 progressive stack:
 //   level 1 = warn
@@ -53,6 +54,6 @@ export async function POST(request, { params }) {
     p_level: levelNum,
     p_reason: reason,
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.moderation.users.id.penalty', fallbackStatus: 400 });
   return NextResponse.json({ warning_id: data });
 }

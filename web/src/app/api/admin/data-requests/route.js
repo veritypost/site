@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // GET /api/admin/data-requests?status=pending
 // Lists data_requests joined with the requesting user's identity info
@@ -23,6 +24,6 @@ export async function GET(request) {
     .select('*, users!fk_data_requests_user_id(id, username, email, email_verified, created_at, avatar_color)')
     .eq('status', status)
     .order('created_at', { ascending: false });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.data_requests', fallbackStatus: 400 });
   return NextResponse.json({ requests: data || [] });
 }

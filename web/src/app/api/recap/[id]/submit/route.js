@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { v2LiveGuard } from '@/lib/featureFlags';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // POST /api/recap/[id]/submit — grade a recap attempt.
 // Body: { answers: [{ question_id, selected_answer:int }] }
@@ -25,6 +26,6 @@ export async function POST(request, { params }) {
     p_recap_quiz_id: params.id,
     p_answers: answers,
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'recap.id.submit', fallbackStatus: 400 });
   return NextResponse.json(data);
 }

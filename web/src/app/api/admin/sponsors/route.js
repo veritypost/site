@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 export async function GET() {
   try { await requirePermission('admin.ads.sponsors.manage'); }
@@ -12,7 +13,7 @@ export async function GET() {
   }
   const service = createServiceClient();
   const { data, error } = await service.from('sponsors').select('*').order('created_at', { ascending: false }).limit(500);
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.sponsors', fallbackStatus: 400 });
   return NextResponse.json({ sponsors: data || [] });
 }
 
@@ -32,6 +33,6 @@ export async function POST(request) {
     billing_email: b.billing_email || null, contract_start: b.contract_start || null,
     contract_end: b.contract_end || null, is_active: true,
   }).select('id').single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.sponsors', fallbackStatus: 400 });
   return NextResponse.json({ id: data.id });
 }

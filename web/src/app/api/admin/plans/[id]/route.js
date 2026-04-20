@@ -4,6 +4,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // PATCH /api/admin/plans/[id]   — update a plan row
 //
@@ -36,7 +37,7 @@ export async function PATCH(request, { params }) {
 
   const service = createServiceClient();
   const { error } = await service.from('plans').update(patch).eq('id', id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.plans.id', fallbackStatus: 400 });
 
   try {
     await service.from('audit_log').insert({

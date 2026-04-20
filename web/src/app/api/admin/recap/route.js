@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // GET — list recaps. POST — create a new recap skeleton.
 // Body: { category_id?, week_start, week_end, title, description?, article_ids? }
@@ -15,7 +16,7 @@ export async function GET() {
   const service = createServiceClient();
   const { data, error } = await service.from('weekly_recap_quizzes')
     .select('*, categories(name)').order('week_start', { ascending: false }).limit(50);
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.recap', fallbackStatus: 400 });
   return NextResponse.json({ recaps: data || [] });
 }
 
@@ -40,6 +41,6 @@ export async function POST(request) {
     article_ids: b.article_ids || [],
     is_active: true,
   }).select('id').single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.recap', fallbackStatus: 400 });
   return NextResponse.json({ id: data.id });
 }

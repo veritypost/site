@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // POST /api/admin/appeals/[id]/resolve  { outcome: 'approved'|'denied', notes? }
 // On 'approved' the penalty is reversed server-side.
@@ -24,6 +25,6 @@ export async function POST(request, { params }) {
     p_outcome: outcome,
     p_notes: notes || null,
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.appeals.id.resolve', fallbackStatus: 400 });
   return NextResponse.json({ ok: true });
 }

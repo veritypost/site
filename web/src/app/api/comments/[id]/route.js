@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // PATCH /api/comments/[id] — owner edit.
 export async function PATCH(request, { params }) {
@@ -23,7 +24,7 @@ export async function PATCH(request, { params }) {
     p_comment_id: id,
     p_body: body,
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'comments.id', fallbackStatus: 400 });
   return NextResponse.json({ ok: true });
 }
 
@@ -42,6 +43,6 @@ export async function DELETE(_request, { params }) {
     p_user_id: user.id,
     p_comment_id: id,
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'comments.id', fallbackStatus: 400 });
   return NextResponse.json({ ok: true });
 }

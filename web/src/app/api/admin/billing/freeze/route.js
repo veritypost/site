@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // Skip grace and freeze immediately (D40). Use when an admin
 // needs to close out a user past their grace window without
@@ -37,6 +38,6 @@ export async function POST(request) {
 
   const service = createServiceClient();
   const { data, error } = await service.rpc('billing_freeze_profile', { p_user_id: user_id });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.billing.freeze', fallbackStatus: 400 });
   return NextResponse.json(data);
 }

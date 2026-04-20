@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { hasPermissionServer } from '@/lib/auth';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // GET /api/search?q=...&category=...&subcategory=...&from=...&to=...&source=...
 // D26: basic keyword for everyone (anon can search titles), advanced
@@ -90,7 +91,7 @@ export async function GET(request) {
   }
 
   const { data, error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'search', fallbackStatus: 400 });
 
   return NextResponse.json({
     articles: data || [],

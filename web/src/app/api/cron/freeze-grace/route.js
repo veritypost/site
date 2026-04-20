@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { verifyCronAuth } from '@/lib/cronAuth';
 import { withCronLog } from '@/lib/cronLog';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // D40: freeze every user whose 7-day grace has expired. Runs hourly.
 // Auth: CRON_SECRET via verifyCronAuth (timing-safe compare + x-vercel-cron).
@@ -17,7 +18,7 @@ async function run(request) {
   }
   const service = createServiceClient();
   const { data, error } = await service.rpc('billing_freeze_expired_grace');
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'cron.freeze_grace', fallbackStatus: 500 });
   return NextResponse.json({ frozen_count: data, ran_at: new Date().toISOString() });
 }
 

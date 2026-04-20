@@ -5,6 +5,7 @@ import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { validateConsentPayload, COPPA_CONSENT_VERSION } from '@/lib/coppaConsent';
 import { buildPbkdf2Credential } from '@/lib/kidPin';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 const WEAK_PINS = new Set([
   '0000', '1111', '2222', '3333', '4444', '5555', '6666', '7777', '8888', '9999',
@@ -28,7 +29,7 @@ export async function GET() {
     .eq('parent_user_id', user.id)
     .eq('is_active', true)
     .order('created_at');
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'kids', fallbackStatus: 400 });
   return NextResponse.json({ kids: data || [] });
 }
 
@@ -101,7 +102,7 @@ export async function POST(request) {
     })
     .select('id')
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'kids', fallbackStatus: 400 });
 
   await service.from('users').update({ has_kids_profiles: true }).eq('id', user.id);
 

@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // GET — list upcoming sessions (visible to family accounts; kids list these).
 // POST — editor-only, schedule a new session.
@@ -25,7 +26,7 @@ export async function GET(request) {
     .eq('status', status)
     .eq('is_active', true)
     .order('scheduled_at');
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'expert_sessions', fallbackStatus: 400 });
   return NextResponse.json({ sessions: data || [] });
 }
 
@@ -56,6 +57,6 @@ export async function POST(request) {
     })
     .select('id')
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'expert_sessions', fallbackStatus: 400 });
   return NextResponse.json({ id: data.id });
 }

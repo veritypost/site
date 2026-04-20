@@ -5,6 +5,7 @@ import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { validateConsentPayload, COPPA_CONSENT_VERSION } from '@/lib/coppaConsent';
 import { buildPbkdf2Credential } from '@/lib/kidPin';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 const WEAK_PINS = new Set([
   '0000', '1111', '2222', '3333', '4444', '5555', '6666', '7777', '8888', '9999',
@@ -78,7 +79,7 @@ export async function POST(request) {
     p_pin_hash: pinCred.pin_hash,
     p_date_of_birth: b.date_of_birth || null,
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'kids.trial', fallbackStatus: 400 });
 
   const nowIso = new Date().toISOString();
   const { data: fresh } = await service

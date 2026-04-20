@@ -4,6 +4,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // POST /api/admin/permissions   — create a permission row
 //
@@ -37,7 +38,7 @@ export async function POST(request) {
     deny_mode: body.deny_mode || 'locked',
   };
   const { data, error } = await service.from('permissions').insert(row).select().single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.permissions', fallbackStatus: 400 });
 
   try {
     await service.from('audit_log').insert({

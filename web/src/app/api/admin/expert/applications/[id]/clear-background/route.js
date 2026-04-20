@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // Phase 18.1: admin clears a journalist's background check so
 // approve_expert_application will accept them. Journalist approvals
@@ -27,7 +28,7 @@ export async function POST(request, { params }) {
     .select('id, background_check_status')
     .maybeSingle();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.expert.applications.id.clear_background', fallbackStatus: 400 });
   if (!data) return NextResponse.json({ error: 'Application not found' }, { status: 404 });
 
   await service.from('audit_log').insert({

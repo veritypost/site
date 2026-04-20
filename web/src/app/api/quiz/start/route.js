@@ -5,6 +5,7 @@ import { requirePermission } from '@/lib/auth';
 import { assertKidOwnership } from '@/lib/kids';
 import { createServiceClient } from '@/lib/supabase/server';
 import { v2LiveGuard } from '@/lib/featureFlags';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 export async function POST(request) {
   const blocked = await v2LiveGuard(); if (blocked) return blocked;
@@ -32,7 +33,7 @@ export async function POST(request) {
     p_kid_profile_id: kid_profile_id || null,
   });
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return safeErrorResponse(NextResponse, error, { route: 'quiz.start', fallbackStatus: 400 });
   }
   return NextResponse.json(data);
 }

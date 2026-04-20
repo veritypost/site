@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 export async function GET(request) {
   let user;
@@ -30,7 +31,7 @@ export async function GET(request) {
   if (category) q = q.eq('category_id', category);
 
   const { data, error } = await q;
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'recap', fallbackStatus: 400 });
 
   // Existing attempt per recap so the UI can badge completed.
   const ids = (data || []).map(r => r.id);

@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // POST /api/expert/queue/[id]/answer
 // Body: { body }
@@ -23,6 +24,6 @@ export async function POST(request, { params }) {
     p_queue_item_id: params.id,
     p_body: body,
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'expert.queue.id.answer', fallbackStatus: 400 });
   return NextResponse.json(data);
 }

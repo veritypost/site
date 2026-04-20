@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission, getUserRoles } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // POST — expert answers a kid question (approves it at the same time).
 // Editor/admin can also answer/approve for moderation purposes.
@@ -61,6 +62,6 @@ export async function POST(request, { params }) {
       answered_at: new Date().toISOString(),
     })
     .eq('id', params.id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'expert_sessions.questions.id.answer', fallbackStatus: 400 });
   return NextResponse.json({ ok: true });
 }

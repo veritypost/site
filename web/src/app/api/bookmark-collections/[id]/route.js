@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 export async function PATCH(request, { params }) {
   let user;
@@ -17,7 +18,7 @@ export async function PATCH(request, { params }) {
     p_name: name,
     p_description: description || null,
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'bookmark_collections.id', fallbackStatus: 400 });
   return NextResponse.json({ ok: true });
 }
 
@@ -31,6 +32,6 @@ export async function DELETE(_request, { params }) {
     p_user_id: user.id,
     p_collection_id: params.id,
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'bookmark_collections.id', fallbackStatus: 400 });
   return NextResponse.json({ ok: true });
 }

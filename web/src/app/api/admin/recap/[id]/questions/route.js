@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // POST /api/admin/recap/[id]/questions — add a question.
 // Body: { article_id?, question_text, options: [{text, is_correct}], explanation?, sort_order? }
@@ -29,6 +30,6 @@ export async function POST(request, { params }) {
     explanation: b.explanation || null,
     sort_order: b.sort_order || 0,
   }).select('id').single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.recap.id.questions', fallbackStatus: 400 });
   return NextResponse.json({ id: data.id });
 }

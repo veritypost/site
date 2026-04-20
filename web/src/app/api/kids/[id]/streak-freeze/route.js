@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 export async function POST(_request, { params }) {
   let user;
@@ -14,6 +15,6 @@ export async function POST(_request, { params }) {
     p_parent_id: user.id,
     p_kid_profile_id: params.id,
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'kids.id.streak_freeze', fallbackStatus: 400 });
   return NextResponse.json(data);
 }

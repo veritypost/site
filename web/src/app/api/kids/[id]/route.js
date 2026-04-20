@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 async function ownKid(service, userId, kidId) {
   // Only treat kids that are is_active=true as owned. Soft-deleted
@@ -39,7 +40,7 @@ export async function PATCH(request, { params }) {
   if (Object.keys(update).length === 0) return NextResponse.json({ ok: true });
 
   const { error } = await service.from('kid_profiles').update(update).eq('id', params.id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'kids.id', fallbackStatus: 400 });
   return NextResponse.json({ ok: true });
 }
 

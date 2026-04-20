@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 export async function GET(request) {
   let user;
@@ -47,7 +48,7 @@ export async function GET(request) {
       .not('kid_profile_id', 'is', null)
       .order('score', { ascending: false })
       .limit(limit);
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error) return safeErrorResponse(NextResponse, error, { route: 'kids.global_leaderboard', fallbackStatus: 400 });
     const rows = (data || []).map(r => ({
       id: r.kid_profile_id,
       display_name: r.kid_profiles?.display_name || 'Unknown',
@@ -63,7 +64,7 @@ export async function GET(request) {
     .eq('global_leaderboard_opt_in', true)
     .order('verity_score', { ascending: false })
     .limit(limit);
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'kids.global_leaderboard', fallbackStatus: 400 });
   const rows = (data || []).map(r => ({
     id: r.id,
     display_name: r.display_name || 'Unknown',

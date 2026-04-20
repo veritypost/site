@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 export async function POST(request, { params }) {
   let user;
@@ -22,6 +23,6 @@ export async function POST(request, { params }) {
     p_application_id: params.id,
     p_rejection_reason: rejection_reason,
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.expert.applications.id.reject', fallbackStatus: 400 });
   return NextResponse.json({ ok: true });
 }

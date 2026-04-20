@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // GET /api/reports/weekly-reading-report — D25 per-user weekly data.
 // Paid only; free users get an upsell hint.
@@ -16,6 +17,6 @@ export async function GET() {
   if (!paid) return NextResponse.json({ paid: false, report: null });
 
   const { data, error } = await service.rpc('weekly_reading_report', { p_user_id: user.id });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'reports.weekly_reading_report', fallbackStatus: 400 });
   return NextResponse.json({ paid: true, report: data });
 }

@@ -4,6 +4,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // D40: restore from frozen state. Score picks up from frozen_verity_score.
 // Activity during the frozen period does not count.
@@ -37,7 +38,7 @@ export async function POST(request) {
     p_new_plan_id: plan.id,
   });
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return safeErrorResponse(NextResponse, error, { route: 'billing.resubscribe', fallbackStatus: 400 });
   }
   return NextResponse.json(data);
 }

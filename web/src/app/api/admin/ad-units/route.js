@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 export async function GET(request) {
   try { await requirePermission('admin.ads.view'); }
@@ -18,7 +19,7 @@ export async function GET(request) {
   if (placementId) q = q.eq('placement_id', placementId);
   if (campaignId)  q = q.eq('campaign_id', campaignId);
   const { data, error } = await q;
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.ad_units', fallbackStatus: 400 });
   return NextResponse.json({ units: data || [] });
 }
 
@@ -57,6 +58,6 @@ export async function POST(request) {
     approved_by: b.approval_status === 'approved' ? user.id : null,
     is_active: true,
   }).select('id').single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.ad_units', fallbackStatus: 400 });
   return NextResponse.json({ id: data.id });
 }
