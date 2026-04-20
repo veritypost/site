@@ -25,14 +25,14 @@ struct KidPickerView: View {
                             .foregroundStyle(K.dim)
                     }
 
-                    if auth.isLoadingKids && auth.availableKids.isEmpty {
+                    if auth.isBusy && auth.availableKids.isEmpty {
                         ProgressView().padding(.top, 40)
                     } else if auth.availableKids.isEmpty {
                         emptyState
                     } else {
                         VStack(spacing: 12) {
                             ForEach(auth.availableKids) { kid in
-                                Button { auth.select(kid) } label: { row(kid) }
+                                Button { auth.selectKid(kid) } label: { row(kid) }
                                     .buttonStyle(.plain)
                             }
                         }

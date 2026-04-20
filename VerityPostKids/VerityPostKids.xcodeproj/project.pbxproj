@@ -1,0 +1,409 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		1738AD35A766F42D38998EE2 /* KidsAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54781BD709ADC4A406CE0878 /* KidsAuth.swift */; };
+		1C2813F116F3AFDC26D6688C /* FlameShape.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AC3F85C37A8F066CB3B3711 /* FlameShape.swift */; };
+		2CB867CC063E039B3D827F91 /* BadgeUnlockScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F0E00BF0E23900ED952D6B9 /* BadgeUnlockScene.swift */; };
+		2D0F041EE31A4AD0B92E729F /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AE11EAFD9F0CA7DA398AF37 /* Models.swift */; };
+		3274034236B12EFDB9B6D459 /* PairCodeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0294259BBB29EE50F69E579B /* PairCodeView.swift */; };
+		50F58DB8B2B4C7302A738480 /* CountUpText.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8E0923FEBDCF3B489AF44D5 /* CountUpText.swift */; };
+		55274D59A30F704FF8BB7101 /* KidsAppRoot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84EB55027E956CCF4CE8EC68 /* KidsAppRoot.swift */; };
+		5715E3BAB52A0C326EDF7123 /* GreetingScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = A07D66E9A6A788F32377791D /* GreetingScene.swift */; };
+		5D8EAD3D01F86B2BD70A86E4 /* QuizPassScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5116F30BF6F33F44FF00C85B /* QuizPassScene.swift */; };
+		5F2204F11B82CDF9276F98E5 /* SupabaseKidsClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF8D7E0A12E5F8ACA7E01F1B /* SupabaseKidsClient.swift */; };
+		6388683C3B827A341879AFB1 /* VerityPostKidsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7850C87647B367225CB6261F /* VerityPostKidsApp.swift */; };
+		6942E5482D1A1FD441E454B2 /* SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D80ABC0B8A71DDC194DD123 /* SignInView.swift */; };
+		909A96E0C0F38C03FF6D7D5D /* StreakScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = 456A67084D78F1B60B3E21A0 /* StreakScene.swift */; };
+		A25A97B2AADB431630B0424E /* KidsAppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3153D2B72BDB3EA24F15616E /* KidsAppState.swift */; };
+		A3AA44D56ACB51E7972CEF99 /* KidPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28D1A612569BB16ACECF8402 /* KidPickerView.swift */; };
+		AD856BC980527A1AA062962A /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 3231E3A4C1F6B1DE4063FC8E /* Supabase */; };
+		E26C25D70717FF06CE927200 /* ParticleSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF0745187FC833D220441615 /* ParticleSystem.swift */; };
+		F36F28DE59910E2DAE3F4D3F /* KidsTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60AE09822D75BFAD667F91E /* KidsTheme.swift */; };
+		FF7D55F9580DE4402A36A0BE /* PairingClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 354FE093006411DBBD390AC5 /* PairingClient.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		0294259BBB29EE50F69E579B /* PairCodeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairCodeView.swift; sourceTree = "<group>"; };
+		07515D97F2458CE08E3C9BE3 /* VerityPostKids.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = VerityPostKids.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		0F0E00BF0E23900ED952D6B9 /* BadgeUnlockScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BadgeUnlockScene.swift; sourceTree = "<group>"; };
+		28D1A612569BB16ACECF8402 /* KidPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KidPickerView.swift; sourceTree = "<group>"; };
+		3153D2B72BDB3EA24F15616E /* KidsAppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KidsAppState.swift; sourceTree = "<group>"; };
+		354FE093006411DBBD390AC5 /* PairingClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingClient.swift; sourceTree = "<group>"; };
+		3AC3F85C37A8F066CB3B3711 /* FlameShape.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlameShape.swift; sourceTree = "<group>"; };
+		456A67084D78F1B60B3E21A0 /* StreakScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreakScene.swift; sourceTree = "<group>"; };
+		5116F30BF6F33F44FF00C85B /* QuizPassScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizPassScene.swift; sourceTree = "<group>"; };
+		54781BD709ADC4A406CE0878 /* KidsAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KidsAuth.swift; sourceTree = "<group>"; };
+		7850C87647B367225CB6261F /* VerityPostKidsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerityPostKidsApp.swift; sourceTree = "<group>"; };
+		7D80ABC0B8A71DDC194DD123 /* SignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInView.swift; sourceTree = "<group>"; };
+		84EB55027E956CCF4CE8EC68 /* KidsAppRoot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KidsAppRoot.swift; sourceTree = "<group>"; };
+		8AE11EAFD9F0CA7DA398AF37 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		A07D66E9A6A788F32377791D /* GreetingScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GreetingScene.swift; sourceTree = "<group>"; };
+		C8E0923FEBDCF3B489AF44D5 /* CountUpText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CountUpText.swift; sourceTree = "<group>"; };
+		D60AE09822D75BFAD667F91E /* KidsTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KidsTheme.swift; sourceTree = "<group>"; };
+		EF0745187FC833D220441615 /* ParticleSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParticleSystem.swift; sourceTree = "<group>"; };
+		FF8D7E0A12E5F8ACA7E01F1B /* SupabaseKidsClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseKidsClient.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		8F623F06C51942638EDDF9AA /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AD856BC980527A1AA062962A /* Supabase in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		3FC970738C77B7B8D4A00A68 /* VerityPostKids */ = {
+			isa = PBXGroup;
+			children = (
+				0F0E00BF0E23900ED952D6B9 /* BadgeUnlockScene.swift */,
+				C8E0923FEBDCF3B489AF44D5 /* CountUpText.swift */,
+				3AC3F85C37A8F066CB3B3711 /* FlameShape.swift */,
+				A07D66E9A6A788F32377791D /* GreetingScene.swift */,
+				28D1A612569BB16ACECF8402 /* KidPickerView.swift */,
+				84EB55027E956CCF4CE8EC68 /* KidsAppRoot.swift */,
+				3153D2B72BDB3EA24F15616E /* KidsAppState.swift */,
+				54781BD709ADC4A406CE0878 /* KidsAuth.swift */,
+				D60AE09822D75BFAD667F91E /* KidsTheme.swift */,
+				8AE11EAFD9F0CA7DA398AF37 /* Models.swift */,
+				0294259BBB29EE50F69E579B /* PairCodeView.swift */,
+				354FE093006411DBBD390AC5 /* PairingClient.swift */,
+				EF0745187FC833D220441615 /* ParticleSystem.swift */,
+				5116F30BF6F33F44FF00C85B /* QuizPassScene.swift */,
+				7D80ABC0B8A71DDC194DD123 /* SignInView.swift */,
+				456A67084D78F1B60B3E21A0 /* StreakScene.swift */,
+				FF8D7E0A12E5F8ACA7E01F1B /* SupabaseKidsClient.swift */,
+				7850C87647B367225CB6261F /* VerityPostKidsApp.swift */,
+			);
+			path = VerityPostKids;
+			sourceTree = "<group>";
+		};
+		4B3CB13759E228B920A4132A = {
+			isa = PBXGroup;
+			children = (
+				3FC970738C77B7B8D4A00A68 /* VerityPostKids */,
+				75163B35DFBF3846F5E32B0B /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		75163B35DFBF3846F5E32B0B /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				07515D97F2458CE08E3C9BE3 /* VerityPostKids.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		BF47F280391ABA1D92006E47 /* VerityPostKids */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6CBCBDF3B47F66DE306D3A7F /* Build configuration list for PBXNativeTarget "VerityPostKids" */;
+			buildPhases = (
+				8E38790D8CD0D6B6B47314D8 /* Sources */,
+				8F623F06C51942638EDDF9AA /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = VerityPostKids;
+			packageProductDependencies = (
+				3231E3A4C1F6B1DE4063FC8E /* Supabase */,
+			);
+			productName = VerityPostKids;
+			productReference = 07515D97F2458CE08E3C9BE3 /* VerityPostKids.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		5D8693C21F46C552C54F3232 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					BF47F280391ABA1D92006E47 = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 26C9E256944DFC3348921B1A /* Build configuration list for PBXProject "VerityPostKids" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 4B3CB13759E228B920A4132A;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				1426EE59A0789A5897D73C7A /* XCRemoteSwiftPackageReference "supabase-swift" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 75163B35DFBF3846F5E32B0B /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				BF47F280391ABA1D92006E47 /* VerityPostKids */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		8E38790D8CD0D6B6B47314D8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2CB867CC063E039B3D827F91 /* BadgeUnlockScene.swift in Sources */,
+				50F58DB8B2B4C7302A738480 /* CountUpText.swift in Sources */,
+				1C2813F116F3AFDC26D6688C /* FlameShape.swift in Sources */,
+				5715E3BAB52A0C326EDF7123 /* GreetingScene.swift in Sources */,
+				A3AA44D56ACB51E7972CEF99 /* KidPickerView.swift in Sources */,
+				55274D59A30F704FF8BB7101 /* KidsAppRoot.swift in Sources */,
+				A25A97B2AADB431630B0424E /* KidsAppState.swift in Sources */,
+				1738AD35A766F42D38998EE2 /* KidsAuth.swift in Sources */,
+				F36F28DE59910E2DAE3F4D3F /* KidsTheme.swift in Sources */,
+				2D0F041EE31A4AD0B92E729F /* Models.swift in Sources */,
+				3274034236B12EFDB9B6D459 /* PairCodeView.swift in Sources */,
+				FF7D55F9580DE4402A36A0BE /* PairingClient.swift in Sources */,
+				E26C25D70717FF06CE927200 /* ParticleSystem.swift in Sources */,
+				5D8EAD3D01F86B2BD70A86E4 /* QuizPassScene.swift in Sources */,
+				6942E5482D1A1FD441E454B2 /* SignInView.swift in Sources */,
+				909A96E0C0F38C03FF6D7D5D /* StreakScene.swift in Sources */,
+				5F2204F11B82CDF9276F98E5 /* SupabaseKidsClient.swift in Sources */,
+				6388683C3B827A341879AFB1 /* VerityPostKidsApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		6E40596C50FC1B69F4D0ADB6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_KEY_SUPABASE_KEY = sb_publishable_cghQhP7iWFHIPAWnhsH3tw_COmnxYJG;
+				INFOPLIST_KEY_SUPABASE_URL = "https://fyiwulqphgmoqullmrfn.supabase.co";
+				INFOPLIST_KEY_VP_SITE_URL = "https://veritypost.com";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.veritypost.kids;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		7F692E2532A98086327381B2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Verity Post Kids";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+		95ADFE44E8174FE693CA1BB0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Verity Post Kids";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+		AA60B4293916CBE19ACD7D59 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_KEY_SUPABASE_KEY = sb_publishable_cghQhP7iWFHIPAWnhsH3tw_COmnxYJG;
+				INFOPLIST_KEY_SUPABASE_URL = "https://fyiwulqphgmoqullmrfn.supabase.co";
+				INFOPLIST_KEY_VP_SITE_URL = "https://veritypost.com";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.veritypost.kids;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		26C9E256944DFC3348921B1A /* Build configuration list for PBXProject "VerityPostKids" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				95ADFE44E8174FE693CA1BB0 /* Debug */,
+				7F692E2532A98086327381B2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		6CBCBDF3B47F66DE306D3A7F /* Build configuration list for PBXNativeTarget "VerityPostKids" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA60B4293916CBE19ACD7D59 /* Debug */,
+				6E40596C50FC1B69F4D0ADB6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		1426EE59A0789A5897D73C7A /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase-community/supabase-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		3231E3A4C1F6B1DE4063FC8E /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1426EE59A0789A5897D73C7A /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 5D8693C21F46C552C54F3232 /* Project object */;
+}

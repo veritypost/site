@@ -24,6 +24,7 @@ struct QuizPassScene: View {
     let insight: String
 
     var onShare: (() -> Void)? = nil
+    var onDone: (() -> Void)? = nil
 
     struct Answer: Identifiable {
         let id = UUID()
