@@ -45,9 +45,6 @@ New migration extends `freeze_kid_trial()` to call `create_notification('kid_tri
 psql "$DATABASE_URL" -f schema/106_kid_trial_freeze_notification.sql
 ```
 
-### 8 — Audit Vercel team + env-var change history
-Remove ex-dev from team. Scan env-var changes for unexpected entries.
-
 ## P1
 
 ### 9 — Apple Developer account
@@ -56,6 +53,13 @@ Gates all iOS publishing — App Store Connect products, APNs `.p8`, `apple-app-
 ---
 
 ## Post-launch (not blocking launch)
+
+### PL-0b — Vercel team + env-var change history audit
+Scan env-var edits + deployment history for anything unexpected.
+
+**Why deferred:** env secrets were already rotated (#2, done), so any entries the ex-dev set are now invalid. Full log review can wait.
+
+**One-click you should still do pre-launch:** Settings → Team → **remove the ex-dev user**. Key rotation doesn't kick someone out of the Vercel team — while they're still on it, they could deploy a branch that writes new keys into Vercel env and bypasses your rotation entirely. This is the one mitigation you can't skip.
 
 ### PL-0a — Stripe dashboard audit
 Webhook endpoints, API keys (including restricted), Connect accounts, team members. Anything the ex-dev may have added that a key-rotation doesn't cover.
