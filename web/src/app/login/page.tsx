@@ -2,7 +2,7 @@
 // @feature-verified system_auth 2026-04-18
 'use client';
 
-import { useState, FormEvent, CSSProperties } from 'react';
+import { Suspense, useState, FormEvent, CSSProperties } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '../../lib/supabase/client';
 import { resolveNext } from '@/lib/authRedirect';
@@ -31,7 +31,17 @@ type MeRow = Pick<Tables<'users'>, 'onboarding_completed_at' | 'email_verified'>
 
 type OAuthProvider = 'google' | 'apple';
 
+// Next.js 14 requires useSearchParams() callers to sit inside a Suspense
+// boundary for static generation. Wrap the inner component once here.
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageInner />
+    </Suspense>
+  );
+}
+
+function LoginPageInner() {
   const searchParams = useSearchParams();
   const nextParam = resolveNext(searchParams?.get('next') ?? null);
   // Single input accepts either an email or a username. If the typed

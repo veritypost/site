@@ -17,7 +17,7 @@
 // polish. ADMIN_C (the light-bordered, dark-on-white default) is the
 // right fit — matches other admin pages and renders fine in public chrome.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 
@@ -117,7 +117,17 @@ function truncate(s: string | null | undefined, len = 140): string {
 // ---------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------
+// Next.js 14 requires useSearchParams() callers to sit inside a Suspense
+// boundary for static generation. Wrap the inner component once here.
 export default function ProfilePage() {
+  return (
+    <Suspense fallback={null}>
+      <ProfilePageInner />
+    </Suspense>
+  );
+}
+
+function ProfilePageInner() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const searchParams = useSearchParams();
