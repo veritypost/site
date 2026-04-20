@@ -121,12 +121,25 @@ struct ReadingLogInsert: Encodable {
 
 // MARK: - Quiz + Quiz attempts
 // Table: public.quizzes (one question per row; grouped by article_id + pool_group)
+// Options are stored as jsonb: [{"text": "...", "is_correct": true/false}, ...]
+struct QuizOption: Codable, Equatable, Identifiable {
+    let text: String
+    let isCorrect: Bool
+
+    var id: String { text }   // stable within a question
+
+    enum CodingKeys: String, CodingKey {
+        case text
+        case isCorrect = "is_correct"
+    }
+}
+
 struct QuizQuestion: Codable, Identifiable, Equatable {
     let id: String
     let articleId: String
     let questionText: String
-    let questionType: String?        // "multiple_choice" etc.
-    let options: [String]?            // From jsonb array
+    let questionType: String?
+    let options: [QuizOption]
     let explanation: String?
     let difficulty: String?
     let points: Int?
@@ -144,6 +157,10 @@ struct QuizQuestion: Codable, Identifiable, Equatable {
         case points
         case poolGroup = "pool_group"
         case sortOrder = "sort_order"
+    }
+
+    var correctOption: QuizOption? {
+        options.first { $0.isCorrect }
     }
 }
 

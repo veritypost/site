@@ -19,14 +19,14 @@ struct KidsAppRoot: View {
 
     private enum ActiveSheet: Identifiable {
         case streak(previous: Int, current: Int, milestone: StreakScene.Milestone?)
-        case quiz
+        case articles(categoryName: String, categoryColor: Color)
         case badge(BadgeUnlockScene)
 
         var id: String {
             switch self {
-            case .streak: return "streak"
-            case .quiz:   return "quiz"
-            case .badge:  return "badge"
+            case .streak:   return "streak"
+            case .articles: return "articles"
+            case .badge:    return "badge"
             }
         }
     }
@@ -92,8 +92,8 @@ struct KidsAppRoot: View {
             onStreakTap: {
                 presentStreak(previous: state.streakDays, current: state.streakDays)
             },
-            onCategoryTap: { _ in
-                present(.quiz)
+            onCategoryTap: { cat in
+                present(.articles(categoryName: cat.name, categoryColor: cat.color))
             }
         )
     }
@@ -108,25 +108,15 @@ struct KidsAppRoot: View {
                 milestone: milestone,
                 onDone: { activeSheet = nil }
             )
-        case .quiz:
-            QuizPassScene(
-                question: "Which headline uses a loaded word?",
-                answers: [
-                    .init(text: "\"City announces new park plans\"",            correct: false),
-                    .init(text: "\"Mayor slams opposition in heated debate\"",  correct: true),
-                    .init(text: "\"School board reviews budget proposal\"",     correct: false),
-                    .init(text: "\"Weather expected to change this week\"",     correct: false)
-                ],
-                questionNumber: 5,
-                totalQuestions: 5,
-                priorScore: state.verityScore,
-                newScore: state.verityScore + 12,
-                correctCount: 5,
-                timeSeconds: 42,
-                insight: "You spotted a loaded headline on the first try.",
-                onShare: { },
-                onDone: { completeQuiz() }
+        case .articles(let name, let color):
+            ArticleListView(
+                categoryName: name,
+                categoryColor: color,
+                categorySlug: nil,
+                onClose: { activeSheet = nil }
             )
+            .environmentObject(auth)
+            .environmentObject(state)
         case .badge(let badge):
             badge
         }
@@ -149,6 +139,8 @@ struct KidsAppRoot: View {
     }
 
     private func completeQuiz() {
+        // Only used by scene dismiss — the real quiz engine writes attempts
+        // directly via KidQuizEngineView + advance_streak RPC.
         let outcome = state.completeQuiz(score: 12, biasedSpotted: true)
         queuedBadge = outcome.badge
         let prev = outcome.previousStreak

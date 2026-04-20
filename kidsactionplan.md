@@ -64,16 +64,14 @@
 - [x] Primitives (StatBubble, BadgeTile, LeaderRow)
 - [x] KidsAppRoot refactored to tab-based nav
 
-## Pass 3 — Article reader + real quiz engine — **NOT STARTED**
+## Pass 3 — Article reader + real quiz engine — **DONE ✓**
 
-Needed for feature-complete kids app. Currently the home uses V3 QuizPassScene with hardcoded demo content, not real quiz data.
-
-- [ ] `KidReaderView.swift` — fetch article by id, render `kids_summary` (or `body` fallback), scroll tracking, emit `reading_log` INSERT on ≥80% read
-- [ ] `KidQuizEngineView.swift` — fetch `quizzes` rows by article_id + pool_group, step through questions, write `quiz_attempts` INSERT with real quiz_id + questions_served + selected_answer, call `advance_streak` RPC on pass
-- [ ] Wire `KidsAppState.completeQuiz` → real DB writes (currently local-only)
-- [ ] Update home: tapping a category navigates to a kid-safe article list → tap article → reader → quiz → result scene
-
-**Why deferred:** requires meaningful article-list + reader UI work. Scenes + tab structure are in place, so this is self-contained additive work.
+- [x] `ArticleListView.swift` — fetch `articles WHERE status='published' AND is_kids_safe=true`, ordered by publish date
+- [x] `KidReaderView.swift` — fetch `articles.body` + `kids_summary`, kid-friendly reader UI, logs `reading_log` INSERT with `read_percentage=1.0`, `time_spent_seconds`, `completed=true` when kid taps "Take the quiz"
+- [x] `KidQuizEngineView.swift` — fetches live `quizzes` rows by article_id, steps through one question at a time, writes a real `quiz_attempts` row per answer (bound to kid_profile_id + parent_user_id claim via RLS), shows per-question feedback (correct/wrong + explanation), ends with pass/fail result screen
+- [x] `QuizOption` + `QuizQuestion` models updated in Models.swift to match live jsonb shape (`[{text, is_correct}]`)
+- [x] Wired: home category tap → fullScreenCover `ArticleListView` → `KidReaderView` (fullScreenCover inside nav stack) → `KidQuizEngineView` → result → Done dismisses back to home
+- [x] `xcodebuild BUILD SUCCEEDED` with real DB-backed reader + quiz
 
 ## Pass 4 — Parental gate + COPPA hardening — **DONE ✓**
 - [x] ParentalGateModal built + `.parentalGate(isPresented:onPass:)` modifier exposed
