@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '../../../../lib/supabase/client';
 import { clearKidMode, getActiveKidId } from '../../../../lib/kidMode';
 import Badge from '@/components/kids/Badge';
+import PairDeviceButton from '@/components/kids/PairDeviceButton';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import type { Tables } from '@/types/database-helpers';
 
@@ -323,6 +324,10 @@ export default function KidDashboardPage() {
           />
         </Section>
       )}
+
+      <Section title="Pair a device">
+        <PairDeviceButton kidId={id} />
+      </Section>
 
       <Section title="Activity">
         {timeline.length === 0 ? (
