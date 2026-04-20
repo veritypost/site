@@ -54,6 +54,15 @@ Without it, signup accepts known-leaked passwords.
 ### 5 — Publish ≥10 real articles; delete 5 `Test:` placeholders
 `select * from articles where is_published=true and title ilike 'test%'` should return 0 rows before launch.
 
+### 5b — Seed `streak.freeze_max_kids` setting (surfaced by preflight run)
+Preflight flagged this as missing from the `settings` table. Other `streak.*` settings exist. Run:
+```sql
+INSERT INTO settings (key, value, description)
+VALUES ('streak.freeze_max_kids', '2', 'Max streak freezes per week for Family-plan kids per D19')
+ON CONFLICT (key) DO NOTHING;
+```
+Without it, kid streak-freeze feature falls back to code default (may be undefined).
+
 ### 6 — Audit Supabase admin/owner seats
 ```sql
 select u.email, r.name, ur.granted_at

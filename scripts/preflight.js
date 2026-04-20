@@ -8,7 +8,7 @@
 // Usage:
 //   node scripts/preflight.js
 //
-// Required env (reads from site/.env.local):
+// Required env (reads from web/.env.local):
 //   NEXT_PUBLIC_SUPABASE_URL
 //   SUPABASE_SERVICE_ROLE_KEY
 //
@@ -22,10 +22,10 @@
 const fs   = require('fs');
 const path = require('path');
 
-const SITE_DIR = path.resolve(__dirname, '..', 'site');
+const SITE_DIR = path.resolve(__dirname, '..', 'web');
 const SUPABASE_PKG = path.join(SITE_DIR, 'node_modules', '@supabase', 'supabase-js');
 if (!fs.existsSync(SUPABASE_PKG)) {
-  console.error(`@supabase/supabase-js not found at ${SUPABASE_PKG}. Run npm install in site/.`);
+  console.error(`@supabase/supabase-js not found at ${SUPABASE_PKG}. Run npm install in web/.`);
   process.exit(1);
 }
 const { createClient } = require(SUPABASE_PKG);
@@ -194,7 +194,7 @@ async function main() {
   const plans = await checkPlanSeed();
   plans.ok ? pass(`plans: ${plans.count}/9`) : fail(`plans missing: ${plans.missing.join(', ')}`);
   const roles = await checkRoleSeed();
-  roles.ok ? pass(`roles: ${roles.count}/9`) : fail('role seed incomplete');
+  roles.ok ? pass(`roles: ${roles.count}/8`) : fail('role seed incomplete');
   const templates = await checkTemplateSeed();
   templates.ok ? pass(`active email templates: ${templates.count}`) : fail('core email templates not active');
   (await checkAnyAdminExists()) ? pass('at least one admin/owner exists') : fail('no admin or owner user found');
@@ -257,7 +257,7 @@ async function main() {
   try {
     const vercelJsonPath = path.join(SITE_DIR, 'vercel.json');
     if (!fs.existsSync(vercelJsonPath)) {
-      warn('site/vercel.json not found — crons only run on Vercel');
+      warn('web/vercel.json not found — crons only run on Vercel');
     } else {
       const { crons = [] } = JSON.parse(fs.readFileSync(vercelJsonPath, 'utf8'));
       const expected = [

@@ -8,13 +8,13 @@
 // - Creates 2 kid_profiles under test_family (Emma + Liam).
 // - Idempotent: re-running updates existing rows, skips auth-user recreation.
 //
-// Requires SUPABASE_SERVICE_ROLE_KEY + NEXT_PUBLIC_SUPABASE_URL in site/.env.local.
+// Requires SUPABASE_SERVICE_ROLE_KEY + NEXT_PUBLIC_SUPABASE_URL in web/.env.local.
 // ============================================================================
 
 const fs = require('fs');
 const path = require('path');
 
-const SITE_DIR = path.resolve(__dirname, '..', 'site');
+const SITE_DIR = path.resolve(__dirname, '..', 'web');
 const { createClient } = require(path.join(SITE_DIR, 'node_modules', '@supabase', 'supabase-js'));
 
 function loadEnv(file) {

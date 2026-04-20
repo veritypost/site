@@ -11,7 +11,7 @@
 // Usage:
 //   node scripts/check-stripe-prices.js
 //
-// Env (read from site/.env.local):
+// Env (read from web/.env.local):
 //   NEXT_PUBLIC_SUPABASE_URL
 //   SUPABASE_SERVICE_ROLE_KEY
 //   STRIPE_SECRET_KEY     (optional — if missing, only reports
@@ -21,11 +21,11 @@
 const fs   = require('fs');
 const path = require('path');
 
-const SITE_DIR = path.resolve(__dirname, '..', 'site');
+const SITE_DIR = path.resolve(__dirname, '..', 'web');
 const SUPABASE_PKG = path.join(SITE_DIR, 'node_modules', '@supabase', 'supabase-js');
 if (!fs.existsSync(SUPABASE_PKG)) {
   console.error(`Could not find @supabase/supabase-js at ${SUPABASE_PKG}`);
-  console.error(`Run "npm install" inside site/ first.`);
+  console.error(`Run "npm install" inside web/ first.`);
   process.exit(1);
 }
 const { createClient } = require(SUPABASE_PKG);
@@ -51,7 +51,7 @@ const SUPABASE_URL     = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const STRIPE_KEY       = process.env.STRIPE_SECRET_KEY;
 if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-  console.error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in site/.env.local');
+  console.error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in web/.env.local');
   process.exit(1);
 }
 
@@ -116,7 +116,7 @@ async function main() {
   console.log('\n' + YELLOW(`${missing} of ${plans.length} paid plan(s) missing stripe_price_id.`));
 
   if (!STRIPE_KEY) {
-    console.log('\n' + DIM('STRIPE_SECRET_KEY not set in site/.env.local — skipping Stripe lookup.'));
+    console.log('\n' + DIM('STRIPE_SECRET_KEY not set in web/.env.local — skipping Stripe lookup.'));
     console.log(DIM('Set it and re-run to get suggested UPDATE statements.'));
     process.exit(1);
   }
