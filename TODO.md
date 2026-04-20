@@ -4,6 +4,21 @@ Outstanding work. P0 ship-blocker · P1 high · P2 should-fix · P3 polish · OW
 
 Active list only. When done: delete the block. Git log is the history.
 
+## Latest bench verification (2026-04-20, full developer-style audit)
+
+- `cd web && npx tsc --noEmit` → exits 0. Typecheck clean.
+- `xcodebuild VerityPost -destination 'name=iPhone 17'` → BUILD SUCCEEDED.
+- `xcodebuild VerityPostKids -destination 'name=iPhone 17'` → BUILD SUCCEEDED.
+- Secrets: `git ls-files | grep .env` = 0. `.gitignore` covers `.env*`, `*.p8`, `*.pem`, `*.key`, `node_modules/`, `.next/`, `.DS_Store`, `.vercel/`.
+- No hardcoded credentials found in web source, scripts, or either iOS app.
+- Zero `'superadmin'` references in `web/src/types/database.ts`.
+- Zero `dangerouslySetInnerHTML` across non-admin pages.
+- 172 API routes: no critical RLS/auth/money bypasses found. Canonical shape followed in ≥97% of routes.
+- 105 migrations: no `DELETE`/`UPDATE` without `WHERE`, no `DROP CASCADE` unsafe, `CREATE INDEX IF NOT EXISTS` everywhere.
+- Both iOS apps: no third-party analytics linked, no IDFA usage, no hardcoded secrets.
+
+Remaining items below are real defects + remaining launch work.
+
 ---
 
 ## P0 — before any deploy
@@ -23,6 +38,10 @@ Only surviving admin page that calls `supabase.from(...).insert(...)` directly f
 ### 4 — Wire `ParentalGateModal` into VerityPostKids
 `VerityPostKids/VerityPostKids/ParentalGateModal.swift` — component fully built, zero callers. Apple rejects Kids Category apps without a parental gate before IAP / external links / settings changes.
 **Done when:** `grep -r "ParentalGateModal()" VerityPostKids/` shows ≥ 3 call sites covering IAP, external URLs, and settings.
+
+### 4b — Fix kids Keychain accessibility level
+`VerityPostKids/VerityPostKids/PairingClient.swift:170` — kid JWT is stored with `kSecAttrAccessibleAfterFirstUnlock`. This means the token is accessible by processes whenever the device has been unlocked once since boot, even when currently locked. Adult app's `Keychain.swift:20` already uses the correct `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` — kids must match.
+**Done when:** `grep kSecAttrAccessible VerityPostKids/` shows only `WhenUnlockedThisDeviceOnly`. COPPA audit bar.
 
 ### 5 — (OWNER) Apply seed SQLs 101–104 to live DB
 ```
@@ -106,6 +125,26 @@ On network failure: kid sees their score go up locally, server sees nothing, lea
 ### 17 — (OWNER) Apple Developer account
 Gates all iOS publishing — App Store Connect products, APNs `.p8`, `apple-app-site-association` upload, TestFlight. Code is ready; single owner step.
 
+### 17b — Fix `error.message` leaks in 3 admin/auth routes
+Prior T-013 sweep missed these (different pattern — catch-block message pass-through vs. `{error}` destructure):
+- `web/src/app/api/admin/users/[id]/ban/route.js:57` — returns `upErr.message` in body.
+- `web/src/app/api/admin/users/[id]/plan/route.js:59,68` — returns `planErr.message` + `upErr.message`.
+- `web/src/app/api/auth/callback/route.js:47` — auth path leaks error.message (more sensitive).
+**Do:** route through `safeErrorResponse` with a `[route-tag]` + generic client copy.
+**Done when:** `grep "NextResponse.json.*error.*message" web/src/app/api/admin/users/[id]/ban web/src/app/api/admin/users/[id]/plan web/src/app/api/auth/callback` = 0.
+
+### 17c — `/api/account/onboarding` uses direct `users.update()`
+`web/src/app/api/account/onboarding/route.js:17` — writes to `public.users` directly. The `reject_privileged_user_updates` trigger now blocks non-privileged-column updates from non-admins, but the route should also go through `public.update_own_profile(p_fields jsonb)` like the 7 other self-profile write sites.
+**Done when:** route uses the RPC, not a direct `.update()`.
+
+### 17d — `StoreManager.swift` syncPurchaseToServer doesn't verify HTTP 200
+`VerityPost/VerityPost/StoreManager.swift:211-250` — `syncPurchaseToServer` logs non-2xx responses to debug only; the local flow continues as if purchase synced. A 4xx/5xx means the server never recorded entitlement, user paid but stays on prior tier.
+**Do:** check `httpResponse.statusCode` in 200..<300; retry or surface error otherwise.
+
+### 17e — `PairingClient.swift:132` silent JWT apply failure
+`VerityPostKids/VerityPostKids/PairingClient.swift:132` — `restore()` calls `try? await applySession(token:)`. If the token injection fails (e.g., network blip during restore), the session silently reverts to anon; kid browses as unauthenticated with no warning to parent.
+**Do:** surface the failure. Either show a "couldn't restore session, re-pair device" screen or retry with backoff.
+
 ---
 
 ## P2
@@ -176,3 +215,12 @@ These actively mislead because their premise is retired:
 
 ### 27 — Pre-launch holding page
 `docs/planning/PRELAUNCH_HOME_SCREEN.md` blueprint is a 30-min task: new `middleware.ts` + `/preview` bypass route + env toggle `NEXT_PUBLIC_SITE_MODE=coming_soon`. Implement when you want a public-facing "coming soon" screen during final QA. Optional.
+
+### 28 — `preflight.js` expected-cron list out of sync with `vercel.json`
+`scripts/preflight.js:263-270` expects 6 crons. `web/vercel.json` declares 9. After TODO #1 fixes the `site/` path bug, the script will run but emit spurious warnings for the extra 3 (`send-push`, `check-user-achievements`, `flag-expert-reverifications`). Add them to the expected list.
+
+### 29 — Two `console.error` calls in `story/[slug]/page.tsx`
+Lines 225-226, 326, 357 log `[stories] fetch error` on the normal fetch path; every anonymous article load writes a line to prod logs. Wrap in `if (process.env.NODE_ENV !== 'production')` or remove.
+
+### 30 — No lint/format config
+Repo has no `.eslintrc*` or `.prettierrc*`. Adopting even a minimal config (`no-console`, `no-unused-vars`, `no-explicit-any` warn-level) would have caught several items from this audit. Low priority but valuable long-term. GitHub Action + pre-commit hook would pair well.
