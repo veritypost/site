@@ -91,12 +91,12 @@ A fresh agent picks the top unchecked task, reads file:line, does the work, clos
 **Do**: Load categories from DB on mount; replace the hardcoded arrays.
 **Accept**: All active adult categories selectable in both pages.
 
-### T-019 — Role arrays duplicated in admin pages (helper shipped; consumer sweep pending)
+### T-019 — Role arrays: 2-wide `['owner', 'admin']` cases need product decision
 **Priority**: P1  **Effort**: S  **Lens**: DB-DRIFT  **Source**: A1:T-024 + A2:G-011,G-012,G-013
-**File**: `components/CommentThread.tsx:136`; `admin/moderation/page.tsx:26,119-120`; `admin/reports/page.tsx:85`; `admin/recap/page.tsx:76`; `admin/verification/page.tsx:100`; `admin/categories/page.tsx:91`; `admin/data-requests/page.tsx:84`; `admin/comments/page.tsx:132`; `admin/kids-story-manager/page.tsx:133`; `admin/expert-sessions/page.tsx:80`; `admin/email-templates/page.tsx:63`; `admin/promo/page.tsx:89`; `admin/plans/page.tsx:100`; `admin/features/page.tsx:159`; `admin/settings/page.tsx:64`; `admin/ad-campaigns/page.tsx:64`; `admin/ad-placements/page.tsx:65`; `admin/support/page.tsx:215`; `admin/page.tsx:118`
-**Why**: `lib/roles.js` now exports `getRoleNames()` + `rolesUpTo()` + `rolesAtLeast()` + the frozen role Sets; admin/users migrated off its hardcoded ROLE_ORDER. The 19 other admin pages still re-enumerate `['owner', 'admin']`/`['owner', 'superadmin', 'admin']`/etc. inline — subtly inconsistent between pages.
-**Do**: Replace each inline array with the matching frozen Set from `lib/roles.js` (or `rolesAtLeast()` for async paths).
-**Accept**: Grep `\['owner', 'superadmin'|'owner', 'admin'\]` outside lib/roles.js ≤ 5.
+**File**: 12 files — `admin/reader:106`, `admin/words:57`, `admin/plans:100`, `admin/email-templates:63`, `admin/features:159`, `admin/cohorts:157`, `admin/stories:87`, `admin/support:215`, `admin/story-manager:162`, `admin/streaks:83`, `admin/webhooks:95`, `admin/promo:89`
+**Why**: Helpers (`ADMIN_ROLES`, `EDITOR_ROLES`, `MOD_ROLES`) shipped; 16 pages migrated off verbatim 3+ wide inline arrays. Remaining 12 all use 2-wide `['owner', 'admin']` — `ADMIN_ROLES` is 3 wide (`+ superadmin`), so normalizing to `ADMIN_ROLES.has(x)` would *expand* access to superadmins. Likely a copy-paste bug (superadmin accidentally omitted) but potentially intentional per-page.
+**Do**: Per-page decision: is the superadmin exclusion a design choice or a bug? If design choice, leave + add inline comment. If bug (likely default — permission system elsewhere treats superadmin as a strict superset of admin), swap to `ADMIN_ROLES.has(x)` and add a flag in the commit body for the behavioural expansion.
+**Accept**: Every one of the 12 files either uses `ADMIN_ROLES.has()` or has an inline comment explaining why owner+admin-only is correct.
 
 ### T-020 — Silent kid `quiz_attempts` insert failure (score drift) `needs-live-check`
 **Priority**: P1  **Effort**: S  **Lens**: IOS  **Source**: A1:T-018
