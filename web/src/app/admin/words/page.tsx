@@ -84,42 +84,18 @@ export default function WordsAdmin() {
 
   const addWord = async (words: string[]) => {
     const isReserved = tab === 'reserved';
-    const table = isReserved ? 'reserved_usernames' : 'blocked_words';
+    const kind = isReserved ? 'reserved' : 'blocked';
     const toAdd = words.filter((w) => !list.includes(w));
     if (toAdd.length === 0) { setNewWord(''); return; }
 
-    if (isReserved) {
-      for (const w of toAdd) {
-        const { error: auditErr } = await supabase.rpc('record_admin_action', {
-          p_action: 'reserved_username.add',
-          p_target_table: 'reserved_usernames',
-          p_target_id: null,
-          p_reason: null,
-          p_old_value: null,
-          p_new_value: { username: w },
-        });
-        if (auditErr) { toast.push({ message: `Audit log write failed: ${auditErr.message}`, variant: 'danger' }); return; }
-      }
-    } else {
-      const { error: auditErr } = await supabase.rpc('record_admin_action', {
-        p_action: 'banned_word.add',
-        p_target_table: 'blocked_words',
-        p_target_id: null,
-        p_reason: null,
-        p_old_value: null,
-        p_new_value: { words: toAdd },
-      });
-      if (auditErr) { toast.push({ message: `Audit log write failed: ${auditErr.message}`, variant: 'danger' }); return; }
-    }
-
-    const rows = isReserved
-      ? toAdd.map((w) => ({ username: w }))
-      : toAdd.map((w) => ({ word: w }));
-    const { error } = isReserved
-      ? await supabase.from('reserved_usernames').insert(rows as { username: string }[])
-      : await supabase.from('blocked_words').insert(rows as { word: string }[]);
-    if (error) {
-      toast.push({ message: `Add failed: ${error.message}`, variant: 'danger' });
+    const res = await fetch('/api/admin/words', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind, words: toAdd }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.push({ message: `Add failed: ${json.error || 'unknown error'}`, variant: 'danger' });
       return;
     }
     setList((prev) => [...prev, ...toAdd].sort());
@@ -150,23 +126,15 @@ export default function WordsAdmin() {
     if (!ok) return;
 
     const isReserved = tab === 'reserved';
-    const { error: auditErr } = await supabase.rpc('record_admin_action', {
-      p_action: isReserved ? 'reserved_username.delete' : 'banned_word.delete',
-      p_target_table: isReserved ? 'reserved_usernames' : 'blocked_words',
-      p_target_id: null,
-      p_reason: null,
-      p_old_value: isReserved ? { username: word } : { word },
-      p_new_value: null,
+    const kind = isReserved ? 'reserved' : 'blocked';
+    const res = await fetch('/api/admin/words', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind, word }),
     });
-    if (auditErr) {
-      toast.push({ message: `Audit log write failed: ${auditErr.message}`, variant: 'danger' });
-      return;
-    }
-    const { error } = isReserved
-      ? await supabase.from('reserved_usernames').delete().eq('username', word)
-      : await supabase.from('blocked_words').delete().eq('word', word);
-    if (error) {
-      toast.push({ message: `Remove failed: ${error.message}`, variant: 'danger' });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.push({ message: `Remove failed: ${json.error || 'unknown error'}`, variant: 'danger' });
       return;
     }
     setList((prev) => prev.filter((w) => w !== word));

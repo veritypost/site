@@ -107,8 +107,13 @@ function EmailTemplatesInner() {
     setSaving(true);
     try {
       const updates = { subject: editSubject, body_text: editBody };
-      const { error } = await supabase.from('email_templates').update(updates).eq('id', selected.id);
-      if (error) { push({ message: `Save failed: ${error.message}`, variant: 'danger' }); return; }
+      const res = await fetch(`/api/admin/email-templates/${selected.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) { push({ message: `Save failed: ${json.error || 'unknown error'}`, variant: 'danger' }); return; }
       setTemplates((prev) => prev.map((t) => t.id === selected.id ? { ...t, ...updates } as EmailTemplate : t));
       push({ message: 'Template saved', variant: 'success' });
       setEditing(false);
@@ -121,23 +126,15 @@ function EmailTemplatesInner() {
     const nextActive = !tmpl.is_active;
     // Optimistic
     setTemplates((prev) => prev.map((t) => t.id === id ? { ...t, is_active: nextActive } : t));
-    const { error: auditErr } = await supabase.rpc('record_admin_action', {
-      p_action: 'email_template.toggle',
-      p_target_table: 'email_templates',
-      p_target_id: id,
-      p_reason: null,
-      p_old_value: { is_active: !!tmpl.is_active },
-      p_new_value: { is_active: nextActive },
+    const res = await fetch(`/api/admin/email-templates/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: nextActive }),
     });
-    if (auditErr) {
+    if (!res.ok) {
       setTemplates((prev) => prev.map((t) => t.id === id ? { ...t, is_active: tmpl.is_active } : t));
-      push({ message: `Audit log failed: ${auditErr.message}`, variant: 'danger' });
-      return;
-    }
-    const { error } = await supabase.from('email_templates').update({ is_active: nextActive }).eq('id', id);
-    if (error) {
-      setTemplates((prev) => prev.map((t) => t.id === id ? { ...t, is_active: tmpl.is_active } : t));
-      push({ message: `Toggle failed: ${error.message}`, variant: 'danger' });
+      const json = await res.json().catch(() => ({ error: 'toggle failed' }));
+      push({ message: `Toggle failed: ${json.error || 'unknown error'}`, variant: 'danger' });
       return;
     }
     push({ message: nextActive ? 'Template enabled' : 'Template disabled', variant: 'success' });

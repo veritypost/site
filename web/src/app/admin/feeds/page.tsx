@@ -132,13 +132,15 @@ function FeedsAdminInner() {
   const toggleFeed = async (id: string, nextValue: boolean) => {
     // Optimistic
     setFeeds((prev) => prev.map((f) => (f.id === id ? { ...f, is_active: nextValue } : f)));
-    const { error } = await supabase
-      .from('feeds')
-      .update({ is_active: nextValue })
-      .eq('id', id);
-    if (error) {
+    const res = await fetch(`/api/admin/feeds/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: nextValue }),
+    });
+    if (!res.ok) {
       setFeeds((prev) => prev.map((f) => (f.id === id ? { ...f, is_active: !nextValue } : f)));
-      toast.push({ message: `Toggle failed: ${error.message}`, variant: 'danger' });
+      const json = await res.json().catch(() => ({ error: 'toggle failed' }));
+      toast.push({ message: `Toggle failed: ${json.error || 'unknown error'}`, variant: 'danger' });
     } else {
       toast.push({ message: nextValue ? 'Feed resumed' : 'Feed paused', variant: 'success', duration: 1500 });
     }
@@ -152,20 +154,29 @@ function FeedsAdminInner() {
       variant: 'danger',
     });
     if (!ok) return;
-    const { error } = await supabase.from('feeds').delete().eq('id', feed.id);
-    if (error) { toast.push({ message: `Delete failed: ${error.message}`, variant: 'danger' }); return; }
+    const res = await fetch(`/api/admin/feeds/${feed.id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({ error: 'delete failed' }));
+      toast.push({ message: `Delete failed: ${json.error || 'unknown error'}`, variant: 'danger' });
+      return;
+    }
     setFeeds((prev) => prev.filter((f) => f.id !== feed.id));
     setSelected(null);
     toast.push({ message: 'Feed removed', variant: 'success' });
   };
 
   const rePull = async (id: string) => {
+    const res = await fetch(`/api/admin/feeds/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'repull' }),
+    });
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({ error: 're-pull failed' }));
+      toast.push({ message: `Re-pull failed: ${json.error || 'unknown error'}`, variant: 'danger' });
+      return;
+    }
     const now = new Date().toISOString();
-    const { error } = await supabase
-      .from('feeds')
-      .update({ error_count: 0, last_error: null, last_error_at: null, last_polled_at: now })
-      .eq('id', id);
-    if (error) { toast.push({ message: `Re-pull failed: ${error.message}`, variant: 'danger' }); return; }
     setFeeds((prev) => prev.map((f) => (f.id === id
       ? { ...f, error_count: 0, last_error: null, last_error_at: null, last_polled_at: now }
       : f)));
@@ -175,22 +186,21 @@ function FeedsAdminInner() {
   const addFeed = async () => {
     if (!newOutlet.trim() || !newUrl.trim()) return;
     setAdding(true);
-    const newEntry = {
-      name: newOutlet.trim(),
-      source_name: newOutlet.trim(),
-      url: newUrl.trim(),
-      feed_type: 'rss',
-      is_active: true,
-      error_count: 0,
-    };
-    const { data, error } = await supabase
-      .from('feeds')
-      .insert(newEntry)
-      .select()
-      .single();
+    const res = await fetch('/api/admin/feeds', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: newOutlet.trim(),
+        source_name: newOutlet.trim(),
+        url: newUrl.trim(),
+        feed_type: 'rss',
+        is_active: true,
+      }),
+    });
+    const json = await res.json().catch(() => ({}));
     setAdding(false);
-    if (error) { toast.push({ message: `Add failed: ${error.message}`, variant: 'danger' }); return; }
-    if (data) setFeeds((prev) => [...prev, data]);
+    if (!res.ok || !json.row) { toast.push({ message: `Add failed: ${json.error || 'unknown error'}`, variant: 'danger' }); return; }
+    setFeeds((prev) => [...prev, json.row]);
     toast.push({ message: 'Feed added', variant: 'success' });
     setNewOutlet('');
     setNewUrl('');
