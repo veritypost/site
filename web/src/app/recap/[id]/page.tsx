@@ -2,9 +2,8 @@
 // @feature-verified recap 2026-04-18
 'use client';
 import { useState, useEffect, CSSProperties } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { assertNotKidMode } from '@/lib/guards';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import type { Tables } from '@/types/database-helpers';
 
@@ -65,7 +64,6 @@ const C = {
 export default function RecapPlayer() {
   const params = useParams<{ id: string }>();
   const id = params?.id;
-  const router = useRouter();
   const [loading, setLoading] = useState<boolean>(true);
   const [recap, setRecap] = useState<RecapRow | null>(null);
   const [questions, setQuestions] = useState<RecapQuestion[]>([]);
@@ -76,7 +74,6 @@ export default function RecapPlayer() {
   const [busy, setBusy] = useState<boolean>(false);
 
   useEffect(() => {
-    if (assertNotKidMode(router)) return;
     if (!id) return;
     (async () => {
       await refreshAllPermissions();
@@ -97,7 +94,7 @@ export default function RecapPlayer() {
       setQuestions(data.questions || []);
       setLoading(false);
     })();
-  }, [id, router]);
+  }, [id]);
 
   async function submit() {
     if (!id) return;

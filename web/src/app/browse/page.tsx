@@ -2,15 +2,12 @@
 // @feature-verified shared_pages 2026-04-18
 'use client';
 import { useState, useEffect, CSSProperties } from 'react';
-import { useRouter } from 'next/navigation';
 import { createClient } from '../../lib/supabase/client';
-import { assertNotKidMode } from '@/lib/guards';
 import type { Tables } from '@/types/database-helpers';
 
 // /browse is a public category directory. RLS lets anonymous viewers read
 // published articles + active categories, so there's no tier/role gate to
-// invert — anyone (including kids routed away by assertNotKidMode) either
-// sees the page or is redirected. The former audit called out
+// invert — anyone lands on this surface. The former audit called out
 // `browse.view` / `browse.article.anon_read` as hypothetical keys; neither
 // currently exists in the resolver seed, and RLS already enforces the
 // equivalent access, so no hasPermission() call is added here.
@@ -81,7 +78,6 @@ function timeAgo(dateString: string | null | undefined): string {
 }
 
 export default function BrowsePage() {
-  const router = useRouter();
   const [search, setSearch] = useState<string>('');
   const [activeFilter, setActiveFilter] = useState<FilterKey>('Most Recent');
   const [expandedCat, setExpandedCat] = useState<string | null>(null);
@@ -91,7 +87,6 @@ export default function BrowsePage() {
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    if (assertNotKidMode(router)) return;
     const supabase = createClient();
 
     async function fetchData() {
@@ -99,8 +94,7 @@ export default function BrowsePage() {
 
       // Fetch categories. Pass 17 / UJ-507: adult /browse filters out
       // any `kids-*` slug so kid-only categories don't leak into the
-      // adult catalogue. Kid surfaces use the mirror filter in
-      // /kids/category.
+      // adult catalogue.
       const { data: cats } = await supabase
         .from('categories')
         .select('id, name, slug')
@@ -163,7 +157,7 @@ export default function BrowsePage() {
     }
 
     fetchData();
-  }, [router]);
+  }, []);
 
   const filtered = categories.filter(c =>
     !search || (c.name || '').toLowerCase().includes(search.toLowerCase())

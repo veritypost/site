@@ -193,14 +193,13 @@ function ExpertSessionsInner() {
         <div style={{ display: 'flex', alignItems: 'center', gap: S[2] }}>
           <Badge variant={statusVariant(row.status)} dot>{row.status || '—'}</Badge>
           {row.status === 'live' && (
-            <a
-              href={`/kids/expert-sessions/${row.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ fontSize: F.xs, color: ADMIN_C.accent, textDecoration: 'none' }}
-            >
-              Join as moderator
-            </a>
+            // TODO: the web-side `/kids/expert-sessions/<id>` moderator
+            // viewer was retired with the rest of the kid web UI.
+            // Replace with an admin-facing moderator view or link out to
+            // the VerityPostKids iOS app once that flow exists.
+            <span style={{ fontSize: F.xs, color: ADMIN_C.dim }}>
+              Moderate in Kids app
+            </span>
           )}
         </div>
       ),

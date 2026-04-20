@@ -38,12 +38,6 @@ export const useAuth = () => useContext(AuthContext);
 
 const HIDE_NAV = ['/login', '/signup', '/signup/pick-username', '/signup/expert', '/forgot-password', '/reset-password', '/verify-email', '/api/auth/callback', '/logout', '/welcome'];
 const isAdmin = (p: string) => p.startsWith('/admin');
-const isKid = (p: string) => p === '/kids' || p.startsWith('/kids/');
-
-// Key used across the site to mark kid-mode as active. Written by /kids
-// when a profile is selected, cleared by /kids/profile on exit-PIN success.
-// Readers listen for the `vp:kid-mode-changed` window event to re-sync.
-const ACTIVE_KID_KEY = 'vp_active_kid_id';
 
 interface NavItem { label: string; href: string }
 
@@ -57,7 +51,6 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
   const path = usePathname() || '/';
   const [mounted, setMounted] = useState<boolean>(false);
   const [unreadCount, setUnreadCount] = useState<number>(0);
-  const [activeKidId, setActiveKidId] = useState<string | null>(null);
   const [canSeeAdmin, setCanSeeAdmin] = useState<boolean>(false);
   // R13-T4 (Crew 7): `search.basic` gates the search icon in the top
   // bar. Hydrated alongside `admin.dashboard.view` in the same profile
@@ -67,22 +60,6 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setMounted(true);
-    try { setActiveKidId(window.localStorage.getItem(ACTIVE_KID_KEY) || null); } catch {}
-
-    const onKidModeChanged = () => {
-      try { setActiveKidId(window.localStorage.getItem(ACTIVE_KID_KEY) || null); } catch {}
-    };
-    window.addEventListener('vp:kid-mode-changed', onKidModeChanged);
-    // Cross-tab sync.
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === ACTIVE_KID_KEY) setActiveKidId(e.newValue || null);
-    };
-    window.addEventListener('storage', onStorage);
-
-    return () => {
-      window.removeEventListener('vp:kid-mode-changed', onKidModeChanged);
-      window.removeEventListener('storage', onStorage);
-    };
   }, []);
 
   useEffect(() => {
@@ -146,12 +123,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
     return () => { cancelled = true; clearInterval(id); };
   }, [loggedIn]);
 
-  const onKidRoute = mounted && isKid(path);
-  const kidModeActive = onKidRoute && !!activeKidId;
-  // In kid-mode routes without a selected profile (picker / PIN states),
-  // hide nav entirely; Task 8 spec.
-  const showNav = mounted && !HIDE_NAV.includes(path) && !isAdmin(path)
-    && !(onKidRoute && !activeKidId);
+  const showNav = mounted && !HIDE_NAV.includes(path) && !isAdmin(path);
   const onAdminPage = mounted && isAdmin(path);
   // UJ-200 (Pass 17): banner is strictly admin+ territory. Editor and
   // moderator roles can reach the admin routes they're authorised for
@@ -172,7 +144,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
     accent: 'var(--accent)',
   } as const;
 
-  const adultNavItems: NavItem[] = [
+  const navItems: NavItem[] = [
     { label: 'Home', href: '/' },
     { label: 'Notifications', href: '/notifications' },
     { label: 'Leaderboard', href: '/leaderboard' },
@@ -180,16 +152,6 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
       ? { label: 'Profile', href: '/profile' }
       : { label: 'Sign in', href: '/login' },
   ];
-
-  // Kid 3-tab bar per Task 8 spec. Matches the iOS KidTabBar pattern
-  // (Home / Leaderboard / Profile — no Notifications, no Messages).
-  const kidNavItems: NavItem[] = [
-    { label: 'Home', href: '/kids' },
-    { label: 'Leaderboard', href: '/kids/leaderboard' },
-    { label: 'Profile', href: '/kids/profile' },
-  ];
-
-  const navItems: NavItem[] = kidModeActive ? kidNavItems : adultNavItems;
 
   const navStyle: CSSProperties = {
     position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999,
@@ -200,19 +162,13 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
   };
 
   // R13-T3 — top-bar logo. Minimal v1: just "Verity Post" on the left
-  // routing to `/` (adult) or `/kids` (kid-mode active). Same lifecycle
-  // rules as the bottom nav, plus hidden on admin routes (the admin
-  // chrome already owns the top/bottom of the viewport there).
-  //
-  // R13-T4 (Crew 7): hide the global top bar entirely on kid routes —
-  // `KidTopChrome` owns the top on /kids/* and its own sticky header
-  // would otherwise stack underneath this one. Also hide on the kid
-  // picker/PIN pre-mode states (showNav already excludes those).
-  // Right side varies by user state: search icon for signed-in users
-  // with `search.basic`, subtle "Sign in" link for anon, nothing for
-  // kid mode (we've already hidden the whole bar above).
+  // routing to `/`. Same lifecycle rules as the bottom nav, plus hidden
+  // on admin routes (the admin chrome already owns the top/bottom of
+  // the viewport there). Right side varies by user state: search icon
+  // for signed-in users with `search.basic`, subtle "Sign in" link for
+  // anon, nothing otherwise.
   const TOP_BAR_HEIGHT = 44;
-  const showTopBar = showNav && !onKidRoute;
+  const showTopBar = showNav;
   const topBarHomeHref = '/';
   const topBarActive = path === topBarHomeHref;
   // Bug 1 fix: `boxSizing: content-box` means the rendered height is
@@ -286,8 +242,6 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
         //   Signed-in + has search.basic → magnifying-glass icon → /search
         //   Anon                         → subtle "Sign in" text → /login
         //   Otherwise                    → nothing
-        // Kid routes don't reach this render — `showTopBar` is false on
-        // /kids/*, so KidTopChrome owns the top there.
         <header style={topBarStyle}>
           <a
             href={topBarHomeHref}
@@ -310,8 +264,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
               users on `/story/<slug>`, `/browse`, `/category/*` without
               a quick path back into search. Permission-level gating
               (`search.basic`) already decides who can search; path-level
-              gating added nothing beyond friction. Kid routes are already
-              excluded because `showTopBar` is false under `/kids/*`. */}
+              gating added nothing beyond friction. */}
           {loggedIn && canSearch && (
             <a
               href="/search"

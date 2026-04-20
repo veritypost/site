@@ -695,7 +695,7 @@ function KidsStoryManagerInner() {
             <TextInput
               value={story.slug}
               onChange={(e) => updateStory('slug', e.target.value)}
-              leftAddon={<span style={{ fontSize: F.sm, color: C.muted, fontFamily: 'ui-monospace, monospace' }}>/kids/</span>}
+              leftAddon={<span style={{ fontSize: F.sm, color: C.muted, fontFamily: 'ui-monospace, monospace' }}>/story/</span>}
             />
           </div>
         </div>

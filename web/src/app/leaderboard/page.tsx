@@ -2,12 +2,10 @@
 // @feature-verified home_feed 2026-04-18
 'use client';
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { createClient } from '../../lib/supabase/client';
 import Avatar from '../../components/Avatar';
 import StatRow from '../../components/StatRow';
 import VerifiedBadge from '../../components/VerifiedBadge';
-import { assertNotKidMode } from '@/lib/guards';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import type { Tables } from '@/types/database-helpers';
 
@@ -78,7 +76,6 @@ interface CategoryScoreRow {
 
 export default function LeaderboardPage() {
   const supabase = createClient();
-  const router = useRouter();
 
   const [activeTab, setActiveTab] = useState<TabKey>('Top Verifiers');
   const [period, setPeriod] = useState<PeriodKey>('All Time');
@@ -100,7 +97,6 @@ export default function LeaderboardPage() {
 
   useEffect(() => {
     (async () => {
-      if (assertNotKidMode(router)) return;
       const authRes = await supabase.auth.getUser();
 
       // Load real categories from DB — no fake fallback (Bug 91: fake IDs

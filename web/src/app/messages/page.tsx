@@ -2,11 +2,9 @@
 // @feature-verified messaging 2026-04-18
 'use client';
 import { useState, useEffect, useRef, CSSProperties } from 'react';
-import { useRouter } from 'next/navigation';
 import { createClient } from '../../lib/supabase/client';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import { useFocusTrap } from '../../lib/useFocusTrap';
-import { assertNotKidMode } from '../../lib/guards';
 import type { Tables } from '@/types/database-helpers';
 import type { User } from '@supabase/supabase-js';
 
@@ -79,7 +77,6 @@ interface PostgresChangePayload<T> {
 
 export default function MessagesPage() {
   const supabase = createClient();
-  const router = useRouter();
 
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authLoaded, setAuthLoaded] = useState<boolean>(false);
@@ -127,9 +124,6 @@ export default function MessagesPage() {
   void muteUntil;
 
   async function loadMessages() {
-    // Pass 17 / UJ-1115: if the parent device is in kid-mode, bounce to
-    // /kids before touching adult-only DM state.
-    if (assertNotKidMode(router)) return;
     setLoadError('');
     setLoading(true);
     try {

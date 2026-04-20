@@ -1,7 +1,22 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified kids 2026-04-18
 'use client';
-import { KID } from '@/lib/kidTheme';
+
+// Palette inlined from the now-removed lib/kidTheme.js. Badge is the only
+// surviving kid component in the adult web app (used by /profile/kids/[id]
+// to render a child's achievement badges), so a shared token file was
+// retired with the rest of /kids/* and the handful of constants it reads
+// live here directly.
+const CARD = '#FFFFFF';
+const CARD_ALT = '#F5EED9';
+const BORDER = '#E8DDC3';
+const TEXT = '#1F1A15';
+const DIM = '#7A6A5A';
+const ACHIEVEMENT = '#CA8A04';
+const RADIUS_CARD = 14;
+const FONT_SUB = 14;
+const WEIGHT_BOLD = 700;
+const LEADING_HEADING = 1.2;
 
 interface BadgeProps {
   name: string;
@@ -9,15 +24,15 @@ interface BadgeProps {
 }
 
 export default function Badge({ name, subdued = false }: BadgeProps) {
-  const ringColor = subdued ? KID.border : KID.achievement;
-  const ringFill = subdued ? KID.cardAlt : KID.card;
+  const ringColor = subdued ? BORDER : ACHIEVEMENT;
+  const ringFill = subdued ? CARD_ALT : CARD;
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
       padding: '14px 10px',
-      background: KID.card,
+      background: CARD,
       border: `2px solid ${ringColor}`,
-      borderRadius: KID.radius.card,
+      borderRadius: RADIUS_CARD,
       textAlign: 'center',
       minHeight: 120,
     }}>
@@ -26,14 +41,14 @@ export default function Badge({ name, subdued = false }: BadgeProps) {
         background: ringFill,
         border: `3px solid ${ringColor}`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: subdued ? KID.dim : KID.achievement,
+        color: subdued ? DIM : ACHIEVEMENT,
         flex: '0 0 auto',
       }}>
         <StarIcon />
       </div>
       <div style={{
-        fontSize: KID.font.sub, fontWeight: KID.weight.bold,
-        color: KID.text, lineHeight: KID.leading.heading,
+        fontSize: FONT_SUB, fontWeight: WEIGHT_BOLD,
+        color: TEXT, lineHeight: LEADING_HEADING,
       }}>{name}</div>
     </div>
   );

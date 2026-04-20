@@ -2,9 +2,7 @@
 // @feature-verified notifications 2026-04-18
 'use client';
 import { useState, useEffect, CSSProperties } from 'react';
-import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { assertNotKidMode } from '@/lib/guards';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import type { Tables } from '@/types/database-helpers';
 
@@ -29,7 +27,6 @@ type Filter = 'all' | 'unread';
 const C = { card: '#f7f7f7', border: '#e5e5e5', text: '#111', dim: '#666', accent: '#111' } as const;
 
 export default function NotificationsInbox() {
-  const router = useRouter();
   const [loading, setLoading] = useState<boolean>(true);
   const [items, setItems] = useState<NotificationRow[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
@@ -63,7 +60,6 @@ export default function NotificationsInbox() {
 
   // Hydrate the permission cache once, then fetch the feed.
   useEffect(() => {
-    if (assertNotKidMode(router)) return;
     (async () => {
       const supabase = createClient();
       const { data: { user: authUser } } = await supabase.auth.getUser();
@@ -80,7 +76,7 @@ export default function NotificationsInbox() {
       setCanView(hasPermission('notifications.inbox.view'));
       setPermsReady(true);
     })();
-  }, [router]);
+  }, []);
 
   useEffect(() => {
     if (!permsReady) return;

@@ -10,26 +10,15 @@ import {
   refreshIfStale,
   refreshAllPermissions,
   invalidate,
-  getKidSession,
-  setKidSession as setKidSessionInternal,
-  clearKidSession as clearKidSessionInternal,
 } from '../lib/permissions';
 import { onRlsLocked } from '../lib/rlsErrorHandler';
 import LockModal from './LockModal';
 import type { PermissionCapability } from './PermissionGate';
 
-interface KidSession {
-  kid_profile_id: string;
-  token: string;
-}
-
 interface PermissionsContextValue {
   user: User | null;
   loaded: boolean;
   reload: () => Promise<void>;
-  setKidSession: (s: KidSession | null) => void;
-  clearKidSession: () => void;
-  getKidSession: () => KidSession | null;
   tick: number;
   fetchSection: (section: string) => Promise<PermissionCapability[]>;
 }
@@ -48,10 +37,6 @@ export function PermissionsProvider({ children }: PermissionsProviderProps) {
 
   useEffect(() => {
     const supabase = createClient();
-
-    if (typeof window !== 'undefined') {
-      import('../lib/kidSession').then(({ loadKidSession }) => loadKidSession());
-    }
 
     let mounted = true;
     supabase.auth.getUser().then(({ data }) => {
@@ -120,28 +105,15 @@ export function PermissionsProvider({ children }: PermissionsProviderProps) {
     setTick((n) => n + 1);
   }, []);
 
-  const setKidSession = useCallback((s: KidSession | null) => {
-    setKidSessionInternal(s);
-    setTick((n) => n + 1);
-  }, []);
-
-  const clearKidSession = useCallback(() => {
-    clearKidSessionInternal();
-    setTick((n) => n + 1);
-  }, []);
-
   const value = useMemo<PermissionsContextValue>(
     () => ({
       user,
       loaded,
       reload,
-      setKidSession,
-      clearKidSession,
-      getKidSession,
       tick,
       fetchSection: getCapabilities as (section: string) => Promise<PermissionCapability[]>,
     }),
-    [user, loaded, reload, setKidSession, clearKidSession, tick],
+    [user, loaded, reload, tick],
   );
 
   return (

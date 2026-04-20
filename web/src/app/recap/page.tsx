@@ -2,8 +2,6 @@
 // @feature-verified recap 2026-04-18
 'use client';
 import { useEffect, useState, CSSProperties } from 'react';
-import { useRouter } from 'next/navigation';
-import { assertNotKidMode } from '@/lib/guards';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import type { Tables } from '@/types/database-helpers';
 
@@ -38,13 +36,11 @@ const C = {
 } as const;
 
 export default function RecapListPage() {
-  const router = useRouter();
   const [loading, setLoading] = useState<boolean>(true);
   const [recaps, setRecaps] = useState<RecapRow[]>([]);
   const [canView, setCanView] = useState<boolean>(true);
 
   useEffect(() => {
-    if (assertNotKidMode(router)) return;
     (async () => {
       await refreshAllPermissions();
       await refreshIfStale();
@@ -65,7 +61,7 @@ export default function RecapListPage() {
         setLoading(false);
       }
     })();
-  }, [router]);
+  }, []);
 
   if (loading) return <div style={{ padding: 40, color: C.dim }}>Loading…</div>;
 

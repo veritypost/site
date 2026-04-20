@@ -4,9 +4,9 @@
 import { useState, useEffect, CSSProperties, ReactNode } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '../../../../lib/supabase/client';
-import { clearKidMode, getActiveKidId } from '../../../../lib/kidMode';
 import Badge from '@/components/kids/Badge';
 import PairDeviceButton from '@/components/kids/PairDeviceButton';
+import OpenKidsAppButton from '@/components/kids/OpenKidsAppButton';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import type { Tables } from '@/types/database-helpers';
 
@@ -147,7 +147,7 @@ export default function KidDashboardPage() {
         kind: 'read',
         at: r.created_at,
         label: r.articles?.title || 'Article',
-        href: r.articles?.slug ? `/kids/story/${r.articles.slug}` : null,
+        href: null,
       });
     }
     for (const a of attemptSummaries) {
@@ -210,7 +210,6 @@ export default function KidDashboardPage() {
         setError(d?.error || 'Could not change pause state');
         return;
       }
-      if (nextPaused && getActiveKidId() === id) clearKidMode();
       setFlash(nextPaused ? 'Paused. Kid surfaces are hidden until you resume.' : 'Resumed.');
       load();
     } finally {
@@ -329,6 +328,10 @@ export default function KidDashboardPage() {
         <PairDeviceButton kidId={id} />
       </Section>
 
+      <Section title="Open Kids App">
+        <OpenKidsAppButton />
+      </Section>
+
       <Section title="Activity">
         {timeline.length === 0 ? (
           <Empty>Nothing yet &mdash; activity shows up here as soon as {kid.display_name} starts reading.</Empty>
@@ -347,13 +350,12 @@ export default function KidDashboardPage() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {upcoming.map(s => (
-              <a
+              <div
                 key={s.id}
-                href={`/kids/expert-sessions/${s.id}`}
                 style={{
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                   background: C.card, border: `1px solid ${C.border}`,
-                  borderRadius: 10, padding: '10px 12px', textDecoration: 'none', color: C.text,
+                  borderRadius: 10, padding: '10px 12px', color: C.text,
                   gap: 12,
                 }}
               >
@@ -364,8 +366,8 @@ export default function KidDashboardPage() {
                     {new Date(s.scheduled_at).toLocaleString()}
                   </div>
                 </div>
-                <span style={{ fontSize: 11, color: C.dim }}>View &rarr;</span>
-              </a>
+                <span style={{ fontSize: 11, color: C.dim }}>In the Kids app</span>
+              </div>
             ))}
           </div>
         )}

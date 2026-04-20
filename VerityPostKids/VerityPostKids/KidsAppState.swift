@@ -108,7 +108,11 @@ final class KidsAppState: ObservableObject {
 
             let palette: [Color] = [K.purple, K.teal, K.coral, K.sky, K.mint, K.gold]
             self.categories = rows.enumerated().map { i, r in
-                KidCategory(name: r.name, color: palette[i % palette.count], progress: 0)
+                KidCategory(
+                    name: cleanCategoryName(r.name),
+                    color: palette[i % palette.count],
+                    progress: 0
+                )
             }
 
             await loadProgressCounts(for: rows.map(\.id))
@@ -212,4 +216,13 @@ private extension Array {
     subscript(safe index: Int) -> Element? {
         indices.contains(index) ? self[index] : nil
     }
+}
+
+/// Strip admin-context "(Kids)" suffix from category names since the kids
+/// app is kids-only — adult distinction is redundant.
+private func cleanCategoryName(_ name: String) -> String {
+    name
+        .replacingOccurrences(of: " (Kids)", with: "")
+        .replacingOccurrences(of: "(Kids)", with: "")
+        .trimmingCharacters(in: .whitespaces)
 }

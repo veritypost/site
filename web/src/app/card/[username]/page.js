@@ -2,9 +2,8 @@
 // @feature-verified shared_components 2026-04-18
 'use client';
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/client';
-import { assertNotKidMode } from '@/lib/guards';
 
 const C = { bg: '#ffffff', card: '#f7f7f7', border: '#e5e5e5', text: '#111111', dim: '#666666', accent: '#111111' };
 
@@ -21,7 +20,6 @@ function roleBadgeLabel(roles) {
 
 export default function CardPage() {
   const { username } = useParams();
-  const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [target, setTarget] = useState(null);
   const [categories, setCategories] = useState([]);
@@ -34,7 +32,6 @@ export default function CardPage() {
   const [viewerIsAuthed, setViewerIsAuthed] = useState(false);
 
   useEffect(() => {
-    if (assertNotKidMode(router)) return;
     (async () => {
       // Q1 — card is fully public. No viewer-side permission check:
       // `profile.card.view` was removed as a gate because crawlers and

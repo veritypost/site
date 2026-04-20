@@ -9,10 +9,10 @@ export default async function sitemap() {
   // - Dropped `/search`, `/login`, `/signup` — they hold no indexable
   //   content; `/login` is also excluded in robots.js.
   // - Added `/contact` (public support intake, Round D H-11).
-  // - `/kids` kept as the marketing entry for Kids Mode even though the
-  //   app routes live under it.
+  // - `/kids` removed: kid-facing UI moved to the VerityPostKids iOS app;
+  //   the web route now 302s via middleware.
   const staticRoutes = [
-    '', '/browse', '/kids', '/how-it-works', '/contact',
+    '', '/browse', '/how-it-works', '/contact',
     '/privacy', '/terms', '/cookies', '/dmca', '/accessibility',
   ].map((path) => ({
     url: `${base}${path}`,

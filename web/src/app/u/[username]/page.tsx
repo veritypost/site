@@ -2,11 +2,10 @@
 // @feature-verified follow 2026-04-18
 'use client';
 import { useState, useEffect, CSSProperties } from 'react';
-import { useParams, useRouter, notFound } from 'next/navigation';
+import { useParams, notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import FollowButton from '@/components/FollowButton';
 import { useToast } from '@/components/Toast';
-import { assertNotKidMode } from '@/lib/guards';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import type { Tables } from '@/types/database-helpers';
 
@@ -61,7 +60,6 @@ const C = {
 export default function ProfilePage() {
   const params = useParams<{ username: string }>();
   const username = params?.username;
-  const router = useRouter();
   const supabase = createClient();
   const toast = useToast();
   const [me, setMe] = useState<MeRow | null>(null);
@@ -84,7 +82,6 @@ export default function ProfilePage() {
   const [checkedAuth, setCheckedAuth] = useState<boolean>(false);
 
   useEffect(() => {
-    if (assertNotKidMode(router)) return;
     if (!username) return;
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();

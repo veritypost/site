@@ -4,7 +4,6 @@
 import { useState, useEffect, CSSProperties, ReactNode } from 'react';
 import { createClient } from '../../../lib/supabase/client';
 import { COPPA_CONSENT_TEXT, COPPA_CONSENT_VERSION } from '../../../lib/coppaConsent';
-import { clearKidMode, getActiveKidId } from '../../../lib/kidMode';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import type { Tables } from '@/types/database-helpers';
@@ -175,7 +174,6 @@ export default function ParentKidsPage() {
     try {
       const res = await fetch(`/api/kids/${pendingRemove.id}`, { method: 'DELETE', credentials: 'include' });
       if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d?.error || 'Delete failed'); return; }
-      if (getActiveKidId() === pendingRemove.id) clearKidMode();
       setPendingRemove(null);
       load();
     } finally {
@@ -200,7 +198,6 @@ export default function ParentKidsPage() {
         setError(d?.error || 'Could not change pause state');
         return;
       }
-      if (nextPaused && getActiveKidId() === kid.id) clearKidMode();
       setFlash(nextPaused ? `${kid.display_name}\u2019s profile is paused.` : `${kid.display_name}\u2019s profile is active again.`);
       load();
     } finally {
@@ -300,7 +297,6 @@ export default function ParentKidsPage() {
 
       <div style={{ marginTop: 28, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
         <a href="/profile/family" style={{ color: C.accent, fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>Family dashboard &rarr;</a>
-        <a href="/kids/expert-sessions" style={{ color: C.accent, fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>Expert sessions &rarr;</a>
       </div>
 
       <ConfirmDialog

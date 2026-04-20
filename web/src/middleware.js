@@ -188,6 +188,17 @@ export async function middleware(request) {
     return redirect;
   }
 
+  // /kids/* used to host the kid-facing web UI. That surface moved to the
+  // VerityPostKids iOS app; the adult web app now only manages kid profiles
+  // under /profile/kids. Logged-in parents get bounced to the management
+  // dashboard; anonymous visitors land on the kids-app marketing page.
+  if (pathname === '/kids' || pathname.startsWith('/kids/')) {
+    const dest = request.nextUrl.clone();
+    dest.search = '';
+    dest.pathname = user ? '/profile/kids' : '/kids-app';
+    return NextResponse.redirect(dest, { status: 302 });
+  }
+
   return response;
 }
 

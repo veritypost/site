@@ -129,13 +129,8 @@ final class PairingClient {
             return nil
         }
 
-        do {
-            try await applySession(token: token)
-            return StoredPair(token: token, kidProfileId: kidId, kidName: kidName)
-        } catch {
-            clear()
-            return nil
-        }
+        try? await applySession(token: token)
+        return StoredPair(token: token, kidProfileId: kidId, kidName: kidName)
     }
 
     func clear() {
@@ -143,6 +138,7 @@ final class PairingClient {
         UserDefaults.standard.removeObject(forKey: kidIdKey)
         UserDefaults.standard.removeObject(forKey: kidNameKey)
         UserDefaults.standard.removeObject(forKey: expiresKey)
+        SupabaseKidsClient.shared.setBearerToken(nil)
     }
 
     private func persist(_ success: PairSuccess) {
@@ -153,12 +149,11 @@ final class PairingClient {
     }
 
     private func applySession(token: String) async throws {
-        // Custom JWT — use setSession with access+refresh (refresh unused here
-        // because our token isn't refresh-rotatable; acceptable for 30-day TTL).
-        try await SupabaseKidsClient.shared.client.auth.setSession(
-            accessToken: token,
-            refreshToken: token
-        )
+        // Our kid JWT isn't a Supabase Auth session (sub = kid_profile_id,
+        // not an auth.users id). So we skip setSession and instead inject
+        // the token as a global Authorization header on the shared client.
+        // PostgREST validates the signature + honours RLS via the claims.
+        SupabaseKidsClient.shared.setBearerToken(token)
     }
 
     // MARK: Keychain (minimal)

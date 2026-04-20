@@ -2,9 +2,7 @@
 // @feature-verified search 2026-04-18
 'use client';
 import { useState, useEffect, CSSProperties } from 'react';
-import { useRouter } from 'next/navigation';
 import { createClient } from '../../lib/supabase/client';
-import { assertNotKidMode } from '@/lib/guards';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import type { Tables } from '@/types/database-helpers';
 
@@ -34,7 +32,6 @@ interface SearchResponse {
 }
 
 export default function SearchPage() {
-  const router = useRouter();
   const supabase = createClient();
   const [canView, setCanView] = useState<boolean>(true);
   const [canAdvanced, setCanAdvanced] = useState<boolean>(false);
@@ -53,7 +50,6 @@ export default function SearchPage() {
   const [mode, setMode] = useState<string>('basic');
 
   useEffect(() => {
-    if (assertNotKidMode(router)) return;
     (async () => {
       // Permission hydrate — replaces the former users.plans.tier lookup.
       // The resolver applies any paid/role inheritance.

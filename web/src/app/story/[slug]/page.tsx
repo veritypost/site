@@ -3,7 +3,7 @@
 // @feature-verified article_reading 2026-04-18
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import type { User } from '@supabase/supabase-js';
 import { createClient } from '../../../lib/supabase/client';
 import { getSettings, isEnabled, getNumber } from '../../../lib/settings';
@@ -14,7 +14,6 @@ import Ad from '../../../components/Ad';
 import Interstitial from '../../../components/Interstitial';
 import { bumpArticleViewCount } from '../../../lib/session';
 import { useFocusTrap } from '../../../lib/useFocusTrap';
-import { assertNotKidMode } from '@/lib/guards';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import type { Tables } from '@/types/database-helpers';
 
@@ -208,7 +207,6 @@ function Timeline({ events }: { events: TimelineEvent[] }) {
 export default function StoryPage() {
   const params = useParams<{ slug: string }>();
   const slug = params?.slug;
-  const router = useRouter();
   const supabase = createClient();
 
   const [story, setStory] = useState<ArticleRow | null>(null);
@@ -309,11 +307,6 @@ export default function StoryPage() {
 
   useEffect(() => {
     if (!slug) return;
-    // D9/D12: adult article renderer must never run under an active kid
-    // session. /kids/story/[slug] is the kid-safe read path; everything
-    // else (comments, ads, share, follow, source link-outs) is adult
-    // chrome the kid should not see.
-    if (assertNotKidMode(router)) return;
     (async () => {
       setLoading(true);
       try {

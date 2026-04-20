@@ -2,15 +2,13 @@
 // @feature-verified home_feed 2026-04-18
 'use client';
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/client';
-import { assertNotKidMode } from '@/lib/guards';
 
 const SORT_OPTIONS = ['Latest', 'Trending'];
 
 export default function CategoryPage() {
   const { id } = useParams();
-  const router = useRouter();
   const supabase = createClient();
 
   const [category, setCategory] = useState(null);
@@ -24,7 +22,6 @@ export default function CategoryPage() {
   const [visibleCount, setVisibleCount] = useState(5);
 
   useEffect(() => {
-    if (assertNotKidMode(router)) return;
     async function fetchData() {
       setLoading(true);
 
@@ -45,12 +42,13 @@ export default function CategoryPage() {
       }
 
       if (categoryData) {
-        // Pass 17 / UJ-506 + UJ-612: kids-only categories belong at the
-        // /kids/category route; redirect and avoid leaking kid-safe
-        // articles into the adult feed. Also scope the article list to
-        // published-only so drafts / pending entries don't leak here.
+        // Kid-only categories (slug `kids-*`) no longer have a web-side
+        // renderer — the VerityPostKids iOS app owns that surface. Render
+        // the standard not-found state instead of leaking kid-safe articles
+        // into the adult feed.
         if (typeof categoryData.slug === 'string' && categoryData.slug.startsWith('kids-')) {
-          router.replace(`/kids/category/${categoryData.id}`);
+          setCategory(null);
+          setLoading(false);
           return;
         }
         setCategory(categoryData);

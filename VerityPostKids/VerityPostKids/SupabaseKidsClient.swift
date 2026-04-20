@@ -1,15 +1,21 @@
 import Foundation
 import Supabase
 
-// Kids-app-local Supabase client. Same project as the adult app.
-// Reads config from Info.plist keys set in project.yml.
+// Kids-app-local Supabase client. Same project as adult app.
 //
-// Mirrors the adult app's SupabaseManager pattern so rotation/config changes
-// stay symmetric between the two apps. Kids app has no service-role access —
-// all reads/writes go through the standard anon client + user session.
+// NOTE ON AUTH:
+// Our kid JWT is custom-minted (sub = kid_profile_id, signed with
+// SUPABASE_JWT_SECRET). We cannot use client.auth.setSession because it
+// calls GoTrue's /user endpoint to resolve sub against auth.users — and
+// the kid_profile_id isn't in auth.users by design (COPPA: no child
+// accounts). Instead, we inject the kid JWT as a global Authorization
+// header on a fresh SupabaseClient. PostgREST validates the signature +
+// reads claims → RLS sees is_kid_delegated + kid_profile_id correctly.
 
 final class SupabaseKidsClient {
     static let shared = SupabaseKidsClient()
+
+    private(set) var client: SupabaseClient
 
     private static func infoValue(_ key: String) -> String? {
         guard let raw = Bundle.main.object(forInfoDictionaryKey: key) as? String,
@@ -32,34 +38,51 @@ final class SupabaseKidsClient {
         #endif
     }
 
-    private let supabaseURL: URL = {
-        guard let raw = SupabaseKidsClient.resolve("SUPABASE_URL") else {
-            fatalError("[SupabaseKidsClient] SUPABASE_URL not set. Configure INFOPLIST_KEY_SUPABASE_URL in project.yml.")
-        }
-        guard let url = URL(string: raw) else {
-            fatalError("[SupabaseKidsClient] SUPABASE_URL malformed: \(raw)")
-        }
-        return url
-    }()
+    private let supabaseURL: URL
+    private let supabaseKey: String
 
-    private let supabaseKey: String = {
+    private init() {
+        guard let rawURL = SupabaseKidsClient.resolve("SUPABASE_URL") else {
+            fatalError("[SupabaseKidsClient] SUPABASE_URL not set. Configure INFOPLIST_KEY_SUPABASE_URL or set SUPABASE_URL env var in DEBUG.")
+        }
+        guard let url = URL(string: rawURL) else {
+            fatalError("[SupabaseKidsClient] SUPABASE_URL malformed: \(rawURL)")
+        }
         guard let key = SupabaseKidsClient.resolve("SUPABASE_KEY") else {
-            fatalError("[SupabaseKidsClient] SUPABASE_KEY not set. Configure INFOPLIST_KEY_SUPABASE_KEY in project.yml.")
+            fatalError("[SupabaseKidsClient] SUPABASE_KEY not set.")
         }
-        return key
-    }()
 
-    lazy var client: SupabaseClient = {
-        SupabaseClient(supabaseURL: supabaseURL, supabaseKey: supabaseKey)
-    }()
+        self.supabaseURL = url
+        self.supabaseKey = key
+        self.client = SupabaseKidsClient.makeClient(url: url, anonKey: key, bearer: nil)
+    }
 
-    /// Base URL of the Next.js site. Used for API routes the kids app calls.
+    /// Reconfigure the shared client with a bearer token (the kid JWT).
+    /// Pass nil to revert to anon-only (used on sign out).
+    func setBearerToken(_ token: String?) {
+        self.client = SupabaseKidsClient.makeClient(
+            url: supabaseURL,
+            anonKey: supabaseKey,
+            bearer: token
+        )
+    }
+
+    private static func makeClient(url: URL, anonKey: String, bearer: String?) -> SupabaseClient {
+        var headers: [String: String] = [:]
+        if let bearer {
+            headers["Authorization"] = "Bearer \(bearer)"
+        }
+
+        let options = SupabaseClientOptions(
+            global: SupabaseClientOptions.GlobalOptions(headers: headers)
+        )
+        return SupabaseClient(supabaseURL: url, supabaseKey: anonKey, options: options)
+    }
+
     lazy var siteURL: URL = {
         if let raw = SupabaseKidsClient.resolve("VP_SITE_URL"), let url = URL(string: raw) {
             return url
         }
         return URL(string: "https://veritypost.com")!
     }()
-
-    private init() {}
 }

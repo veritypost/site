@@ -93,56 +93,34 @@ struct PairCodeView: View {
     // MARK: Code field
 
     private var codeField: some View {
-        HStack(spacing: 8) {
-            ForEach(0..<codeLength, id: \.self) { i in
-                codeBox(index: i)
+        TextField("XXXXXXXX", text: Binding(
+            get: { code },
+            set: { newValue in
+                let filtered = newValue
+                    .uppercased()
+                    .filter { $0.isLetter || $0.isNumber }
+                code = String(filtered.prefix(codeLength))
             }
-        }
+        ))
+        .keyboardType(.asciiCapable)
+        .textInputAutocapitalization(.characters)
+        .disableAutocorrection(true)
+        .focused($focused)
+        .font(.system(size: 32, weight: .black, design: .rounded))
+        .foregroundStyle(K.text)
+        .kerning(6)
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity, minHeight: 64)
+        .padding(.horizontal, 16)
+        .background(K.card)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
-            TextField("", text: Binding(
-                get: { code },
-                set: { newValue in
-                    let filtered = newValue
-                        .uppercased()
-                        .filter { $0.isLetter || $0.isNumber }
-                    code = String(filtered.prefix(codeLength))
-                }
-            ))
-            .keyboardType(.asciiCapable)
-            .textContentType(.oneTimeCode)
-            .autocapitalization(.allCharacters)
-            .disableAutocorrection(true)
-            .focused($focused)
-            .foregroundStyle(Color.clear)
-            .tint(Color.clear)
-            .onSubmit {
-                if canSubmit { pairNow() }
-            }
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(focused ? K.teal : K.border, lineWidth: focused ? 2 : 1)
         )
-        .contentShape(Rectangle())
-        .onTapGesture { focused = true }
-    }
-
-    private func codeBox(index: Int) -> some View {
-        let char: Character? = {
-            let chars = Array(code)
-            return index < chars.count ? chars[index] : nil
-        }()
-        let isCurrent = index == code.count
-
-        return Text(char.map { String($0) } ?? "")
-            .font(.system(size: 24, weight: .black, design: .rounded))
-            .foregroundStyle(K.text)
-            .frame(width: 36, height: 48)
-            .background(K.card)
-            .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(
-                        isCurrent && focused ? K.teal : K.border,
-                        lineWidth: isCurrent && focused ? 2 : 1
-                    )
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .onSubmit {
+            if canSubmit { pairNow() }
+        }
     }
 
     private var canSubmit: Bool {

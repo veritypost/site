@@ -26,7 +26,6 @@
 //   refreshAllPermissions()    — fetch compute_effective_perms into the full cache
 //   refreshIfStale()           — checks my_perms_version(), refreshes on bump
 //   invalidate()               — clears both caches (call on auth change / logout)
-//   getKidSession()/setKidSession() — parent-provided (kid_profile_id, token) pair
 // ============================================================
 
 import { createClient } from './supabase/client';
@@ -37,13 +36,7 @@ let allPermsCache = null;         // Map<permission_key, row> — null means "ne
 let allPermsFetchedAt = 0;
 let allPermsInflight = null;
 let versionState = { user_version: 0, global_version: 0, checkedAt: 0 };
-let kidSession = null;            // { kid_profile_id, token } — null when acting as parent
 let inflight = new Map();         // section -> Promise (dedupe concurrent fetches)
-
-// --------- Kid session helpers ---------
-export function getKidSession() { return kidSession; }
-export function setKidSession(s) { kidSession = s || null; invalidate(); }
-export function clearKidSession() { kidSession = null; invalidate(); }
 
 // --------- Cache control ---------
 export function invalidate() {
@@ -130,9 +123,7 @@ export async function getCapabilities(section) {
   if (inflight.has(section))     return inflight.get(section);
 
   const supabase = createClient();
-  const args = kidSession
-    ? { p_section: section, p_as_kid: kidSession.kid_profile_id, p_kid_token: kidSession.token }
-    : { p_section: section };
+  const args = { p_section: section };
 
   const p = supabase
     .rpc('get_my_capabilities', args)
@@ -193,9 +184,7 @@ export function getCapability(key) {
 // where you don't have the section cached).
 export async function hasPermissionServer(key) {
   const supabase = createClient();
-  const args = kidSession
-    ? { p_key: key, p_as_kid: kidSession.kid_profile_id, p_kid_token: kidSession.token }
-    : { p_key: key };
+  const args = { p_key: key };
   const { data, error } = await supabase.rpc('has_permission', args);
   if (error) return false;
   return !!data;
@@ -204,10 +193,7 @@ export async function hasPermissionServer(key) {
 // Content-scoped check: e.g. "can this user view THIS article?"
 export async function hasPermissionFor(key, scopeType, scopeId) {
   const supabase = createClient();
-  const base = { p_key: key, p_scope_type: scopeType, p_scope_id: scopeId };
-  const args = kidSession
-    ? { ...base, p_as_kid: kidSession.kid_profile_id, p_kid_token: kidSession.token }
-    : base;
+  const args = { p_key: key, p_scope_type: scopeType, p_scope_id: scopeId };
   const { data, error } = await supabase.rpc('has_permission_for', args);
   if (error) return false;
   return !!data;

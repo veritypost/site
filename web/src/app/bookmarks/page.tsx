@@ -2,9 +2,7 @@
 // @feature-verified bookmarks 2026-04-18
 'use client';
 import { useState, useEffect, CSSProperties, ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
 import { createClient } from '../../lib/supabase/client';
-import { assertNotKidMode } from '@/lib/guards';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import type { Tables } from '@/types/database-helpers';
@@ -50,7 +48,6 @@ function stripKidsTag(name: string | null | undefined): string {
 }
 
 export default function BookmarksPage() {
-  const router = useRouter();
   const supabase = createClient();
   const [items, setItems] = useState<BookmarkRow[]>([]);
   const [collections, setCollections] = useState<CollectionRow[]>([]);
@@ -80,7 +77,6 @@ export default function BookmarksPage() {
   const atCap = !canUnlimited && items.length >= FREE_BOOKMARK_CAP;
 
   async function load() {
-    if (assertNotKidMode(router)) return;
     setLoading(true); setError('');
     const { data: { user: authUser } } = await supabase.auth.getUser();
     if (!authUser) { setLoading(false); return; }

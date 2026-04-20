@@ -4,7 +4,6 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '../../lib/supabase/client';
-import { clearKidMode } from '../../lib/kidMode';
 
 const C = {
   bg: '#ffffff',
@@ -39,9 +38,6 @@ export default function LogoutPage() {
     } catch {
       // ignore — the server call is the source of truth
     }
-    // Pass 17 / UJ-501: active kid-mode must end when the parent logs
-    // out — NavWrapper listens for the dispatched event to re-sync.
-    clearKidMode();
     setStatus(serverOk ? 'done' : 'error');
   };
 
