@@ -45,9 +45,6 @@ New migration extends `freeze_kid_trial()` to call `create_notification('kid_tri
 psql "$DATABASE_URL" -f schema/106_kid_trial_freeze_notification.sql
 ```
 
-### 7 — Audit Stripe dashboard
-Webhook endpoints, API keys (including restricted), Connect accounts, team members. Anything the ex-dev may have added.
-
 ### 8 — Audit Vercel team + env-var change history
 Remove ex-dev from team. Scan env-var changes for unexpected entries.
 
@@ -59,6 +56,16 @@ Gates all iOS publishing — App Store Connect products, APNs `.p8`, `apple-app-
 ---
 
 ## Post-launch (not blocking launch)
+
+### PL-0a — Stripe dashboard audit
+Webhook endpoints, API keys (including restricted), Connect accounts, team members. Anything the ex-dev may have added that a key-rotation doesn't cover.
+
+**Why deferred:** key rotation (#2, done) invalidates the ex-dev's *signing* access. Residual risk = any *endpoints* or *Connect accounts* they may have attached to your Stripe account that still fire on events or receive payouts regardless of your key state. Quick-sanity-check these three before going live to real money:
+1. Developers → Webhooks — only one endpoint, pointing at `veritypost.com/api/stripe/webhook`?
+2. Connect → Accounts — none present that you didn't create?
+3. Settings → Team — ex-dev removed?
+
+If those three look clean, the full audit can wait.
 
 ### PL-0 — Enable HIBP (leaked-password check) in Supabase Auth
 One-click toggle: Authentication → Policies → "Leaked password protection" → on.
