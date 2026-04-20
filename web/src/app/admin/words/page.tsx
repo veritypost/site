@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { ADMIN_ROLES } from '@/lib/roles';
 import { createClient } from '@/lib/supabase/client';
 
 import Page, { PageHeader } from '@/components/admin/Page';
@@ -54,7 +55,7 @@ export default function WordsAdmin() {
       const roleNames = ((userRoles || []) as Array<{ roles: { name: string } | null }>)
         .map((r) => r.roles?.name).filter(Boolean) as string[];
 
-      if (!profile || !['owner', 'admin'].some((r) => roleNames.includes(r))) {
+      if (!profile || !roleNames.some((r: string) => ADMIN_ROLES.has(r))) {
         router.push('/');
         return;
       }

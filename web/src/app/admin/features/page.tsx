@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { ADMIN_ROLES } from '@/lib/roles';
 import { createClient } from '@/lib/supabase/client';
 import DestructiveActionConfirm from '@/components/admin/DestructiveActionConfirm';
 
@@ -156,7 +157,7 @@ export default function FeatureFlagsAdmin() {
         .eq('user_id', user.id);
       const names = ((userRoles || []) as Array<{ roles: { name: string } | null }>)
         .map((r) => r.roles?.name).filter(Boolean) as string[];
-      if (!names.some((n) => ['owner', 'admin'].includes(n))) { router.push('/'); return; }
+      if (!names.some((n) => ADMIN_ROLES.has(n))) { router.push('/'); return; }
       setAuthorized(true);
       await loadAll();
       setLoading(false);

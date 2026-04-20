@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ADMIN_ROLES } from '@/lib/roles';
 import { createClient } from '../../../lib/supabase/client';
 import Page, { PageHeader } from '@/components/admin/Page';
 import PageSection from '@/components/admin/PageSection';
@@ -103,7 +104,7 @@ function ReaderInner() {
       const { data: profile } = await supabase.from('users').select('id').eq('id', user.id).single();
       const { data: userRoles } = await supabase.from('user_roles').select('roles(name)').eq('user_id', user.id);
       const roleNames = (userRoles || []).map((r: any) => r.roles?.name).filter(Boolean);
-      if (!profile || !['owner', 'admin'].some((r) => roleNames.includes(r))) { router.push('/'); return; }
+      if (!profile || !roleNames.some((r: string) => ADMIN_ROLES.has(r))) { router.push('/'); return; }
 
       const { data: settingsRows } = await supabase.from('settings').select('key, value').like('key', 'reader_%');
       if (settingsRows) {

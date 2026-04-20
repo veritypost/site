@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ADMIN_ROLES } from '@/lib/roles';
 import { createClient } from '@/lib/supabase/client';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 import type { Tables } from '@/types/database-helpers';
@@ -92,7 +93,7 @@ export default function WebhooksAdmin() {
         })
         .filter(Boolean) as string[];
 
-      if (!profile || !['owner', 'admin'].some((r) => roleNames.includes(r))) {
+      if (!profile || !roleNames.some((r) => ADMIN_ROLES.has(r))) {
         router.push('/'); return;
       }
 

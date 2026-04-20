@@ -2,6 +2,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { ADMIN_ROLES } from '@/lib/roles';
 import { createClient } from '@/lib/supabase/client';
 import DestructiveActionConfirm from '@/components/admin/DestructiveActionConfirm';
 import type { Tables } from '@/types/database-helpers';
@@ -159,7 +160,7 @@ function StoryEditorInner() {
       const roleNames = (userRoles || [])
         .map((r) => (r as { roles?: { name?: string | null } | null }).roles?.name)
         .filter((n): n is string => Boolean(n));
-      if (!profile || !['owner', 'admin'].some((r) => roleNames.includes(r))) {
+      if (!profile || !roleNames.some((r) => ADMIN_ROLES.has(r))) {
         router.push('/');
         return;
       }

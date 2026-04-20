@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ADMIN_ROLES } from '@/lib/roles';
 import { createClient } from '../../../lib/supabase/client';
 import DestructiveActionConfirm from '@/components/admin/DestructiveActionConfirm';
 import Page, { PageHeader } from '@/components/admin/Page';
@@ -86,7 +87,7 @@ function PromoInner() {
       if (!user) { router.push('/'); return; }
       const { data: userRoles } = await supabase.from('user_roles').select('roles(name)').eq('user_id', user.id);
       const names = (userRoles || []).map((r: any) => r.roles?.name).filter(Boolean);
-      if (!names.some((n: string) => ['owner', 'admin'].includes(n))) { router.push('/'); return; }
+      if (!names.some((n: string) => ADMIN_ROLES.has(n))) { router.push('/'); return; }
       setAuthorized(true);
       await loadAll();
       setLoading(false);
