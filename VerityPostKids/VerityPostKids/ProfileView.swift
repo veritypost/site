@@ -11,6 +11,10 @@ struct ProfileView: View {
     @State private var badges: [UserAchievement] = []
     @State private var loading: Bool = true
     @State private var loadError: String? = nil
+    // T-013 — parental gate before unpair. Unpair is effectively a
+    // "log out / forget device" action; COPPA/Kids Category review
+    // requires parental verification before a kid can trigger it.
+    @State private var showUnpairGate: Bool = false
 
     private var client: SupabaseClient { SupabaseKidsClient.shared.client }
 
@@ -27,6 +31,9 @@ struct ProfileView: View {
         }
         .background(K.bg.ignoresSafeArea())
         .task { await loadBadges() }
+        .parentalGate(isPresented: $showUnpairGate) {
+            Task { await auth.signOut() }
+        }
     }
 
     // MARK: Header
@@ -50,7 +57,7 @@ struct ProfileView: View {
                 .font(.system(size: 22, weight: .black, design: .rounded))
                 .foregroundStyle(K.text)
 
-            Button { Task { await auth.signOut() } } label: {
+            Button { showUnpairGate = true } label: {
                 Text("Unpair this device")
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(K.dim)
