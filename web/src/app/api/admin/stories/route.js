@@ -1,8 +1,23 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified admin_api 2026-04-18
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
+
+// T-023 — audit all state-changing article mutations via service client.
+async function auditStoryAction(actorId, action, articleId, meta) {
+  try {
+    const service = createServiceClient();
+    await service.from('audit_log').insert({
+      actor_id: actorId,
+      actor_type: 'user',
+      action,
+      target_type: 'article',
+      target_id: articleId,
+      metadata: meta || {},
+    });
+  } catch { /* best-effort */ }
+}
 
 export async function POST(request) {
   try {
@@ -42,6 +57,10 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Could not create article' }, { status: 500 });
     }
 
+    await auditStoryAction(user.id, 'article.create', article.id, {
+      title: article.title, slug: article.slug, status: article.status,
+    });
+
     return NextResponse.json({ article });
   } catch (err) {
     if (err.status) {
@@ -54,7 +73,7 @@ export async function POST(request) {
 export async function PUT(request) {
   try {
     const supabase = await createClient();
-    await requirePermission('admin.articles.edit.any');
+    const user = await requirePermission('admin.articles.edit.any');
 
     const body = await request.json();
 
@@ -81,6 +100,8 @@ export async function PUT(request) {
       return NextResponse.json({ error: 'Could not update article' }, { status: 500 });
     }
 
+    await auditStoryAction(user.id, 'article.update', body.id, { updated_fields: Object.keys(updates) });
+
     return NextResponse.json({ article });
   } catch (err) {
     if (err.status) {
@@ -93,7 +114,7 @@ export async function PUT(request) {
 export async function DELETE(request) {
   try {
     const supabase = await createClient();
-    await requirePermission('admin.articles.delete');
+    const user = await requirePermission('admin.articles.delete');
 
     const { id } = await request.json();
 
@@ -110,6 +131,8 @@ export async function DELETE(request) {
     if (error) {
       return NextResponse.json({ error: 'Could not delete article' }, { status: 500 });
     }
+
+    await auditStoryAction(user.id, 'article.delete', id, { soft_delete: true });
 
     return NextResponse.json({ success: true });
   } catch (err) {

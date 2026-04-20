@@ -101,10 +101,23 @@ DR-replay from scratch produces a weaker DB than live:
 - Migrations 100–105 missing from rebuild file entirely.
 **Done when:** a fresh Supabase project replayed from disk matches live shape.
 
-### 23 — `record_admin_action` audit coverage gap
-Only **23 of 73** admin API routes call `recordAdminAction` or `record_admin_action`. Everything under `/api/admin/**` that mutates state should audit. Missing ~50 are concentrated in: ad-campaigns/placements/units, appeals, data-requests, expert/applications, moderation/comments+reports, permission-sets, permissions, plans, recap, sponsors, subscriptions, users/[id]/{ban,data-export,mark-quiz,mark-read,plan,role-set,roles}.
-**Do:** sweep every admin route; add `await recordAdminAction({...})` from `lib/adminMutation.ts` where the mutation has meaningful state change.
-**Done when:** every admin-route mutation either audits or has an inline exception comment.
+### 23 — Admin audit coverage (partial; high-risk closed)
+Original agent grep for "recordAdminAction|record_admin_action" missed routes that audit via direct `audit_log.insert(...)`. The real gap is ~12 admin routes, not 50.
+
+**Closed 2026-04-20:** data-requests/approve + reject (GDPR-touching), stories POST/PUT/DELETE (content lifecycle). These had no audit at all and now write to `audit_log` via the service client.
+
+**Remaining admin routes with no audit** (lower-risk config changes, 12 files):
+```
+admin/ad-campaigns/route.js + [id]/route.js
+admin/ad-placements/route.js + [id]/route.js
+admin/ad-units/route.js + [id]/route.js
+admin/recap/route.js + [id]/route.js + [id]/questions/route.js + questions/[id]/route.js
+admin/sponsors/route.js + [id]/route.js
+```
+**Do:** mirror the pattern used in stories/route.js — a single `auditAction(actorId, action, targetId, meta)` helper at top of each file that wraps `service.from('audit_log').insert(...)`. Call after each mutation.
+**Done when:** every admin mutation in those 12 files writes an audit_log row.
+
+Non-admin routes surfaced by the grep (bookmarks/account/kids/cron/etc.) don't need audit_log entries — they're user-scoped actions, not privileged admin changes. Out of scope for this item.
 
 ### 24 — Family leaderboard may show only the paired kid
 `VerityPostKids/VerityPostKids/LeaderboardView.swift:218-229` — Family scope query on `kid_profiles` filters by `parent_user_id`. Under kid JWT, RLS returns only the paired kid's own row (migration 096). Siblings under the same parent won't appear.

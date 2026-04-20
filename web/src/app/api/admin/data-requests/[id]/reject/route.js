@@ -52,5 +52,18 @@ export async function POST(request, { params }) {
     })
     .eq('id', params.id);
   if (error) return safeErrorResponse(NextResponse, error, { route: 'admin/data-requests/reject', fallbackStatus: 400 });
+
+  // T-023 — GDPR-touching action; needs audit trail.
+  try {
+    await service.from('audit_log').insert({
+      actor_id: user.id,
+      actor_type: 'user',
+      action: 'data_request.reject',
+      target_type: 'data_request',
+      target_id: params.id,
+      metadata: { reason: trimmed.slice(0, 200) },
+    });
+  } catch { /* best-effort */ }
+
   return NextResponse.json({ ok: true });
 }
