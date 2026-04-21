@@ -38,6 +38,12 @@ export default function IdeasIndex() {
       title: 'Stockholm-quiet home feed',
       hook: 'No modules, no rails, no images. Just headlines.',
     },
+    {
+      href: '/ideas/feed',
+      num: '05',
+      title: 'Five home-feed paradigms (post-card)',
+      hook: 'Phone-scale prototypes of Edition / Index / Ranked / Spread / Briefing. The research-backed set.',
+    },
   ];
 
   return (
