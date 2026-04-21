@@ -9,8 +9,14 @@
 // box (the App Store requires a reachable Support URL).
 
 import type { CSSProperties } from 'react';
+import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { formatCents } from '@/lib/plans';
+
+export const metadata: Metadata = {
+  title: 'Help — Verity Post',
+  description: 'Get help using Verity Post. Support contacts and common questions.',
+};
 
 interface FAQ {
   q: string;

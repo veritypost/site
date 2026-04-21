@@ -1,6 +1,12 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified shared_pages 2026-04-18
 import type { CSSProperties } from 'react';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Cookie Policy — Verity Post',
+  description: 'How Verity Post uses cookies and similar technologies.',
+};
 
 export default function CookiesPage() {
   const sectionStyle: CSSProperties = { marginBottom: '32px' };

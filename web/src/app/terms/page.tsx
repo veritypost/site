@@ -1,6 +1,12 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified shared_pages 2026-04-18
 import type { CSSProperties } from 'react';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Terms of Service — Verity Post',
+  description: 'Rules governing your use of Verity Post.',
+};
 
 export default function TermsPage() {
   const sectionStyle: CSSProperties = { marginBottom: '32px' };

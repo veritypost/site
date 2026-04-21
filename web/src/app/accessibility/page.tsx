@@ -1,6 +1,12 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified shared_pages 2026-04-18
 import type { CSSProperties } from 'react';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Accessibility — Verity Post',
+  description: 'Verity Post\'s commitment to accessibility and how to request support.',
+};
 
 export default function AccessibilityPage() {
   const sectionStyle: CSSProperties = { marginBottom: '32px' };

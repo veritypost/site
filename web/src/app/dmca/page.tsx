@@ -1,6 +1,12 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified shared_pages 2026-04-18
 import type { CSSProperties } from 'react';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'DMCA — Verity Post',
+  description: 'How to submit a copyright takedown notice to Verity Post.',
+};
 
 export default function DMCAPage() {
   const sectionStyle: CSSProperties = { marginBottom: '32px' };
