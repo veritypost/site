@@ -336,6 +336,85 @@ Based on `.env.example` rewrite from 2026-04-20. Each is optional; document-by-d
 
 ---
 
+## Pre-Launch — Parked (trigger-based resume)
+
+Items investigated and explicitly deferred to post-launch based on the owner's launch model + current risk profile. Each entry lists trigger events that unpark it; full context preserved so resumption requires no re-investigation. Nothing here is cancelled — parking is a scheduling decision, not a scope change.
+
+### Admin route compliance sweep — `record_admin_action` + `checkRateLimit` + `Retry-After` across 75 routes
+
+**Cross-reference:** full per-route audit at `Sessions/04-21-2026/Session 1/ADMIN_ROUTE_COMPLIANCE_AUDIT_2026-04-21.md`. Open item #15 in this file (§"UI — Discrete targeted fixes") carries the sweep's technical detail; this entry carries the parking rationale and resume context.
+
+**Why parked (2026-04-21):**
+- Owner is sole admin for ~3 months. The gaps (audit trail, rate limits, outranks) are defense-in-depth, not primary access control.
+- Primary access control (permissions) is 100% in place — every route has `requirePermission('<key>')`; a non-admin cannot hit any admin mutation route.
+- The gaps become load-bearing when a SECOND admin is onboarded OR when compliance reporting hits at scale (GDPR DSAR, COPPA inquiry), not for a solo-admin launch phase.
+- AdSense + Apple reviews are in-flight; pushing admin-route changes during review is low-risk but unnecessary for the review outcome itself.
+
+**Trigger events that unpark this work (on any trigger → schedule the sweep):**
+1. Onboarding a second admin (mod, editor, expert, background-checked journalist, or any role with admin-adjacent permissions). Plan the sweep BEFORE the onboard date, not after.
+2. Real EU traffic at scale + first GDPR Data Subject Access Request arrives. Audit trail becomes load-bearing immediately.
+3. Real COPPA-relevant Kids iOS traffic + first compliance inquiry.
+4. 3-month mark from launch (approximately 2026-07-21; adjust if launch slides). Revisit regardless of triggers.
+5. Discovery of an incident that required audit-trail forensics and reconstruction failed (reactive trigger — bad to hit, but valid).
+
+**Headline audit numbers (for future context):**
+- 75 total admin mutation routes
+- 23 (31%) pass all required-always checks
+- 18 (24%) minor gaps
+- 34 (45%) major gaps
+- 5 (7%) broken with 3+ violations each
+- 73/75 (97%) missing `checkRateLimit`
+- 52/75 (69%) missing `record_admin_action` via SECDEF RPC
+- 8/75 (11%) missing `Retry-After` on 429
+
+**Sweep plan as scoped 2026-04-21 (preserve verbatim for resume):**
+
+**Phase 0 — prereq, ~15 min: fix the helper bug.**
+- `web/src/lib/adminMutation.ts:63-80` — `recordAdminAction` wrapper currently omits `p_ip` and `p_user_agent` (2 of 8 required RPC params).
+- Must be fixed FIRST — propagating the bug across 52 routes via the helper would mean every audit row has NULL IP/UA.
+- 6-agent ship pattern (4 pre-impl + 2 post-impl per memory `feedback_4pre_2post_ship_pattern.md`).
+
+**Phase 1 — ~30 min: 5 worst-offender routes.**
+- `web/src/app/api/admin/settings/route.js` (4 violations)
+- `web/src/app/api/admin/ad-placements/route.js` (3 violations)
+- `web/src/app/api/admin/permission-sets/role-wiring/route.js` (3 violations)
+- Plus 2 more from the audit's "broken" bucket (see `ADMIN_ROUTE_COMPLIANCE_AUDIT_2026-04-21.md`).
+- Bring each fully compliant with the CLAUDE.md contract.
+
+**Phase 2 — ~2 hrs: rate-limit sweep across 73 routes.**
+- Proposed 3-tier budget pattern (owner to approve or change at unpark time):
+  - **Strict (max: 10, windowSec: 60):** user-targeting mutations (bans, role changes, permission grants, account delete/anonymize)
+  - **Medium (max: 30, windowSec: 60):** content mutations (categories, feature flags, ad placements, RSS feeds, email templates)
+  - **Lenient (max: 60, windowSec: 60):** read-like admin writes (mark notification read, cache invalidate, generate recap)
+- Add `Retry-After: <windowSec>` header to all 429 responses (closes the 8/75 header gap).
+- Commit per route subgroup (by folder: `roles/`, `moderation/`, `ads/`, etc. — ~6-8 commits total).
+
+**Phase 3 — ~1.5 hrs: audit-call sweep across 52 routes.**
+- Uses the FIXED helper from Phase 0.
+- Capture `p_old_value` (read row before mutation) and `p_new_value` (incoming change) per route.
+- Set `p_target_table` and `p_target_id` from the route's mutation target.
+- Call helper in standard post-mutation position.
+- Harder than Phase 2 because old/new value capture requires reading each route's mutation shape; still mechanical once pattern locks.
+- Commit per route subgroup.
+
+**Phase 4 — ~30 min: verification pass.**
+- Re-run compliance audit.
+- Confirm all 75 routes pass all required-always checks.
+- Any remaining gaps → targeted fix pass.
+- Mark FIX_SESSION_1 #15 as SHIPPED.
+- Refresh `@admin-verified` markers on every touched file with the new date.
+
+**Total: ~4-5 hrs of focused agent work.**
+
+**Decisions already made (do not re-litigate at resume):**
+- `@admin-verified` lockdown: blanket approval already given by owner for this specific scope.
+- Commit cadence: per subgroup (not per file, not one giant commit).
+- Ship pattern: 4+2 agent pattern for Phase 0 (helper); per-route agent + post-verify for Phase 1; subgroup-level agent + post-verify for Phases 2-3.
+- All 3 required RPCs (`record_admin_action` 8-param, `require_outranks`, `check_rate_limit`) verified present on live DB — no DB work needed, sweep is entirely route-side code.
+- No public-surface risk: none of the 75 routes are touched by the AdSense crawler or the Apple reviewer.
+
+---
+
 ## UI — Discrete targeted fixes (~4-8 hrs total)
 
 ### 1. Per-page `<title>` metadata — merged with SEO polish **[PARTIAL SHIP 2026-04-21 — server components done]**
@@ -720,6 +799,8 @@ Fixes #4 + #12 + #13 + #14 + #20 in one pass.
 ---
 
 ### 15. Admin route compliance sweep — 75 routes against CLAUDE.md mutation contract
+
+**Status: PARKED 2026-04-21** — see §"Pre-Launch — Parked (trigger-based resume)" above for the trigger-event list, the why-parked rationale, the 5-phase sweep plan, the 3-tier rate-limit proposal, and the decisions-already-made list. Item is still OPEN work; parking is a scheduling decision, not a scope change. Technical detail below preserved verbatim for resume.
 
 **Full per-route audit (2026-04-21):** `Sessions/04-21-2026/Session 1/ADMIN_ROUTE_COMPLIANCE_AUDIT_2026-04-21.md`
 

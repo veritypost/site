@@ -811,4 +811,20 @@ Actual total: **75 admin mutation routes**, not 24. Original audit undercounted 
 
 **No fixes applied yet** — owner reviews the audit and decides sweep strategy before dispatch.
 
+### 2026-04-21 — Admin compliance sweep — PARKED under Pre-Launch category (trigger-based resume)
+After reviewing the audit, owner questioned whether the sweep is urgent given (a) permissions lock the primary access gate on 100% of routes (verified — no non-admin can hit an admin mutation route), (b) owner is sole admin for ~3 months, and (c) the gaps are defense-in-depth (rate limits, audit trail, outranks) not primary access. Owner's call: park entirely, including the helper bug fix, until a trigger event fires.
+
+**Parked work:** the full admin-compliance sweep — helper bug fix in `adminMutation.ts:63-80` + all 4 phases (5 broken routes, rate-limit sweep across 73 routes with 3-tier budget proposal, audit-call sweep across 52 routes, verification pass). Full context preserved in `Current Projects/FIX_SESSION_1.md` under the new `## Pre-Launch — Parked (trigger-based resume)` section (inserted between the 00- summary and UI discrete fixes). #15 banner updated with PARKED status + cross-ref. Audit report remains at `Sessions/04-21-2026/Session 1/ADMIN_ROUTE_COMPLIANCE_AUDIT_2026-04-21.md`.
+
+**Resume triggers (any one fires → schedule the sweep):**
+1. Onboarding a second admin (mod, editor, expert, journalist). Plan sweep BEFORE onboard date.
+2. Real EU traffic at scale + first GDPR DSAR.
+3. Real COPPA-relevant Kids iOS traffic + first inquiry.
+4. 3-month mark (~2026-07-21, adjust for actual launch).
+5. Reactive: incident requiring audit-trail forensics we cannot reconstruct.
+
+**Decisions already locked in (don't re-litigate at resume):** @admin-verified blanket approval for this scope already granted; commit cadence = per subgroup; ship pattern = 4+2 agents for helper fix, per-route for Phase 1, subgroup-level for Phases 2-3; all 3 required RPCs verified present on live DB; no DB migrations needed for sweep; no public-surface risk (AdSense crawler + Apple reviewer never touch `/api/admin/*`).
+
+**Rationale for parking over shipping-now:** the sweep is 4-5 hrs of autonomous work, AdSense + Apple are mid-review, and the defense-in-depth gaps have no immediate consumer. Pushing this work now spends the time but doesn't protect against any active threat. The work materially matters at the moment a second admin lands or at the 3-month mark; doing it then (with fresh context, fresh audit, fresh threat model) is more useful than doing it now and letting it drift for 90 days.
+
 ### 2026-04-21 — observations / bugs spotted so far
