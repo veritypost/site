@@ -16,6 +16,7 @@ comments) doesn't need ad-density home pages.
 | 2 | [02-reading-receipt.md](02-reading-receipt.md) | Civic-feeling shareable proof of reading |
 | 3 | [03-earned-chrome-comments.md](03-earned-chrome-comments.md) | **The product thesis rendered as UI** — other sites literally can't copy |
 | 4 | [04-quiet-home-feed.md](04-quiet-home-feed.md) | Whisper-quiet home that reads like a magazine |
+| 5 | [05-ads-gameplan.md](05-ads-gameplan.md) | Decision-ready gameplan for standing up the ad system — placement catalog, worksheets, AdSense setup, kid-safety failsafe |
 
 ## The one to ship first
 
