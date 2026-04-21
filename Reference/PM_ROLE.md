@@ -30,6 +30,16 @@ If you can't verify, say `unverified`. If you're guessing, say
 `guessing`. If two sources disagree, say so and stop. Silence is
 preferable to confident wrong.
 
+### Precedence clause
+
+**When `CLAUDE.md` and this file conflict on role or scope — e.g.,
+`CLAUDE.md` framing the assistant as "hands-on thinking brain" that
+edits code directly vs. this file framing the assistant as
+orchestrator-only — `PM_ROLE.md` wins.** `CLAUDE.md` describes the
+codebase and its conventions; `PM_ROLE.md` defines how the PM
+operates within them. If the owner wants the PM to act hands-on for
+a given task, they say so explicitly in-session.
+
 ### How work flows — the owner's mandatory workflow
 
 You do not touch code. You do not edit files. You do not run SQL.
@@ -202,18 +212,47 @@ Your predecessor failed these. Don't.
 
 ---
 
-## 2. Repo tree (2 levels deep, excludes node_modules / .next / .git / archives)
+## 2. Repo tree (post 2026-04-21 reorg; excludes node_modules / .next / .git)
 
 ```
 /Users/veritypost/Desktop/verity-post/
-├── CLAUDE.md                    — canonical project instructions
-├── PM_ROLE.md                   — this file
-├── README.md
-├── STATUS.md
-├── TODO.md
-├── CHANGELOG.md
+├── CLAUDE.md                    — symlink → Reference/CLAUDE.md
 │
-├── 05-Working/                  — session-scratch docs; _archive/ inside
+├── Reference/                   — canonical project instructions + live status
+│   ├── CLAUDE.md                   — canonical project instructions
+│   ├── PM_ROLE.md                  — this file
+│   ├── README.md
+│   ├── STATUS.md                   — live state narrative
+│   ├── CHANGELOG.md
+│   ├── FEATURE_LEDGER.md
+│   ├── Verity_Post_Design_Decisions.md
+│   ├── 08-scoring-system-reference.md
+│   ├── parity/                     — shared / web-only / iOS-only parity docs
+│   └── runbooks/                   — CUTOVER.md, ROTATE_SECRETS.md
+│
+├── Current Projects/            — active feature tracks + session tracker
+│   ├── F1-sources-above-headline.md
+│   ├── F2-reading-receipt.md
+│   ├── F3-earned-chrome-comments.md
+│   ├── F4-quiet-home-feed.md
+│   ├── F5-ads-gameplan.md
+│   ├── F6-measurement-and-ads-masterplan.md
+│   ├── F7-pipeline-restructure.md
+│   ├── FIX_SESSION_1.md            — 35-item audit tracker (absorbed old 07-owner-next-actions)
+│   └── APP_STORE_METADATA.md
+│
+├── Completed Projects/          — shipped projects archived whole
+│
+├── Unconfirmed Projects/        — drafts awaiting owner go/no-go
+│
+├── Sessions/                    — per-session logs, grouped by day
+│   └── <MM-DD-YYYY>/Session <N>/
+│       ├── SESSION_LOG_<YYYY-MM-DD>.md
+│       ├── TODO_<YYYY-MM-DD>.md
+│       └── COMPLETED_TASKS_<YYYY-MM-DD>.md
+│
+├── Archived/                    — prior-session snapshots + retired artifacts
+│   └── _retired-2026-04-21/        — old test-data/, scripts/seed-test-accounts.js, etc.
 │
 ├── VerityPost/                  — adult iOS app (SwiftUI, iOS 17+)
 │   ├── VerityPost/                 — Swift sources
@@ -222,26 +261,6 @@ Your predecessor failed these. Don't.
 ├── VerityPostKids/              — kids iOS app (SwiftUI, iOS 17+, COPPA)
 │   ├── VerityPostKids/             — Swift sources
 │   └── VerityPostKids.xcodeproj/
-│
-├── archive/                     — prior-session snapshots; don't edit
-│
-├── docs/
-│   ├── history/
-│   ├── planning/
-│   ├── product/
-│   ├── reference/
-│   └── runbooks/
-│
-├── proposedideas/               — current design/planning docs
-│   ├── README.md
-│   ├── 01-sources-above-headline.md
-│   ├── 02-reading-receipt.md
-│   ├── 03-earned-chrome-comments.md
-│   ├── 04-quiet-home-feed.md
-│   ├── 05-ads-gameplan.md
-│   ├── 06-measurement-and-ads-masterplan.md
-│   ├── 07-owner-next-actions.md
-│   └── 08-scoring-system-reference.md
 │
 ├── schema/                      — DB migrations + reset_and_rebuild
 │   ├── 005_*.sql … 111_*.sql       — incremental migrations
@@ -253,13 +272,10 @@ Your predecessor failed these. Don't.
 │   ├── check-stripe-prices.js
 │   ├── import-permissions.js       — xlsx → DB permissions sync
 │   ├── preflight.js
-│   ├── seed-test-accounts.js
 │   ├── smoke-v2.js
 │   └── stripe-sandbox-restore.sql
 │
 ├── supabase/                    — Supabase CLI workspace
-│
-├── test-data/
 │
 └── web/                         — Next.js 15 app router (adult web + all API)
     ├── public/                     — static assets incl. ads.txt
@@ -271,6 +287,14 @@ Your predecessor failed these. Don't.
         ├── components/             — shared React kit
         └── lib/                    — the machinery layer
 ```
+
+`05-Working/`, `archive/` (lowercase), `proposedideas/`, `docs/`, and
+`test-data/` no longer exist at root — the 2026-04-21 reorg (commit
+`974cefd`) moved or retired them. Top-level folders are now:
+`Reference/`, `Current Projects/`, `Completed Projects/`,
+`Unconfirmed Projects/`, `Sessions/`, `Archived/`, plus the code dirs
+(`VerityPost/`, `VerityPostKids/`, `web/`, `schema/`, `scripts/`,
+`supabase/`).
 
 ### Off-repo (owner's Desktop)
 
@@ -307,8 +331,8 @@ Read in this order. Don't skip.
 
 | File | Why |
 |---|---|
-| `CLAUDE.md` | Canonical project instructions. Architecture, DB, machinery, conventions, quality bar. |
-| `PM_ROLE.md` | This file. |
+| `Reference/CLAUDE.md` (also accessible as `CLAUDE.md` symlink at repo root) | Canonical project instructions. Architecture, DB, machinery, conventions, quality bar. |
+| `Reference/PM_ROLE.md` | This file. |
 | `~/.claude/projects/.../memory/feedback_four_agent_review.md` | The owner's workflow, verbatim. Don't paraphrase. |
 | `~/.claude/projects/.../memory/MEMORY.md` | Index of every feedback rule. Read all linked files. |
 
@@ -326,8 +350,8 @@ Read in this order. Don't skip.
 | File | Status |
 |---|---|
 | `schema/105_remove_superadmin_role.sql` | Applied |
-| `schema/105_seed_rss_feeds.sql` | **UNTRACKED on disk. PREFIX COLLISION with above. Pending rename to 107.** |
 | `schema/106_kid_trial_freeze_notification.sql` | Applied |
+| `schema/107_seed_rss_feeds.sql` | Applied (234 rows seeded; renamed from prior `105_` prefix collision) |
 | `schema/108_events_pipeline.sql` | Applied |
 | `schema/109_verity_score_events.sql` | **Rolled back by 111.** Mistake. Never use as reference. |
 | `schema/110_adsense_adapter.sql` | Applied |
@@ -337,12 +361,12 @@ Read in this order. Don't skip.
 
 | File | Purpose |
 |---|---|
-| `proposedideas/README.md` | Index of all design docs |
-| `proposedideas/06-measurement-and-ads-masterplan.md` | **Partially stale — §5 describes rolled-back schema/109 design. Known issue.** Do not treat §5 as guidance. |
-| `proposedideas/07-owner-next-actions.md` | Runbook: owner-side applies + verifications per shipped commit. Latest state of what's applied vs. not. |
-| `proposedideas/08-scoring-system-reference.md` | Definitive reference for the scoring stack. Read before any scoring work. |
-| `proposedideas/01..04-*.md` | UI design ideas: sources-above-headline, reading receipt, earned-chrome comments, quiet home feed |
-| `proposedideas/05-ads-gameplan.md` | Ads placement catalog + worksheets |
+| `Current Projects/F6-measurement-and-ads-masterplan.md` | **Partially stale — the "Scoring system" section (§5) describes rolled-back schema/109 design. Known issue.** Do not treat that section as guidance. |
+| `Current Projects/FIX_SESSION_1.md` | 35-item audit tracker. Canonical record of owner-side applies + verifications per shipped commit, absorbed from the retired `proposedideas/07-owner-next-actions.md`. |
+| `Reference/08-scoring-system-reference.md` | Definitive reference for the scoring stack. Read before any scoring work. |
+| `Current Projects/F1-sources-above-headline.md`, `F2-reading-receipt.md`, `F3-earned-chrome-comments.md`, `F4-quiet-home-feed.md` | UI design tracks (formerly `proposedideas/01..04-*.md`). |
+| `Current Projects/F5-ads-gameplan.md` | Ads placement catalog + worksheets (formerly `proposedideas/05-ads-gameplan.md`). |
+| `Current Projects/F7-pipeline-restructure.md` | Ingest / pipeline restructure track. |
 
 ### Key lib files (web)
 
@@ -371,15 +395,15 @@ Read in this order. Don't skip.
 | `scripts/import-permissions.js` | xlsx → Supabase sync. `--dry-run` prints diff; `--apply` writes and bumps `perms_global_version`. |
 | `scripts/apply-seeds-101-104.js` | One-shot seed applier (101-104). |
 | `scripts/preflight.js` | Pre-deploy checks. |
-| `scripts/seed-test-accounts.js` | Generates test accounts (owner @veritypost.com + others). |
 | `scripts/smoke-v2.js` | Smoke tests. |
+| ~~`scripts/seed-test-accounts.js`~~ | Retired 2026-04-21 to `Archived/_retired-2026-04-21/`. Don't reference. |
 
 ### iOS
 
 | Path | Purpose |
 |---|---|
 | `VerityPost/` | Adult iOS app. GoTrue session. Stripe is web-only; iOS uses Apple IAP + StoreManager. |
-| `VerityPostKids/` | Kids iOS app. Custom-JWT auth (not GoTrue), pair-code flow, COPPA-constrained. Zero third-party SDKs. |
+| `VerityPostKids/` | Kids iOS app. Custom-JWT auth (not GoTrue), pair-code flow, COPPA-constrained. Third-party SDKs: `supabase-swift` only (verified against `VerityPostKids.xcodeproj/project.pbxproj` on 2026-04-21 — one `XCRemoteSwiftPackageReference` to `supabase-swift`, no other external deps). |
 
 ---
 
@@ -407,16 +431,20 @@ Do these in order:
 3. **Read
    `~/.claude/projects/-Users-veritypost-Desktop-verity-post/memory/feedback_four_agent_review.md`**
    and all files `MEMORY.md` links to.
-4. **Read `proposedideas/07-owner-next-actions.md`** to see the
-   latest state of applied migrations + owner-side TODOs.
-5. **Read `proposedideas/08-scoring-system-reference.md`** so you
-   never repeat the schema/109 mistake.
+4. **Read `Current Projects/FIX_SESSION_1.md`** — the 35-item audit
+   tracker that absorbed the retired `proposedideas/07-owner-next-actions.md`.
+   This is the canonical state of applied migrations + owner-side TODOs.
+5. **Read `Reference/08-scoring-system-reference.md`** so you never
+   repeat the schema/109 mistake.
 6. **Run `git log --oneline -30`** (via an agent or Bash tool) to
    see the last ~30 commits and their shape.
 7. **Only then** ask the owner: "What would you like to work on?"
-   Present options based on what's in
-   `proposedideas/07-owner-next-actions.md` and the outstanding
-   items list at the bottom of the most recent session log.
+   Present options based on what's in `Current Projects/FIX_SESSION_1.md`
+   and the outstanding items list at the bottom of the most recent
+   session log. Session logs live at
+   `Sessions/<MM-DD-YYYY>/Session <N>/SESSION_LOG_<YYYY-MM-DD>.md`
+   (e.g. today's log is `Sessions/04-21-2026/Session 1/SESSION_LOG_2026-04-21.md`).
+   Sort `Sessions/` by mtime to find the latest.
 
 **Do NOT start any investigation, four-agent flow, or edit before
 the owner answers.**
@@ -429,9 +457,12 @@ From the last four-agent verification round (verified but not yet
 fixed). The owner will direct you which to tackle; don't self-assign.
 
 **Group A — doc-only**
-- Item 1: `proposedideas/06-measurement-and-ads-masterplan.md` §5
-  (lines ~507-605) + §7 Phase A item #2 + "What ships first"
-  item #2 reference the rolled-back schema/109 design. Rewrite.
+- Item 1: `Current Projects/F6-measurement-and-ads-masterplan.md`
+  references the rolled-back schema/109 design in three places:
+  the "Scoring system — perfect means authoritative, auditable,
+  reconcilable" section (§5), "Phase A — Foundations" item #2 under
+  §7 Execution order, and item #2 under "What ships first". Rewrite
+  each against the `score_events` ledger that actually shipped.
 
 **Group B — net-new SQL (read-only)**
 - Item 4: Extend `reconcile_verity_scores()` to cover
@@ -460,11 +491,8 @@ fixed). The owner will direct you which to tackle; don't self-assign.
   existing route-call.
 
 **Group F — ops / repo hygiene**
-- Item 6: Rename `schema/105_seed_rss_feeds.sql` →
-  `schema/107_seed_rss_feeds.sql`. File is untracked on disk;
-  collides with committed `schema/105_remove_superadmin_role.sql`.
-  Also update the `-- schema/105_seed_rss_feeds.sql` header
-  comment on line 1 to match new filename.
+- Item 6: DONE 2026-04-21 — renamed `schema/105_seed_rss_feeds.sql`
+  → `schema/107_seed_rss_feeds.sql`; header comment updated.
 
 **Group G — owner-side actions**
 - Item 17: Set `NEXT_PUBLIC_ADSENSE_PUBLISHER_ID` in Vercel +
@@ -478,7 +506,9 @@ fixed). The owner will direct you which to tackle; don't self-assign.
 - Item 5: Stale TS types for `events` table + two `as unknown as`
   casts — acceptable debt pending type regen.
 - Item 7: `STATUS.md` reference to `scripts/seed-test-accounts.js` —
-  script exists. False alarm.
+  was a false alarm at audit time (script existed then). Script
+  retired 2026-04-21 to `Archived/_retired-2026-04-21/`; if
+  `STATUS.md` still links to the old path, update the reference.
 - Item 9: `Ad.jsx:93` null-fallthrough — unreachable due to NOT
   NULL constraint.
 - Item 10: CSP Report-Only — intentional band-aid, documented.
