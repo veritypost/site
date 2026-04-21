@@ -13,7 +13,7 @@ Single source of truth for every fix under consideration in this session. Each i
 | # | Title | Verdict | Effort |
 |---|---|---|---|
 | 00-A | Enable pg_cron | REAL, WORTH DOING | 2 min Supabase / 15 min Vercel-cron alt |
-| 00-B | AdSense publisher ID + ads.txt | REAL, WORTH DOING (gated on Google approval) | 15 min |
+| 00-B | AdSense publisher ID + ads.txt | **SHIPPED 2026-04-21** (verification path; live serving pending Google approval) | 15 min |
 | 00-C | **URGENT** Supabase URL typo | STILL OPEN, owner-verify | 2 min + redeploy |
 | 00-D | Sentry activation | REAL, WORTH DOING (post-launch OK) | 10 min |
 | 00-E | Other env vars (PREVIEW/HEALTH/APPLE CA) | REAL-OPTIONAL all three | 5 min each if needed |
@@ -89,7 +89,7 @@ Everything else is post-launch polish or parked per owner.
 
 ---
 
-### 00-B — AdSense publisher ID + ads.txt
+### 00-B — AdSense publisher ID + ads.txt **[SHIPPED 2026-04-21 — verification path; live ad serving pending Google approval]**
 **What:** AdSense integration awaiting domain approval.
 **Target (once AdSense approves):**
 1. Copy pub ID `ca-pub-xxxxxxxxxxxxxxxx` from AdSense console
@@ -103,6 +103,17 @@ Everything else is post-launch polish or parked per owner.
 **Verdict: REAL and WORTH DOING** (2 agents converged) — gated on AdSense approval (external).
 
 **Effort:** 15 min (gated on external AdSense approval)
+
+**SHIPPED 2026-04-21 (verification path landed; live ad serving still blocked on Google approval):**
+- `web/public/ads.txt:12` uncommented + populated with real pub ID `ca-pub-3486969662269929` (commit `1e27318`)
+- `NEXT_PUBLIC_ADSENSE_PUBLISHER_ID` set in Vercel (Production) environment
+- `<meta name="google-adsense-account" content="ca-pub-3486969662269929">` added to `web/src/app/layout.js` root metadata as verification fallback (commit `cbf1875`)
+- AdSense site ownership **verified in Google's console**
+- Privacy policy AdSense disclosure shipped alongside (commit `91055cc`) — new section 6 "Advertising & Cookies" in `web/src/app/privacy/page.tsx` names Google AdSense, describes personalized-ad cookies, links to `https://adssettings.google.com`, `https://policies.google.com/technologies/partner-sites`, `https://policies.google.com/technologies/ads`. COPPA/Your Rights/Contact sections renumbered 6→7, 7→8, 8→9. No existing section body altered. 78 words body text, matches existing JSX structure (bullet list inside `<div style={sectionStyle}>` + `<h2 style={headingStyle}>`). Closes the pre-approval audit's "medium-risk compliance gap."
+
+**Residual bug (minor follow-up, not launch-blocking):** `NEXT_PUBLIC_ADSENSE_PUBLISHER_ID` value in Vercel has a trailing space. Vercel UI cleanup still pending — doesn't block ownership verification but will need to be fixed before live serving so the pub ID string matches exactly.
+
+**Still pending (external, Google-side):** AdSense approval for serving ads. Not actionable on our side.
 
 ---
 
@@ -315,7 +326,7 @@ Based on `.env.example` rewrite from 2026-04-20. Each is optional; document-by-d
 - **00-A** Enable pg_cron (partition maintenance)
 
 **Parked / post-launch:**
-- **00-B** AdSense (gated on external approval)
+- **00-B** AdSense — verification path SHIPPED 2026-04-21; live ad serving still gated on external Google approval
 - **00-D** Sentry activation
 - **00-E** Other env vars
 - **00-F** CSP enforce flip
@@ -577,6 +588,8 @@ Pattern used: plain `.js` layouts matching repo convention (root layout.js + all
 
 ## UI — Design-system bundle
 
+**Numbering note:** The items below use numbers 4, 12, 13, 14, 20 as internal refs to the design-system-bundle investigation. These numbers COLLIDE with items 4, 12, 13, 14, 20 in the "UI — Discrete targeted fixes" / "Other fixes" sections above (respectively: Touch targets, SEO icons, `.env` cleanup, reserved-usernames, ESLint/Prettier). When cross-referencing across sections, disambiguate via suffix — e.g., "#4-responsive" for the design-system-bundle item #4 vs. "#4-touch-targets" for the discrete-fixes #4. (Flagged by Agent 4 adversarial review 2026-04-21.)
+
 5 audit items map to the same underlying debt: inline-styles sprawl with no shared tokens outside `web/src/lib/adminPalette.js`. Admin uses the tokens; public bypasses.
 
 **Bundled items + evidence counts:**
@@ -626,7 +639,7 @@ Fixes #4 + #12 + #13 + #14 + #20 in one pass.
 
 ## Other fixes (from `PRE_LAUNCH_AUDIT_LOG_2026-04-20.md` verification)
 
-### 11. Error-state polish — reader hot path
+### 11. Error-state polish — reader hot path **[PARTIAL SHIP 2026-04-21 — 1/9 sites done (signup duplicate-email); 8/9 remain]**
 **Problem:** 9 sites silently swallow Supabase errors; empty feed/search/detail looks identical to "no data" with no retry banner or error signal. All 9 verified still-accurate against current code.
 
 **Target sites (all confirmed match audit file:line refs):**
@@ -635,7 +648,7 @@ Fixes #4 + #12 + #13 + #14 + #20 in one pass.
 - `web/src/app/story/[slug]/page.tsx:326` (`storyErr` logged; only `!storyData` checked)
 - `web/src/app/story/[slug]/page.tsx:396` (`user_passed_article_quiz` RPC failure silently locks discussion — currently safe behind `{false && …}` gate)
 - `web/src/app/story/[slug]/page.tsx:409-411, 417-429` (timeline/sources/bookmark/plan queries drop error field; silent fallback to defaults)
-- `web/src/app/signup/page.tsx:104-106` (missing 409 / email-already-exists detection; retry creates duplicate auth user)
+- ~~`web/src/app/signup/page.tsx:104-106`~~ — **DONE 2026-04-21 commit `b7996ee`** (duplicate-email detection landed, see sub-item block below)
 - `web/src/app/welcome/page.tsx:95` (transient network error on `getUser()` → redirect to `/verify-email`, possible loop)
 - `web/src/components/PermissionsProvider.tsx:47-49, 58-60` (`refreshAllPermissions` failures swallowed via `.catch()`; `hasPermission` then resolves `false` = "feature not granted" instead of "resolver down")
 - `web/src/app/error.js:9-19` and `web/src/app/global-error.js:10-20` (error-boundary POST to `/api/errors` with `.catch(() => {})`; if endpoint is down, crash never logged — mitigated when Sentry activates, see 00-D)
@@ -643,6 +656,13 @@ Fixes #4 + #12 + #13 + #14 + #20 in one pass.
 **Fix pattern:** for each, destructure `{ data, error }`, check `if (error) { setErrorMessage('...'); return; }`, render retry banner or empty-state-with-retry. Signup: add `res.status === 409` check.
 
 **Options:** skip / fix top 3 most-impactful (page.tsx:225 feed error, signup:104 duplicate, welcome:95 loop) — ~30 min / full sweep all 9 — ~2 hrs (recommended post-launch, not blocking)
+
+**SHIPPED 2026-04-21 — signup-409 sub-item only (commit `b7996ee`):**
+- Added two-tier duplicate-email detection in `web/src/app/signup/page.tsx`. On 400 from `/api/auth/signup` with a syntactically-valid email, re-probes `/api/auth/check-email` to confirm `available === false` before changing copy. Avoids mis-labeling password-policy 400s as duplicate.
+- New state variable `duplicateEmail` + error copy "An account with this email already exists. Sign in instead." + inline "Go to sign in" link to `/login?email=<addr>` (email query param currently ignored by login page; activates gracefully when login page adds prefill).
+- Preserves all a11y (`role="alert"`, `aria-describedby`, `htmlFor`/`id` pairs from item #3), rate-limit 429 path, password validation. TypeScript clean.
+- **API-contract note for any future sweep:** the signup route returns HTTP 400 (not 409) for ALL Supabase GoTrue errors including duplicate — the audit's original "missing 409 check" framing was a misclassification. The client handles this by re-probing `/api/auth/check-email` rather than reshaping the API contract. Any remaining #11 sub-items that involve Supabase-backed auth errors should use the same re-probe pattern, not assume distinct status codes.
+- Parent #11 status: **8/9 sites remain open**. Do NOT mark #11 fully shipped.
 
 ---
 
@@ -828,6 +848,26 @@ These are **feature-level work**, not fixes. Rolled up here for full-scope visib
 
 **Scope:** 3-8 hrs (3-4 pure build; 6-8 with quiz API refactor).
 **Owner decisions:** render partial receipt if quiz skipped, or nothing.
+
+---
+
+### F3-prereq. Flip quiz + discussion kill-switch **[OWNER DECISION — gates all F3 refinements]**
+**What:** Flip the launch-phase kill switch at `web/src/app/story/[slug]/page.tsx:939` — currently `{false && (isDesktop || showMobileDiscussion)}` hides the entire quiz + discussion block. The 3-branch logic (anon → null, verified non-pass → lock panel, passed → CommentThread) is already wired; the `false &&` guard is the only thing suppressing it.
+
+**Why separate from F3:** Agent 4 adversarial review (2026-04-21, 4-agent review flow) flagged that this was buried inside F3's body as a "prerequisite" but is actually a distinct owner-decision gate that blocks F3 entirely. Without the flip, no F3 refinement can be observed, tested, or shipped. Tracking it as its own item makes the gating explicit.
+
+**This is an owner decision, not a dev task.** The code line is already written; turning it on is a product-timing call (when to open the core "earn the comments" mechanic — depends on quiz content readiness per 00-L).
+
+**Cross-references:**
+- F3 "Earned chrome comments" (below) — cannot ship any refinements until this flip lands
+- 00-L quiz content — flipping before articles have ≥10 questions would expose the locked-discussion state on every article (all users see "Discussion is locked until you pass the quiz" with no path to pass); F3-prereq should sequence after 00-L
+- Owner's "launch-hide" memory (kept state + queries + types alive so unhide is one-line flip) — this is exactly that pattern; the flip is one character
+
+**Launch-blocking?** No, under the owner's reviewer-approval launch model (confirmed 2026-04-21 in session): everything not-ready is kill-switched until post-approval. Comments can launch dark and flip post-approval without blocking initial ship.
+
+**Target:** `web/src/app/story/[slug]/page.tsx:939` — remove `false &&` from the render guard.
+
+**Effort:** 10 sec code change. Owner-decision effort is the judgment call, not the edit.
 
 ---
 
