@@ -75,7 +75,16 @@ export default function PrivacyPage() {
         </div>
 
         <div style={sectionStyle}>
-          <h2 style={headingStyle}>6. COPPA Compliance</h2>
+          <h2 style={headingStyle}>6. Advertising & Cookies</h2>
+          <ul style={listStyle}>
+            <li>Verity Post uses Google AdSense to display advertisements. Google and its third-party vendors may use cookies and similar technologies to serve ads based on your prior visits to this site and other sites.</li>
+            <li>You can opt out of personalized advertising by visiting Google&apos;s Ads Settings at https://adssettings.google.com, or learn more about how Google uses data from sites that use its services at https://policies.google.com/technologies/partner-sites.</li>
+            <li>For details on Google&apos;s advertising technologies and cookies, see https://policies.google.com/technologies/ads.</li>
+          </ul>
+        </div>
+
+        <div style={sectionStyle}>
+          <h2 style={headingStyle}>7. COPPA Compliance</h2>
           <ul style={listStyle}>
             <li>We do not knowingly collect personal information from children under 13 without verifiable parental consent.</li>
             <li>Kids Mode collects minimal data and does not enable social features or public profile creation.</li>
@@ -84,7 +93,7 @@ export default function PrivacyPage() {
         </div>
 
         <div style={sectionStyle}>
-          <h2 style={headingStyle}>7. Your Rights</h2>
+          <h2 style={headingStyle}>8. Your Rights</h2>
           <ul style={listStyle}>
             <li>You may access, correct, or delete your personal data at any time through your account settings.</li>
             <li>You may opt out of non-essential communications and data processing for recommendation purposes.</li>
@@ -94,7 +103,7 @@ export default function PrivacyPage() {
         </div>
 
         <div style={sectionStyle}>
-          <h2 style={headingStyle}>8. Contact</h2>
+          <h2 style={headingStyle}>9. Contact</h2>
           <ul style={listStyle}>
             <li>Verity Post is operated by Verity Post LLC.</li>
             <li>For privacy and data protection inquiries: legal@veritypost.com</li>
