@@ -298,7 +298,12 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
           }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, justifyContent: 'center', marginBottom: 12 }}>
               {[
-                { label: 'Help', href: '/help' },
+                // LAUNCH: 'Help' link hidden from users pre-launch. The
+                // /help page itself stays reachable because Apple App
+                // Store submission requires a public Support URL — the
+                // page is registered as that URL. Put this back when
+                // ready for public launch:
+                // { label: 'Help', href: '/help' },
                 { label: 'Contact', href: '/contact' },
                 { label: 'Privacy', href: '/privacy' },
                 { label: 'Terms', href: '/terms' },

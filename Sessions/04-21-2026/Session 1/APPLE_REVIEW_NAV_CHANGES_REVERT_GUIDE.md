@@ -554,6 +554,34 @@ oversight") before wide public launch.
 
 ---
 
+## Change 12 — Help link hidden from footer
+
+**File:** `web/src/app/NavWrapper.tsx`
+**What it does:** the "Help" entry in the footer nav link row is
+commented out. Users no longer see a visible path to `/help`.
+
+### Important: do NOT null-return the /help page itself
+
+The `/help` route is registered as the **public Support URL** required
+by Apple App Store submission. Its source file header explicitly calls
+this out:
+
+> Public support URL for App Store submission. No auth gate — the page
+> must render for anon visitors... the App Store requires a reachable
+> Support URL.
+
+If the page itself is hidden (early-return null, 404, redirect), App
+Store review will reject the app. Only the footer link was removed, so
+the URL stays discoverable to Apple's crawler and anyone with the direct
+link while remaining invisible to casual browsing users.
+
+### How to revert
+
+Uncomment the `{ label: 'Help', href: '/help' }` line in the footer
+links array inside `NavWrapper.tsx`.
+
+---
+
 ## Verification after revert
 
 After reverting any combination of the above, run these checks before
