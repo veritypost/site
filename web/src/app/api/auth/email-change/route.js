@@ -34,7 +34,10 @@ export async function POST(request) {
     .from('users')
     .update({ email_verified: false })
     .eq('id', user.id);
-  if (updErr) return NextResponse.json({ error: updErr.message }, { status: 400 });
+  if (updErr) {
+    console.error('[auth.email-change]', updErr);
+    return NextResponse.json({ error: 'Could not update email' }, { status: 400 });
+  }
 
   // auth.resend on the server-side supabase client uses the current
   // session's auth context. Best-effort — if Supabase rejects (e.g. the

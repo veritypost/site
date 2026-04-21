@@ -157,7 +157,8 @@ export async function POST(request) {
       message: `You've been upgraded to ${plan.display_name}!`,
     });
   } catch (err) {
-    if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
+    console.error('[promo.redeem]', err);
+    if (err.status) return NextResponse.json({ error: 'Forbidden' }, { status: err.status });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

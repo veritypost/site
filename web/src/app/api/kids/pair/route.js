@@ -98,6 +98,12 @@ export async function POST(request) {
       expires_at: new Date(exp * 1000).toISOString(),
     });
   } catch (err) {
-    return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 });
+    console.error('[kids.pair]', err);
+    // NOTE: iOS `PairingClient.swift` parses the error string for keywords
+    // "used" / "expired". Those keywords are only emitted by the RPC-error
+    // mapping above (lines 62-67), which already returns safe hardcoded
+    // messages. This catch-all covers unexpected failures (JWT signing,
+    // network, etc.) and returns a generic safe response.
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

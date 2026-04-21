@@ -18,7 +18,11 @@ import { checkRateLimit } from '@/lib/rateLimit';
 export async function POST(request) {
   let user;
   try { user = await requirePermission('billing.upgrade.checkout'); }
-  catch (err) { if (err.status) return NextResponse.json({ error: err.message }, { status: err.status }); return NextResponse.json({ error: 'Internal error' }, { status: 500 }); }
+  catch (err) {
+    console.error('[stripe.checkout] auth:', err?.message);
+    if (err.status) return NextResponse.json({ error: 'Forbidden' }, { status: err.status });
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+  }
 
   const service = createServiceClient();
 
@@ -62,6 +66,7 @@ export async function POST(request) {
     });
     return NextResponse.json({ url: session.url, session_id: session.id });
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: err.status || 500 });
+    console.error('[stripe.checkout]', err);
+    return NextResponse.json({ error: 'Checkout failed' }, { status: err.status || 500 });
   }
 }

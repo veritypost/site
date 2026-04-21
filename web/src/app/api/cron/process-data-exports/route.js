@@ -25,7 +25,10 @@ async function run(request) {
   const service = createServiceClient();
 
   const { data: claimed, error: claimErr } = await service.rpc('claim_next_export_request');
-  if (claimErr) return NextResponse.json({ error: claimErr.message }, { status: 500 });
+  if (claimErr) {
+    console.error('[cron.process-data-exports] claim failed:', claimErr);
+    return NextResponse.json({ error: 'Claim failed' }, { status: 500 });
+  }
   if (!claimed || !claimed.id) {
     return NextResponse.json({ processed: 0, ran_at: new Date().toISOString() });
   }
@@ -86,7 +89,8 @@ async function run(request) {
       processing_started_at: null,
       notes: `worker error: ${err.message}`,
     }).eq('id', claimed.id);
-    return NextResponse.json({ error: err.message, request_id: claimed.id }, { status: 500 });
+    console.error('[cron.process-data-exports] worker error:', err);
+    return NextResponse.json({ error: 'Worker error', request_id: claimed.id }, { status: 500 });
   }
 }
 

@@ -41,7 +41,10 @@ async function run(request) {
     .in('type', Object.keys(TYPE_TO_TEMPLATE))
     .order('created_at')
     .limit(BATCH_SIZE);
-  if (loadErr) return NextResponse.json({ error: loadErr.message }, { status: 500 });
+  if (loadErr) {
+    console.error('[cron.send-emails] load failed:', loadErr);
+    return NextResponse.json({ error: 'Load failed' }, { status: 500 });
+  }
   if (!queued?.length) return NextResponse.json({ sent: 0 });
 
   const userIds = [...new Set(queued.map(n => n.user_id))];

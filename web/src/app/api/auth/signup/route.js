@@ -44,7 +44,8 @@ export async function POST(request) {
     });
 
     if (authError) {
-      return NextResponse.json({ error: authError.message }, { status: 400 });
+      console.error('[auth.signup]', authError);
+      return NextResponse.json({ error: 'Signup failed' }, { status: 400 });
     }
 
     const userId = authData.user?.id;

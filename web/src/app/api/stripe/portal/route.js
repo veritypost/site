@@ -8,7 +8,11 @@ import { createBillingPortalSession } from '@/lib/stripe';
 export async function POST(request) {
   let user;
   try { user = await requirePermission('billing.portal.open'); }
-  catch (err) { if (err.status) return NextResponse.json({ error: err.message }, { status: err.status }); return NextResponse.json({ error: 'Internal error' }, { status: 500 }); }
+  catch (err) {
+    console.error('[stripe.portal] auth:', err?.message);
+    if (err.status) return NextResponse.json({ error: 'Forbidden' }, { status: err.status });
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+  }
 
   const service = createServiceClient();
   const { data: me } = await service
@@ -25,6 +29,7 @@ export async function POST(request) {
     });
     return NextResponse.json({ url: session.url });
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: err.status || 500 });
+    console.error('[stripe.portal]', err);
+    return NextResponse.json({ error: 'Portal unavailable' }, { status: err.status || 500 });
   }
 }

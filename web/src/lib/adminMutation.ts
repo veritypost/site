@@ -79,14 +79,27 @@ export async function recordAdminAction(args: RecordAdminActionArgs): Promise<vo
   }
 }
 
-// Standard envelope for the try/catch around requirePermission. The
-// sentinel codes (`UNAUTHENTICATED`, `PERMISSION_DENIED:<key>`,
-// `EMAIL_NOT_VERIFIED`) are stable strings the client can branch on —
-// not DB-error leaks.
+// Standard envelope for the try/catch around requirePermission. Maps the
+// sentinel codes thrown by `web/src/lib/auth.js` to safe, hardcoded
+// client-facing messages. Strips the `:<permissionKey>` suffix from
+// `PERMISSION_DENIED:<key>` so internal permission-key vocabulary never
+// reaches the client.
+const AUTH_ERROR_MAP: Record<string, string> = {
+  UNAUTHENTICATED: 'Unauthenticated',
+  EMAIL_NOT_VERIFIED: 'Email not verified',
+  BANNED: 'Access denied',
+  MUTED: 'Your account is temporarily restricted',
+  PERMISSION_DENIED: 'Forbidden',
+  PLAN_FEATURE_DISABLED: 'Feature unavailable',
+  PERM_RESOLVE_FAILED: 'Access check failed',
+};
+
 export function permissionError(err: unknown): NextResponse {
   const e = err as { status?: number; message?: string } | undefined;
   if (e && typeof e.status === 'number') {
-    return NextResponse.json({ error: e.message || 'Forbidden' }, { status: e.status });
+    const raw = (e.message || '').split(':')[0];
+    const safe = AUTH_ERROR_MAP[raw] || 'Forbidden';
+    return NextResponse.json({ error: safe }, { status: e.status });
   }
   return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 }

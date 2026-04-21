@@ -64,7 +64,8 @@ export async function POST(request) {
   let event;
   try { event = verifyWebhook(raw, sig); }
   catch (err) {
-    return NextResponse.json({ error: `Signature: ${err.message}` }, { status: 400 });
+    console.error('[stripe.webhook] signature verification failed:', err?.message);
+    return NextResponse.json({ error: 'Signature verification failed' }, { status: 400 });
   }
 
   const service = createServiceClient();
@@ -159,12 +160,15 @@ export async function POST(request) {
     }).eq('id', logId);
     return NextResponse.json({ received: true });
   } catch (err) {
+    console.error('[stripe.webhook] processing failed:', err);
+    // Server-side audit row stores the raw message for debugging; response
+    // to Stripe stays generic.
     await service.from('webhook_log').update({
       processing_status: 'failed',
-      processing_error: err.message,
+      processing_error: err?.message || 'unknown',
     }).eq('id', logId);
-    // Returning 500 tells Stripe to retry.
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    // Returning 500 tells Stripe to retry; body text doesn't affect retry.
+    return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 });
   }
 }
 
