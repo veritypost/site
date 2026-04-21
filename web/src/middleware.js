@@ -165,6 +165,7 @@ export async function middleware(request) {
       pathname === '/preview' ||
       pathname.startsWith('/api/') ||
       pathname.startsWith('/admin') ||
+      pathname.startsWith('/ideas') ||
       pathname.startsWith('/_next/') ||
       pathname === '/favicon.ico' ||
       pathname === '/robots.txt' ||
