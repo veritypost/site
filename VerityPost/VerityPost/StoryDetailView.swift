@@ -164,6 +164,7 @@ struct StoryDetailView: View {
                         .font(.system(.footnote, design: .default, weight: .semibold))
                         .foregroundColor(isBookmarked ? VP.accent : VP.text)
                 }
+                .buttonStyle(.bordered)
             }
         }
         .alert("Bookmark limit reached", isPresented: $showUpgradeAlert) {

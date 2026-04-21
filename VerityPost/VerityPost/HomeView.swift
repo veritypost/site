@@ -139,6 +139,7 @@ struct HomeView: View {
                                     .font(.system(.subheadline, design: .default, weight: .semibold))
                                     .foregroundColor(VP.accent)
                             }
+                            .buttonStyle(.bordered)
                             .padding(.top, 4)
                         }
                         .padding(.horizontal, 40)
@@ -475,6 +476,8 @@ struct HomeView: View {
                             Button("Clear all") { clearFilters() }
                                 .font(.system(.caption, design: .default, weight: .semibold))
                                 .foregroundColor(VP.danger)
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
                         }
                         .padding(.vertical, 10)
                         .padding(.horizontal, 14)
