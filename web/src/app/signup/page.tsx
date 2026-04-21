@@ -52,6 +52,7 @@ export default function SignupPage() {
   const [focused, setFocused] = useState<FocusField>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
+  const [duplicateEmail, setDuplicateEmail] = useState<string>('');
 
   const strength: PasswordStrength = strengthScore(password);
   const match = !!(password && confirmPassword && password === confirmPassword);
@@ -94,6 +95,7 @@ export default function SignupPage() {
     if (mismatch) return;
     setLoading(true);
     setError('');
+    setDuplicateEmail('');
     try {
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
@@ -104,6 +106,29 @@ export default function SignupPage() {
       const data = (await res.json()) as { error?: string; needsEmailConfirmation?: boolean };
 
       if (!res.ok) {
+        // Duplicate-email detection. The signup route flattens Supabase
+        // GoTrue's "User already registered" error into a generic 400
+        // "Signup failed", so we can't rely on status/body alone. If the
+        // on-blur availability probe already marked this email as taken,
+        // use that. Otherwise, on a 400 from the signup route, re-probe
+        // /api/auth/check-email to confirm before changing copy — this
+        // prevents hijacking unrelated 400s (password policy, etc.).
+        const trimmedEmail = email.trim().toLowerCase();
+        let isDuplicate = emailCheck.status === 'taken';
+        if (!isDuplicate && res.status === 400 && trimmedEmail.includes('@')) {
+          try {
+            const probe = await fetch(`/api/auth/check-email?email=${encodeURIComponent(trimmedEmail)}`);
+            if (probe.ok) {
+              const probeBody = (await probe.json()) as { checked?: boolean; available?: boolean };
+              if (probeBody.checked && probeBody.available === false) isDuplicate = true;
+            }
+          } catch {}
+        }
+        if (isDuplicate) {
+          setDuplicateEmail(trimmedEmail);
+          setError('An account with this email already exists. Sign in instead.');
+          return;
+        }
         throw new Error(data.error || 'Failed to create account');
       }
 
@@ -170,7 +195,15 @@ export default function SignupPage() {
 
         {error && (
           <div id="signup-form-error" role="alert" style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '12px 14px', marginBottom: '16px' }}>
-            <p style={{ margin: 0, fontSize: '13px', color: '#dc2626' }}>{error}</p>
+            <p style={{ margin: 0, fontSize: '13px', color: '#dc2626' }}>
+              {error}
+              {duplicateEmail && (
+                <>
+                  {' '}
+                  <a href={`/login?email=${encodeURIComponent(duplicateEmail)}`} style={{ color: '#dc2626', fontWeight: 600, textDecoration: 'underline' }}>Go to sign in</a>
+                </>
+              )}
+            </p>
           </div>
         )}
 
