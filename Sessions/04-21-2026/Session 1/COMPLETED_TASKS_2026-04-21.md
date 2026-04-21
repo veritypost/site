@@ -63,3 +63,47 @@ Format: `- <YYYY-MM-DD HH:MM> — <short title> — <commit hash or "no-commit">
 - 2026-04-21 — SHIPPED F1 (sources above headline) — 4 agents pre-impl + 2 agents post-impl; adversary caught sort_order blocker; "Reported from · X · Y · Z" small-caps line above headline with slice(0,3) + "+N more" + full-list aria-label — no-commit
 - 2026-04-21 — SHIPPED iOS parity follow-ups — StoryDetailView badge() helper now solid-bg/white/heavy matching web canonical; LeaderboardView empty state now has title + explanation + conditional Clear-filters bordered button mirroring web #18 — no-commit
 - 2026-04-21 — Schema prefix-collision rename — `schema/105_seed_rss_feeds.sql` → `schema/107_seed_rss_feeds.sql` (header comment + 2 refs in `Reference/PM_ROLE.md` updated); pure filename hygiene, zero DB impact — uncommitted, pending-bundle
+
+---
+
+## Completed — Session 1 shipped work (2026-04-21, end-of-day)
+
+### AdSense verification path (domain site-ownership)
+- 2026-04-21 — Populate `web/public/ads.txt` with real publisher ID for AdSense domain verification — `1e27318`
+- 2026-04-21 — Add `google-adsense-account` meta tag to root layout for site-ownership verification fallback — `cbf1875`
+- 2026-04-21 — Add Advertising & Cookies section to `/privacy` for AdSense compliance language — `91055cc`
+
+### Signup bug fix (launch-critical Agent 4 elevation)
+- 2026-04-21 — Detect duplicate-email 400 on signup and route user to sign-in (closes #11 signup-409 race condition flagged by Agent 4) — `b7996ee`
+
+### Documentation hygiene
+- 2026-04-21 — Hygiene sweep: STATUS deploy line corrected to "Deploys on push to main (verified 2026-04-21)", `archive/`→`Archived/` path patches in 4 live docs, 8 commented Stripe price ID lines removed from `web/.env.example` (source of truth is `plans.stripe_price_id` DB col) — `7c28405`
+- 2026-04-21 — `Reference/PM_ROLE.md` post-reorg path drift fix + CLAUDE precedence clause + VerityPostKids supabase-swift SDK correction — `6dcde8a`
+- 2026-04-21 — `Current Projects/FIX_SESSION_1.md` marked AdSense + signup work shipped + absorbed Agent 4 findings — `5d4d1ee`
+- 2026-04-21 — `Current Projects/FIX_SESSION_1.md` refined F5 targeting status + noted #6 bottom nav kill-switched state — `719fd65`
+- 2026-04-21 — `gitignore` `.mcp.json` + log owner-action sequence through 2026-04-21 — `67c57d3`
+- 2026-04-21 — End-of-session state sync: PM_ROLE §6 shipped items + supersede note, CLAUDE.md "What you always know" section rewritten against current paths, Session 1 TODO marked completed, REMAINING_ITEMS map appended with Session-end status — no-commit (PM handles commits)
+
+### Research deliverables (artifacts landed in Sessions/04-21-2026/Session 1/)
+- 2026-04-21 — Session 1 artifacts committed: `REMAINING_ITEMS_RELATIONSHIP_MAP_2026-04-21.md` (4-agent map of 35 remaining items) + `KILL_SWITCH_INVENTORY_2026-04-21.md` (11-entry launch-hide catalog + 4-phase flip-order) + schema/107 rename landed — `7c229f2`
+- 2026-04-21 — Kill-switch inventory + schema/025 scoping finding logged — `942d467`
+- 2026-04-21 — Admin route compliance sweep: 75 routes audited, 52 missing audit + 73 missing rate-limit (31% pass rate); artifact at `ADMIN_ROUTE_COMPLIANCE_AUDIT_2026-04-21.md` — `1794af9`
+- 2026-04-21 — Parked admin compliance sweep under new Pre-Launch "trigger-based resume" category in FIX_SESSION_1 with full Phase 0-4 plan, 3-tier rate-limit proposal, 5 trigger events — `7cbc1bc`
+
+### Owner actions shipped (no commit — external dashboards)
+- 2026-04-21 — Vercel: set `NEXT_PUBLIC_ADSENSE_PUBLISHER_ID=ca-pub-3486969662269929` in Production; 2 redeploys (fixed `EXT`→`NEXT` typo, then redeployed without build cache); trailing space trimmed from value — no-commit
+- 2026-04-21 — Vercel team membership verified: only owner (`admin-13890452`); 00-J closed as not applicable — no-commit
+- 2026-04-21 — Supabase: applied `schema/106_kid_trial_freeze_notification.sql` via MCP (closes 00-M) — no-commit
+- 2026-04-21 — Supabase: enabled `pg_cron` extension + registered two `events-maintenance` cron jobs (create-next-partition nightly 00:05 UTC, drop-old-partitions nightly 00:15 UTC); both verified via MCP (closes 00-A pg_cron track) — no-commit
+- 2026-04-21 — Apple Developer: Organization-track enrollment submitted (Verity Post LLC); on Apple's clock. (00-I applied; waiting.) — no-commit
+- 2026-04-21 — Google Search Console: `sitemap.xml` submitted — no-commit
+- 2026-04-21 — AdSense: application submitted and domain site-ownership verified via meta tag; CMP wizard started, "3 choices" message pattern selected for this site + future sites; full publish gated behind serving approval — no-commit
+- 2026-04-21 — Stripe 3-check: 1 webhook endpoint, no unauthorized Connect accounts, no ex-dev on team; Live mode confirmed (closes 00-K) — no-commit
+
+### Parking decisions (trigger-based resume — still OPEN work)
+- 2026-04-21 — #15 admin route compliance sweep parked (75 routes, 31% pass, 4-5 hr scope) — context preserved in FIX_SESSION_1 "Pre-Launch — Parked (trigger-based resume)" section; resume on any of 5 named triggers — no-commit
+- 2026-04-21 — 00-O HIBP leaked-password toggle parked (Pro-plan gated; waits on Supabase upgrade) — no-commit
+- 2026-04-21 — CMP wizard final publish parked (gated behind AdSense serving approval) — no-commit
+
+### Memory entries added (cross-session)
+- 2026-04-21 — Wrote `feedback_no_assumption_when_no_visibility.md`, `feedback_update_everything_as_you_go.md`, `project_launch_model.md` (reviewer-approval launch model) to `~/.claude/projects/.../memory/` and indexed all three in `MEMORY.md` — no-commit

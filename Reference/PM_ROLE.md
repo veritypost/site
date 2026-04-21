@@ -453,6 +453,12 @@ the owner answers.**
 
 ## 6. Known outstanding items at handover
 
+> **Supersede note (2026-04-21):** A later full audit at
+> `Current Projects/FIX_SESSION_1.md` is now the canonical tracker
+> for outstanding work. This section is preserved as a snapshot of
+> the handover context that spawned that audit, not as live state.
+> Read FIX_SESSION_1.md for what's actually open.
+
 From the last four-agent verification round (verified but not yet
 fixed). The owner will direct you which to tackle; don't self-assign.
 
@@ -495,11 +501,21 @@ fixed). The owner will direct you which to tackle; don't self-assign.
   → `schema/107_seed_rss_feeds.sql`; header comment updated.
 
 **Group G — owner-side actions**
-- Item 17: Set `NEXT_PUBLIC_ADSENSE_PUBLISHER_ID` in Vercel +
-  replace `web/public/ads.txt` placeholder line. Blocked on
-  AdSense approval.
-- Item 18: Install CMP (Google Funding Choices). Needed before EU
-  traffic.
+- Item 17: DONE 2026-04-21 — verification path shipped. Env var
+  `NEXT_PUBLIC_ADSENSE_PUBLISHER_ID=ca-pub-3486969662269929` set in
+  Vercel Production (two redeploys; `EXT`→`NEXT` typo + trailing
+  space trimmed). `web/public/ads.txt` populated with real pub ID
+  (commit `1e27318`). Site-ownership meta tag fallback shipped
+  (commit `cbf1875`). AdSense console confirmed site-ownership
+  verified. Approval to *serve* ads still pending Google — that's a
+  separate gate from domain verification.
+- Item 18: Partial 2026-04-21 — CMP wizard started in AdSense
+  console; owner selected the "3 choices" message pattern
+  (Consent / Do not consent / Manage) for this site and any future
+  sites. Final publish is gated behind AdSense serving approval. EU
+  traffic still blocked until publish completes. See
+  `Sessions/04-21-2026/Session 1/SESSION_LOG_2026-04-21.md` for the
+  decision detail.
 
 ### Verified clean / non-issues
 

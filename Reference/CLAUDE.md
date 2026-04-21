@@ -65,10 +65,10 @@ Three apps, one DB. All connected via Supabase (`fyiwulqphgmoqullmrfn`).
 
 ## What you always know (re-read every session)
 
-- `/STATUS.md` — what exists, what's locked, what's shipped
-- `/TASKS.md` — what's open, stable IDs T-001…T-101, prioritized P0–P4
-- `/DONE.md` — what's shipped, grouped by area. Ground truth. If a fix is logged here, it shipped. Don't re-raise it unless you can prove regression.
-- `05-Working/BATCH_FIXES_2026_04_20.md` — most recent session log, if you need context for why a thing is the way it is now
+- `Reference/STATUS.md` — live state narrative: what exists, what's locked, what's shipped
+- `Current Projects/FIX_SESSION_1.md` — canonical audit tracker (absorbed the retired `TASKS.md` + `proposedideas/07-owner-next-actions.md`). Per-item `SHIPPED <date>` blocks replace the old `DONE.md` append-a-line workflow
+- `DONE.md` — retired; ship status is tracked inline in `Current Projects/FIX_SESSION_1.md` via per-item `SHIPPED <date>` blocks plus the Session folder's `COMPLETED_TASKS_<YYYY-MM-DD>.md`
+- Most recent session log: `Sessions/<MM-DD-YYYY>/Session <N>/SESSION_LOG_<YYYY-MM-DD>.md`. Sort `Sessions/` by mtime to find the latest (as of this writing, `Sessions/04-21-2026/Session 1/SESSION_LOG_2026-04-21.md`)
 
 ## The repo
 

@@ -200,3 +200,47 @@ Source: `/Users/veritypost/Desktop/verity-post/Current Projects/FIX_SESSION_1.md
 - Item count convergence: 3/4 agents landed at 35 remaining (Agent 1, Agent 3, Agent 4 independently). Agent 2 reported 39 due to including SHIPPED items as context; not a factual disagreement.
 - Deltas Agent 4 added (not present in Agent 3's consolidated map): F3 kill-switch as its own line item, page.tsx edit-collision risk, schema/025 unknown blocking F5/F6, Kids-platform prereq cluster, #11 signup-409 elevation to launch-critical, F4/F5 reframe (phase not conflict), FIX_SESSION_1 numbering collision between design-system bundle items and Other-fixes items.
 - No unresolved contradictions between agents — all deltas are additive.
+
+---
+
+## Session-end status (2026-04-21)
+
+This document was produced mid-session and is stale for the launch-critical cluster. Several named items shipped or changed status the same day. The rest of the relationship analysis remains valid — file collisions, env-var overlaps, cluster groupings, sequencing chain, silent-conflict risks, and the 35-item scope are all still useful for the still-open items. Only the launch-critical and Agent-4-flagged items shifted.
+
+### Launch-critical cluster — status after end-of-day
+
+| Item | Status after 2026-04-21 | Evidence |
+|---|---|---|
+| **00-C** (Supabase URL truncation) | CLOSED — not applicable, site works on live. Owner-verified. | no-commit (owner dashboard verification) |
+| **00-J** (ex-dev on Vercel team) | CLOSED — only owner (`admin-13890452`) on team; no ex-dev to remove. | no-commit (Vercel team audit) |
+| **00-L** (quiz content authoring) | DEFERRED under reviewer-approval launch model — comments are kill-switched at `story/[slug]/page.tsx:939`, so reviewers never see empty-quiz articles. Still open as post-approval work. | see memory `project_launch_model.md` |
+| **00-M** (schema/106 kid-trial freeze notification) | SHIPPED — applied via MCP 2026-04-21, verified. | no-commit (Supabase apply) |
+| **00-I** (Apple Dev enrollment) | APPLIED — Organization-track submission; on Apple's review clock. Item is "in flight," not open dev work. | no-commit (Apple dashboard) |
+| **#11 signup-409** (Agent-4 elevation) | SHIPPED — duplicate-email 400 detection + sign-in routing. | `b7996ee` |
+
+### AdSense-approval signals
+
+The earlier audit's "AdSense-approval signals audit" items (`/contact` page, `/privacy` AdSense language, broken footer links, `/sitemap.xml`) partially shipped the same day:
+- `/privacy` AdSense language — SHIPPED (`91055cc`, Advertising & Cookies section).
+- `sitemap.xml` — SHIPPED (owner submitted to Google Search Console, no-commit).
+- `ads.txt` + site-ownership meta tag — SHIPPED (`1e27318` + `cbf1875`).
+- CMP wizard — started; "3 choices" pattern selected; final publish parked behind serving approval.
+- `/contact` page + broken footer link sweep — not verified in this session, still open.
+
+### Items whose status CHANGED without shipping
+
+- **#15** (admin route compliance sweep) — PARKED under new "Pre-Launch — Parked (trigger-based resume)" category in FIX_SESSION_1 (`7cbc1bc`). 75 routes audited (31% pass rate), 4-5 hr scope, 5 resume triggers defined. Audit artifact: `ADMIN_ROUTE_COMPLIANCE_AUDIT_2026-04-21.md`.
+- **00-O** (HIBP leaked-password toggle) — PARKED (Pro-plan gated; waits on Supabase upgrade).
+- **CMP final publish** — PARKED behind AdSense serving approval (wizard config started, 3-choices pattern chosen).
+
+### What still holds from this document
+
+- File-collision maps (`page.tsx`, `story/[slug]/page.tsx`, `middleware.js`, `layout.js`, etc.) — unchanged.
+- Env-var + external-account overlap grid — mostly unchanged (AdSense pub ID now set in Vercel; Stripe 3-check clean; Vercel team clean; Apple enrollment in flight).
+- Sequencing chain (hard + soft) — still correct for the items that remain open.
+- Silent-conflict risks — still valid for the remaining reader-UX + design-system + F4/F5 phasing work.
+- Owner-decision gates — F3 kill-switch flip, F4/F5 phasing, #6 bottom nav, F7 §12 decisions, #14-reserved-usernames scope all still open.
+
+### Note on this document's shelf life
+
+This map was built BEFORE several launch-critical items shipped the same day. Treat the "Natural clusters" and "Launch-critical" sections as snapshot-of-audit-time. For live state of the 35-item audit, read `Current Projects/FIX_SESSION_1.md` — items that shipped carry inline `SHIPPED <date>` blocks there.
