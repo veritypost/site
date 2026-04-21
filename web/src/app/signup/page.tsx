@@ -169,15 +169,15 @@ export default function SignupPage() {
         <p style={{ fontSize: '14px', color: C.dim, margin: '0 0 28px 0' }}>News you can trust — create your free account</p>
 
         {error && (
-          <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '12px 14px', marginBottom: '16px' }}>
+          <div id="signup-form-error" role="alert" style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '12px 14px', marginBottom: '16px' }}>
             <p style={{ margin: 0, fontSize: '13px', color: '#dc2626' }}>{error}</p>
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} aria-describedby={error ? 'signup-form-error' : undefined}>
           <div style={{ marginBottom: '14px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: C.text, marginBottom: '7px' }}>Email address</label>
-            <input type="email" placeholder="jane@example.com" value={email} onChange={(e) => { setEmail(e.target.value); setEmailCheck({ status: 'idle' }); }}
+            <label htmlFor="signup-email" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: C.text, marginBottom: '7px' }}>Email address</label>
+            <input id="signup-email" type="email" placeholder="jane@example.com" value={email} onChange={(e) => { setEmail(e.target.value); setEmailCheck({ status: 'idle' }); }}
               onFocus={() => setFocused('email')} onBlur={() => { setFocused(null); checkEmailAvailability(email); }} style={field('email')} autoComplete="email" />
             {emailCheck.status === 'checking' && <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>Checking availability…</div>}
             {emailCheck.status === 'available' && <div style={{ fontSize: 11, color: C.success, marginTop: 4 }}>Email is available.</div>}
@@ -185,12 +185,14 @@ export default function SignupPage() {
           </div>
 
           <div style={{ marginBottom: '6px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: C.text, marginBottom: '7px' }}>Password</label>
+            <label htmlFor="signup-password" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: C.text, marginBottom: '7px' }}>Password</label>
             <div style={{ position: 'relative' }}>
-              <input type={showPassword ? 'text' : 'password'} placeholder="Create a strong password" value={password}
+              <input id="signup-password" type={showPassword ? 'text' : 'password'} placeholder="Create a strong password" value={password}
                 onChange={(e) => setPassword(e.target.value)} onFocus={() => setFocused('pw')} onBlur={() => setFocused(null)}
                 style={{ ...field('pw'), paddingRight: '56px' }} autoComplete="new-password" />
               <button type="button" onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-pressed={showPassword}
                 style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', color: C.dim, fontFamily: 'inherit' }}>
                 {showPassword ? 'Hide' : 'Show'}
               </button>
@@ -209,8 +211,8 @@ export default function SignupPage() {
           )}
 
           <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: C.text, marginBottom: '7px' }}>Confirm password</label>
-            <input type={showPassword ? 'text' : 'password'} placeholder="Repeat your password" value={confirmPassword}
+            <label htmlFor="signup-confirm-password" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: C.text, marginBottom: '7px' }}>Confirm password</label>
+            <input id="signup-confirm-password" type={showPassword ? 'text' : 'password'} placeholder="Repeat your password" value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)} onFocus={() => setFocused('cpw')} onBlur={() => setFocused(null)}
               style={{ ...field('cpw'), borderColor: mismatch ? '#ef4444' : match ? C.success : focused === 'cpw' ? C.accent : C.border }}
               autoComplete="new-password" />

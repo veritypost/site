@@ -310,11 +310,26 @@ export default function StoryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // R13-C5 Fix 5: regwall now has a soft Close action. Focus trap keeps
-  // Tab inside the dialog; Escape remains a no-op (close is an explicit
-  // click on the Close button + sessionStorage persistence).
+  // Regwall soft-close handler. Shared by the Close button AND the Escape
+  // key so keyboard dismissal persists via sessionStorage the same way a
+  // click does (prevents re-showing on next route change in the same session).
+  const dismissRegWall = () => {
+    setRegWallDismissed(true);
+    setShowRegWall(false);
+    try { window.sessionStorage.setItem('vp:regwall-dismissed', '1'); }
+    catch (e) { console.error('[story] regwall dismiss write', e); }
+  };
   const regWallRef = useRef<HTMLDivElement | null>(null);
-  useFocusTrap(showRegWall, regWallRef);
+  useFocusTrap(showRegWall, regWallRef, { onEscape: dismissRegWall });
+
+  // Body scroll lock while the regwall is open (matches Interstitial pattern
+  // in web/src/components/Interstitial.tsx).
+  useEffect(() => {
+    if (!showRegWall || typeof document === 'undefined') return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [showRegWall]);
 
   const reportModalRef = useRef<HTMLDivElement | null>(null);
   useFocusTrap(showReportModal, reportModalRef, {
@@ -747,12 +762,7 @@ export default function StoryPage() {
                 unchanged; this only dismisses the current showing and
                 persists per-session via sessionStorage. */}
             <button
-              onClick={() => {
-                setRegWallDismissed(true);
-                setShowRegWall(false);
-                try { window.sessionStorage.setItem('vp:regwall-dismissed', '1'); }
-                catch (e) { console.error('[story] regwall dismiss write', e); }
-              }}
+              onClick={dismissRegWall}
               aria-label="Close"
               style={{
                 position: 'absolute', top: 10, right: 12,
@@ -762,7 +772,7 @@ export default function StoryPage() {
             >Close</button>
             <div id="regwall-title" style={{ fontSize: 22, fontWeight: 800, marginBottom: 10, color: 'var(--white)' }}>Sign up to keep reading</div>
             <div style={{ fontSize: 14, color: 'var(--soft)', marginBottom: 24, lineHeight: 1.5 }}>
-              You&apos;ve reached the free article limit. Create an account to continue.
+              Free, and takes 30 seconds.
             </div>
             <a href="/signup" style={{
               display: 'inline-block', padding: '12px 32px', borderRadius: 10,
@@ -855,11 +865,6 @@ export default function StoryPage() {
                       </button>
                     );
                   })()}
-                  {!canBookmarkAdd && typeof bookmarkTotal === 'number' && bookmarkTotal >= bookmarkCap && !bookmarked && (
-                    <div style={{ fontSize: 13, color: '#b45309', marginLeft: 8 }}>
-                      You&apos;ve used {bookmarkCap} of {bookmarkCap} free bookmarks. <a href="/profile/settings/billing" style={{ color: '#b45309', fontWeight: 700 }}>Upgrade for unlimited</a>
-                    </div>
-                  )}
                   <button onClick={handleShare} style={{
                     padding: '10px 14px', borderRadius: 8, minHeight: 44,
                     border: '1px solid var(--border)', background: 'transparent',
@@ -867,6 +872,16 @@ export default function StoryPage() {
                   }}>{shareMsg || 'Share'}</button>
                 </div>
               </div>
+
+              {/* Bookmark-cap notice: standalone row below the action row so the
+                  message never overflows the inner button group at narrow
+                  viewports (320/375/390). Rendered only when the user has no
+                  add permission AND is at cap AND hasn't bookmarked this article. */}
+              {!canBookmarkAdd && typeof bookmarkTotal === 'number' && bookmarkTotal >= bookmarkCap && !bookmarked && (
+                <div role="status" aria-live="polite" style={{ fontSize: 13, color: '#b45309', marginBottom: 28 }}>
+                  You&apos;ve used {bookmarkCap} of {bookmarkCap} free bookmarks. <a href="/profile/settings/billing" style={{ color: '#b45309', fontWeight: 700 }}>Upgrade for unlimited</a>
+                </div>
+              )}
 
               {canViewBody ? (
                 <article>

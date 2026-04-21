@@ -139,16 +139,17 @@ export default function ResetPasswordPage() {
         <p style={{ fontSize: '14px', color: C.dim, margin: '0 0 28px 0' }}>Make it strong — you won&apos;t need the old one anymore.</p>
 
         {error && (
-          <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '12px 14px', marginBottom: '16px' }}>
+          <div id="reset-password-form-error" role="alert" style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '12px 14px', marginBottom: '16px' }}>
             <p style={{ margin: 0, fontSize: '13px', color: '#dc2626' }}>{error}</p>
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} aria-describedby={error ? 'reset-password-form-error' : undefined}>
           <div style={{ marginBottom: '14px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: C.text, marginBottom: '7px' }}>New password</label>
+            <label htmlFor="reset-password-new" style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: C.text, marginBottom: '7px' }}>New password</label>
             <div style={{ position: 'relative' }}>
               <input
+                id="reset-password-new"
                 type={showPassword ? 'text' : 'password'}
                 placeholder="Create a strong password"
                 value={password}
@@ -159,6 +160,8 @@ export default function ResetPasswordPage() {
                 style={{ width: '100%', padding: '11px 56px 11px 14px', fontSize: '15px', color: C.text, backgroundColor: C.bg, border: `1.5px solid ${focused === 'pw' ? C.accent : C.border}`, borderRadius: '10px', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', transition: 'border-color 0.15s' }}
               />
               <button type="button" onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-pressed={showPassword}
                 style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', color: C.dim, fontFamily: 'inherit' }}>
                 {showPassword ? 'Hide' : 'Show'}
               </button>
@@ -181,8 +184,9 @@ export default function ResetPasswordPage() {
           </div>
 
           <div style={{ marginBottom: '24px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: C.text, marginBottom: '7px' }}>Confirm new password</label>
+            <label htmlFor="reset-password-confirm" style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: C.text, marginBottom: '7px' }}>Confirm new password</label>
             <input
+              id="reset-password-confirm"
               type={showPassword ? 'text' : 'password'}
               placeholder="Repeat your password"
               value={confirmPassword}

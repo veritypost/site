@@ -75,7 +75,7 @@ export default function ForgotPasswordPage() {
         <div style={{ fontSize: '20px', fontWeight: '800', color: C.accent, letterSpacing: '-0.5px', marginBottom: '28px' }}>Verity Post</div>
 
         {error && (
-          <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '12px 14px', marginBottom: '16px' }}>
+          <div id="forgot-password-form-error" role="alert" style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '12px 14px', marginBottom: '16px' }}>
             <p style={{ margin: 0, fontSize: '13px', color: '#dc2626' }}>{error}</p>
           </div>
         )}
@@ -87,10 +87,11 @@ export default function ForgotPasswordPage() {
               Enter your email and we&apos;ll send you a link to reset your password.
             </p>
 
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} aria-describedby={error ? 'forgot-password-form-error' : undefined}>
               <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: C.text, marginBottom: '7px' }}>Email address</label>
+                <label htmlFor="forgot-password-email" style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: C.text, marginBottom: '7px' }}>Email address</label>
                 <input
+                  id="forgot-password-email"
                   type="email"
                   placeholder="jane@example.com"
                   value={email}

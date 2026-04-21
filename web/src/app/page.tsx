@@ -2,6 +2,7 @@
 // @feature-verified home_feed 2026-04-18
 'use client';
 import { useState, useEffect, useMemo, useRef, Fragment, CSSProperties } from 'react';
+import Link from 'next/link';
 import { createClient } from '../lib/supabase/client';
 import { useAuth } from './NavWrapper';
 import Ad from '../components/Ad';
@@ -695,30 +696,36 @@ export default function HomePage() {
           `home.breaking_banner.view` (was: unconditional). Anon viewers
           still see it if the base-permissions grant allows. */}
       {breakingStory && canBreakingBanner && (
-        <div style={{ background: '#ef4444', color: '#fff', padding: '10px 16px', overflow: 'hidden' }}>
-          <div style={{ maxWidth: 680, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontWeight: 800, fontSize: 11, letterSpacing: '0.1em', whiteSpace: 'nowrap', background: 'rgba(0,0,0,0.2)', padding: '2px 8px', borderRadius: 4 }}>
-              BREAKING
-            </span>
-            <span style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {breakingStory.title}
-            </span>
-          </div>
-          {canBreakingBannerPaid && (breakingStory.excerpt || breakingStory.published_at) && (
-            <div style={{ maxWidth: 680, margin: '4px auto 0', fontSize: 12, color: 'rgba(255,255,255,0.92)', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-              {breakingStory.excerpt && (
-                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {breakingStory.excerpt}
-                </span>
-              )}
-              {breakingStory.published_at && (
-                <span style={{ fontSize: 11, opacity: 0.85, whiteSpace: 'nowrap' }}>
-                  {new Date(breakingStory.published_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-                </span>
-              )}
+        <Link
+          href={`/story/${breakingStory.slug}`}
+          aria-label={`Breaking news: ${breakingStory.title}`}
+          style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}
+        >
+          <div style={{ background: '#ef4444', color: '#fff', padding: '10px 16px', overflow: 'hidden' }}>
+            <div style={{ maxWidth: 680, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontWeight: 800, fontSize: 11, letterSpacing: '0.1em', whiteSpace: 'nowrap', background: 'rgba(0,0,0,0.2)', padding: '2px 8px', borderRadius: 4 }}>
+                BREAKING
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {breakingStory.title}
+              </span>
             </div>
-          )}
-        </div>
+            {canBreakingBannerPaid && (breakingStory.excerpt || breakingStory.published_at) && (
+              <div style={{ maxWidth: 680, margin: '4px auto 0', fontSize: 12, color: 'rgba(255,255,255,0.92)', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                {breakingStory.excerpt && (
+                  <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {breakingStory.excerpt}
+                  </span>
+                )}
+                {breakingStory.published_at && (
+                  <span style={{ fontSize: 11, opacity: 0.85, whiteSpace: 'nowrap' }}>
+                    {new Date(breakingStory.published_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        </Link>
       )}
 
       <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 16px' }}>
