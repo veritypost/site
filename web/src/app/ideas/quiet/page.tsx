@@ -33,10 +33,8 @@ export default function QuietFeedMockup() {
       <div style={{ maxWidth: 680, margin: '0 auto', padding: '40px 24px 120px' }}>
         <div style={{ borderTop: `1px solid ${T.rule}` }}>
           {HEADLINES.map((h, i) => (
-            <a
+            <div
               key={i}
-              href="#"
-              onClick={(e) => e.preventDefault()}
               style={{
                 display: 'block',
                 padding: '36px 0',
@@ -64,7 +62,7 @@ export default function QuietFeedMockup() {
               }}>
                 {h.category} · {h.minutes} min · {h.sources} sources
               </div>
-            </a>
+            </div>
           ))}
         </div>
 

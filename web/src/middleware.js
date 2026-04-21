@@ -116,6 +116,17 @@ export async function middleware(request) {
   const csp = buildCsp(nonce);
   const pathname = request.nextUrl.pathname;
 
+  // Standalone-preview short-circuit. /ideas/* renders inline sample data
+  // with no DB, no auth, no Supabase. Returning early means this surface
+  // keeps working even when Supabase env vars aren't configured locally
+  // (e.g., missing .env.local). Must come before the createServerClient
+  // call below or that call throws and the route 404s.
+  if (pathname.startsWith('/ideas')) {
+    const passthrough = NextResponse.next();
+    passthrough.headers.set('x-request-id', requestId);
+    return passthrough;
+  }
+
   // M-17 — preflight short-circuit for /api/*.
   if (pathname.startsWith('/api/') && request.method === 'OPTIONS') {
     const preflight = new NextResponse(null, { status: 204 });
