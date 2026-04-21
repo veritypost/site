@@ -14,6 +14,7 @@ import Ad from '../../../components/Ad';
 import Interstitial from '../../../components/Interstitial';
 import { bumpArticleViewCount } from '../../../lib/session';
 import { useFocusTrap } from '../../../lib/useFocusTrap';
+import { useTrack } from '@/lib/useTrack';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import { getPlanLimitValue } from '@/lib/plans';
 import type { Tables } from '@/types/database-helpers';
@@ -209,6 +210,7 @@ export default function StoryPage() {
   const params = useParams<{ slug: string }>();
   const slug = params?.slug;
   const supabase = createClient();
+  const trackEvent = useTrack();
 
   const [story, setStory] = useState<ArticleRow | null>(null);
   const [timeline, setTimeline] = useState<TimelineRow[]>([]);
@@ -444,6 +446,25 @@ export default function StoryPage() {
       }
     })();
   }, [slug]);
+
+  // Fire page_view once the article resolves. Keyed on story.id so
+  // slug aliases or editor renames re-fire if the loaded article
+  // changes identity under the same URL.
+  useEffect(() => {
+    if (!story?.id) return;
+    trackEvent('page_view', 'product', {
+      content_type: 'story',
+      article_id: story.id,
+      article_slug: story.slug ?? null,
+      category_slug: story.categories?.slug ?? null,
+      author_id: story.author_id ?? null,
+      page: `/story/${story.slug}`,
+      payload: {
+        is_breaking: !!story.is_breaking,
+        quiz_pool_size: quizPoolSize,
+      },
+    });
+  }, [story?.id, quizPoolSize, trackEvent]);
 
   // Mark reading complete only after a genuine engagement signal:
   // 30s dwell OR scroll >=80% of the viewport height past the start.

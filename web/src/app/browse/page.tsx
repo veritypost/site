@@ -3,6 +3,7 @@
 'use client';
 import { useState, useEffect, CSSProperties } from 'react';
 import { createClient } from '../../lib/supabase/client';
+import { usePageViewTrack } from '@/lib/useTrack';
 import type { Tables } from '@/types/database-helpers';
 
 // /browse is a public category directory. RLS lets anonymous viewers read
@@ -78,6 +79,7 @@ function timeAgo(dateString: string | null | undefined): string {
 }
 
 export default function BrowsePage() {
+  usePageViewTrack('browse');
   const [search, setSearch] = useState<string>('');
   const [activeFilter, setActiveFilter] = useState<FilterKey>('Most Recent');
   const [expandedCat, setExpandedCat] = useState<string | null>(null);

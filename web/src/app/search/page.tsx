@@ -4,6 +4,7 @@
 import { useState, useEffect, CSSProperties } from 'react';
 import { createClient } from '../../lib/supabase/client';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
+import { usePageViewTrack } from '@/lib/useTrack';
 import type { Tables } from '@/types/database-helpers';
 
 // D26: basic keyword search for everyone; advanced filters (date, category,
@@ -33,6 +34,7 @@ interface SearchResponse {
 
 export default function SearchPage() {
   const supabase = createClient();
+  usePageViewTrack('search');
   const [canView, setCanView] = useState<boolean>(true);
   const [canAdvanced, setCanAdvanced] = useState<boolean>(false);
   const [canFilterCategory, setCanFilterCategory] = useState<boolean>(false);

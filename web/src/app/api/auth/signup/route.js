@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import { validatePasswordServer } from '@/lib/password';
 import { getSiteUrl } from '@/lib/siteUrl';
+import { trackServer } from '@/lib/trackServer';
 
 export async function POST(request) {
   try {
@@ -90,6 +91,21 @@ export async function POST(request) {
     }
 
     const needsEmailConfirmation = !authData.session || !authData.user?.email_confirmed_at;
+
+    // Server-side signup_complete event. Fire-and-forget — telemetry
+    // failures must not block the signup response.
+    if (userId) {
+      void trackServer('signup_complete', 'product', {
+        user_id: userId,
+        user_tier: 'anon', // not verified yet
+        request,
+        payload: {
+          method: 'email',
+          needs_email_confirmation: needsEmailConfirmation,
+        },
+      });
+    }
+
     return NextResponse.json({ user: authData.user, needsEmailConfirmation });
   } catch (err) {
     console.error('[signup]', err);

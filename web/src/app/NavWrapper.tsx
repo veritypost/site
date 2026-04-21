@@ -11,10 +11,12 @@ import type { Tables } from '@/types/database-helpers';
 
 type ProfileRow = Pick<
   Tables<'users'>,
+  | 'id'
   | 'username'
   | 'avatar_url'
   | 'avatar_color'
   | 'verity_score'
+  | 'plan_id'
   | 'plan_status'
   | 'email_verified'
   | 'streak_current'
@@ -25,16 +27,51 @@ type ProfileRow = Pick<
   | 'frozen_at'
   | 'plan_grace_period_ends_at'
   | 'deletion_scheduled_for'
+  | 'created_at'
 >;
 
 interface AuthContextValue {
   loggedIn: boolean;
   user: ProfileRow | null;
   authLoaded: boolean;
+  /**
+   * Normalized tier string for analytics / telemetry. One of:
+   * 'anon' | 'free_verified' | 'verity' | 'verity_pro' |
+   * 'verity_family' | 'verity_family_xl'. Derived from plan_id +
+   * email_verified. Never raw plan row — callers shouldn't need to
+   * know the DB-side plan taxonomy to fire a track() call.
+   */
+  userTier: string;
+  /** Days since signup, or null for anon. */
+  tenureDays: number | null;
 }
 
-export const AuthContext = createContext<AuthContextValue>({ loggedIn: false, user: null, authLoaded: false });
+export const AuthContext = createContext<AuthContextValue>({
+  loggedIn: false, user: null, authLoaded: false,
+  userTier: 'anon', tenureDays: null,
+});
 export const useAuth = () => useContext(AuthContext);
+
+function deriveTier(user: ProfileRow | null): string {
+  if (!user) return 'anon';
+  if (!user.email_verified) return 'anon';
+  // plan_id is a FK to plans.id. Tier string lives on plans.tier in the
+  // DB, but we don't need a join here — the paid plans have predictable
+  // id values that include the tier. Anything else maps to free_verified.
+  const raw = String(user.plan_id || '').toLowerCase();
+  if (raw.includes('family_xl')) return 'verity_family_xl';
+  if (raw.includes('family')) return 'verity_family';
+  if (raw.includes('pro')) return 'verity_pro';
+  if (raw.includes('verity')) return 'verity';
+  return 'free_verified';
+}
+
+function daysSince(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  const then = Date.parse(iso);
+  if (!Number.isFinite(then)) return null;
+  return Math.max(0, Math.floor((Date.now() - then) / 86_400_000));
+}
 
 const HIDE_NAV = ['/', '/login', '/signup', '/signup/pick-username', '/signup/expert', '/forgot-password', '/reset-password', '/verify-email', '/api/auth/callback', '/logout', '/welcome'];
 const isAdmin = (p: string) => p.startsWith('/admin');
@@ -80,7 +117,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
       }
       const { data: profile } = await supabase
         .from('users')
-        .select('username, avatar_url, avatar_color, verity_score, plan_status, email_verified, streak_current, is_banned, is_muted, muted_until, locked_until, frozen_at, plan_grace_period_ends_at, deletion_scheduled_for')
+        .select('id, username, avatar_url, avatar_color, verity_score, plan_id, plan_status, email_verified, streak_current, is_banned, is_muted, muted_until, locked_until, frozen_at, plan_grace_period_ends_at, deletion_scheduled_for, created_at')
         .eq('id', authUser.id)
         .maybeSingle<ProfileRow>();
 
@@ -197,7 +234,11 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
     : ({ ['--vp-top-bar-h' as string]: '0px' } as CSSProperties);
 
   return (
-    <AuthContext.Provider value={{ loggedIn, user, authLoaded }}>
+    <AuthContext.Provider value={{
+      loggedIn, user, authLoaded,
+      userTier: deriveTier(user),
+      tenureDays: daysSince(user?.created_at ?? null),
+    }}>
       {loggedIn && user && <AccountStateBanner user={user} />}
       <div style={{
         // Bug 1 fix: reserve the FULL rendered top-bar height

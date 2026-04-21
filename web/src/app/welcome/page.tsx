@@ -4,6 +4,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '../../lib/supabase/client';
+import { useTrack } from '@/lib/useTrack';
 
 // Dual-purpose page:
 //   - When NEXT_PUBLIC_SITE_MODE=coming_soon → renders the holding card
@@ -76,10 +77,18 @@ export default function WelcomePage() {
 
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
+  const trackEvent = useTrack();
   const [index, setIndex] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
   const [busy, setBusy] = useState<boolean>(false);
   const [finishError, setFinishError] = useState<string | null>(null);
+
+  // page_view fires once loading resolves so we don't count the bounce-out
+  // branches (unverified, already-onboarded) as carousel views.
+  useEffect(() => {
+    if (loading) return;
+    trackEvent('page_view', 'product', { content_type: 'welcome' });
+  }, [loading, trackEvent]);
 
   useEffect(() => {
     (async () => {
@@ -105,6 +114,10 @@ export default function WelcomePage() {
         const body = await res.json().catch(() => ({}));
         throw new Error(body?.error || `Onboarding write failed (${res.status}).`);
       }
+      trackEvent('onboarding_complete', 'product', {
+        content_type: 'welcome',
+        payload: { carousel_screen_reached: index + 1 },
+      });
       router.replace('/');
     } catch (err) {
       console.error('Onboarding finish failed', err);

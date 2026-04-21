@@ -4,6 +4,7 @@
 
 import { useState, FormEvent, CSSProperties } from 'react';
 import { passwordStrength as strengthScore, PASSWORD_REQS } from '../../lib/password';
+import { usePageViewTrack, useTrack } from '@/lib/useTrack';
 
 // This page has no role/plan/tier/verify gates — it's a pre-auth
 // account-creation form. Permission migration adds types only.
@@ -39,6 +40,8 @@ interface PasswordRule {
 }
 
 export default function SignupPage() {
+  usePageViewTrack('signup');
+  const trackEvent = useTrack();
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
@@ -104,6 +107,13 @@ export default function SignupPage() {
         throw new Error(data.error || 'Failed to create account');
       }
 
+      trackEvent('signup_complete', 'product', {
+        content_type: 'signup',
+        payload: {
+          needs_email_confirmation: !!data.needsEmailConfirmation,
+          method: 'email',
+        },
+      });
       window.location.href = data.needsEmailConfirmation ? '/verify-email' : '/signup/pick-username';
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create account. Please try again.';

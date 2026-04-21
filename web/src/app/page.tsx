@@ -6,6 +6,7 @@ import { createClient } from '../lib/supabase/client';
 import { useAuth } from './NavWrapper';
 import Ad from '../components/Ad';
 import RecapCard from '../components/RecapCard';
+import { usePageViewTrack } from '@/lib/useTrack';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import type { Tables } from '@/types/database-helpers';
 
@@ -136,6 +137,10 @@ function getDateRange(preset: string | null): DateRange {
 export default function HomePage() {
   const supabase = useMemo(() => createClient(), []);
   const { loggedIn, user: authUser } = useAuth() as { loggedIn: boolean; user: AuthUserLike };
+
+  // Fire one page_view on mount; user_id / tier / tenure auto-injected
+  // by useTrack via AuthContext.
+  usePageViewTrack('home');
 
   const [stories, setStories] = useState<HomeStory[]>([]);
   const [categories, setCategories] = useState<CategoryRow[]>([]);

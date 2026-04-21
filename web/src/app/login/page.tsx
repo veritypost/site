@@ -6,6 +6,7 @@ import { Suspense, useState, FormEvent, CSSProperties } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '../../lib/supabase/client';
 import { resolveNext } from '@/lib/authRedirect';
+import { usePageViewTrack } from '@/lib/useTrack';
 import type { Tables } from '@/types/database-helpers';
 
 // This page has no role/plan/tier/verify gates — it's a pre-auth login
@@ -44,6 +45,7 @@ export default function LoginPage() {
 function LoginPageInner() {
   const searchParams = useSearchParams();
   const nextParam = resolveNext(searchParams?.get('next') ?? null);
+  usePageViewTrack('login');
   // Single input accepts either an email or a username. If the typed
   // value contains `@`, we route through Supabase signin directly;
   // otherwise we POST to /api/auth/resolve-username first and use the

@@ -7,6 +7,7 @@ import Avatar from '../../components/Avatar';
 import StatRow from '../../components/StatRow';
 import VerifiedBadge from '../../components/VerifiedBadge';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
+import { usePageViewTrack } from '@/lib/useTrack';
 import type { Tables } from '@/types/database-helpers';
 
 // Leaderboard — D5/D31. Public top-3, verified readers see the full list,
@@ -76,6 +77,7 @@ interface CategoryScoreRow {
 
 export default function LeaderboardPage() {
   const supabase = createClient();
+  usePageViewTrack('leaderboard');
 
   const [activeTab, setActiveTab] = useState<TabKey>('Top Verifiers');
   const [period, setPeriod] = useState<PeriodKey>('All Time');

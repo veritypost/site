@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { trackServer } from '@/lib/trackServer';
 
 // POST — mark onboarding complete (either finished or skipped).
 // Idempotent: second call is a no-op.
@@ -13,8 +14,9 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // `.update()`. Keeps this in line with the 7+ other self-profile
 // write sites (per Round 5 Item 2). The authed cookie-scoped client
 // is required so auth.uid() resolves inside the RPC.
-export async function POST() {
-  try { await requireAuth(); }
+export async function POST(request) {
+  let authUser;
+  try { authUser = await requireAuth(); }
   catch { return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 }); }
 
   const authed = createClient();
@@ -23,5 +25,12 @@ export async function POST() {
   });
 
   if (error) return safeErrorResponse(NextResponse, error, { route: 'account.onboarding', fallbackStatus: 500 });
+
+  // Fire onboarding_complete after the authoritative write succeeds.
+  void trackServer('onboarding_complete', 'product', {
+    user_id: authUser?.id ?? null,
+    request,
+  });
+
   return NextResponse.json({ ok: true });
 }

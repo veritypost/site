@@ -5,6 +5,7 @@ import { useState } from 'react';
 import Interstitial from './Interstitial';
 import { bumpQuizCount } from '../lib/session';
 import { hasPermission } from '@/lib/permissions';
+import { useTrack } from '@/lib/useTrack';
 
 interface QuizOption {
   text: string;
@@ -72,6 +73,7 @@ export default function ArticleQuiz({
   const [result, setResult] = useState<QuizResult | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [showInterstitial, setShowInterstitial] = useState<boolean>(false);
+  const trackEvent = useTrack();
 
   const canStart = hasPermission('quiz.attempt.start');
   const canRetake = hasPermission('quiz.retake');
@@ -103,6 +105,15 @@ export default function ArticleQuiz({
       setCurrentIndex(0);
       setStartedAt(Date.now());
       setStage('answering');
+      trackEvent('quiz_started', 'product', {
+        content_type: 'story',
+        article_id: articleId,
+        payload: {
+          attempt_number: data.attempt_number,
+          max_attempts: data.max_attempts,
+          question_count: (data.questions || []).length,
+        },
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setStage('idle');
@@ -127,6 +138,18 @@ export default function ArticleQuiz({
       if (!res.ok) throw new Error(data?.error || 'Could not submit quiz');
       setResult(data);
       setStage('result');
+      trackEvent('quiz_completed', 'product', {
+        content_type: 'story',
+        article_id: articleId,
+        payload: {
+          passed: !!data.passed,
+          correct: data.correct,
+          total: data.total,
+          percentile: data.percentile ?? null,
+          time_taken_seconds: payload.time_taken_seconds,
+          attempt_number: attemptMeta?.attempt_number ?? null,
+        },
+      });
       if (data.passed && typeof onPass === 'function') onPass();
       if (seeInterstitialAd) {
         const n = bumpQuizCount();
