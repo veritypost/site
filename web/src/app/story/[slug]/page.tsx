@@ -821,10 +821,10 @@ export default function StoryPage() {
                   </span>
                 )}
                 {story.is_breaking && (
-                  <span style={{ fontSize: 10, fontWeight: 500, padding: '1px 6px', borderRadius: 4, background: 'rgba(239,68,68,0.15)', color: 'var(--wrong)' }}>Breaking</span>
+                  <span style={{ fontSize: 10, fontWeight: 800, color: '#ffffff', background: '#ef4444', padding: '2px 6px', borderRadius: 4, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Breaking</span>
                 )}
                 {story.is_developing && (
-                  <span style={{ fontSize: 10, fontWeight: 500, padding: '1px 6px', borderRadius: 4, background: 'rgba(245,158,11,0.15)', color: 'var(--amber)' }}>Developing</span>
+                  <span style={{ fontSize: 10, fontWeight: 800, color: '#ffffff', background: '#f59e0b', padding: '2px 6px', borderRadius: 4, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Developing</span>
                 )}
               </div>
 
