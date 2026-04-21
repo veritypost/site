@@ -1,0 +1,12 @@
+# Verity Post — Authorized Digital Sellers (ads.txt).
+# https://iabtechlab.com/ads-txt/
+#
+# Replace the placeholder publisher ID below with the real ca-pub-...
+# from the AdSense console once the domain is approved. Without the
+# real line AdSense will serve no ads; with a wrong line AdSense will
+# refuse payment at monthly settlement.
+#
+# Format per line:
+#   <domain>, <publisher_id>, <relationship>, <TAG-ID>
+#
+# google.com, ca-pub-REPLACE_WITH_REAL_ID, DIRECT, f08c47fec0942fa0

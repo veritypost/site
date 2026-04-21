@@ -3,6 +3,9 @@
 'use client';
 import { useEffect, useState, useRef } from 'react';
 import { getSessionId } from '../lib/session';
+import AdSenseSlot from './AdSenseSlot';
+
+const ADSENSE_PUBLISHER_ID = process.env.NEXT_PUBLIC_ADSENSE_PUBLISHER_ID || '';
 
 // D23: tier-aware ad slot. Hidden entirely when the server-side
 // serve_ad RPC refuses (viewer tier in placement.hidden_for_tiers,
@@ -76,6 +79,29 @@ export default function Ad({ placement, page = 'unknown', position = 'inline', a
       Sponsored{ad.advertiser_name ? ` · ${ad.advertiser_name}` : ''}
     </div>
   );
+
+  // Network adapter dispatch. `ad.ad_network` comes from the serve_ad
+  // RPC (schema/110). Known values:
+  //   * 'direct' or 'house' → renders creative_url / creative_html
+  //     via the legacy path below.
+  //   * 'google_adsense'    → renders an <ins class="adsbygoogle">
+  //     slot, filled client-side by the AdSense library.
+  //
+  // Any unknown network value falls through to the direct/house path,
+  // which is a safe default — the creative columns are populated with
+  // fallback content for every unit regardless of network.
+  if (ad.ad_network === 'google_adsense' && ad.ad_network_unit_id && ADSENSE_PUBLISHER_ID) {
+    return (
+      <div style={wrapStyle}>
+        {sponsoredLabel}
+        <AdSenseSlot
+          slotId={ad.ad_network_unit_id}
+          publisherId={ADSENSE_PUBLISHER_ID}
+          format={ad.ad_format === 'fluid' ? 'fluid' : 'auto'}
+        />
+      </div>
+    );
+  }
 
   // HTML creative (networks) renders inside a sandboxed iframe so third-
   // party markup cannot access document.cookie, localStorage, or the

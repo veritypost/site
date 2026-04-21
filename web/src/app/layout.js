@@ -15,6 +15,11 @@ import GAListener from '../components/GAListener';
 // even if the env var isn't configured on a branch preview.
 const GA_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || 'G-NE37VG1FP6';
 
+// Google AdSense publisher ID (ca-pub-xxxxxxxxxxxxxxxx). Only set this
+// once AdSense has approved the domain; until then the script tag stays
+// off. `AdSenseSlot` components gate themselves on this being present.
+const ADSENSE_PUB_ID = process.env.NEXT_PUBLIC_ADSENSE_PUBLISHER_ID || '';
+
 // DA-030 — self-host fonts via next/font/google. Killed the cross-
 // origin @import in globals.css which was paying DNS + TLS + fetch
 // cost on every cold load. `display: 'swap'` avoids FOIT; `variable`
@@ -139,6 +144,20 @@ export default function RootLayout({ children }) {
         <Suspense fallback={null}>
           <GAListener />
         </Suspense>
+
+        {/* Google AdSense library. Loaded only when NEXT_PUBLIC_ADSENSE_
+            PUBLISHER_ID is set — keeps the script off the page entirely
+            until the publisher ID is in hand. `afterInteractive` so first
+            paint is unblocked. AdSense per-slot <ins> blocks are rendered
+            by <AdSenseSlot /> (see components/AdSenseSlot.tsx). */}
+        {ADSENSE_PUB_ID && (
+          <Script
+            id="adsense-loader"
+            strategy="afterInteractive"
+            src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_PUB_ID}`}
+            crossOrigin="anonymous"
+          />
+        )}
 
         <ObservabilityInit />
         <PermissionsProvider>
