@@ -777,4 +777,10 @@ Owner confirmed Stripe is in Live mode (not Test mode) on the production account
 
 All three clean. 00-K closes. 00-G (full Stripe audit: key verification, webhook secret rotation check, end-to-end checkout smoke test) remains open but is lower priority post-launch — code side is production-grade already (verified in earlier session).
 
+### 2026-04-21 — Pack A research — SHIPPED (schema/025 verify + kill-switch inventory)
+
+**schema/025 status (MCP verify):** Not applied as a named migration (no row in `supabase_migrations.schema_migrations` for `025` / `phase17`). However, all 5 `targeting_*` jsonb columns exist on `ad_units` (`targeting_categories`, `targeting_cohorts`, `targeting_countries`, `targeting_plans`, `targeting_platforms`) — landed via some earlier consolidated migration. Critical finding: **`serve_ad` RPC does NOT consult `targeting_categories`** — verified by inspecting `pg_get_functiondef`. Columns ready, RPC ignores them. F5's ad targeting is half-built; extending `serve_ad` to honor the targeting columns is its own dev task, not an existing-but-pending migration.
+
+**Kill-switch inventory:** 11 launch-hides catalogued in `Sessions/04-21-2026/Session 1/KILL_SWITCH_INVENTORY_2026-04-21.md` (468 lines). Breakdown: 6 React `{false && ...}` conditionals, 3 `LAUNCH_HIDE_*` feature-flag constants, 1 `coming_soon` env gate, 1 commented nav item. Key entries: quiz + discussion (page.tsx:977), timelines mobile + desktop (955, 964), anonymous signup interstitial (79), weekly recap (list + detail + home card), mobile tab bar (791), bottom nav (`SHOW_BOTTOM_NAV = false` in NavWrapper:89), Help footer link, `coming_soon` mode (currently off — site is live). Document includes 4-phase flip-order proposal for launch day and 3 false-positive entries explicitly excluded. This is the single canonical reference for "what to turn on for real launch" — one file to work from instead of hunting through 3000-line files.
+
 ### 2026-04-21 — observations / bugs spotted so far
