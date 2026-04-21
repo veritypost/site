@@ -426,7 +426,7 @@ export default function StoryPage() {
 
         const [timelineRes, sourcesRes, quizPoolRes] = await Promise.all([
           supabase.from('timelines').select('*').eq('article_id', storyId).order('event_date', { ascending: true }),
-          supabase.from('sources').select('*').eq('article_id', storyId),
+          supabase.from('sources').select('*').eq('article_id', storyId).order('sort_order', { ascending: true }),
           supabase.from('quizzes').select('id', { count: 'exact', head: true }).eq('article_id', storyId),
         ]);
         setTimeline((timelineRes.data as TimelineRow[] | null) || []);
@@ -814,6 +814,23 @@ export default function StoryPage() {
             {/* Article body — on desktop always; on mobile only when Article tab is active */}
             {showArticleBody && (
             <div className="tab-article">
+              {/* Sources-above-headline trust signal: visible only when the
+                  article cites 2+ outlets. Ordering relies on the sources
+                  query ORDER BY sort_order so truncation is deterministic.
+                  SourcePills further down still renders the expandable
+                  detail per source; this line is a quick-glance complement. */}
+              {sources.length >= 2 && (
+                <div
+                  aria-label={`Reported from: ${sources.map(s => s.publisher).filter(Boolean).join(', ')}`}
+                  style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--dim)', marginBottom: 10, lineHeight: 1.4 }}
+                >
+                  Reported from
+                  {sources.slice(0, 3).map(s => s.publisher).filter(Boolean).map((p, i) => (
+                    <span key={i}> · {p}</span>
+                  ))}
+                  {sources.length > 3 && <span> · +{sources.length - 3} more</span>}
+                </div>
+              )}
               <div style={{ display: 'flex', gap: 6, marginBottom: 12, alignItems: 'center', flexWrap: 'wrap' }}>
                 {categoryName && (
                   <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--accent)' }}>

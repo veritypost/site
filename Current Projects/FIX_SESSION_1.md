@@ -374,6 +374,18 @@ Based on `.env.example` rewrite from 2026-04-20. Each is optional; document-by-d
 **Remaining (client components — separate layout.js work deferred):**
 - `web/src/app/page.tsx` (home), `category/[id]/page.js`, `login/page.tsx`, `signup/page.tsx`, `bookmarks/page.tsx`, `leaderboard/page.tsx`, `profile/page.tsx`, admin routes — these need sibling `layout.js` files since `'use client'` blocks direct metadata export. ~30-45 min if tackled.
 
+**SHIPPED 2026-04-21 (client group, partial)** — 6-agent verification all GREEN. Created 6 new sibling `layout.js` files:
+- `web/src/app/login/layout.js` — "Sign in — Verity Post"
+- `web/src/app/signup/layout.js` — "Sign up — Verity Post"
+- `web/src/app/bookmarks/layout.js` — "Bookmarks — Verity Post"
+- `web/src/app/leaderboard/layout.js` — "Leaderboard — Verity Post"
+- `web/src/app/profile/layout.js` — "Profile — Verity Post"
+- `web/src/app/category/[id]/layout.js` — "Category — Verity Post" (static; dynamic `generateMetadata` deferred as future sprint if SEO data shows landing-page value)
+
+Skipped: home (`/` — root layout owns brand title, distinct metadata would require route-group restructure), admin (`@admin-verified` locked + zero SEO ROI per agent D).
+
+Pattern used: plain `.js` layouts matching repo convention (root layout.js + all dynamic layout.js files are .js), minimal shape — `export const metadata = { title, description }` + default `Layout({ children })` pass-through. Server components by default (no `'use client'`), so metadata export works directly. All page.tsx siblings untouched.
+
 ---
 
 ### 2. Regwall modal — Escape handler + body scroll lock + unify copy **[SHIPPED 2026-04-21]**
@@ -779,7 +791,7 @@ Fixes #4 + #12 + #13 + #14 + #20 in one pass.
 
 These are **feature-level work**, not fixes. Rolled up here for full-scope visibility. Each has its own full design doc in `Current Projects/` sibling files (same folder); summary below. Verified against current code state by 2 independent agents 2026-04-21.
 
-### F1. Sources above headline (`F1-sources-above-headline.md`)
+### F1. Sources above headline (`F1-sources-above-headline.md`) **[SHIPPED 2026-04-21]**
 **What:** Small-caps outlet list above article headline as trust signal.
 **Status:** partial — sources data fetched at `story/[slug]/page.tsx:408-412`; rendered as pills via SourcePills (line 894). Above-headline zone (lines 801-829) currently shows category badge + breaking/developing flags + source COUNT only. No outlet-name line.
 **Prerequisites:** none (data live).
@@ -787,6 +799,14 @@ These are **feature-level work**, not fixes. Rolled up here for full-scope visib
 **Owner decisions:** show line only if `sources.length >= 2`; optional dot badge if `sources.length >= 3`; truncate to 3 outlets on mobile with "+N more."
 
 **Verified 2026-04-21 (2 agents): LEGIT & READY TO SHIP** — proposal premise still valid, data ready, no competing UI, spec unchanged.
+
+**SHIPPED 2026-04-21** (6-agent verification: 4 pre-impl + 2 post-impl, both GREEN):
+- `web/src/app/story/[slug]/page.tsx:429` — sources query now ORDER BY sort_order (adversary blocker: arbitrary Postgres row order made truncation non-deterministic)
+- New small-caps "REPORTED FROM · NYT · REUTERS · BBC" block inserted in tab-article div BEFORE the category/badges row
+- Gated on `sources.length >= 2`; rendered outlets sliced to 3 + "+N more" fallback
+- aria-label joins FULL source list (screen readers get complete info even when truncated visually)
+- Style: 11px uppercase 0.06em letter-spacing var(--dim) color — distinct from category chip (accent color) and Breaking/Developing badges (solid fill)
+- SourcePills below body unchanged — complementary quick-glance vs. expandable-detail signals
 
 ---
 

@@ -626,6 +626,48 @@ All 3 sites have title + explanation + CTA with aria-label. Conditional CTAs cor
 
 Item #18 status: SHIPPED (pending commit).
 
+### 2026-04-21 — shipped item #1 client group (per-page metadata via layout.js)
+Max rigor. 6 agents.
+
+**Pre-impl (4 agents):**
+- A (scope audit): 7 of 8 candidates confirmed `'use client'` + no sibling layout. Admin has existing `admin/layout.tsx` with `@admin-verified` lock + role gate; skip. Home (root) can't get a sibling layout because root `layout.js` is its parent; skip (brand title = home title is acceptable).
+- B (pattern): static layout shape — `export const metadata = { title, description }` + pass-through `Layout({ children })` function. `.js` extension matches repo convention. Proposed titles + descriptions for 5 routes + recommended dynamic generateMetadata for category (deferred per adversary's "static for launch").
+- C (cross-check): root layout passes children through; no parent-folder conflicts for any target; profile has 16+ nested settings pages that would inherit the parent metadata — acceptable as the settings tabs render inside profile/page.tsx anyway.
+- D (adversary): no blocker. Flagged: all titles must end "— Verity Post" (replacement not append, no root template); signup sub-routes get parent title (acceptable since they're one flow); category static is fine for launch; admin is zero-SEO-ROI, skip.
+
+**Implementation (6 new files):**
+- `web/src/app/login/layout.js` — "Sign in — Verity Post"
+- `web/src/app/signup/layout.js` — "Sign up — Verity Post"
+- `web/src/app/bookmarks/layout.js` — "Bookmarks — Verity Post"
+- `web/src/app/leaderboard/layout.js` — "Leaderboard — Verity Post"
+- `web/src/app/profile/layout.js` — "Profile — Verity Post"
+- `web/src/app/category/[id]/layout.js` — "Category — Verity Post"
+
+Each 8 lines: plain JS, no type imports, no `'use client'`, pass-through children.
+
+**Post-impl (2 agents, both GREEN):**
+All 6 files correct shape; page.tsx siblings untouched; em-dash consistent; admin layout untouched; `category/[id]` bracket-path resolved correctly.
+
+Item #1 (full) status: server-component group + client-component group both SHIPPED. Only home (root-level brand title) + admin (locked + no SEO value) intentionally left with root metadata.
+
+### 2026-04-21 — shipped F1 (sources above headline)
+Max rigor. 6 agents.
+
+**Pre-impl (4 agents):**
+- A (doc + header deep-read): F1 spec confirmed; insertion point = top of tab-article div, before category/badges row at line 817; sources.publisher field is the display string.
+- B (data trace): sources query at line 429 via `.select('*').eq('article_id', storyId)`; shape is `Tables<'sources'> & { ... }`; `publisher` field is the outlet name (nullable); `sort_order` int column exists in schema but query was NOT using it; SourcePills at line 915 renders same array as expandable pills below body.
+- C (cross-check): no existing duplicate render above headline (web or iOS); mobile 320px has headroom for new ~14px line; place above badge row per news-site convention.
+- D (adversary): **BLOCKER found — sources query had NO ORDER BY**, so arbitrary Postgres row order made truncation non-deterministic. Fix: `.order('sort_order', { ascending: true })`. Also required: `slice(0, 3)` + "+N more" fallback for mobile; full-list aria-label for screen readers; filter null publishers. "REPORTED FROM" prefix included; middle-dot `·` separator matches codebase convention.
+
+**Implementation:**
+- `page.tsx:429` — added `.order('sort_order', { ascending: true })` to sources query
+- Inserted new conditional block at line 817, before existing category/badges div. Small-caps "Reported from · X · Y · Z · +N more" with aria-label full list, gated on `sources.length >= 2`, slice(0,3), filter null publishers.
+
+**Post-impl (2 agents, both GREEN):**
+Query order clause present, new block at correct location + proper gating + slice + fallback + aria-label full list + SourcePills intact + TS clean.
+
+F1 status: SHIPPED (pending commit).
+
 ### 2026-04-21 — observations / bugs spotted so far
 - **CLAUDE.md references non-existent files.** `CLAUDE.md` cites `TASKS.md`, `DONE.md`, and `05-Working/BATCH_FIXES_2026_04_20.md` as canonical; none exist on disk. This drifts the project's own constitution.
 - **Prefix collision in `schema/`.** `105_seed_rss_feeds.sql` (untracked) shares prefix with committed `105_remove_superadmin_role.sql`. Rename to `107_` pending (already tracked in the review as Group F Item 6).
