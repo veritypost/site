@@ -16,6 +16,12 @@ export default function PrivacyPage() {
         </div>
 
         <div style={sectionStyle}>
+          <p style={{ fontSize: '14px', color: '#111111', lineHeight: '1.8', margin: 0 }}>
+            Verity Post is operated by Verity Post LLC, which acts as the data controller for personal information processed through the platform. This policy explains what we collect, how we use it, and your rights.
+          </p>
+        </div>
+
+        <div style={sectionStyle}>
           <h2 style={headingStyle}>1. Data We Collect</h2>
           <ul style={listStyle}>
             <li>Account information: email address, username, password hash, and profile details you choose to provide.</li>
@@ -84,8 +90,9 @@ export default function PrivacyPage() {
         <div style={sectionStyle}>
           <h2 style={headingStyle}>8. Contact</h2>
           <ul style={listStyle}>
+            <li>Verity Post is operated by Verity Post LLC.</li>
             <li>For privacy and data protection inquiries: legal@veritypost.com</li>
-            <li>For general questions: info@veritypost.com</li>
+            <li>For general questions: support@veritypost.com</li>
           </ul>
         </div>
       </div>

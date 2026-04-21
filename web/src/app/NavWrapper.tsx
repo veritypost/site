@@ -298,6 +298,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
           }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, justifyContent: 'center', marginBottom: 12 }}>
               {[
+                { label: 'About', href: '/about' },
                 // LAUNCH: 'Help' link hidden from users pre-launch. The
                 // /help page itself stays reachable because Apple App
                 // Store submission requires a public Support URL — the
@@ -317,7 +318,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
               ))}
             </div>
             <div style={{ textAlign: 'center', fontSize: 10, color: 'var(--muted)' }}>
-              verity post
+              © {new Date().getFullYear()} Verity Post LLC. All rights reserved.
             </div>
           </footer>
         )}

@@ -16,6 +16,12 @@ export default function TermsPage() {
         </div>
 
         <div style={sectionStyle}>
+          <p style={{ fontSize: '14px', color: '#111111', lineHeight: '1.8', margin: 0 }}>
+            These Terms of Service govern your use of Verity Post, operated by Verity Post LLC (&quot;Verity Post&quot;, &quot;we&quot;, &quot;us&quot;). By accessing or using the platform, you agree to these terms.
+          </p>
+        </div>
+
+        <div style={sectionStyle}>
           <h2 style={headingStyle}>1. Account Terms</h2>
           <ul style={listStyle}>
             <li>You must provide a valid email address and accurate information when creating an account.</li>
@@ -87,6 +93,15 @@ export default function TermsPage() {
             <li>We may modify these terms at any time. Material changes will be communicated via email or in-app notification at least 30 days in advance.</li>
             <li>Continued use of Verity Post after changes take effect constitutes acceptance of the revised terms.</li>
             <li>If you do not agree with updated terms, you may close your account before the changes take effect.</li>
+          </ul>
+        </div>
+
+        <div style={sectionStyle}>
+          <h2 style={headingStyle}>9. Contact</h2>
+          <ul style={listStyle}>
+            <li>Verity Post is operated by Verity Post LLC.</li>
+            <li>For legal notices and terms inquiries: legal@veritypost.com</li>
+            <li>For general support: support@veritypost.com</li>
           </ul>
         </div>
       </div>
