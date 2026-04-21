@@ -38,6 +38,7 @@ export const useAuth = () => useContext(AuthContext);
 
 const HIDE_NAV = ['/', '/login', '/signup', '/signup/pick-username', '/signup/expert', '/forgot-password', '/reset-password', '/verify-email', '/api/auth/callback', '/logout', '/welcome'];
 const isAdmin = (p: string) => p.startsWith('/admin');
+const isIdeasPreview = (p: string) => p.startsWith('/ideas');
 
 interface NavItem { label: string; href: string }
 
@@ -123,7 +124,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
     return () => { cancelled = true; clearInterval(id); };
   }, [loggedIn]);
 
-  const showNav = mounted && !HIDE_NAV.includes(path) && !isAdmin(path);
+  const showNav = mounted && !HIDE_NAV.includes(path) && !isAdmin(path) && !isIdeasPreview(path);
   const onAdminPage = mounted && isAdmin(path);
   // UJ-200 (Pass 17): banner is strictly admin+ territory. Editor and
   // moderator roles can reach the admin routes they're authorised for
