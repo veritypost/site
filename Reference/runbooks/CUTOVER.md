@@ -92,9 +92,9 @@ Expected: `{"ok":true, "checks": {...}}`.
 
 ## 5 — Post-deploy smoke
 
-Run `docs/runbooks/TEST_WALKTHROUGH.md` end-to-end. All steps must match "Expected".
+**TBD — smoke test needs redesign.** The prior walkthrough (`docs/runbooks/TEST_WALKTHROUGH.md`, retired 2026-04-21 to `Archived/_retired-2026-04-21/TEST_WALKTHROUGH.md`) relied on 18+ seeded test accounts that the owner wiped from live DB on 2026-04-21. A replacement admin-only or single-user smoke test must be authored before production cutover. Until then, verify the critical paths below manually with the admin user and fresh test content.
 
-Critical paths:
+Critical paths to cover once a new walkthrough exists:
 - Signup → verify email → welcome → home feed
 - Quiz pass → comment unlocks
 - Stripe checkout → webhook fires → plan flips
