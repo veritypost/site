@@ -71,6 +71,7 @@ export const metadata = {
   // are present.
   other: {
     'mobile-web-app-capable': 'yes',
+    'google-adsense-account': 'ca-pub-3486969662269929',
   },
 };
 
