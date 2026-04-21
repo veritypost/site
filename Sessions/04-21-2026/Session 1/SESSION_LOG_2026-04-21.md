@@ -681,8 +681,45 @@ Small iOS-only edits mirroring already-shipped web patterns. 1 post-fix verifier
 
 Both follow-ups CLOSE iOS-web parity gaps logged when #17 and #18 shipped. iOS empty-state + badge treatments are now consistent with their web counterparts.
 
+### 2026-04-21 — remaining-items relationship map produced
+Owner asked for a cross-reference of everything remaining in `Current Projects/FIX_SESSION_1.md` — what touches what (same code, same DB, same infra, same owner-decision). Ran the 4-agent workflow:
+- Agents 1 + 2 parallel investigators, identical task brief, pure relationship analysis (no fix proposals).
+- Agent 3 serial consolidation — reconciled both reports, noted Agent 1/3's 35-remaining count vs. Agent 2's 39 (Agent 2 included SHIPPED items as context, not a factual disagreement).
+- Agent 4 independent adversary — added genuine finds A3 missed: F3 kill-switch at `page.tsx:939` should be its own line item; `page.tsx` + `story/[slug]/page.tsx` edit-collision risk if multiple items ship independently; schema/025 status unknown blocks F5/F6 scoping; Kids-platform prereq cluster (00-I → #18 → F7) was scattered; signup-409 check in #11 is a 5-min race-condition worth elevating to launch-critical; F4/F5 "conflict" reframed as phase decision (F4 pre-launch quiet, F5 post-launch ads, same slot); canonical document has a numbering collision between design-system-bundle items #4/12/13/14/20 and Other-fixes items with same numbers.
+
+All deltas additive, no unresolved contradictions. Output written to `Sessions/04-21-2026/Session 1/REMAINING_ITEMS_RELATIONSHIP_MAP_2026-04-21.md` — adjacency by file + DB + env var, 9 natural clusters, hard vs. soft sequencing chains, silent-conflict risks, 14 unknowns blocking execution.
+
 ### 2026-04-21 — observations / bugs spotted so far
 - **CLAUDE.md references non-existent files.** `CLAUDE.md` cites `TASKS.md`, `DONE.md`, and `05-Working/BATCH_FIXES_2026_04_20.md` as canonical; none exist on disk. This drifts the project's own constitution.
-- **Prefix collision in `schema/`.** `105_seed_rss_feeds.sql` (untracked) shares prefix with committed `105_remove_superadmin_role.sql`. Rename to `107_` pending (already tracked in the review as Group F Item 6).
+- **Prefix collision in `schema/`.** `105_seed_rss_feeds.sql` (untracked) shares prefix with committed `105_remove_superadmin_role.sql`. **RESOLVED 2026-04-21** — renamed to `schema/107_seed_rss_feeds.sql`, header comment updated, `Reference/PM_ROLE.md` reconciled. Zero DB impact (migrations already applied); pure filename hygiene. Uncommitted — pending user approval to bundle.
 - **`proposedideas/06-measurement-and-ads-masterplan.md` §5** documents rolled-back schema/109 design as if live. Already flagged in the review (Group A Item 1) but worth holding in session memory so it doesn't get cited.
 - **Tooling note (local):** after renaming a file via `mv` in the same session, the Edit tool refused the next edit with "File has not been read yet" until I re-ran Read. Minor friction, not a bug in the repo — just a workflow note for future file-rename flows in this session.
+
+### 2026-04-21 — AdSense site-ownership verification landed + CMP configured
+Owner kicked off AdSense domain verification. Real publisher ID: `ca-pub-3486969662269929`.
+
+**Commits pushed to `main`:**
+- `1e27318` — `adsense: populate ads.txt with real publisher ID for domain verification`. Uncommented `web/public/ads.txt:12` + swapped `ca-pub-REPLACE_WITH_REAL_ID` for the real ID. TAG-ID `f08c47fec0942fa0` preserved.
+- `cbf1875` — `adsense: add google-adsense-account meta tag for site-ownership verification`. Added `<meta name="google-adsense-account" content="ca-pub-3486969662269929">` to the root layout via Next.js metadata API `other` field (hardcoded — does NOT gate on env var, since the env-var path failed twice during this session).
+
+**Env-var path bugs encountered (for future reference):**
+1. First redeploy: owner set `NEXT_PUBLIC_ADSENSE_PUBLISHER_ID` but Vercel reused build cache. `NEXT_PUBLIC_*` vars bake in at build time, so the old build served without the loader rendering. Fix: redeploy with "Use existing Build Cache" unchecked.
+2. Second redeploy: owner caught the env-var name typo (`EXT_PUBLIC_...` missing the leading `N`) and fixed it. Clean redeploy landed the script loader in the HTML.
+3. **Residual bug (not fixed — low priority):** env-var value has a trailing space. Googlebot-view HTML shows `client=ca-pub-3486969662269929 ` (with trailing space before `"`). AdSense tolerates it and verification still passed. Cleanup: Vercel → Env Vars → edit → trim trailing space → save. Will bake into next redeploy.
+
+**Final live state (verified via curl, including Googlebot + AdsBot-Google + Mediapartners-Google UAs — same HTML across all):**
+- Meta tag: `<meta name="google-adsense-account" content="ca-pub-3486969662269929"/>` in `<head>` on every route
+- Script loader: `adsbygoogle.js?client=ca-pub-3486969662269929` preloaded in `<head>`, rendered by Next.js `<Script strategy="afterInteractive">`
+- `ads.txt`: `google.com, ca-pub-3486969662269929, DIRECT, f08c47fec0942fa0` live at `/ads.txt`
+- Domain ownership: **verified in AdSense console**
+
+**CMP (Consent Management Platform) configuration — in progress:**
+- Chose "Use Google's CMP to create a message with 3 choices (Consent, Do not consent, and Manage options) for my site and future sites" — the GDPR-safe pattern. 2-choice pattern has CNIL / EU DPA fine history; certified-CMP option is overkill for launch.
+- Region targeting recommended: at minimum EEA + UK + Switzerland (regulatory minimum); owner can opt "all regions" for worldwide banner with minor US UX cost.
+- This closes the F5 "CMP gap" that the relationship map flagged as the EU-launch blocker for AdSense.
+
+**AdSense application status:** submitted, in review. Google doesn't offer fast-track. Per owner's ask, discussed the signals that actually move review time — content quantity (~10–15 more articles is the biggest accelerant; currently 15–16 live), `/contact` page existence (not yet verified), privacy page explicitly naming AdSense + cookies + opt-out (not yet verified), broken footer links (not yet verified), sitemap at `/sitemap.xml` (not yet verified). Owner did not kick off the audit — parked as post-submission polish. Standard approval window: 3–14 days after submission when all signals are clean.
+
+**Zero live ads rendering right now:** no `ad_unit` rows in DB with `ad_network='google_adsense'` + `approval_status='approved'`. The script loader fires but `Ad.jsx:93` dispatch returns null without an approved unit, so nothing renders. When ready to monetize, create rows via `/admin/ad-placements`.
+
+### 2026-04-21 — observations / bugs spotted so far
