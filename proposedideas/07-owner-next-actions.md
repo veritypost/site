@@ -7,31 +7,37 @@ still need to do manually for the work to take effect.
 
 ---
 
-## #1 — Apply `schema/109_verity_score_events.sql`
+## URGENT — apply `schema/111_rollback_parallel_score_ledger.sql`
 
-Supabase → SQL Editor → paste the file → Run.
+Schema/109 shipped a parallel scoring ledger without realizing the
+app already has a mature scoring system (`score_events` + `award_points`
++ `score_on_quiz_submit` from schema/022_phase14_scoring.sql). Every
+quiz pass since you applied 109 was double-credited — once by the real
+system, once by my trigger's flat 10-point fallback.
 
-**Verify:**
+Schema/111 unwinds it:
+  * drops the `quiz_attempts` trigger and its function,
+  * subtracts the double-credit from `users.verity_score` for every
+    user the trigger fired against,
+  * drops `increment_verity_score`, `reconcile_verity_scores`, and
+    the `verity_score_events` table,
+  * reinstates a correct `reconcile_verity_scores` function keyed on
+    the real ledger (`score_events`).
+
+**Apply first**, before the other items below.
+
+---
+
+## #1 — Superseded
+
+Schema/109 was mistakenly rolled out and then reverted by schema/111
+(see URGENT section above). The legacy `score_events` ledger is the
+authoritative one. No separate apply needed here.
+
+**After applying 111, verify:**
 ```sql
--- 1. Ledger table exists.
-SELECT count(*) FROM public.verity_score_events;
--- (returns a number; if zero users had nonzero scores, zero is fine)
-
--- 2. Backfill seeded a row per user with nonzero score.
-SELECT source, count(*) FROM public.verity_score_events
-  GROUP BY source;
--- (expect: backfill_initial with one row per user with score > 0)
-
--- 3. Reconciliation returns no drift.
+-- reconcile against the real ledger — empty result = clean
 SELECT * FROM public.reconcile_verity_scores();
--- (expect: empty result set)
-
--- 4. RPC is callable.
-SELECT public.increment_verity_score(
-  '00000000-0000-0000-0000-000000000000'::uuid,
-  'test', 0
-);
--- (expect: {"ok":true,"noop":true,"reason":"zero_delta"})
 ```
 
 ---
