@@ -41,7 +41,7 @@ export default function AboutPage() {
 
         <Section title="Company">
           <p style={textStyle}>
-            Verity Post is operated by <strong>Verity Post LLC</strong>, a United States limited liability company. Verity Post LLC owns and operates the Verity Post website, the Verity Post iOS application, and the Verity Post Kids iOS application.
+            Verity Post is operated by <strong>Verity Post LLC</strong>, a United States limited liability company. Verity Post LLC owns and operates the Verity Post website.
           </p>
         </Section>
 
