@@ -719,25 +719,36 @@ Fixes #4 + #12 + #13 + #14 + #20 in one pass.
 
 ---
 
-### 15. Admin audit backfill — 23 of 24 admin routes missing `record_admin_action`
-**Problem:** Per 2-agent verification, only 1 of 24 sampled admin mutation routes calls `record_admin_action`. Rest have no audit trail for admin actions.
+### 15. Admin route compliance sweep — 75 routes against CLAUDE.md mutation contract
 
-**Known missing (sample):**
-- `web/src/app/api/admin/categories/route.ts`
-- `web/src/app/api/admin/features/route.ts`
-- `web/src/app/api/admin/feeds/route.ts`
-- `web/src/app/api/admin/promo/route.ts`
-- `web/src/app/api/admin/rate-limits/route.ts`
-- `web/src/app/api/admin/ad-campaigns/route.ts`
-- `web/src/app/api/admin/ad-placements/route.ts`
-- `web/src/app/api/admin/ad-units/route.ts`
-- `web/src/app/api/admin/recap/route.ts`
-- `web/src/app/api/admin/sponsors/route.ts`
-- …plus more
+**Full per-route audit (2026-04-21):** `Sessions/04-21-2026/Session 1/ADMIN_ROUTE_COMPLIANCE_AUDIT_2026-04-21.md`
 
-**Pattern to copy:** any already-audited admin mutation route. Call `record_admin_action(p_action, p_target_table, p_target_id, p_reason, p_old_value, p_new_value, p_ip, p_user_agent)` after every mutation (pattern documented in `CLAUDE.md`).
+**Problem:** Full audit of all 75 admin mutation routes shows broad non-compliance with the CLAUDE.md mutation contract (`requirePermission → createServiceClient → checkRateLimit → validate → RPC/write → audit → response`, plus `require_outranks` + `record_admin_action` + `Retry-After` on 429s). Only 23 of 75 routes (31%) pass all required-always checks. 18 (24%) have minor gaps, 34 (45%) have major gaps, and 5 (7%) are broken with 3+ critical violations each.
 
-**Effort:** ~30 min sweep across 12-24 routes (mechanical once pattern is understood).
+**Top 3 violations by frequency:**
+1. **Missing `checkRateLimit` — 73/75 (97%).** Only `broadcasts/alert` and `send-email` include rate limiting. This is the largest hole — admin routes without rate limits are an abuse surface if an admin token is ever compromised.
+2. **Missing `record_admin_action` via SECDEF RPC — 52/75 (69%).** Some routes write directly to the `audit_log` table, bypassing the RPC's validation.
+3. **Missing `Retry-After` header on 429 responses — 8/75 (11%).**
+
+**Worst 3 offenders (most violations per route):**
+- `web/src/app/api/admin/settings/route.js` — 4 violations
+- `web/src/app/api/admin/ad-placements/route.js` — 3 violations
+- `web/src/app/api/admin/permission-sets/role-wiring/route.js` — 3 violations
+
+**Helper bug — fix first:** `web/src/lib/adminMutation.ts:63-80` — the `recordAdminAction` helper omits the last 2 of 8 required RPC params (`p_ip`, `p_user_agent`). Every route using the helper is partially compliant by design; the helper itself must be fixed before any sweep is useful.
+
+**RPC availability (verified via MCP):** all 3 required RPCs — `record_admin_action`, `require_outranks`, `check_rate_limit` — exist on the live DB with correct signatures.
+
+**Pattern to copy:** after the helper is fixed, any already-audited admin mutation route. Call `record_admin_action(p_action, p_target_table, p_target_id, p_reason, p_old_value, p_new_value, p_ip, p_user_agent)` after every mutation (pattern documented in `CLAUDE.md`).
+
+**Effort (revised):**
+- Fix the `recordAdminAction` helper first (add `p_ip` + `p_user_agent` support) — ~15 min
+- Add `checkRateLimit` to 73 routes — ~2 hrs (per-route rate-limit budget decisions + routes pattern)
+- Add `record_admin_action` via SECDEF RPC to 52 routes — ~1-1.5 hrs (some mechanical, some need `p_old_value`/`p_new_value` capture which requires knowing the mutation shape)
+- Add `Retry-After` header to 8 routes — ~15 min
+- Fix 5 "broken" routes (3+ violations each) — ~30 min focused
+
+**Total: ~4-5 hrs of focused agent work.**
 
 ---
 

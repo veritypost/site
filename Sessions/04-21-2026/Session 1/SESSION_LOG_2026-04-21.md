@@ -783,4 +783,32 @@ All three clean. 00-K closes. 00-G (full Stripe audit: key verification, webhook
 
 **Kill-switch inventory:** 11 launch-hides catalogued in `Sessions/04-21-2026/Session 1/KILL_SWITCH_INVENTORY_2026-04-21.md` (468 lines). Breakdown: 6 React `{false && ...}` conditionals, 3 `LAUNCH_HIDE_*` feature-flag constants, 1 `coming_soon` env gate, 1 commented nav item. Key entries: quiz + discussion (page.tsx:977), timelines mobile + desktop (955, 964), anonymous signup interstitial (79), weekly recap (list + detail + home card), mobile tab bar (791), bottom nav (`SHOW_BOTTOM_NAV = false` in NavWrapper:89), Help footer link, `coming_soon` mode (currently off — site is live). Document includes 4-phase flip-order proposal for launch day and 3 false-positive entries explicitly excluded. This is the single canonical reference for "what to turn on for real launch" — one file to work from instead of hunting through 3000-line files.
 
+### 2026-04-21 — Admin route compliance audit — findings landed, fix scope refined
+Owner pushed back on using the `@admin-verified` lockdown as proof of "verified complete" — the earlier audit showed 23/24 admin routes were missing `record_admin_action` calls, meaning the marker wasn't reliable. Requested full compliance audit of every admin mutation route against the `CLAUDE.md` contract before committing to any fix sweep.
+
+**Research-only audit results (saved to `Sessions/04-21-2026/Session 1/ADMIN_ROUTE_COMPLIANCE_AUDIT_2026-04-21.md`):**
+
+Actual total: **75 admin mutation routes**, not 24. Original audit undercounted by sampling.
+
+**Compliance breakdown:**
+- 23 routes (31%) pass all required-always checks
+- 18 routes (24%) have minor gaps (missing optional helpers)
+- 34 routes (45%) have major gaps (missing required core checks)
+- 5 routes (7%) broken (3+ critical violations each)
+
+**Top 3 violations by frequency:**
+1. **Missing `checkRateLimit` — 73/75 routes (97%).** Only `broadcasts/alert` and `send-email` have rate limiting. This is the largest and most security-relevant hole — admin tokens without rate limits = unbounded abuse surface if any token leaks.
+2. **Missing `record_admin_action` via SECDEF RPC — 52/75 routes (69%).** Some bypass the RPC by writing directly to `audit_log` (skips validation).
+3. **Missing `Retry-After` header on 429 responses — 8/75 routes (11%).**
+
+**Worst 3 offenders:** `web/src/app/api/admin/settings/route.js` (4 violations), `ad-placements/route.js` (3), `permission-sets/role-wiring/route.js` (3).
+
+**Helper bug found:** `web/src/lib/adminMutation.ts:63-80` — the `recordAdminAction` wrapper omits `p_ip` and `p_user_agent` (2 of 8 required RPC params). Routes using the helper are partially compliant BY DESIGN until the helper itself is fixed. Must be fixed first before any sweep is meaningful.
+
+**RPC availability verified via MCP:** all three required RPCs (`record_admin_action` 8-param, `require_outranks`, `check_rate_limit`) exist on live DB with correct signatures. No DB work needed for the sweep — it's all client-side code fixes.
+
+**FIX_SESSION_1 #15 updated** to reflect the refined scope: renamed from "Admin audit backfill — 23 of 24 routes" to "Admin route compliance sweep — 75 routes against CLAUDE.md mutation contract." Effort estimate raised from ~30 min to ~4-5 hrs focused agent work, broken into 5 sub-tasks (helper fix first, then rate-limit 73 routes, audit-call 52 routes, Retry-After 8 routes, broken-5 focus pass).
+
+**No fixes applied yet** — owner reviews the audit and decides sweep strategy before dispatch.
+
 ### 2026-04-21 — observations / bugs spotted so far
