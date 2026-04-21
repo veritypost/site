@@ -52,12 +52,7 @@ export default function DMCAPage() {
 
         <div style={sectionStyle}>
           <h2 style={headingStyle}>Contact</h2>
-          <p style={textStyle}>DMCA notices and counter-notices should be sent to:</p>
-          <p style={textStyle}>
-            DMCA Agent, Verity Post, Inc.<br />
-            123 Media Lane, San Francisco, CA 94105<br />
-            Email: dmca@veritypost.com
-          </p>
+          <p style={textStyle}>Send DMCA notices and counter-notices to legal@veritypost.com.</p>
         </div>
       </div>
     </div>

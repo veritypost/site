@@ -56,13 +56,7 @@ export default function AccessibilityPage() {
 
         <div style={sectionStyle}>
           <h2 style={headingStyle}>Feedback & Contact</h2>
-          <p style={textStyle}>We welcome your feedback on the accessibility of Verity Post. If you encounter any barriers or have suggestions for improvement, please contact us:</p>
-          <p style={textStyle}>
-            Email: accessibility@veritypost.com<br />
-            Phone: (555) 123-4567<br />
-            Mailing address: Verity Post, Inc., 123 Media Lane, San Francisco, CA 94105
-          </p>
-          <p style={textStyle}>We aim to respond to accessibility feedback within 2 business days.</p>
+          <p style={textStyle}>If you encounter accessibility barriers, contact support@veritypost.com.</p>
         </div>
       </div>
     </div>

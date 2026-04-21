@@ -195,12 +195,15 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
   //                 the legal + support links are reachable wherever
   //                 the brand is visible, including home.
   const isAuthRoute = AUTH_HIDE.includes(path);
-  const chromeHidden = isAuthRoute || isAdmin(path) || isIdeasPreview(path) || isStory(path);
-  // Each surface ANDs its launch-gate flag with the route rule. Route-level
-  // hiding always wins (auth/admin/ideas/story stay clean regardless of flags).
-  const showTopBar = mounted && SHOW_TOP_BAR && !chromeHidden;
-  const showNav = mounted && SHOW_BOTTOM_NAV && !chromeHidden && path !== '/';
-  const showFooter = mounted && SHOW_FOOTER && !chromeHidden;
+  // Fully chrome-free surfaces — admin owns its own shell, auth pages run
+  // fullscreen, ideas preview is intentionally bare.
+  const fullyBare = isAuthRoute || isAdmin(path) || isIdeasPreview(path);
+  // Per-surface rules. Top bar shows on story pages so a reader can tap
+  // the wordmark to return home; bottom nav and footer stay off there to
+  // keep the reading viewport clean.
+  const showTopBar = mounted && SHOW_TOP_BAR && !fullyBare;
+  const showNav = mounted && SHOW_BOTTOM_NAV && !fullyBare && !isStory(path) && path !== '/';
+  const showFooter = mounted && SHOW_FOOTER && !fullyBare && !isStory(path);
   const onAdminPage = mounted && isAdmin(path);
   // UJ-200 (Pass 17): banner is strictly admin+ territory. Editor and
   // moderator roles can reach the admin routes they're authorised for

@@ -67,7 +67,7 @@ export default function TermsPage() {
           <h2 style={headingStyle}>6. Disclaimers</h2>
           <ul style={listStyle}>
             <li>Verity Post is provided &quot;as is&quot; without warranties of any kind, express or implied.</li>
-            <li>We do not guarantee the accuracy, completeness, or reliability of any content, including Verity Scores and AI-generated summaries.</li>
+            <li>We do not guarantee the accuracy, completeness, or reliability of any content, including Verity Scores and article summaries.</li>
             <li>Verity Post is not a legal, medical, or financial advisory service. Content should not be relied upon as professional advice.</li>
           </ul>
         </div>

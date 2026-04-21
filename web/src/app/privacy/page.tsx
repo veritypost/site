@@ -36,11 +36,10 @@ export default function PrivacyPage() {
         </div>
 
         <div style={sectionStyle}>
-          <h2 style={headingStyle}>3. AI & Content Processing</h2>
+          <h2 style={headingStyle}>3. Content Processing</h2>
           <ul style={listStyle}>
-            <li>We use AI models to summarize articles, generate quiz questions, and assist with content analysis.</li>
-            <li>AI-generated content is always labeled as such. Human editorial oversight is applied to all published content assessments.</li>
-            <li>Your reading patterns may be used in aggregate to train recommendation models, but individual data is anonymized.</li>
+            <li>We process articles to generate summaries, quiz questions, and content analysis under human editorial oversight.</li>
+            <li>Your reading patterns may be used in aggregate to inform recommendation features, and individual data is anonymized before use.</li>
           </ul>
         </div>
 
@@ -68,7 +67,7 @@ export default function PrivacyPage() {
           <ul style={listStyle}>
             <li>We do not knowingly collect personal information from children under 13 without verifiable parental consent.</li>
             <li>Kids Mode collects minimal data and does not enable social features or public profile creation.</li>
-            <li>Parents may review, modify, or delete their child&apos;s data by contacting privacy@veritypost.com.</li>
+            <li>Parents may review, modify, or delete their child&apos;s data by contacting legal@veritypost.com.</li>
           </ul>
         </div>
 
@@ -78,16 +77,15 @@ export default function PrivacyPage() {
             <li>You may access, correct, or delete your personal data at any time through your account settings.</li>
             <li>You may opt out of non-essential communications and data processing for recommendation purposes.</li>
             <li>California residents may exercise additional rights under the CCPA. EU residents are protected under GDPR.</li>
-            <li>To exercise any data rights, contact privacy@veritypost.com or use the in-app privacy controls.</li>
+            <li>To exercise any data rights, contact legal@veritypost.com or use the in-app privacy controls.</li>
           </ul>
         </div>
 
         <div style={sectionStyle}>
           <h2 style={headingStyle}>8. Contact</h2>
           <ul style={listStyle}>
-            <li>For privacy inquiries: privacy@veritypost.com</li>
-            <li>Data Protection Officer: dpo@veritypost.com</li>
-            <li>Mailing address: Verity Post, Inc., 123 Media Lane, San Francisco, CA 94105</li>
+            <li>For privacy and data protection inquiries: legal@veritypost.com</li>
+            <li>For general questions: info@veritypost.com</li>
           </ul>
         </div>
       </div>

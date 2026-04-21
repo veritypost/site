@@ -35,7 +35,7 @@ Plus two already-normal preferences carried over:
 
 ## Files changed
 
-Six files were modified in this session:
+Files modified in this session:
 
 1. `web/src/app/NavWrapper.tsx`
 2. `web/src/app/page.tsx`
@@ -43,6 +43,12 @@ Six files were modified in this session:
 4. `web/src/app/recap/[id]/page.tsx`         (launch-hide added)
 5. `web/src/app/notifications/page.tsx`      (copy edit)
 6. `web/src/app/story/[slug]/page.tsx`       (launch-hide signup interstitial)
+7. `web/src/app/privacy/page.tsx`            (content edit, contact cleanup)
+8. `web/src/app/terms/page.tsx`              (content edit)
+9. `web/src/app/dmca/page.tsx`               (contact cleanup)
+10. `web/src/app/accessibility/page.tsx`     (contact cleanup)
+11. `web/src/app/help/page.tsx`              (email remap)
+12. `web/src/app/cookies/page.tsx`           (email remap)
 
 Nothing else. No DB changes, no config changes, no new dependencies.
 
@@ -458,6 +464,93 @@ for future pre-launch toggles or be removed on a full revert.
 The `Interstitial` component itself (`web/src/components/Interstitial.tsx`),
 the `bumpArticleViewCount` session helper, and the registration wall
 that kicks in at `free_article_limit` views are all untouched.
+
+---
+
+## Change 10 — Top bar now visible on article pages
+
+**File:** `web/src/app/NavWrapper.tsx`
+**What it does:** readers on `/story/<slug>` see the top wordmark so they
+can tap "verity post" to return home. Bottom nav and footer stay hidden
+to keep the reading viewport clean.
+
+### Before
+
+`isStory(path)` was included in the `chromeHidden` composite — every
+surface was off on story routes.
+
+### After (current)
+
+A new split: `fullyBare` covers the truly chrome-free surfaces (admin,
+auth, ideas preview). The top bar gate is `!fullyBare` only. The bottom
+nav and footer gates additionally exclude `isStory(path)`.
+
+```tsx
+const fullyBare = isAuthRoute || isAdmin(path) || isIdeasPreview(path);
+const showTopBar = mounted && SHOW_TOP_BAR && !fullyBare;
+const showNav = mounted && SHOW_BOTTOM_NAV && !fullyBare && !isStory(path) && path !== '/';
+const showFooter = mounted && SHOW_FOOTER && !fullyBare && !isStory(path);
+```
+
+### How to revert to "no chrome at all on story"
+
+Add `isStory(path)` back into the `fullyBare` predicate, or replace the
+three gates with the earlier `chromeHidden` pattern from Change 3.
+
+---
+
+## Change 11 — Public legal/support pages trimmed
+
+**Files:**
+- `web/src/app/privacy/page.tsx`
+- `web/src/app/terms/page.tsx`
+- `web/src/app/dmca/page.tsx`
+- `web/src/app/accessibility/page.tsx`
+- `web/src/app/help/page.tsx`
+- `web/src/app/cookies/page.tsx`
+
+**What it does:** three parallel edits across the public legal and
+support pages:
+
+1. **Removed every physical mailing address.** "Verity Post, Inc.,
+   123 Media Lane, San Francisco, CA 94105" was present on privacy,
+   dmca, and accessibility pages. All three are gone.
+2. **Removed the only phone number.** "(555) 123-4567" on the
+   accessibility page is gone.
+3. **Remapped contact emails** to the four addresses the owner has
+   provisioned: `advertising@`, `support@`, `legal@`, `info@`.
+   - `privacy@veritypost.com` → `legal@veritypost.com` (privacy + cookies pages)
+   - `dpo@veritypost.com` → removed (no replacement needed; not legally required absent GDPR representative designation)
+   - `dmca@veritypost.com` → `legal@veritypost.com`
+   - `accessibility@veritypost.com` → `support@veritypost.com`
+   - `admin@veritypost.com` → `support@veritypost.com`
+4. **Removed every reference to AI.** The privacy page had a full
+   "AI & Content Processing" section that was rewritten as a single
+   "Content Processing" section with no AI mention. Terms had a
+   disclaimer referencing "AI-generated summaries" — rewritten to
+   "article summaries".
+
+### How to revert
+
+There is no single flag for this one; these are content edits to
+live legal copy. If the owner decides to re-disclose AI use (which
+is the FTC-safer posture once traffic is real), the original
+privacy section 3 should be restored and the terms disclaimer
+should read "AI-generated summaries" again.
+
+If the owner ever wants to re-publish the physical address or
+phone number (for example after incorporating in a specific
+jurisdiction), re-add them to the privacy, dmca, and accessibility
+contact blocks.
+
+### Important compliance note for re-enablement
+
+When the site publishes AI-generated articles publicly, the FTC
+disclosure posture is much safer with an explicit statement on the
+privacy or terms page. The DB already marks articles with
+`is_ai_generated = true`. Consider restoring a short disclosure
+line ("articles may be generated with AI assistance under editorial
+oversight") before wide public launch.
 
 ---
 

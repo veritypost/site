@@ -170,7 +170,7 @@ export default async function HelpPage() {
               </div>
               <div style={{ fontSize: '13px', color: '#666666' }}>
                 Or email{' '}
-                <a href="mailto:admin@veritypost.com" style={linkStyle}>admin@veritypost.com</a>
+                <a href="mailto:support@veritypost.com" style={linkStyle}>support@veritypost.com</a>
                 .
               </div>
             </>

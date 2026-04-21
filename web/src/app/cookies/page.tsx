@@ -63,7 +63,7 @@ export default function CookiesPage() {
 
         <div style={sectionStyle}>
           <h2 style={headingStyle}>Contact</h2>
-          <p style={textStyle}>For questions about our use of cookies, contact privacy@veritypost.com.</p>
+          <p style={textStyle}>For questions about our use of cookies, contact legal@veritypost.com.</p>
         </div>
       </div>
     </div>
