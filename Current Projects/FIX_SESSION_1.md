@@ -494,6 +494,8 @@ Pattern used: plain `.js` layouts matching repo convention (root layout.js + all
 ---
 
 ### 6. Bottom nav reorder — OWNER DESIGN CALL
+**Current state (2026-04-21):** bottom nav is `SHOW_BOTTOM_NAV = false` at `web/src/app/NavWrapper.tsx:89` — kill-switched off, not rendering on any route. The design decision is therefore two-layered: (1) turn it back on? (2) if yes, what tabs? See kill-switch inventory at `Sessions/04-21-2026/Session 1/KILL_SWITCH_INVENTORY_2026-04-21.md` for full context.
+
 **Problem:** Current 4-item nav (`Home / Notifications / Leaderboard / Profile`) may or may not cover the right destinations. Not a defect; a product/IA decision.
 
 **Targets (if changing):**
@@ -942,7 +944,7 @@ These are **feature-level work**, not fixes. Rolled up here for full-scope visib
 
 **Critical gaps:**
 1. **CMP (Google Funding Choices or similar) — ABSENT.** AdSense loads unconditionally → EU GDPR / ePrivacy compliance risk. Largest blocker.
-2. Targeting logic in `serve_ad`: `targeting_categories` column exists but may not be consulted by the RPC (needs verify; agent flagged `schema/025_phase17_fixes.sql` as pending).
+2. Targeting logic in `serve_ad`: schema columns exist (all 5 `targeting_*` jsonb cols on `ad_units`: `targeting_categories`, `targeting_cohorts`, `targeting_countries`, `targeting_plans`, `targeting_platforms` — verified via MCP 2026-04-21); `serve_ad` RPC body does NOT reference them (verified via `pg_get_functiondef`); extending the RPC to honor the 5 targeting columns is pending dev work, scope ~2-4 hrs. No schema migration is missing — the columns landed without `schema/025_phase17_fixes.sql` (no `025`/`phase17` row in `supabase_migrations.schema_migrations`).
 3. **Slot editor UI (Page B)** — AdSense snippet paste → parse `<ins class="adsbygoogle">` → create `ad_unit` row. Missing.
 4. **Targeting preview tool (Page C)** — simulate-as-user, show which ad renders. Missing.
 5. IntersectionObserver viewability logging — schema columns ready, collection code absent.
