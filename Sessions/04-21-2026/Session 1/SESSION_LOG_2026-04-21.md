@@ -722,4 +722,59 @@ Owner kicked off AdSense domain verification. Real publisher ID: `ca-pub-3486969
 
 **Zero live ads rendering right now:** no `ad_unit` rows in DB with `ad_network='google_adsense'` + `approval_status='approved'`. The script loader fires but `Ad.jsx:93` dispatch returns null without an approved unit, so nothing renders. When ready to monetize, create rows via `/admin/ad-placements`.
 
+### 2026-04-21 — 00-J Vercel ex-dev removal — CLOSED (not applicable)
+Owner checked Vercel → Team list. **Only one member: `admin-13890452` (the owner's account).** The `veritypost` label seen on git-driven deploys in the Deployments UI is the GitHub integration display tag on pushed commits, not a separate team member. Ex-dev was either never added to Vercel or was removed earlier. No action required; 00-J closes as "not applicable under current team state."
+
+**Durable note:** Vercel deploy display names (`veritypost` on git pushes vs. `admin-13890452` on manual redeploys) do not prove distinct team members. Verify via Settings → Team email column, not deploy labels.
+
+### 2026-04-21 — Vercel env-var trailing-space cleanup — DONE
+Owner trimmed the trailing space from the `NEXT_PUBLIC_ADSENSE_PUBLISHER_ID` value in Vercel → Settings → Environment Variables. Value now reads exactly `ca-pub-3486969662269929` (no padding). The clean value bakes into the next redeploy automatically; AdSense was tolerating the stray space so no functional regression was in flight. Residual-bug follow-up flagged in FIX_SESSION_1 for this item is now closed.
+
+### 2026-04-21 — 00-M schema/106 kid-trial freeze notification applied — SHIPPED
+Owner pasted `schema/106_kid_trial_freeze_notification.sql` into Supabase SQL Editor and ran it. Verified via MCP (`SELECT proname, prosrc ILIKE '%create_notification%' FROM pg_proc WHERE proname='freeze_kid_trial'`) that the function body now contains a `create_notification` call and totals 1641 chars. Kid-trial → Family conversion funnel notification path is live. Not launch-blocking under the reviewer-approval launch model (Kids iOS is Apple-gated anyway), but closes a real product hole — parents will now be notified when a kid trial freezes instead of silent expiry. `kid_trial_expired` email template already in DB from earlier session work; the trigger now fires it.
+
+### 2026-04-21 — 00-O HIBP leaked-password protection — PARKED (Pro-plan gated)
+Owner confirmed Supabase project is on a plan below Pro. Supabase's HIBP (HaveIBeenPwned) integration for leaked-password rejection at signup is gated behind Pro Plan and above per the docs page the owner inspected. Toggle is grayed out on the current tier. **Parking as a "do when upgrading to Pro" item** alongside any other Pro-gated features we accumulate. When owner upgrades, this becomes a 30-second toggle in Authentication → Password Protection. Not launch-blocking (password strength + length requirements still enforced at signup; HIBP is an additional layer, not the only layer).
+
+### 2026-04-21 — 00-A pg_cron enabled + events-maintenance jobs registered — SHIPPED
+Owner enabled `pg_cron` via Supabase → Database → Extensions (schema locked to `pg_catalog` — the only valid target). Verified via MCP: `pg_cron` 1.6.4 installed. Schema/108's DO block had originally skipped job registration (pg_cron wasn't installed at first apply), so MCP execute_sql couldn't re-register (read-only transaction). Owner ran two `cron.schedule(...)` calls in SQL Editor to register the jobs. Verified via MCP — both jobs live:
+- `events-create-next-partition` (jobid 1) — `5 0 * * *` — `SELECT public.create_events_partition_for(current_date + 1);` — active
+- `events-drop-old-partitions` (jobid 2) — `15 0 * * *` — `SELECT public.drop_old_events_partitions(90);` — active
+
+`events` table partition auto-maintenance is now self-sustaining (nightly partition creation + 90-day retention drop). F6 measurement foundation depends on this; one less risk on the analytics track.
+
+**Durable note:** MCP `execute_sql` runs in a read-only transaction — cannot register cron jobs, insert data, or do any mutation. For mutations the options are: owner runs SQL in Supabase dashboard, or dispatch an agent using `mcp__supabase__apply_migration` (write-capable).
+
+### 2026-04-21 — 00-I Apple Developer Program enrollment — APPLIED (Organization track)
+Owner submitted enrollment under **Organization** (business entity, "Verity Post LLC"). This matches the legal-pages commit `cbdea50` where Verity Post LLC was named as operator; App Store listing attribution will read the LLC name. Apple's approval clock is now running.
+
+**Expected timeline:** Organization enrollment takes longer than Individual — Apple verifies the business entity via DUNS (Dun & Bradstreet) and cross-checks the legal registration. Typical wait: **1-3+ weeks**, sometimes longer if DUNS records don't match Apple's expected format. Individual would have been 1-2 days.
+
+**What unblocks the moment Apple approves:**
+- App Store Connect access → create 8 IAP products (IDs already hardcoded in `VerityPost/VerityPost/StoreManager.swift:50-57`: `com.veritypost.{verity,verity_pro,verity_family,verity_family_xl}.{monthly,annual}`)
+- Generate APNs `.p8` auth key → populate `APNS_AUTH_KEY`, `APNS_KEY_ID`, `APNS_TEAM_ID` in Vercel env vars
+- `apple-app-site-association` file for Universal Links (deep-linking from web → iOS app)
+- Provisioning profiles + distribution certs
+- TestFlight setup for internal/external beta
+- Submit both VerityPost (adult) and VerityPostKids apps to App Store Review
+- Kids iOS COPPA attestation in App Review form
+
+iOS launch track is now entirely gated on Apple — nothing further to do on owner's side until the approval email lands. Web launch is unaffected and proceeds independently.
+
+### 2026-04-21 — CMP wizard finish — PARKED (gated behind AdSense approval)
+Owner clarified: most of the CMP configuration flow (regions, vendor list, preview, publish) is gated behind AdSense account approval — cannot be completed until Google approves. The earlier "3-choice Consent/Do not consent/Manage" selection was a preference capture, not a publish action. The full Privacy & Messaging section in AdSense console is hidden pre-approval. **Parking CMP-finish as post-approval work** alongside "create ad_unit rows in /admin/ad-placements."
+
+**Correction to earlier session guidance:** my "clicks to finish the CMP wizard" list assumed post-approval access. It was wrong. Hit the `feedback_no_assumption_when_no_visibility.md` rule again — don't narrate external-dashboard flows I can't actually see. Logged for future sessions.
+
+### 2026-04-21 — Google Search Console sitemap submission — SHIPPED
+Owner verified `veritypost.com` in Google Search Console under a prior-linked email (auto-verified from a past session; owner confirmed they have access to that email). Submitted `sitemap.xml` under the Sitemaps panel — the input field auto-prepends the domain, so typing just `sitemap.xml` resolves to `https://veritypost.com/sitemap.xml`. Indexing is now actively running on Google's main crawl (independent of AdSense review but complementary — AdSense looks at how Google has indexed the site, and faster indexation accelerates the signal Google uses to judge content quality during AdSense review).
+
+### 2026-04-21 — 00-K Stripe 3-check — SHIPPED (all clean)
+Owner confirmed Stripe is in Live mode (not Test mode) on the production account, then ran all three checks:
+1. Webhooks — exactly one endpoint, `https://veritypost.com/api/stripe/webhook`. No rogue endpoints.
+2. Connect → Accounts — empty or only owner-created. No unauthorized Connect accounts.
+3. Team members — only trusted accounts, no ex-dev.
+
+All three clean. 00-K closes. 00-G (full Stripe audit: key verification, webhook secret rotation check, end-to-end checkout smoke test) remains open but is lower priority post-launch — code side is production-grade already (verified in earlier session).
+
 ### 2026-04-21 — observations / bugs spotted so far

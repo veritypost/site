@@ -54,6 +54,7 @@ logs/
 
 # --- Claude Code session data ----------------------------------------------
 .claude/
+.mcp.json
 
 # --- macOS / editor / OS ---------------------------------------------------
 .DS_Store
