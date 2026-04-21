@@ -18,7 +18,7 @@ Verity Post is a permission-driven news platform (web + iOS) whose admin console
 | iOS kids | `VerityPostKids/` | SwiftUI, iOS 17+ (COPPA, custom JWT) |
 | Admin console | `web/src/app/admin/*` + `web/src/app/api/admin/*` | 39 pages + 27 DS components, `@admin-verified` LOCKED |
 | Database | Supabase project `fyiwulqphgmoqullmrfn` | 114 tables |
-| Hosting | Vercel | Ignored Build Step ON — manual redeploy only |
+| Hosting | Vercel | Deploys on push to `main` (verified 2026-04-21) |
 
 ## Permission system (product DNA)
 

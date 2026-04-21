@@ -2,7 +2,7 @@
 
 Ordered checklist for deploying Verity Post to production. Every step is idempotent or has a rollback.
 
-Prior runbook was based on the v1→v2 migration phase and referenced the deleted `site/` folder + an incomplete migration list; archived as `archive/2026-04-20-consolidation/CUTOVER.md.old`.
+Prior runbook was based on the v1→v2 migration phase and referenced the deleted `site/` folder + an incomplete migration list; archived as `Archived/2026-04-20-consolidation/CUTOVER.md.old`.
 
 ---
 

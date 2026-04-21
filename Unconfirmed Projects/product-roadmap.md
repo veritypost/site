@@ -176,7 +176,7 @@ None beyond current capstone state.
 
 - **Where:** Supabase Dashboard for project `fyiwulqphgmoqullmrfn` → Auth → Providers → Email → Password Security
 - **Toggle:** "Prevent use of leaked passwords" ON
-- **Exact clickpath:** `archive/2026-04-19-prelaunch-sprint/round_g_owner_action.md`
+- **Exact clickpath:** `Archived/2026-04-19-prelaunch-sprint/round_g_owner_action.md`
 - **Effect:** signups and password changes using breached passwords rejected with error
 - **Verification:** incognito → signup with `password123` → expect rejection with leaked-password error
 - **Why it matters:** H-04 advisor warning from capstone; without it, users can sign up with known-breached passwords
@@ -251,8 +251,8 @@ Round A/B SQL was applied to live DB via MCP `execute_sql` but never committed a
 
 ```bash
 # From repo root
-cp archive/2026-04-19-prelaunch-sprint/round_a_migration.sql schema/092_round_a_rls_lockdown.sql
-cp archive/2026-04-19-prelaunch-sprint/round_b_migration.sql schema/093_round_b_rpc_actor_lockdown.sql
+cp Archived/2026-04-19-prelaunch-sprint/round_a_migration.sql schema/092_round_a_rls_lockdown.sql
+cp Archived/2026-04-19-prelaunch-sprint/round_b_migration.sql schema/093_round_b_rpc_actor_lockdown.sql
 
 # Update reset_and_rebuild_v2.sql to concat them in via CREATE OR REPLACE statements
 # (Manual edit — see existing rebuild file for pattern)
@@ -1423,12 +1423,12 @@ Month 7+:  Admin evolution (4 page rebuilds, Stripe-sync)
 | Parity matrix (web vs iOS) | `docs/product/parity/` |
 | Schema + migrations | `schema/` |
 | Historical build logs | `docs/history/` |
-| Closed sprint archives | `archive/<pass>/_README.md` |
-| HIBP toggle clickpath | `archive/2026-04-19-prelaunch-sprint/round_g_owner_action.md` |
-| Round A SQL (for migration 092 commit) | `archive/2026-04-19-prelaunch-sprint/round_a_migration.sql` |
-| Round B SQL (for migration 093 commit) | `archive/2026-04-19-prelaunch-sprint/round_b_migration.sql` |
-| Capstone verification report | `archive/2026-04-19-prelaunch-sprint/_prelaunch_capstone_report.md` |
-| Structure synthesis (future repo shape) | `archive/restructure-2026-04-19/structure-synthesis.md` |
+| Closed sprint archives | `Archived/<pass>/_README.md` |
+| HIBP toggle clickpath | `Archived/2026-04-19-prelaunch-sprint/round_g_owner_action.md` |
+| Round A SQL (for migration 092 commit) | `Archived/2026-04-19-prelaunch-sprint/round_a_migration.sql` |
+| Round B SQL (for migration 093 commit) | `Archived/2026-04-19-prelaunch-sprint/round_b_migration.sql` |
+| Capstone verification report | `Archived/2026-04-19-prelaunch-sprint/_prelaunch_capstone_report.md` |
+| Structure synthesis (future repo shape) | `Archived/restructure-2026-04-19/structure-synthesis.md` |
 
 ---
 

@@ -19,7 +19,7 @@ Permission-driven news discussion platform. Web + iOS, shared Supabase backend.
 | [`scripts/`](scripts/) | Dev scripts: seed accounts, import permissions, preflight, smoke tests. |
 | [`test-data/`](test-data/) | Seed JSON + SQL fixtures. |
 | [`docs/`](docs/) | Documentation: reference, runbooks, product, planning, history. |
-| [`archive/`](archive/) | Closed passes, obsolete snapshots, scratch UI. Historical only. |
+| [`Archived/`](Archived/) | Closed passes, obsolete snapshots, scratch UI. Historical only. |
 
 ## Docs map
 

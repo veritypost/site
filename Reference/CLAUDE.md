@@ -154,7 +154,7 @@ Three apps, one DB. All connected via Supabase (`fyiwulqphgmoqullmrfn`).
 ├── scripts/
 │   └── import-permissions.js     rebuilds permission matrix from xlsx → Supabase
 │
-├── supabase/ test-data/ docs/ archive/ 05-Working/
+├── supabase/ test-data/ docs/ Archived/ 05-Working/
 ```
 
 ## The machinery (stay fluent in these)
