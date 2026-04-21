@@ -9,4 +9,4 @@
 # Format per line:
 #   <domain>, <publisher_id>, <relationship>, <TAG-ID>
 #
-# google.com, ca-pub-REPLACE_WITH_REAL_ID, DIRECT, f08c47fec0942fa0
+google.com, ca-pub-3486969662269929, DIRECT, f08c47fec0942fa0
