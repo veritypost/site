@@ -659,6 +659,230 @@ That's the full public-launch flip. Two files, three lines, one commit.
 - Related article doc on Desktop: `~/Desktop/VerityPost_10_Sourced_Articles_2026-04-21.docx`
 - Related SQL for article inserts: `~/Desktop/VerityPost_10_Articles_INSERT_2026-04-21.sql`
 
-All three were produced in the same session. The article work is unrelated
-to the nav changes — if you revert the nav, nothing about the articles
-or the SQL changes.
+---
+
+# Article work (separate from the nav changes)
+
+Produced in the same session but independent of the nav changes — reverting
+the nav does not touch the articles, and reverting the articles does not
+touch the nav. Captured here so all session output is in one place.
+
+## Current state
+
+**The SQL file exists on Desktop. It has NOT been run against the
+database as of the end of this session.** If you want the 10 articles
+live, you have to execute the SQL file yourself (see "How to insert"
+below). If you do not run it, nothing hits the DB and this section is
+informational only.
+
+## What the 10 articles are
+
+All adult-only, all sourced to primary references, all original prose
+written from extracted facts. Status defaults to `'draft'` and
+`moderation_status='pending'` on insert, so nothing auto-publishes —
+you review them in admin and manually promote to `published`.
+
+| # | Slug | Category | Headline |
+|---|---|---|---|
+| 1 | curiosity-mars-organic-molecules-nitrogen-heterocycle | space | Curiosity finds seven new organic molecules on Mars |
+| 2 | uranus-neptune-carbon-hydrogen-superionic | space | New carbon and hydrogen phase predicted inside Uranus and Neptune |
+| 3 | corona-discharge-trees-thunderstorms-penn-state | science | Penn State records trees glowing electric during thunderstorms |
+| 4 | pinene-termite-trap-ucr-95-percent | science | Pine scent pushes termite kill rate past 95 percent |
+| 5 | madecassic-acid-antibiotic-resistance-kent-ucl | medicine | Herb compound kills drug resistant bacteria via protein humans lack |
+| 6 | moringa-seeds-microplastics-water-treatment-brazil | environment | Moringa seed extract rivals industrial coagulant for microplastics |
+| 7 | california-hybrid-honeybees-varroa-resistance | environment | Southern California hybrid bees carry 68 percent fewer mites |
+| 8 | ultrafast-camera-femtosecond-imaging-ecnu | physics | New camera captures full femtosecond light pulses in one shot |
+| 9 | dolomite-crystal-grown-lab-200-years | science | Michigan team grows dolomite in lab after two centuries of failure |
+| 10 | japan-miyako-m74-earthquake-offshore-iwate | world | Magnitude 7.4 earthquake strikes off Miyako, Japan |
+
+Full content (headline, slug, 1–2 sentence summary, 140–200 word body,
+primary sources) is in the Desktop Word doc and is also embedded in the
+SQL file as the INSERT values.
+
+## How each article is sourced
+
+Every specific fact (name, number, institution, date, finding) traces
+to one of three source types, listed under each article in both the
+Word doc and the SQL `sources` inserts:
+
+- **U.S. government (public domain)** — articles 1 (NASA Curiosity) and
+  10 (USGS earthquake). No copyright exists on federal works under
+  17 U.S.C. § 105.
+- **Peer-reviewed journal** — articles 2–9 cite the original paper's
+  DOI (Nature Communications, Science, Optica, Geophysical Research
+  Letters, ACS Omega, RSC Medicinal Chemistry, Journal of Economic
+  Entomology, Scientific Reports). Facts are not copyrightable.
+- **University press release** — most of articles 2–9 also cite the
+  institution's own press release URL (Carnegie, Penn State, UC
+  Riverside, São Paulo State, Optica Publishing Group). Press releases
+  are intended for distribution; coverage is expected and welcome.
+
+Aggregator URLs (ScienceDaily) were deliberately removed from the
+attribution chain after source hardening.
+
+## Copyright posture
+
+Low risk. Facts extracted, prose written fresh, attribution to primary
+sources. No sentence copied or paraphrased closely from any outlet.
+Zero direct quotes in any article. No banned editorial language (per
+the V2 editorial guide). Every article passes its headline-summary
+anti-repetition check and the 4× summary character cap.
+
+## Known accuracy caveats
+
+- **Article 4 (termite)** cites a 2024 Journal of Economic Entomology
+  paper. The ScienceDaily writeup we sourced from was dated April 2026
+  but the underlying paper is from 2024. The article body does not
+  claim the finding is "this week" news, only states the finding and
+  its journal. Safe factually but not breaking news.
+- **Article 9 (dolomite)** cites a 2023 Science paper. Same situation:
+  factually correct statement, not breaking news.
+- Everything else (articles 1, 2, 3, 5, 6, 7, 8, 10) is 2026 material
+  that was current on 2026-04-21.
+
+The editor should still read each source URL before publishing.
+
+## How to insert
+
+Three options, pick one:
+
+**Option A: Supabase SQL Editor (easiest).** Open the Supabase
+dashboard, go to SQL Editor, paste the contents of
+`~/Desktop/VerityPost_10_Articles_INSERT_2026-04-21.sql`, click Run.
+The commented verify block at the bottom of the file will show you
+10 rows with their source counts when you uncomment and re-run it.
+
+**Option B: psql command line.**
+```bash
+psql "$DATABASE_URL" -f ~/Desktop/VerityPost_10_Articles_INSERT_2026-04-21.sql
+```
+
+**Option C: via Claude's Supabase MCP tool.** Ask in a future session;
+the SQL file is idempotent (`ON CONFLICT (slug) DO NOTHING`), so
+running it twice is safe.
+
+The whole file is wrapped in `BEGIN ... COMMIT;` so it's atomic — all
+10 articles (plus 19 source rows) land together, or nothing lands.
+
+## How to confirm they inserted
+
+After running, paste this into the Supabase SQL Editor:
+
+```sql
+SELECT slug, title, status, moderation_status,
+  (SELECT COUNT(*) FROM public.sources WHERE article_id = a.id) AS source_count
+FROM public.articles a
+WHERE slug IN (
+  'curiosity-mars-organic-molecules-nitrogen-heterocycle',
+  'uranus-neptune-carbon-hydrogen-superionic',
+  'corona-discharge-trees-thunderstorms-penn-state',
+  'pinene-termite-trap-ucr-95-percent',
+  'madecassic-acid-antibiotic-resistance-kent-ucl',
+  'moringa-seeds-microplastics-water-treatment-brazil',
+  'california-hybrid-honeybees-varroa-resistance',
+  'ultrafast-camera-femtosecond-imaging-ecnu',
+  'dolomite-crystal-grown-lab-200-years',
+  'japan-miyako-m74-earthquake-offshore-iwate'
+)
+ORDER BY slug;
+```
+
+Expected: 10 rows, `status='draft'`, `moderation_status='pending'`,
+`source_count` between 1 and 3 per row.
+
+## How to publish (when ready)
+
+The articles ship in draft status so nothing goes live on insert.
+When you want them public, either:
+
+- Open each in admin and flip status to `published` via the UI, or
+- Run this bulk update in SQL:
+
+```sql
+UPDATE public.articles
+   SET status='published',
+       moderation_status='approved',
+       is_verified=true,
+       published_at=NOW()
+ WHERE slug IN (
+  'curiosity-mars-organic-molecules-nitrogen-heterocycle',
+  'uranus-neptune-carbon-hydrogen-superionic',
+  -- ... etc, list all 10 ...
+  'japan-miyako-m74-earthquake-offshore-iwate'
+ );
+```
+
+Only do this after reading each source URL and the article copy once
+more. Defamation exposure lands on the publisher, not on Anthropic or
+on Claude.
+
+## How to remove (full revert)
+
+If you insert them and then decide to pull them, atomically:
+
+```sql
+BEGIN;
+
+DELETE FROM public.sources
+ WHERE article_id IN (
+   SELECT id FROM public.articles
+    WHERE slug IN (
+      'curiosity-mars-organic-molecules-nitrogen-heterocycle',
+      'uranus-neptune-carbon-hydrogen-superionic',
+      'corona-discharge-trees-thunderstorms-penn-state',
+      'pinene-termite-trap-ucr-95-percent',
+      'madecassic-acid-antibiotic-resistance-kent-ucl',
+      'moringa-seeds-microplastics-water-treatment-brazil',
+      'california-hybrid-honeybees-varroa-resistance',
+      'ultrafast-camera-femtosecond-imaging-ecnu',
+      'dolomite-crystal-grown-lab-200-years',
+      'japan-miyako-m74-earthquake-offshore-iwate'
+    )
+ );
+
+DELETE FROM public.articles
+ WHERE slug IN (
+  'curiosity-mars-organic-molecules-nitrogen-heterocycle',
+  'uranus-neptune-carbon-hydrogen-superionic',
+  'corona-discharge-trees-thunderstorms-penn-state',
+  'pinene-termite-trap-ucr-95-percent',
+  'madecassic-acid-antibiotic-resistance-kent-ucl',
+  'moringa-seeds-microplastics-water-treatment-brazil',
+  'california-hybrid-honeybees-varroa-resistance',
+  'ultrafast-camera-femtosecond-imaging-ecnu',
+  'dolomite-crystal-grown-lab-200-years',
+  'japan-miyako-m74-earthquake-offshore-iwate'
+ );
+
+COMMIT;
+```
+
+Both tables are cleaned in one transaction. The `sources` rows are
+deleted first because the `articles` delete would fail otherwise if
+FK constraints enforce `ON DELETE RESTRICT`. If the FK is already
+`ON DELETE CASCADE`, the first DELETE can be skipped — but it's safe
+either way.
+
+## AI disclosure note
+
+All 10 articles were written by Claude (claude-opus-4-7). The SQL
+sets `is_ai_generated=true`, `ai_model='claude-opus-4-7'`, and
+`ai_provider='anthropic'` on every row. That metadata is in the DB
+but NOT displayed on the public site (AI references were removed
+from privacy and terms per Change 11).
+
+**This is an FTC disclosure risk when you go live to real traffic.**
+AI-generated news without public disclosure can trigger FTC deceptive
+practices review. Before you publish any of these to anon traffic,
+restore a short AI-disclosure line to the privacy or terms page (see
+Change 11 note) or add a byline / content-label on the article reader
+itself. This is not a blocker for Apple review (Apple cares about
+the app, not article provenance); it is a blocker for real public
+launch.
+
+---
+
+All article work and nav work were produced in the same session but
+are independent. Reverting the nav changes does not touch the
+articles. Never running the SQL file (which is the default state)
+means the article work has zero effect on the site.
