@@ -18,6 +18,8 @@ comments) doesn't need ad-density home pages.
 | 4 | [04-quiet-home-feed.md](04-quiet-home-feed.md) | Whisper-quiet home that reads like a magazine |
 | 5 | [05-ads-gameplan.md](05-ads-gameplan.md) | Decision-ready gameplan for standing up the ad system — placement catalog, worksheets, AdSense setup, kid-safety failsafe |
 | 6 | [06-measurement-and-ads-masterplan.md](06-measurement-and-ads-masterplan.md) | **The unified master plan** — one event pipeline feeding ads, scoring, GA4, and own-built analytics. Supersedes parts of #5 once you're ready to scale |
+| 7 | [07-owner-next-actions.md](07-owner-next-actions.md) | Runbook of owner-side applies + verifications after each shipped commit |
+| 8 | [08-scoring-system-reference.md](08-scoring-system-reference.md) | **Definitive reference** for the existing Verity Post scoring stack. Read before any future scoring work |
 
 ## The one to ship first
 
