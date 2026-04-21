@@ -327,7 +327,7 @@ Based on `.env.example` rewrite from 2026-04-20. Each is optional; document-by-d
 
 ## UI — Discrete targeted fixes (~4-8 hrs total)
 
-### 1. Per-page `<title>` metadata — merged with SEO polish
+### 1. Per-page `<title>` metadata — merged with SEO polish **[PARTIAL SHIP 2026-04-21 — server components done]**
 **Problem:** ~100 static/list routes inherit the root title from `web/src/app/layout.js`. Dynamic routes already have per-page metadata (see `web/src/app/story/[slug]/layout.js`, `u/[username]/layout.js`, `card/[username]/layout.js`). Home + category pages ALSO lack per-page metadata (see SEO sub-items below).
 
 **Three fix patterns depending on component type:**
@@ -360,6 +360,19 @@ Based on `.env.example` rewrite from 2026-04-20. Each is optional; document-by-d
 **Options:** skip / top 10 routes (~30-45 min) / full sweep all ~100 routes (few hrs)
 
 **Overlap note:** This fold supersedes PRE_LAUNCH_AUDIT's "SEO polish — legal pages / home / category" sub-items. Together, item #1 + sub-items here are the complete "per-page metadata" fix.
+
+**SHIPPED 2026-04-21 (server-component group)** — 6-agent verification all GREEN:
+- `privacy/page.tsx` — "Privacy Policy — Verity Post"
+- `terms/page.tsx` — "Terms of Service — Verity Post"
+- `cookies/page.tsx` — "Cookie Policy — Verity Post"
+- `dmca/page.tsx` — "DMCA — Verity Post"
+- `accessibility/page.tsx` — "Accessibility — Verity Post"
+- `help/page.tsx` — "Help — Verity Post" (App Store Support URL)
+- `/about` already had metadata (commit `cbdea50` — canonical pattern used)
+- Each file imports `Metadata` type from `next` and exports `const metadata: Metadata = { title, description }`. Em-dash formatting consistent across files. No root `title.template` so no double-decoration. GA4 will now get distinct `page_title` values. OG/Twitter inherit root metadata fallback (still works).
+
+**Remaining (client components — separate layout.js work deferred):**
+- `web/src/app/page.tsx` (home), `category/[id]/page.js`, `login/page.tsx`, `signup/page.tsx`, `bookmarks/page.tsx`, `leaderboard/page.tsx`, `profile/page.tsx`, admin routes — these need sibling `layout.js` files since `'use client'` blocks direct metadata export. ~30-45 min if tackled.
 
 ---
 
@@ -427,7 +440,7 @@ Based on `.env.example` rewrite from 2026-04-20. Each is optional; document-by-d
 
 ---
 
-### 5. iOS bare text buttons — add visual styling
+### 5. iOS bare text buttons — add visual styling **[SHIPPED 2026-04-21]**
 **Problem:** Plain `Button { Text(...) }` with only color styling; not visually distinguishable as tappable.
 
 **Targets:**
@@ -441,6 +454,19 @@ Based on `.env.example` rewrite from 2026-04-20. Each is optional; document-by-d
 **Pattern:** wrap in `.buttonStyle(.bordered)` or add `.padding(.horizontal, 12).padding(.vertical, 8).background(VP.card).clipShape(Capsule())`.
 
 **Options:** skip / fix all 6 (~20 min, recommended)
+
+**SHIPPED 2026-04-21** (6-agent verification: 4 pre-impl + 2 post-impl, both GREEN). **Scope reduced from 6 to 3 sites** based on agent D adversarial review:
+
+- `HomeView.swift:135-143` "Try again" (data reload recovery) — added `.buttonStyle(.bordered)` ✅
+- `HomeView.swift:475` "Clear all" (filter reset) — added `.buttonStyle(.bordered)` + `.controlSize(.small)` (keeps footprint compact in card layout) ✅
+- `StoryDetailView.swift:160-167` "Save"/"Saved" (toolbar) — added `.buttonStyle(.bordered)`. Existing text-color state variance (VP.accent when saved, VP.text when not) preserved. ✅
+
+**Intentionally excluded:**
+- `HomeView.swift:186` "Load More" — already has `.buttonStyle(.plain)` + explicit padding; audit was stale
+- `HomeView.swift:237` "Maybe Later" — regwall soft-skip; intentional minimalism preserves primary "Create free account" emphasis
+- `ContentView.swift:47` "Continue without signing in" — auth splash secondary action; bordering would compete with primary "Try again" recovery CTA above it
+
+**Verified:** dark-mode locked to `.light` so no regression risk; iOS 17+ deployment target supports `.bordered` (iOS 15+); no Kids-app analogous sites needing same treatment; VoiceOver reads Text content directly; no SwiftLint config.
 
 ---
 
@@ -485,6 +511,7 @@ Based on `.env.example` rewrite from 2026-04-20. Each is optional; document-by-d
 ---
 
 ### 8. Home breaking banner — make linkable (+ optional unify) **[SHIPPED 2026-04-21]**
+### 17. Breaking treatment unification **[SHIPPED 2026-04-21 — web sites unified; iOS StoryDetailView follow-up]**
 **Problem:** Home banner not clickable; 3 visual variants across surfaces.
 
 **Targets:**
@@ -501,7 +528,7 @@ Based on `.env.example` rewrite from 2026-04-20. Each is optional; document-by-d
 
 ---
 
-### 9. Empty-state sweep — 3-4 edge cases
+### 9. Empty-state sweep — 3-4 edge cases **[SHIPPED 2026-04-21]**
 **Problem:** Main flows fine; edge cases lack explanation/CTA.
 
 **Targets:**

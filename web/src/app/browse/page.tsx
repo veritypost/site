@@ -283,7 +283,17 @@ export default function BrowsePage() {
             <div>
               <h2 style={{ margin: '0 0 14px', fontSize: 16, fontWeight: 800, letterSpacing: '-0.02em' }}>All Categories</h2>
               {filtered.length === 0 && (
-                <div style={{ textAlign: 'center', padding: '32px 0', color: PALETTE.dim }}>No categories found.</div>
+                <div style={{ textAlign: 'center', padding: '32px 0' }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: '#111', marginBottom: 6 }}>No categories match</div>
+                  <div style={{ fontSize: 13, color: PALETTE.dim, marginBottom: 14, lineHeight: 1.5 }}>Try shorter keywords, or clear your search to see all categories.</div>
+                  {search && (
+                    <button
+                      onClick={() => setSearch('')}
+                      aria-label="Clear category search"
+                      style={{ padding: '9px 18px', background: '#111', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                    >Clear search</button>
+                  )}
+                </div>
               )}
               <div style={{
                 display: 'grid',

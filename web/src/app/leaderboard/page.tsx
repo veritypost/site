@@ -356,7 +356,17 @@ export default function LeaderboardPage() {
         <div style={{ borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' }}>
           {loading && <div style={{ padding: 30, textAlign: 'center', color: 'var(--dim)', fontSize: 12 }}>Loading...</div>}
           {!loading && users.length === 0 && (
-            <div style={{ padding: 30, textAlign: 'center', color: 'var(--dim)', fontSize: 12 }}>No results.</div>
+            <div style={{ padding: 30, textAlign: 'center' }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#111', marginBottom: 6 }}>No results</div>
+              <div style={{ fontSize: 12, color: 'var(--dim)', marginBottom: 12, lineHeight: 1.5 }}>No one has earned points with these filters yet.</div>
+              {(activeCat || activeSub) && (
+                <button
+                  onClick={() => { setActiveCat(null); setActiveSub(null); }}
+                  aria-label="Clear category and subcategory filters"
+                  style={{ padding: '8px 16px', background: '#111', color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                >Clear filters</button>
+              )}
+            </div>
           )}
           {/* Anon view: blur ALL (top 3 + 4-8) with lock overlay */}
           {!me && users.length > 0 && (

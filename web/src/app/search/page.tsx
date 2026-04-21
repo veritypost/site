@@ -174,7 +174,11 @@ export default function SearchPage() {
           </a>
         ))}
         {results.length === 0 && !loading && q && (
-          <div style={{ padding: 40, textAlign: 'center', color: '#666', fontSize: 13 }}>No matches. Try a different keyword.</div>
+          <div style={{ padding: 40, textAlign: 'center' }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#111', marginBottom: 6 }}>No matches</div>
+            <div style={{ fontSize: 13, color: '#666', marginBottom: 14, lineHeight: 1.5 }}>Try shorter keywords, or browse by category.</div>
+            <a href="/browse" aria-label="Browse all categories" style={{ display: 'inline-block', padding: '9px 18px', background: '#111', color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>Browse categories</a>
+          </div>
         )}
       </div>
     </div>
