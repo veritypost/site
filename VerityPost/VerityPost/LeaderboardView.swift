@@ -137,10 +137,28 @@ struct LeaderboardView: View {
                 if loading {
                     ProgressView().padding(.top, 60)
                 } else if users.isEmpty {
-                    Text("No results.")
-                        .font(.footnote)
-                        .foregroundColor(VP.dim)
-                        .padding(.top, 40)
+                    VStack(spacing: 8) {
+                        Text("No results")
+                            .font(.system(.subheadline, design: .default, weight: .bold))
+                            .foregroundColor(VP.text)
+                        Text("No one has earned points with these filters yet.")
+                            .font(.footnote)
+                            .foregroundColor(VP.dim)
+                            .multilineTextAlignment(.center)
+                        if activeCategory != nil || activeSubcategory != nil {
+                            Button {
+                                activeCategory = nil
+                                activeSubcategory = nil
+                            } label: {
+                                Text("Clear filters")
+                                    .font(.system(.footnote, design: .default, weight: .semibold))
+                            }
+                            .buttonStyle(.bordered)
+                            .padding(.top, 4)
+                        }
+                    }
+                    .padding(.horizontal, 40)
+                    .padding(.top, 40)
                 } else {
                     VStack(spacing: 0) {
                         // Top 3 always visible

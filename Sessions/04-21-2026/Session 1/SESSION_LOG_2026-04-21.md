@@ -668,6 +668,19 @@ Query order clause present, new block at correct location + proper gating + slic
 
 F1 status: SHIPPED (pending commit).
 
+### 2026-04-21 — shipped 2 iOS parity follow-ups
+Small iOS-only edits mirroring already-shipped web patterns. 1 post-fix verifier (rigor scaled to scope — these are mirror fixes, most risk is already verified upstream).
+
+**Changes:**
+1. `VerityPost/VerityPost/StoryDetailView.swift` `badge()` helper (~line 1165) — tinted `color.opacity(0.12)` bg + colored text → solid `color` bg + white text + `.heavy` weight + tracking 0.5. Matches web canonical solid-red/white/uppercase established in commit 46c27d2 (#17) and iOS HomeView card badge. Both callers at lines 242-243 (Breaking + Developing) unchanged.
+2. `VerityPost/VerityPost/LeaderboardView.swift:140` — bare `Text("No results.")` → VStack with title ("No results", subheadline bold) + explanation ("No one has earned points with these filters yet.") + conditional `.buttonStyle(.bordered)` "Clear filters" button wired to reset `activeCategory` + `activeSubcategory` state. Only renders the button when at least one filter is non-nil. Mirrors web #18 empty-state pattern.
+
+**Post-fix verifier: GREEN.** Helper solid-bg + white-fg confirmed; LeaderboardView VStack + conditional CTA confirmed; SwiftUI syntax clean.
+
+**Diagnostic note (pre-existing, not caused by these edits):** SourceKit `No such module 'Supabase'` on line 2 of both files (the `import Supabase` statement). IDE's SPM resolution hiccup — also appeared after prior iOS commits this session; not a real compile error.
+
+Both follow-ups CLOSE iOS-web parity gaps logged when #17 and #18 shipped. iOS empty-state + badge treatments are now consistent with their web counterparts.
+
 ### 2026-04-21 — observations / bugs spotted so far
 - **CLAUDE.md references non-existent files.** `CLAUDE.md` cites `TASKS.md`, `DONE.md`, and `05-Working/BATCH_FIXES_2026_04_20.md` as canonical; none exist on disk. This drifts the project's own constitution.
 - **Prefix collision in `schema/`.** `105_seed_rss_feeds.sql` (untracked) shares prefix with committed `105_remove_superadmin_role.sql`. Rename to `107_` pending (already tracked in the review as Group F Item 6).

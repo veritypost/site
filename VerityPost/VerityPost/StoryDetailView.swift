@@ -1163,13 +1163,17 @@ struct StoryDetailView: View {
 
     // MARK: - Helpers
     private func badge(_ text: String, color: Color) -> some View {
+        // Canonical solid-bg + white-text style, matches web story-page
+        // Breaking/Developing badges (commit 46c27d2) + iOS HomeView card
+        // badge. Was previously a tinted variant (color.opacity(0.12));
+        // unified 2026-04-21.
         Text(text)
-            .font(.system(.caption2, design: .default, weight: .bold))
-            .tracking(1)
-            .foregroundColor(color)
+            .font(.system(.caption2, design: .default, weight: .heavy))
+            .tracking(0.5)
+            .foregroundColor(.white)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(RoundedRectangle(cornerRadius: 4).fill(color.opacity(0.12)))
+            .background(RoundedRectangle(cornerRadius: 4).fill(color))
     }
 
     private func formatDate(_ date: Date) -> String {
