@@ -35,7 +35,14 @@ const C = {
   success: '#16a34a',
 } as const;
 
+// LAUNCH: weekly recap hidden pre-launch. Flip to false when sign-ups
+// and paid plans open. Component + queries + types stay alive — see
+// companion revert guide in Sessions/04-21-2026.
+const LAUNCH_HIDE_RECAP = true;
+
 export default function RecapListPage() {
+  if (LAUNCH_HIDE_RECAP) return null;
+
   const [loading, setLoading] = useState<boolean>(true);
   const [recaps, setRecaps] = useState<RecapRow[]>([]);
   const [canView, setCanView] = useState<boolean>(true);

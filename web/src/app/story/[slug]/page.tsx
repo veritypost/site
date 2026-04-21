@@ -72,6 +72,12 @@ interface ReportCategory {
   label: string;
 }
 
+// LAUNCH: anonymous "Keep reading, free" signup interstitial hidden
+// pre-launch. Flip to false when sign-ups open. Trigger logic and
+// component stay alive — see companion revert guide in
+// Sessions/04-21-2026.
+const LAUNCH_HIDE_ANON_INTERSTITIAL = true;
+
 const REPORT_CATEGORIES: ReportCategory[] = [
   { value: 'harassment', label: 'Harassment' },
   { value: 'misinformation', label: 'Misinformation' },
@@ -348,7 +354,7 @@ export default function StoryPage() {
           // The registration wall (harder block) kicks in at the configured
           // free_article_limit.
           const views = bumpArticleViewCount();
-          if (views >= 2) setShowAnonInterstitial(true);
+          if (views >= 2 && !LAUNCH_HIDE_ANON_INTERSTITIAL) setShowAnonInterstitial(true);
           if (isEnabled(allSettings, 'registration_wall', false)) {
             const limit = getNumber(allSettings, 'free_article_limit', 5);
             // R13-C5 Fix 5 — honor per-session dismissal so a user who
@@ -718,7 +724,7 @@ export default function StoryPage() {
   return (
     <div className="vp-dark">
       {/* D23: anonymous 2nd-article interstitial (sign-up CTA variant) */}
-      <Interstitial open={showAnonInterstitial} onClose={() => setShowAnonInterstitial(false)} variant="signup" />
+      <Interstitial open={showAnonInterstitial && !LAUNCH_HIDE_ANON_INTERSTITIAL} onClose={() => setShowAnonInterstitial(false)} variant="signup" />
 
       {/* Registration wall */}
       {showRegWall && !regWallDismissed && (

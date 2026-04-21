@@ -811,7 +811,13 @@ export default function HomePage() {
               Day {authUser?.streak_current}
             </div>
           )}
-          {!loading && feedVisible.length > 0 && <RecapCard />}
+          {/* LAUNCH: RecapCard hidden pre-launch — the anon variant pushes
+              paid sign-ups ("See what you missed this week"), and we're not
+              ready to convert traffic yet. Flip back to
+              `{!loading && feedVisible.length > 0 && <RecapCard />}`
+              when sign-ups are open. Component, queries, and types stay
+              live — see web/src/components/RecapCard.tsx. */}
+          {false && !loading && feedVisible.length > 0 && <RecapCard />}
           {!loading && feedVisible.filter(s => s.slug).map((story, idx) => (
             <Fragment key={story.id}>
               <a

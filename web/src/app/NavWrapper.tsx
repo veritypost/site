@@ -73,9 +73,32 @@ function daysSince(iso: string | null | undefined): number | null {
   return Math.max(0, Math.floor((Date.now() - then) / 86_400_000));
 }
 
-const HIDE_NAV = ['/', '/login', '/signup', '/signup/pick-username', '/signup/expert', '/forgot-password', '/reset-password', '/verify-email', '/api/auth/callback', '/logout', '/welcome'];
+// ============================================================
+// LAUNCH GATES — one-line kill switches for the global chrome.
+// Flip any of these to hide that surface site-wide while the site
+// is pre-launch / under review (e.g. Apple Developer Program
+// verification). Per-route hiding still applies on top; these just
+// add a global veto.
+//
+// Quick presets:
+//   Fully cloaked (brand-only landing):  TOP=true, NAV=false, FOOT=true
+//   Fully public:                        TOP=true, NAV=true,  FOOT=true
+//   Dark mode (hide everything):         TOP=false, NAV=false, FOOT=false
+// ============================================================
+const SHOW_TOP_BAR = true;      // "verity post" wordmark + search icon
+const SHOW_BOTTOM_NAV = false;  // Home / Notifications / Leaderboard / Profile
+const SHOW_FOOTER = true;       // Help / Contact / Privacy / Terms / etc.
+
+// Auth / onboarding routes that run fullscreen without any global chrome.
+// Separate from '/' — home now shows the top bar + footer (no bottom nav),
+// so it's handled with its own gate below instead of living in this list.
+const AUTH_HIDE = ['/login', '/signup', '/signup/pick-username', '/signup/expert', '/forgot-password', '/reset-password', '/verify-email', '/api/auth/callback', '/logout', '/welcome'];
 const isAdmin = (p: string) => p.startsWith('/admin');
 const isIdeasPreview = (p: string) => p.startsWith('/ideas');
+// Article reader owns the viewport — no global nav, no footer. Reading
+// experience is kept clean on both /story/<slug> and any deeper /story
+// route (e.g. /story/<slug>/something future).
+const isStory = (p: string) => p.startsWith('/story');
 
 interface NavItem { label: string; href: string }
 
@@ -161,7 +184,23 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
     return () => { cancelled = true; clearInterval(id); };
   }, [loggedIn]);
 
-  const showNav = mounted && !HIDE_NAV.includes(path) && !isAdmin(path) && !isIdeasPreview(path);
+  // Chrome visibility gates. Three surfaces, three rules:
+  //   showTopBar  — "verity post" wordmark + search icon. Shown on home
+  //                 AND on all standard content pages. Hidden on auth,
+  //                 admin, ideas preview, and story reader.
+  //   showNav     — bottom 4-item nav bar. Hidden on home (no sign-up
+  //                 push pre-launch), plus all the same surfaces the
+  //                 top bar is hidden on.
+  //   showFooter  — Help/Contact/Privacy strip. Follows showTopBar so
+  //                 the legal + support links are reachable wherever
+  //                 the brand is visible, including home.
+  const isAuthRoute = AUTH_HIDE.includes(path);
+  const chromeHidden = isAuthRoute || isAdmin(path) || isIdeasPreview(path) || isStory(path);
+  // Each surface ANDs its launch-gate flag with the route rule. Route-level
+  // hiding always wins (auth/admin/ideas/story stay clean regardless of flags).
+  const showTopBar = mounted && SHOW_TOP_BAR && !chromeHidden;
+  const showNav = mounted && SHOW_BOTTOM_NAV && !chromeHidden && path !== '/';
+  const showFooter = mounted && SHOW_FOOTER && !chromeHidden;
   const onAdminPage = mounted && isAdmin(path);
   // UJ-200 (Pass 17): banner is strictly admin+ territory. Editor and
   // moderator roles can reach the admin routes they're authorised for
@@ -208,7 +247,6 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
   // for signed-in users with `search.basic`, subtle "Sign in" link for
   // anon, nothing otherwise.
   const TOP_BAR_HEIGHT = 44;
-  const showTopBar = showNav;
   const topBarHomeHref = '/';
   const topBarActive = path === topBarHomeHref;
   // Bug 1 fix: `boxSizing: content-box` means the rendered height is
@@ -250,7 +288,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
       }}>
         {children}
 
-        {showNav && (
+        {showFooter && (
           <footer style={{
             maxWidth: 680, margin: '0 auto', padding: '32px 16px 24px',
             borderTop: '1px solid var(--border)',
@@ -271,7 +309,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
               ))}
             </div>
             <div style={{ textAlign: 'center', fontSize: 10, color: 'var(--muted)' }}>
-              Verity Post
+              verity post
             </div>
           </footer>
         )}
@@ -298,7 +336,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
               textDecoration: 'none',
             }}
           >
-            Verity Post
+            verity post
           </a>
           {/* Round D H-14 — search icon ungated from home-only. The former
               `path === '/'` clause was a layout leftover from when `/` had

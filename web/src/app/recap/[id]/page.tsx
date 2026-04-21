@@ -61,7 +61,14 @@ const C = {
   danger: '#dc2626',
 } as const;
 
+// LAUNCH: weekly recap hidden pre-launch. Flip to false when sign-ups
+// and paid plans open. Component + queries + types stay alive — see
+// companion revert guide in Sessions/04-21-2026.
+const LAUNCH_HIDE_RECAP = true;
+
 export default function RecapPlayer() {
+  if (LAUNCH_HIDE_RECAP) return null;
+
   const params = useParams<{ id: string }>();
   const id = params?.id;
   const [loading, setLoading] = useState<boolean>(true);
