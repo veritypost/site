@@ -22,8 +22,14 @@
 --   * user_agent and ip are never stored raw. Server hashes with a
 --     rotating salt before insert.
 --
--- Apply with: supabase sql editor → paste file → run. Requires pg_cron
--- extension (already enabled on Supabase by default).
+-- Apply with: supabase sql editor → paste file → run.
+--
+-- pg_cron is OPTIONAL. If the extension isn't enabled the migration
+-- still succeeds; partition maintenance (create tomorrow's partition,
+-- drop old ones) falls back to "owner runs the helper functions
+-- manually or via an external cron." To enable pg_cron on Supabase:
+-- Database → Extensions → search `pg_cron` → Enable, then re-run this
+-- file (idempotent) to register the two jobs.
 
 BEGIN;
 
@@ -188,25 +194,37 @@ CREATE TABLE IF NOT EXISTS public.events_default
 
 -- =========================================================================
 -- 5. pg_cron jobs — create tomorrow's partition each night, drop old.
+--    Optional; the migration succeeds even if pg_cron isn't installed.
 -- =========================================================================
 
--- pg_cron is enabled on Supabase by default. If it's not on your instance,
--- run: CREATE EXTENSION IF NOT EXISTS pg_cron;
+DO $cron_setup$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
+    -- Create a partition for day-after-tomorrow every night at 00:05 UTC.
+    -- Safe to re-run; create_events_partition_for is idempotent.
+    PERFORM cron.schedule(
+      'events-create-next-partition',
+      '5 0 * * *',
+      $cron_job$SELECT public.create_events_partition_for(current_date + 1);$cron_job$
+    );
 
--- Create a partition for day-after-tomorrow every night at 00:05 UTC.
--- Safe to re-run; create_events_partition_for is idempotent.
-SELECT cron.schedule(
-  'events-create-next-partition',
-  '5 0 * * *',
-  $$SELECT public.create_events_partition_for(current_date + 1);$$
-);
+    -- Drop partitions older than 90 days, nightly at 00:15 UTC.
+    PERFORM cron.schedule(
+      'events-drop-old-partitions',
+      '15 0 * * *',
+      $cron_job$SELECT public.drop_old_events_partitions(90);$cron_job$
+    );
 
--- Drop partitions older than 90 days, nightly at 00:15 UTC.
-SELECT cron.schedule(
-  'events-drop-old-partitions',
-  '15 0 * * *',
-  $$SELECT public.drop_old_events_partitions(90);$$
-);
+    RAISE NOTICE 'pg_cron jobs scheduled: events-create-next-partition, events-drop-old-partitions';
+  ELSE
+    RAISE NOTICE 'pg_cron not installed; skipping partition-maintenance jobs. '
+                 'Enable via Supabase dashboard (Database → Extensions → pg_cron) '
+                 'and re-run this file to register the jobs. Until then, call '
+                 'create_events_partition_for(date) and drop_old_events_partitions(days) '
+                 'manually or via an external scheduler.';
+  END IF;
+END
+$cron_setup$;
 
 -- =========================================================================
 -- 6. Admin helper view — useful for spot-checks before we build dashboards.
