@@ -1550,11 +1550,12 @@ Empty array if all correct.`;
       const outputSummary: Record<string, unknown> = {
         article_id: articleId,
         slug,
-        final_error_type: finalErrorType,
+        final_error_type: finalErrorType, // one-cycle legacy stash — migration 120 promotes to real column
       };
-      // error_type lives in output_summary (no dedicated column on
-      // pipeline_runs). error_stack + error_message + prompt_fingerprint
-      // are real columns (migration 114).
+      // error_type is now a real column (migration 120 STAGED). We still write
+      // final_error_type into output_summary for one cycle for backward compat
+      // with any in-flight consumers. error_stack + error_message +
+      // prompt_fingerprint are migration-114 columns.
       await service
         .from('pipeline_runs')
         .update({
@@ -1577,7 +1578,8 @@ Empty array if all correct.`;
               : null,
           error_message: finalErrorMessage,
           error_stack: finalErrorStack,
-        })
+          error_type: finalErrorType, // migration 120 STAGED — column exists post-apply
+        } as never)
         .eq('id', runId);
     } catch (updateErr) {
       console.error('[newsroom.generate.finally.run-update]', updateErr);
@@ -1651,8 +1653,10 @@ async function failRun(
 ): Promise<void> {
   try {
     const completedAt = new Date();
-    // pipeline_runs has no `error_type` column (only pipeline_costs does per
-    // migration 114). Stash error_type inside output_summary jsonb.
+    // error_type column added in migration 120 STAGED. Route dual-writes the
+    // real column AND the legacy output_summary stash for one cycle (backward
+    // compat for any in-flight consumers pre-apply). Follow-up removes the
+    // legacy stash + `as never` cast after owner runs types:gen post-apply.
     await service
       .from('pipeline_runs')
       .update({
@@ -1662,8 +1666,9 @@ async function failRun(
         total_cost_usd: totalCostUsd,
         items_failed: 1,
         error_message: errorMessage.slice(0, 2000),
-        output_summary: { error_type: errorType } as unknown as Json,
-      })
+        error_type: errorType, // migration 120 STAGED — column exists post-apply
+        output_summary: { error_type: errorType } as unknown as Json, // one-cycle compat
+      } as never)
       .eq('id', runId);
   } catch (err) {
     console.error('[newsroom.generate.failRun]', err);
