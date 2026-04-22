@@ -2,7 +2,7 @@
 
 What the product IS. Not what's left.
 
-- Active work → **`TODO.md`** at repo root.
+- Active work → **`Current Projects/FIX_SESSION_1.md`**.
 - How to work in this codebase → **`CLAUDE.md`** at repo root.
 
 ## One-line summary
@@ -55,7 +55,7 @@ Three apps, one DB, shared Supabase.
 | `web/src/lib/appleReceipt.js` | Apple StoreKit 2 JWS chain verify (ES256, vendored root CA) |
 | `web/src/lib/kidPin.js` | PBKDF2 100k / salted kid PIN hashing + legacy SHA-256 rehash |
 | `web/src/lib/cronAuth.js` | `verifyCronAuth` — `x-vercel-cron` header OR constant-time bearer |
-| `schema/reset_and_rebuild_v2.sql` | canonical DR replay (see `TODO.md` — drift known) |
+| `schema/reset_and_rebuild_v2.sql` | canonical DR replay (see `Current Projects/FIX_SESSION_1.md` — drift known) |
 
 ## Dev tooling
 

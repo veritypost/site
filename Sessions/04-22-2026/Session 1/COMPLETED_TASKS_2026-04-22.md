@@ -2,6 +2,7 @@
 
 ## Shipped
 
+- `8dc121b` — **F7 Phase 3 cleanup Stream 2 — F3 + F5 + F6 + F8 + F12 (5 surgical fixes, 1 commit)** — `web/src/app/api/admin/pipeline/generate/route.ts` (+63 / -44 net +19). F3 audience peek now fail-closed at 422 with `error_type='schema_validation'` when `feedIds.length===0` after null-filter (prevents adult-tagged cluster passing as `audience='kid'`); the existing `if (feedIds.length>0)` wrapper unwrapped — branch now unconditional after the guard. F5 `statusForError` switch loses 3 dead cases (`permission_denied`/`rate_limit`/`kill_switch` — all return their HTTP status before any `pipeline_runs` row is written, never round-trip the switch); same 3 cases removed from `safeErrorMessage`; comment block added above each function explaining why the codes are absent. F6 `QuizQuestionSchema` gets a `.refine()` rejecting questions with **>1** is_correct=true options (deviation from prompt's `===1`: zero is allowed because L1291 normalizer falls back to `correct_index`/`correct_answer`; `===1` would break legitimate `correct_index`-only LLM outputs — this hits the actual bug while preserving the existing fallback path). F8 main-finally `pipeline_runs` UPDATE adds `.eq('status','running')` chain so cancel/cron-orphan-cleanup terminal states win the race; comment explains the guard. F12 `step_timings_ms` + `output_summary` casts simplified `as unknown as Json` → `as Json` (types already match Json). Investigator → adversary → implementer flow internal: adversary caught the F6 deviation (zero-is_correct path with correct_index fallback) and recommended `<=1` over `===1`. Self-verified: `tsc --noEmit` exit 0, `next lint --file route.ts` clean, no other consumers of `QuizQuestionSchema`/`QuizSchema` outside route.ts (grep confirmed). Closes F3, F5, F6, F8, F12 from `Sessions/04-22-2026/Session 1/MASTER_CLEANUP_PLAN.md`.
 - `64cd609` — **M1-M47 multi-agent review sweep** — 31 applied fixes across `VerityAdMockups.jsx` (moved to `Current Projects/ad-mockups/`), `Reference/CLAUDE.md`, `Current Projects/F7-PM-LAUNCH-PROMPT.md`; 7 NO-CHANGE; 3 SUBSUMED; 4 DEFER-OWNER; 4 DEADLOCKED (logged). New root `STATUS.md` symlink. `REVIEW_UNRESOLVED_2026-04-21.md` session artifact.
 - `c043b2d` — **M6 kids-waitlist email capture (code + staged migration)** — `schema/112_kids_waitlist.sql` + `schema/113_rollback_kids_waitlist.sql` (RLS + rate-limits seeds, idempotent `ON CONFLICT DO UPDATE`), `web/src/app/api/kids-waitlist/route.ts` (dual-key rate limit + honeypot + bot UA + structured log taxonomy), `web/src/app/kids-app/page.tsx` inline form with aria-live. Migration apply pending.
 - `df7b598` — **F7 Phase 1 — decisions locked + editorial-guide.ts port (9/10 exports)** — `Current Projects/F7-DECISIONS-LOCKED.md` (8 decisions + 10 invariants + 14 pre-flight items + 16 divergences + 5 open items + 7 future obligations, rev 2 + 5 clarifications after 3-auditor review), `web/src/lib/pipeline/editorial-guide.ts` (verbatim port, sha256 in TSDoc, full F7 PM §3a four-agent flow complete), `web/.prettierignore` (permanent `src/lib/pipeline` exclusion).
@@ -30,15 +31,15 @@
 
 ## Staged / pending apply (live state verified 2026-04-22 end-of-session via MCP)
 
-**Already applied to live DB (handoff queue reduced):**
-- ✅ `schema/112_kids_waitlist.sql` — `kids_waitlist` table LIVE
-- ✅ `schema/118_f7_persist_generated_article.sql` — `persist_generated_article` RPC LIVE
+**All F7 migrations applied to live `fyiwulqphgmoqullmrfn`:**
+- `schema/112_kids_waitlist.sql` — `kids_waitlist` table LIVE
+- `schema/116_f7_cluster_locks_and_perms.sql` — cluster-lock RPCs + perms + columns LIVE
+- `schema/118_f7_persist_generated_article.sql` — `persist_generated_article` RPC LIVE
+- `schema/120_f7_pipeline_runs_error_type.sql` — `pipeline_runs.error_type` column LIVE
+- `schema/122_*.sql` — FK constraints (cluster_id across discovery_items + kid_discovery_items + pipeline_runs + pipeline_costs + kid_articles; ON DELETE symmetry) LIVE
+- `schema/124_*.sql` — kids_summary drop / hygiene LIVE
 
-**Still STAGED (apply via Supabase SQL editor):**
-- ⏳ `schema/116_f7_cluster_locks_and_perms.sql` — RPCs `claim_cluster_lock` + `release_cluster_lock` NOT live; perms `admin.pipeline.run_generate` + `admin.pipeline.release_cluster_lock` NOT seeded; `feed_clusters.locked_*` columns NOT live
-- ⏳ `schema/120_f7_pipeline_runs_error_type.sql` — `pipeline_runs.error_type` column NOT live; **MUST apply BEFORE generate route ships** (supabase-js silently no-ops on column-not-found; rows stick at `status='running'`)
-
-**After applying 116 + 120: `cd web && npm run types:gen`** — types file is currently STALE: it does NOT include `kids_waitlist` table or `persist_generated_article` RPC even though both are LIVE (owner applied 112+118 between sessions; types regen pending). Once types regenerate, the `as never` casts in `generate/route.ts` (Task 16) and `runs/[id]/cancel/route.ts` (Task 18) and `cron/pipeline-cleanup/route.ts` (Task 19) and `kids-waitlist/route.ts` (pre-session cast at L126-128) can all be cleaned up — separate follow-up task.
+`cd web && npm run types:gen` was run post-apply; `web/src/types/database.ts` now reflects all five new/altered surfaces. **Owner apply queue is empty.** (Dead-cast cleanup — Stream 3 D1-D11 — tracked separately in `MASTER_CLEANUP_PLAN.md`.)
 
 ## Blocked
 

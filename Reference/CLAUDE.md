@@ -100,6 +100,7 @@ Three apps, one DB. All connected via Supabase (`fyiwulqphgmoqullmrfn`).
 │       │   ├── kids-app/         anon landing for /kids/* redirect
 │       │   └── api/              (see below)
 │       ├── lib/                  the machinery — where the patterns live
+│       │   ├── pipeline/    F7 AI pipeline helpers (editorial-guide, call-model, cost-tracker, errors, plagiarism-check, prompt-overrides, persist-article, render-body, scrape-article, cluster, story-match, logger, clean-text)
 │       ├── components/           shared React kit (LockModal, PermissionGate, Toast, DataTable, etc.)
 │       └── types/database.ts     generated Supabase types (large; regenerated from schema)
 │

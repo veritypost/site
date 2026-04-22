@@ -2,7 +2,7 @@
 
 Operational guide for the Verity Post AI pipeline orchestrator. Read this BEFORE debugging a failed run or onboarding a new agent to Phase 3 code.
 
-Scope: Task 10 (`/api/newsroom/generate`) through Task 13 (persistence helper). Tasks 14-19 (publish, review, surrounding flows) ship next session and will be appended to this runbook.
+Scope: Tasks 10-19 (full Phase 3) shipped 2026-04-22; Task 20 (Phase 4) home page also shipped. Tasks 21+ (cluster detail, run detail UI, surrounding flows) ship next session and will be appended to this runbook.
 
 ---
 
@@ -39,11 +39,11 @@ Each log line should carry this shape via `console.log(JSON.stringify({ ... }))`
 
 ```json
 {
-  "tag": "newsroom.generate.prompt:agent_3_writer",
+  "tag": "newsroom.generate.prompt:body",
   "run_id": "...",
   "cluster_id": "...",
   "audience": "adult" | "kid",
-  "step": "agent_3_writer",
+  "step": "body",
   "duration_ms": 8421,
   "tokens_in": 12800,
   "tokens_out": 3200,
@@ -60,9 +60,11 @@ Info logs include `error_type: null` and `error_message: null` for grep-consiste
 
 ### 3a. Step vocabulary (use these literal strings)
 
-`cluster_lock` · `cluster_lock_contested` · `kill_switch_check` · `cost_cap_check` · `scrape` · `scrape_fallback` · `agent_1_research` · `agent_2_research` · `agent_3_writer` · `agent_4_editor` · `agent_5_sources` · `agent_6_timeline` · `agent_7_quiz` · `agent_8_headline` · `agent_9_kids_summary` · `agent_10_fact_check` · `json_parse` · `schema_validation` · `persist:articles` · `persist:sources` · `persist:timelines` · `persist:quizzes` · `persist:cluster_link` · `cluster_unlock` · `run_complete` · `run_failed`
+Canonical 12-step prompt chain from `web/src/app/api/admin/pipeline/generate/route.ts` (`Step` union + `ALL_STEPS` array):
 
-(Final list reconciled against editorial-guide.ts Task 1 exports during Task 10 planning.)
+`audience_safety_check` · `source_fetch` · `headline` · `summary` · `categorization` · `body` · `source_grounding` · `plagiarism_check` · `timeline` · `kid_url_sanitizer` · `quiz` · `quiz_verification`
+
+`persist` is the terminal non-LLM step. Operational logs additionally use: `kill_switch_check` · `cost_cap_check` · `cluster_lock` · `cluster_lock_contested` · `cluster_unlock` · `json_parse` · `schema_validation` · `run_complete` · `run_failed`. Mirror the same step strings in `prompt-overrides.ts` (`StepName` literal union) — typos there silently disable an override.
 
 ### 3b. error_type vocabulary (use these literal strings)
 
@@ -77,23 +79,28 @@ Each completed run writes a cumulative map onto `pipeline_runs.step_timings_ms`:
 ```json
 {
   "cluster_lock": 12,
-  "scrape": 2340,
-  "agent_1_research": 8400,
-  "agent_2_research": 8210,
-  "agent_3_writer": 14500,
-  "agent_4_editor": 6100,
+  "source_fetch": 2340,
+  "headline": 4100,
+  "summary": 3800,
+  "categorization": 3200,
+  "body": 14500,
+  "source_grounding": 6100,
+  "plagiarism_check": 1800,
+  "timeline": 5400,
+  "quiz": 4200,
+  "quiz_verification": 2100,
   "persist": 180,
-  "total": 39742
+  "total": 47732
 }
 ```
 
-Admin UI (Phase 4) plots this as a horizontal bar per-step. Missing keys = step didn't run (kid audience skips `agent_9_kids_summary`? No — kid audience runs a DIFFERENT prompt chain; step names still apply).
+Admin UI (Phase 4) plots this as a horizontal bar per-step. Missing keys = step didn't run (adult audience skips `audience_safety_check` + `kid_url_sanitizer`; kid audience runs the full 12).
 
 ### 3d. pipeline_costs rows
 
 One row per LLM call (written by `call-model.ts` finally-block, already shipped). Task 10 adds three NON-LLM row types:
 
-- `step='scrape'`: `cost_usd=0`, `latency_ms=actual`, `success=t/f`, `metadata={ bytes, scrape_mode: 'jina'|'cheerio' }`
+- `step='source_fetch'`: `cost_usd=0`, `latency_ms=actual`, `success=t/f`, `metadata={ bytes, scrape_mode: 'jina'|'cheerio' }`
 - `step='cluster_lock'`: `cost_usd=0`, `latency_ms=actual`, `metadata={ acquired: true|false }`
 - `step='persist'`: `cost_usd=0`, `latency_ms=actual`, `metadata={ articles: 1, sources: 4, timelines: 6, quizzes: 5 }`
 
@@ -222,17 +229,17 @@ Soft alert: `pipeline.daily_cost_soft_alert_pct=50` — log a `WARN` (not an err
 9. try {
      9a. For each discovery_item with raw_body IS NULL: invoke scrape-article; store into discovery_items.raw_body + metadata.scrape_mode
      9b. Build corpus: concatenate all raw_body with <source_article>…</source_article> wraps (THIS is where the wrap happens, not at ingest)
-     9c. Run editorial-guide chain:
-         - Agent 1 research (Anthropic or OpenAI by model param)
-         - Agent 2 research (parallel via Promise.all if model supports, else serial)
-         - Agent 3 writer (consumes Agent 1+2 outputs)
-         - Agent 4 editor (consumes Agent 3 output)
-         - Agent 5 sources (consumes Agent 4 output + corpus for source attribution)
-         - Agent 6 timeline (consumes Agent 4 output + corpus)
-         - Agent 7 quiz (consumes Agent 4 output)
-         - Agent 8 headline (consumes Agent 4 output)
-         - Agent 9 kids summary — SKIPPED for kid audience (kid prompt chain uses a different Agent 9 that rewrites for grade level)
-         - Agent 10 fact check (consumes Agent 4 output + corpus)
+     9c. Run editorial-guide chain (canonical 12-step):
+         - audience_safety_check (kid audience only — gate)
+         - source_fetch (scrape any discovery_items missing raw_body)
+         - parallel: headline, summary, categorization
+         - body (consumes headline + summary + categorization + corpus)
+         - source_grounding (consumes body + corpus for source attribution)
+         - plagiarism_check (n-gram scan; rewrite via Haiku iff overlap >= rewrite_pct)
+         - timeline (consumes body + corpus)
+         - kid_url_sanitizer (kid audience only — strips/rewrites unsafe URLs in body)
+         - quiz (consumes body)
+         - quiz_verification (consumes quiz + body — re-asks model to confirm correctness)
      9d. Schema-validate each prompt's JSON output (Zod). On validation fail → throw SchemaValidationError.
      9e. Persist to articles/kid_articles + sources/kid_sources + timelines/kid_timelines + quizzes/kid_quizzes (Task 13)
      9f. Update discovery_items.state='generated' + discovery_items.article_id for all items in cluster
@@ -252,8 +259,8 @@ Soft alert: `pipeline.daily_cost_soft_alert_pct=50` — log a `WARN` (not an err
 
 ## 8. Prompt chain invariants (from editorial-guide.ts)
 
-- Adult chain: 10 prompts total (agent_1 through agent_10).
-- Kid chain: 10 prompts total but agent_9 uses the kids-summary variant; everything else is shared.
+- Adult chain: 10 LLM calls (audience_safety_check + kid_url_sanitizer skipped).
+- Kid chain: 12 LLM calls (audience_safety_check gate + kid_url_sanitizer post-body); shares the rest of the 12-step vocabulary; downstream persistence routes to `kid_articles` / `kid_sources` / `kid_timelines` / `kid_quizzes`.
 - Each prompt has a sha256 baked into editorial-guide.ts TSDoc (tamper-evidence — Phase 1 Task 1).
 - `prompt_fingerprint` on `pipeline_runs` and `pipeline_costs` = sha256 of the concatenated rendered prompts in this run (deterministic given the inputs). Enables cache invalidation reasoning.
 - Schema-validate every output via Zod. Partial output (text that doesn't parse as JSON) → throw `SchemaValidationError` with the first 500 chars of output quoted.
@@ -349,3 +356,19 @@ Start of changelog:
 
 ### 2026-04-22 — Task 10 planning
 - Runbook created. Initial draft pre-Task-10 Agent 1+2 dispatch.
+
+### 2026-04-22 — Task 11 (`7fef1ad`)
+- Migration 116 cluster locks shipped: `feed_clusters.locked_by/locked_at/last_generation_run_id/generation_state` columns + `claim_cluster_lock(cluster_id, locked_by, ttl_sec=600)` + `release_cluster_lock(cluster_id, locked_by)` RPCs (explicit `p_locked_by` since `auth.uid()` is NULL under service role). Perms `admin.pipeline.run_generate` + `admin.pipeline.release_cluster_lock` seeded; rate-limit `newsroom_cluster_unlock` (10/60s) seeded; setting `pipeline.default_category_id` seeded. Unique partial indexes on `articles(cluster_id)` and `kid_articles(cluster_id)` (belt-and-suspenders vs lock).
+- `POST /api/admin/newsroom/clusters/:id/unlock` shipped — admin override via `release_cluster_lock(id, NULL)` + `record_admin_action` audit.
+
+### 2026-04-22 — Task 16 (`7ed6b2c`)
+- Migration 120 adds `pipeline_runs.error_type text NULL` column + backfills from legacy `output_summary->>'error_type'` and `->>'final_error_type'` keys. Generate route now dual-writes the real column AND keeps the legacy `output_summary.final_error_type` stash for one cycle (Task 16 follow-up will remove the stash). Critical deploy ordering: migration 120 MUST apply BEFORE the generate route ships, otherwise supabase-js silently no-ops on column-not-found and `pipeline_runs` rows stick at `status='running'`.
+
+### 2026-04-22 — Task 17 (`0361d16`)
+- `POST /api/admin/pipeline/runs/:id/retry` shipped. SELECTs failed run, gates on `pipeline_type='generate'` + `status='failed'` + cluster_id/audience present, internal same-origin fetch to `/api/admin/pipeline/generate` with `cookie` pass-through (generate re-auths via `requirePermission` + `cookies()`), fetch wrapped in try/catch (Sentry + 500 'Retry dispatch failed' on dispatch failure). Audit via `record_admin_action({action:'pipeline_retry', newValue:{new_run_id, original_error_type}})` only when generate returns ok + new_run_id. `originalErrorType` extracted from migration 120's first-class column with legacy `output_summary` fallback.
+
+### 2026-04-22 — Task 18 (`31275c6`)
+- `POST /api/admin/pipeline/runs/:id/cancel` shipped. SOFT cancel design: marks `pipeline_runs.status='failed', error_type='abort', error_message='Cancelled by admin'` with `.eq('status','running')` re-check to avoid stomping a finally that beat us. Best-effort `release_cluster_lock(p_cluster_id, p_locked_by=run_id)` (idempotent per migration 116) + best-effort discovery items reset from `state='generating'` → `'clustered'`. `output_summary` writes `{cancelled_by_admin:true, error_type:'abort'}` (distinctive marker for log review). **Cancel does NOT write `total_cost_usd`** — the running lambda's finally is the sole writer of that column; cancel-after-finally is a no-op (re-check filters 0 rows), cancel-before-finally gets overwritten by the lambda's own non-status-gated finally update. Mid-step worker abort is out of scope. Audit via `record_admin_action({action:'pipeline_cancel', newValue:{cluster_id, audience, soft_cancel:true, was_status, was_started_at}})`.
+
+### 2026-04-22 — Task 19 (`9b9a32e`)
+- `GET /api/cron/pipeline-cleanup` shipped (10th vercel.json cron, `*/5 * * * *`). Three idempotent best-effort sweeps: (1) orphan **runs** — `pipeline_runs.status='running' AND started_at < now()-10min` → `status='failed', error_type='abort', error_message='Orphaned run — auto-cleanup'`; (2) orphan **discovery items** — `discovery_items` + `kid_discovery_items` rows in `state='generating' AND updated_at < now()-10min` → `state='clustered'` so the next ingest can re-queue (without this sweep, items stay stuck forever when generate's lambda dies before its finally runs); (3) orphan **locks** — `feed_clusters` rows with `locked_until < now()` → `locked_by/locked_at/generation_state` NULL (double-insurance against `release_cluster_lock` failures). All three sweeps wrapped in independent try/catch; response always 200 with per-sweep generic error codes (Vercel cron must not retry on 5xx).

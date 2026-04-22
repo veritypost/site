@@ -436,11 +436,38 @@ Known adjacent concerns tracked but not blockers:
 - `compute_effective_perms` returns both granted=true and granted=false rows; RLS policies correctly filter.
 - `categories.category_density` column nullable with no seed — Phase 3 orchestrator must handle null with "default 5 events" fallback (documented in column COMMENT).
 
-### Phase 1 Task 4 — exit verification — PENDING (blocked on migration apply)
-Requires: migration 114 applied via Supabase SQL editor → `npm run types:gen` → full tsc clean → eslint clean → manual RLS probe (kid-JWT blocked on articles, adult-JWT allowed, service-role unaffected) → Phase 1 exit criteria checklist verified against F7-DECISIONS-LOCKED.md. Gate for Phase 2 kickoff.
+### Phase 1 Task 4 — exit verification — SHIPPED 2026-04-22 (commit `958879c`)
 
-### Phase 1 Task 3 — migration 114 + cost-tracker + settings seeds — PENDING
-Blocked on §3i owner "apply" for live DB writes.
+Migration 114 applied by owner via Supabase SQL editor. `npm run types:gen` regenerated `web/src/types/database.ts` with 8 new tables + RPC typed. `web/src/app/api/admin/feeds/route.ts` gained `audience` field (required by migration's `feeds.audience NOT NULL`). `Sessions/04-22-2026/Session 1/PHASE1_EXIT_RLS_PROBE.sql` written for owner's manual live-behavior probe. Independent gate auditor cleared Phase 1 → Phase 2 exit: 13/13 checks passed against live DB + on-disk files.
+
+### Phase 2 Tasks 5-9 — port pipeline helpers + ingest route — SHIPPED 2026-04-22
+
+All 5 Phase 2 tasks shipped. Per-task SHAs + diff summaries in `Sessions/04-22-2026/Session 1/COMPLETED_TASKS_2026-04-22.md`:
+
+- Task 5 — `clean-text.ts` port (12-replace HTML/markdown stripper)
+- Task 6 — `scrape-article.ts` port (Jina Reader + cheerio fallback)
+- Task 7 — `cluster.ts` (35% keyword-overlap greedy clusterer)
+- Task 8 — `story-match.ts` (40% overlap dedupe against published articles)
+- Task 9 — `POST /api/newsroom/ingest/run` (RSS fanout + audience routing + dedup)
+
+### Phase 3 Tasks 10-19 — orchestrator + observability + recovery — SHIPPED 2026-04-22
+
+All 10 Phase 3 tasks shipped. Per-task SHAs + diff summaries in `Sessions/04-22-2026/Session 1/COMPLETED_TASKS_2026-04-22.md`:
+
+- Task 10 — `POST /api/admin/pipeline/generate` (12-step chain, 1737 lines)
+- Task 11 — migration 116 cluster locks + `POST /api/admin/newsroom/clusters/:id/unlock`
+- Task 12 — `GET /api/admin/pipeline/runs/:id` observability
+- Task 13 — migration 118 `persist_generated_article` RPC + wrapper
+- Task 14 — plagiarism rewrite loop port
+- Task 15 — Layer 1 per-(cat,step,audience) prompt overrides
+- Task 16 — migration 120 `pipeline_runs.error_type` column + route dual-write
+- Task 17 — `POST /api/admin/pipeline/runs/:id/retry`
+- Task 18 — `POST /api/admin/pipeline/runs/:id/cancel`
+- Task 19 — `GET /api/cron/pipeline-cleanup` orphan-sweep cron
+
+### Phase 4 Task 20 — Newsroom home page `/admin/newsroom` — SHIPPED 2026-04-22
+
+`web/src/app/admin/newsroom/page.tsx` (474 lines). Per-task SHA + diff summary in `Sessions/04-22-2026/Session 1/COMPLETED_TASKS_2026-04-22.md`. Cluster card grid with Generate adult / Generate kid / Unlock / View buttons; Refresh feeds + Pipeline runs nav; offset paginated. Phase 4 continues with Tasks 21+ (cluster detail, run detail UI) next session.
 
 ---
 

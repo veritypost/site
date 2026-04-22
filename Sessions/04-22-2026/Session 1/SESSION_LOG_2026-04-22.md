@@ -75,3 +75,47 @@ See `Sessions/04-21-2026/Session 2/REVIEW_UNRESOLVED_2026-04-21.md`.
 Resume Phase 1 Task 2 (`call-model.ts` multi-provider helper) after `npm install` approval. Then Phase 1 Task 3 (migration 114 + cost-tracker + settings seeds). Then Phase 1 exit criteria check, then Phase 2.
 
 Either (a) continue in this session, (b) spin a fresh F7 PM session via `Current Projects/F7-PM-LAUNCH-PROMPT.md`, or (c) pause for owner review of the 4 commits before pushing.
+
+---
+
+## End-of-session summary (appended 2026-04-22 close)
+
+Phase 1 Task 1 above ended at ~11am. After that the session continued through Phase 1, Phase 2, Phase 3, the start of Phase 4, and a multi-agent audit + parallel cleanup sweep. Per-task SHAs + diff summaries live in `COMPLETED_TASKS_2026-04-22.md`; the F7-DECISIONS-LOCKED.md SHIPPED log holds per-phase rollups. This block is the chronological catch-up.
+
+### Phase 1 completion (Tasks 2-4)
+- Task 2 — `call-model.ts` multi-provider helper + `cost-tracker.ts` stub + Anthropic/OpenAI SDK installs.
+- Task 3 — full `cost-tracker.ts` + `errors.ts` extraction + migration 114 (8 new tables, 5 ALTERs, 21 RLS policies, 19 settings + 4 ai_models + 2 rate_limits seeds, RPC `pipeline_today_cost_usd`, trigger `tg_set_updated_at`). Migration 114 applied live by owner via Supabase SQL editor; types regenerated.
+- Task 4 — exit verification + `admin/feeds/route.ts` audience fix (commit `958879c`). Independent gate auditor cleared 13/13 checks; Phase 2 unblocked.
+
+### Phase 2 completion (Tasks 5-9)
+Tasks 5 (`clean-text.ts`), 6 (`scrape-article.ts`), 7 (`cluster.ts`), 8 (`story-match.ts`), 9 (`POST /api/newsroom/ingest/run`) all shipped. Phase 2 closed end-to-end.
+
+### Phase 3 completion (Tasks 10-19)
+All 10 Phase 3 tasks shipped:
+- Task 10 — `POST /api/admin/pipeline/generate` (1737 lines, canonical 12-step chain)
+- Task 11 — migration 116 cluster locks + unlock endpoint + this runbook
+- Task 12 — `GET /api/admin/pipeline/runs/:id` observability
+- Task 13 — migration 118 `persist_generated_article` RPC + wrapper
+- Task 14 — plagiarism rewrite loop port
+- Task 15 — Layer 1 per-(cat,step,audience) prompt overrides
+- Task 16 — migration 120 `pipeline_runs.error_type` column + dual-write
+- Task 17 — `POST /api/admin/pipeline/runs/:id/retry`
+- Task 18 — `POST /api/admin/pipeline/runs/:id/cancel`
+- Task 19 — `GET /api/cron/pipeline-cleanup` orphan-sweep cron
+
+### Phase 4 start (Task 20)
+Task 20 shipped: `web/src/app/admin/newsroom/page.tsx` (474 lines). Cluster card grid, Generate adult / Generate kid / Unlock / View buttons, Refresh feeds + Pipeline runs nav, offset paginated. Phase 4 continues with Tasks 21+ (cluster detail, run detail UI) in a future session.
+
+### Migrations applied + types regenerated this session
+All 5 staged F7 migrations applied to live `fyiwulqphgmoqullmrfn`: **112** (kids_waitlist), **116** (cluster locks + perms + RPCs), **118** (persist_generated_article RPC), **120** (pipeline_runs.error_type column), **124** (kids_summary drop / hygiene). Plus migration **122** (FK constraints) applied. `npm run types:gen` regenerated `web/src/types/database.ts` post-apply; the full owner apply queue is now empty.
+
+### Bug found + fixed mid-flight
+`locked_until` column-shape bug surfaced during Task 20 click-through; root-cause fix shipped in commit `bf69fc5`.
+
+### Audit pass + parallel cleanup streams
+End-of-session audit dispatched 5 audit agents + 4 independent verifiers + 2 planner agents to synthesize a master cleanup plan (`MASTER_CLEANUP_PLAN.md`). Findings landed in 4 parallel streams:
+- **F1-F12** — pipeline correctness/observability fixes (clustering wiring, audience peek, cache token columns, quiz multi-correct, etc.)
+- **D1-D11** — dead `as never` / `as unknown as` casts removed post types regen
+- **DOC1-DOC6** — documentation drift sync (this stream — CLAUDE.md tree adds `pipeline/`, STATUS.md TODO→FIX_SESSION_1, F7-DECISIONS-LOCKED phase rollups, this runbook step-vocab + changelog, this session log catch-up, COMPLETED_TASKS staged-section update)
+
+All four streams shipped in separate bundled commits this session.
