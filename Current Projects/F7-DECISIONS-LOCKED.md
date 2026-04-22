@@ -369,6 +369,27 @@ The F7 build diverges from the snapshot in specific places. Flagging so no imple
 
 ---
 
+## SHIPPED log (per-phase progress)
+
+### Phase 1 Task 1 — editorial-guide.ts port — SHIPPED 2026-04-22 (commit `df7b598`)
+
+- `web/src/lib/pipeline/editorial-guide.ts` — new file, 49,521 bytes, 1012 lines, UTF-8, trailing LF preserved.
+- 9 named exports ported verbatim from snapshot `editorial-guide.js` (`EDITORIAL_GUIDE`, `CATEGORY_PROMPTS`, `HEADLINE_PROMPT`, `QUIZ_PROMPT`, `TIMELINE_PROMPT`, `AUDIENCE_PROMPT`, `KID_ARTICLE_PROMPT`, `KID_TIMELINE_PROMPT`, `KID_QUIZ_PROMPT`). `REVIEW_PROMPT` excluded per divergence D-editorial.
+- Type annotations: `: string` on 8 consts, `: Record<string, string>` on `CATEGORY_PROMPTS`. Both quoted keys (`'united states'`, `'crime & justice'`) preserved verbatim.
+- Source sha256 `3a401195539be2bb947edade0fc7140949bde0dcc958923be78dd01f78200e7a` baked into TSDoc header for tamper-evidence per invariant #10.
+- `web/.prettierignore` updated with permanent `src/lib/pipeline` exclusion to protect verbatim prompt content from future auto-format drift.
+- Full F7 PM §3a four-agent flow executed (Agents 1+2 parallel investigators → Agent 3 serial reviewer → Agent 4 serial adversary caught 4 real errors in Agent 3's plan → Agent 5 Implementation → 2 post-impl verifiers parallel). Adversary corrections absorbed: REVIEW_PROMPT excision range corrected (L903-L1006 not L903-L1010; preserves kid-section divider), CATEGORY_PROMPTS quoted-keys reading corrected, TSDoc rationale rewrite, tsc baseline acknowledgement (2 pre-existing `kids-waitlist` generated-type warnings unchanged).
+- Post-impl VERIFY: SHIPPED. Post-impl REGRESSION: CLEAN with 3 non-blocking adjacent concerns (prettierignore addressed in this commit; CLAUDE.md tree entry deferred to next doc-sync; `/admin/pipeline/page.tsx:34` coincidental string-literal `'EDITORIAL_GUIDE'` as UI label noted).
+- tsc clean for new file; 2 pre-existing baseline errors unchanged.
+
+### Phase 1 Task 2 — call-model.ts multi-provider helper — PENDING
+Blocked on `npm install @anthropic-ai/sdk openai` approval (both SDKs missing from `web/package.json` as of 2026-04-22).
+
+### Phase 1 Task 3 — migration 114 + cost-tracker + settings seeds — PENDING
+Blocked on §3i owner "apply" for live DB writes.
+
+---
+
 ## How to use this file
 
 - **Every Phase 1/2/3/4 agent reads this file first** before reading `F7-pipeline-restructure.md` or `F7-PM-LAUNCH-PROMPT.md`.
