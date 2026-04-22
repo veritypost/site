@@ -469,6 +469,10 @@ All 10 Phase 3 tasks shipped. Per-task SHAs + diff summaries in `Sessions/04-22-
 
 `web/src/app/admin/newsroom/page.tsx` (474 lines). Per-task SHA + diff summary in `Sessions/04-22-2026/Session 1/COMPLETED_TASKS_2026-04-22.md`. Cluster card grid with Generate adult / Generate kid / Unlock / View buttons; Refresh feeds + Pipeline runs nav; offset paginated. Phase 4 continues with Tasks 21+ (cluster detail, run detail UI) next session.
 
+### Phase 4 Task 27 — Run detail page `/admin/pipeline/runs/:id` — SHIPPED 2026-04-22 (commit `a53a260`)
+
+`web/src/app/admin/pipeline/runs/[id]/page.tsx` (948 lines post-prettier). Consumes Task 12 GET endpoint. Header with run_id + pipeline_type + status badge + audience; totals panel (cost, tokens, cache hit ratio, retry/failure counts); CSS-only step timings bar chart (width% = latency_ms / max); per-step detail table with model/tokens/cost/latency/status + inline error_type + error_message row when failed; input_params + output_summary + freeform_instructions JSON pretty-printed in monospace `<pre>` blocks (overflow:auto, maxHeight 480); prompt_fingerprint monospace display. Retry button (status=failed + pipeline_type=generate only) wired to Task 17; Cancel button (status=running only) wired to Task 18; Refresh button for manual reload; Open cluster shortcut when cluster_id present. Client-side ADMIN_ROLES gate + backend permission gates are both enforced. 404 + load-error + not-found branches all render with a back-to-pipeline CTA. No polling — Task 22 modal owns its own polling. Unblocks Task 20 generate-success redirect target + Task 21 history-link target + Task 22 modal.
+
 ---
 
 ## How to use this file

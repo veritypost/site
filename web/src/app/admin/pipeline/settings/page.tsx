@@ -287,7 +287,7 @@ export default function PipelineSettingsPage() {
           Cost dashboard
         </Link>
         <span>·</span>
-        <Link href="/admin/pipeline/observability" style={{ color: ADMIN_C.accent }}>
+        <Link href="/admin/pipeline/runs" style={{ color: ADMIN_C.accent }}>
           Observability
         </Link>
         <span>·</span>

@@ -1,4 +1,4 @@
-# Next-session handoff — Phase 4 Tasks 21-30 (admin UI remainder)
+# Next-session handoff — F7 COMPLETE / freeform Phase 5
 
 Paste this into the first message of your next Claude Code session.
 
@@ -6,15 +6,14 @@ Paste this into the first message of your next Claude Code session.
 
 ## STATE OF THE WORLD (2026-04-22 end-of-session)
 
-**F7 status:**
+**F7 status — ALL PHASES COMPLETE (Tasks 1-30 of 30 shipped):**
 
 | Phase | Scope | State |
 |---|---|---|
 | Phase 1 (Foundation) | Tasks 1-4 | ✅ LIVE |
 | Phase 2 (Ingest) | Tasks 5-9 | ✅ LIVE |
 | Phase 3 (Orchestrator) | Tasks 10-19 | ✅ LIVE |
-| Phase 4 (Admin UI) | Task 20 | ✅ LIVE — Newsroom home page |
-| Phase 4 remaining | Tasks 21-30 | ⏳ NEXT |
+| Phase 4 (Admin UI) | Tasks 20-30 | ✅ LIVE — full admin surface for the AI pipeline |
 
 **Migrations — all applied live in `fyiwulqphgmoqullmrfn`:**
 - 112 (kids_waitlist), 114 (F7 foundation), 116 (cluster locks + perms), 118 (persist_generated_article RPC), 120 (pipeline_runs.error_type), 122 (cluster_id FKs + asymmetric ON DELETE fix), 124 (kids_summary RPC branch drop)
@@ -37,24 +36,34 @@ Paste this into the first message of your next Claude Code session.
 
 ---
 
-## PHASE 4 REMAINING — 9 TASKS
+## PHASE 4 — ALL SHIPPED (no work remaining in F7)
 
-Per the Phase 4 handoff originally in the superseded prompt. Brief sketches:
+| Task | What | SHA |
+|---|---|---|
+| 20 | `/admin/newsroom` home — cluster grid | `6938c8c` |
+| 21 | `/admin/newsroom/clusters/:id` cluster detail | `2d63621` |
+| 22 | Generation modal (`components/admin/GenerationModal.tsx`) | `b250695` |
+| 23 | `/admin/articles/:id/review` | `1f19e42` |
+| 24 | `/admin/articles/:id/edit` | `1f19e42` |
+| 25 | Publish/reject (PATCH on shared endpoint) | `1f19e42` |
+| 26 | `/admin/pipeline/runs` observability dashboard | `d366911` |
+| 27 | `/admin/pipeline/runs/:id` run detail | `a53a260` |
+| 28 | `/admin/pipeline/costs` cost tracker dashboard | `16822db` |
+| 29 | `/admin/pipeline/settings` settings UI | `f5be651` |
+| 30 | Manual ingest button (covered by Task 20 Refresh feeds) | n/a — already on Task 20 |
 
-- **Task 21** — `/admin/newsroom/clusters/:id` cluster detail page. Shows cluster's discovery_items list with add/remove, generation history, Generate button → POST `/api/admin/pipeline/generate`.
-- **Task 22** — generation modal. Progress via polling `/api/admin/pipeline/runs/:id` every 2s. Step timings bar. Redirect to article review on completion. Replaces Task 20's inline Generate buttons.
-- **Task 23** — article draft review page `/admin/articles/:id/review`. Shows title, subtitle, body_html preview, sources, timeline, quiz. Edit / Regenerate / Publish / Reject.
-- **Task 24** — article edit page `/admin/articles/:id/edit`. Rich-text body editor. Inline sources/timeline/quiz editors. Save via new PATCH `/api/admin/articles/:id` route.
-- **Task 25** — publish flow. `status='published', moderation_status='approved', published_at=now()`. Schedule-publish option. Reject: `status='archived'` + reason.
-- **Task 26** — observability dashboard `/admin/pipeline/runs`. Paginated list, filters (status, audience, date range). Row-click → detail.
-- **Task 27** — run detail view `/admin/pipeline/runs/:id`. Full pipeline_runs row + pipeline_costs children. Step timings chart. Prompt fingerprint. Retry/Cancel buttons.
-- **Task 28** — cost tracker dashboard `/admin/pipeline/costs`. Today vs daily cap. Per-model breakdown. 30-day chart. Per-run outliers.
-- **Task 29** — settings UI `/admin/pipeline/settings`. Kill-switch toggles + cost cap sliders + default_category_id dropdown. Save → PATCH `/api/admin/settings/pipeline`.
-- **Task 30** — manual ingest button. Already on Task 20 header; verify.
+Pipeline is fully reachable end-to-end through normal admin flow:
+1. Admin opens `/admin/newsroom`
+2. Clicks Refresh feeds → ingest + cluster runs → cluster cards appear
+3. Clicks View on a card → cluster detail page with discovery items + run history
+4. Clicks Generate → modal opens with audience picker + freeform instructions → progress polled live
+5. On completion → article review page → Edit / Regenerate / Publish / Reject
+6. Publish → article goes to `status='published'` and lands in reader
+7. Observability: `/admin/pipeline/runs` lists every run; click → detail with step timings + retry/cancel
+8. Cost: `/admin/pipeline/costs` shows today vs cap + per-model + 30-day chart
+9. Settings: `/admin/pipeline/settings` toggles kill switches + tunes thresholds
 
-**Recommended session split:**
-- Session 2: Tasks 21-25 (per-cluster flow)
-- Session 3: Tasks 26-30 (observability + settings)
+**Click-through verification needed (owner)** — every Phase 4 page needs a manual eyeball pass since I can't open a browser.
 
 ---
 
@@ -82,6 +91,10 @@ Dead casts + types: after every migration apply, `cd web && npm run types:gen` a
 
 ## START
 
-Read the 7 docs above. Say "Ready." Wait for direction.
+F7 is complete. Next session is freeform — read the 7 docs above, say "Ready," wait for direction. Likely candidates for Phase 5+ work:
 
-When user says start → pick the next task from the Phase 4 list + run the 3-agent flow.
+1. **Click-through audit** of all Phase 4 admin pages (owner-led; PM provides dev-server boot + diff context)
+2. **Build `web/src/lib/pipeline/redact.ts`** (E2 deferred from cleanup) — Sentry payload PII scrubber per F7-DECISIONS Phase 1 pre-flight item #6
+3. **Wire Layer 1 prompt overrides into plagiarism rewrite** (F2 deferred — `web/src/lib/pipeline/plagiarism-check.ts` rewrite call doesn't yet receive overrides; minor)
+4. **Phase 5 — content + reader UX** (F1/F2/F3/F4 from Future Projects — sources above headline, reading receipt, earned-chrome comments, quiet home feed)
+5. **Other launch-blocker items** in `Current Projects/FIX_SESSION_1.md`
