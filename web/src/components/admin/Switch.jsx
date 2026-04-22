@@ -19,22 +19,16 @@ import { ADMIN_C, F, S } from '../../lib/adminPalette';
  * @param {object} [props.style] Applied to outer <label>.
  */
 const Switch = forwardRef(function Switch(
-  {
-    checked = false,
-    onChange,
-    disabled = false,
-    label,
-    hint,
-    id,
-    style,
-  },
-  ref,
+  { checked = false, onChange, disabled = false, label, hint, id, style },
+  ref
 ) {
   // Local mirror: optimistic UI. We flip immediately on click and then
   // call onChange. If the parent rejects the change and keeps `checked`
   // as-is, the effect below snaps us back.
   const [local, setLocal] = useState(checked);
-  useEffect(() => { setLocal(checked); }, [checked]);
+  useEffect(() => {
+    setLocal(checked);
+  }, [checked]);
 
   const handleClick = () => {
     if (disabled) return;
@@ -52,8 +46,12 @@ const Switch = forwardRef(function Switch(
       aria-checked={local}
       disabled={disabled}
       onClick={handleClick}
-      onFocus={(e) => { e.currentTarget.style.boxShadow = `0 0 0 2px ${ADMIN_C.ring}`; }}
-      onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
+      onFocus={(e) => {
+        e.currentTarget.style.boxShadow = `0 0 0 2px ${ADMIN_C.ring}`;
+      }}
+      onBlur={(e) => {
+        e.currentTarget.style.boxShadow = 'none';
+      }}
       style={{
         width: 32,
         height: 18,
@@ -102,14 +100,10 @@ const Switch = forwardRef(function Switch(
       {toggle}
       <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {label && (
-          <span style={{ fontSize: F.base, color: ADMIN_C.white, lineHeight: 1.4 }}>
-            {label}
-          </span>
+          <span style={{ fontSize: F.base, color: ADMIN_C.white, lineHeight: 1.4 }}>{label}</span>
         )}
         {hint && (
-          <span style={{ fontSize: F.xs, color: ADMIN_C.dim, lineHeight: 1.4 }}>
-            {hint}
-          </span>
+          <span style={{ fontSize: F.xs, color: ADMIN_C.dim, lineHeight: 1.4 }}>{hint}</span>
         )}
       </span>
     </label>

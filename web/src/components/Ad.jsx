@@ -30,13 +30,21 @@ export default function Ad({ placement, page = 'unknown', position = 'inline', a
       const params = new URLSearchParams({ placement });
       if (articleId) params.set('article_id', articleId);
       if (sessionId) params.set('session_id', sessionId);
-      const res = await fetch(`/api/ads/serve?${params}`).catch(err => { console.error('[ads] serve fetch', err); return null; });
+      const res = await fetch(`/api/ads/serve?${params}`).catch((err) => {
+        console.error('[ads] serve fetch', err);
+        return null;
+      });
       if (!res || cancelled) return;
-      const data = await res.json().catch(err => { console.error('[ads] serve parse', err); return {}; });
+      const data = await res.json().catch((err) => {
+        console.error('[ads] serve parse', err);
+        return {};
+      });
       if (data?.ad_unit) setAd(data.ad_unit);
     }
     fetchAd();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [placement, articleId]);
 
   // Log impression once the ad has actually rendered.
@@ -57,9 +65,13 @@ export default function Ad({ placement, page = 'unknown', position = 'inline', a
         position,
       }),
     })
-      .then(r => r.json())
-      .then(d => { if (d?.impression_id) setImpressionId(d.impression_id); })
-      .catch(err => { console.error('[ads] impression log', err); });
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.impression_id) setImpressionId(d.impression_id);
+      })
+      .catch((err) => {
+        console.error('[ads] impression log', err);
+      });
   }, [ad, page, position, articleId]);
 
   if (!ad) return null;
@@ -70,12 +82,23 @@ export default function Ad({ placement, page = 'unknown', position = 'inline', a
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ impression_id: impressionId }),
-      }).catch(err => { console.error('[ads] click log', err); });
+      }).catch((err) => {
+        console.error('[ads] click log', err);
+      });
     }
   }
 
   const sponsoredLabel = (
-    <div style={{ fontSize: 9, fontWeight: 700, color: '#999', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
+    <div
+      style={{
+        fontSize: 9,
+        fontWeight: 700,
+        color: '#999',
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+        marginBottom: 4,
+      }}
+    >
       Sponsored{ad.advertiser_name ? ` · ${ad.advertiser_name}` : ''}
     </div>
   );
@@ -125,21 +148,31 @@ export default function Ad({ placement, page = 'unknown', position = 'inline', a
     <a
       href={ad.click_url || '#'}
       onClick={handleClick}
-      target="_blank" rel="noopener noreferrer sponsored"
+      target="_blank"
+      rel="noopener noreferrer sponsored"
       style={{ ...wrapStyle, display: 'block', textDecoration: 'none', color: 'inherit' }}
     >
       {sponsoredLabel}
       {ad.creative_url && (
-        <img src={ad.creative_url} alt={ad.alt_text || 'Sponsored'} style={{ maxWidth: '100%', display: 'block', borderRadius: 6 }} />
+        <img
+          src={ad.creative_url}
+          alt={ad.alt_text || 'Sponsored'}
+          style={{ maxWidth: '100%', display: 'block', borderRadius: 6 }}
+        />
       )}
       {ad.cta_text && (
-        <div style={{ fontSize: 13, fontWeight: 700, color: '#111', marginTop: 6 }}>{ad.cta_text}</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#111', marginTop: 6 }}>
+          {ad.cta_text}
+        </div>
       )}
     </a>
   );
 }
 
 const wrapStyle = {
-  background: '#f7f7f7', border: '1px solid #e5e5e5',
-  borderRadius: 10, padding: '10px 12px', margin: '12px 0',
+  background: '#f7f7f7',
+  border: '1px solid #e5e5e5',
+  borderRadius: 10,
+  padding: '10px 12px',
+  margin: '12px 0',
 };

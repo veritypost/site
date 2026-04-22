@@ -22,8 +22,11 @@ type Body = {
 
 export async function POST(request: Request) {
   let actor;
-  try { actor = await requirePermission('admin.promo.create'); }
-  catch (err) { return permissionError(err); }
+  try {
+    actor = await requirePermission('admin.promo.create');
+  } catch (err) {
+    return permissionError(err);
+  }
   void actor;
 
   const body = (await request.json().catch(() => ({}))) as Body;
@@ -41,8 +44,10 @@ export async function POST(request: Request) {
     description: body.description || null,
     discount_type: body.discount_type,
     discount_value: body.discount_value,
-    applies_to_plans: Array.isArray(body.applies_to_plans) && body.applies_to_plans.length > 0
-      ? body.applies_to_plans : null,
+    applies_to_plans:
+      Array.isArray(body.applies_to_plans) && body.applies_to_plans.length > 0
+        ? body.applies_to_plans
+        : null,
     duration: body.duration || 'once',
     duration_months: body.duration_months ?? null,
     max_uses: body.max_uses ?? null,
@@ -63,7 +68,11 @@ export async function POST(request: Request) {
     action: 'promo.create',
     targetTable: 'promo_codes',
     targetId: data.id,
-    newValue: { code: data.code, discount_type: data.discount_type, discount_value: data.discount_value },
+    newValue: {
+      code: data.code,
+      discount_type: data.discount_type,
+      discount_value: data.discount_value,
+    },
   });
 
   return NextResponse.json({ ok: true, row: data });

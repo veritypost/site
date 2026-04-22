@@ -38,7 +38,10 @@ export async function POST(request) {
     p_new_plan_id: plan.id,
   });
   if (error) {
-    return safeErrorResponse(NextResponse, error, { route: 'billing.change_plan', fallbackStatus: 400 });
+    return safeErrorResponse(NextResponse, error, {
+      route: 'billing.change_plan',
+      fallbackStatus: 400,
+    });
   }
   return NextResponse.json(data);
 }

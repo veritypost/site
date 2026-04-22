@@ -13,8 +13,9 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // are revoked. Membership edits now route through service-role.
 export async function POST(request) {
   let actor;
-  try { actor = await requirePermission('admin.permissions.set.edit'); }
-  catch (err) {
+  try {
+    actor = await requirePermission('admin.permissions.set.edit');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -22,14 +23,21 @@ export async function POST(request) {
   const body = await request.json().catch(() => ({}));
   const { permission_set_id, permission_id } = body || {};
   if (!permission_set_id || !permission_id) {
-    return NextResponse.json({ error: 'permission_set_id and permission_id required' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'permission_set_id and permission_id required' },
+      { status: 400 }
+    );
   }
 
   const service = createServiceClient();
   const { error } = await service
     .from('permission_set_perms')
     .insert({ permission_set_id, permission_id });
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.permission_sets.members', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'admin.permission_sets.members',
+      fallbackStatus: 400,
+    });
 
   try {
     await service.from('audit_log').insert({
@@ -39,15 +47,18 @@ export async function POST(request) {
       target_id: permission_set_id,
       metadata: { permission_id },
     });
-  } catch { /* best-effort */ }
+  } catch {
+    /* best-effort */
+  }
 
   return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(request) {
   let actor;
-  try { actor = await requirePermission('admin.permissions.set.edit'); }
-  catch (err) {
+  try {
+    actor = await requirePermission('admin.permissions.set.edit');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -56,7 +67,10 @@ export async function DELETE(request) {
   const permission_set_id = url.searchParams.get('permission_set_id');
   const permission_id = url.searchParams.get('permission_id');
   if (!permission_set_id || !permission_id) {
-    return NextResponse.json({ error: 'permission_set_id and permission_id required' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'permission_set_id and permission_id required' },
+      { status: 400 }
+    );
   }
 
   const service = createServiceClient();
@@ -65,7 +79,11 @@ export async function DELETE(request) {
     .delete()
     .eq('permission_set_id', permission_set_id)
     .eq('permission_id', permission_id);
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.permission_sets.members', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'admin.permission_sets.members',
+      fallbackStatus: 400,
+    });
 
   try {
     await service.from('audit_log').insert({
@@ -75,7 +93,9 @@ export async function DELETE(request) {
       target_id: permission_set_id,
       metadata: { permission_id },
     });
-  } catch { /* best-effort */ }
+  } catch {
+    /* best-effort */
+  }
 
   return NextResponse.json({ ok: true });
 }

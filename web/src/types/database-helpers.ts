@@ -16,8 +16,7 @@ export type TableInsert<T extends keyof Database['public']['Tables']> =
 export type TableUpdate<T extends keyof Database['public']['Tables']> =
   Database['public']['Tables'][T]['Update'];
 
-export type Enums<T extends keyof Database['public']['Enums']> =
-  Database['public']['Enums'][T];
+export type Enums<T extends keyof Database['public']['Enums']> = Database['public']['Enums'][T];
 
 export type DbClient = SupabaseClient<Database>;
 

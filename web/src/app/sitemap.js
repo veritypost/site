@@ -12,8 +12,14 @@ export default async function sitemap() {
   // - `/kids` removed: kid-facing UI moved to the VerityPostKids iOS app;
   //   the web route now 302s via middleware.
   const staticRoutes = [
-    '', '/browse', '/contact',
-    '/privacy', '/terms', '/cookies', '/dmca', '/accessibility',
+    '',
+    '/browse',
+    '/contact',
+    '/privacy',
+    '/terms',
+    '/cookies',
+    '/dmca',
+    '/accessibility',
   ].map((path) => ({
     url: `${base}${path}`,
     lastModified: new Date(),

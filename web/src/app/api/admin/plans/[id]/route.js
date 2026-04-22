@@ -11,14 +11,22 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // Round A (C-05) — authenticated UPDATE on plans is revoked. The admin
 // plans UI patches pricing / visibility / copy via this endpoint.
 const ALLOWED_FIELDS = new Set([
-  'price_cents', 'billing_period', 'trial_days', 'is_visible',
-  'sort_order', 'description', 'display_name', 'name', 'is_active',
+  'price_cents',
+  'billing_period',
+  'trial_days',
+  'is_visible',
+  'sort_order',
+  'description',
+  'display_name',
+  'name',
+  'is_active',
 ]);
 
 export async function PATCH(request, { params }) {
   let actor;
-  try { actor = await requirePermission('admin.plans.edit'); }
-  catch (err) {
+  try {
+    actor = await requirePermission('admin.plans.edit');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -37,7 +45,8 @@ export async function PATCH(request, { params }) {
 
   const service = createServiceClient();
   const { error } = await service.from('plans').update(patch).eq('id', id);
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.plans.id', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, { route: 'admin.plans.id', fallbackStatus: 400 });
 
   try {
     await service.from('audit_log').insert({
@@ -47,7 +56,9 @@ export async function PATCH(request, { params }) {
       target_id: id,
       metadata: patch,
     });
-  } catch { /* best-effort */ }
+  } catch {
+    /* best-effort */
+  }
 
   return NextResponse.json({ ok: true });
 }

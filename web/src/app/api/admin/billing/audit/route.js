@@ -15,15 +15,19 @@ import { createServiceClient } from '@/lib/supabase/server';
 // Auth: caller must hold admin.billing.audit (falls back to admin.billing.view).
 export async function POST(request) {
   let actor;
-  try { actor = await requirePermission('admin.billing.view'); }
-  catch (err) {
+  try {
+    actor = await requirePermission('admin.billing.view');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   let body;
-  try { body = await request.json(); }
-  catch { return NextResponse.json({ error: 'invalid json body' }, { status: 400 }); }
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'invalid json body' }, { status: 400 });
+  }
 
   const { action, target_type, target_id, metadata } = body || {};
   if (!action || typeof action !== 'string') {

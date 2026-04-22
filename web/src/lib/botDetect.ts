@@ -10,7 +10,7 @@ const BOT_PATTERNS: RegExp[] = [
   /bot\b/i,
   /crawler/i,
   /spider/i,
-  /slurp/i,                    // Yahoo
+  /slurp/i, // Yahoo
   /yandex/i,
   /baidu/i,
   /duckduck/i,
@@ -30,7 +30,7 @@ const BOT_PATTERNS: RegExp[] = [
   /embedly/i,
   /pingdom/i,
   /gtmetrix/i,
-  /lighthouse/i,               // also fires headless Chrome
+  /lighthouse/i, // also fires headless Chrome
   /headlesschrome/i,
   /phantomjs/i,
   /selenium/i,

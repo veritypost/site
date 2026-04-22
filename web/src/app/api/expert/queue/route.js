@@ -10,8 +10,9 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // plus items they've claimed and answered.
 export async function GET(request) {
   let user;
-  try { user = await requirePermission('expert.queue.view'); }
-  catch (err) {
+  try {
+    user = await requirePermission('expert.queue.view');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
@@ -24,14 +25,16 @@ export async function GET(request) {
     .select('category_id, expert_applications!inner(user_id, status)')
     .eq('expert_applications.user_id', user.id)
     .eq('expert_applications.status', 'approved');
-  const categoryIds = (catRows || []).map(r => r.category_id);
+  const categoryIds = (catRows || []).map((r) => r.category_id);
 
   const url = new URL(request.url);
   const status = url.searchParams.get('status') || 'pending';
 
   let q = service
     .from('expert_queue_items')
-    .select('*, comments!fk_expert_queue_items_comment_id(id, body, created_at, users!fk_comments_user_id(username, avatar_color)), answer:comments!fk_expert_queue_items_answer_comment_id(id, status), articles(title, slug)')
+    .select(
+      '*, comments!fk_expert_queue_items_comment_id(id, body, created_at, users!fk_comments_user_id(username, avatar_color)), answer:comments!fk_expert_queue_items_answer_comment_id(id, status), articles(title, slug)'
+    )
     .eq('status', status)
     .order('created_at', { ascending: false });
 
@@ -48,6 +51,7 @@ export async function GET(request) {
   }
 
   const { data, error } = await q;
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'expert.queue', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, { route: 'expert.queue', fallbackStatus: 400 });
   return NextResponse.json({ items: data || [] });
 }

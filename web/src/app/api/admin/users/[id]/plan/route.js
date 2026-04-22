@@ -18,8 +18,9 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // Anything else resolves plans.id by plan.name and sets plan_status='active'.
 export async function PATCH(request, { params }) {
   let actor;
-  try { actor = await requirePermission('admin.billing.override_plan'); }
-  catch (err) {
+  try {
+    actor = await requirePermission('admin.billing.override_plan');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -37,7 +38,12 @@ export async function PATCH(request, { params }) {
     const { data: outranks, error: rankErr } = await authed.rpc('require_outranks', {
       target_user_id: targetId,
     });
-    if (rankErr) return safeErrorResponse(NextResponse, rankErr, { route: 'admin.users.plan', fallbackStatus: 500, fallbackMessage: 'Rank check failed' });
+    if (rankErr)
+      return safeErrorResponse(NextResponse, rankErr, {
+        route: 'admin.users.plan',
+        fallbackStatus: 500,
+        fallbackMessage: 'Rank check failed',
+      });
     if (!outranks) {
       return NextResponse.json(
         { error: 'Cannot act on a user whose rank meets or exceeds your own' },
@@ -57,16 +63,23 @@ export async function PATCH(request, { params }) {
       .select('id')
       .eq('name', plan_name)
       .maybeSingle();
-    if (planErr) return safeErrorResponse(NextResponse, planErr, { route: 'admin.users.plan', fallbackStatus: 500, fallbackMessage: 'Plan lookup failed' });
+    if (planErr)
+      return safeErrorResponse(NextResponse, planErr, {
+        route: 'admin.users.plan',
+        fallbackStatus: 500,
+        fallbackMessage: 'Plan lookup failed',
+      });
     if (!planRow) return NextResponse.json({ error: 'Plan not found' }, { status: 404 });
     update = { plan_id: planRow.id, plan_status: 'active' };
   }
 
-  const { error: upErr } = await service
-    .from('users')
-    .update(update)
-    .eq('id', targetId);
-  if (upErr) return safeErrorResponse(NextResponse, upErr, { route: 'admin.users.plan', fallbackStatus: 500, fallbackMessage: 'Could not update plan' });
+  const { error: upErr } = await service.from('users').update(update).eq('id', targetId);
+  if (upErr)
+    return safeErrorResponse(NextResponse, upErr, {
+      route: 'admin.users.plan',
+      fallbackStatus: 500,
+      fallbackMessage: 'Could not update plan',
+    });
 
   try {
     await service.from('audit_log').insert({
@@ -76,7 +89,9 @@ export async function PATCH(request, { params }) {
       target_id: targetId,
       metadata: { plan: plan_name },
     });
-  } catch { /* best-effort */ }
+  } catch {
+    /* best-effort */
+  }
 
   const { error: bumpErr } = await service.rpc('bump_user_perms_version', {
     p_user_id: targetId,

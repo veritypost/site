@@ -2,9 +2,7 @@ import { headers } from 'next/headers';
 
 export async function getClientIp() {
   const h = await headers();
-  return h.get('x-forwarded-for')?.split(',')[0]?.trim()
-    || h.get('x-real-ip')
-    || '127.0.0.1';
+  return h.get('x-forwarded-for')?.split(',')[0]?.trim() || h.get('x-real-ip') || '127.0.0.1';
 }
 
 // DA-031 / F-018 / F-019 — the pre-fix implementation ran a SELECT
@@ -59,7 +57,8 @@ export async function getRateLimit(supabase, policyKey, fallback) {
   const now = Date.now();
   const cached = POLICY_CACHE.get(policyKey);
   if (cached && cached.expiresAt > now) {
-    if (cached.isActive === false) return { max: Infinity, windowSec: fallback.windowSec, disabled: true };
+    if (cached.isActive === false)
+      return { max: Infinity, windowSec: fallback.windowSec, disabled: true };
     return { max: cached.max, windowSec: cached.windowSec };
   }
 

@@ -115,7 +115,7 @@ interface SanitizedEvent {
 
 function sanitize(
   raw: unknown,
-  ctx: { ua: string | null; ip: string; isBot: boolean },
+  ctx: { ua: string | null; ip: string; isBot: boolean }
 ): SanitizedEvent | null {
   if (!raw || typeof raw !== 'object') return null;
   const e = raw as Record<string, unknown>;
@@ -165,8 +165,7 @@ function sanitize(
     device_type: clampString(e.device_type, 16),
     viewport_w: clampInt(e.viewport_w),
     viewport_h: clampInt(e.viewport_h),
-    consent_analytics:
-      typeof e.consent_analytics === 'boolean' ? e.consent_analytics : null,
+    consent_analytics: typeof e.consent_analytics === 'boolean' ? e.consent_analytics : null,
     consent_ads: typeof e.consent_ads === 'boolean' ? e.consent_ads : null,
     experiment_bucket: clampString(e.experiment_bucket, 64),
     user_agent_hash: ctx.ua ? sha256(ctx.ua) : null,
@@ -203,7 +202,7 @@ export async function POST(request: Request) {
   if (events.length > MAX_EVENTS_PER_BATCH) {
     return NextResponse.json(
       { error: `Max ${MAX_EVENTS_PER_BATCH} events per batch` },
-      { status: 413 },
+      { status: 413 }
     );
   }
 
@@ -237,26 +236,27 @@ export async function POST(request: Request) {
   // yet because schema/108_events_pipeline.sql hasn't been applied to the
   // live DB. Cast the `.from()` call until the owner regenerates types
   // after applying the migration (`supabase gen types` CLI).
-  const fromEvents = (supabase as unknown as {
-    from: (t: string) => {
-      upsert: (
-        rows: SanitizedEvent[],
-        opts: { onConflict: string; ignoreDuplicates: boolean },
-      ) => {
-        select: (cols: string) => Promise<{ data: Array<{ event_id: string }> | null; error: Error | null }>;
+  const fromEvents = (
+    supabase as unknown as {
+      from: (t: string) => {
+        upsert: (
+          rows: SanitizedEvent[],
+          opts: { onConflict: string; ignoreDuplicates: boolean }
+        ) => {
+          select: (
+            cols: string
+          ) => Promise<{ data: Array<{ event_id: string }> | null; error: Error | null }>;
+        };
       };
-    };
-  }).from('events');
+    }
+  ).from('events');
   const { data, error } = await fromEvents
     .upsert(rows, { onConflict: 'event_id,occurred_at', ignoreDuplicates: true })
     .select('event_id');
 
   if (error) {
     console.error('[events.batch] insert failed', error);
-    return NextResponse.json(
-      { error: 'Internal error' },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 
   const accepted = data?.length ?? 0;

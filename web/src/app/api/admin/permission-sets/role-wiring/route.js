@@ -11,8 +11,9 @@ import { createServiceClient } from '@/lib/supabase/server';
 // is retained as a SELECT-only grant; writes go through this route.
 export async function POST(request) {
   let actor;
-  try { actor = await requirePermission('admin.permissions.assign_to_role'); }
-  catch (err) {
+  try {
+    actor = await requirePermission('admin.permissions.assign_to_role');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -20,7 +21,10 @@ export async function POST(request) {
   const body = await request.json().catch(() => ({}));
   const { role_id, permission_set_id, enabled } = body || {};
   if (!role_id || !permission_set_id || typeof enabled !== 'boolean') {
-    return NextResponse.json({ error: 'role_id, permission_set_id, and enabled required' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'role_id, permission_set_id, and enabled required' },
+      { status: 400 }
+    );
   }
 
   const service = createServiceClient();
@@ -46,7 +50,9 @@ export async function POST(request) {
       target_id: permission_set_id,
       metadata: { role_id },
     });
-  } catch { /* best-effort */ }
+  } catch {
+    /* best-effort */
+  }
 
   return NextResponse.json({ ok: true });
 }

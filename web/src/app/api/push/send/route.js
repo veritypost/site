@@ -17,15 +17,19 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
-  try { await requirePermission('admin.push.send_test'); }
-  catch (err) {
+  try {
+    await requirePermission('admin.push.send_test');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   let body;
-  try { body = await request.json(); }
-  catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
 
   const { user_id, title, body: text, action_url, metadata } = body || {};
   if (!user_id || !title) {

@@ -7,6 +7,8 @@ import { useRouter } from 'next/navigation';
 
 export default function SettingsProfileRedirect(): null {
   const router = useRouter();
-  useEffect(() => { router.replace('/profile/settings#profile'); }, [router]);
+  useEffect(() => {
+    router.replace('/profile/settings#profile');
+  }, [router]);
   return null;
 }

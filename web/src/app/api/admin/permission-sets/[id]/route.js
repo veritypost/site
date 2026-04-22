@@ -14,8 +14,9 @@ const ALLOWED_FIELDS = new Set(['display_name', 'description', 'is_active']);
 
 export async function PATCH(request, { params }) {
   let actor;
-  try { actor = await requirePermission('admin.permissions.set.edit'); }
-  catch (err) {
+  try {
+    actor = await requirePermission('admin.permissions.set.edit');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -34,7 +35,11 @@ export async function PATCH(request, { params }) {
 
   const service = createServiceClient();
   const { error } = await service.from('permission_sets').update(patch).eq('id', id);
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.permission_sets.id', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'admin.permission_sets.id',
+      fallbackStatus: 400,
+    });
 
   try {
     await service.from('audit_log').insert({
@@ -44,15 +49,18 @@ export async function PATCH(request, { params }) {
       target_id: id,
       metadata: patch,
     });
-  } catch { /* best-effort */ }
+  } catch {
+    /* best-effort */
+  }
 
   return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(_request, { params }) {
   let actor;
-  try { actor = await requirePermission('admin.permissions.set.edit'); }
-  catch (err) {
+  try {
+    actor = await requirePermission('admin.permissions.set.edit');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -75,7 +83,11 @@ export async function DELETE(_request, { params }) {
   }
 
   const { error } = await service.from('permission_sets').delete().eq('id', id);
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.permission_sets.id', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'admin.permission_sets.id',
+      fallbackStatus: 400,
+    });
 
   try {
     await service.from('audit_log').insert({
@@ -85,7 +97,9 @@ export async function DELETE(_request, { params }) {
       target_id: id,
       metadata: { key: existing.key },
     });
-  } catch { /* best-effort */ }
+  } catch {
+    /* best-effort */
+  }
 
   return NextResponse.json({ ok: true });
 }

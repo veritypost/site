@@ -48,8 +48,14 @@ export default function TTSButton({ text, title = 'Listen' }: TTSButtonProps) {
     const u = new SpeechSynthesisUtterance(text);
     u.rate = 1.0;
     u.pitch = 1.0;
-    u.onend = () => { setSpeaking(false); setPaused(false); };
-    u.onerror = () => { setSpeaking(false); setPaused(false); };
+    u.onend = () => {
+      setSpeaking(false);
+      setPaused(false);
+    };
+    u.onerror = () => {
+      setSpeaking(false);
+      setPaused(false);
+    };
     synth.speak(u);
     setSpeaking(true);
     setPaused(false);
@@ -57,8 +63,13 @@ export default function TTSButton({ text, title = 'Listen' }: TTSButtonProps) {
 
   function togglePause() {
     const synth = window.speechSynthesis;
-    if (paused) { synth.resume(); setPaused(false); }
-    else { synth.pause(); setPaused(true); }
+    if (paused) {
+      synth.resume();
+      setPaused(false);
+    } else {
+      synth.pause();
+      setPaused(true);
+    }
   }
 
   function stop() {
@@ -70,11 +81,17 @@ export default function TTSButton({ text, title = 'Listen' }: TTSButtonProps) {
   return (
     <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
       {!speaking ? (
-        <button onClick={start} title={title} style={btn}>Listen</button>
+        <button onClick={start} title={title} style={btn}>
+          Listen
+        </button>
       ) : (
         <>
-          <button onClick={togglePause} style={btn}>{paused ? 'Resume' : 'Pause'}</button>
-          <button onClick={stop} style={btnGhost}>Stop</button>
+          <button onClick={togglePause} style={btn}>
+            {paused ? 'Resume' : 'Pause'}
+          </button>
+          <button onClick={stop} style={btnGhost}>
+            Stop
+          </button>
         </>
       )}
     </span>
@@ -82,10 +99,22 @@ export default function TTSButton({ text, title = 'Listen' }: TTSButtonProps) {
 }
 
 const btn: CSSProperties = {
-  padding: '5px 12px', borderRadius: 8, border: 'none',
-  background: '#111', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+  padding: '5px 12px',
+  borderRadius: 8,
+  border: 'none',
+  background: '#111',
+  color: '#fff',
+  fontSize: 12,
+  fontWeight: 700,
+  cursor: 'pointer',
 };
 const btnGhost: CSSProperties = {
-  padding: '5px 12px', borderRadius: 8, border: '1px solid #e5e5e5',
-  background: 'transparent', color: '#111', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+  padding: '5px 12px',
+  borderRadius: 8,
+  border: '1px solid #e5e5e5',
+  background: 'transparent',
+  color: '#111',
+  fontSize: 12,
+  fontWeight: 600,
+  cursor: 'pointer',
 };

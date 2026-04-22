@@ -51,18 +51,22 @@ async function run(request) {
     if (uploadErr) throw new Error(`upload: ${uploadErr.message}`);
 
     const { data: signed, error: signErr } = await service.storage
-      .from(BUCKET).createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
+      .from(BUCKET)
+      .createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
     if (signErr) throw new Error(`sign: ${signErr.message}`);
 
     const expiresAt = new Date(Date.now() + SIGNED_URL_TTL_SECONDS * 1000).toISOString();
 
-    await service.from('data_requests').update({
-      status: 'completed',
-      completed_at: new Date().toISOString(),
-      download_url: signed.signedUrl,
-      download_expires_at: expiresAt,
-      file_size_bytes: size,
-    }).eq('id', claimed.id);
+    await service
+      .from('data_requests')
+      .update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        download_url: signed.signedUrl,
+        download_expires_at: expiresAt,
+        file_size_bytes: size,
+      })
+      .eq('id', claimed.id);
 
     // In-app notification; the send-emails cron will fan out email.
     await service.rpc('create_notification', {
@@ -84,11 +88,14 @@ async function run(request) {
       ran_at: new Date().toISOString(),
     });
   } catch (err) {
-    await service.from('data_requests').update({
-      status: 'pending',
-      processing_started_at: null,
-      notes: `worker error: ${err.message}`,
-    }).eq('id', claimed.id);
+    await service
+      .from('data_requests')
+      .update({
+        status: 'pending',
+        processing_started_at: null,
+        notes: `worker error: ${err.message}`,
+      })
+      .eq('id', claimed.id);
     console.error('[cron.process-data-exports] worker error:', err);
     return NextResponse.json({ error: 'Worker error', request_id: claimed.id }, { status: 500 });
   }

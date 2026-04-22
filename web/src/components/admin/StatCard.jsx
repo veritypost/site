@@ -19,15 +19,7 @@ import { ADMIN_C, F, S } from '../../lib/adminPalette';
  * @param {React.ReactNode} [props.footnote]
  * @param {object} [props.style]
  */
-export default function StatCard({
-  label,
-  value,
-  delta,
-  trend,
-  sparkline,
-  footnote,
-  style,
-}) {
+export default function StatCard({ label, value, delta, trend, sparkline, footnote, style }) {
   let resolvedTrend = trend;
   if (!resolvedTrend && typeof delta === 'string') {
     if (delta.trim().startsWith('-')) resolvedTrend = 'down';
@@ -36,9 +28,11 @@ export default function StatCard({
   }
 
   const deltaColor =
-    resolvedTrend === 'up' ? ADMIN_C.success
-    : resolvedTrend === 'down' ? ADMIN_C.danger
-    : ADMIN_C.dim;
+    resolvedTrend === 'up'
+      ? ADMIN_C.success
+      : resolvedTrend === 'down'
+        ? ADMIN_C.danger
+        : ADMIN_C.dim;
 
   return (
     <div
@@ -101,9 +95,7 @@ export default function StatCard({
             lineHeight: 1.4,
           }}
         >
-          {delta && (
-            <span style={{ color: deltaColor, fontWeight: 500 }}>{delta}</span>
-          )}
+          {delta && <span style={{ color: deltaColor, fontWeight: 500 }}>{delta}</span>}
           {footnote && <span>{footnote}</span>}
         </div>
       )}

@@ -11,8 +11,9 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // Round A (C-05) — authenticated INSERT on permission_sets is revoked.
 export async function POST(request) {
   let actor;
-  try { actor = await requirePermission('admin.permissions.set.edit'); }
-  catch (err) {
+  try {
+    actor = await requirePermission('admin.permissions.set.edit');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -32,7 +33,11 @@ export async function POST(request) {
     is_active: true,
   };
   const { data, error } = await service.from('permission_sets').insert(row).select().single();
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.permission_sets', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'admin.permission_sets',
+      fallbackStatus: 400,
+    });
 
   try {
     await service.from('audit_log').insert({
@@ -42,7 +47,9 @@ export async function POST(request) {
       target_id: data.id,
       metadata: { key, display_name },
     });
-  } catch { /* best-effort */ }
+  } catch {
+    /* best-effort */
+  }
 
   return NextResponse.json({ permission_set: data });
 }

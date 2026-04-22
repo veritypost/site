@@ -7,6 +7,8 @@ import { useRouter } from 'next/navigation';
 
 export default function SettingsEmailsRedirect(): null {
   const router = useRouter();
-  useEffect(() => { router.replace('/profile/settings#emails'); }, [router]);
+  useEffect(() => {
+    router.replace('/profile/settings#emails');
+  }, [router]);
   return null;
 }

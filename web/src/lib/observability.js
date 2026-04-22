@@ -17,8 +17,10 @@ function hasClientDsn() {
 }
 
 function hasServerDsn() {
-  return typeof process !== 'undefined'
-    && Boolean(process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN);
+  return (
+    typeof process !== 'undefined' &&
+    Boolean(process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN)
+  );
 }
 
 async function loadSentryIfInstalled() {
@@ -102,8 +104,14 @@ export async function setUser(userId, extra) {
 // pass. These stubs preserve the call shape so existing callers
 // continue to work; a future chunk replaces the bodies.
 
-export async function track(event, props) { void event; void props; }
-export async function identify(userId, traits) { void userId; void traits; }
+export async function track(event, props) {
+  void event;
+  void props;
+}
+export async function identify(userId, traits) {
+  void userId;
+  void traits;
+}
 export async function resetIdentity() {}
 
 export function initObservability() {

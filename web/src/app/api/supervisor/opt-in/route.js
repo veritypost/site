@@ -7,8 +7,12 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 
 export async function POST(request) {
   let user;
-  try { user = await requirePermission('supervisor.opt_in'); }
-  catch (err) { if (err.status) return NextResponse.json({ error: err.message }, { status: err.status }); return NextResponse.json({ error: 'Internal error' }, { status: 500 }); }
+  try {
+    user = await requirePermission('supervisor.opt_in');
+  } catch (err) {
+    if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+  }
 
   const { category_id } = await request.json().catch(() => ({}));
   if (!category_id) return NextResponse.json({ error: 'category_id required' }, { status: 400 });
@@ -18,6 +22,10 @@ export async function POST(request) {
     p_user_id: user.id,
     p_category_id: category_id,
   });
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'supervisor.opt_in', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'supervisor.opt_in',
+      fallbackStatus: 400,
+    });
   return NextResponse.json({ ok: true });
 }

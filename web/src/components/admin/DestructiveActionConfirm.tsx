@@ -43,7 +43,10 @@ export default function DestructiveActionConfirm({
 
   useEffect(() => {
     if (!open) {
-      setTyped(''); setReason(''); setBusy(false); setError('');
+      setTyped('');
+      setReason('');
+      setBusy(false);
+      setError('');
     }
   }, [open]);
 
@@ -55,7 +58,8 @@ export default function DestructiveActionConfirm({
 
   async function submit() {
     if (!canSubmit) return;
-    setBusy(true); setError('');
+    setBusy(true);
+    setError('');
     try {
       const supabase = createClient();
       const { error: rpcErr } = await supabase.rpc('record_admin_action', {
@@ -86,14 +90,18 @@ export default function DestructiveActionConfirm({
       aria-modal="true"
       onClick={onClose}
       style={{
-        position: 'fixed', inset: 0, zIndex: 9999,
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9999,
         background: 'rgba(17, 17, 17, 0.85)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         padding: 16,
       }}
     >
       <div
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
         style={{
           background: '#111',
           border: '1px solid #333',
@@ -105,51 +113,122 @@ export default function DestructiveActionConfirm({
         }}
       >
         <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 10 }}>{title}</div>
-        <div style={{ fontSize: 13, color: '#bbb', lineHeight: 1.5, marginBottom: 14 }}>{message}</div>
+        <div style={{ fontSize: 13, color: '#bbb', lineHeight: 1.5, marginBottom: 14 }}>
+          {message}
+        </div>
 
         {confirmText && (
           <>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#888', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            <label
+              style={{
+                display: 'block',
+                fontSize: 11,
+                fontWeight: 700,
+                color: '#888',
+                marginBottom: 4,
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+              }}
+            >
               Type <span style={{ color: '#fff' }}>{confirmText}</span> to confirm
             </label>
             <input
               value={typed}
-              onChange={e => setTyped(e.target.value)}
+              onChange={(e) => setTyped(e.target.value)}
               autoFocus
               spellCheck={false}
               autoCorrect="off"
               autoCapitalize="none"
-              style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #333', background: '#1a1a1a', color: '#fff', fontSize: 13, outline: 'none', marginBottom: 10, fontFamily: 'inherit', boxSizing: 'border-box' }}
+              style={{
+                width: '100%',
+                padding: '8px 10px',
+                borderRadius: 8,
+                border: '1px solid #333',
+                background: '#1a1a1a',
+                color: '#fff',
+                fontSize: 13,
+                outline: 'none',
+                marginBottom: 10,
+                fontFamily: 'inherit',
+                boxSizing: 'border-box',
+              }}
             />
           </>
         )}
 
-        <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#888', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+        <label
+          style={{
+            display: 'block',
+            fontSize: 11,
+            fontWeight: 700,
+            color: '#888',
+            marginBottom: 4,
+            textTransform: 'uppercase',
+            letterSpacing: '0.04em',
+          }}
+        >
           Reason {reasonRequired ? '(required)' : '(optional)'}
         </label>
         <textarea
           value={reason}
-          onChange={e => setReason(e.target.value)}
+          onChange={(e) => setReason(e.target.value)}
           rows={3}
-          placeholder={reasonRequired ? 'Why are you doing this?' : 'Optional context for the audit log'}
-          style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #333', background: '#1a1a1a', color: '#fff', fontSize: 13, outline: 'none', marginBottom: 10, fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }}
+          placeholder={
+            reasonRequired ? 'Why are you doing this?' : 'Optional context for the audit log'
+          }
+          style={{
+            width: '100%',
+            padding: '8px 10px',
+            borderRadius: 8,
+            border: '1px solid #333',
+            background: '#1a1a1a',
+            color: '#fff',
+            fontSize: 13,
+            outline: 'none',
+            marginBottom: 10,
+            fontFamily: 'inherit',
+            resize: 'vertical',
+            boxSizing: 'border-box',
+          }}
         />
 
-        {error && (
-          <div style={{ fontSize: 12, color: '#f87171', marginBottom: 10 }}>{error}</div>
-        )}
+        {error && <div style={{ fontSize: 12, color: '#f87171', marginBottom: 10 }}>{error}</div>}
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button
             onClick={onClose}
             disabled={busy}
-            style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid #333', background: 'transparent', color: '#bbb', fontSize: 12, fontWeight: 600, cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit' }}
-          >Cancel</button>
+            style={{
+              padding: '8px 14px',
+              borderRadius: 8,
+              border: '1px solid #333',
+              background: 'transparent',
+              color: '#bbb',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: busy ? 'default' : 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            Cancel
+          </button>
           <button
             onClick={submit}
             disabled={!canSubmit}
-            style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: canSubmit ? '#dc2626' : '#555', color: '#fff', fontSize: 12, fontWeight: 700, cursor: canSubmit ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}
-          >{busy ? 'Working…' : confirmLabel}</button>
+            style={{
+              padding: '8px 14px',
+              borderRadius: 8,
+              border: 'none',
+              background: canSubmit ? '#dc2626' : '#555',
+              color: '#fff',
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: canSubmit ? 'pointer' : 'not-allowed',
+              fontFamily: 'inherit',
+            }}
+          >
+            {busy ? 'Working…' : confirmLabel}
+          </button>
         </div>
       </div>
     </div>

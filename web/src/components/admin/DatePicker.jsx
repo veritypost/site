@@ -22,17 +22,8 @@ import TextInput from './TextInput';
  * @param {boolean} [props.block]
  * @param {object} [props.style]
  */
-const DatePicker = forwardRef(function DatePicker(
-  { includeTime = false, ...rest },
-  ref,
-) {
-  return (
-    <TextInput
-      ref={ref}
-      type={includeTime ? 'datetime-local' : 'date'}
-      {...rest}
-    />
-  );
+const DatePicker = forwardRef(function DatePicker({ includeTime = false, ...rest }, ref) {
+  return <TextInput ref={ref} type={includeTime ? 'datetime-local' : 'date'} {...rest} />;
 });
 
 export default DatePicker;

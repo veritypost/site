@@ -54,7 +54,9 @@ export default function Drawer({
     if (!open || typeof document === 'undefined') return undefined;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
+    return () => {
+      document.body.style.overflow = prev;
+    };
   }, [open]);
 
   if (!open) return null;
@@ -62,7 +64,9 @@ export default function Drawer({
   return (
     <div
       role="presentation"
-      onClick={(e) => { if (e.target === e.currentTarget) attemptClose(); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) attemptClose();
+      }}
       style={{
         position: 'fixed',
         inset: 0,
@@ -121,7 +125,14 @@ export default function Drawer({
               </h2>
             )}
             {description && (
-              <p style={{ margin: `${S[1]}px 0 0`, fontSize: F.sm, color: ADMIN_C.dim, lineHeight: 1.5 }}>
+              <p
+                style={{
+                  margin: `${S[1]}px 0 0`,
+                  fontSize: F.sm,
+                  color: ADMIN_C.dim,
+                  lineHeight: 1.5,
+                }}
+              >
                 {description}
               </p>
             )}
@@ -140,14 +151,20 @@ export default function Drawer({
               cursor: 'pointer',
               borderRadius: 4,
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = ADMIN_C.accent; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = ADMIN_C.dim; }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = ADMIN_C.accent;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = ADMIN_C.dim;
+            }}
           >
             ×
           </button>
         </div>
 
-        <div style={{ padding: S[4], flex: 1, overflowY: 'auto', fontSize: F.base, lineHeight: 1.5 }}>
+        <div
+          style={{ padding: S[4], flex: 1, overflowY: 'auto', fontSize: F.base, lineHeight: 1.5 }}
+        >
           {children}
         </div>
 

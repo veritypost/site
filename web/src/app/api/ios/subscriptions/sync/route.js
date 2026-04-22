@@ -25,9 +25,7 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
   const authHeader = request.headers.get('authorization') || '';
-  const token = authHeader.toLowerCase().startsWith('bearer ')
-    ? authHeader.slice(7).trim()
-    : null;
+  const token = authHeader.toLowerCase().startsWith('bearer ') ? authHeader.slice(7).trim() : null;
   if (!token) {
     return NextResponse.json({ error: 'Missing bearer token' }, { status: 401 });
   }
@@ -40,12 +38,18 @@ export async function POST(request) {
   const userId = authData.user.id;
 
   let body;
-  try { body = await request.json(); }
-  catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
 
   const { productId, transactionId, receipt } = body || {};
   if (!productId || !transactionId || !receipt) {
-    return NextResponse.json({ error: 'productId, transactionId, receipt required' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'productId, transactionId, receipt required' },
+      { status: 400 }
+    );
   }
 
   let payload;
@@ -59,7 +63,10 @@ export async function POST(request) {
     return NextResponse.json({ error: 'productId mismatch between body and JWS' }, { status: 400 });
   }
   if (String(payload.transactionId) !== String(transactionId)) {
-    return NextResponse.json({ error: 'transactionId mismatch between body and JWS' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'transactionId mismatch between body and JWS' },
+      { status: 400 }
+    );
   }
 
   const service = createServiceClient();
@@ -77,14 +84,18 @@ export async function POST(request) {
 
   let logId = prior?.id;
   if (!logId) {
-    const { data: inserted } = await service.from('webhook_log').insert({
-      source: 'apple_sync',
-      event_type: payload.type || 'Auto-Renewable Subscription',
-      event_id: eventId,
-      payload,
-      processing_status: 'received',
-      signature_valid: true,
-    }).select('id').single();
+    const { data: inserted } = await service
+      .from('webhook_log')
+      .insert({
+        source: 'apple_sync',
+        event_type: payload.type || 'Auto-Renewable Subscription',
+        event_id: eventId,
+        payload,
+        processing_status: 'received',
+        signature_valid: true,
+      })
+      .select('id')
+      .single();
     logId = inserted?.id;
   }
 
@@ -93,10 +104,13 @@ export async function POST(request) {
     // from App Store Server Notifications (Task 2), not from client sync.
     if (payload.revocationDate) {
       await service.rpc('billing_freeze_profile', { p_user_id: userId });
-      await service.from('webhook_log').update({
-        processing_status: 'processed',
-        processed_at: new Date().toISOString(),
-      }).eq('id', logId);
+      await service
+        .from('webhook_log')
+        .update({
+          processing_status: 'processed',
+          processed_at: new Date().toISOString(),
+        })
+        .eq('id', logId);
       return NextResponse.json({ received: true, revoked: true });
     }
 
@@ -111,11 +125,13 @@ export async function POST(request) {
 
     if (userRow.frozen_at) {
       await service.rpc('billing_resubscribe', {
-        p_user_id: userId, p_new_plan_id: plan.id,
+        p_user_id: userId,
+        p_new_plan_id: plan.id,
       });
     } else {
       await service.rpc('billing_change_plan', {
-        p_user_id: userId, p_new_plan_id: plan.id,
+        p_user_id: userId,
+        p_new_plan_id: plan.id,
       });
     }
 
@@ -147,10 +163,13 @@ export async function POST(request) {
       await service.from('subscriptions').insert(subRow);
     }
 
-    await service.from('webhook_log').update({
-      processing_status: 'processed',
-      processed_at: new Date().toISOString(),
-    }).eq('id', logId);
+    await service
+      .from('webhook_log')
+      .update({
+        processing_status: 'processed',
+        processed_at: new Date().toISOString(),
+      })
+      .eq('id', logId);
 
     return NextResponse.json({
       received: true,
@@ -161,10 +180,13 @@ export async function POST(request) {
     });
   } catch (err) {
     if (logId) {
-      await service.from('webhook_log').update({
-        processing_status: 'failed',
-        processing_error: err.message,
-      }).eq('id', logId);
+      await service
+        .from('webhook_log')
+        .update({
+          processing_status: 'failed',
+          processing_error: err.message,
+        })
+        .eq('id', logId);
     }
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

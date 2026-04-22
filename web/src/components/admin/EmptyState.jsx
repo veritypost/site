@@ -17,14 +17,7 @@ import { ADMIN_C, F, S } from '../../lib/adminPalette';
  * @param {'sm'|'md'} [props.size='md']
  * @param {object} [props.style]
  */
-export default function EmptyState({
-  icon,
-  title,
-  description,
-  cta,
-  size = 'md',
-  style,
-}) {
+export default function EmptyState({ icon, title, description, cta, size = 'md', style }) {
   const padding = size === 'sm' ? S[6] : S[12];
   return (
     <div

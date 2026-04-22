@@ -95,11 +95,15 @@ export async function POST(request) {
     // (the cents removed from the user's billable amount by this free upgrade).
     const targetPlanId = promo.applies_to_plans?.[0];
     if (!targetPlanId) {
-      await supabase.from('promo_codes')
+      await supabase
+        .from('promo_codes')
         .update({ current_uses: promo.current_uses })
         .eq('id', promo.id)
         .eq('current_uses', promo.current_uses + 1);
-      return NextResponse.json({ error: 'This promo is not tied to a specific plan.' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'This promo is not tied to a specific plan.' },
+        { status: 400 }
+      );
     }
     const { data: plan } = await supabase
       .from('plans')
@@ -108,7 +112,8 @@ export async function POST(request) {
       .maybeSingle();
 
     if (!plan) {
-      await supabase.from('promo_codes')
+      await supabase
+        .from('promo_codes')
         .update({ current_uses: promo.current_uses })
         .eq('id', promo.id)
         .eq('current_uses', promo.current_uses + 1);
@@ -124,15 +129,20 @@ export async function POST(request) {
 
     if (useError) {
       // Roll back counter (best-effort; no-ops if a concurrent redeemer raced).
-      await supabase.from('promo_codes')
+      await supabase
+        .from('promo_codes')
         .update({ current_uses: promo.current_uses })
         .eq('id', promo.id)
         .eq('current_uses', promo.current_uses + 1);
       console.error('[promo/redeem] promo_uses insert failed:', useError);
-      return NextResponse.json({ error: 'Could not record redemption. Please try again.' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Could not record redemption. Please try again.' },
+        { status: 500 }
+      );
     }
 
-    await supabase.from('users')
+    await supabase
+      .from('users')
       .update({ plan_id: plan.id, plan_status: 'active' })
       .eq('id', user.id);
 

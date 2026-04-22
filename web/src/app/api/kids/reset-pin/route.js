@@ -10,8 +10,11 @@ export async function POST(request) {
   try {
     const supabase = await createClient();
     let user;
-    try { user = await requirePermission('kids.pin.reset'); }
-    catch (err) { return NextResponse.json({ error: err.message }, { status: err.status || 401 }); }
+    try {
+      user = await requirePermission('kids.pin.reset');
+    } catch (err) {
+      return NextResponse.json({ error: err.message }, { status: err.status || 401 });
+    }
 
     // Rate-limit parent-password brute-force: 5 reset attempts per hour per user.
     const svc = createServiceClient();
@@ -22,7 +25,10 @@ export async function POST(request) {
       windowSec: 3600,
     });
     if (rate.limited) {
-      return NextResponse.json({ error: 'Too many PIN reset attempts. Try again later.' }, { status: 429, headers: { 'Retry-After': '3600' } });
+      return NextResponse.json(
+        { error: 'Too many PIN reset attempts. Try again later.' },
+        { status: 429, headers: { 'Retry-After': '3600' } }
+      );
     }
 
     const { kid_profile_id, password } = await request.json();

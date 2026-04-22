@@ -19,7 +19,9 @@ export const OWNER_ROLES = Object.freeze(new Set(['owner']));
 export const ADMIN_ROLES = Object.freeze(new Set(['owner', 'admin']));
 export const EDITOR_ROLES = Object.freeze(new Set(['owner', 'admin', 'editor']));
 export const MOD_ROLES = Object.freeze(new Set(['owner', 'admin', 'editor', 'moderator']));
-export const EXPERT_ROLES = Object.freeze(new Set(['owner', 'admin', 'editor', 'expert', 'journalist', 'educator']));
+export const EXPERT_ROLES = Object.freeze(
+  new Set(['owner', 'admin', 'editor', 'expert', 'journalist', 'educator'])
+);
 
 // ---- DB-live role hierarchy ----
 //

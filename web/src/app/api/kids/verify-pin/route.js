@@ -11,8 +11,11 @@ const LOCKOUT_SECONDS = 60;
 
 export async function POST(request) {
   let user;
-  try { user = await requirePermission('kids.pin.verify'); }
-  catch (err) { return NextResponse.json({ error: err.message }, { status: err.status || 401 }); }
+  try {
+    user = await requirePermission('kids.pin.verify');
+  } catch (err) {
+    return NextResponse.json({ error: err.message }, { status: err.status || 401 });
+  }
 
   // Outer guard over the DB-level per-kid lockout: 30 attempts/min per parent across all kids.
   const rlSvc = createServiceClient();
@@ -23,7 +26,10 @@ export async function POST(request) {
     windowSec: 60,
   });
   if (rate.limited) {
-    return NextResponse.json({ error: 'Too many attempts. Wait a minute.', retryAfter: 60 }, { status: 429, headers: { 'Retry-After': '60' } });
+    return NextResponse.json(
+      { error: 'Too many attempts. Wait a minute.', retryAfter: 60 },
+      { status: 429, headers: { 'Retry-After': '60' } }
+    );
   }
 
   try {
@@ -40,7 +46,9 @@ export async function POST(request) {
 
     const { data: profile, error } = await service
       .from('kid_profiles')
-      .select('id, pin_hash, pin_salt, pin_hash_algo, pin_attempts, pin_locked_until, parent_user_id')
+      .select(
+        'id, pin_hash, pin_salt, pin_hash_algo, pin_attempts, pin_locked_until, parent_user_id'
+      )
       .eq('id', kid_profile_id)
       .eq('parent_user_id', user.id)
       .maybeSingle();
@@ -74,10 +82,7 @@ export async function POST(request) {
         update.pin_salt = cred.pin_salt;
         update.pin_hash_algo = cred.pin_hash_algo;
       }
-      await service
-        .from('kid_profiles')
-        .update(update)
-        .eq('id', profile.id);
+      await service.from('kid_profiles').update(update).eq('id', profile.id);
 
       return NextResponse.json({ ok: true });
     }
@@ -102,10 +107,7 @@ export async function POST(request) {
       );
     }
 
-    return NextResponse.json(
-      { error: 'Incorrect PIN' },
-      { status: 401 }
-    );
+    return NextResponse.json({ error: 'Incorrect PIN' }, { status: 401 });
   } catch (err) {
     console.error('[kids/verify-pin]', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

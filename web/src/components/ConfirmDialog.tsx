@@ -44,22 +44,40 @@ export default function ConfirmDialog({
       aria-modal="true"
       aria-labelledby="confirm-dialog-title"
       style={{
-        position: 'fixed', inset: 0, zIndex: 10000,
+        position: 'fixed',
+        inset: 0,
+        zIndex: 10000,
         background: 'rgba(0,0,0,0.45)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         padding: 16,
       }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose?.();
       }}
     >
-      <div style={{
-        background: '#ffffff', borderRadius: 14, maxWidth: 420, width: '100%',
-        padding: 20, boxShadow: '0 10px 40px rgba(0,0,0,0.25)',
-      }}>
-        <h2 id="confirm-dialog-title" style={{
-          margin: '0 0 8px 0', fontSize: 18, fontWeight: 700, color: '#111111',
-        }}>{title}</h2>
+      <div
+        style={{
+          background: '#ffffff',
+          borderRadius: 14,
+          maxWidth: 420,
+          width: '100%',
+          padding: 20,
+          boxShadow: '0 10px 40px rgba(0,0,0,0.25)',
+        }}
+      >
+        <h2
+          id="confirm-dialog-title"
+          style={{
+            margin: '0 0 8px 0',
+            fontSize: 18,
+            fontWeight: 700,
+            color: '#111111',
+          }}
+        >
+          {title}
+        </h2>
         {message && (
           <p style={{ margin: '0 0 18px 0', fontSize: 14, color: '#5a5a5a', lineHeight: 1.5 }}>
             {message}
@@ -71,10 +89,16 @@ export default function ConfirmDialog({
             onClick={onClose}
             disabled={busy}
             style={{
-              padding: '8px 14px', fontSize: 14, fontWeight: 500,
-              border: '1px solid #e5e5e5', borderRadius: 8,
-              background: '#ffffff', color: '#111111', cursor: busy ? 'not-allowed' : 'pointer',
-            }}>
+              padding: '8px 14px',
+              fontSize: 14,
+              fontWeight: 500,
+              border: '1px solid #e5e5e5',
+              borderRadius: 8,
+              background: '#ffffff',
+              color: '#111111',
+              cursor: busy ? 'not-allowed' : 'pointer',
+            }}
+          >
             {cancelLabel}
           </button>
           <button
@@ -82,13 +106,17 @@ export default function ConfirmDialog({
             onClick={onConfirm}
             disabled={busy}
             style={{
-              padding: '8px 14px', fontSize: 14, fontWeight: 600,
-              border: 'none', borderRadius: 8,
+              padding: '8px 14px',
+              fontSize: 14,
+              fontWeight: 600,
+              border: 'none',
+              borderRadius: 8,
               background: danger ? '#b91c1c' : '#111111',
               color: '#ffffff',
               cursor: busy ? 'not-allowed' : 'pointer',
               opacity: busy ? 0.6 : 1,
-            }}>
+            }}
+          >
             {busy ? 'Working…' : confirmLabel}
           </button>
         </div>

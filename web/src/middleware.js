@@ -13,15 +13,11 @@ import { createServerClient } from '@supabase/ssr';
 // (app/admin/layout.tsx) handles its own auth + role check and returns
 // a 404 for anon or non-staff callers. Putting /admin here would redirect
 // anon to /login?next=/admin, disclosing that /admin is a real surface.
-const PROTECTED_PREFIXES = [
-  '/profile',
-  '/messages',
-  '/bookmarks',
-];
+const PROTECTED_PREFIXES = ['/profile', '/messages', '/bookmarks'];
 
 function isProtected(pathname) {
-  return PROTECTED_PREFIXES.some((prefix) =>
-    pathname === prefix || pathname.startsWith(prefix + '/')
+  return PROTECTED_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(prefix + '/')
   );
 }
 
@@ -58,7 +54,11 @@ function mintNonce() {
 function buildCsp(nonce) {
   const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
   const supabaseOrigin = (() => {
-    try { return new URL(SUPABASE_URL).origin; } catch { return ''; }
+    try {
+      return new URL(SUPABASE_URL).origin;
+    } catch {
+      return '';
+    }
   })();
   const supabaseWss = supabaseOrigin ? supabaseOrigin.replace('https://', 'wss://') : '';
 
@@ -68,13 +68,15 @@ function buildCsp(nonce) {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data: https://fonts.gstatic.com",
-    `connect-src 'self' ${supabaseOrigin} ${supabaseWss} https://api.stripe.com https://api.openai.com https://*.ingest.sentry.io`.replace(/\s+/g, ' ').trim(),
-    "frame-src https://js.stripe.com https://hooks.stripe.com",
+    `connect-src 'self' ${supabaseOrigin} ${supabaseWss} https://api.stripe.com https://api.openai.com https://*.ingest.sentry.io`
+      .replace(/\s+/g, ' ')
+      .trim(),
+    'frame-src https://js.stripe.com https://hooks.stripe.com',
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",
     "object-src 'none'",
-    "report-uri /api/csp-report",
+    'report-uri /api/csp-report',
   ].join('; ');
 }
 
@@ -99,7 +101,8 @@ const ALLOWED_ORIGINS = new Set([
   'http://localhost:3333',
 ]);
 const CORS_ALLOW_METHODS = 'GET, POST, PATCH, DELETE, OPTIONS';
-const CORS_ALLOW_HEADERS = 'authorization, content-type, x-health-token, x-request-id, x-vercel-cron';
+const CORS_ALLOW_HEADERS =
+  'authorization, content-type, x-health-token, x-request-id, x-vercel-cron';
 
 function applyCors(request, response) {
   const origin = request.headers.get('origin');
@@ -232,13 +235,8 @@ export async function middleware(request) {
   // and the /kids/* fork below branch on `user`, so every other request
   // (home, story, /api/*, /login, etc.) can avoid a Supabase auth round-trip
   // entirely. Cuts middleware p50 on public pages dramatically.
-  const needsUser =
-    isProtected(pathname) ||
-    pathname === '/kids' ||
-    pathname.startsWith('/kids/');
-  const user = needsUser
-    ? (await supabase.auth.getUser()).data.user
-    : null;
+  const needsUser = isProtected(pathname) || pathname === '/kids' || pathname.startsWith('/kids/');
+  const user = needsUser ? (await supabase.auth.getUser()).data.user : null;
 
   if (!user && isProtected(pathname)) {
     const loginUrl = request.nextUrl.clone();

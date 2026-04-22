@@ -12,8 +12,9 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // F-035: actor-outranks-target required (see billing/cancel).
 export async function POST(request) {
   let user;
-  try { user = await requirePermission('admin.billing.freeze'); }
-  catch (err) {
+  try {
+    user = await requirePermission('admin.billing.freeze');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -38,6 +39,10 @@ export async function POST(request) {
 
   const service = createServiceClient();
   const { data, error } = await service.rpc('billing_freeze_profile', { p_user_id: user_id });
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.billing.freeze', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'admin.billing.freeze',
+      fallbackStatus: 400,
+    });
   return NextResponse.json(data);
 }

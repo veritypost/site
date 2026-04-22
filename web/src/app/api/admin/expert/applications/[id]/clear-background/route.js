@@ -10,8 +10,9 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // refuse until background_check_status='cleared'.
 export async function POST(request, { params }) {
   let user;
-  try { user = await requirePermission('admin.expert.applications.clear_background'); }
-  catch (err) {
+  try {
+    user = await requirePermission('admin.expert.applications.clear_background');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -28,7 +29,11 @@ export async function POST(request, { params }) {
     .select('id, background_check_status')
     .maybeSingle();
 
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.expert.applications.id.clear_background', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'admin.expert.applications.id.clear_background',
+      fallbackStatus: 400,
+    });
   if (!data) return NextResponse.json({ error: 'Application not found' }, { status: 404 });
 
   await service.from('audit_log').insert({

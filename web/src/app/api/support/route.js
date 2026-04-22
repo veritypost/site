@@ -37,8 +37,8 @@ export async function POST(request) {
     // `priority` defaults to 'normal' on the table so we don't pass one.
     const { data: ticket, error: rpcErr } = await supabase.rpc('create_support_ticket', {
       p_category: category,
-      p_subject:  subject,
-      p_body:     description,
+      p_subject: subject,
+      p_body: description,
     });
     if (rpcErr) return NextResponse.json({ error: rpcErr.message }, { status: 500 });
 
@@ -56,7 +56,8 @@ export async function GET(request) {
     const supabase = token ? createClientFromToken(token) : await createClient();
     const user = await requireAuth(supabase);
 
-    const { data } = await supabase.from('support_tickets')
+    const { data } = await supabase
+      .from('support_tickets')
       .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });

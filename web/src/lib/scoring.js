@@ -16,7 +16,10 @@ export async function scoreQuizSubmit(service, { userId, kidProfileId, articleId
   return data;
 }
 
-export async function scoreReadingComplete(service, { userId, kidProfileId, articleId, readingLogId }) {
+export async function scoreReadingComplete(
+  service,
+  { userId, kidProfileId, articleId, readingLogId }
+) {
   const { data, error } = await service.rpc('score_on_reading_complete', {
     p_user_id: userId,
     p_kid_profile_id: toNull(kidProfileId),
@@ -67,7 +70,10 @@ export async function checkAchievements(service, { userId }) {
 // Back-compat shim for older call sites. New code should call the
 // RPC-specific helpers above. This wraps award_points directly so
 // ad-hoc grants (admin tools, one-off adjustments) still work.
-export async function awardPoints(service, { userId, kidProfileId, action, articleId, categoryId, sourceType, sourceId, syntheticKey }) {
+export async function awardPoints(
+  service,
+  { userId, kidProfileId, action, articleId, categoryId, sourceType, sourceId, syntheticKey }
+) {
   const { data, error } = await service.rpc('award_points', {
     p_action: action,
     p_user_id: toNull(userId),

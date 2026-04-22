@@ -29,8 +29,11 @@ type CreateBody = {
 
 export async function POST(request: Request) {
   let actor;
-  try { actor = await requirePermission('admin.features.create'); }
-  catch (err) { return permissionError(err); }
+  try {
+    actor = await requirePermission('admin.features.create');
+  } catch (err) {
+    return permissionError(err);
+  }
   void actor;
 
   const body = (await request.json().catch(() => ({}))) as CreateBody;
@@ -54,7 +57,18 @@ export async function POST(request: Request) {
     is_killswitch: !!body.is_killswitch,
     expires_at: body.expires_at || null,
   };
-  for (const f of ['target_platforms','target_min_app_version','target_max_app_version','target_min_os_version','target_user_ids','target_plan_tiers','target_countries','target_cohort_ids','conditions','variant'] as const) {
+  for (const f of [
+    'target_platforms',
+    'target_min_app_version',
+    'target_max_app_version',
+    'target_min_os_version',
+    'target_user_ids',
+    'target_plan_tiers',
+    'target_countries',
+    'target_cohort_ids',
+    'conditions',
+    'variant',
+  ] as const) {
     const v = body[f];
     if (v !== undefined && v !== null) row[f] = v;
   }

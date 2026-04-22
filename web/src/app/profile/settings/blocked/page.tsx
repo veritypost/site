@@ -7,6 +7,8 @@ import { useRouter } from 'next/navigation';
 
 export default function SettingsBlockedRedirect(): null {
   const router = useRouter();
-  useEffect(() => { router.replace('/profile/settings#blocked'); }, [router]);
+  useEffect(() => {
+    router.replace('/profile/settings#blocked');
+  }, [router]);
   return null;
 }

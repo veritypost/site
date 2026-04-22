@@ -8,8 +8,9 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // GET /api/bookmarks/export — JSON download (D13, paid-only).
 export async function GET() {
   let user;
-  try { user = await requirePermission('bookmarks.export'); }
-  catch (err) {
+  try {
+    user = await requirePermission('bookmarks.export');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
@@ -18,16 +19,22 @@ export async function GET() {
 
   const { data, error } = await service
     .from('bookmarks')
-    .select('id, notes, created_at, collection_id, bookmark_collections!fk_bookmarks_collection_id(name), articles!fk_bookmarks_article_id(title, slug, excerpt, published_at, categories!fk_articles_category_id(name))')
+    .select(
+      'id, notes, created_at, collection_id, bookmark_collections!fk_bookmarks_collection_id(name), articles!fk_bookmarks_article_id(title, slug, excerpt, published_at, categories!fk_articles_category_id(name))'
+    )
     .eq('user_id', user.id)
     .order('created_at', { ascending: false });
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'bookmarks.export', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'bookmarks.export',
+      fallbackStatus: 400,
+    });
 
   const payload = {
     exported_at: new Date().toISOString(),
     user_id: user.id,
     count: (data || []).length,
-    bookmarks: (data || []).map(b => ({
+    bookmarks: (data || []).map((b) => ({
       created_at: b.created_at,
       notes: b.notes,
       collection: b.bookmark_collections?.name || null,

@@ -12,8 +12,11 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (!subId) return NextResponse.json({ error: 'subscription id required' }, { status: 400 });
 
   let actor;
-  try { actor = await requirePermission('admin.billing.override_plan'); }
-  catch (err) { return permissionError(err); }
+  try {
+    actor = await requirePermission('admin.billing.override_plan');
+  } catch (err) {
+    return permissionError(err);
+  }
 
   const body = (await request.json().catch(() => ({}))) as Body;
   const days = Number(body.days);

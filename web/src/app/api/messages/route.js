@@ -10,8 +10,9 @@ import { createServiceClient } from '@/lib/supabase/server';
 // side via the post_message RPC (migration 049).
 export async function POST(request) {
   let user;
-  try { user = await requirePermission('messages.dm.compose'); }
-  catch (err) {
+  try {
+    user = await requirePermission('messages.dm.compose');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
@@ -29,14 +30,21 @@ export async function POST(request) {
   });
   if (error) {
     const msg = error.message || '';
-    const status = msg.includes('paid plan') ? 403
-      : msg.includes('muted') || msg.includes('banned') ? 403
-      : msg.includes('rate limit') ? 429
-      : msg.includes('participant') ? 403
-      : 400;
-    const userMsg = status === 429 ? 'Too many messages. Please slow down.'
-      : status === 403 ? 'You cannot send messages in this conversation.'
-      : 'Could not send message';
+    const status = msg.includes('paid plan')
+      ? 403
+      : msg.includes('muted') || msg.includes('banned')
+        ? 403
+        : msg.includes('rate limit')
+          ? 429
+          : msg.includes('participant')
+            ? 403
+            : 400;
+    const userMsg =
+      status === 429
+        ? 'Too many messages. Please slow down.'
+        : status === 403
+          ? 'You cannot send messages in this conversation.'
+          : 'Could not send message';
     console.error('[messages.post]', error);
     const headers = status === 429 ? { 'Retry-After': '60' } : undefined;
     return NextResponse.json({ error: userMsg }, { status, headers });

@@ -7,7 +7,9 @@
    animation using the defined @keyframes degrades to a near-instant
    transition instead of disorienting motion. */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
@@ -21,7 +23,7 @@
   --card: #f7f7f7;
   --border: #222222;
   --rule: #e5e5e5;
-  --white: #111111;      /* primary text — named for parity with vp-views var names */
+  --white: #111111; /* primary text — named for parity with vp-views var names */
   --text: #111111;
   --soft: #444444;
   /* DA-054 — `--dim` was `#666666`. Review recalculated contrast vs
@@ -70,18 +72,34 @@
   color: var(--accent);
   text-decoration: underline;
 }
-.vp-dark a:hover { opacity: 0.85; }
+.vp-dark a:hover {
+  opacity: 0.85;
+}
 
-.vp-dark ::selection { background: rgba(0, 0, 0, 0.15); }
+.vp-dark ::selection {
+  background: rgba(0, 0, 0, 0.15);
+}
 
-@keyframes vpFadeIn { from { opacity: 0 } to { opacity: 1 } }
+@keyframes vpFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
 
 /* Kid-mode celebration motion. The baseline reduced-motion rule at
    the top of this file collapses all animation to near-instant, so
    these rules respect OS preferences automatically. */
 @keyframes kidStreakPulse {
-  0%, 100% { transform: scale(1); }
-  50%      { transform: scale(1.06); }
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
 }
 .kid-streak-pulse {
   animation: kidStreakPulse 2.4s ease-in-out infinite;
@@ -89,8 +107,14 @@
   display: inline-block;
 }
 @keyframes kidCelebrateRise {
-  from { opacity: 0; transform: translateY(6px) scale(0.98); }
-  to   { opacity: 1; transform: translateY(0)   scale(1); }
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 .kid-celebrate-rise {
   animation: kidCelebrateRise 220ms ease-out both;

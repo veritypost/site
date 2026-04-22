@@ -10,10 +10,12 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // Body: { reason, description? }
 // D39: any verified user can report content.
 export async function POST(request, { params }) {
-  const blocked = await v2LiveGuard(); if (blocked) return blocked;
+  const blocked = await v2LiveGuard();
+  if (blocked) return blocked;
   let user;
-  try { user = await requirePermission('comments.report'); }
-  catch (err) {
+  try {
+    user = await requirePermission('comments.report');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
@@ -33,6 +35,10 @@ export async function POST(request, { params }) {
     })
     .select('id')
     .single();
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'comments.id.report', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'comments.id.report',
+      fallbackStatus: 400,
+    });
   return NextResponse.json({ id: data.id });
 }

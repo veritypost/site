@@ -9,8 +9,9 @@ import { checkRateLimit } from '@/lib/rateLimit';
 // Body: { target_user_id }
 export async function POST(request) {
   let user;
-  try { user = await requirePermission('profile.follow'); }
-  catch (err) {
+  try {
+    user = await requirePermission('profile.follow');
+  } catch (err) {
     console.error('[follows.POST]', err);
     if (err.status) {
       return NextResponse.json({ error: 'Not allowed to follow' }, { status: err.status });
@@ -19,7 +20,8 @@ export async function POST(request) {
   }
 
   const { target_user_id } = await request.json().catch(() => ({}));
-  if (!target_user_id) return NextResponse.json({ error: 'target_user_id required' }, { status: 400 });
+  if (!target_user_id)
+    return NextResponse.json({ error: 'target_user_id required' }, { status: 400 });
 
   const service = createServiceClient();
 
@@ -30,7 +32,10 @@ export async function POST(request) {
     windowSec: 60,
   });
   if (rate.limited) {
-    return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': '60' } });
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': '60' } }
+    );
   }
 
   const { data, error } = await service.rpc('toggle_follow', {

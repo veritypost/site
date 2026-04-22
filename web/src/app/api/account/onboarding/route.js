@@ -16,15 +16,22 @@ import { trackServer } from '@/lib/trackServer';
 // is required so auth.uid() resolves inside the RPC.
 export async function POST(request) {
   let authUser;
-  try { authUser = await requireAuth(); }
-  catch { return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 }); }
+  try {
+    authUser = await requireAuth();
+  } catch {
+    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+  }
 
   const authed = createClient();
   const { error } = await authed.rpc('update_own_profile', {
     p_fields: { onboarding_completed_at: new Date().toISOString() },
   });
 
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'account.onboarding', fallbackStatus: 500 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'account.onboarding',
+      fallbackStatus: 500,
+    });
 
   // Fire onboarding_complete after the authoritative write succeeds.
   void trackServer('onboarding_complete', 'product', {

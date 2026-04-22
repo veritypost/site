@@ -44,7 +44,7 @@ const HTML_DANGER_PATTERNS = [
   /<\s*iframe\b/i,
   /<\s*object\b/i,
   /<\s*embed\b/i,
-  /\son[a-z]+\s*=/i,              // onclick=, onerror=, onload=, ...
+  /\son[a-z]+\s*=/i, // onclick=, onerror=, onload=, ...
   /javascript\s*:/i,
   /data\s*:\s*text\/html/i,
 ];
@@ -55,8 +55,9 @@ function htmlLooksDangerous(html) {
 
 export async function POST(request) {
   let user;
-  try { user = await requirePermission('admin.email.send_manual'); }
-  catch (err) {
+  try {
+    user = await requirePermission('admin.email.send_manual');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -101,17 +102,26 @@ export async function POST(request) {
     return NextResponse.json({ error: 'to must contain at least one address' }, { status: 400 });
   }
   if (recipients.length > MAX_RECIPIENTS) {
-    return NextResponse.json({ error: `Max ${MAX_RECIPIENTS} recipients per request` }, { status: 400 });
+    return NextResponse.json(
+      { error: `Max ${MAX_RECIPIENTS} recipients per request` },
+      { status: 400 }
+    );
   }
   const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (recipients.some((r) => typeof r !== 'string' || !EMAIL_RX.test(r))) {
-    return NextResponse.json({ error: 'recipients must be valid email addresses' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'recipients must be valid email addresses' },
+      { status: 400 }
+    );
   }
 
   try {
     const result = await sendEmail({ to: recipients, subject, html });
     if (!result?.ok) {
-      return NextResponse.json({ error: result?.reason || 'Failed to send email' }, { status: 500 });
+      return NextResponse.json(
+        { error: result?.reason || 'Failed to send email' },
+        { status: 500 }
+      );
     }
 
     // F-020 audit record. Stores recipient count + first 200 chars of

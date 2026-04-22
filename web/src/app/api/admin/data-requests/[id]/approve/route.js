@@ -12,8 +12,9 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // status pending -> processing -> completed via claim_next_export_request.
 export async function POST(request, { params }) {
   let user;
-  try { user = await requirePermission('admin.users.data_requests.process'); }
-  catch (err) {
+  try {
+    user = await requirePermission('admin.users.data_requests.process');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -30,7 +31,11 @@ export async function POST(request, { params }) {
       updated_at: now,
     })
     .eq('id', params.id);
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.data_requests.id.approve', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'admin.data_requests.id.approve',
+      fallbackStatus: 400,
+    });
 
   // T-023 — GDPR-touching action; needs audit trail.
   try {
@@ -42,7 +47,9 @@ export async function POST(request, { params }) {
       target_id: params.id,
       metadata: { verified_at: now },
     });
-  } catch { /* best-effort */ }
+  } catch {
+    /* best-effort */
+  }
 
   return NextResponse.json({ ok: true });
 }

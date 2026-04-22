@@ -177,17 +177,15 @@ export async function POST(request, { params }) {
           .eq('id', existing.id);
         if (updErr) return dbError('override update', updErr, 'override update failed');
       } else {
-        const { error: insErr } = await service
-          .from('permission_scope_overrides')
-          .insert({
-            scope_type: 'user',
-            scope_id: targetUserId,
-            permission_key,
-            override_action: overrideAction,
-            reason: reason ?? null,
-            expires_at: expiresIso,
-            created_by: actor.id,
-          });
+        const { error: insErr } = await service.from('permission_scope_overrides').insert({
+          scope_type: 'user',
+          scope_id: targetUserId,
+          permission_key,
+          override_action: overrideAction,
+          reason: reason ?? null,
+          expires_at: expiresIso,
+          created_by: actor.id,
+        });
         if (insErr) return dbError('override insert', insErr, 'override insert failed');
       }
 
@@ -217,19 +215,17 @@ export async function POST(request, { params }) {
       if (!setRow) return notFound(`permission_set not found: ${set_key}`);
 
       // Upsert on the composite PK (user_id, permission_set_id).
-      const { error: upErr } = await service
-        .from('user_permission_sets')
-        .upsert(
-          {
-            user_id: targetUserId,
-            permission_set_id: setRow.id,
-            granted_by: actor.id,
-            granted_at: new Date().toISOString(),
-            expires_at: expiresIso,
-            reason: reason ?? null,
-          },
-          { onConflict: 'user_id,permission_set_id' }
-        );
+      const { error: upErr } = await service.from('user_permission_sets').upsert(
+        {
+          user_id: targetUserId,
+          permission_set_id: setRow.id,
+          granted_by: actor.id,
+          granted_at: new Date().toISOString(),
+          expires_at: expiresIso,
+          reason: reason ?? null,
+        },
+        { onConflict: 'user_id,permission_set_id' }
+      );
       if (upErr) return dbError('set upsert', upErr, 'permission set assignment failed');
       auditNewValue = { set_key, permission_set_id: setRow.id, expires_at: expiresIso };
     } else if (action === 'remove_set') {

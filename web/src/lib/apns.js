@@ -24,9 +24,7 @@ let jwtCache = { token: null, expiresAt: 0 };
 
 function apnsAuthority(environment) {
   const env = (environment || process.env.APNS_ENV || 'production').toLowerCase();
-  return env === 'sandbox'
-    ? 'https://api.sandbox.push.apple.com'
-    : 'https://api.push.apple.com';
+  return env === 'sandbox' ? 'https://api.sandbox.push.apple.com' : 'https://api.push.apple.com';
 }
 
 // Normalise any input (column value, option, env var) to one of the two APNs
@@ -64,11 +62,10 @@ function signAppleJwt() {
   const signingInput = `${headerB64}.${payloadB64}`;
 
   const key = crypto.createPrivateKey(loadAuthKey());
-  const sig = crypto.sign(
-    'SHA256',
-    Buffer.from(signingInput, 'utf8'),
-    { key, dsaEncoding: 'ieee-p1363' }
-  );
+  const sig = crypto.sign('SHA256', Buffer.from(signingInput, 'utf8'), {
+    key,
+    dsaEncoding: 'ieee-p1363',
+  });
   const token = `${signingInput}.${sig.toString('base64url')}`;
 
   jwtCache = { token, expiresAt: now + JWT_MAX_AGE_SECONDS };
@@ -115,7 +112,7 @@ function sendOnSession(session, deviceToken, notification, opts = {}) {
   const headers = {
     ':method': 'POST',
     ':path': `/3/device/${deviceToken}`,
-    'authorization': `bearer ${jwt}`,
+    authorization: `bearer ${jwt}`,
     'apns-topic': topic,
     'apns-push-type': 'alert',
     'apns-priority': String(opts.priority ?? 10),
@@ -141,8 +138,12 @@ function sendOnSession(session, deviceToken, notification, opts = {}) {
         invalidated: false,
       });
     });
-    req.on('response', (h) => { responseHeaders = h; });
-    req.on('data', (chunk) => { responseBody += chunk; });
+    req.on('response', (h) => {
+      responseHeaders = h;
+    });
+    req.on('data', (chunk) => {
+      responseBody += chunk;
+    });
     req.on('error', (err) => {
       resolve({
         ok: false,
@@ -157,13 +158,17 @@ function sendOnSession(session, deviceToken, notification, opts = {}) {
       const apnsId = responseHeaders?.['apns-id'] || null;
       let reason = null;
       if (responseBody) {
-        try { reason = JSON.parse(responseBody)?.reason || null; } catch { /* body not JSON */ }
+        try {
+          reason = JSON.parse(responseBody)?.reason || null;
+        } catch {
+          /* body not JSON */
+        }
       }
       if (status === 200) {
         resolve({ ok: true, status, apnsId, reason: null, retryable: false, invalidated: false });
         return;
       }
-      const invalidated = (status === 410) || (reason && DEAD_TOKEN_REASONS.has(reason));
+      const invalidated = status === 410 || (reason && DEAD_TOKEN_REASONS.has(reason));
       const retryable = status >= 500 || status === 429;
       resolve({ ok: false, status, apnsId, reason, retryable, invalidated });
     });
@@ -184,7 +189,11 @@ export async function withApnsSession(fn, { environment } = {}) {
       send: (token, payload, opts) => sendOnSession(session, token, payload, opts),
     });
   } finally {
-    try { session.close(); } catch { /* already closed */ }
+    try {
+      session.close();
+    } catch {
+      /* already closed */
+    }
   }
 }
 
@@ -223,32 +232,39 @@ export async function sendPushToUser(service, userId, notification, { notificati
     (byEnv[env] ||= []).push(t);
   }
 
-  let delivered = 0, failed = 0, invalidated = 0;
+  let delivered = 0,
+    failed = 0,
+    invalidated = 0;
 
   for (const [env, envTokens] of Object.entries(byEnv)) {
-    await withApnsSession(async ({ send }) => {
-      await Promise.all(envTokens.map(async (t) => {
-        const r = await send(t.push_token, notification, opts);
-        await service.from('push_receipts').insert({
-          notification_id: notificationId || null,
-          user_id: userId,
-          provider: 'apns',
-          push_token: t.push_token,
-          status: r.ok ? 'delivered' : 'failed',
-          provider_message_id: r.apnsId || null,
-          error_code: r.reason || null,
-          error_message: r.ok ? null : (r.reason || `http ${r.status}`),
-          token_invalidated: !!r.invalidated,
-          sent_at: new Date().toISOString(),
-        });
-        if (r.ok) delivered += 1;
-        else failed += 1;
-        if (r.invalidated) {
-          invalidated += 1;
-          await service.rpc('invalidate_user_push_token', { p_token: t.push_token });
-        }
-      }));
-    }, { environment: env });
+    await withApnsSession(
+      async ({ send }) => {
+        await Promise.all(
+          envTokens.map(async (t) => {
+            const r = await send(t.push_token, notification, opts);
+            await service.from('push_receipts').insert({
+              notification_id: notificationId || null,
+              user_id: userId,
+              provider: 'apns',
+              push_token: t.push_token,
+              status: r.ok ? 'delivered' : 'failed',
+              provider_message_id: r.apnsId || null,
+              error_code: r.reason || null,
+              error_message: r.ok ? null : r.reason || `http ${r.status}`,
+              token_invalidated: !!r.invalidated,
+              sent_at: new Date().toISOString(),
+            });
+            if (r.ok) delivered += 1;
+            else failed += 1;
+            if (r.invalidated) {
+              invalidated += 1;
+              await service.rpc('invalidate_user_push_token', { p_token: t.push_token });
+            }
+          })
+        );
+      },
+      { environment: env }
+    );
   }
 
   return { delivered, failed, invalidated, attempted: tokens.length };

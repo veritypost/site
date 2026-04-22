@@ -7,6 +7,8 @@ import { useRouter } from 'next/navigation';
 
 export default function SettingsSupervisorRedirect(): null {
   const router = useRouter();
-  useEffect(() => { router.replace('/profile/settings#supervisor'); }, [router]);
+  useEffect(() => {
+    router.replace('/profile/settings#supervisor');
+  }, [router]);
   return null;
 }

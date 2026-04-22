@@ -9,8 +9,9 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // Body: { resolution, notes? }
 export async function POST(request, { params }) {
   let user;
-  try { user = await requirePermission('admin.moderation.reports.bulk_resolve'); }
-  catch (err) {
+  try {
+    user = await requirePermission('admin.moderation.reports.bulk_resolve');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -25,6 +26,10 @@ export async function POST(request, { params }) {
     p_resolution: resolution,
     p_notes: notes || null,
   });
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.moderation.reports.id.resolve', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'admin.moderation.reports.id.resolve',
+      fallbackStatus: 400,
+    });
   return NextResponse.json({ ok: true });
 }

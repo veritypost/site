@@ -9,8 +9,9 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // Body: { body }
 export async function POST(request, { params }) {
   let user;
-  try { user = await requirePermission('expert.answer.submit'); }
-  catch (err) {
+  try {
+    user = await requirePermission('expert.answer.submit');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
@@ -24,6 +25,10 @@ export async function POST(request, { params }) {
     p_queue_item_id: params.id,
     p_body: body,
   });
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'expert.queue.id.answer', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'expert.queue.id.answer',
+      fallbackStatus: 400,
+    });
   return NextResponse.json(data);
 }

@@ -10,13 +10,16 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 
 function clientIp(request) {
   const fwd = request.headers.get('x-forwarded-for');
-  return fwd ? fwd.split(',')[0].trim() : (request.headers.get('x-real-ip') || null);
+  return fwd ? fwd.split(',')[0].trim() : request.headers.get('x-real-ip') || null;
 }
 
 export async function GET() {
   let user;
-  try { user = await requirePermission('kids.parent.view'); }
-  catch (err) { return NextResponse.json({ error: err.message }, { status: err.status || 401 }); }
+  try {
+    user = await requirePermission('kids.parent.view');
+  } catch (err) {
+    return NextResponse.json({ error: err.message }, { status: err.status || 401 });
+  }
 
   const service = createServiceClient();
   const { data } = await service
@@ -29,19 +32,29 @@ export async function GET() {
 
 export async function POST(request) {
   let user;
-  try { user = await requirePermission('kids.trial.start'); }
-  catch (err) { return NextResponse.json({ error: err.message }, { status: err.status || 401 }); }
+  try {
+    user = await requirePermission('kids.trial.start');
+  } catch (err) {
+    return NextResponse.json({ error: err.message }, { status: err.status || 401 });
+  }
 
   const b = await request.json().catch(() => ({}));
-  if (!b.display_name) return NextResponse.json({ error: 'display_name required' }, { status: 400 });
+  if (!b.display_name)
+    return NextResponse.json({ error: 'display_name required' }, { status: 400 });
 
   if (!b.date_of_birth) {
-    return NextResponse.json({ error: 'Date of birth required and must be in the past.' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'Date of birth required and must be in the past.' },
+      { status: 400 }
+    );
   }
   const dob = new Date(b.date_of_birth);
   const now = new Date();
   if (Number.isNaN(dob.getTime()) || dob >= now) {
-    return NextResponse.json({ error: 'Date of birth required and must be in the past.' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'Date of birth required and must be in the past.' },
+      { status: 400 }
+    );
   }
   const ageMs = now - dob;
   const maxAgeMs = 13 * 365.25 * 24 * 60 * 60 * 1000;
@@ -71,11 +84,15 @@ export async function POST(request) {
     p_pin_hash: pinCred.pin_hash,
     p_date_of_birth: b.date_of_birth || null,
   });
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'kids.trial', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, { route: 'kids.trial', fallbackStatus: 400 });
 
   const nowIso = new Date().toISOString();
   const { data: fresh } = await service
-    .from('kid_profiles').select('metadata').eq('id', kidId).maybeSingle();
+    .from('kid_profiles')
+    .select('metadata')
+    .eq('id', kidId)
+    .maybeSingle();
   const merged = {
     ...(fresh?.metadata || {}),
     coppa_consent: {
@@ -85,13 +102,16 @@ export async function POST(request) {
       ip: clientIp(request),
     },
   };
-  await service.from('kid_profiles').update({
-    metadata: merged,
-    coppa_consent_given: true,
-    coppa_consent_at: nowIso,
-    pin_salt: pinCred.pin_salt,
-    pin_hash_algo: pinCred.pin_hash_algo,
-  }).eq('id', kidId);
+  await service
+    .from('kid_profiles')
+    .update({
+      metadata: merged,
+      coppa_consent_given: true,
+      coppa_consent_at: nowIso,
+      pin_salt: pinCred.pin_salt,
+      pin_hash_algo: pinCred.pin_hash_algo,
+    })
+    .eq('id', kidId);
 
   return NextResponse.json({ kid_id: kidId });
 }

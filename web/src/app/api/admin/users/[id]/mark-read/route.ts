@@ -12,8 +12,11 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (!targetId) return NextResponse.json({ error: 'user id required' }, { status: 400 });
 
   let actor;
-  try { actor = await requirePermission('admin.users.mark_read'); }
-  catch (err) { return permissionError(err); }
+  try {
+    actor = await requirePermission('admin.users.mark_read');
+  } catch (err) {
+    return permissionError(err);
+  }
 
   const rankErr = await requireAdminOutranks(targetId, actor.id);
   if (rankErr) return rankErr;

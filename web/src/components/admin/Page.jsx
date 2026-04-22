@@ -94,12 +94,18 @@ export function PageHeader({
               padding: '2px 4px',
               borderRadius: 4,
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = ADMIN_C.accent; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = ADMIN_C.dim; }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = ADMIN_C.accent;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = ADMIN_C.dim;
+            }}
           >
             {backLabel}
           </Link>
-          <span aria-hidden="true" style={{ color: ADMIN_C.muted }}>/</span>
+          <span aria-hidden="true" style={{ color: ADMIN_C.muted }}>
+            /
+          </span>
           <span style={{ color: ADMIN_C.soft }}>{title}</span>
         </nav>
       )}

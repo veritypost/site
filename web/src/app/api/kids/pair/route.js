@@ -39,8 +39,11 @@ export async function POST(request) {
     }
 
     let body;
-    try { body = await request.json(); }
-    catch { return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 }); }
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
 
     const { code, device } = body || {};
     if (!code || typeof code !== 'string' || code.length < 6 || code.length > 16) {
@@ -61,9 +64,12 @@ export async function POST(request) {
 
     if (error) {
       const msg = (error.message || '').toLowerCase();
-      if (msg.includes('invalid code'))    return NextResponse.json({ error: 'Invalid code' }, { status: 400 });
-      if (msg.includes('already used'))    return NextResponse.json({ error: 'Code already used' }, { status: 410 });
-      if (msg.includes('expired'))         return NextResponse.json({ error: 'Code expired' }, { status: 410 });
+      if (msg.includes('invalid code'))
+        return NextResponse.json({ error: 'Invalid code' }, { status: 400 });
+      if (msg.includes('already used'))
+        return NextResponse.json({ error: 'Code already used' }, { status: 410 });
+      if (msg.includes('expired'))
+        return NextResponse.json({ error: 'Code expired' }, { status: 410 });
       return NextResponse.json({ error: 'Could not pair' }, { status: 500 });
     }
 

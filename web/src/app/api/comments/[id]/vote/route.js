@@ -10,10 +10,12 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // Body: { type: 'upvote' | 'downvote' | 'clear' }
 // D29: separate counts. Same vote twice clears. Different vote switches.
 export async function POST(request, { params }) {
-  const blocked = await v2LiveGuard(); if (blocked) return blocked;
+  const blocked = await v2LiveGuard();
+  if (blocked) return blocked;
   let user;
-  try { user = await requirePermission('comments.upvote'); }
-  catch (err) {
+  try {
+    user = await requirePermission('comments.upvote');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
@@ -30,6 +32,10 @@ export async function POST(request, { params }) {
     p_comment_id: id,
     p_vote_type: type,
   });
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'comments.id.vote', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'comments.id.vote',
+      fallbackStatus: 400,
+    });
   return NextResponse.json(data);
 }

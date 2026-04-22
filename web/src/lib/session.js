@@ -4,8 +4,9 @@ export function getSessionId() {
   if (typeof window === 'undefined') return null;
   let id = sessionStorage.getItem('vp_session_id');
   if (!id) {
-    id = (crypto?.randomUUID?.() ||
-      `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
+    id =
+      crypto?.randomUUID?.() ||
+      `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
     sessionStorage.setItem('vp_session_id', id);
   }
   return id;

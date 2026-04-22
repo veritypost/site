@@ -9,8 +9,9 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // On 'approved' the penalty is reversed server-side.
 export async function POST(request, { params }) {
   let user;
-  try { user = await requirePermission('admin.moderation.appeal.approve'); }
-  catch (err) {
+  try {
+    user = await requirePermission('admin.moderation.appeal.approve');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -25,6 +26,10 @@ export async function POST(request, { params }) {
     p_outcome: outcome,
     p_notes: notes || null,
   });
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.appeals.id.resolve', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'admin.appeals.id.resolve',
+      fallbackStatus: 400,
+    });
   return NextResponse.json({ ok: true });
 }

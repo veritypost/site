@@ -62,7 +62,16 @@ export default function Sidebar({ items = [], title, width = 220, style }) {
         </div>
       )}
       <nav>
-        <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <ul
+          style={{
+            listStyle: 'none',
+            margin: 0,
+            padding: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2,
+          }}
+        >
           {items.map((item) => (
             <SidebarItem key={item.href || item.label} item={item} pathname={pathname} depth={0} />
           ))}
@@ -123,11 +132,25 @@ function SidebarItem({ item, pathname, depth }) {
           transition: 'background 100ms ease',
           borderLeft: active ? `2px solid ${ADMIN_C.accent}` : '2px solid transparent',
         }}
-        onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = ADMIN_C.hover; }}
-        onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+        onMouseEnter={(e) => {
+          if (!active) e.currentTarget.style.background = ADMIN_C.hover;
+        }}
+        onMouseLeave={(e) => {
+          if (!active) e.currentTarget.style.background = 'transparent';
+        }}
       >
         {item.icon && (
-          <span aria-hidden="true" style={{ display: 'inline-flex', width: 14, height: 14, alignItems: 'center', justifyContent: 'center', color: ADMIN_C.dim }}>
+          <span
+            aria-hidden="true"
+            style={{
+              display: 'inline-flex',
+              width: 14,
+              height: 14,
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: ADMIN_C.dim,
+            }}
+          >
             {item.icon}
           </span>
         )}

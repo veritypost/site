@@ -66,7 +66,7 @@ export interface ServerTrackOptions {
 export async function trackServer(
   event_name: string,
   event_category: EventCategory,
-  opts: ServerTrackOptions = {},
+  opts: ServerTrackOptions = {}
 ): Promise<void> {
   try {
     const supabase = createServiceClient();
@@ -74,7 +74,7 @@ export async function trackServer(
     const headers = opts.request?.headers;
     const ua = headers?.get('user-agent') ?? null;
     const xff = headers?.get('x-forwarded-for') ?? '';
-    const ip = xff ? xff.split(',')[0].trim() : headers?.get('x-real-ip') ?? '0.0.0.0';
+    const ip = xff ? xff.split(',')[0].trim() : (headers?.get('x-real-ip') ?? '0.0.0.0');
 
     const occurredAt =
       opts.occurred_at instanceof Date
@@ -118,11 +118,13 @@ export async function trackServer(
 
     // See batch/route.ts for the same TypeScript note — events table not
     // yet in src/types/database.ts. Cast until types regenerate.
-    const fromEvents = (supabase as unknown as {
-      from: (t: string) => {
-        insert: (row: Record<string, unknown>) => Promise<{ error: Error | null }>;
-      };
-    }).from('events');
+    const fromEvents = (
+      supabase as unknown as {
+        from: (t: string) => {
+          insert: (row: Record<string, unknown>) => Promise<{ error: Error | null }>;
+        };
+      }
+    ).from('events');
     const { error } = await fromEvents.insert(row);
     if (error) {
       console.error('[trackServer] insert failed', { event_name, error });

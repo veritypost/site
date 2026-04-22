@@ -10,13 +10,16 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 
 function clientIp(request) {
   const fwd = request.headers.get('x-forwarded-for');
-  return fwd ? fwd.split(',')[0].trim() : (request.headers.get('x-real-ip') || null);
+  return fwd ? fwd.split(',')[0].trim() : request.headers.get('x-real-ip') || null;
 }
 
 export async function GET() {
   let user;
-  try { user = await requirePermission('kids.parent.view'); }
-  catch (err) { return NextResponse.json({ error: err.message }, { status: err.status || 401 }); }
+  try {
+    user = await requirePermission('kids.parent.view');
+  } catch (err) {
+    return NextResponse.json({ error: err.message }, { status: err.status || 401 });
+  }
 
   const service = createServiceClient();
   const { data, error } = await service
@@ -31,19 +34,29 @@ export async function GET() {
 
 export async function POST(request) {
   let user;
-  try { user = await requirePermission('kids.profile.create'); }
-  catch (err) { return NextResponse.json({ error: err.message }, { status: err.status || 401 }); }
+  try {
+    user = await requirePermission('kids.profile.create');
+  } catch (err) {
+    return NextResponse.json({ error: err.message }, { status: err.status || 401 });
+  }
 
   const b = await request.json().catch(() => ({}));
-  if (!b.display_name) return NextResponse.json({ error: 'display_name required' }, { status: 400 });
+  if (!b.display_name)
+    return NextResponse.json({ error: 'display_name required' }, { status: 400 });
 
   if (!b.date_of_birth) {
-    return NextResponse.json({ error: 'Date of birth required and must be in the past.' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'Date of birth required and must be in the past.' },
+      { status: 400 }
+    );
   }
   const dob = new Date(b.date_of_birth);
   const now = new Date();
   if (Number.isNaN(dob.getTime()) || dob >= now) {
-    return NextResponse.json({ error: 'Date of birth required and must be in the past.' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'Date of birth required and must be in the past.' },
+      { status: 400 }
+    );
   }
   const ageMs = now - dob;
   const maxAgeMs = 13 * 365.25 * 24 * 60 * 60 * 1000;

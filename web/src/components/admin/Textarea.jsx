@@ -26,7 +26,7 @@ const Textarea = forwardRef(function Textarea(
     onInput,
     ...rest
   },
-  ref,
+  ref
 ) {
   const borderColor = error ? ADMIN_C.danger : ADMIN_C.border;
 

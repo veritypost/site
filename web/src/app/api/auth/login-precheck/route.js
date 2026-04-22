@@ -56,8 +56,9 @@ export async function POST(request) {
       return NextResponse.json({ locked: false });
     }
 
-    const { data: lockedUntil } = await service
-      .rpc('get_user_lockout_by_email', { p_email: email });
+    const { data: lockedUntil } = await service.rpc('get_user_lockout_by_email', {
+      p_email: email,
+    });
     if (lockedUntil) {
       return NextResponse.json({ locked: true, locked_until: lockedUntil });
     }

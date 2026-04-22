@@ -28,10 +28,7 @@ if (dsn) {
     // this automatically.
     release: process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA,
     // Avoid firing Sentry self-errors into Sentry (loop prevention).
-    ignoreErrors: [
-      'Non-Error promise rejection captured',
-      'ResizeObserver loop',
-    ],
+    ignoreErrors: ['Non-Error promise rejection captured', 'ResizeObserver loop'],
     // T-033 — strip emails, Authorization headers, request-body secrets.
     beforeSend: scrubPII,
   });

@@ -9,13 +9,7 @@
 // Prices in cents per D42.
 // ============================================================
 
-export const TIER_ORDER = [
-  'free',
-  'verity',
-  'verity_pro',
-  'verity_family',
-  'verity_family_xl',
-];
+export const TIER_ORDER = ['free', 'verity', 'verity_pro', 'verity_family', 'verity_family_xl'];
 
 export const TIERS = {
   free: {
@@ -56,11 +50,7 @@ export const TIERS = {
       'Category leaderboards + weekly recap quiz',
       'Profile banner + shareable card',
     ],
-    missing: [
-      'Streak freezes',
-      'Completely ad-free',
-      'Kid profiles',
-    ],
+    missing: ['Streak freezes', 'Completely ad-free', 'Kid profiles'],
   },
   verity_pro: {
     tier: 'verity_pro',
@@ -110,20 +100,20 @@ export const TIERS = {
 // Cents per tier × cycle. Matches plans seed block exactly.
 export const PRICING = {
   verity: {
-    monthly: { cents: 399,   planName: 'verity_monthly' },
-    annual:  { cents: 3999,  planName: 'verity_annual' },
+    monthly: { cents: 399, planName: 'verity_monthly' },
+    annual: { cents: 3999, planName: 'verity_annual' },
   },
   verity_pro: {
-    monthly: { cents: 999,   planName: 'verity_pro_monthly' },
-    annual:  { cents: 9999,  planName: 'verity_pro_annual' },
+    monthly: { cents: 999, planName: 'verity_pro_monthly' },
+    annual: { cents: 9999, planName: 'verity_pro_annual' },
   },
   verity_family: {
-    monthly: { cents: 1499,  planName: 'verity_family_monthly' },
-    annual:  { cents: 14999, planName: 'verity_family_annual' },
+    monthly: { cents: 1499, planName: 'verity_family_monthly' },
+    annual: { cents: 14999, planName: 'verity_family_annual' },
   },
   verity_family_xl: {
-    monthly: { cents: 1999,  planName: 'verity_family_xl_monthly' },
-    annual:  { cents: 19999, planName: 'verity_family_xl_annual' },
+    monthly: { cents: 1999, planName: 'verity_family_xl_monthly' },
+    annual: { cents: 19999, planName: 'verity_family_xl_annual' },
   },
 };
 
@@ -239,12 +229,12 @@ export async function getPlanLimitValue(supabase, planId, featureKey, defaultVal
 
 export async function getPlanByName(supabase, planRowName) {
   const plans = await getPlans(supabase);
-  return plans.find(p => p.name === planRowName) || null;
+  return plans.find((p) => p.name === planRowName) || null;
 }
 
 export async function getPlanById(supabase, id) {
   const plans = await getPlans(supabase);
-  return plans.find(p => p.id === id) || null;
+  return plans.find((p) => p.id === id) || null;
 }
 
 // Resolve a user's current marketed tier from their users row.
@@ -253,10 +243,8 @@ export async function getPlanById(supabase, id) {
 export function resolveUserTier(userRow, plansList) {
   if (!userRow) return { tier: 'free', planRow: null, state: 'anonymous' };
   if (userRow.frozen_at) return { tier: 'free', planRow: null, state: 'frozen' };
-  const planRow = plansList?.find(p => p.id === userRow.plan_id) || null;
+  const planRow = plansList?.find((p) => p.id === userRow.plan_id) || null;
   const tier = planRow?.tier || 'free';
-  const state = userRow.plan_grace_period_ends_at
-    ? 'grace'
-    : (tier === 'free' ? 'free' : 'active');
+  const state = userRow.plan_grace_period_ends_at ? 'grace' : tier === 'free' ? 'free' : 'active';
   return { tier, planRow, state };
 }

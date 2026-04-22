@@ -7,8 +7,9 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 
 export async function POST(_request, { params }) {
   let user;
-  try { user = await requirePermission('admin.moderation.comment.approve'); }
-  catch (err) {
+  try {
+    user = await requirePermission('admin.moderation.comment.approve');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -18,6 +19,10 @@ export async function POST(_request, { params }) {
     p_mod_id: user.id,
     p_comment_id: params.id,
   });
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.moderation.comments.id.unhide', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'admin.moderation.comments.id.unhide',
+      fallbackStatus: 400,
+    });
   return NextResponse.json({ ok: true });
 }

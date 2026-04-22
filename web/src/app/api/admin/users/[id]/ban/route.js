@@ -18,8 +18,9 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // with the rank guard.
 export async function POST(request, { params }) {
   let actor;
-  try { actor = await requirePermission('admin.users.ban'); }
-  catch (err) {
+  try {
+    actor = await requirePermission('admin.users.ban');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -36,7 +37,12 @@ export async function POST(request, { params }) {
     const { data: outranks, error: rankErr } = await authed.rpc('require_outranks', {
       target_user_id: targetId,
     });
-    if (rankErr) return safeErrorResponse(NextResponse, rankErr, { route: 'admin.users.ban', fallbackStatus: 500, fallbackMessage: 'Rank check failed' });
+    if (rankErr)
+      return safeErrorResponse(NextResponse, rankErr, {
+        route: 'admin.users.ban',
+        fallbackStatus: 500,
+        fallbackMessage: 'Rank check failed',
+      });
     if (!outranks) {
       return NextResponse.json(
         { error: 'Cannot act on a user whose rank meets or exceeds your own' },
@@ -48,14 +54,21 @@ export async function POST(request, { params }) {
   const service = createServiceClient();
 
   const update = banned
-    ? { is_banned: true, banned_at: new Date().toISOString(), banned_by: actor.id, ban_reason: reason }
+    ? {
+        is_banned: true,
+        banned_at: new Date().toISOString(),
+        banned_by: actor.id,
+        ban_reason: reason,
+      }
     : { is_banned: false, banned_at: null, banned_by: null, ban_reason: null };
 
-  const { error: upErr } = await service
-    .from('users')
-    .update(update)
-    .eq('id', targetId);
-  if (upErr) return safeErrorResponse(NextResponse, upErr, { route: 'admin.users.ban', fallbackStatus: 500, fallbackMessage: 'Could not update ban state' });
+  const { error: upErr } = await service.from('users').update(update).eq('id', targetId);
+  if (upErr)
+    return safeErrorResponse(NextResponse, upErr, {
+      route: 'admin.users.ban',
+      fallbackStatus: 500,
+      fallbackMessage: 'Could not update ban state',
+    });
 
   try {
     await service.from('audit_log').insert({
@@ -65,7 +78,9 @@ export async function POST(request, { params }) {
       target_id: targetId,
       metadata: { reason },
     });
-  } catch { /* best-effort */ }
+  } catch {
+    /* best-effort */
+  }
 
   const { error: bumpErr } = await service.rpc('bump_user_perms_version', {
     p_user_id: targetId,

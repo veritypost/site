@@ -21,13 +21,20 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   const body = (await request.json().catch(() => ({}))) as PatchBody;
   if (!body.status || !['published', 'draft', 'scheduled'].includes(body.status)) {
-    return NextResponse.json({ error: 'status must be published|draft|scheduled' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'status must be published|draft|scheduled' },
+      { status: 400 }
+    );
   }
 
-  const permKey = body.status === 'published' ? 'admin.articles.publish' : 'admin.articles.unpublish';
+  const permKey =
+    body.status === 'published' ? 'admin.articles.publish' : 'admin.articles.unpublish';
   let actor;
-  try { actor = await requirePermission(permKey); }
-  catch (err) { return permissionError(err); }
+  try {
+    actor = await requirePermission(permKey);
+  } catch (err) {
+    return permissionError(err);
+  }
 
   const service = createServiceClient();
   const { data: prior } = await service
@@ -67,8 +74,11 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   if (!id) return NextResponse.json({ error: 'article id required' }, { status: 400 });
 
   let actor;
-  try { actor = await requirePermission('admin.articles.delete'); }
-  catch (err) { return permissionError(err); }
+  try {
+    actor = await requirePermission('admin.articles.delete');
+  } catch (err) {
+    return permissionError(err);
+  }
 
   const service = createServiceClient();
   const { data: prior } = await service

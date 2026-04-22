@@ -11,8 +11,9 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // number, or 'true'/'false'). Admin+ only. Stamps updated_by + writes
 // audit_log.
 export async function GET() {
-  try { await requirePermission('admin.settings.edit'); }
-  catch (err) {
+  try {
+    await requirePermission('admin.settings.edit');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -20,18 +21,22 @@ export async function GET() {
   const service = createServiceClient();
   const { data, error } = await service
     .from('settings')
-    .select('id, key, value, value_type, category, display_name, description, is_public, updated_at')
+    .select(
+      'id, key, value, value_type, category, display_name, description, is_public, updated_at'
+    )
     .eq('is_sensitive', false)
     .order('category')
     .order('key');
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.settings', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, { route: 'admin.settings', fallbackStatus: 400 });
   return NextResponse.json({ settings: data || [] });
 }
 
 export async function PATCH(request) {
   let user;
-  try { user = await requirePermission('admin.settings.edit'); }
-  catch (err) {
+  try {
+    user = await requirePermission('admin.settings.edit');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -49,7 +54,10 @@ export async function PATCH(request) {
     .maybeSingle();
   if (!existing) return NextResponse.json({ error: 'Unknown setting' }, { status: 404 });
   if (existing.is_sensitive) {
-    return NextResponse.json({ error: 'Setting is marked sensitive and not editable here' }, { status: 403 });
+    return NextResponse.json(
+      { error: 'Setting is marked sensitive and not editable here' },
+      { status: 403 }
+    );
   }
 
   // Type-check before writing so a string "foo" doesn't land in a number field.
@@ -60,14 +68,19 @@ export async function PATCH(request) {
     return NextResponse.json({ error: 'Value must be true or false' }, { status: 400 });
   }
   if (existing.value_type === 'json') {
-    try { JSON.parse(value); } catch { return NextResponse.json({ error: 'Value must be valid JSON' }, { status: 400 }); }
+    try {
+      JSON.parse(value);
+    } catch {
+      return NextResponse.json({ error: 'Value must be valid JSON' }, { status: 400 });
+    }
   }
 
   const { error } = await service
     .from('settings')
     .update({ value, updated_by: user.id, updated_at: new Date().toISOString() })
     .eq('id', existing.id);
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.settings', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, { route: 'admin.settings', fallbackStatus: 400 });
 
   await service.from('audit_log').insert({
     actor_id: user.id,

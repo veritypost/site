@@ -36,8 +36,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   else if (body.action === 'toggle_killswitch') permKey = 'admin.features.killswitch';
 
   let actor;
-  try { actor = await requirePermission(permKey); }
-  catch (err) { return permissionError(err); }
+  try {
+    actor = await requirePermission(permKey);
+  } catch (err) {
+    return permissionError(err);
+  }
   void actor;
 
   const service = createServiceClient();
@@ -52,7 +55,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (typeof body.is_enabled !== 'boolean') {
       return NextResponse.json({ error: 'is_enabled required' }, { status: 400 });
     }
-    const { error } = await service.from('feature_flags').update({ is_enabled: body.is_enabled }).eq('id', id);
+    const { error } = await service
+      .from('feature_flags')
+      .update({ is_enabled: body.is_enabled })
+      .eq('id', id);
     if (error) return NextResponse.json({ error: 'Could not toggle flag' }, { status: 500 });
     await recordAdminAction({
       action: 'feature.toggle',
@@ -68,7 +74,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (typeof body.is_killswitch !== 'boolean') {
       return NextResponse.json({ error: 'is_killswitch required' }, { status: 400 });
     }
-    const { error } = await service.from('feature_flags').update({ is_killswitch: body.is_killswitch }).eq('id', id);
+    const { error } = await service
+      .from('feature_flags')
+      .update({ is_killswitch: body.is_killswitch })
+      .eq('id', id);
     if (error) return NextResponse.json({ error: 'Could not toggle killswitch' }, { status: 500 });
     await recordAdminAction({
       action: 'feature.killswitch',
@@ -93,7 +102,18 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
   if (typeof body.is_killswitch === 'boolean') update.is_killswitch = body.is_killswitch;
   if (body.expires_at !== undefined) update.expires_at = body.expires_at;
-  for (const f of ['target_platforms','target_min_app_version','target_max_app_version','target_min_os_version','target_user_ids','target_plan_tiers','target_countries','target_cohort_ids','conditions','variant'] as const) {
+  for (const f of [
+    'target_platforms',
+    'target_min_app_version',
+    'target_max_app_version',
+    'target_min_os_version',
+    'target_user_ids',
+    'target_plan_tiers',
+    'target_countries',
+    'target_cohort_ids',
+    'conditions',
+    'variant',
+  ] as const) {
     if (body[f] !== undefined) update[f] = body[f];
   }
   if (Object.keys(update).length === 0) {
@@ -128,8 +148,11 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
 
   let actor;
-  try { actor = await requirePermission('admin.features.delete'); }
-  catch (err) { return permissionError(err); }
+  try {
+    actor = await requirePermission('admin.features.delete');
+  } catch (err) {
+    return permissionError(err);
+  }
   void actor;
 
   const service = createServiceClient();

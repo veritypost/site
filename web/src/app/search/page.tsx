@@ -60,7 +60,11 @@ export default function SearchPage() {
       // search.view: page-level capability. Anon users still see the
       // page (they have search.articles.free via the anon set), so we
       // default-true and only flip off if the resolver says no.
-      setCanView(hasPermission('search.view') || hasPermission('search.basic') || hasPermission('search.articles.free'));
+      setCanView(
+        hasPermission('search.view') ||
+          hasPermission('search.basic') ||
+          hasPermission('search.articles.free')
+      );
       setCanAdvanced(hasPermission('search.advanced'));
       setCanFilterCategory(hasPermission('search.advanced.category'));
       setCanFilterDate(hasPermission('search.advanced.date_range'));
@@ -79,17 +83,18 @@ export default function SearchPage() {
 
   async function runSearch() {
     if (!q.trim()) return;
-    setLoading(true); setError('');
+    setLoading(true);
+    setError('');
     const params = new URLSearchParams({ q: q.trim() });
     if (canAdvanced) {
       if (category && canFilterCategory) params.set('category', category);
-      if (from     && canFilterDate)     params.set('from', from);
-      if (to       && canFilterDate)     params.set('to', to);
-      if (source   && canFilterSource)   params.set('source', source);
+      if (from && canFilterDate) params.set('from', from);
+      if (to && canFilterDate) params.set('to', to);
+      if (source && canFilterSource) params.set('source', source);
     }
     try {
       const res = await fetch(`/api/search?${params.toString()}`);
-      const data = await res.json() as SearchResponse;
+      const data = (await res.json()) as SearchResponse;
       if (!res.ok) throw new Error(data?.error || 'Search failed');
       setResults(data.articles || []);
       setMode(data.mode || 'basic');
@@ -101,13 +106,22 @@ export default function SearchPage() {
     }
   }
 
-  const filterStyle: CSSProperties = { padding: '8px 10px', borderRadius: 8, border: '1px solid #e5e5e5', fontSize: 13, outline: 'none', background: '#fff' };
+  const filterStyle: CSSProperties = {
+    padding: '8px 10px',
+    borderRadius: 8,
+    border: '1px solid #e5e5e5',
+    fontSize: 13,
+    outline: 'none',
+    background: '#fff',
+  };
 
   if (!canView) {
     return (
       <div style={{ maxWidth: 520, margin: '64px auto', padding: '0 16px', textAlign: 'center' }}>
         <h1 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 12px' }}>Search unavailable</h1>
-        <p style={{ fontSize: 13, color: '#666' }}>Search is disabled on your account. Contact support if you think this is a mistake.</p>
+        <p style={{ fontSize: 13, color: '#666' }}>
+          Search is disabled on your account. Contact support if you think this is a mistake.
+        </p>
       </div>
     );
   }
@@ -119,65 +133,162 @@ export default function SearchPage() {
       <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
         <input
           value={q}
-          onChange={e => setQ(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && runSearch()}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && runSearch()}
           placeholder="Search by keyword"
           aria-label="Search articles"
-          style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: '1px solid #e5e5e5', fontSize: 14, outline: 'none' }}
+          style={{
+            flex: 1,
+            padding: '10px 14px',
+            borderRadius: 10,
+            border: '1px solid #e5e5e5',
+            fontSize: 14,
+            outline: 'none',
+          }}
         />
-        <button onClick={runSearch} disabled={!q.trim() || loading} style={{
-          padding: '10px 18px', borderRadius: 10, border: 'none',
-          background: q.trim() && !loading ? '#111' : '#ccc', color: '#fff',
-          fontSize: 14, fontWeight: 700, cursor: q.trim() && !loading ? 'pointer' : 'default',
-        }}>{loading ? 'Searching…' : 'Search'}</button>
+        <button
+          onClick={runSearch}
+          disabled={!q.trim() || loading}
+          style={{
+            padding: '10px 18px',
+            borderRadius: 10,
+            border: 'none',
+            background: q.trim() && !loading ? '#111' : '#ccc',
+            color: '#fff',
+            fontSize: 14,
+            fontWeight: 700,
+            cursor: q.trim() && !loading ? 'pointer' : 'default',
+          }}
+        >
+          {loading ? 'Searching…' : 'Search'}
+        </button>
       </div>
 
       {canAdvanced ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8, marginBottom: 16 }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+            gap: 8,
+            marginBottom: 16,
+          }}
+        >
           {canFilterCategory && (
-            <select value={category} onChange={e => setCategory(e.target.value)} style={filterStyle}>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              style={filterStyle}
+            >
               <option value="">All categories</option>
-              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
             </select>
           )}
           {canFilterDate && (
             <>
-              <input type="date" value={from} onChange={e => setFrom(e.target.value)} style={filterStyle} />
-              <input type="date" value={to} onChange={e => setTo(e.target.value)} style={filterStyle} />
+              <input
+                type="date"
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+                style={filterStyle}
+              />
+              <input
+                type="date"
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+                style={filterStyle}
+              />
             </>
           )}
           {canFilterSource && (
-            <input value={source} onChange={e => setSource(e.target.value)} placeholder="Source publisher…" style={filterStyle} />
+            <input
+              value={source}
+              onChange={(e) => setSource(e.target.value)}
+              placeholder="Source publisher…"
+              style={filterStyle}
+            />
           )}
         </div>
       ) : (
-        <div style={{ background: '#f7f7f7', border: '1px solid #e5e5e5', borderRadius: 10, padding: '10px 14px', marginBottom: 16, fontSize: 12, color: '#666' }}>
+        <div
+          style={{
+            background: '#f7f7f7',
+            border: '1px solid #e5e5e5',
+            borderRadius: 10,
+            padding: '10px 14px',
+            marginBottom: 16,
+            fontSize: 12,
+            color: '#666',
+          }}
+        >
           Advanced filters (date range, category, source) are available on paid plans.{' '}
-          <a href="/profile/settings/billing" style={{ color: '#111', fontWeight: 700 }}>View plans →</a>
+          <a href="/profile/settings/billing" style={{ color: '#111', fontWeight: 700 }}>
+            View plans →
+          </a>
         </div>
       )}
 
       {error && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 10 }}>{error}</div>}
 
       <div style={{ fontSize: 11, color: '#999', marginBottom: 6 }}>
-        {results.length > 0 ? `${results.length} result${results.length === 1 ? '' : 's'} · ${mode}` : null}
+        {results.length > 0
+          ? `${results.length} result${results.length === 1 ? '' : 's'} · ${mode}`
+          : null}
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {results.map(a => (
-          <a key={a.id} href={`/story/${a.slug}`} style={{ display: 'block', background: '#f7f7f7', border: '1px solid #e5e5e5', borderRadius: 10, padding: 14, textDecoration: 'none', color: '#111' }}>
+        {results.map((a) => (
+          <a
+            key={a.id}
+            href={`/story/${a.slug}`}
+            style={{
+              display: 'block',
+              background: '#f7f7f7',
+              border: '1px solid #e5e5e5',
+              borderRadius: 10,
+              padding: 14,
+              textDecoration: 'none',
+              color: '#111',
+            }}
+          >
             <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{a.title}</div>
-            {a.excerpt && <div style={{ fontSize: 13, color: '#444', marginBottom: 6 }}>{a.excerpt}</div>}
+            {a.excerpt && (
+              <div style={{ fontSize: 13, color: '#444', marginBottom: 6 }}>{a.excerpt}</div>
+            )}
             <div style={{ fontSize: 11, color: '#666' }}>
-              {a.categories?.name}{a.categories?.name && a.published_at ? ' · ' : ''}{a.published_at ? new Date(a.published_at).toLocaleDateString() : ''}
+              {a.categories?.name}
+              {a.categories?.name && a.published_at ? ' · ' : ''}
+              {a.published_at ? new Date(a.published_at).toLocaleDateString() : ''}
             </div>
           </a>
         ))}
         {results.length === 0 && !loading && q && (
           <div style={{ padding: 40, textAlign: 'center' }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#111', marginBottom: 6 }}>No matches</div>
-            <div style={{ fontSize: 13, color: '#666', marginBottom: 14, lineHeight: 1.5 }}>Try shorter keywords, or browse by category.</div>
-            <a href="/browse" aria-label="Browse all categories" style={{ display: 'inline-block', padding: '9px 18px', background: '#111', color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>Browse categories</a>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#111', marginBottom: 6 }}>
+              No matches
+            </div>
+            <div style={{ fontSize: 13, color: '#666', marginBottom: 14, lineHeight: 1.5 }}>
+              Try shorter keywords, or browse by category.
+            </div>
+            <a
+              href="/browse"
+              aria-label="Browse all categories"
+              style={{
+                display: 'inline-block',
+                padding: '9px 18px',
+                background: '#111',
+                color: '#fff',
+                borderRadius: 8,
+                fontSize: 13,
+                fontWeight: 600,
+                textDecoration: 'none',
+              }}
+            >
+              Browse categories
+            </a>
           </div>
         )}
       </div>

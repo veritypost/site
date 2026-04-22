@@ -34,18 +34,23 @@ export async function POST(request) {
   if (rl.limited) {
     return NextResponse.json(
       { error: 'Too many requests. Try again in an hour.' },
-      { status: 429 },
+      { status: 429 }
     );
   }
 
   let body;
-  try { body = await request.json(); }
-  catch { return NextResponse.json({ error: 'Invalid body' }, { status: 400 }); }
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
+  }
 
-  const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase().slice(0, 254) : '';
+  const email =
+    typeof body?.email === 'string' ? body.email.trim().toLowerCase().slice(0, 254) : '';
   const name = typeof body?.name === 'string' ? body.name.trim().slice(0, 120) : null;
   const reason = typeof body?.reason === 'string' ? body.reason.trim().slice(0, 1000) : null;
-  const referral = typeof body?.referral_source === 'string' ? body.referral_source.trim().slice(0, 80) : null;
+  const referral =
+    typeof body?.referral_source === 'string' ? body.referral_source.trim().slice(0, 80) : null;
   const type = typeof body?.type === 'string' ? body.type.trim().slice(0, 40) : 'general';
 
   if (!email || !email.includes('@') || email.length < 5) {

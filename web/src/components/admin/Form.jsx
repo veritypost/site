@@ -48,9 +48,7 @@ export default function Form({ onSubmit, gap = 'md', style, children, ...rest })
  */
 export function FormActions({ align = 'right', style, children }) {
   const justify =
-    align === 'left' ? 'flex-start'
-    : align === 'between' ? 'space-between'
-    : 'flex-end';
+    align === 'left' ? 'flex-start' : align === 'between' ? 'space-between' : 'flex-end';
   return (
     <div
       style={{

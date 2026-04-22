@@ -10,8 +10,9 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // D14: fan out to every eligible user; create_notification enforces
 // the per-user daily cap for free tier.
 export async function POST(request) {
-  try { await requirePermission('admin.broadcasts.breaking.send'); }
-  catch (err) {
+  try {
+    await requirePermission('admin.broadcasts.breaking.send');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -26,6 +27,10 @@ export async function POST(request) {
     p_title: title,
     p_body: body || null,
   });
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.broadcasts.breaking', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'admin.broadcasts.breaking',
+      fallbackStatus: 400,
+    });
   return NextResponse.json({ sent_count: data });
 }

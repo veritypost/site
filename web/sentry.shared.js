@@ -10,10 +10,20 @@
 
 const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 const REDACT_BODY_KEYS = [
-  'password', 'current_password', 'new_password', 'old_password',
-  'token', 'access_token', 'refresh_token', 'id_token',
-  'api_key', 'secret', 'authorization', 'stripe-signature',
-  'pin', 'pin_hash',
+  'password',
+  'current_password',
+  'new_password',
+  'old_password',
+  'token',
+  'access_token',
+  'refresh_token',
+  'id_token',
+  'api_key',
+  'secret',
+  'authorization',
+  'stripe-signature',
+  'pin',
+  'pin_hash',
 ];
 const REDACT_HEADER_RE = /^(authorization|cookie|x-.*-(token|secret))$/i;
 

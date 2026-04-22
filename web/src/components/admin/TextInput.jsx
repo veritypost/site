@@ -31,7 +31,7 @@ const TextInput = forwardRef(function TextInput(
     onBlur,
     ...rest
   },
-  ref,
+  ref
 ) {
   const padY = size === 'sm' ? 4 : 6;
   const padX = size === 'sm' ? 8 : 10;
@@ -81,7 +81,14 @@ const TextInput = forwardRef(function TextInput(
         }}
       >
         {leftAddon && (
-          <span style={{ padding: `0 ${S[2]}px`, color: ADMIN_C.muted, display: 'flex', alignItems: 'center' }}>
+          <span
+            style={{
+              padding: `0 ${S[2]}px`,
+              color: ADMIN_C.muted,
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
             {leftAddon}
           </span>
         )}
@@ -94,7 +101,14 @@ const TextInput = forwardRef(function TextInput(
           {...rest}
         />
         {rightAddon && (
-          <span style={{ padding: `0 ${S[2]}px`, color: ADMIN_C.muted, display: 'flex', alignItems: 'center' }}>
+          <span
+            style={{
+              padding: `0 ${S[2]}px`,
+              color: ADMIN_C.muted,
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
             {rightAddon}
           </span>
         )}

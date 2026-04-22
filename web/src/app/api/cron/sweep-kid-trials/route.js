@@ -12,10 +12,15 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 async function run(request) {
-  if (!verifyCronAuth(request).ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!verifyCronAuth(request).ok)
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   const service = createServiceClient();
   const { data, error } = await service.rpc('sweep_kid_trial_expiries');
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'cron.sweep_kid_trials', fallbackStatus: 500 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'cron.sweep_kid_trials',
+      fallbackStatus: 500,
+    });
   return NextResponse.json({ frozen_count: data, ran_at: new Date().toISOString() });
 }
 

@@ -42,6 +42,7 @@ export function resolveNext(raw, fallback = null) {
 export function resolveNextForRedirect(siteUrl, raw, fallback = '/') {
   const safe = resolveNext(raw, fallback);
   // If the fallback was itself invalid, hard-stop to '/'.
-  const path = (typeof safe === 'string' && (safe.startsWith('/') && !safe.startsWith('//'))) ? safe : '/';
+  const path =
+    typeof safe === 'string' && safe.startsWith('/') && !safe.startsWith('//') ? safe : '/';
   return `${siteUrl}${path}`;
 }

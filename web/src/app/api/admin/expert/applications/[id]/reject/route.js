@@ -7,8 +7,9 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 
 export async function POST(request, { params }) {
   let user;
-  try { user = await requirePermission('admin.expert.applications.reject'); }
-  catch (err) {
+  try {
+    user = await requirePermission('admin.expert.applications.reject');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -23,6 +24,10 @@ export async function POST(request, { params }) {
     p_application_id: params.id,
     p_rejection_reason: rejection_reason,
   });
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.expert.applications.id.reject', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'admin.expert.applications.id.reject',
+      fallbackStatus: 400,
+    });
   return NextResponse.json({ ok: true });
 }

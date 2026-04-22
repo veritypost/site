@@ -13,8 +13,9 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // through this endpoint.
 export async function POST(request) {
   let actor;
-  try { actor = await requirePermission('admin.permissions.set.edit'); }
-  catch (err) {
+  try {
+    actor = await requirePermission('admin.permissions.set.edit');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -22,7 +23,10 @@ export async function POST(request) {
   const body = await request.json().catch(() => ({}));
   const { key, display_name, category } = body || {};
   if (!key || !display_name || !category) {
-    return NextResponse.json({ error: 'key, display_name, and category are required' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'key, display_name, and category are required' },
+      { status: 400 }
+    );
   }
 
   const service = createServiceClient();
@@ -38,7 +42,11 @@ export async function POST(request) {
     deny_mode: body.deny_mode || 'locked',
   };
   const { data, error } = await service.from('permissions').insert(row).select().single();
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.permissions', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'admin.permissions',
+      fallbackStatus: 400,
+    });
 
   try {
     await service.from('audit_log').insert({
@@ -48,7 +56,9 @@ export async function POST(request) {
       target_id: data.id,
       metadata: { key, display_name, category },
     });
-  } catch { /* best-effort */ }
+  } catch {
+    /* best-effort */
+  }
 
   return NextResponse.json({ permission: data });
 }

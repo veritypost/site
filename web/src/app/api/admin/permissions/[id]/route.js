@@ -11,14 +11,21 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 //
 // Round A (C-05) — authenticated UPDATE/DELETE on permissions are revoked.
 const ALLOWED_FIELDS = new Set([
-  'display_name', 'category', 'ui_section', 'lock_message',
-  'requires_verified', 'is_public', 'is_active', 'deny_mode',
+  'display_name',
+  'category',
+  'ui_section',
+  'lock_message',
+  'requires_verified',
+  'is_public',
+  'is_active',
+  'deny_mode',
 ]);
 
 export async function PATCH(request, { params }) {
   let actor;
-  try { actor = await requirePermission('admin.permissions.set.edit'); }
-  catch (err) {
+  try {
+    actor = await requirePermission('admin.permissions.set.edit');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -37,7 +44,11 @@ export async function PATCH(request, { params }) {
 
   const service = createServiceClient();
   const { error } = await service.from('permissions').update(patch).eq('id', id);
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.permissions.id', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'admin.permissions.id',
+      fallbackStatus: 400,
+    });
 
   try {
     await service.from('audit_log').insert({
@@ -47,15 +58,18 @@ export async function PATCH(request, { params }) {
       target_id: id,
       metadata: patch,
     });
-  } catch { /* best-effort */ }
+  } catch {
+    /* best-effort */
+  }
 
   return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(_request, { params }) {
   let actor;
-  try { actor = await requirePermission('admin.permissions.set.edit'); }
-  catch (err) {
+  try {
+    actor = await requirePermission('admin.permissions.set.edit');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -65,7 +79,11 @@ export async function DELETE(_request, { params }) {
 
   const service = createServiceClient();
   const { error } = await service.from('permissions').delete().eq('id', id);
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.permissions.id', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'admin.permissions.id',
+      fallbackStatus: 400,
+    });
 
   try {
     await service.from('audit_log').insert({
@@ -75,7 +93,9 @@ export async function DELETE(_request, { params }) {
       target_id: id,
       metadata: {},
     });
-  } catch { /* best-effort */ }
+  } catch {
+    /* best-effort */
+  }
 
   return NextResponse.json({ ok: true });
 }

@@ -18,16 +18,8 @@ import { ADMIN_C, F, S } from '../../lib/adminPalette';
  * @param {object} [props.style] Applied to the outer <label>.
  */
 const Checkbox = forwardRef(function Checkbox(
-  {
-    label,
-    hint,
-    indeterminate = false,
-    disabled = false,
-    style,
-    onChange,
-    ...rest
-  },
-  ref,
+  { label, hint, indeterminate = false, disabled = false, style, onChange, ...rest },
+  ref
 ) {
   const setRef = (el) => {
     if (el) el.indeterminate = indeterminate;
@@ -69,14 +61,10 @@ const Checkbox = forwardRef(function Checkbox(
       <span style={{ display: 'inline-flex', alignItems: 'center', height: 20 }}>{input}</span>
       <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {label && (
-          <span style={{ fontSize: F.base, color: ADMIN_C.white, lineHeight: 1.4 }}>
-            {label}
-          </span>
+          <span style={{ fontSize: F.base, color: ADMIN_C.white, lineHeight: 1.4 }}>{label}</span>
         )}
         {hint && (
-          <span style={{ fontSize: F.xs, color: ADMIN_C.dim, lineHeight: 1.4 }}>
-            {hint}
-          </span>
+          <span style={{ fontSize: F.xs, color: ADMIN_C.dim, lineHeight: 1.4 }}>{hint}</span>
         )}
       </span>
     </label>

@@ -17,8 +17,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
 
   let actor;
-  try { actor = await requirePermission('admin.email_templates.edit'); }
-  catch (err) { return permissionError(err); }
+  try {
+    actor = await requirePermission('admin.email_templates.edit');
+  } catch (err) {
+    return permissionError(err);
+  }
   void actor;
 
   const body = (await request.json().catch(() => ({}))) as PatchBody;
@@ -46,9 +49,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return NextResponse.json({ error: 'Could not save template' }, { status: 500 });
   }
 
-  const action = typeof body.is_active === 'boolean' && Object.keys(update).length === 1
-    ? 'email_template.toggle'
-    : 'email_template.edit';
+  const action =
+    typeof body.is_active === 'boolean' && Object.keys(update).length === 1
+      ? 'email_template.toggle'
+      : 'email_template.edit';
 
   await recordAdminAction({
     action,

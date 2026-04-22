@@ -20,7 +20,8 @@ function bearerToken(request) {
 
 export async function POST(request) {
   try {
-    const blocked = await v2LiveGuard(); if (blocked) return blocked;
+    const blocked = await v2LiveGuard();
+    if (blocked) return blocked;
     const token = bearerToken(request);
     const supabase = token ? createClientFromToken(token) : await createClient();
 
@@ -43,7 +44,10 @@ export async function POST(request) {
         .maybeSingle();
 
       if (article && !article.is_kids_safe) {
-        return NextResponse.json({ error: 'This article is not available for kid profiles' }, { status: 403 });
+        return NextResponse.json(
+          { error: 'This article is not available for kid profiles' },
+          { status: 403 }
+        );
       }
     }
 
@@ -92,7 +96,10 @@ export async function POST(request) {
           articleId,
           readingLogId: existing.id,
         });
-        if (scoring?.error) { console.error('score_on_reading_complete failed', scoring.error); scoring = null; }
+        if (scoring?.error) {
+          console.error('score_on_reading_complete failed', scoring.error);
+          scoring = null;
+        }
         newAchievements = await checkAchievements(service, { userId: user.id });
       }
 
@@ -118,14 +125,22 @@ export async function POST(request) {
 
     let newAchievements = [];
     if (completed) {
-      await incrementField(supabase, { table: 'articles', id: articleId, field: 'view_count', amount: 1 });
+      await incrementField(supabase, {
+        table: 'articles',
+        id: articleId,
+        field: 'view_count',
+        amount: 1,
+      });
       scoring = await scoreReadingComplete(service, {
         userId: user.id,
         kidProfileId: kidProfileId || null,
         articleId,
         readingLogId: entry.id,
       });
-      if (scoring?.error) { console.error('score_on_reading_complete failed', scoring.error); scoring = null; }
+      if (scoring?.error) {
+        console.error('score_on_reading_complete failed', scoring.error);
+        scoring = null;
+      }
       newAchievements = await checkAchievements(service, { userId: user.id });
     }
 

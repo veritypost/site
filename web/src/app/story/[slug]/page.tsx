@@ -89,7 +89,11 @@ const REPORT_CATEGORIES: ReportCategory[] = [
 
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return '';
-  return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  return new Date(iso).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
 }
 
 function timeAgo(iso: string | null | undefined): string {
@@ -114,11 +118,14 @@ function SourcePills({ sources }: { sources: SourcePill[] }) {
             key={src.id || i}
             onClick={() => setExpanded(expanded === i ? null : i)}
             style={{
-              padding: '4px 10px', borderRadius: 16,
+              padding: '4px 10px',
+              borderRadius: 16,
               border: expanded === i ? '1px solid var(--soft)' : '1px solid var(--border)',
               background: 'transparent',
               color: expanded === i ? 'var(--white)' : 'var(--dim)',
-              fontSize: 11, fontWeight: 500, cursor: 'pointer',
+              fontSize: 11,
+              fontWeight: 500,
+              cursor: 'pointer',
               fontFamily: 'var(--font-sans)',
             }}
           >
@@ -127,16 +134,29 @@ function SourcePills({ sources }: { sources: SourcePill[] }) {
         ))}
       </div>
       {expanded !== null && sources[expanded] && (
-        <div style={{
-          marginTop: 8, padding: '10px 12px', borderRadius: 8,
-          background: 'var(--srcCard)', border: '1px solid var(--border)',
-          animation: 'vpFadeIn 0.15s ease',
-        }}>
+        <div
+          style={{
+            marginTop: 8,
+            padding: '10px 12px',
+            borderRadius: 8,
+            background: 'var(--srcCard)',
+            border: '1px solid var(--border)',
+            animation: 'vpFadeIn 0.15s ease',
+          }}
+        >
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4, color: 'var(--white)' }}>
             {sources[expanded].publisher || 'Source'}
           </div>
           {sources[expanded].title && (
-            <div style={{ fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-serif)', color: 'var(--white)', marginBottom: 4 }}>
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 600,
+                fontFamily: 'var(--font-serif)',
+                color: 'var(--white)',
+                marginBottom: 4,
+              }}
+            >
               {sources[expanded].title}
             </div>
           )}
@@ -146,8 +166,12 @@ function SourcePills({ sources }: { sources: SourcePill[] }) {
             </div>
           )}
           {sources[expanded].url && (
-            <a href={sources[expanded].url || '#'} target="_blank" rel="noopener noreferrer"
-              style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)' }}>
+            <a
+              href={sources[expanded].url || '#'}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)' }}
+            >
               Read on {sources[expanded].publisher} →
             </a>
           )}
@@ -162,44 +186,80 @@ function Timeline({ events }: { events: TimelineEvent[] }) {
     return <div style={{ fontSize: 12, color: 'var(--dim)' }}>No timeline yet.</div>;
   }
   // Flag the most recent non-future event as "current" if none is explicitly marked.
-  const hasExplicitCurrent = events.some(e => e.is_current);
+  const hasExplicitCurrent = events.some((e) => e.is_current);
   return (
     <div style={{ position: 'relative', paddingLeft: 24 }}>
-      <div style={{
-        position: 'absolute', left: 4, top: 4, bottom: 4, width: 1,
-        background: 'var(--tlLine)',
-      }} />
+      <div
+        style={{
+          position: 'absolute',
+          left: 4,
+          top: 4,
+          bottom: 4,
+          width: 1,
+          background: 'var(--tlLine)',
+        }}
+      />
       {events.map((ev, i) => {
         const isCurrent = ev.is_current || (!hasExplicitCurrent && i === events.length - 1);
         return (
           <div key={ev.id || i} style={{ paddingBottom: 22, position: 'relative' }}>
             {isCurrent ? (
               <>
-                <div style={{
-                  position: 'absolute', left: -24, top: 2,
-                  fontSize: 9, textTransform: 'uppercase', color: 'var(--accent)',
-                  fontWeight: 600, letterSpacing: '0.05em',
-                  transform: 'translateX(-100%) translateX(-8px)', whiteSpace: 'nowrap',
-                }}>NOW</div>
-                <div style={{
-                  position: 'absolute', left: -26, top: 0,
-                  width: 12, height: 12, borderRadius: '50%',
-                  background: 'var(--white)', border: '2px solid var(--accent)',
-                  boxShadow: '0 0 0 4px var(--bg)',
-                }} />
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: -24,
+                    top: 2,
+                    fontSize: 9,
+                    textTransform: 'uppercase',
+                    color: 'var(--accent)',
+                    fontWeight: 600,
+                    letterSpacing: '0.05em',
+                    transform: 'translateX(-100%) translateX(-8px)',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  NOW
+                </div>
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: -26,
+                    top: 0,
+                    width: 12,
+                    height: 12,
+                    borderRadius: '50%',
+                    background: 'var(--white)',
+                    border: '2px solid var(--accent)',
+                    boxShadow: '0 0 0 4px var(--bg)',
+                  }}
+                />
               </>
             ) : (
-              <div style={{
-                position: 'absolute', left: -24, top: 4,
-                width: 8, height: 8, borderRadius: '50%',
-                background: ev.is_future ? 'var(--tlDot)' : 'var(--dim)',
-                opacity: ev.is_future ? 0.45 : 1,
-              }} />
+              <div
+                style={{
+                  position: 'absolute',
+                  left: -24,
+                  top: 4,
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  background: ev.is_future ? 'var(--tlDot)' : 'var(--dim)',
+                  opacity: ev.is_future ? 0.45 : 1,
+                }}
+              />
             )}
             <div style={{ opacity: ev.is_future ? 0.45 : 1 }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--dim)', marginBottom: 2 }}>
-                {ev.event_date ? new Date(ev.event_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : ''}
-                {ev.is_future && <span style={{ fontStyle: 'italic', marginLeft: 6 }}>Upcoming</span>}
+                {ev.event_date
+                  ? new Date(ev.event_date).toLocaleDateString('en-US', {
+                      month: 'short',
+                      year: 'numeric',
+                    })
+                  : ''}
+                {ev.is_future && (
+                  <span style={{ fontStyle: 'italic', marginLeft: 6 }}>Upcoming</span>
+                )}
               </div>
               <div style={{ fontSize: 14, lineHeight: 1.5, color: 'var(--soft)' }}>
                 {ev.event_label || ev.event_body}
@@ -279,7 +339,9 @@ export default function StoryPage() {
   // `storage` event from Supabase's auth token key (cross-tab).
   useEffect(() => {
     if (!currentUser) return;
-    try { window.sessionStorage.removeItem('vp:regwall-dismissed'); } catch {}
+    try {
+      window.sessionStorage.removeItem('vp:regwall-dismissed');
+    } catch {}
     setRegWallDismissed(false);
   }, [currentUser]);
 
@@ -287,7 +349,9 @@ export default function StoryPage() {
     if (typeof window === 'undefined') return;
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
-        try { window.sessionStorage.removeItem('vp:regwall-dismissed'); } catch {}
+        try {
+          window.sessionStorage.removeItem('vp:regwall-dismissed');
+        } catch {}
         setRegWallDismissed(false);
       }
     });
@@ -296,7 +360,9 @@ export default function StoryPage() {
       // localStorage. Any change there on another tab means auth state
       // just moved; drop the regwall dismissal so this tab re-evaluates.
       if (e.key && e.key.startsWith('sb-') && e.key.includes('auth-token')) {
-        try { window.sessionStorage.removeItem('vp:regwall-dismissed'); } catch {}
+        try {
+          window.sessionStorage.removeItem('vp:regwall-dismissed');
+        } catch {}
         setRegWallDismissed(false);
       }
     };
@@ -316,8 +382,11 @@ export default function StoryPage() {
   const dismissRegWall = () => {
     setRegWallDismissed(true);
     setShowRegWall(false);
-    try { window.sessionStorage.setItem('vp:regwall-dismissed', '1'); }
-    catch (e) { console.error('[story] regwall dismiss write', e); }
+    try {
+      window.sessionStorage.setItem('vp:regwall-dismissed', '1');
+    } catch (e) {
+      console.error('[story] regwall dismiss write', e);
+    }
   };
   const regWallRef = useRef<HTMLDivElement | null>(null);
   useFocusTrap(showRegWall, regWallRef, { onEscape: dismissRegWall });
@@ -328,7 +397,9 @@ export default function StoryPage() {
     if (!showRegWall || typeof document === 'undefined') return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
+    return () => {
+      document.body.style.overflow = prev;
+    };
   }, [showRegWall]);
 
   const reportModalRef = useRef<HTMLDivElement | null>(null);
@@ -347,15 +418,20 @@ export default function StoryPage() {
           .eq('slug', slug)
           .single();
         if (storyErr) console.error('[story] load failed', storyErr);
-        if (!storyData) { setLoading(false); return; }
+        if (!storyData) {
+          setLoading(false);
+          return;
+        }
         setStory(storyData as unknown as ArticleRow);
 
-        const allSettings = await getSettings(supabase).catch(err => {
+        const allSettings = await getSettings(supabase).catch((err) => {
           console.error('[story] settings load failed', err);
           return {};
         });
 
-        const { data: { user: authUser } } = await supabase.auth.getUser();
+        const {
+          data: { user: authUser },
+        } = await supabase.auth.getUser();
         if (authUser) setCurrentUser(authUser as AuthUser);
 
         if (!authUser) {
@@ -376,8 +452,13 @@ export default function StoryPage() {
             // clicked Close once isn't re-blocked on every subsequent
             // article load in the same browser tab.
             let dismissed = false;
-            try { dismissed = typeof window !== 'undefined' && window.sessionStorage.getItem('vp:regwall-dismissed') === '1'; }
-            catch (e) { console.error('[story] regwall dismiss read', e); }
+            try {
+              dismissed =
+                typeof window !== 'undefined' &&
+                window.sessionStorage.getItem('vp:regwall-dismissed') === '1';
+            } catch (e) {
+              console.error('[story] regwall dismiss read', e);
+            }
             if (dismissed) setRegWallDismissed(true);
             if (views >= limit && !dismissed) setShowRegWall(true);
           }
@@ -389,7 +470,10 @@ export default function StoryPage() {
             .select('email_verified, plans(tier)')
             .eq('id', authUser.id)
             .single();
-          const userRow = userData as { email_verified?: boolean | null; plans?: { tier?: string | null } | null } | null;
+          const userRow = userData as {
+            email_verified?: boolean | null;
+            plans?: { tier?: string | null } | null;
+          } | null;
           setUserTier(userRow?.plans?.tier || 'free');
 
           await refreshAllPermissions();
@@ -407,7 +491,7 @@ export default function StoryPage() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ articleId: storyData.id, completed: false }),
-          }).catch(err => console.error('[story] read-open signal failed', err));
+          }).catch((err) => console.error('[story] read-open signal failed', err));
         }
 
         const storyId = storyData.id;
@@ -425,9 +509,20 @@ export default function StoryPage() {
         }
 
         const [timelineRes, sourcesRes, quizPoolRes] = await Promise.all([
-          supabase.from('timelines').select('*').eq('article_id', storyId).order('event_date', { ascending: true }),
-          supabase.from('sources').select('*').eq('article_id', storyId).order('sort_order', { ascending: true }),
-          supabase.from('quizzes').select('id', { count: 'exact', head: true }).eq('article_id', storyId),
+          supabase
+            .from('timelines')
+            .select('*')
+            .eq('article_id', storyId)
+            .order('event_date', { ascending: true }),
+          supabase
+            .from('sources')
+            .select('*')
+            .eq('article_id', storyId)
+            .order('sort_order', { ascending: true }),
+          supabase
+            .from('quizzes')
+            .select('id', { count: 'exact', head: true })
+            .eq('article_id', storyId),
         ]);
         setTimeline((timelineRes.data as TimelineRow[] | null) || []);
         setSources((sourcesRes.data as SourceRow[] | null) || []);
@@ -438,19 +533,36 @@ export default function StoryPage() {
 
         if (authUser) {
           const { data: bookmarkRes } = await supabase
-            .from('bookmarks').select('id').eq('user_id', authUser.id).eq('article_id', storyId).maybeSingle();
-          if (bookmarkRes) { setBookmarked(true); setBookmarkId(bookmarkRes.id); }
+            .from('bookmarks')
+            .select('id')
+            .eq('user_id', authUser.id)
+            .eq('article_id', storyId)
+            .maybeSingle();
+          if (bookmarkRes) {
+            setBookmarked(true);
+            setBookmarkId(bookmarkRes.id);
+          }
           // Pass 17 / UJ-608 + UJ-613: pre-fetch the user's total bookmark
           // count so the button can pre-disable at the free-tier cap
           // (DB-driven via plan_features.bookmarks — see T-016). Cheap
           // query — `count: 'exact', head: true` returns just the row count.
           const { count: bookmarkCount } = await supabase
-            .from('bookmarks').select('id', { count: 'exact', head: true }).eq('user_id', authUser.id);
+            .from('bookmarks')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', authUser.id);
           if (typeof bookmarkCount === 'number') setBookmarkTotal(bookmarkCount);
           // T-016: resolve the DB-side bookmark cap for the user's plan.
           const { data: planProfile } = await supabase
-            .from('users').select('plan_id').eq('id', authUser.id).maybeSingle();
-          const cap = await getPlanLimitValue(supabase, planProfile?.plan_id ?? null, 'bookmarks', 10);
+            .from('users')
+            .select('plan_id')
+            .eq('id', authUser.id)
+            .maybeSingle();
+          const cap = await getPlanLimitValue(
+            supabase,
+            planProfile?.plan_id ?? null,
+            'bookmarks',
+            10
+          );
           if (typeof cap === 'number') setBookmarkCap(cap);
         }
       } catch (err) {
@@ -505,7 +617,7 @@ export default function StoryPage() {
           completed: true,
           readPercentage: readPercentage ?? null,
         }),
-      }).catch(err => console.error('[story] read-complete signal failed', err));
+      }).catch((err) => console.error('[story] read-complete signal failed', err));
     };
 
     // M-09: gate the dwell-timer behind visibility so a tab that has
@@ -570,8 +682,12 @@ export default function StoryPage() {
     setBookmarkError('');
     if (bookmarked && bookmarkId) {
       const res = await fetch(`/api/bookmarks/${bookmarkId}`, { method: 'DELETE' });
-      if (res.ok) { setBookmarked(false); setBookmarkId(null); }
-      else { setBookmarkError('Could not remove bookmark. Please try again.'); }
+      if (res.ok) {
+        setBookmarked(false);
+        setBookmarkId(null);
+      } else {
+        setBookmarkError('Could not remove bookmark. Please try again.');
+      }
     } else {
       // Route enforces D13 cap via the bookmark_cap trigger.
       const res = await fetch('/api/bookmarks', {
@@ -580,8 +696,10 @@ export default function StoryPage() {
         body: JSON.stringify({ article_id: story.id }),
       });
       const data = await res.json().catch(() => ({}));
-      if (res.ok && data?.id) { setBookmarked(true); setBookmarkId(data.id); }
-      else {
+      if (res.ok && data?.id) {
+        setBookmarked(true);
+        setBookmarkId(data.id);
+      } else {
         // M-11: dedupe cap messaging — the inline banner is the single
         // source of truth for the at-cap state (the button is disabled
         // at cap anyway, so this branch is unreachable under normal
@@ -608,10 +726,15 @@ export default function StoryPage() {
       });
       if (res.ok) {
         setReportSuccess(true);
-        setReportCategory(''); setReportDetail('');
-        setTimeout(() => { setShowReportModal(false); setReportSuccess(false); setReportError(''); }, 2000);
+        setReportCategory('');
+        setReportDetail('');
+        setTimeout(() => {
+          setShowReportModal(false);
+          setReportSuccess(false);
+          setReportError('');
+        }, 2000);
       } else {
-        const data = await res.json().catch(() => ({} as { error?: string }));
+        const data = await res.json().catch(() => ({}) as { error?: string });
         setReportError(data?.error || 'Could not submit report. Please try again.');
       }
     } catch (e) {
@@ -622,21 +745,29 @@ export default function StoryPage() {
 
   if (loading) {
     return (
-      <div className="vp-dark" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div
+        className="vp-dark"
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      >
         <div style={{ fontSize: 15, color: 'var(--dim)' }}>Loading...</div>
       </div>
     );
   }
   if (!story) {
     return (
-      <div className="vp-dark" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div
+        className="vp-dark"
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      >
         <div style={{ fontSize: 15, color: 'var(--dim)' }}>Article not found.</div>
       </div>
     );
   }
 
   const categoryName = story.categories?.name || '';
-  const bodyParagraphs = story.body ? story.body.split('\n').filter(p => p.trim().length > 0) : [];
+  const bodyParagraphs = story.body
+    ? story.body.split('\n').filter((p) => p.trim().length > 0)
+    : [];
 
   // D1 quiz gate:
   //   - quizPoolSize < 10 → entire block hidden (not enough questions to
@@ -658,26 +789,48 @@ export default function StoryPage() {
     } else {
       const signupHref = `/signup?next=${encodeURIComponent('/story/' + story.slug)}`;
       quizNode = (
-        <div style={{
-          padding: 18, borderRadius: 12,
-          border: '1px solid var(--border)', background: 'var(--card)',
-          textAlign: 'center',
-        }}>
+        <div
+          style={{
+            padding: 18,
+            borderRadius: 12,
+            border: '1px solid var(--border)',
+            background: 'var(--card)',
+            textAlign: 'center',
+          }}
+        >
           <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--white)', marginBottom: 6 }}>
             Take the quiz to join the discussion
           </div>
           <div style={{ fontSize: 13, color: 'var(--dim)', lineHeight: 1.5, marginBottom: 14 }}>
-            Comments on every article are gated by a short comprehension quiz. Sign up to take this one and unlock the conversation.
+            Comments on every article are gated by a short comprehension quiz. Sign up to take this
+            one and unlock the conversation.
           </div>
-          <a href={signupHref} style={{
-            display: 'inline-block', padding: '10px 18px', borderRadius: 10,
-            background: 'var(--accent)', color: '#fff',
-            fontSize: 13, fontWeight: 600, textDecoration: 'none',
-          }}>Sign up</a>
+          <a
+            href={signupHref}
+            style={{
+              display: 'inline-block',
+              padding: '10px 18px',
+              borderRadius: 10,
+              background: 'var(--accent)',
+              color: '#fff',
+              fontSize: 13,
+              fontWeight: 600,
+              textDecoration: 'none',
+            }}
+          >
+            Sign up
+          </a>
           <div style={{ marginTop: 10 }}>
-            <a href={`/login?next=${encodeURIComponent('/story/' + story.slug)}`} style={{
-              fontSize: 12, color: 'var(--dim)', textDecoration: 'none',
-            }}>Already have an account? Sign in</a>
+            <a
+              href={`/login?next=${encodeURIComponent('/story/' + story.slug)}`}
+              style={{
+                fontSize: 12,
+                color: 'var(--dim)',
+                textDecoration: 'none',
+              }}
+            >
+              Already have an account? Sign in
+            </a>
           </div>
         </div>
       );
@@ -685,14 +838,21 @@ export default function StoryPage() {
   }
 
   const lockPanelStyle: React.CSSProperties = {
-    padding: '18px 20px', borderRadius: 12,
-    border: '1px solid var(--border)', background: 'var(--card)',
+    padding: '18px 20px',
+    borderRadius: 12,
+    border: '1px solid var(--border)',
+    background: 'var(--card)',
     textAlign: 'center',
   };
   const lockCtaStyle: React.CSSProperties = {
-    display: 'inline-block', padding: '10px 18px', borderRadius: 10,
-    background: 'var(--accent)', color: '#fff',
-    fontSize: 13, fontWeight: 600, textDecoration: 'none',
+    display: 'inline-block',
+    padding: '10px 18px',
+    borderRadius: 10,
+    background: 'var(--accent)',
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: 600,
+    textDecoration: 'none',
   };
 
   const discussionSection = userPassedQuiz ? (
@@ -739,23 +899,39 @@ export default function StoryPage() {
   return (
     <div className="vp-dark">
       {/* D23: anonymous 2nd-article interstitial (sign-up CTA variant) */}
-      <Interstitial open={showAnonInterstitial && !LAUNCH_HIDE_ANON_INTERSTITIAL} onClose={() => setShowAnonInterstitial(false)} variant="signup" />
+      <Interstitial
+        open={showAnonInterstitial && !LAUNCH_HIDE_ANON_INTERSTITIAL}
+        onClose={() => setShowAnonInterstitial(false)}
+        variant="signup"
+      />
 
       {/* Registration wall */}
       {showRegWall && !regWallDismissed && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(17,17,17,0.92)',
-          zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          backdropFilter: 'blur(4px)',
-        }}>
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(17,17,17,0.92)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backdropFilter: 'blur(4px)',
+          }}
+        >
           <div
             ref={regWallRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="regwall-title"
             style={{
-              background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16,
-              padding: '40px 32px', maxWidth: 420, textAlign: 'center', position: 'relative',
+              background: 'var(--card)',
+              border: '1px solid var(--border)',
+              borderRadius: 16,
+              padding: '40px 32px',
+              maxWidth: 420,
+              textAlign: 'center',
+              position: 'relative',
             }}
           >
             {/* R13-C5 Fix 5 — soft close. The views >= limit gate is
@@ -765,20 +941,44 @@ export default function StoryPage() {
               onClick={dismissRegWall}
               aria-label="Close"
               style={{
-                position: 'absolute', top: 10, right: 12,
-                background: 'transparent', border: 'none', color: 'var(--soft)',
-                fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '4px 8px',
+                position: 'absolute',
+                top: 10,
+                right: 12,
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--soft)',
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: 'pointer',
+                padding: '4px 8px',
               }}
-            >Close</button>
-            <div id="regwall-title" style={{ fontSize: 22, fontWeight: 800, marginBottom: 10, color: 'var(--white)' }}>Sign up to keep reading</div>
+            >
+              Close
+            </button>
+            <div
+              id="regwall-title"
+              style={{ fontSize: 22, fontWeight: 800, marginBottom: 10, color: 'var(--white)' }}
+            >
+              Sign up to keep reading
+            </div>
             <div style={{ fontSize: 14, color: 'var(--soft)', marginBottom: 24, lineHeight: 1.5 }}>
               Free, and takes 30 seconds.
             </div>
-            <a href="/signup" style={{
-              display: 'inline-block', padding: '12px 32px', borderRadius: 10,
-              background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 15,
-              textDecoration: 'none',
-            }}>Create free account</a>
+            <a
+              href="/signup"
+              style={{
+                display: 'inline-block',
+                padding: '12px 32px',
+                borderRadius: 10,
+                background: 'var(--accent)',
+                color: '#fff',
+                fontWeight: 700,
+                fontSize: 15,
+                textDecoration: 'none',
+              }}
+            >
+              Create free account
+            </a>
           </div>
         </div>
       )}
@@ -789,22 +989,38 @@ export default function StoryPage() {
           tabs come back online. Flip `false` → original condition
           to unhide. */}
       {false && !isDesktop && (
-      <div style={{
-        display: 'flex',
-        borderBottom: '1px solid var(--border)',
-        background: 'var(--bg)',
-        position: 'sticky', top: 'var(--vp-top-bar-h, 0px)', zIndex: 50,
-      }}>
-        {(['Article', 'Timeline', 'Discussion'] as const).map(tab => (
-          <button key={tab} onClick={() => setActiveTab(tab)} style={{
-            flex: 1, padding: '10px 0', background: 'transparent', border: 'none',
-            borderBottom: activeTab === tab ? '2px solid var(--white)' : '2px solid transparent',
-            color: activeTab === tab ? 'var(--white)' : 'var(--dim)',
-            fontWeight: activeTab === tab ? 600 : 400, fontSize: 13, cursor: 'pointer',
-            fontFamily: 'var(--font-sans)',
-          }}>{tab}</button>
-        ))}
-      </div>
+        <div
+          style={{
+            display: 'flex',
+            borderBottom: '1px solid var(--border)',
+            background: 'var(--bg)',
+            position: 'sticky',
+            top: 'var(--vp-top-bar-h, 0px)',
+            zIndex: 50,
+          }}
+        >
+          {(['Article', 'Timeline', 'Discussion'] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              style={{
+                flex: 1,
+                padding: '10px 0',
+                background: 'transparent',
+                border: 'none',
+                borderBottom:
+                  activeTab === tab ? '2px solid var(--white)' : '2px solid transparent',
+                color: activeTab === tab ? 'var(--white)' : 'var(--dim)',
+                fontWeight: activeTab === tab ? 600 : 400,
+                fontSize: 13,
+                cursor: 'pointer',
+                fontFamily: 'var(--font-sans)',
+              }}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
       )}
 
       <div style={{ maxWidth: 960, margin: '0 auto', padding: '24px 16px 80px' }}>
@@ -813,148 +1029,339 @@ export default function StoryPage() {
           <div className="story-content" style={{ flex: 1, maxWidth: '65ch', minWidth: 0 }}>
             {/* Article body — on desktop always; on mobile only when Article tab is active */}
             {showArticleBody && (
-            <div className="tab-article">
-              {/* Sources-above-headline trust signal: visible only when the
+              <div className="tab-article">
+                {/* Sources-above-headline trust signal: visible only when the
                   article cites 2+ outlets. Ordering relies on the sources
                   query ORDER BY sort_order so truncation is deterministic.
                   SourcePills further down still renders the expandable
                   detail per source; this line is a quick-glance complement. */}
-              {sources.length >= 2 && (
+                {sources.length >= 2 && (
+                  <div
+                    aria-label={`Reported from: ${sources
+                      .map((s) => s.publisher)
+                      .filter(Boolean)
+                      .join(', ')}`}
+                    style={{
+                      fontSize: 11,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.06em',
+                      color: 'var(--dim)',
+                      marginBottom: 10,
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    Reported from
+                    {sources
+                      .slice(0, 3)
+                      .map((s) => s.publisher)
+                      .filter(Boolean)
+                      .map((p, i) => (
+                        <span key={i}> · {p}</span>
+                      ))}
+                    {sources.length > 3 && <span> · +{sources.length - 3} more</span>}
+                  </div>
+                )}
                 <div
-                  aria-label={`Reported from: ${sources.map(s => s.publisher).filter(Boolean).join(', ')}`}
-                  style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--dim)', marginBottom: 10, lineHeight: 1.4 }}
+                  style={{
+                    display: 'flex',
+                    gap: 6,
+                    marginBottom: 12,
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                  }}
                 >
-                  Reported from
-                  {sources.slice(0, 3).map(s => s.publisher).filter(Boolean).map((p, i) => (
-                    <span key={i}> · {p}</span>
-                  ))}
-                  {sources.length > 3 && <span> · +{sources.length - 3} more</span>}
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: 6, marginBottom: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-                {categoryName && (
-                  <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--accent)' }}>
-                    {categoryName}
-                  </span>
-                )}
-                {story.is_breaking && (
-                  <span style={{ fontSize: 10, fontWeight: 800, color: '#ffffff', background: '#ef4444', padding: '2px 6px', borderRadius: 4, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Breaking</span>
-                )}
-                {story.is_developing && (
-                  <span style={{ fontSize: 10, fontWeight: 800, color: '#ffffff', background: '#f59e0b', padding: '2px 6px', borderRadius: 4, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Developing</span>
-                )}
-              </div>
-
-              <h1 style={{
-                fontFamily: 'var(--font-serif)', fontSize: 26, fontWeight: 700,
-                lineHeight: 1.25, letterSpacing: -0.4, marginBottom: 12, color: 'var(--white)',
-              }}>{story.title}</h1>
-
-              {story.excerpt && (
-                <p style={{ fontSize: 15, lineHeight: 1.5, color: 'var(--soft)', marginBottom: 16 }}>
-                  {story.excerpt}
-                </p>
-              )}
-
-              <div style={{ fontSize: 13, color: 'var(--dim)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28, gap: 12, flexWrap: 'wrap' }}>
-                <span>
-                  {formatDate(story.published_at || story.created_at)}
-                  {sources.length > 0 && ` · ${sources.length} source${sources.length === 1 ? '' : 's'}`}
-                </span>
-                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                  {canListenTts && (
-                    <TTSButton text={`${story.title}. ${story.body || ''}`} />
+                  {categoryName && (
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.06em',
+                        color: 'var(--accent)',
+                      }}
+                    >
+                      {categoryName}
+                    </span>
                   )}
-                  {/* T-016: free-plan bookmark cap is DB-driven. Previously
-                    * hardcoded `>= 10` and "10 of 10"; bookmarkCap now
-                    * comes from plan_features.bookmarks for the user's plan. */}
-                  {(() => {
-                    const atCap = !bookmarked && !canBookmarkAdd && typeof bookmarkTotal === 'number' && bookmarkTotal >= bookmarkCap;
-                    return (
-                      <button onClick={toggleBookmark} disabled={atCap} title={atCap ? 'Upgrade for unlimited bookmarks' : undefined} style={{
-                        padding: '10px 14px', borderRadius: 8, minHeight: 44,
-                        border: '1px solid var(--border)', background: 'transparent',
-                        color: bookmarked ? 'var(--accent)' : atCap ? '#ccc' : 'var(--dim)',
-                        fontSize: 13, cursor: atCap ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-sans)',
-                        opacity: atCap ? 0.6 : 1,
-                      }}>
-                        {bookmarked ? 'Saved' : atCap ? `At cap (${bookmarkCap})` : 'Save'}
-                      </button>
-                    );
-                  })()}
-                  <button onClick={handleShare} style={{
-                    padding: '10px 14px', borderRadius: 8, minHeight: 44,
-                    border: '1px solid var(--border)', background: 'transparent',
-                    color: 'var(--dim)', fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font-sans)',
-                  }}>{shareMsg || 'Share'}</button>
+                  {story.is_breaking && (
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 800,
+                        color: '#ffffff',
+                        background: '#ef4444',
+                        padding: '2px 6px',
+                        borderRadius: 4,
+                        letterSpacing: '0.05em',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      Breaking
+                    </span>
+                  )}
+                  {story.is_developing && (
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 800,
+                        color: '#ffffff',
+                        background: '#f59e0b',
+                        padding: '2px 6px',
+                        borderRadius: 4,
+                        letterSpacing: '0.05em',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      Developing
+                    </span>
+                  )}
                 </div>
-              </div>
 
-              {/* Bookmark-cap notice: standalone row below the action row so the
+                <h1
+                  style={{
+                    fontFamily: 'var(--font-serif)',
+                    fontSize: 26,
+                    fontWeight: 700,
+                    lineHeight: 1.25,
+                    letterSpacing: -0.4,
+                    marginBottom: 12,
+                    color: 'var(--white)',
+                  }}
+                >
+                  {story.title}
+                </h1>
+
+                {story.excerpt && (
+                  <p
+                    style={{
+                      fontSize: 15,
+                      lineHeight: 1.5,
+                      color: 'var(--soft)',
+                      marginBottom: 16,
+                    }}
+                  >
+                    {story.excerpt}
+                  </p>
+                )}
+
+                <div
+                  style={{
+                    fontSize: 13,
+                    color: 'var(--dim)',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: 28,
+                    gap: 12,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <span>
+                    {formatDate(story.published_at || story.created_at)}
+                    {sources.length > 0 &&
+                      ` · ${sources.length} source${sources.length === 1 ? '' : 's'}`}
+                  </span>
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                    {canListenTts && <TTSButton text={`${story.title}. ${story.body || ''}`} />}
+                    {/* T-016: free-plan bookmark cap is DB-driven. Previously
+                     * hardcoded `>= 10` and "10 of 10"; bookmarkCap now
+                     * comes from plan_features.bookmarks for the user's plan. */}
+                    {(() => {
+                      const atCap =
+                        !bookmarked &&
+                        !canBookmarkAdd &&
+                        typeof bookmarkTotal === 'number' &&
+                        bookmarkTotal >= bookmarkCap;
+                      return (
+                        <button
+                          onClick={toggleBookmark}
+                          disabled={atCap}
+                          title={atCap ? 'Upgrade for unlimited bookmarks' : undefined}
+                          style={{
+                            padding: '10px 14px',
+                            borderRadius: 8,
+                            minHeight: 44,
+                            border: '1px solid var(--border)',
+                            background: 'transparent',
+                            color: bookmarked ? 'var(--accent)' : atCap ? '#ccc' : 'var(--dim)',
+                            fontSize: 13,
+                            cursor: atCap ? 'not-allowed' : 'pointer',
+                            fontFamily: 'var(--font-sans)',
+                            opacity: atCap ? 0.6 : 1,
+                          }}
+                        >
+                          {bookmarked ? 'Saved' : atCap ? `At cap (${bookmarkCap})` : 'Save'}
+                        </button>
+                      );
+                    })()}
+                    <button
+                      onClick={handleShare}
+                      style={{
+                        padding: '10px 14px',
+                        borderRadius: 8,
+                        minHeight: 44,
+                        border: '1px solid var(--border)',
+                        background: 'transparent',
+                        color: 'var(--dim)',
+                        fontSize: 13,
+                        cursor: 'pointer',
+                        fontFamily: 'var(--font-sans)',
+                      }}
+                    >
+                      {shareMsg || 'Share'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Bookmark-cap notice: standalone row below the action row so the
                   message never overflows the inner button group at narrow
                   viewports (320/375/390). Rendered only when the user has no
                   add permission AND is at cap AND hasn't bookmarked this article. */}
-              {!canBookmarkAdd && typeof bookmarkTotal === 'number' && bookmarkTotal >= bookmarkCap && !bookmarked && (
-                <div role="status" aria-live="polite" style={{ fontSize: 13, color: '#b45309', marginBottom: 28 }}>
-                  You&apos;ve used {bookmarkCap} of {bookmarkCap} free bookmarks. <a href="/profile/settings/billing" style={{ color: '#b45309', fontWeight: 700 }}>Upgrade for unlimited</a>
-                </div>
-              )}
+                {!canBookmarkAdd &&
+                  typeof bookmarkTotal === 'number' &&
+                  bookmarkTotal >= bookmarkCap &&
+                  !bookmarked && (
+                    <div
+                      role="status"
+                      aria-live="polite"
+                      style={{ fontSize: 13, color: '#b45309', marginBottom: 28 }}
+                    >
+                      You&apos;ve used {bookmarkCap} of {bookmarkCap} free bookmarks.{' '}
+                      <a
+                        href="/profile/settings/billing"
+                        style={{ color: '#b45309', fontWeight: 700 }}
+                      >
+                        Upgrade for unlimited
+                      </a>
+                    </div>
+                  )}
 
-              {canViewBody ? (
-                <article>
-                  {bodyParagraphs.map((p, i) => (
-                    <p key={i} style={{
-                      fontSize: 18, lineHeight: 1.55, color: 'var(--white)',
-                      marginBottom: 16, fontFamily: 'var(--font-sans)',
-                    }}>{p}</p>
-                  ))}
-                </article>
-              ) : currentUser ? (
-                <div style={{
-                  padding: '20px 22px', borderRadius: 12,
-                  border: '1px solid var(--border)', background: 'var(--card)',
-                  textAlign: 'center',
-                }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--white)', marginBottom: 6 }}>
-                    Upgrade to read this article
+                {canViewBody ? (
+                  <article>
+                    {bodyParagraphs.map((p, i) => (
+                      <p
+                        key={i}
+                        style={{
+                          fontSize: 18,
+                          lineHeight: 1.55,
+                          color: 'var(--white)',
+                          marginBottom: 16,
+                          fontFamily: 'var(--font-sans)',
+                        }}
+                      >
+                        {p}
+                      </p>
+                    ))}
+                  </article>
+                ) : currentUser ? (
+                  <div
+                    style={{
+                      padding: '20px 22px',
+                      borderRadius: 12,
+                      border: '1px solid var(--border)',
+                      background: 'var(--card)',
+                      textAlign: 'center',
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 700,
+                        color: 'var(--white)',
+                        marginBottom: 6,
+                      }}
+                    >
+                      Upgrade to read this article
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        color: 'var(--dim)',
+                        lineHeight: 1.5,
+                        marginBottom: 14,
+                      }}
+                    >
+                      Your current plan does not include full article access.
+                    </div>
+                    <a
+                      href="/profile/settings/billing"
+                      style={{
+                        display: 'inline-block',
+                        padding: '10px 18px',
+                        borderRadius: 10,
+                        background: 'var(--accent)',
+                        color: '#fff',
+                        fontSize: 13,
+                        fontWeight: 600,
+                        textDecoration: 'none',
+                      }}
+                    >
+                      Upgrade
+                    </a>
                   </div>
-                  <div style={{ fontSize: 13, color: 'var(--dim)', lineHeight: 1.5, marginBottom: 14 }}>
-                    Your current plan does not include full article access.
+                ) : null}
+
+                {canViewSources && <SourcePills sources={sources} />}
+
+                {!canViewAdFree && (
+                  <Ad
+                    placement="article_bottom"
+                    page="article"
+                    position="bottom"
+                    articleId={story.id}
+                  />
+                )}
+
+                {bookmarkError && (
+                  <div
+                    style={{
+                      marginTop: 12,
+                      padding: '8px 10px',
+                      fontSize: 12,
+                      color: 'var(--wrong)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 6,
+                      background: 'rgba(239,68,68,0.08)',
+                    }}
+                  >
+                    {bookmarkError}
                   </div>
-                  <a href="/profile/settings/billing" style={{
-                    display: 'inline-block', padding: '10px 18px', borderRadius: 10,
-                    background: 'var(--accent)', color: '#fff',
-                    fontSize: 13, fontWeight: 600, textDecoration: 'none',
-                  }}>Upgrade</a>
+                )}
+
+                {/* Report */}
+                <div style={{ marginTop: 24, textAlign: 'right' }}>
+                  <button
+                    onClick={() => setShowReportModal(true)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--dim)',
+                      fontSize: 11,
+                      cursor: 'pointer',
+                      fontFamily: 'var(--font-sans)',
+                    }}
+                  >
+                    Report this article
+                  </button>
                 </div>
-              ) : null}
-
-              {canViewSources && <SourcePills sources={sources} />}
-
-              {!canViewAdFree && (
-                <Ad placement="article_bottom" page="article" position="bottom" articleId={story.id} />
-              )}
-
-              {bookmarkError && (
-                <div style={{ marginTop: 12, padding: '8px 10px', fontSize: 12, color: 'var(--wrong)', border: '1px solid var(--border)', borderRadius: 6, background: 'rgba(239,68,68,0.08)' }}>
-                  {bookmarkError}
-                </div>
-              )}
-
-              {/* Report */}
-              <div style={{ marginTop: 24, textAlign: 'right' }}>
-                <button onClick={() => setShowReportModal(true)} style={{
-                  background: 'transparent', border: 'none',
-                  color: 'var(--dim)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font-sans)',
-                }}>Report this article</button>
               </div>
-            </div>
             )}
 
             {/* Timeline (mobile) — launch-phase hide. */}
             {false && showMobileTimeline && canViewTimeline && (
               <div>
-                <div style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, color: 'var(--dim)', marginBottom: 16, letterSpacing: '0.04em' }}>Timeline</div>
+                <div
+                  style={{
+                    fontSize: 11,
+                    textTransform: 'uppercase',
+                    fontWeight: 600,
+                    color: 'var(--dim)',
+                    marginBottom: 16,
+                    letterSpacing: '0.04em',
+                  }}
+                >
+                  Timeline
+                </div>
                 <Timeline events={timeline} />
               </div>
             )}
@@ -962,12 +1369,29 @@ export default function StoryPage() {
 
           {/* Timeline (desktop aside) — launch-phase hide. */}
           {false && isDesktop && canViewTimeline && (
-          <aside style={{
-            width: 260, flexShrink: 0, position: 'sticky', top: 60, alignSelf: 'flex-start',
-          }}>
-            <div style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, color: 'var(--dim)', marginBottom: 16, letterSpacing: '0.04em' }}>Timeline</div>
-            <Timeline events={timeline} />
-          </aside>
+            <aside
+              style={{
+                width: 260,
+                flexShrink: 0,
+                position: 'sticky',
+                top: 60,
+                alignSelf: 'flex-start',
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 11,
+                  textTransform: 'uppercase',
+                  fontWeight: 600,
+                  color: 'var(--dim)',
+                  marginBottom: 16,
+                  letterSpacing: '0.04em',
+                }}
+              >
+                Timeline
+              </div>
+              <Timeline events={timeline} />
+            </aside>
           )}
         </div>
 
@@ -981,26 +1405,60 @@ export default function StoryPage() {
             {/* R13-C5 Fix 4 — simple exit path after article + comments.
                 No related-article selection (new product work); just a
                 clear "where to next" so readers aren't stranded. */}
-            <div style={{
-              marginTop: 32, padding: '20px 20px 24px', borderRadius: 12,
-              border: '1px solid var(--border)', background: 'var(--card)',
-              textAlign: 'center',
-            }}>
-              <div style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, color: 'var(--dim)', letterSpacing: '0.04em', marginBottom: 10 }}>
+            <div
+              style={{
+                marginTop: 32,
+                padding: '20px 20px 24px',
+                borderRadius: 12,
+                border: '1px solid var(--border)',
+                background: 'var(--card)',
+                textAlign: 'center',
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 11,
+                  textTransform: 'uppercase',
+                  fontWeight: 600,
+                  color: 'var(--dim)',
+                  letterSpacing: '0.04em',
+                  marginBottom: 10,
+                }}
+              >
                 You might also like
               </div>
               <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-                <a href="/" style={{
-                  display: 'inline-block', padding: '10px 20px', borderRadius: 10,
-                  background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 700,
-                  textDecoration: 'none',
-                }}>Back to home</a>
-                <a href="/browse" style={{
-                  display: 'inline-block', padding: '10px 20px', borderRadius: 10,
-                  border: '1px solid var(--border)', background: 'transparent',
-                  color: 'var(--white)', fontSize: 13, fontWeight: 600,
-                  textDecoration: 'none',
-                }}>Browse articles</a>
+                <a
+                  href="/"
+                  style={{
+                    display: 'inline-block',
+                    padding: '10px 20px',
+                    borderRadius: 10,
+                    background: 'var(--accent)',
+                    color: '#fff',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    textDecoration: 'none',
+                  }}
+                >
+                  Back to home
+                </a>
+                <a
+                  href="/browse"
+                  style={{
+                    display: 'inline-block',
+                    padding: '10px 20px',
+                    borderRadius: 10,
+                    border: '1px solid var(--border)',
+                    background: 'transparent',
+                    color: 'var(--white)',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    textDecoration: 'none',
+                  }}
+                >
+                  Browse articles
+                </a>
               </div>
             </div>
           </div>
@@ -1009,49 +1467,89 @@ export default function StoryPage() {
 
       {/* Report modal */}
       {showReportModal && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(17,17,17,0.85)',
-          zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }} onClick={() => setShowReportModal(false)}>
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(17,17,17,0.85)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          onClick={() => setShowReportModal(false)}
+        >
           <div
             ref={reportModalRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="report-modal-title"
-            onClick={e => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
             style={{
-              background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14,
-              padding: 20, maxWidth: 420, width: '90%',
+              background: 'var(--card)',
+              border: '1px solid var(--border)',
+              borderRadius: 14,
+              padding: 20,
+              maxWidth: 420,
+              width: '90%',
             }}
           >
-            <div id="report-modal-title" style={{ fontSize: 16, fontWeight: 700, color: 'var(--white)', marginBottom: 12 }}>Report this article</div>
+            <div
+              id="report-modal-title"
+              style={{ fontSize: 16, fontWeight: 700, color: 'var(--white)', marginBottom: 12 }}
+            >
+              Report this article
+            </div>
             {reportSuccess ? (
-              <div style={{ fontSize: 13, color: 'var(--right)' }}>Thanks — we&apos;ll review it.</div>
+              <div style={{ fontSize: 13, color: 'var(--right)' }}>
+                Thanks — we&apos;ll review it.
+              </div>
             ) : (
               <>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
-                  {REPORT_CATEGORIES.map(c => (
-                    <label key={c.value} style={{
-                      display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
-                      border: `1px solid ${reportCategory === c.value ? 'var(--accent)' : 'var(--border)'}`,
-                      background: reportCategory === c.value ? 'rgba(129,140,248,0.08)' : 'transparent',
-                      borderRadius: 8, cursor: 'pointer',
-                    }}>
-                      <input type="radio" name="report" checked={reportCategory === c.value}
-                        onChange={() => setReportCategory(c.value)} style={{ accentColor: 'var(--accent)' }} />
+                  {REPORT_CATEGORIES.map((c) => (
+                    <label
+                      key={c.value}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: '8px 10px',
+                        border: `1px solid ${reportCategory === c.value ? 'var(--accent)' : 'var(--border)'}`,
+                        background:
+                          reportCategory === c.value ? 'rgba(129,140,248,0.08)' : 'transparent',
+                        borderRadius: 8,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="report"
+                        checked={reportCategory === c.value}
+                        onChange={() => setReportCategory(c.value)}
+                        style={{ accentColor: 'var(--accent)' }}
+                      />
                       <span style={{ fontSize: 13, color: 'var(--white)' }}>{c.label}</span>
                     </label>
                   ))}
                 </div>
                 <textarea
-                  value={reportDetail} onChange={e => setReportDetail(e.target.value)}
+                  value={reportDetail}
+                  onChange={(e) => setReportDetail(e.target.value)}
                   placeholder="Anything else we should know? (optional)"
                   rows={3}
                   style={{
-                    width: '100%', padding: 8, borderRadius: 6,
-                    border: '1px solid var(--border)', background: 'var(--bg)',
-                    color: 'var(--white)', fontSize: 13, fontFamily: 'var(--font-sans)',
-                    outline: 'none', boxSizing: 'border-box', resize: 'vertical',
+                    width: '100%',
+                    padding: 8,
+                    borderRadius: 6,
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg)',
+                    color: 'var(--white)',
+                    fontSize: 13,
+                    fontFamily: 'var(--font-sans)',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                    resize: 'vertical',
                   }}
                 />
                 {reportError && (
@@ -1060,23 +1558,45 @@ export default function StoryPage() {
                   </div>
                 )}
                 <div style={{ display: 'flex', gap: 6, marginTop: 12, justifyContent: 'flex-end' }}>
-                  <button onClick={() => { setShowReportModal(false); setReportError(''); }} style={{
-                    padding: '6px 14px', borderRadius: 6, border: '1px solid var(--border)',
-                    background: 'transparent', color: 'var(--dim)', fontSize: 12, cursor: 'pointer',
-                  }}>Cancel</button>
-                  <button onClick={handleReport} disabled={!reportCategory} style={{
-                    padding: '6px 14px', borderRadius: 6, border: 'none',
-                    background: reportCategory ? 'var(--accent)' : 'var(--tlDot)',
-                    color: '#fff', fontSize: 12, fontWeight: 600,
-                    cursor: reportCategory ? 'pointer' : 'default',
-                  }}>Submit</button>
+                  <button
+                    onClick={() => {
+                      setShowReportModal(false);
+                      setReportError('');
+                    }}
+                    style={{
+                      padding: '6px 14px',
+                      borderRadius: 6,
+                      border: '1px solid var(--border)',
+                      background: 'transparent',
+                      color: 'var(--dim)',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleReport}
+                    disabled={!reportCategory}
+                    style={{
+                      padding: '6px 14px',
+                      borderRadius: 6,
+                      border: 'none',
+                      background: reportCategory ? 'var(--accent)' : 'var(--tlDot)',
+                      color: '#fff',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: reportCategory ? 'pointer' : 'default',
+                    }}
+                  >
+                    Submit
+                  </button>
                 </div>
               </>
             )}
           </div>
         </div>
       )}
-
     </div>
   );
 }

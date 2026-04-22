@@ -10,8 +10,11 @@ export async function POST(_request: Request, { params }: { params: { id: string
   if (!targetId) return NextResponse.json({ error: 'user id required' }, { status: 400 });
 
   let actor;
-  try { actor = await requirePermission('admin.users.export_data'); }
-  catch (err) { return permissionError(err); }
+  try {
+    actor = await requirePermission('admin.users.export_data');
+  } catch (err) {
+    return permissionError(err);
+  }
   void actor;
 
   const service = createServiceClient();

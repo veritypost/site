@@ -5,9 +5,7 @@ const CACHE_TTL = 10_000;
 export async function getSettings(supabase) {
   if (_cache && Date.now() - _cacheTime < CACHE_TTL) return _cache;
 
-  const { data, error } = await supabase
-    .from('settings')
-    .select('key, value, value_type');
+  const { data, error } = await supabase.from('settings').select('key, value, value_type');
 
   if (error || !data) return _cache || {};
 
@@ -17,7 +15,11 @@ export async function getSettings(supabase) {
     if (row.value_type === 'boolean') val = val === 'true';
     else if (row.value_type === 'number') val = Number(val);
     else if (row.value_type === 'json') {
-      try { val = JSON.parse(val); } catch { /* keep as string */ }
+      try {
+        val = JSON.parse(val);
+      } catch {
+        /* keep as string */
+      }
     } else if (row.value_type === 'string' && val.startsWith('"') && val.endsWith('"')) {
       val = val.slice(1, -1);
     }

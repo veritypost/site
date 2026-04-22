@@ -38,7 +38,7 @@ import { verifyWebhook, retrieveSubscription } from '@/lib/stripe';
 // arrived after a prior attempt had inserted 'received' but before it
 // marked 'processed' — potentially double-applying billing RPCs.
 
-export const runtime = 'nodejs';           // need node crypto
+export const runtime = 'nodejs'; // need node crypto
 export const dynamic = 'force-dynamic';
 
 // Belt-and-braces body-size cap. Stripe events are small (<100 KB in
@@ -62,8 +62,9 @@ export async function POST(request) {
   }
 
   let event;
-  try { event = verifyWebhook(raw, sig); }
-  catch (err) {
+  try {
+    event = verifyWebhook(raw, sig);
+  } catch (err) {
     console.error('[stripe.webhook] signature verification failed:', err?.message);
     return NextResponse.json({ error: 'Signature verification failed' }, { status: 400 });
   }
@@ -72,14 +73,18 @@ export async function POST(request) {
 
   // Step A: try to INSERT and claim processing in one step.
   let logId = null;
-  const { data: inserted, error: insertError } = await service.from('webhook_log').insert({
-    source: 'stripe',
-    event_type: event.type,
-    event_id: event.id,
-    payload: event,
-    processing_status: 'processing',
-    signature_valid: true,
-  }).select('id').maybeSingle();
+  const { data: inserted, error: insertError } = await service
+    .from('webhook_log')
+    .insert({
+      source: 'stripe',
+      event_type: event.type,
+      event_id: event.id,
+      payload: event,
+      processing_status: 'processing',
+      signature_valid: true,
+    })
+    .select('id')
+    .maybeSingle();
 
   if (inserted) {
     logId = inserted.id;
@@ -154,19 +159,25 @@ export async function POST(request) {
         // Unknown event types are logged but not treated as errors.
         break;
     }
-    await service.from('webhook_log').update({
-      processing_status: 'processed',
-      processed_at: new Date().toISOString(),
-    }).eq('id', logId);
+    await service
+      .from('webhook_log')
+      .update({
+        processing_status: 'processed',
+        processed_at: new Date().toISOString(),
+      })
+      .eq('id', logId);
     return NextResponse.json({ received: true });
   } catch (err) {
     console.error('[stripe.webhook] processing failed:', err);
     // Server-side audit row stores the raw message for debugging; response
     // to Stripe stays generic.
-    await service.from('webhook_log').update({
-      processing_status: 'failed',
-      processing_error: err?.message || 'unknown',
-    }).eq('id', logId);
+    await service
+      .from('webhook_log')
+      .update({
+        processing_status: 'failed',
+        processing_error: err?.message || 'unknown',
+      })
+      .eq('id', logId);
     // Returning 500 tells Stripe to retry; body text doesn't affect retry.
     return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 });
   }
@@ -177,22 +188,29 @@ export async function POST(request) {
 async function lookupUserAndPlan(service, customerId, priceId, fallbackUserId) {
   let userRow = null;
   if (customerId) {
-    const { data } = await service.from('users')
+    const { data } = await service
+      .from('users')
       .select('id, plan_id, plan_status, frozen_at, plan_grace_period_ends_at')
-      .eq('stripe_customer_id', customerId).maybeSingle();
+      .eq('stripe_customer_id', customerId)
+      .maybeSingle();
     if (data) userRow = data;
   }
   if (!userRow && fallbackUserId) {
-    const { data } = await service.from('users')
+    const { data } = await service
+      .from('users')
       .select('id, plan_id, plan_status, frozen_at, plan_grace_period_ends_at')
-      .eq('id', fallbackUserId).maybeSingle();
+      .eq('id', fallbackUserId)
+      .maybeSingle();
     if (data) userRow = data;
   }
 
   let planRow = null;
   if (priceId) {
-    const { data } = await service.from('plans')
-      .select('id, name, tier').eq('stripe_price_id', priceId).maybeSingle();
+    const { data } = await service
+      .from('plans')
+      .select('id, name, tier')
+      .eq('stripe_price_id', priceId)
+      .maybeSingle();
     if (data) planRow = data;
   }
   return { userRow, planRow };
@@ -224,21 +242,27 @@ async function handleCheckoutCompleted(service, session) {
   // Step 1: resolve by existing customer → user mapping if one exists.
   let userRow = null;
   if (customerId) {
-    const { data } = await service.from('users')
+    const { data } = await service
+      .from('users')
       .select('id, stripe_customer_id, plan_id, plan_status, frozen_at, plan_grace_period_ends_at')
-      .eq('stripe_customer_id', customerId).maybeSingle();
+      .eq('stripe_customer_id', customerId)
+      .maybeSingle();
     if (data) userRow = data;
   }
 
   // Step 2: if no prior mapping, fall back to the claimed id.
   if (!userRow) {
-    const { data } = await service.from('users')
+    const { data } = await service
+      .from('users')
       .select('id, stripe_customer_id, plan_id, plan_status, frozen_at, plan_grace_period_ends_at')
-      .eq('id', claimedUserId).maybeSingle();
+      .eq('id', claimedUserId)
+      .maybeSingle();
     if (data) userRow = data;
   }
   if (!userRow) {
-    throw new Error(`checkout.session.completed: user not found (claimed=${claimedUserId}, customer=${customerId})`);
+    throw new Error(
+      `checkout.session.completed: user not found (claimed=${claimedUserId}, customer=${customerId})`
+    );
   }
 
   // Step 3: the resolved row must match the claimed id. If the customer
@@ -259,7 +283,8 @@ async function handleCheckoutCompleted(service, session) {
       );
     }
     if (!userRow.stripe_customer_id) {
-      await service.from('users')
+      await service
+        .from('users')
         .update({ stripe_customer_id: customerId })
         .eq('id', userRow.id)
         .is('stripe_customer_id', null);
@@ -272,17 +297,22 @@ async function handleCheckoutCompleted(service, session) {
   const sub = await retrieveSubscription(subId);
   const priceId = sub.items?.data?.[0]?.price?.id;
 
-  const { data: plan } = await service.from('plans')
-    .select('id, name, tier').eq('stripe_price_id', priceId).maybeSingle();
+  const { data: plan } = await service
+    .from('plans')
+    .select('id, name, tier')
+    .eq('stripe_price_id', priceId)
+    .maybeSingle();
   if (!plan) throw new Error(`no plan row for stripe_price_id=${priceId}`);
 
   if (userRow.frozen_at) {
     await service.rpc('billing_resubscribe', {
-      p_user_id: userRow.id, p_new_plan_id: plan.id,
+      p_user_id: userRow.id,
+      p_new_plan_id: plan.id,
     });
   } else {
     await service.rpc('billing_change_plan', {
-      p_user_id: userRow.id, p_new_plan_id: plan.id,
+      p_user_id: userRow.id,
+      p_new_plan_id: plan.id,
     });
   }
 }
@@ -317,7 +347,8 @@ async function handleSubscriptionUpdated(service, sub) {
       // column clear so un-cancel still works before the next schema
       // migration. Audit the fallback for observability.
       if (/billing_uncancel_subscription/i.test(rpcErr?.message || '')) {
-        await service.from('users')
+        await service
+          .from('users')
           .update({
             plan_grace_period_ends_at: null,
             plan_status: 'active',
@@ -342,11 +373,13 @@ async function handleSubscriptionUpdated(service, sub) {
   if (planRow && planRow.id !== userRow.plan_id) {
     if (userRow.frozen_at) {
       await service.rpc('billing_resubscribe', {
-        p_user_id: userRow.id, p_new_plan_id: planRow.id,
+        p_user_id: userRow.id,
+        p_new_plan_id: planRow.id,
       });
     } else {
       await service.rpc('billing_change_plan', {
-        p_user_id: userRow.id, p_new_plan_id: planRow.id,
+        p_user_id: userRow.id,
+        p_new_plan_id: planRow.id,
       });
     }
   }
@@ -362,8 +395,9 @@ async function handleChargeRefunded(service, charge) {
   const { userRow } = await lookupUserAndPlan(service, customerId, null);
   if (!userRow) return;
 
-  const fullyRefunded = Boolean(charge.refunded)
-    || (charge.amount && charge.amount_refunded && charge.amount === charge.amount_refunded);
+  const fullyRefunded =
+    Boolean(charge.refunded) ||
+    (charge.amount && charge.amount_refunded && charge.amount === charge.amount_refunded);
 
   await service.from('audit_log').insert({
     actor_id: userRow.id,
@@ -390,9 +424,8 @@ async function handleChargeRefunded(service, charge) {
 // out of scope for this chunk; we write to audit_log + create an
 // admin-visible notification via the existing notification RPC.
 async function handleChargeDispute(service, dispute) {
-  const customerId = dispute.charge && typeof dispute.charge === 'object'
-    ? dispute.charge.customer
-    : null;
+  const customerId =
+    dispute.charge && typeof dispute.charge === 'object' ? dispute.charge.customer : null;
 
   let userRow = null;
   if (customerId) {
@@ -425,14 +458,17 @@ async function handleChargeDispute(service, dispute) {
         p_user_id: userRow.id,
         p_type: 'billing_alert',
         p_title: 'Dispute opened on your card',
-        p_body: 'We received a dispute from your card issuer. If this was not you, contact support so we can reach out to your bank.',
+        p_body:
+          'We received a dispute from your card issuer. If this was not you, contact support so we can reach out to your bank.',
         p_action_url: '/profile/settings/billing',
         p_action_type: 'billing',
         p_action_id: null,
         p_priority: 'high',
         p_metadata: { dispute_id: dispute.id },
       });
-    } catch { /* notification RPC best-effort */ }
+    } catch {
+      /* notification RPC best-effort */
+    }
   }
 }
 
@@ -459,13 +495,16 @@ async function handlePaymentFailed(service, invoice) {
       p_user_id: userRow.id,
       p_type: 'billing_alert',
       p_title: 'Payment failed',
-      p_body: "We couldn't charge your card for your last payment. Update your payment method to keep your subscription active.",
+      p_body:
+        "We couldn't charge your card for your last payment. Update your payment method to keep your subscription active.",
       p_action_url: '/profile/settings/billing',
       p_action_type: 'billing',
       p_action_id: null,
       p_priority: 'high',
       p_metadata: { invoice_id: invoice.id, stripe_customer_id: invoice.customer },
     });
-  } catch { /* swallow — webhook ack takes precedence */ }
+  } catch {
+    /* swallow — webhook ack takes precedence */
+  }
   return invoice.id;
 }

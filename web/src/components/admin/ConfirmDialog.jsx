@@ -51,12 +51,15 @@ export default function ConfirmDialog({
 
   if (!open) return null;
 
-  const btnVariant = variant === 'primary' ? 'primary' : variant === 'warning' ? 'primary' : 'danger';
+  const btnVariant =
+    variant === 'primary' ? 'primary' : variant === 'warning' ? 'primary' : 'danger';
 
   return (
     <div
       role="presentation"
-      onClick={(e) => { if (e.target === e.currentTarget && !busy) onCancel?.(); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !busy) onCancel?.();
+      }}
       style={{
         position: 'fixed',
         inset: 0,
@@ -168,7 +171,9 @@ export function ConfirmDialogHost() {
 
   useEffect(() => {
     pushRequest = (r) => setReq(r);
-    return () => { pushRequest = null; };
+    return () => {
+      pushRequest = null;
+    };
   }, []);
 
   const handleCancel = useCallback(() => {

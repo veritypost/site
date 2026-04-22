@@ -7,8 +7,9 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 
 export async function GET() {
   let user;
-  try { user = await requirePermission('kids.parent.weekly_report.view'); }
-  catch (err) {
+  try {
+    user = await requirePermission('kids.parent.weekly_report.view');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
@@ -16,11 +17,18 @@ export async function GET() {
   const service = createServiceClient();
   let ownerId = user.id;
   const { data: subRow } = await service
-    .from('subscriptions').select('family_owner_id')
-    .eq('user_id', user.id).eq('status', 'active').maybeSingle();
+    .from('subscriptions')
+    .select('family_owner_id')
+    .eq('user_id', user.id)
+    .eq('status', 'active')
+    .maybeSingle();
   if (subRow?.family_owner_id) ownerId = subRow.family_owner_id;
 
   const { data, error } = await service.rpc('family_weekly_report', { p_owner_id: ownerId });
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'family.weekly_report', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'family.weekly_report',
+      fallbackStatus: 400,
+    });
   return NextResponse.json(data || {});
 }

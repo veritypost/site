@@ -18,7 +18,9 @@ export async function register() {
 
   const Sentry = await import('@sentry/nextjs');
   // Shared PII scrubber lives at web/sentry.shared.js (CJS).
-  const sentryShared = (await import('../sentry.shared.js')) as { scrubPII: (e: unknown) => unknown };
+  const sentryShared = (await import('../sentry.shared.js')) as {
+    scrubPII: (e: unknown) => unknown;
+  };
   const { scrubPII } = sentryShared;
 
   const baseConfig = {

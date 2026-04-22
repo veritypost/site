@@ -51,7 +51,9 @@ export default function PageSection({
                 {title}
               </h2>
             )}
-            {aside && <div style={{ display: 'flex', gap: S[2], alignItems: 'center' }}>{aside}</div>}
+            {aside && (
+              <div style={{ display: 'flex', gap: S[2], alignItems: 'center' }}>{aside}</div>
+            )}
           </div>
           {description && (
             <p

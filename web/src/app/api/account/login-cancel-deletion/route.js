@@ -21,12 +21,12 @@ import { createClient, createClientFromToken, createServiceClient } from '@/lib/
 export async function POST(request) {
   try {
     const auth = request.headers.get('authorization') || '';
-    const bearer = auth.toLowerCase().startsWith('bearer ')
-      ? auth.slice(7).trim()
-      : null;
+    const bearer = auth.toLowerCase().startsWith('bearer ') ? auth.slice(7).trim() : null;
 
     const authClient = bearer ? createClientFromToken(bearer) : await createClient();
-    const { data: { user } } = await authClient.auth.getUser();
+    const {
+      data: { user },
+    } = await authClient.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
     }
@@ -37,7 +37,10 @@ export async function POST(request) {
     });
     if (error) {
       console.error('[account.login-cancel-deletion]', error.message);
-      return NextResponse.json({ cancelled: false, error: 'Could not cancel deletion' }, { status: 500 });
+      return NextResponse.json(
+        { cancelled: false, error: 'Could not cancel deletion' },
+        { status: 500 }
+      );
     }
     return NextResponse.json({ cancelled: !!data });
   } catch {

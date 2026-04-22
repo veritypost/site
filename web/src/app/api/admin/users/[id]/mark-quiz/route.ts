@@ -12,8 +12,11 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (!targetId) return NextResponse.json({ error: 'user id required' }, { status: 400 });
 
   let actor;
-  try { actor = await requirePermission('admin.users.mark_quiz'); }
-  catch (err) { return permissionError(err); }
+  try {
+    actor = await requirePermission('admin.users.mark_quiz');
+  } catch (err) {
+    return permissionError(err);
+  }
 
   const rankErr = await requireAdminOutranks(targetId, actor.id);
   if (rankErr) return rankErr;
@@ -32,7 +35,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
     .select('id')
     .eq('slug', slug)
     .maybeSingle();
-  if (!story) return NextResponse.json({ error: `No article with slug "${slug}"` }, { status: 404 });
+  if (!story)
+    return NextResponse.json({ error: `No article with slug "${slug}"` }, { status: 404 });
 
   const { data: pool } = await service
     .from('quizzes')

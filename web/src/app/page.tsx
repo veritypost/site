@@ -27,14 +27,26 @@ const C = {
 // and bypass the kids-safe WHERE clause on the query below. Matches the
 // shared logic in /api/search/route.js (kept in sync by hand).
 function sanitizeIlikeTerm(s: string): string {
-  return String(s || '').replace(/[,.%*()"\\_]/g, ' ').trim();
+  return String(s || '')
+    .replace(/[,.%*()"\\_]/g, ' ')
+    .trim();
 }
 
 // ------- Local shape helpers -------
 // Story projection the home feed cares about (subset of the articles row plus
 // a couple of fields read off `categories`). Kept local because only this page
 // slices it this way.
-type HomeStory = Pick<Tables<'articles'>, 'id' | 'title' | 'slug' | 'excerpt' | 'category_id' | 'subcategory_id' | 'is_breaking' | 'published_at'>;
+type HomeStory = Pick<
+  Tables<'articles'>,
+  | 'id'
+  | 'title'
+  | 'slug'
+  | 'excerpt'
+  | 'category_id'
+  | 'subcategory_id'
+  | 'is_breaking'
+  | 'published_at'
+>;
 
 // Category / subcategory projection. DB rows plus fallbacks share this shape.
 type CategoryRow = Pick<Tables<'categories'>, 'id' | 'name' | 'slug'> & {
@@ -60,10 +72,13 @@ interface ModeOption {
 
 // `useAuth` currently returns a loose merged profile (JSX context). Keep the
 // local shape tight to just the props this page reads so the rest is ignored.
-type AuthUserLike = {
-  email_verified?: boolean | null;
-  streak_current?: number | null;
-} | null | undefined;
+type AuthUserLike =
+  | {
+      email_verified?: boolean | null;
+      streak_current?: number | null;
+    }
+  | null
+  | undefined;
 
 // Categories seeded with kid versions can be named "Science (kids)" /
 // "World (kids)" / "Kids Science" / "Science kids". Inside any view that
@@ -80,10 +95,15 @@ function stripKidsTag(name: string | null | undefined): string {
 
 function CategoryBadge({ name }: { name: string }) {
   return (
-    <span style={{
-      fontSize: 11, fontWeight: 600, color: C.accent,
-      letterSpacing: '0.03em', textTransform: 'uppercase',
-    }}>
+    <span
+      style={{
+        fontSize: 11,
+        fontWeight: 600,
+        color: C.accent,
+        letterSpacing: '0.03em',
+        textTransform: 'uppercase',
+      }}
+    >
       {stripKidsTag(name)}
     </span>
   );
@@ -111,7 +131,11 @@ interface DateRange {
 
 function getDateRange(preset: string | null): DateRange {
   const now = new Date();
-  const startOfDay = (d: Date): Date => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+  const startOfDay = (d: Date): Date => {
+    const x = new Date(d);
+    x.setHours(0, 0, 0, 0);
+    return x;
+  };
 
   switch (preset) {
     case 'today':
@@ -195,7 +219,9 @@ export default function HomePage() {
       setCanBreakingBanner(hasPermission('home.breaking_banner.view'));
       setCanBreakingBannerPaid(hasPermission('home.breaking_banner.view.paid'));
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [loggedIn]);
 
   useEffect(() => {
@@ -205,7 +231,9 @@ export default function HomePage() {
       const [storiesRes, allCatsRes, sourcesRes] = await Promise.all([
         supabase
           .from('articles')
-          .select('id, title, slug, excerpt, category_id, subcategory_id, is_breaking, published_at')
+          .select(
+            'id, title, slug, excerpt, category_id, subcategory_id, is_breaking, published_at'
+          )
           .eq('status', 'published')
           .order('published_at', { ascending: false })
           .limit(100),
@@ -223,9 +251,7 @@ export default function HomePage() {
           .not('slug', 'like', 'kids-%')
           .not('name', 'ilike', '%(kids)%')
           .order('sort_order', { ascending: true, nullsFirst: false }),
-        supabase
-          .from('sources')
-          .select('publisher'),
+        supabase.from('sources').select('publisher'),
       ]);
 
       if (storiesRes.error) console.error('Stories fetch error:', storiesRes.error);
@@ -243,18 +269,25 @@ export default function HomePage() {
       // real articles (the fake ID never matched any article.category_id).
       // Owner seeds the categories table; admin/categories lets them add
       // more. An empty DB now shows an empty category bar, not a facade.
-      const allCats = ((allCatsRes.data as CategoryRow[] | null) || [])
-        .filter(c => c.metadata?.audience !== 'kids');
-      const dbParents = allCats.filter(c => !c.parent_id);
-      const dbSubs = allCats.filter(c => !!c.parent_id);
+      const allCats = ((allCatsRes.data as CategoryRow[] | null) || []).filter(
+        (c) => c.metadata?.audience !== 'kids'
+      );
+      const dbParents = allCats.filter((c) => !c.parent_id);
+      const dbSubs = allCats.filter((c) => !!c.parent_id);
       setCategories(dbParents);
       setSubcategories(dbSubs);
 
       // Dedupe source outlets
-      const uniqueSources = [...new Set(((sourcesRes.data as { publisher: string | null }[] | null) || []).map(s => s.publisher).filter((p): p is string => !!p))].sort();
+      const uniqueSources = [
+        ...new Set(
+          ((sourcesRes.data as { publisher: string | null }[] | null) || [])
+            .map((s) => s.publisher)
+            .filter((p): p is string => !!p)
+        ),
+      ].sort();
       setSources(uniqueSources);
 
-      const breaking = storyList.find(s => s.is_breaking);
+      const breaking = storyList.find((s) => s.is_breaking);
       if (breaking) setBreakingStory(breaking);
 
       setLoading(false);
@@ -265,21 +298,23 @@ export default function HomePage() {
 
   // Category map for display
   const categoryMap: Record<string, CategoryRow> = {};
-  categories.forEach(c => { categoryMap[c.id] = c; });
+  categories.forEach((c) => {
+    categoryMap[c.id] = c;
+  });
 
   // Adult-feed category/subcategory id sets. Anything not in these is a
   // kids-only row that must not surface on the adult home (D9/D12).
-  const adultCategoryIds = new Set(categories.map(c => c.id));
-  const adultSubcategoryIds = new Set(subcategories.map(sc => sc.id));
+  const adultCategoryIds = new Set(categories.map((c) => c.id));
+  const adultSubcategoryIds = new Set(subcategories.map((sc) => sc.id));
 
-  const categoryPills = ['All', ...categories.map(c => c.name)];
+  const categoryPills = ['All', ...categories.map((c) => c.name)];
 
   // Feed filtering (non-search)
-  const activeCatObj = categories.find(c => c.name === activeCategory);
+  const activeCatObj = categories.find((c) => c.name === activeCategory);
   const activeCatSubcats = activeCatObj
-    ? subcategories.filter(sc => sc.parent_id === activeCatObj.id)
+    ? subcategories.filter((sc) => sc.parent_id === activeCatObj.id)
     : [];
-  const feedFiltered = stories.filter(s => {
+  const feedFiltered = stories.filter((s) => {
     // D9/D12 — drop articles whose category is a kids-only row.
     if (s.category_id && !adultCategoryIds.has(s.category_id)) return false;
     if (s.subcategory_id && !adultSubcategoryIds.has(s.subcategory_id)) return false;
@@ -358,8 +393,12 @@ export default function HomePage() {
         .select('article_id')
         .eq('publisher', selectedSource);
 
-      const sourceArticleIds = new Set(((sourceLinks as { article_id: string | null }[] | null) || []).map(s => s.article_id).filter((id): id is string => !!id));
-      results = results.filter(s => s.id !== null && sourceArticleIds.has(s.id));
+      const sourceArticleIds = new Set(
+        ((sourceLinks as { article_id: string | null }[] | null) || [])
+          .map((s) => s.article_id)
+          .filter((id): id is string => !!id)
+      );
+      results = results.filter((s) => s.id !== null && sourceArticleIds.has(s.id));
     }
 
     // Quiz search — find stories whose quiz question matches the query
@@ -371,8 +410,12 @@ export default function HomePage() {
         .select('article_id')
         .ilike('question_text', `%${q}%`);
 
-      const quizArticleIds = new Set(((quizRows as { article_id: string | null }[] | null) || []).map(q => q.article_id).filter((id): id is string => !!id));
-      results = results.filter(s => s.id !== null && quizArticleIds.has(s.id));
+      const quizArticleIds = new Set(
+        ((quizRows as { article_id: string | null }[] | null) || [])
+          .map((q) => q.article_id)
+          .filter((id): id is string => !!id)
+      );
+      results = results.filter((s) => s.id !== null && quizArticleIds.has(s.id));
     }
 
     setSearchResults(results);
@@ -395,8 +438,14 @@ export default function HomePage() {
     // users who hit the search affordance get routed to /verify-email,
     // where the resend-verification action actually lives. Home no
     // longer owns that UI.
-    if (!loggedIn) { window.location.href = '/login'; return; }
-    if (!canSearch) { window.location.href = '/verify-email'; return; }
+    if (!loggedIn) {
+      window.location.href = '/login';
+      return;
+    }
+    if (!canSearch) {
+      window.location.href = '/verify-email';
+      return;
+    }
     setSearchOpen(true);
     setTimeout(() => searchInputRef.current?.focus(), 100);
   };
@@ -406,30 +455,44 @@ export default function HomePage() {
     clearSearch();
   };
 
-  const subcatsForCat = (catId: string) => subcategories.filter(sc => sc.parent_id === catId);
+  const subcatsForCat = (catId: string) => subcategories.filter((sc) => sc.parent_id === catId);
 
   const hasActiveFilters = searchQuery || datePreset || selectedSource || selectedCat;
 
   const pillStyle = (active: boolean): CSSProperties => ({
-    padding: '12px 16px', borderRadius: 99, fontSize: 13, fontWeight: 600,
+    padding: '12px 16px',
+    borderRadius: 99,
+    fontSize: 13,
+    fontWeight: 600,
     minHeight: 44,
     border: `1.5px solid ${active ? C.accent : C.border}`,
     background: active ? C.accent : C.bg,
     color: active ? '#fff' : C.dim,
-    cursor: 'pointer', whiteSpace: 'nowrap',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
   });
 
   const chipStyle = (active: boolean): CSSProperties => ({
-    padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500,
+    padding: '5px 12px',
+    borderRadius: 8,
+    fontSize: 12,
+    fontWeight: 500,
     border: `1px solid ${active ? C.accent : C.border}`,
     background: active ? '#f0f0f0' : C.bg,
     color: active ? C.accent : C.dim,
-    cursor: 'pointer', whiteSpace: 'nowrap',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
   });
 
   return (
-    <div style={{ background: C.bg, minHeight: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', color: C.text }}>
-
+    <div
+      style={{
+        background: C.bg,
+        minHeight: '100vh',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        color: C.text,
+      }}
+    >
       {/* R13-T4 (Crew 7) — the home page's own sticky search nav was
           removed. NavWrapper's global top bar now owns the search entry
           point. Round D H-14 also removed the inline
@@ -447,51 +510,108 @@ export default function HomePage() {
           aria-modal="true"
           aria-labelledby="search-dialog-title"
           style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            zIndex: 200, background: C.bg, overflowY: 'auto',
-          }}><h2 id="search-dialog-title" style={{ position: 'absolute', left: -9999, width: 1, height: 1, overflow: 'hidden' }}>Search articles</h2>
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 200,
+            background: C.bg,
+            overflowY: 'auto',
+          }}
+        >
+          <h2
+            id="search-dialog-title"
+            style={{ position: 'absolute', left: -9999, width: 1, height: 1, overflow: 'hidden' }}
+          >
+            Search articles
+          </h2>
           {/* Search header */}
-          <div style={{
-            position: 'sticky', top: 0, zIndex: 201, background: C.bg,
-            borderBottom: `1px solid ${C.border}`, padding: '12px 16px',
-          }}>
+          <div
+            style={{
+              position: 'sticky',
+              top: 0,
+              zIndex: 201,
+              background: C.bg,
+              borderBottom: `1px solid ${C.border}`,
+              padding: '12px 16px',
+            }}
+          >
             <div style={{ maxWidth: 680, margin: '0 auto' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                <button onClick={closeSearch} style={{
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  fontSize: 14, fontWeight: 600, color: C.dim, padding: 0,
-                }}>
+                <button
+                  onClick={closeSearch}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: C.dim,
+                    padding: 0,
+                  }}
+                >
                   Cancel
                 </button>
                 <div style={{ flex: 1, position: 'relative' }}>
                   <input
                     ref={searchInputRef}
                     value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') runSearch(); }}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') runSearch();
+                    }}
                     placeholder="Search articles..."
                     style={{
-                      width: '100%', height: 40, borderRadius: 10,
-                      border: `1.5px solid ${C.border}`, padding: '0 12px',
-                      fontSize: 14, background: C.card, color: C.text,
-                      outline: 'none', boxSizing: 'border-box',
+                      width: '100%',
+                      height: 40,
+                      borderRadius: 10,
+                      border: `1.5px solid ${C.border}`,
+                      padding: '0 12px',
+                      fontSize: 14,
+                      background: C.card,
+                      color: C.text,
+                      outline: 'none',
+                      boxSizing: 'border-box',
                     }}
                   />
                 </div>
-                <button onClick={runSearch} style={{
-                  padding: '8px 16px', borderRadius: 8, border: 'none',
-                  background: C.accent, color: '#fff', fontSize: 13,
-                  fontWeight: 600, cursor: 'pointer',
-                }}>
+                <button
+                  onClick={runSearch}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: 8,
+                    border: 'none',
+                    background: C.accent,
+                    color: '#fff',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
                   Search
                 </button>
               </div>
 
               {/* Search mode pills */}
               <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-                <span style={{ fontSize: 11, color: C.dim, fontWeight: 600, alignSelf: 'center', marginRight: 4 }}>Search by:</span>
-                {SEARCH_MODES.map(m => (
-                  <button key={m.key} onClick={() => setSearchMode(m.key)} style={pillStyle(searchMode === m.key)}>
+                <span
+                  style={{
+                    fontSize: 11,
+                    color: C.dim,
+                    fontWeight: 600,
+                    alignSelf: 'center',
+                    marginRight: 4,
+                  }}
+                >
+                  Search by:
+                </span>
+                {SEARCH_MODES.map((m) => (
+                  <button
+                    key={m.key}
+                    onClick={() => setSearchMode(m.key)}
+                    style={pillStyle(searchMode === m.key)}
+                  >
                     {m.label}
                   </button>
                 ))}
@@ -499,8 +619,18 @@ export default function HomePage() {
 
               {/* Date preset pills */}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 11, color: C.dim, fontWeight: 600, alignSelf: 'center', marginRight: 4 }}>Date:</span>
-                {DATE_PRESETS.map(d => (
+                <span
+                  style={{
+                    fontSize: 11,
+                    color: C.dim,
+                    fontWeight: 600,
+                    alignSelf: 'center',
+                    marginRight: 4,
+                  }}
+                >
+                  Date:
+                </span>
+                {DATE_PRESETS.map((d) => (
                   <button
                     key={d.key}
                     onClick={() => setDatePreset(datePreset === d.key ? null : d.key)}
@@ -520,10 +650,16 @@ export default function HomePage() {
                     type="date"
                     aria-label="Start date"
                     value={customFrom}
-                    onChange={e => setCustomFrom(e.target.value)}
+                    onChange={(e) => setCustomFrom(e.target.value)}
                     style={{
-                      flex: 1, height: 34, borderRadius: 8, border: `1px solid ${C.border}`,
-                      padding: '0 8px', fontSize: 13, color: C.text, background: C.card,
+                      flex: 1,
+                      height: 34,
+                      borderRadius: 8,
+                      border: `1px solid ${C.border}`,
+                      padding: '0 8px',
+                      fontSize: 13,
+                      color: C.text,
+                      background: C.card,
                     }}
                   />
                   <span style={{ fontSize: 12, color: C.dim }}>to</span>
@@ -531,10 +667,16 @@ export default function HomePage() {
                     type="date"
                     aria-label="End date"
                     value={customTo}
-                    onChange={e => setCustomTo(e.target.value)}
+                    onChange={(e) => setCustomTo(e.target.value)}
                     style={{
-                      flex: 1, height: 34, borderRadius: 8, border: `1px solid ${C.border}`,
-                      padding: '0 8px', fontSize: 13, color: C.text, background: C.card,
+                      flex: 1,
+                      height: 34,
+                      borderRadius: 8,
+                      border: `1px solid ${C.border}`,
+                      padding: '0 8px',
+                      fontSize: 13,
+                      color: C.text,
+                      background: C.card,
                     }}
                   />
                 </div>
@@ -543,9 +685,11 @@ export default function HomePage() {
               {/* Source filter */}
               {sources.length > 0 && (
                 <div style={{ marginTop: 10 }}>
-                  <span style={{ fontSize: 11, color: C.dim, fontWeight: 600, marginRight: 8 }}>Source:</span>
+                  <span style={{ fontSize: 11, color: C.dim, fontWeight: 600, marginRight: 8 }}>
+                    Source:
+                  </span>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
-                    {sources.map(s => (
+                    {sources.map((s) => (
                       <button
                         key={s}
                         onClick={() => setSelectedSource(selectedSource === s ? null : s)}
@@ -560,20 +704,39 @@ export default function HomePage() {
 
               {/* Active filter summary + clear */}
               {hasActiveFilters && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginTop: 10,
+                  }}
+                >
                   <div style={{ fontSize: 11, color: C.dim }}>
                     {[
                       searchQuery && `"${searchQuery}" (${searchMode})`,
-                      datePreset && (datePreset === 'custom' ? `${customFrom || '...'} - ${customTo || '...'}` : datePreset),
+                      datePreset &&
+                        (datePreset === 'custom'
+                          ? `${customFrom || '...'} - ${customTo || '...'}`
+                          : datePreset),
                       selectedSource,
-                      selectedCat && categories.find(c => c.id === selectedCat)?.name,
-                      selectedSubcat && subcategories.find(sc => sc.id === selectedSubcat)?.name,
-                    ].filter(Boolean).join(' / ')}
+                      selectedCat && categories.find((c) => c.id === selectedCat)?.name,
+                      selectedSubcat && subcategories.find((sc) => sc.id === selectedSubcat)?.name,
+                    ]
+                      .filter(Boolean)
+                      .join(' / ')}
                   </div>
-                  <button onClick={clearSearch} style={{
-                    background: 'none', border: 'none', cursor: 'pointer',
-                    fontSize: 12, fontWeight: 600, color: '#ef4444',
-                  }}>
+                  <button
+                    onClick={clearSearch}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: '#ef4444',
+                    }}
+                  >
                     Clear all
                   </button>
                 </div>
@@ -584,62 +747,108 @@ export default function HomePage() {
           {/* Categories + Subcategories — same horizontal pills as main feed */}
           <div style={{ maxWidth: 680, margin: '0 auto', padding: '16px 16px 120px' }}>
             {/* Category pills */}
-            <div style={{ display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 8 }}>
+            <div
+              style={{
+                display: 'flex',
+                gap: 6,
+                overflowX: 'auto',
+                scrollbarWidth: 'none',
+                paddingBottom: 8,
+              }}
+            >
               <button
-                onClick={() => { setSelectedCat(null); setSelectedSubcat(null); }}
+                onClick={() => {
+                  setSelectedCat(null);
+                  setSelectedSubcat(null);
+                }}
                 style={{
-                  whiteSpace: 'nowrap', padding: '7px 16px', borderRadius: 99,
+                  whiteSpace: 'nowrap',
+                  padding: '7px 16px',
+                  borderRadius: 99,
                   border: `1.5px solid ${!selectedCat ? C.accent : C.border}`,
                   background: !selectedCat ? C.accent : C.bg,
                   color: !selectedCat ? '#fff' : C.dim,
-                  fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
                 }}
-              >All</button>
-              {categories.map(cat => {
+              >
+                All
+              </button>
+              {categories.map((cat) => {
                 const isSelected = selectedCat === cat.id;
                 return (
                   <button
                     key={cat.id}
-                    onClick={() => { setSelectedCat(isSelected ? null : cat.id); setSelectedSubcat(null); }}
+                    onClick={() => {
+                      setSelectedCat(isSelected ? null : cat.id);
+                      setSelectedSubcat(null);
+                    }}
                     style={{
-                      whiteSpace: 'nowrap', padding: '7px 16px', borderRadius: 99,
+                      whiteSpace: 'nowrap',
+                      padding: '7px 16px',
+                      borderRadius: 99,
                       border: `1.5px solid ${isSelected ? C.accent : C.border}`,
                       background: isSelected ? C.accent : C.bg,
                       color: isSelected ? '#fff' : C.dim,
-                      fontSize: 13, fontWeight: isSelected ? 600 : 500, cursor: 'pointer',
+                      fontSize: 13,
+                      fontWeight: isSelected ? 600 : 500,
+                      cursor: 'pointer',
                     }}
-                  >{stripKidsTag(cat.name)}</button>
+                  >
+                    {stripKidsTag(cat.name)}
+                  </button>
                 );
               })}
             </div>
 
             {/* Subcategory pills — show when a category is selected */}
             {selectedCat && subcatsForCat(selectedCat).length > 0 && (
-              <div style={{ display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 12 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 6,
+                  overflowX: 'auto',
+                  scrollbarWidth: 'none',
+                  paddingBottom: 12,
+                }}
+              >
                 <button
                   onClick={() => setSelectedSubcat(null)}
                   style={{
-                    whiteSpace: 'nowrap', padding: '4px 12px', borderRadius: 99,
+                    whiteSpace: 'nowrap',
+                    padding: '4px 12px',
+                    borderRadius: 99,
                     border: `1px solid ${!selectedSubcat ? C.accent : C.border}`,
                     background: !selectedSubcat ? '#f0f0f0' : C.bg,
                     color: !selectedSubcat ? C.accent : C.dim,
-                    fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                    fontSize: 12,
+                    fontWeight: 500,
+                    cursor: 'pointer',
                   }}
-                >All {categories.find(c => c.id === selectedCat)?.name}</button>
-                {subcatsForCat(selectedCat).map(sc => {
+                >
+                  All {categories.find((c) => c.id === selectedCat)?.name}
+                </button>
+                {subcatsForCat(selectedCat).map((sc) => {
                   const subActive = selectedSubcat === sc.id;
                   return (
                     <button
                       key={sc.id}
                       onClick={() => setSelectedSubcat(subActive ? null : sc.id)}
                       style={{
-                        whiteSpace: 'nowrap', padding: '4px 12px', borderRadius: 99,
+                        whiteSpace: 'nowrap',
+                        padding: '4px 12px',
+                        borderRadius: 99,
                         border: `1px solid ${subActive ? C.accent : C.border}`,
                         background: subActive ? '#f0f0f0' : C.bg,
                         color: subActive ? C.accent : C.dim,
-                        fontSize: 12, fontWeight: subActive ? 600 : 400, cursor: 'pointer',
+                        fontSize: 12,
+                        fontWeight: subActive ? 600 : 400,
+                        cursor: 'pointer',
                       }}
-                    >{sc.name}</button>
+                    >
+                      {sc.name}
+                    </button>
                   );
                 })}
               </div>
@@ -648,42 +857,77 @@ export default function HomePage() {
             {/* Search results */}
             {searchResults !== null && (
               <div style={{ marginTop: 24 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
-                  {searching ? 'Searching...' : `${searchResults.length} result${searchResults.length !== 1 ? 's' : ''}`}
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: C.dim,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                    marginBottom: 10,
+                  }}
+                >
+                  {searching
+                    ? 'Searching...'
+                    : `${searchResults.length} result${searchResults.length !== 1 ? 's' : ''}`}
                 </div>
 
                 {!searching && searchResults.length === 0 && (
-                  <div style={{ textAlign: 'center', padding: '32px 0', color: C.dim, fontSize: 13 }}>
+                  <div
+                    style={{ textAlign: 'center', padding: '32px 0', color: C.dim, fontSize: 13 }}
+                  >
                     No articles match your filters.
                   </div>
                 )}
 
-                {!searching && searchResults.map(story => (
-                  <a
-                    key={story.id}
-                    href={`/story/${story.slug}`}
-                    style={{
-                      display: 'block', background: C.card, border: `1px solid ${C.border}`,
-                      borderRadius: 10, padding: '12px 14px', marginBottom: 8,
-                      textDecoration: 'none', color: 'inherit',
-                    }}
-                  >
-                    <CategoryBadge name={(story.category_id && categoryMap[story.category_id]?.name) || ''} />
-                    <p style={{ margin: '4px 0 0', fontWeight: 700, fontSize: 14, lineHeight: 1.4, color: C.text }}>
-                      {story.title}
-                    </p>
-                    {story.excerpt && (
-                      <p style={{ margin: '4px 0 0', fontSize: 12, color: C.dim, lineHeight: 1.4 }}>
-                        {story.excerpt}
+                {!searching &&
+                  searchResults.map((story) => (
+                    <a
+                      key={story.id}
+                      href={`/story/${story.slug}`}
+                      style={{
+                        display: 'block',
+                        background: C.card,
+                        border: `1px solid ${C.border}`,
+                        borderRadius: 10,
+                        padding: '12px 14px',
+                        marginBottom: 8,
+                        textDecoration: 'none',
+                        color: 'inherit',
+                      }}
+                    >
+                      <CategoryBadge
+                        name={(story.category_id && categoryMap[story.category_id]?.name) || ''}
+                      />
+                      <p
+                        style={{
+                          margin: '4px 0 0',
+                          fontWeight: 700,
+                          fontSize: 14,
+                          lineHeight: 1.4,
+                          color: C.text,
+                        }}
+                      >
+                        {story.title}
                       </p>
-                    )}
-                    {story.published_at && (
-                      <div style={{ marginTop: 6, fontSize: 11, color: C.dim }}>
-                        {new Date(story.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </div>
-                    )}
-                  </a>
-                ))}
+                      {story.excerpt && (
+                        <p
+                          style={{ margin: '4px 0 0', fontSize: 12, color: C.dim, lineHeight: 1.4 }}
+                        >
+                          {story.excerpt}
+                        </p>
+                      )}
+                      {story.published_at && (
+                        <div style={{ marginTop: 6, fontSize: 11, color: C.dim }}>
+                          {new Date(story.published_at).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                          })}
+                        </div>
+                      )}
+                    </a>
+                  ))}
               </div>
             )}
           </div>
@@ -701,25 +945,80 @@ export default function HomePage() {
           aria-label={`Breaking news: ${breakingStory.title}`}
           style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}
         >
-          <div style={{ background: '#ef4444', color: '#fff', padding: '10px 16px', overflow: 'hidden' }}>
-            <div style={{ maxWidth: 680, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontWeight: 800, fontSize: 11, letterSpacing: '0.1em', whiteSpace: 'nowrap', background: 'rgba(0,0,0,0.2)', padding: '2px 8px', borderRadius: 4 }}>
+          <div
+            style={{
+              background: '#ef4444',
+              color: '#fff',
+              padding: '10px 16px',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                maxWidth: 680,
+                margin: '0 auto',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+              }}
+            >
+              <span
+                style={{
+                  fontWeight: 800,
+                  fontSize: 11,
+                  letterSpacing: '0.1em',
+                  whiteSpace: 'nowrap',
+                  background: 'rgba(0,0,0,0.2)',
+                  padding: '2px 8px',
+                  borderRadius: 4,
+                }}
+              >
                 BREAKING
               </span>
-              <span style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <span
+                style={{
+                  fontSize: 13,
+                  fontWeight: 500,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
                 {breakingStory.title}
               </span>
             </div>
             {canBreakingBannerPaid && (breakingStory.excerpt || breakingStory.published_at) && (
-              <div style={{ maxWidth: 680, margin: '4px auto 0', fontSize: 12, color: 'rgba(255,255,255,0.92)', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div
+                style={{
+                  maxWidth: 680,
+                  margin: '4px auto 0',
+                  fontSize: 12,
+                  color: 'rgba(255,255,255,0.92)',
+                  display: 'flex',
+                  gap: 10,
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                }}
+              >
                 {breakingStory.excerpt && (
-                  <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
                     {breakingStory.excerpt}
                   </span>
                 )}
                 {breakingStory.published_at && (
                   <span style={{ fontSize: 11, opacity: 0.85, whiteSpace: 'nowrap' }}>
-                    {new Date(breakingStory.published_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                    {new Date(breakingStory.published_at).toLocaleTimeString('en-US', {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })}
                   </span>
                 )}
               </div>
@@ -729,16 +1028,20 @@ export default function HomePage() {
       )}
 
       <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 16px' }}>
-
         {/* Category + subcategory pill rows intentionally hidden for
             launch. Filter state (`activeCategory` defaults to 'All')
             still drives the feed — we just don't render the pills. */}
         {false && (
-          <div style={{
-            display: 'flex', gap: 8, overflowX: 'auto', padding: '14px 0',
-            scrollbarWidth: 'none',
-          }}>
-            {categoryPills.map(cat => (
+          <div
+            style={{
+              display: 'flex',
+              gap: 8,
+              overflowX: 'auto',
+              padding: '14px 0',
+              scrollbarWidth: 'none',
+            }}
+          >
+            {categoryPills.map((cat) => (
               <button
                 key={cat}
                 onClick={() => {
@@ -747,11 +1050,15 @@ export default function HomePage() {
                   setVisibleCount(6);
                 }}
                 style={{
-                  whiteSpace: 'nowrap', padding: '6px 16px', borderRadius: 99,
+                  whiteSpace: 'nowrap',
+                  padding: '6px 16px',
+                  borderRadius: 99,
                   border: `1.5px solid ${activeCategory === cat ? C.accent : C.border}`,
                   background: activeCategory === cat ? C.accent : C.bg,
                   color: activeCategory === cat ? '#fff' : C.dim,
-                  fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
                 }}
               >
                 {cat}
@@ -761,23 +1068,35 @@ export default function HomePage() {
         )}
 
         {false && canSubcategories && activeCategory !== 'All' && activeCatSubcats.length > 0 && (
-          <div style={{
-            display: 'flex', gap: 6, overflowX: 'auto', padding: '0 0 12px',
-            scrollbarWidth: 'none',
-          }}>
+          <div
+            style={{
+              display: 'flex',
+              gap: 6,
+              overflowX: 'auto',
+              padding: '0 0 12px',
+              scrollbarWidth: 'none',
+            }}
+          >
             <button
-              onClick={() => { setActiveSubcategory(null); setVisibleCount(6); }}
+              onClick={() => {
+                setActiveSubcategory(null);
+                setVisibleCount(6);
+              }}
               style={{
-                whiteSpace: 'nowrap', padding: '4px 12px', borderRadius: 99,
+                whiteSpace: 'nowrap',
+                padding: '4px 12px',
+                borderRadius: 99,
                 border: `1px solid ${!activeSubcategory ? C.accent : C.border}`,
                 background: !activeSubcategory ? '#f0f0f0' : C.bg,
                 color: !activeSubcategory ? C.accent : C.dim,
-                fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                fontSize: 12,
+                fontWeight: 500,
+                cursor: 'pointer',
               }}
             >
               All {activeCategory}
             </button>
-            {activeCatSubcats.map(sc => {
+            {activeCatSubcats.map((sc) => {
               const isActive = activeSubcategory === sc.id;
               return (
                 <button
@@ -787,11 +1106,15 @@ export default function HomePage() {
                     setVisibleCount(6);
                   }}
                   style={{
-                    whiteSpace: 'nowrap', padding: '4px 12px', borderRadius: 99,
+                    whiteSpace: 'nowrap',
+                    padding: '4px 12px',
+                    borderRadius: 99,
                     border: `1px solid ${isActive ? C.accent : C.border}`,
                     background: isActive ? '#f0f0f0' : C.bg,
                     color: isActive ? C.accent : C.dim,
-                    fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                    fontSize: 12,
+                    fontWeight: 500,
+                    cursor: 'pointer',
                   }}
                 >
                   {sc.name}
@@ -813,11 +1136,14 @@ export default function HomePage() {
               No articles found.
             </div>
           )}
-          {!loading && feedVisible.length > 0 && loggedIn && (authUser?.streak_current || 0) > 0 && (
-            <div style={{ fontSize: 13, fontWeight: 600, color: C.text, margin: '0 0 12px' }}>
-              Day {authUser?.streak_current}
-            </div>
-          )}
+          {!loading &&
+            feedVisible.length > 0 &&
+            loggedIn &&
+            (authUser?.streak_current || 0) > 0 && (
+              <div style={{ fontSize: 13, fontWeight: 600, color: C.text, margin: '0 0 12px' }}>
+                Day {authUser?.streak_current}
+              </div>
+            )}
           {/* LAUNCH: RecapCard hidden pre-launch — the anon variant pushes
               paid sign-ups ("See what you missed this week"), and we're not
               ready to convert traffic yet. Flip back to
@@ -825,58 +1151,96 @@ export default function HomePage() {
               when sign-ups are open. Component, queries, and types stay
               live — see web/src/components/RecapCard.tsx. */}
           {false && !loading && feedVisible.length > 0 && <RecapCard />}
-          {!loading && feedVisible.filter(s => s.slug).map((story, idx) => (
-            <Fragment key={story.id}>
-              <a
-                href={`/story/${story.slug}`}
-                style={{
-                  background: C.card, border: `1px solid ${C.border}`,
-                  borderRadius: 12, marginBottom: 12, overflow: 'hidden',
-                  display: 'block', textDecoration: 'none', color: 'inherit',
-                  cursor: 'pointer',
-                }}
-              >
-                <div style={{ padding: '14px 16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <CategoryBadge name={(story.category_id && categoryMap[story.category_id]?.name) || ''} />
-                    {story.is_breaking && (
-                      <span style={{
-                        fontSize: 10, fontWeight: 800, color: '#ffffff',
-                        background: '#ef4444', padding: '2px 6px', borderRadius: 4,
-                        letterSpacing: '0.05em', textTransform: 'uppercase',
-                      }}>
-                        BREAKING
-                      </span>
-                    )}
-                  </div>
-                  <p style={{ margin: '4px 0 0', fontWeight: 700, fontSize: 15, lineHeight: 1.4, color: C.text }}>
-                    {story.title}
-                  </p>
-                  <p style={{ margin: '4px 0 0', fontSize: 13, lineHeight: 1.5, color: C.dim }}>
-                    {story.excerpt}
-                  </p>
-                  {story.published_at && (
-                    <div style={{ marginTop: 6, fontSize: 11, color: C.dim }}>
-                      {new Date(story.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+          {!loading &&
+            feedVisible
+              .filter((s) => s.slug)
+              .map((story, idx) => (
+                <Fragment key={story.id}>
+                  <a
+                    href={`/story/${story.slug}`}
+                    style={{
+                      background: C.card,
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 12,
+                      marginBottom: 12,
+                      overflow: 'hidden',
+                      display: 'block',
+                      textDecoration: 'none',
+                      color: 'inherit',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div style={{ padding: '14px 16px' }}>
+                      <div
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}
+                      >
+                        <CategoryBadge
+                          name={(story.category_id && categoryMap[story.category_id]?.name) || ''}
+                        />
+                        {story.is_breaking && (
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 800,
+                              color: '#ffffff',
+                              background: '#ef4444',
+                              padding: '2px 6px',
+                              borderRadius: 4,
+                              letterSpacing: '0.05em',
+                              textTransform: 'uppercase',
+                            }}
+                          >
+                            BREAKING
+                          </span>
+                        )}
+                      </div>
+                      <p
+                        style={{
+                          margin: '4px 0 0',
+                          fontWeight: 700,
+                          fontSize: 15,
+                          lineHeight: 1.4,
+                          color: C.text,
+                        }}
+                      >
+                        {story.title}
+                      </p>
+                      <p style={{ margin: '4px 0 0', fontSize: 13, lineHeight: 1.5, color: C.dim }}>
+                        {story.excerpt}
+                      </p>
+                      {story.published_at && (
+                        <div style={{ marginTop: 6, fontSize: 11, color: C.dim }}>
+                          {new Date(story.published_at).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </a>
+                  {(idx + 1) % 6 === 0 && idx !== feedVisible.length - 1 && (
+                    <div style={{ marginBottom: 12 }}>
+                      <Ad placement="home_feed" page="home" position={`feed-${idx + 1}`} />
                     </div>
                   )}
-                </div>
-              </a>
-              {(idx + 1) % 6 === 0 && idx !== feedVisible.length - 1 && (
-                <div style={{ marginBottom: 12 }}>
-                  <Ad placement="home_feed" page="home" position={`feed-${idx + 1}`} />
-                </div>
-              )}
-            </Fragment>
-          ))}
+                </Fragment>
+              ))}
 
           {!loading && visibleCount < feedFiltered.length && (
             <button
-              onClick={() => setVisibleCount(v => v + 4)}
+              onClick={() => setVisibleCount((v) => v + 4)}
               style={{
-                display: 'block', width: '100%', padding: '14px', marginTop: 8,
-                background: C.card, border: `1.5px solid ${C.border}`,
-                borderRadius: 12, cursor: 'pointer', fontSize: 14, fontWeight: 600,
+                display: 'block',
+                width: '100%',
+                padding: '14px',
+                marginTop: 8,
+                background: C.card,
+                border: `1.5px solid ${C.border}`,
+                borderRadius: 12,
+                cursor: 'pointer',
+                fontSize: 14,
+                fontWeight: 600,
                 color: C.accent,
               }}
             >

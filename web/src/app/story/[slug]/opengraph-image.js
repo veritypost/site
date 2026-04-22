@@ -23,32 +23,39 @@ export default async function Image({ params }) {
   const excerpt = (story?.excerpt || '').slice(0, 220);
 
   return new ImageResponse(
-    (
-      <div style={{
-        width: '100%', height: '100%',
-        background: '#111', color: '#f5f5f5',
-        display: 'flex', flexDirection: 'column',
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        background: '#111',
+        color: '#f5f5f5',
+        display: 'flex',
+        flexDirection: 'column',
         padding: '72px 80px',
         fontFamily: 'system-ui, -apple-system, sans-serif',
-      }}>
-        <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', color: '#888' }}>
-          Verity Post
-        </div>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div style={{ fontSize: 60, fontWeight: 800, lineHeight: 1.1, marginBottom: 24 }}>
-            {title}
-          </div>
-          {excerpt && (
-            <div style={{ fontSize: 28, lineHeight: 1.4, color: '#bbb' }}>
-              {excerpt}
-            </div>
-          )}
-        </div>
-        <div style={{ fontSize: 22, color: '#666', borderTop: '2px solid #333', paddingTop: 20 }}>
-          News you can trust
-        </div>
+      }}
+    >
+      <div
+        style={{
+          fontSize: 24,
+          fontWeight: 700,
+          letterSpacing: 3,
+          textTransform: 'uppercase',
+          color: '#888',
+        }}
+      >
+        Verity Post
       </div>
-    ),
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <div style={{ fontSize: 60, fontWeight: 800, lineHeight: 1.1, marginBottom: 24 }}>
+          {title}
+        </div>
+        {excerpt && <div style={{ fontSize: 28, lineHeight: 1.4, color: '#bbb' }}>{excerpt}</div>}
+      </div>
+      <div style={{ fontSize: 22, color: '#666', borderTop: '2px solid #333', paddingTop: 20 }}>
+        News you can trust
+      </div>
+    </div>,
     { ...size }
   );
 }

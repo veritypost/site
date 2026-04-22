@@ -18,6 +18,10 @@ export async function POST() {
 
   const service = createServiceClient();
   const { data, error } = await service.rpc('billing_freeze_expired_grace');
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.billing.sweep_grace', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'admin.billing.sweep_grace',
+      fallbackStatus: 400,
+    });
   return NextResponse.json({ frozen_count: data });
 }

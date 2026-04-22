@@ -16,7 +16,9 @@ async function auditStoryAction(actorId, action, articleId, meta) {
       target_id: articleId,
       metadata: meta || {},
     });
-  } catch { /* best-effort */ }
+  } catch {
+    /* best-effort */
+  }
 }
 
 export async function POST(request) {
@@ -30,11 +32,14 @@ export async function POST(request) {
       return NextResponse.json({ error: 'title is required' }, { status: 400 });
     }
 
-    const slug = body.slug || body.title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
-      + '-' + Date.now().toString(36);
+    const slug =
+      body.slug ||
+      body.title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '') +
+        '-' +
+        Date.now().toString(36);
 
     const { data: article, error } = await supabase
       .from('articles')
@@ -58,7 +63,9 @@ export async function POST(request) {
     }
 
     await auditStoryAction(user.id, 'article.create', article.id, {
-      title: article.title, slug: article.slug, status: article.status,
+      title: article.title,
+      slug: article.slug,
+      status: article.status,
     });
 
     return NextResponse.json({ article });
@@ -100,7 +107,9 @@ export async function PUT(request) {
       return NextResponse.json({ error: 'Could not update article' }, { status: 500 });
     }
 
-    await auditStoryAction(user.id, 'article.update', body.id, { updated_fields: Object.keys(updates) });
+    await auditStoryAction(user.id, 'article.update', body.id, {
+      updated_fields: Object.keys(updates),
+    });
 
     return NextResponse.json({ article });
   } catch (err) {

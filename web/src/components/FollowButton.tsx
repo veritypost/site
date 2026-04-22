@@ -62,12 +62,17 @@ export default function FollowButton({
   }
 
   return (
-    <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
+    <div
+      style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}
+    >
       <button
         onClick={toggle}
         disabled={busy}
         style={{
-          padding: '6px 14px', borderRadius: 8, fontWeight: 700, fontSize: 12,
+          padding: '6px 14px',
+          borderRadius: 8,
+          fontWeight: 700,
+          fontSize: 12,
           border: following ? '1px solid #e5e5e5' : 'none',
           background: following ? 'transparent' : '#111',
           color: following ? '#111' : '#fff',

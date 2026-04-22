@@ -6,26 +6,38 @@ import { ADMIN_C, F, S } from '../../lib/adminPalette';
 import Spinner from './Spinner';
 
 const SIZES = {
-  sm: { padY: 4,  padX: 10, fontSize: F.sm,   height: 26 },
-  md: { padY: 6,  padX: 14, fontSize: F.base, height: 32 },
+  sm: { padY: 4, padX: 10, fontSize: F.sm, height: 26 },
+  md: { padY: 6, padX: 14, fontSize: F.base, height: 32 },
 };
 
 const VARIANTS = {
   primary: {
-    bg: ADMIN_C.accent, fg: '#ffffff', border: ADMIN_C.accent,
-    hoverBg: '#000000', spinnerColor: '#ffffff',
+    bg: ADMIN_C.accent,
+    fg: '#ffffff',
+    border: ADMIN_C.accent,
+    hoverBg: '#000000',
+    spinnerColor: '#ffffff',
   },
   secondary: {
-    bg: ADMIN_C.bg, fg: ADMIN_C.accent, border: ADMIN_C.border,
-    hoverBg: ADMIN_C.card, spinnerColor: ADMIN_C.accent,
+    bg: ADMIN_C.bg,
+    fg: ADMIN_C.accent,
+    border: ADMIN_C.border,
+    hoverBg: ADMIN_C.card,
+    spinnerColor: ADMIN_C.accent,
   },
   ghost: {
-    bg: 'transparent', fg: ADMIN_C.soft, border: 'transparent',
-    hoverBg: ADMIN_C.hover, spinnerColor: ADMIN_C.accent,
+    bg: 'transparent',
+    fg: ADMIN_C.soft,
+    border: 'transparent',
+    hoverBg: ADMIN_C.hover,
+    spinnerColor: ADMIN_C.accent,
   },
   danger: {
-    bg: ADMIN_C.danger, fg: '#ffffff', border: ADMIN_C.danger,
-    hoverBg: '#dc2626', spinnerColor: '#ffffff',
+    bg: ADMIN_C.danger,
+    fg: '#ffffff',
+    border: ADMIN_C.danger,
+    hoverBg: '#dc2626',
+    spinnerColor: '#ffffff',
   },
 };
 
@@ -63,7 +75,7 @@ const Button = forwardRef(function Button(
     onBlur,
     ...rest
   },
-  ref,
+  ref
 ) {
   const v = VARIANTS[variant] || VARIANTS.secondary;
   const sz = SIZES[size] || SIZES.md;

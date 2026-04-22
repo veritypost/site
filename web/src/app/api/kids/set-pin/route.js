@@ -11,8 +11,11 @@ export async function POST(request) {
   try {
     const supabase = await createClient();
     let user;
-    try { user = await requirePermission('kids.pin.set'); }
-    catch (err) { return NextResponse.json({ error: err.message }, { status: err.status || 401 }); }
+    try {
+      user = await requirePermission('kids.pin.set');
+    } catch (err) {
+      return NextResponse.json({ error: err.message }, { status: err.status || 401 });
+    }
 
     const { kid_profile_id, pin } = await request.json();
 

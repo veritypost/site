@@ -7,8 +7,9 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 
 export async function POST(_request, { params }) {
   let user;
-  try { user = await requirePermission('expert.queue.decline'); }
-  catch (err) {
+  try {
+    user = await requirePermission('expert.queue.decline');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
@@ -18,6 +19,10 @@ export async function POST(_request, { params }) {
     p_user_id: user.id,
     p_queue_item_id: params.id,
   });
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'expert.queue.id.decline', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'expert.queue.id.decline',
+      fallbackStatus: 400,
+    });
   return NextResponse.json({ ok: true });
 }

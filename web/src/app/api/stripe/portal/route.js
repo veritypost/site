@@ -7,8 +7,9 @@ import { createBillingPortalSession } from '@/lib/stripe';
 
 export async function POST(request) {
   let user;
-  try { user = await requirePermission('billing.portal.open'); }
-  catch (err) {
+  try {
+    user = await requirePermission('billing.portal.open');
+  } catch (err) {
     console.error('[stripe.portal] auth:', err?.message);
     if (err.status) return NextResponse.json({ error: 'Forbidden' }, { status: err.status });
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
@@ -16,9 +17,15 @@ export async function POST(request) {
 
   const service = createServiceClient();
   const { data: me } = await service
-    .from('users').select('stripe_customer_id').eq('id', user.id).maybeSingle();
+    .from('users')
+    .select('stripe_customer_id')
+    .eq('id', user.id)
+    .maybeSingle();
   if (!me?.stripe_customer_id) {
-    return NextResponse.json({ error: 'No Stripe customer on file yet — complete checkout first.' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'No Stripe customer on file yet — complete checkout first.' },
+      { status: 400 }
+    );
   }
 
   const origin = new URL(request.url).origin;

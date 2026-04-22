@@ -7,6 +7,8 @@ import { useRouter } from 'next/navigation';
 
 export default function SettingsPasswordRedirect(): null {
   const router = useRouter();
-  useEffect(() => { router.replace('/profile/settings#password'); }, [router]);
+  useEffect(() => {
+    router.replace('/profile/settings#password');
+  }, [router]);
   return null;
 }

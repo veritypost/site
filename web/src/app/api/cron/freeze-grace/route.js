@@ -18,7 +18,11 @@ async function run(request) {
   }
   const service = createServiceClient();
   const { data, error } = await service.rpc('billing_freeze_expired_grace');
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'cron.freeze_grace', fallbackStatus: 500 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'cron.freeze_grace',
+      fallbackStatus: 500,
+    });
   return NextResponse.json({ frozen_count: data, ran_at: new Date().toISOString() });
 }
 

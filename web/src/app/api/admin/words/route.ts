@@ -25,8 +25,11 @@ export async function POST(request: Request) {
     : [];
   if (words.length === 0) return NextResponse.json({ error: 'words required' }, { status: 400 });
 
-  try { await requirePermission(resolvePermKey(kind)); }
-  catch (err) { return permissionError(err); }
+  try {
+    await requirePermission(resolvePermKey(kind));
+  } catch (err) {
+    return permissionError(err);
+  }
 
   const table = resolveTable(kind);
   const col = resolveColumn(kind);
@@ -56,8 +59,11 @@ export async function DELETE(request: Request) {
   const word = typeof body.word === 'string' ? body.word.trim().toLowerCase() : '';
   if (!word) return NextResponse.json({ error: 'word required' }, { status: 400 });
 
-  try { await requirePermission(resolvePermKey(kind)); }
-  catch (err) { return permissionError(err); }
+  try {
+    await requirePermission(resolvePermKey(kind));
+  } catch (err) {
+    return permissionError(err);
+  }
 
   const table = resolveTable(kind);
   const col = resolveColumn(kind);

@@ -11,22 +11,34 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 //                                 quiet_hours_end?, frequency? }
 export async function GET() {
   let user;
-  try { user = await requirePermission('notifications.prefs.view'); }
-  catch (err) { if (err.status) return NextResponse.json({ error: err.message }, { status: err.status }); return NextResponse.json({ error: 'Internal error' }, { status: 500 }); }
+  try {
+    user = await requirePermission('notifications.prefs.view');
+  } catch (err) {
+    if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+  }
 
   const service = createServiceClient();
   const { data, error } = await service
     .from('alert_preferences')
     .select('*')
     .eq('user_id', user.id);
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'notifications.preferences', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'notifications.preferences',
+      fallbackStatus: 400,
+    });
   return NextResponse.json({ preferences: data || [] });
 }
 
 export async function PATCH(request) {
   let user;
-  try { user = await requirePermission('notifications.prefs.toggle_push'); }
-  catch (err) { if (err.status) return NextResponse.json({ error: err.message }, { status: err.status }); return NextResponse.json({ error: 'Internal error' }, { status: 500 }); }
+  try {
+    user = await requirePermission('notifications.prefs.toggle_push');
+  } catch (err) {
+    if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+  }
 
   const b = await request.json().catch(() => ({}));
   if (!b.alert_type) return NextResponse.json({ error: 'alert_type required' }, { status: 400 });
@@ -37,7 +49,9 @@ export async function PATCH(request) {
   const { data: existing } = await service
     .from('alert_preferences')
     .select('id')
-    .eq('user_id', user.id).eq('alert_type', b.alert_type).maybeSingle();
+    .eq('user_id', user.id)
+    .eq('alert_type', b.alert_type)
+    .maybeSingle();
 
   const payload = {
     user_id: user.id,
@@ -56,6 +70,10 @@ export async function PATCH(request) {
   const { error } = existing
     ? await service.from('alert_preferences').update(payload).eq('id', existing.id)
     : await service.from('alert_preferences').insert(payload);
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'notifications.preferences', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'notifications.preferences',
+      fallbackStatus: 400,
+    });
   return NextResponse.json({ ok: true });
 }

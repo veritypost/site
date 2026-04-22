@@ -41,12 +41,22 @@ export async function POST(request) {
   // path, which itself rate-limits per email; defense-in-depth.
   try {
     const service = createServiceClient();
-    const ipHit = await checkRateLimit(service, { key: `login_failed:ip:${ip}`, policyKey: 'login_failed_ip', max: 30, windowSec: 3600 });
+    const ipHit = await checkRateLimit(service, {
+      key: `login_failed:ip:${ip}`,
+      policyKey: 'login_failed_ip',
+      max: 30,
+      windowSec: 3600,
+    });
     if (ipHit.limited) return NextResponse.json({ locked: false });
 
     // Layer 1: per-email — normal users retry 2-3 times before asking
     // for a reset, so 3/hour does not impact the happy path.
-    const emailHit = await checkRateLimit(service, { key: `login_failed:email:${email}`, policyKey: 'login_failed_email', max: 3, windowSec: 3600 });
+    const emailHit = await checkRateLimit(service, {
+      key: `login_failed:email:${email}`,
+      policyKey: 'login_failed_email',
+      max: 3,
+      windowSec: 3600,
+    });
     if (emailHit.limited) return NextResponse.json({ locked: false });
 
     // Layer 3: proof-of-failure. Ephemeral client means this auth call
@@ -55,8 +65,10 @@ export async function POST(request) {
     // someone else's brute-force attempt would never reach this branch
     // because they don't know the password.
     const ephemeral = createEphemeralClient();
-    const { data: probe, error: probeError } = await ephemeral.auth
-      .signInWithPassword({ email, password });
+    const { data: probe, error: probeError } = await ephemeral.auth.signInWithPassword({
+      email,
+      password,
+    });
 
     if (!probeError && probe?.user) {
       // Credentials are valid. The original failure the client reported
@@ -64,13 +76,16 @@ export async function POST(request) {
       // griefer without the password — either way, we refuse to record.
       // Sign out the probe session immediately to avoid leaking an
       // access token on the server.
-      try { await ephemeral.auth.signOut(); } catch {}
+      try {
+        await ephemeral.auth.signOut();
+      } catch {}
       return NextResponse.json({ locked: false });
     }
 
     // Credentials are genuinely invalid — record the failure.
-    const { data: lockedUntil } = await service
-      .rpc('record_failed_login_by_email', { p_email: email });
+    const { data: lockedUntil } = await service.rpc('record_failed_login_by_email', {
+      p_email: email,
+    });
     if (lockedUntil && new Date(lockedUntil) > new Date()) {
       return NextResponse.json({ locked: true, locked_until: lockedUntil });
     }

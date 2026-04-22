@@ -19,9 +19,11 @@ const PLACEHOLDER_URL = 'https://placeholder.supabase.co';
 const PLACEHOLDER_KEY = 'placeholder-anon-key';
 
 export function createClient(): SupabaseClient<Database> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    || (isDev ? PLACEHOLDER_URL : (undefined as unknown as string));
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    || (isDev ? PLACEHOLDER_KEY : (undefined as unknown as string));
+  const url =
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    (isDev ? PLACEHOLDER_URL : (undefined as unknown as string));
+  const key =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    (isDev ? PLACEHOLDER_KEY : (undefined as unknown as string));
   return createBrowserClient<Database>(url as string, key as string);
 }

@@ -59,7 +59,7 @@ export async function POST(request: Request) {
   if (rl.limited) {
     return NextResponse.json(
       { error: 'Too many breaking alerts. Wait before sending another.' },
-      { status: 429, headers: { 'Retry-After': '600' } },
+      { status: 429, headers: { 'Retry-After': '600' } }
     );
   }
 
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
   if (!categoryId) {
     return NextResponse.json(
       { error: 'No categories configured — cannot create breaking alert' },
-      { status: 400 },
+      { status: 400 }
     );
   }
 

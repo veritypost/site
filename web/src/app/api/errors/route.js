@@ -47,18 +47,26 @@ export async function POST(request) {
   }
 
   let body;
-  try { body = await request.json(); }
-  catch { return NextResponse.json({ ok: true }); }
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ ok: true });
+  }
 
-  const msg = typeof body?.message === 'string' ? body.message.slice(0, 2000) : 'Unknown client error';
+  const msg =
+    typeof body?.message === 'string' ? body.message.slice(0, 2000) : 'Unknown client error';
   const stack = typeof body?.stack === 'string' ? body.stack.slice(0, 8000) : null;
   const route = typeof body?.route === 'string' ? body.route.slice(0, 200) : null;
-  const severity = ['info', 'warning', 'error', 'fatal'].includes(body?.severity) ? body.severity : 'error';
+  const severity = ['info', 'warning', 'error', 'fatal'].includes(body?.severity)
+    ? body.severity
+    : 'error';
 
   let userId = null;
   try {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     userId = user?.id || null;
   } catch {}
 

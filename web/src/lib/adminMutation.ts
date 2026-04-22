@@ -28,20 +28,19 @@ type RecordAdminActionArgs = {
 // wrong for self-directed admin operations like editing your own row).
 export async function requireAdminOutranks(
   targetUserId: string | null | undefined,
-  actorId: string,
+  actorId: string
 ): Promise<NextResponse | null> {
   if (!targetUserId || targetUserId === actorId) return null;
   const authed = createClient();
   // require_outranks isn't in the generated Database.Functions enum
   // (post-generation RPC). Cast to bypass the enum check; the RPC
   // exists on the live DB and is exercised by every .js admin route.
-  const { data: outranks, error } = await (authed.rpc as unknown as (
-    fn: string,
-    args: Record<string, unknown>,
-  ) => Promise<{ data: boolean | null; error: { message: string } | null }>)(
-    'require_outranks',
-    { target_user_id: targetUserId },
-  );
+  const { data: outranks, error } = await (
+    authed.rpc as unknown as (
+      fn: string,
+      args: Record<string, unknown>
+    ) => Promise<{ data: boolean | null; error: { message: string } | null }>
+  )('require_outranks', { target_user_id: targetUserId });
   if (error) {
     console.error('[adminMutation] require_outranks failed:', error.message);
     return NextResponse.json({ error: 'Rank check failed' }, { status: 500 });
@@ -49,7 +48,7 @@ export async function requireAdminOutranks(
   if (!outranks) {
     return NextResponse.json(
       { error: 'Cannot act on a user whose rank meets or exceeds your own' },
-      { status: 403 },
+      { status: 403 }
     );
   }
   return null;

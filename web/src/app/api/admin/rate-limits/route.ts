@@ -18,8 +18,11 @@ type Body = {
 
 export async function POST(request: Request) {
   let actor;
-  try { actor = await requirePermission('admin.rate_limits.configure'); }
-  catch (err) { return permissionError(err); }
+  try {
+    actor = await requirePermission('admin.rate_limits.configure');
+  } catch (err) {
+    return permissionError(err);
+  }
   void actor;
 
   const body = (await request.json().catch(() => ({}))) as Body;

@@ -8,10 +8,14 @@ import { scoreQuizSubmit, checkAchievements } from '@/lib/scoring';
 import { v2LiveGuard } from '@/lib/featureFlags';
 
 export async function POST(request) {
-  const blocked = await v2LiveGuard(); if (blocked) return blocked;
+  const blocked = await v2LiveGuard();
+  if (blocked) return blocked;
   let user;
-  try { user = await requirePermission('quiz.attempt.submit'); }
-  catch (err) { return NextResponse.json({ error: err.message }, { status: err.status || 401 }); }
+  try {
+    user = await requirePermission('quiz.attempt.submit');
+  } catch (err) {
+    return NextResponse.json({ error: err.message }, { status: err.status || 401 });
+  }
 
   const body = await request.json().catch(() => ({}));
   const { article_id, answers, kid_profile_id, time_taken_seconds } = body || {};
@@ -24,7 +28,10 @@ export async function POST(request) {
   }
   for (const a of answers) {
     if (!a?.quiz_id || typeof a.selected_answer !== 'number') {
-      return NextResponse.json({ error: 'each answer needs {quiz_id, selected_answer:int}' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'each answer needs {quiz_id, selected_answer:int}' },
+        { status: 400 }
+      );
     }
   }
 
@@ -63,9 +70,7 @@ export async function POST(request) {
     }
   }
 
-  const newAchievements = data?.passed
-    ? await checkAchievements(service, { userId: user.id })
-    : [];
+  const newAchievements = data?.passed ? await checkAchievements(service, { userId: user.id }) : [];
 
   return NextResponse.json({ ...data, scoring, newAchievements });
 }

@@ -1,7 +1,11 @@
 /** @type {import('next').NextConfig} */
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseHostname = (() => {
-  try { return new URL(SUPABASE_URL).hostname; } catch { return null; }
+  try {
+    return new URL(SUPABASE_URL).hostname;
+  } catch {
+    return null;
+  }
 })();
 
 // H-05 / L-02 — Content-Security-Policy is emitted from
@@ -13,7 +17,10 @@ const securityHeaders = [
   { key: 'X-Frame-Options', value: 'DENY' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()' },
+  {
+    key: 'Permissions-Policy',
+    value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+  },
   { key: 'X-DNS-Prefetch-Control', value: 'on' },
   // Content-Security-Policy intentionally emitted from middleware.js so
   // the per-request nonce (required by script-src) can be interpolated.
@@ -39,9 +46,7 @@ const nextConfig = {
   },
   poweredByHeader: false,
   async headers() {
-    return [
-      { source: '/:path*', headers: securityHeaders },
-    ];
+    return [{ source: '/:path*', headers: securityHeaders }];
   },
 };
 
@@ -62,20 +67,19 @@ try {
   if (isProd) {
     throw new Error(
       `[next.config] @sentry/nextjs failed to load in production: ${err?.message || err}. ` +
-      `Refusing to build without error reporting. Fix the dependency and redeploy.`
+        `Refusing to build without error reporting. Fix the dependency and redeploy.`
     );
   }
-  console.warn('[next.config] @sentry/nextjs not installed; local/preview build continues without Sentry.');
+  console.warn(
+    '[next.config] @sentry/nextjs not installed; local/preview build continues without Sentry.'
+  );
 }
 
-module.exports = withSentryConfig(
-  nextConfig,
-  {
-    silent: true,
-    org: process.env.SENTRY_ORG,
-    project: process.env.SENTRY_PROJECT,
-    authToken: process.env.SENTRY_AUTH_TOKEN,
-    disableLogger: true,
-    automaticVercelMonitors: false,
-  }
-);
+module.exports = withSentryConfig(nextConfig, {
+  silent: true,
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  disableLogger: true,
+  automaticVercelMonitors: false,
+});

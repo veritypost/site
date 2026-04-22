@@ -25,7 +25,8 @@ const BATCH_SIZE = 500;
 const CONCURRENCY = 50;
 
 async function run(request) {
-  if (!verifyCronAuth(request).ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!verifyCronAuth(request).ok)
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   if (!process.env.APNS_AUTH_KEY) {
     return NextResponse.json({ error: 'APNS_AUTH_KEY not configured', sent: 0 }, { status: 503 });
   }
@@ -45,35 +46,40 @@ async function run(request) {
   }
   if (!queued?.length) return NextResponse.json({ sent: 0 });
 
-  const userIds = [...new Set(queued.map(n => n.user_id))];
+  const userIds = [...new Set(queued.map((n) => n.user_id))];
   const [{ data: prefs }, { data: tokens }, { data: planRows }] = await Promise.all([
-    service.from('alert_preferences')
+    service
+      .from('alert_preferences')
       .select('user_id, alert_type, channel_push, is_enabled, quiet_hours_start, quiet_hours_end')
       .in('user_id', userIds),
-    service.from('user_push_tokens')
+    service
+      .from('user_push_tokens')
       .select('id, user_id, push_token, environment')
       .in('user_id', userIds)
       .eq('provider', 'apns')
       .is('invalidated_at', null),
-    service.from('users')
-      .select('id, timezone, plans(tier)')
-      .in('id', userIds),
+    service.from('users').select('id, timezone, plans(tier)').in('id', userIds),
   ]);
 
   // Bug 98: belt-and-suspenders quiet-hours check. The create_notification RPC
   // already forces channel='in_app' when quiet hours are active — but it evaluates
   // against server-UTC time. At dispatch we re-check in the caller's timezone so a
   // direct notifications INSERT or a timezone-aware preference is still honoured.
-  const userTz = Object.fromEntries((planRows || []).map(u => [u.id, u.timezone || 'UTC']));
+  const userTz = Object.fromEntries((planRows || []).map((u) => [u.id, u.timezone || 'UTC']));
   function nowMinutesInTz(tz) {
     try {
       const parts = new Intl.DateTimeFormat('en-US', {
-        timeZone: tz, hour12: false, hour: '2-digit', minute: '2-digit',
+        timeZone: tz,
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
       }).formatToParts(new Date());
-      const h = Number(parts.find(p => p.type === 'hour')?.value || 0);
-      const m = Number(parts.find(p => p.type === 'minute')?.value || 0);
+      const h = Number(parts.find((p) => p.type === 'hour')?.value || 0);
+      const m = Number(parts.find((p) => p.type === 'minute')?.value || 0);
       return h * 60 + m;
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   }
   function parseTimeToMinutes(t) {
     if (!t) return null;
@@ -86,7 +92,7 @@ async function run(request) {
     if (s == null || e == null) return false;
     const now = nowMinutesInTz(tz);
     if (now == null) return false;
-    return s < e ? (now >= s && now < e) : (now >= s || now < e);
+    return s < e ? now >= s && now < e : now >= s || now < e;
   }
 
   // D14: free Verified users get a capped number of breaking-news
@@ -95,11 +101,13 @@ async function run(request) {
   // for the free plan). T-016 — the `>= 1` hardcode lower down reads
   // this resolved value.
   const freeUserIds = (planRows || [])
-    .filter(u => !u.plans?.tier || u.plans.tier === 'free')
-    .map(u => u.id);
-  const freePlanRow = (planRows || []).find(u => u.plans?.tier === 'free' && u.plans)?.plans;
-  const freePlanId = (planRows || []).find(u => u.plan_id && u.plans?.tier === 'free')?.plan_id ?? null;
-  const breakingDailyCap = (await getPlanLimitValue(service, freePlanId, 'breaking_alerts', 1)) ?? 1;
+    .filter((u) => !u.plans?.tier || u.plans.tier === 'free')
+    .map((u) => u.id);
+  const freePlanRow = (planRows || []).find((u) => u.plans?.tier === 'free' && u.plans)?.plans;
+  const freePlanId =
+    (planRows || []).find((u) => u.plan_id && u.plans?.tier === 'free')?.plan_id ?? null;
+  const breakingDailyCap =
+    (await getPlanLimitValue(service, freePlanId, 'breaking_alerts', 1)) ?? 1;
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const breakingSentToday = {};
@@ -118,36 +126,47 @@ async function run(request) {
   const freeSet = new Set(freeUserIds);
 
   const prefKey = (uid, type) => `${uid}:${type}`;
-  const prefsMap = Object.fromEntries((prefs || []).map(p => [prefKey(p.user_id, p.alert_type), p]));
+  const prefsMap = Object.fromEntries(
+    (prefs || []).map((p) => [prefKey(p.user_id, p.alert_type), p])
+  );
 
   const tokensByUser = {};
   for (const t of tokens || []) {
     (tokensByUser[t.user_id] ||= []).push(t);
   }
 
-  let sent = 0, skipped = 0, failed = 0, invalidated = 0;
+  let sent = 0,
+    skipped = 0,
+    failed = 0,
+    invalidated = 0;
 
   // First pass: dispositions that don't need APNs at all.
   const needsDispatch = [];
   for (const n of queued) {
     const pref = prefsMap[prefKey(n.user_id, n.type)];
     if (pref && (pref.is_enabled === false || pref.channel_push === false)) {
-      await service.from('notifications').update({
-        push_sent: true,
-        push_sent_at: new Date().toISOString(),
-        metadata: { ...(n.metadata || {}), push_skip_reason: 'opted_out' },
-      }).eq('id', n.id);
+      await service
+        .from('notifications')
+        .update({
+          push_sent: true,
+          push_sent_at: new Date().toISOString(),
+          metadata: { ...(n.metadata || {}), push_skip_reason: 'opted_out' },
+        })
+        .eq('id', n.id);
       skipped++;
       continue;
     }
     // Belt-and-suspenders quiet-hours check at dispatch time.
     if (pref && insideQuietHours(pref, userTz[n.user_id])) {
-      await service.from('notifications').update({
-        channel: 'in_app',
-        push_sent: true,
-        push_sent_at: new Date().toISOString(),
-        metadata: { ...(n.metadata || {}), push_skip_reason: 'quiet_hours' },
-      }).eq('id', n.id);
+      await service
+        .from('notifications')
+        .update({
+          channel: 'in_app',
+          push_sent: true,
+          push_sent_at: new Date().toISOString(),
+          metadata: { ...(n.metadata || {}), push_skip_reason: 'quiet_hours' },
+        })
+        .eq('id', n.id);
       skipped++;
       continue;
     }
@@ -158,12 +177,15 @@ async function run(request) {
     if (n.type === 'breaking_news' && freeSet.has(n.user_id)) {
       const already = breakingSentToday[n.user_id] || 0;
       if (already >= breakingDailyCap) {
-        await service.from('notifications').update({
-          channel: 'in_app',
-          push_sent: true,
-          push_sent_at: new Date().toISOString(),
-          metadata: { ...(n.metadata || {}), push_skip_reason: 'breaking_news_daily_cap' },
-        }).eq('id', n.id);
+        await service
+          .from('notifications')
+          .update({
+            channel: 'in_app',
+            push_sent: true,
+            push_sent_at: new Date().toISOString(),
+            metadata: { ...(n.metadata || {}), push_skip_reason: 'breaking_news_daily_cap' },
+          })
+          .eq('id', n.id);
         skipped++;
         continue;
       }
@@ -171,11 +193,14 @@ async function run(request) {
     }
     const userTokens = tokensByUser[n.user_id];
     if (!userTokens?.length) {
-      await service.from('notifications').update({
-        push_sent: true,
-        push_sent_at: new Date().toISOString(),
-        metadata: { ...(n.metadata || {}), push_skip_reason: 'no_token' },
-      }).eq('id', n.id);
+      await service
+        .from('notifications')
+        .update({
+          push_sent: true,
+          push_sent_at: new Date().toISOString(),
+          metadata: { ...(n.metadata || {}), push_skip_reason: 'no_token' },
+        })
+        .eq('id', n.id);
       skipped++;
       continue;
     }
@@ -205,48 +230,56 @@ async function run(request) {
     const pairs = dispatchByEnv[env];
     if (!pairs.length) continue;
 
-    await withApnsSession(async ({ send }) => {
-      let i = 0;
-      while (i < pairs.length) {
-        const wave = pairs.slice(i, i + CONCURRENCY);
-        i += CONCURRENCY;
+    await withApnsSession(
+      async ({ send }) => {
+        let i = 0;
+        while (i < pairs.length) {
+          const wave = pairs.slice(i, i + CONCURRENCY);
+          i += CONCURRENCY;
 
-        await Promise.all(wave.map(async ({ n, token: t }) => {
-          const r = await send(t.push_token, {
-            title: n.title,
-            body: n.body,
-            url: n.action_url,
-            metadata: n.metadata || undefined,
-          });
-          await service.from('push_receipts').insert({
-            notification_id: n.id,
-            user_id: n.user_id,
-            provider: 'apns',
-            push_token: t.push_token,
-            status: r.ok ? 'delivered' : 'failed',
-            provider_message_id: r.apnsId || null,
-            error_code: r.reason || null,
-            error_message: r.ok ? null : (r.reason || `http ${r.status}`),
-            token_invalidated: !!r.invalidated,
-            sent_at: new Date().toISOString(),
-          });
-          if (r.ok) deliveredNotifIds.add(n.id);
-          if (r.invalidated) {
-            invalidated += 1;
-            await service.rpc('invalidate_user_push_token', { p_token: t.push_token });
-          }
-        }));
-      }
-    }, { environment: env });
+          await Promise.all(
+            wave.map(async ({ n, token: t }) => {
+              const r = await send(t.push_token, {
+                title: n.title,
+                body: n.body,
+                url: n.action_url,
+                metadata: n.metadata || undefined,
+              });
+              await service.from('push_receipts').insert({
+                notification_id: n.id,
+                user_id: n.user_id,
+                provider: 'apns',
+                push_token: t.push_token,
+                status: r.ok ? 'delivered' : 'failed',
+                provider_message_id: r.apnsId || null,
+                error_code: r.reason || null,
+                error_message: r.ok ? null : r.reason || `http ${r.status}`,
+                token_invalidated: !!r.invalidated,
+                sent_at: new Date().toISOString(),
+              });
+              if (r.ok) deliveredNotifIds.add(n.id);
+              if (r.invalidated) {
+                invalidated += 1;
+                await service.rpc('invalidate_user_push_token', { p_token: t.push_token });
+              }
+            })
+          );
+        }
+      },
+      { environment: env }
+    );
   }
 
   // Mark every notification push_sent once both envs have drained. A
   // non-retryable failure on any device shouldn't cause replay.
   for (const { n } of needsDispatch) {
-    await service.from('notifications').update({
-      push_sent: true,
-      push_sent_at: new Date().toISOString(),
-    }).eq('id', n.id);
+    await service
+      .from('notifications')
+      .update({
+        push_sent: true,
+        push_sent_at: new Date().toISOString(),
+      })
+      .eq('id', n.id);
     if (deliveredNotifIds.has(n.id)) sent += 1;
     else failed += 1;
   }

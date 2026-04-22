@@ -23,22 +23,32 @@ export default function RecapCard() {
       if (!allowed) return;
       const res = await fetch('/api/recap');
       if (!res.ok || cancelled) return;
-      const data = await res.json() as { recaps?: RecapRow[]; paid?: boolean };
+      const data = (await res.json()) as { recaps?: RecapRow[]; paid?: boolean };
       if (cancelled) return;
       if ((data.recaps || []).length > 0) setRecap(data.recaps![0]);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (canView === null) return null;
 
   const cardStyle: CSSProperties = {
-    display: 'block', background: 'linear-gradient(135deg, #111 0%, #333 100%)',
-    color: '#fff', borderRadius: 14, padding: '18px 20px',
-    textDecoration: 'none', margin: '16px 0',
+    display: 'block',
+    background: 'linear-gradient(135deg, #111 0%, #333 100%)',
+    color: '#fff',
+    borderRadius: 14,
+    padding: '18px 20px',
+    textDecoration: 'none',
+    margin: '16px 0',
   };
   const eyebrowStyle: CSSProperties = {
-    fontSize: 11, fontWeight: 700, opacity: 0.7, letterSpacing: 1, textTransform: 'uppercase',
+    fontSize: 11,
+    fontWeight: 700,
+    opacity: 0.7,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   };
   const titleStyle: CSSProperties = { fontSize: 18, fontWeight: 800, margin: '6px 0' };
   const subStyle: CSSProperties = { fontSize: 12, opacity: 0.8 };

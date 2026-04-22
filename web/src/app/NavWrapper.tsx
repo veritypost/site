@@ -47,8 +47,11 @@ interface AuthContextValue {
 }
 
 export const AuthContext = createContext<AuthContextValue>({
-  loggedIn: false, user: null, authLoaded: false,
-  userTier: 'anon', tenureDays: null,
+  loggedIn: false,
+  user: null,
+  authLoaded: false,
+  userTier: 'anon',
+  tenureDays: null,
 });
 export const useAuth = () => useContext(AuthContext);
 
@@ -85,14 +88,25 @@ function daysSince(iso: string | null | undefined): number | null {
 //   Fully public:                        TOP=true, NAV=true,  FOOT=true
 //   Dark mode (hide everything):         TOP=false, NAV=false, FOOT=false
 // ============================================================
-const SHOW_TOP_BAR = true;      // "verity post" wordmark + search icon
-const SHOW_BOTTOM_NAV = false;  // Home / Notifications / Leaderboard / Profile
-const SHOW_FOOTER = true;       // Help / Contact / Privacy / Terms / etc.
+const SHOW_TOP_BAR = true; // "verity post" wordmark + search icon
+const SHOW_BOTTOM_NAV = false; // Home / Notifications / Leaderboard / Profile
+const SHOW_FOOTER = true; // Help / Contact / Privacy / Terms / etc.
 
 // Auth / onboarding routes that run fullscreen without any global chrome.
 // Separate from '/' — home now shows the top bar + footer (no bottom nav),
 // so it's handled with its own gate below instead of living in this list.
-const AUTH_HIDE = ['/login', '/signup', '/signup/pick-username', '/signup/expert', '/forgot-password', '/reset-password', '/verify-email', '/api/auth/callback', '/logout', '/welcome'];
+const AUTH_HIDE = [
+  '/login',
+  '/signup',
+  '/signup/pick-username',
+  '/signup/expert',
+  '/forgot-password',
+  '/reset-password',
+  '/verify-email',
+  '/api/auth/callback',
+  '/logout',
+  '/welcome',
+];
 const isAdmin = (p: string) => p.startsWith('/admin');
 const isIdeasPreview = (p: string) => p.startsWith('/ideas');
 // Article reader owns the viewport — no global nav, no footer. Reading
@@ -100,7 +114,10 @@ const isIdeasPreview = (p: string) => p.startsWith('/ideas');
 // route (e.g. /story/<slug>/something future).
 const isStory = (p: string) => p.startsWith('/story');
 
-interface NavItem { label: string; href: string }
+interface NavItem {
+  label: string;
+  href: string;
+}
 
 export default function NavWrapper({ children }: { children: ReactNode }) {
   const [loggedIn, setLoggedIn] = useState<boolean>(false);
@@ -140,7 +157,9 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
       }
       const { data: profile } = await supabase
         .from('users')
-        .select('id, username, avatar_url, avatar_color, verity_score, plan_id, plan_status, email_verified, streak_current, is_banned, is_muted, muted_until, locked_until, frozen_at, plan_grace_period_ends_at, deletion_scheduled_for, created_at')
+        .select(
+          'id, username, avatar_url, avatar_color, verity_score, plan_id, plan_status, email_verified, streak_current, is_banned, is_muted, muted_until, locked_until, frozen_at, plan_grace_period_ends_at, deletion_scheduled_for, created_at'
+        )
         .eq('id', authUser.id)
         .maybeSingle<ProfileRow>();
 
@@ -169,7 +188,10 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!loggedIn) { setUnreadCount(0); return; }
+    if (!loggedIn) {
+      setUnreadCount(0);
+      return;
+    }
     let cancelled = false;
     async function poll() {
       try {
@@ -177,11 +199,16 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
         if (!res.ok) return;
         const data = await res.json();
         if (!cancelled) setUnreadCount(data.unread_count || 0);
-      } catch (e) { console.error('[nav] notifications poll', e); }
+      } catch (e) {
+        console.error('[nav] notifications poll', e);
+      }
     }
     poll();
     const id = setInterval(poll, 60_000);
-    return () => { cancelled = true; clearInterval(id); };
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
   }, [loggedIn]);
 
   // Chrome visibility gates. Three surfaces, three rules:
@@ -230,17 +257,23 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
     { label: 'Home', href: '/' },
     { label: 'Notifications', href: '/notifications' },
     { label: 'Leaderboard', href: '/leaderboard' },
-    loggedIn
-      ? { label: 'Profile', href: '/profile' }
-      : { label: 'Sign in', href: '/login' },
+    loggedIn ? { label: 'Profile', href: '/profile' } : { label: 'Sign in', href: '/login' },
   ];
 
   const navStyle: CSSProperties = {
-    position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999,
-    background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(12px)',
+    position: 'fixed',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 9999,
+    background: 'rgba(255,255,255,0.97)',
+    backdropFilter: 'blur(12px)',
     borderTop: `1px solid ${C.border}`,
-    display: 'flex', justifyContent: 'space-around', alignItems: 'center',
-    height: 64, paddingBottom: 'max(4px, env(safe-area-inset-bottom))',
+    display: 'flex',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    height: 64,
+    paddingBottom: 'max(4px, env(safe-area-inset-bottom))',
   };
 
   // R13-T3 — top-bar logo. Minimal v1: just "Verity Post" on the left
@@ -258,10 +291,17 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
   // page content under the bar by the safe-area amount.
   const topBarReservedHeight = `calc(${TOP_BAR_HEIGHT}px + env(safe-area-inset-top))`;
   const topBarStyle: CSSProperties = {
-    position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
-    background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(12px)',
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 9999,
+    background: 'rgba(255,255,255,0.97)',
+    backdropFilter: 'blur(12px)',
     borderBottom: `1px solid ${C.border}`,
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     height: TOP_BAR_HEIGHT,
     padding: '0 16px',
     paddingTop: 'env(safe-area-inset-top)',
@@ -275,28 +315,46 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
     : ({ ['--vp-top-bar-h' as string]: '0px' } as CSSProperties);
 
   return (
-    <AuthContext.Provider value={{
-      loggedIn, user, authLoaded,
-      userTier: deriveTier(user),
-      tenureDays: daysSince(user?.created_at ?? null),
-    }}>
+    <AuthContext.Provider
+      value={{
+        loggedIn,
+        user,
+        authLoaded,
+        userTier: deriveTier(user),
+        tenureDays: daysSince(user?.created_at ?? null),
+      }}
+    >
       {loggedIn && user && <AccountStateBanner user={user} />}
-      <div style={{
-        // Bug 1 fix: reserve the FULL rendered top-bar height
-        // (44 + safe-area-inset-top) so iPhone-notched devices don't
-        // push content under the bar.
-        paddingTop: showTopBar ? topBarReservedHeight : 0,
-        paddingBottom: showNav ? (showAdminBanner ? 104 : 68) : (showAdminBanner ? 44 : 0),
-        ...showTopBarVar,
-      }}>
+      <div
+        style={{
+          // Bug 1 fix: reserve the FULL rendered top-bar height
+          // (44 + safe-area-inset-top) so iPhone-notched devices don't
+          // push content under the bar.
+          paddingTop: showTopBar ? topBarReservedHeight : 0,
+          paddingBottom: showNav ? (showAdminBanner ? 104 : 68) : showAdminBanner ? 44 : 0,
+          ...showTopBarVar,
+        }}
+      >
         {children}
 
         {showFooter && (
-          <footer style={{
-            maxWidth: 680, margin: '0 auto', padding: '32px 16px 24px',
-            borderTop: '1px solid var(--border)',
-          }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, justifyContent: 'center', marginBottom: 12 }}>
+          <footer
+            style={{
+              maxWidth: 680,
+              margin: '0 auto',
+              padding: '32px 16px 24px',
+              borderTop: '1px solid var(--border)',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 16,
+                justifyContent: 'center',
+                marginBottom: 12,
+              }}
+            >
               {[
                 { label: 'About', href: '/about' },
                 // LAUNCH: 'Help' link hidden from users pre-launch. The
@@ -312,9 +370,17 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
                 { label: 'Accessibility', href: '/accessibility' },
                 { label: 'DMCA', href: '/dmca' },
               ].map((link) => (
-                <a key={link.label} href={link.href} style={{
-                  fontSize: 11, color: 'var(--muted)', textDecoration: 'none',
-                }}>{link.label}</a>
+                <a
+                  key={link.label}
+                  href={link.href}
+                  style={{
+                    fontSize: 11,
+                    color: 'var(--muted)',
+                    textDecoration: 'none',
+                  }}
+                >
+                  {link.label}
+                </a>
               ))}
             </div>
             <div style={{ textAlign: 'center', fontSize: 10, color: 'var(--muted)' }}>
@@ -360,8 +426,11 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
               href="/search"
               aria-label="Search"
               style={{
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                minWidth: 44, minHeight: 44,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minWidth: 44,
+                minHeight: 44,
                 // Pull into the 16px edge gutter so the visual centre of
                 // the icon aligns with the page's right margin.
                 marginRight: -8,
@@ -370,9 +439,14 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
               }}
             >
               <svg
-                width="20" height="20" viewBox="0 0 24 24"
-                fill="none" stroke="currentColor" strokeWidth="2"
-                strokeLinecap="round" strokeLinejoin="round"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
                 aria-hidden="true"
               >
                 <circle cx="11" cy="11" r="8" />
@@ -395,22 +469,38 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
             const active = path === item.href || (item.href !== '/' && path.startsWith(item.href));
             const showDot = item.href === '/notifications' && unreadCount > 0;
             return (
-              <a key={item.href} href={item.href}
+              <a
+                key={item.href}
+                href={item.href}
                 aria-current={active ? 'page' : undefined}
                 style={{
                   position: 'relative',
-                  textDecoration: 'none', padding: '12px 16px',
-                  minHeight: 44, minWidth: 44,
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 13, fontWeight: active ? 700 : 500,
+                  textDecoration: 'none',
+                  padding: '12px 16px',
+                  minHeight: 44,
+                  minWidth: 44,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 13,
+                  fontWeight: active ? 700 : 500,
                   color: active ? C.accent : C.dim,
-                }}>
+                }}
+              >
                 {item.label}
                 {showDot && (
-                  <span aria-label={`${unreadCount} unread`} style={{
-                    position: 'absolute', top: 4, right: 8,
-                    width: 8, height: 8, borderRadius: 4, background: '#dc2626',
-                  }} />
+                  <span
+                    aria-label={`${unreadCount} unread`}
+                    style={{
+                      position: 'absolute',
+                      top: 4,
+                      right: 8,
+                      width: 8,
+                      height: 8,
+                      borderRadius: 4,
+                      background: '#dc2626',
+                    }}
+                  />
                 )}
               </a>
             );
@@ -419,11 +509,21 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
       )}
 
       {showAdminBanner && (
-        <div style={{
-          position: 'fixed', bottom: showNav ? 56 : 0, left: 0, right: 0, zIndex: 10000,
-          background: '#111', padding: '8px 16px',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16,
-        }}>
+        <div
+          style={{
+            position: 'fixed',
+            bottom: showNav ? 56 : 0,
+            left: 0,
+            right: 0,
+            zIndex: 10000,
+            background: '#111',
+            padding: '8px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 16,
+          }}
+        >
           <a
             href={onAdminPage ? '/' : '/admin'}
             style={{ color: '#fff', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}

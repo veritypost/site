@@ -7,8 +7,11 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 
 export async function GET(request) {
   let user;
-  try { user = await requirePermission('kids.leaderboard.global.view'); }
-  catch (err) { return NextResponse.json({ error: err.message }, { status: err.status || 401 }); }
+  try {
+    user = await requirePermission('kids.leaderboard.global.view');
+  } catch (err) {
+    return NextResponse.json({ error: err.message }, { status: err.status || 401 });
+  }
 
   const url = new URL(request.url);
   const activeKidId = url.searchParams.get('kid_profile_id');
@@ -42,14 +45,20 @@ export async function GET(request) {
   if (categoryId) {
     const { data, error } = await service
       .from('category_scores')
-      .select('kid_profile_id, score, kid_profiles!inner(id, display_name, verity_score, global_leaderboard_opt_in)')
+      .select(
+        'kid_profile_id, score, kid_profiles!inner(id, display_name, verity_score, global_leaderboard_opt_in)'
+      )
       .eq('category_id', categoryId)
       .eq('kid_profiles.global_leaderboard_opt_in', true)
       .not('kid_profile_id', 'is', null)
       .order('score', { ascending: false })
       .limit(limit);
-    if (error) return safeErrorResponse(NextResponse, error, { route: 'kids.global_leaderboard', fallbackStatus: 400 });
-    const rows = (data || []).map(r => ({
+    if (error)
+      return safeErrorResponse(NextResponse, error, {
+        route: 'kids.global_leaderboard',
+        fallbackStatus: 400,
+      });
+    const rows = (data || []).map((r) => ({
       id: r.kid_profile_id,
       display_name: r.kid_profiles?.display_name || 'Unknown',
       score: r.score ?? 0,
@@ -64,8 +73,12 @@ export async function GET(request) {
     .eq('global_leaderboard_opt_in', true)
     .order('verity_score', { ascending: false })
     .limit(limit);
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'kids.global_leaderboard', fallbackStatus: 400 });
-  const rows = (data || []).map(r => ({
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'kids.global_leaderboard',
+      fallbackStatus: 400,
+    });
+  const rows = (data || []).map((r) => ({
     id: r.id,
     display_name: r.display_name || 'Unknown',
     score: r.verity_score ?? 0,

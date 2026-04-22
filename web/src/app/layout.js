@@ -42,10 +42,12 @@ const sourceSerif = Source_Serif_4({
 export const metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://veritypost.com'),
   title: 'Verity Post — Read. Prove it. Discuss.',
-  description: 'News with a quiz-gated comment section. Score 3/5 on the article quiz to join the discussion — every commenter read the article.',
+  description:
+    'News with a quiz-gated comment section. Score 3/5 on the article quiz to join the discussion — every commenter read the article.',
   openGraph: {
     title: 'Verity Post — Read. Prove it. Discuss.',
-    description: 'News with a quiz-gated comment section. Score 3/5 on the article quiz to join the discussion — every commenter read the article.',
+    description:
+      'News with a quiz-gated comment section. Score 3/5 on the article quiz to join the discussion — every commenter read the article.',
     siteName: 'Verity Post',
     type: 'website',
   },
@@ -54,7 +56,8 @@ export const metadata = {
     site: '@VerityPostApp',
     creator: '@VerityPostApp',
     title: 'Verity Post — Read. Prove it. Discuss.',
-    description: 'News with a quiz-gated comment section. Score 3/5 on the article quiz to join the discussion.',
+    description:
+      'News with a quiz-gated comment section. Score 3/5 on the article quiz to join the discussion.',
   },
   // DA-183 — apple mobile PWA hints. Without these, iOS Add-to-Home-Screen
   // installs with a blurred screenshot icon. `themeColor` moved to the
@@ -88,11 +91,22 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${inter.variable} ${sourceSerif.variable}`}>
-      <body style={{ margin: 0, padding: 0, background: '#ffffff', color: '#111111', fontFamily: 'var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+      <body
+        style={{
+          margin: 0,
+          padding: 0,
+          background: '#ffffff',
+          color: '#111111',
+          fontFamily:
+            'var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        }}
+      >
         {/* DA-050 — skip-to-main link. First focusable element; visible
             only when focused so keyboard users can bypass nav + banner +
             category pills straight to article content. */}
-        <a href="#main-content" className="vp-skip-link">Skip to main content</a>
+        <a href="#main-content" className="vp-skip-link">
+          Skip to main content
+        </a>
         <style>{`
           input, textarea, select { color: #111111; }
           input::placeholder, textarea::placeholder { color: #999999; }

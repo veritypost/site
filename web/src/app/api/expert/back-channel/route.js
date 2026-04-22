@@ -8,8 +8,9 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // GET  /api/expert/back-channel?category_id=...&source_comment_id=... — read messages
 // POST /api/expert/back-channel — { category_id, body, source_comment_id?, parent_id?, title? }
 export async function GET(request) {
-  try { await requirePermission('expert.back_channel.read'); }
-  catch (err) {
+  try {
+    await requirePermission('expert.back_channel.read');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
@@ -30,20 +31,28 @@ export async function GET(request) {
   else q = q.is('source_comment_id', null);
 
   const { data, error } = await q;
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'expert.back_channel', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'expert.back_channel',
+      fallbackStatus: 400,
+    });
   return NextResponse.json({ messages: data || [] });
 }
 
 export async function POST(request) {
   let user;
-  try { user = await requirePermission('expert.back_channel.post'); }
-  catch (err) {
+  try {
+    user = await requirePermission('expert.back_channel.post');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
 
-  const { category_id, body, source_comment_id, parent_id, title } = await request.json().catch(() => ({}));
-  if (!category_id || !body) return NextResponse.json({ error: 'category_id and body required' }, { status: 400 });
+  const { category_id, body, source_comment_id, parent_id, title } = await request
+    .json()
+    .catch(() => ({}));
+  if (!category_id || !body)
+    return NextResponse.json({ error: 'category_id and body required' }, { status: 400 });
 
   const service = createServiceClient();
   const { data, error } = await service.rpc('post_back_channel_message', {
@@ -54,6 +63,10 @@ export async function POST(request) {
     p_parent_id: parent_id || null,
     p_title: title || null,
   });
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'expert.back_channel', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'expert.back_channel',
+      fallbackStatus: 400,
+    });
   return NextResponse.json({ id: data });
 }

@@ -2,7 +2,15 @@
 // @feature-verified shared_components 2026-04-18
 'use client';
 
-import { createContext, useContext, useEffect, useMemo, useState, useCallback, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  useCallback,
+  type ReactNode,
+} from 'react';
 import type { User } from '@supabase/supabase-js';
 import { createClient } from '../lib/supabase/client';
 import {
@@ -45,8 +53,12 @@ export function PermissionsProvider({ children }: PermissionsProviderProps) {
       setLoaded(true);
       if (data?.user) {
         refreshAllPermissions()
-          .then(() => { if (mounted) setTick((n) => n + 1); })
-          .catch((err) => { console.error('[permissions] initial refresh', err); });
+          .then(() => {
+            if (mounted) setTick((n) => n + 1);
+          })
+          .catch((err) => {
+            console.error('[permissions] initial refresh', err);
+          });
       }
     });
 
@@ -57,7 +69,9 @@ export function PermissionsProvider({ children }: PermissionsProviderProps) {
       if (session?.user) {
         refreshAllPermissions()
           .then(() => setTick((n) => n + 1))
-          .catch((err) => { console.error('[permissions] auth-change refresh', err); });
+          .catch((err) => {
+            console.error('[permissions] auth-change refresh', err);
+          });
       }
     });
 
@@ -88,16 +102,22 @@ export function PermissionsProvider({ children }: PermissionsProviderProps) {
   }, []);
 
   useEffect(() => {
-    return onRlsLocked((detail: { permission?: string | null; lock_reason?: string | null; error?: { message?: string } | null }) => {
-      setGlobalLock({
-        label:        detail.permission ? detail.permission.split('.').pop() || 'Locked' : 'Locked',
-        lock_reason:  detail.lock_reason || 'not_granted',
-        lock_message: detail.error?.message || null,
-        deny_mode:    'locked',
-        granted:      false,
-        permission_key: detail.permission ?? null,
-      });
-    });
+    return onRlsLocked(
+      (detail: {
+        permission?: string | null;
+        lock_reason?: string | null;
+        error?: { message?: string } | null;
+      }) => {
+        setGlobalLock({
+          label: detail.permission ? detail.permission.split('.').pop() || 'Locked' : 'Locked',
+          lock_reason: detail.lock_reason || 'not_granted',
+          lock_message: detail.error?.message || null,
+          deny_mode: 'locked',
+          granted: false,
+          permission_key: detail.permission ?? null,
+        });
+      }
+    );
   }, []);
 
   const reload = useCallback(async () => {
@@ -113,17 +133,13 @@ export function PermissionsProvider({ children }: PermissionsProviderProps) {
       tick,
       fetchSection: getCapabilities as (section: string) => Promise<PermissionCapability[]>,
     }),
-    [user, loaded, reload, tick],
+    [user, loaded, reload, tick]
   );
 
   return (
     <PermissionsContext.Provider value={value}>
       {children}
-      <LockModal
-        open={!!globalLock}
-        onClose={() => setGlobalLock(null)}
-        capability={globalLock}
-      />
+      <LockModal open={!!globalLock} onClose={() => setGlobalLock(null)} capability={globalLock} />
     </PermissionsContext.Provider>
   );
 }
@@ -151,7 +167,7 @@ export function useCapabilities(section: string) {
   const get = useCallback(
     (key: string): PermissionCapability | null =>
       (caps || []).find((r) => r.permission_key === key) || null,
-    [caps],
+    [caps]
   );
 
   return { caps, get, ready: caps !== null };

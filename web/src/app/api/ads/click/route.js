@@ -36,6 +36,7 @@ export async function POST(request) {
   if (rl.limited) return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
 
   const { error } = await service.rpc('log_ad_click', { p_impression_id: impressionId });
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'ads/click', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, { route: 'ads/click', fallbackStatus: 400 });
   return NextResponse.json({ ok: true });
 }

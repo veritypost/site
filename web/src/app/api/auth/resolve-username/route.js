@@ -21,7 +21,11 @@ import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 
 export async function POST(request) {
   let payload = null;
-  try { payload = await request.json(); } catch { /* noop */ }
+  try {
+    payload = await request.json();
+  } catch {
+    /* noop */
+  }
   const raw = typeof payload?.username === 'string' ? payload.username.trim() : '';
 
   if (!raw || raw.length < 2 || raw.length > 50) {

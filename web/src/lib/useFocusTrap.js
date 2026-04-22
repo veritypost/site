@@ -34,7 +34,9 @@ export function useFocusTrap(isActive, containerRef, { onEscape } = {}) {
   // each render, which would thrash the effect below and steal focus
   // mid-typing. The ref lets the effect run exactly once per activation.
   const onEscapeRef = useRef(onEscape);
-  useEffect(() => { onEscapeRef.current = onEscape; }, [onEscape]);
+  useEffect(() => {
+    onEscapeRef.current = onEscape;
+  }, [onEscape]);
 
   useEffect(() => {
     if (!isActive || typeof document === 'undefined') return undefined;
@@ -43,8 +45,10 @@ export function useFocusTrap(isActive, containerRef, { onEscape } = {}) {
 
     const trigger = document.activeElement;
 
-    const focusables = () => Array.from(container.querySelectorAll(FOCUSABLE))
-      .filter((el) => !el.hasAttribute('disabled') && el.offsetParent !== null);
+    const focusables = () =>
+      Array.from(container.querySelectorAll(FOCUSABLE)).filter(
+        (el) => !el.hasAttribute('disabled') && el.offsetParent !== null
+      );
 
     const initial = focusables();
     if (initial.length > 0) {

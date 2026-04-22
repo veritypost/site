@@ -14,14 +14,21 @@ export async function POST(request) {
     const supabase = await createClient();
 
     const ip = await getClientIp();
-    const hit = await checkRateLimit(supabase, { key: `login:ip:${ip}`, policyKey: 'login_ip', max: 10, windowSec: 900 });
+    const hit = await checkRateLimit(supabase, {
+      key: `login:ip:${ip}`,
+      policyKey: 'login_ip',
+      max: 10,
+      windowSec: 900,
+    });
     if (hit.limited) {
       return NextResponse.json({ error: 'Too many login attempts' }, { status: 429 });
     }
 
     // Identify the signed-in user from the session cookie the client set
     // via its own signInWithPassword call before POSTing here.
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
@@ -32,10 +39,13 @@ export async function POST(request) {
       // Round A: N-02 revokes authenticated INSERT/UPDATE on last_login_ip;
       // C-06 revokes authenticated INSERT on audit_log. Route both writes
       // through the service client.
-      await service.from('users').update({
-        last_login_at: new Date().toISOString(),
-        last_login_ip: ip,
-      }).eq('id', userId);
+      await service
+        .from('users')
+        .update({
+          last_login_at: new Date().toISOString(),
+          last_login_ip: ip,
+        })
+        .eq('id', userId);
 
       // Migration 056 revokes `authenticated` EXECUTE on `increment_field`
       // to close the DA-097 / F-004 Verity Score pump. The login_count

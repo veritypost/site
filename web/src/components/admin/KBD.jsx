@@ -17,7 +17,10 @@ import { ADMIN_C, F } from '../../lib/adminPalette';
 export default function KBD({ keys, size = 'sm', style }) {
   const list = Array.isArray(keys)
     ? keys
-    : String(keys).split('+').map((s) => s.trim()).filter(Boolean);
+    : String(keys)
+        .split('+')
+        .map((s) => s.trim())
+        .filter(Boolean);
   const fontSize = size === 'xs' ? F.xs : F.sm;
   const padY = size === 'xs' ? 1 : 2;
   const padX = size === 'xs' ? 4 : 6;

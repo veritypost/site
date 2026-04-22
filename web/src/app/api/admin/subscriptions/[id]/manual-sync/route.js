@@ -39,8 +39,9 @@ const VALID_ACTIONS = new Set(['downgrade', 'resume']);
 
 export async function POST(request, { params }) {
   let actor;
-  try { actor = await requirePermission('admin.billing.override_plan'); }
-  catch (err) {
+  try {
+    actor = await requirePermission('admin.billing.override_plan');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -49,8 +50,11 @@ export async function POST(request, { params }) {
   if (!subId) return NextResponse.json({ error: 'subscription id required' }, { status: 400 });
 
   let body;
-  try { body = await request.json(); }
-  catch { return NextResponse.json({ error: 'invalid json body' }, { status: 400 }); }
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'invalid json body' }, { status: 400 });
+  }
   const { action, reason } = body || {};
   if (!action || !VALID_ACTIONS.has(action)) {
     return NextResponse.json({ error: `unknown action "${action}"` }, { status: 400 });
@@ -169,7 +173,9 @@ export async function POST(request, { params }) {
         user_id: sub.user_id,
       },
     });
-  } catch { /* best-effort */ }
+  } catch {
+    /* best-effort */
+  }
 
   return NextResponse.json({ ok: true, action, user_id: sub.user_id });
 }

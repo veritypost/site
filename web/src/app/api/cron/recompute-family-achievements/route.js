@@ -19,7 +19,11 @@ async function run(request) {
   }
   const service = createServiceClient();
   const { data, error } = await service.rpc('recompute_family_achievements');
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'cron.recompute_family_achievements', fallbackStatus: 500 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'cron.recompute_family_achievements',
+      fallbackStatus: 500,
+    });
   return NextResponse.json({ ...data, ran_at: new Date().toISOString() });
 }
 

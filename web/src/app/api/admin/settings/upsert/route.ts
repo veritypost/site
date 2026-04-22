@@ -12,8 +12,11 @@ type Body = { key?: string; value?: string | number | boolean };
 
 export async function POST(request: Request) {
   let actor;
-  try { actor = await requirePermission('admin.settings.edit'); }
-  catch (err) { return permissionError(err); }
+  try {
+    actor = await requirePermission('admin.settings.edit');
+  } catch (err) {
+    return permissionError(err);
+  }
 
   const body = (await request.json().catch(() => ({}))) as Body;
   const key = typeof body.key === 'string' ? body.key.trim() : '';
@@ -31,12 +34,18 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (existing?.is_sensitive) {
-    return NextResponse.json({ error: 'Setting is marked sensitive and not editable here' }, { status: 403 });
+    return NextResponse.json(
+      { error: 'Setting is marked sensitive and not editable here' },
+      { status: 403 }
+    );
   }
 
   const { error } = await service
     .from('settings')
-    .upsert({ key, value, updated_by: actor.id, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+    .upsert(
+      { key, value, updated_by: actor.id, updated_at: new Date().toISOString() },
+      { onConflict: 'key' }
+    );
   if (error) {
     console.error('[admin.settings.upsert]', error.message);
     return NextResponse.json({ error: 'Could not save setting' }, { status: 500 });

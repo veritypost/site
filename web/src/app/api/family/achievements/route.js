@@ -9,8 +9,9 @@ import { createServiceClient } from '@/lib/supabase/server';
 // via cron rollups (Phase 11-era); this endpoint is read-only.
 export async function GET() {
   let user;
-  try { user = await requirePermission('kids.achievements.view'); }
-  catch (err) {
+  try {
+    user = await requirePermission('kids.achievements.view');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
@@ -18,8 +19,11 @@ export async function GET() {
   const service = createServiceClient();
   let ownerId = user.id;
   const { data: subRow } = await service
-    .from('subscriptions').select('family_owner_id')
-    .eq('user_id', user.id).eq('status', 'active').maybeSingle();
+    .from('subscriptions')
+    .select('family_owner_id')
+    .eq('user_id', user.id)
+    .eq('status', 'active')
+    .maybeSingle();
   if (subRow?.family_owner_id) ownerId = subRow.family_owner_id;
 
   const { data: defs } = await service
@@ -33,8 +37,10 @@ export async function GET() {
     .select('*')
     .eq('family_owner_id', ownerId);
 
-  const progressById = Object.fromEntries((progress || []).map(p => [p.family_achievement_id, p]));
-  const merged = (defs || []).map(d => ({
+  const progressById = Object.fromEntries(
+    (progress || []).map((p) => [p.family_achievement_id, p])
+  );
+  const merged = (defs || []).map((d) => ({
     ...d,
     progress: progressById[d.id]?.progress || null,
     earned_at: progressById[d.id]?.earned_at || null,

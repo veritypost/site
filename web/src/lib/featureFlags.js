@@ -8,7 +8,7 @@
 // making the DB-read rate noticeable. True invalidation across
 // instances requires pub/sub (Supabase realtime or similar) and is a
 // separate project.
-const CACHE = new Map();     // key -> { value, ts }
+const CACHE = new Map(); // key -> { value, ts }
 const TTL_MS = 10_000;
 
 export async function isFlagEnabled(client, key, defaultValue = false) {
@@ -25,7 +25,9 @@ export async function isFlagEnabled(client, key, defaultValue = false) {
   return value;
 }
 
-export function clearFlagCache() { CACHE.clear(); }
+export function clearFlagCache() {
+  CACHE.clear();
+}
 
 // Convenience wrapper for the master cutover switch.
 // Fail-closed: if the flag row is missing or the DB read fails, treat

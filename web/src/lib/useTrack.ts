@@ -37,7 +37,7 @@ export function useTrack() {
         ...opts,
       });
     },
-    [userId, userTier, tenureDays],
+    [userId, userTier, tenureDays]
   );
 }
 
@@ -53,7 +53,7 @@ export function useTrack() {
 export function usePageViewTrack(
   content_type: string,
   extra: TrackOptions = {},
-  deps: ReadonlyArray<unknown> = [],
+  deps: ReadonlyArray<unknown> = []
 ) {
   const trackEvent = useTrack();
   useEffect(
@@ -64,6 +64,6 @@ export function usePageViewTrack(
       });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [trackEvent, content_type, ...deps],
+    [trackEvent, content_type, ...deps]
   );
 }

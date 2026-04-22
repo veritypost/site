@@ -10,8 +10,9 @@ import { createServiceClient } from '@/lib/supabase/server';
 // Round A (C-05) — writes to plan_permission_sets routed through service.
 export async function POST(request) {
   let actor;
-  try { actor = await requirePermission('admin.permissions.assign_to_plan'); }
-  catch (err) {
+  try {
+    actor = await requirePermission('admin.permissions.assign_to_plan');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -19,7 +20,10 @@ export async function POST(request) {
   const body = await request.json().catch(() => ({}));
   const { plan_id, permission_set_id, enabled } = body || {};
   if (!plan_id || !permission_set_id || typeof enabled !== 'boolean') {
-    return NextResponse.json({ error: 'plan_id, permission_set_id, and enabled required' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'plan_id, permission_set_id, and enabled required' },
+      { status: 400 }
+    );
   }
 
   const service = createServiceClient();
@@ -45,7 +49,9 @@ export async function POST(request) {
       target_id: permission_set_id,
       metadata: { plan_id },
     });
-  } catch { /* best-effort */ }
+  } catch {
+    /* best-effort */
+  }
 
   return NextResponse.json({ ok: true });
 }

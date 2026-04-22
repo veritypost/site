@@ -10,8 +10,11 @@ import { checkRateLimit } from '@/lib/rateLimit';
 // client-side cooldown isn't trivially bypassed by reloading the page.
 export async function POST() {
   let user;
-  try { user = await requireAuth(); }
-  catch { return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 }); }
+  try {
+    user = await requireAuth();
+  } catch {
+    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+  }
 
   const supabase = await createClient();
   const hit = await checkRateLimit(supabase, {
@@ -23,11 +26,13 @@ export async function POST() {
   if (hit.limited) {
     return NextResponse.json(
       { error: 'Too many verification resends. Try again in an hour.' },
-      { status: 429, headers: { 'Retry-After': '3600' } },
+      { status: 429, headers: { 'Retry-After': '3600' } }
     );
   }
 
-  const { data: { user: authUser } } = await supabase.auth.getUser();
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser();
   const email = authUser?.email;
   if (!email) return NextResponse.json({ error: 'Session has no email' }, { status: 400 });
 

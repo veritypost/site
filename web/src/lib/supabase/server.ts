@@ -54,12 +54,20 @@ export function createClientFromToken(token: string): SupabaseClient<Database> {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string,
     {
       global: { headers: { Authorization: `Bearer ${token}` } },
-      cookies: { get() { return undefined; }, set() {}, remove() {} },
+      cookies: {
+        get() {
+          return undefined;
+        },
+        set() {},
+        remove() {},
+      },
     }
   );
 }
 
-export function createClientForRequest(request: { cookies: { get: (name: string) => { value: string } | undefined } }): SupabaseClient<Database> {
+export function createClientForRequest(request: {
+  cookies: { get: (name: string) => { value: string } | undefined };
+}): SupabaseClient<Database> {
   return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL as string,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string,
@@ -78,14 +86,16 @@ export function createClientForRequest(request: { cookies: { get: (name: string)
 export function createServiceClient(): SupabaseClient<Database> {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!key) throw new Error('SUPABASE_SERVICE_ROLE_KEY missing');
-  return createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL as string,
-    key,
-    {
-      cookies: { get() { return undefined; }, set() {}, remove() {} },
-      auth: { persistSession: false, autoRefreshToken: false },
-    }
-  );
+  return createServerClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL as string, key, {
+    cookies: {
+      get() {
+        return undefined;
+      },
+      set() {},
+      remove() {},
+    },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
 }
 
 // Cookie-less anon client. Used when a route needs to run an ephemeral
@@ -96,7 +106,13 @@ export function createEphemeralClient(): SupabaseClient<Database> {
     process.env.NEXT_PUBLIC_SUPABASE_URL as string,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string,
     {
-      cookies: { get() { return undefined; }, set() {}, remove() {} },
+      cookies: {
+        get() {
+          return undefined;
+        },
+        set() {},
+        remove() {},
+      },
       auth: { persistSession: false, autoRefreshToken: false },
     }
   );

@@ -29,7 +29,7 @@ const Select = forwardRef(function Select(
     children,
     ...rest
   },
-  ref,
+  ref
 ) {
   const padY = size === 'sm' ? 4 : 6;
   const padX = size === 'sm' ? 8 : 10;
@@ -70,10 +70,16 @@ const Select = forwardRef(function Select(
       }}
       {...rest}
     >
-      {placeholder && <option value="" disabled>{placeholder}</option>}
+      {placeholder && (
+        <option value="" disabled>
+          {placeholder}
+        </option>
+      )}
       {options
         ? options.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
           ))
         : children}
     </select>

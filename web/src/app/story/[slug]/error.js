@@ -18,8 +18,20 @@ export default function Error({ error, reset }) {
 
   return (
     <div style={{ padding: '40px', textAlign: 'center' }}>
-      <p style={{ color: '#ef4444', marginBottom: '16px' }}>Failed to load article. Please try again.</p>
-      <button onClick={() => reset()} style={{ padding: '8px 16px', background: '#111111', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
+      <p style={{ color: '#ef4444', marginBottom: '16px' }}>
+        Failed to load article. Please try again.
+      </p>
+      <button
+        onClick={() => reset()}
+        style={{
+          padding: '8px 16px',
+          background: '#111111',
+          color: '#fff',
+          border: 'none',
+          borderRadius: '8px',
+          cursor: 'pointer',
+        }}
+      >
         Try again
       </button>
     </div>

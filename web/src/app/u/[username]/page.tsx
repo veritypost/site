@@ -47,14 +47,22 @@ interface UserListItem {
 type FollowsTab = 'followers' | 'following';
 
 // Supabase-nested-select rows.
-interface FollowerRowShape { users: UserListItem | null }
-interface FollowingRowShape { users: UserListItem | null }
+interface FollowerRowShape {
+  users: UserListItem | null;
+}
+interface FollowingRowShape {
+  users: UserListItem | null;
+}
 
 // Q1 — color palette used by the anon CTA hero. Mirrors `/notifications`
 // (R13) so the two anon tabs feel like one system.
 const C = {
-  bg: '#ffffff', card: '#f7f7f7', border: '#e5e5e5',
-  text: '#111111', dim: '#666666', accent: '#111111',
+  bg: '#ffffff',
+  card: '#f7f7f7',
+  border: '#e5e5e5',
+  text: '#111111',
+  dim: '#666666',
+  accent: '#111111',
 } as const;
 
 export default function ProfilePage() {
@@ -84,7 +92,9 @@ export default function ProfilePage() {
   useEffect(() => {
     if (!username) return;
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       setIsAnon(!user);
       setCheckedAuth(true);
       if (user) {
@@ -113,7 +123,9 @@ export default function ProfilePage() {
 
       const { data: targetRow } = await supabase
         .from('users')
-        .select('id, username, display_name, bio, avatar_url, avatar_color, banner_url, verity_score, followers_count, following_count, profile_visibility, is_expert, expert_title, expert_organization')
+        .select(
+          'id, username, display_name, bio, avatar_url, avatar_color, banner_url, verity_score, followers_count, following_count, profile_visibility, is_expert, expert_title, expert_organization'
+        )
         .eq('username', username as string)
         .maybeSingle<TargetRow>();
       if (!targetRow) {
@@ -187,11 +199,18 @@ export default function ProfilePage() {
         <div
           aria-hidden="true"
           style={{
-            width: 64, height: 64, margin: '0 auto 18px',
-            borderRadius: '50%', background: C.card,
+            width: 64,
+            height: 64,
+            margin: '0 auto 18px',
+            borderRadius: '50%',
+            background: C.card,
             border: `1px solid ${C.border}`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 22, fontWeight: 700, color: C.accent,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 22,
+            fontWeight: 700,
+            color: C.accent,
             fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
           }}
         >
@@ -201,14 +220,19 @@ export default function ProfilePage() {
           Sign up to see @{username}&apos;s profile
         </h1>
         <p style={{ fontSize: 14, color: C.dim, margin: '0 0 22px', lineHeight: 1.55 }}>
-          Profiles show reading history, Verity Score, streak, comments, and more. Join free to view this profile and build your own.
+          Profiles show reading history, Verity Score, streak, comments, and more. Join free to view
+          this profile and build your own.
         </p>
         <a
           href={`/signup?next=${nextEnc}`}
           style={{
-            display: 'inline-block', padding: '11px 22px',
-            background: C.accent, color: '#fff',
-            borderRadius: 9, fontSize: 14, fontWeight: 700,
+            display: 'inline-block',
+            padding: '11px 22px',
+            background: C.accent,
+            color: '#fff',
+            borderRadius: 9,
+            fontSize: 14,
+            fontWeight: 700,
             textDecoration: 'none',
           }}
         >
@@ -216,7 +240,12 @@ export default function ProfilePage() {
         </a>
         <div style={{ marginTop: 14, fontSize: 13, color: C.dim }}>
           Already have an account?{' '}
-          <a href={`/login?next=${nextEnc}`} style={{ color: C.accent, fontWeight: 600, textDecoration: 'underline' }}>Sign in</a>
+          <a
+            href={`/login?next=${nextEnc}`}
+            style={{ color: C.accent, fontWeight: 600, textDecoration: 'underline' }}
+          >
+            Sign in
+          </a>
         </div>
       </div>
     );
@@ -228,22 +257,47 @@ export default function ProfilePage() {
 
   return (
     <div style={{ maxWidth: 760, margin: '0 auto', padding: '0 0 80px' }}>
-      <div style={{
-        height: 180,
-        background: target.banner_url ? `center/cover url('${target.banner_url}')` : 'linear-gradient(135deg, #111, #333)',
-      }} />
+      <div
+        style={{
+          height: 180,
+          background: target.banner_url
+            ? `center/cover url('${target.banner_url}')`
+            : 'linear-gradient(135deg, #111, #333)',
+        }}
+      />
       <div style={{ padding: '0 16px', marginTop: -40 }}>
-        <div style={{
-          width: 80, height: 80, borderRadius: '50%',
-          background: target.avatar_color || '#e5e5e5',
-          border: '4px solid #fff',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 32, fontWeight: 800, color: '#fff',
-        }}>{(target.username || '?').charAt(0).toUpperCase()}</div>
+        <div
+          style={{
+            width: 80,
+            height: 80,
+            borderRadius: '50%',
+            background: target.avatar_color || '#e5e5e5',
+            border: '4px solid #fff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 32,
+            fontWeight: 800,
+            color: '#fff',
+          }}
+        >
+          {(target.username || '?').charAt(0).toUpperCase()}
+        </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, flexWrap: 'wrap', gap: 10 }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginTop: 10,
+            flexWrap: 'wrap',
+            gap: 10,
+          }}
+        >
           <div>
-            <div style={{ fontSize: 22, fontWeight: 800 }}>{target.display_name || target.username}</div>
+            <div style={{ fontSize: 22, fontWeight: 800 }}>
+              {target.display_name || target.username}
+            </div>
             <div style={{ fontSize: 13, color: '#666' }}>@{target.username}</div>
             {target.is_expert && canSeeExpert && (
               <div style={{ fontSize: 12, color: '#16a34a', fontWeight: 700, marginTop: 2 }}>
@@ -264,19 +318,29 @@ export default function ProfilePage() {
               )}
               {/* Pass 17 / UJ-609: Send message gated on DM compose permission. */}
               {canSendDm && (
-                <a href={`/messages/new?to=${target.id}`} style={dmLinkStyle}>Send message</a>
+                <a href={`/messages/new?to=${target.id}`} style={dmLinkStyle}>
+                  Send message
+                </a>
               )}
             </div>
           )}
         </div>
 
-        {target.bio && <div style={{ fontSize: 14, color: '#333', marginTop: 10 }}>{target.bio}</div>}
+        {target.bio && (
+          <div style={{ fontSize: 14, color: '#333', marginTop: 10 }}>{target.bio}</div>
+        )}
 
         <div style={{ display: 'flex', gap: 18, marginTop: 14, fontSize: 13, flexWrap: 'wrap' }}>
-          <div><b>{target.followers_count || 0}</b> <span style={{ color: '#666' }}>followers</span></div>
-          <div><b>{target.following_count || 0}</b> <span style={{ color: '#666' }}>following</span></div>
+          <div>
+            <b>{target.followers_count || 0}</b> <span style={{ color: '#666' }}>followers</span>
+          </div>
+          <div>
+            <b>{target.following_count || 0}</b> <span style={{ color: '#666' }}>following</span>
+          </div>
           {canSeeVerityScore && (
-            <div><b>{target.verity_score || 0}</b> <span style={{ color: '#666' }}>Verity Score</span></div>
+            <div>
+              <b>{target.verity_score || 0}</b> <span style={{ color: '#666' }}>Verity Score</span>
+            </div>
           )}
         </div>
 
@@ -289,7 +353,9 @@ export default function ProfilePage() {
               onClick={(e) => {
                 e.preventDefault();
                 if (typeof window !== 'undefined' && target.username) {
-                  navigator.clipboard?.writeText(`${window.location.origin}/card/${target.username}`);
+                  navigator.clipboard?.writeText(
+                    `${window.location.origin}/card/${target.username}`
+                  );
                 }
                 toast.success('Profile card link copied.');
               }}
@@ -330,7 +396,11 @@ export default function ProfilePage() {
 
 function UserList({ users }: { users: UserListItem[] }) {
   if (!users?.length) {
-    return <div style={{ padding: 30, textAlign: 'center', color: '#666', fontSize: 13 }}>Nobody here.</div>;
+    return (
+      <div style={{ padding: 30, textAlign: 'center', color: '#666', fontSize: 13 }}>
+        Nobody here.
+      </div>
+    );
   }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

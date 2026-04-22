@@ -33,16 +33,19 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const show = useCallback((message: ReactNode, opts: ToastOptions = {}) => {
-    const id = Date.now() + Math.random();
-    const tone: ToastTone = opts.tone || 'info';
-    const duration = opts.duration ?? 4000;
-    setToasts((prev) => [...prev, { id, message, tone }]);
-    if (duration > 0) {
-      setTimeout(() => dismiss(id), duration);
-    }
-    return id;
-  }, [dismiss]);
+  const show = useCallback(
+    (message: ReactNode, opts: ToastOptions = {}) => {
+      const id = Date.now() + Math.random();
+      const tone: ToastTone = opts.tone || 'info';
+      const duration = opts.duration ?? 4000;
+      setToasts((prev) => [...prev, { id, message, tone }]);
+      if (duration > 0) {
+        setTimeout(() => dismiss(id), duration);
+      }
+      return id;
+    },
+    [dismiss]
+  );
 
   const api: ToastApi = {
     show,
@@ -76,7 +79,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             key={t.id}
             role={t.tone === 'error' ? 'alert' : 'status'}
             style={{
-              background: t.tone === 'error' ? '#1a1a1e' : t.tone === 'success' ? '#0f766e' : '#1a1a1e',
+              background:
+                t.tone === 'error' ? '#1a1a1e' : t.tone === 'success' ? '#0f766e' : '#1a1a1e',
               color: '#fff',
               padding: '12px 20px',
               borderRadius: 10,
@@ -86,7 +90,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               pointerEvents: 'auto',
               maxWidth: 480,
               animation: 'toast-slide-up 180ms ease-out',
-              borderLeft: t.tone === 'error' ? '3px solid #ef4444' : t.tone === 'success' ? '3px solid #22c55e' : '3px solid #111111',
+              borderLeft:
+                t.tone === 'error'
+                  ? '3px solid #ef4444'
+                  : t.tone === 'success'
+                    ? '3px solid #22c55e'
+                    : '3px solid #111111',
             }}
           >
             {t.message}
@@ -107,10 +116,22 @@ export function useToast(): ToastApi {
   const ctx = useContext(ToastContext);
   if (!ctx) {
     return {
-      show: (m) => { console.log('[toast]', m); return 0; },
-      info: (m) => { console.log('[toast:info]', m); return 0; },
-      success: (m) => { console.log('[toast:success]', m); return 0; },
-      error: (m) => { console.error('[toast:error]', m); return 0; },
+      show: (m) => {
+        console.log('[toast]', m);
+        return 0;
+      },
+      info: (m) => {
+        console.log('[toast:info]', m);
+        return 0;
+      },
+      success: (m) => {
+        console.log('[toast:success]', m);
+        return 0;
+      },
+      error: (m) => {
+        console.error('[toast:error]', m);
+        return 0;
+      },
       dismiss: () => {},
     };
   }

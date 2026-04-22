@@ -19,7 +19,11 @@ async function run(request) {
   }
   const service = createServiceClient();
   const { data, error } = await service.rpc('sweep_expired_deletions');
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'cron.process_deletions', fallbackStatus: 500 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'cron.process_deletions',
+      fallbackStatus: 500,
+    });
   return NextResponse.json({ anonymized_count: data, ran_at: new Date().toISOString() });
 }
 

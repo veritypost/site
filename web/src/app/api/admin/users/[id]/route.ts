@@ -14,8 +14,11 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   if (!targetId) return NextResponse.json({ error: 'user id required' }, { status: 400 });
 
   let actor;
-  try { actor = await requirePermission('admin.users.delete_account'); }
-  catch (err) { return permissionError(err); }
+  try {
+    actor = await requirePermission('admin.users.delete_account');
+  } catch (err) {
+    return permissionError(err);
+  }
 
   const rankErr = await requireAdminOutranks(targetId, actor.id);
   if (rankErr) return rankErr;

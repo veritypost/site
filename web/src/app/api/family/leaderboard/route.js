@@ -7,8 +7,9 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 
 export async function GET() {
   let user;
-  try { user = await requirePermission('family.view_leaderboard'); }
-  catch (err) {
+  try {
+    user = await requirePermission('family.view_leaderboard');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
@@ -25,7 +26,11 @@ export async function GET() {
   if (subRow?.family_owner_id) ownerId = subRow.family_owner_id;
 
   const { data, error } = await service.rpc('family_members', { p_owner_id: ownerId });
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'family.leaderboard', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'family.leaderboard',
+      fallbackStatus: 400,
+    });
 
   const sorted = (data || []).slice().sort((a, b) => (b.score || 0) - (a.score || 0));
   return NextResponse.json({ members: sorted, owner_id: ownerId });

@@ -25,8 +25,9 @@ function escapeForNote(raw) {
 
 export async function POST(request, { params }) {
   let user;
-  try { user = await requirePermission('admin.users.data_requests.process'); }
-  catch (err) {
+  try {
+    user = await requirePermission('admin.users.data_requests.process');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -37,7 +38,10 @@ export async function POST(request, { params }) {
   }
   const trimmed = String(rejection_reason).trim();
   if (trimmed.length > 2000) {
-    return NextResponse.json({ error: 'rejection_reason too long (max 2000 chars)' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'rejection_reason too long (max 2000 chars)' },
+      { status: 400 }
+    );
   }
 
   const service = createServiceClient();
@@ -51,7 +55,11 @@ export async function POST(request, { params }) {
       updated_at: now,
     })
     .eq('id', params.id);
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin/data-requests/reject', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'admin/data-requests/reject',
+      fallbackStatus: 400,
+    });
 
   // T-023 — GDPR-touching action; needs audit trail.
   try {
@@ -63,7 +71,9 @@ export async function POST(request, { params }) {
       target_id: params.id,
       metadata: { reason: trimmed.slice(0, 200) },
     });
-  } catch { /* best-effort */ }
+  } catch {
+    /* best-effort */
+  }
 
   return NextResponse.json({ ok: true });
 }

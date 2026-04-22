@@ -35,12 +35,16 @@ export async function POST(request) {
     }
 
     // Log pipeline run as started
-    const { data: run } = await supabase.from('pipeline_runs').insert({
-      run_type: action,
-      status: 'running',
-      started_at: new Date().toISOString(),
-      metadata: { article_id },
-    }).select('id').single();
+    const { data: run } = await supabase
+      .from('pipeline_runs')
+      .insert({
+        run_type: action,
+        status: 'running',
+        started_at: new Date().toISOString(),
+        metadata: { article_id },
+      })
+      .select('id')
+      .single();
 
     // F-077 — article content is author-supplied text. Without any
     // guard, a malicious editor can embed `Ignore previous instructions
@@ -49,10 +53,11 @@ export async function POST(request) {
     // content in clearly-bounded markers so the model treats it as
     // quoted data, not directives, and (b) strip the most obvious
     // injection directives before interpolation.
-    const stripInjection = (s) => String(s || '')
-      .replace(/ignore (all )?(prior|previous|above) instructions?/gi, '[redacted]')
-      .replace(/system ?:/gi, '[redacted]:')
-      .replace(/</g, '&lt;');
+    const stripInjection = (s) =>
+      String(s || '')
+        .replace(/ignore (all )?(prior|previous|above) instructions?/gi, '[redacted]')
+        .replace(/system ?:/gi, '[redacted]:')
+        .replace(/</g, '&lt;');
 
     const safeTitle = stripInjection(article.title).slice(0, 300);
     const safeExcerpt = stripInjection(article.excerpt || '').slice(0, 500);
@@ -76,7 +81,7 @@ export async function POST(request) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
@@ -94,11 +99,14 @@ export async function POST(request) {
       const err = await aiRes.text();
       console.error('[ai/generate] upstream error:', aiRes.status, err.slice(0, 500));
       if (run?.id) {
-        await supabase.from('pipeline_runs').update({
-          status: 'failed',
-          completed_at: new Date().toISOString(),
-          metadata: { article_id, upstream_status: aiRes.status, error: err.slice(0, 500) },
-        }).eq('id', run.id);
+        await supabase
+          .from('pipeline_runs')
+          .update({
+            status: 'failed',
+            completed_at: new Date().toISOString(),
+            metadata: { article_id, upstream_status: aiRes.status, error: err.slice(0, 500) },
+          })
+          .eq('id', run.id);
       }
       return NextResponse.json({ error: 'AI service unavailable' }, { status: 502 });
     }
@@ -109,17 +117,23 @@ export async function POST(request) {
 
     // Save based on action
     if (action === 'generate') {
-      await supabase.from('articles').update({
-        body: generated,
-        body_html: generated,
-        is_ai_generated: true,
-        ai_model: model,
-        ai_provider: 'openai',
-      }).eq('id', article_id);
+      await supabase
+        .from('articles')
+        .update({
+          body: generated,
+          body_html: generated,
+          is_ai_generated: true,
+          ai_model: model,
+          ai_provider: 'openai',
+        })
+        .eq('id', article_id);
     } else if (action === 'kids_rewrite') {
-      await supabase.from('articles').update({
-        kids_summary: generated,
-      }).eq('id', article_id);
+      await supabase
+        .from('articles')
+        .update({
+          kids_summary: generated,
+        })
+        .eq('id', article_id);
     } else if (action === 'timeline') {
       try {
         const jsonMatch = generated.match(/\[[\s\S]*\]/);
@@ -149,10 +163,13 @@ export async function POST(request) {
 
     // Mark pipeline run complete
     if (run?.id) {
-      await supabase.from('pipeline_runs').update({
-        status: 'completed',
-        completed_at: new Date().toISOString(),
-      }).eq('id', run.id);
+      await supabase
+        .from('pipeline_runs')
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', run.id);
     }
 
     return NextResponse.json({ success: true, action, preview: generated.slice(0, 200) });

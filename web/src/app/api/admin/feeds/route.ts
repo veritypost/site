@@ -15,8 +15,11 @@ type CreateBody = {
 
 export async function POST(request: Request) {
   let actor;
-  try { actor = await requirePermission('admin.feeds.manage'); }
-  catch (err) { return permissionError(err); }
+  try {
+    actor = await requirePermission('admin.feeds.manage');
+  } catch (err) {
+    return permissionError(err);
+  }
   void actor;
 
   const body = (await request.json().catch(() => ({}))) as CreateBody;
@@ -26,7 +29,10 @@ export async function POST(request: Request) {
 
   const row = {
     name,
-    source_name: typeof body.source_name === 'string' && body.source_name.trim() ? body.source_name.trim() : name,
+    source_name:
+      typeof body.source_name === 'string' && body.source_name.trim()
+        ? body.source_name.trim()
+        : name,
     url,
     feed_type: typeof body.feed_type === 'string' && body.feed_type ? body.feed_type : 'rss',
     is_active: body.is_active !== false,

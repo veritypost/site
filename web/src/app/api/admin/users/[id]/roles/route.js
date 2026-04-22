@@ -36,8 +36,9 @@ async function assertActorOutranksTarget(authed, actorId, targetUserId) {
 
 export async function POST(request, { params }) {
   let user;
-  try { user = await requirePermission('admin.moderation.role.grant'); }
-  catch (err) {
+  try {
+    user = await requirePermission('admin.moderation.role.grant');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -77,7 +78,11 @@ export async function POST(request, { params }) {
     p_user_id: params.id,
     p_role_name: role_name,
   });
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.users.id.roles', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'admin.users.id.roles',
+      fallbackStatus: 400,
+    });
 
   // Bump perms_version so the target's client refetches capabilities on
   // next navigation. Without this, moderation console grants/revokes
@@ -94,8 +99,9 @@ export async function POST(request, { params }) {
 
 export async function DELETE(request, { params }) {
   let user;
-  try { user = await requirePermission('admin.moderation.role.revoke'); }
-  catch (err) {
+  try {
+    user = await requirePermission('admin.moderation.role.revoke');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -134,7 +140,11 @@ export async function DELETE(request, { params }) {
     p_user_id: params.id,
     p_role_name: role_name,
   });
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.users.id.roles', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'admin.users.id.roles',
+      fallbackStatus: 400,
+    });
 
   // Bump perms_version so the revoked user's client refetches on next
   // navigation (see POST handler above for rationale). Non-fatal.

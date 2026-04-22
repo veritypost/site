@@ -10,8 +10,9 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // Body: { expert_id, category_id?, title, description?, scheduled_at,
 //         duration_minutes?, max_questions? }
 export async function GET(request) {
-  try { await requirePermission('kids_expert.sessions.list.view'); }
-  catch (err) {
+  try {
+    await requirePermission('kids_expert.sessions.list.view');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
@@ -22,17 +23,24 @@ export async function GET(request) {
   const service = createServiceClient();
   const { data, error } = await service
     .from('kid_expert_sessions')
-    .select('*, users!fk_kid_expert_sessions_expert_id(username, display_name, expert_title), categories(name)')
+    .select(
+      '*, users!fk_kid_expert_sessions_expert_id(username, display_name, expert_title), categories(name)'
+    )
     .eq('status', status)
     .eq('is_active', true)
     .order('scheduled_at');
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'expert_sessions', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'expert_sessions',
+      fallbackStatus: 400,
+    });
   return NextResponse.json({ sessions: data || [] });
 }
 
 export async function POST(request) {
-  try { await requirePermission('admin.expert_sessions.create'); }
-  catch (err) {
+  try {
+    await requirePermission('admin.expert_sessions.create');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -57,6 +65,10 @@ export async function POST(request) {
     })
     .select('id')
     .single();
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'expert_sessions', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'expert_sessions',
+      fallbackStatus: 400,
+    });
   return NextResponse.json({ id: data.id });
 }

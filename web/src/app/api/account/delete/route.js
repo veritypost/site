@@ -28,9 +28,16 @@ function isAllowedOrigin(origin) {
     'http://localhost:3333',
     'https://veritypost.com',
     'https://www.veritypost.com',
-  ].filter(Boolean).map((s) => {
-    try { return new URL(s).origin; } catch { return null; }
-  }).filter(Boolean);
+  ]
+    .filter(Boolean)
+    .map((s) => {
+      try {
+        return new URL(s).origin;
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
   try {
     const probe = new URL(origin).origin;
     return allowed.includes(probe);
@@ -45,7 +52,9 @@ async function resolveAuth(request) {
 
   if (bearer) {
     const authClient = createClientFromToken(bearer);
-    const { data: { user } } = await authClient.auth.getUser();
+    const {
+      data: { user },
+    } = await authClient.auth.getUser();
     return { user, authClient };
   }
 
@@ -54,7 +63,9 @@ async function resolveAuth(request) {
     return { user: null, authClient: null };
   }
   const authClient = await createClient();
-  const { data: { user } } = await authClient.auth.getUser();
+  const {
+    data: { user },
+  } = await authClient.auth.getUser();
   return { user, authClient };
 }
 
@@ -78,7 +89,10 @@ export async function POST(request) {
     windowSec: 3600,
   });
   if (rate.limited) {
-    return NextResponse.json({ error: 'Too many deletion requests. Try again later.' }, { status: 429, headers: { 'Retry-After': '3600' } });
+    return NextResponse.json(
+      { error: 'Too many deletion requests. Try again later.' },
+      { status: 429, headers: { 'Retry-After': '3600' } }
+    );
   }
 
   const { reason } = await request.json().catch(() => ({}));
@@ -87,7 +101,8 @@ export async function POST(request) {
     p_user_id: user.id,
     p_reason: reason || null,
   });
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'account.delete', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, { route: 'account.delete', fallbackStatus: 400 });
   return NextResponse.json(data);
 }
 
@@ -102,6 +117,7 @@ export async function DELETE(request) {
   const { data, error } = await service.rpc('cancel_account_deletion', {
     p_user_id: user.id,
   });
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'account.delete', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, { route: 'account.delete', fallbackStatus: 400 });
   return NextResponse.json({ cancelled: !!data });
 }

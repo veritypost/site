@@ -19,16 +19,25 @@ async function ownKid(service, userId, kidId) {
 
 export async function PATCH(request, { params }) {
   let user;
-  try { user = await requirePermission('kids.profile.update'); }
-  catch (err) { return NextResponse.json({ error: err.message }, { status: err.status || 401 }); }
+  try {
+    user = await requirePermission('kids.profile.update');
+  } catch (err) {
+    return NextResponse.json({ error: err.message }, { status: err.status || 401 });
+  }
 
   const service = createServiceClient();
-  if (!await ownKid(service, user.id, params.id)) {
+  if (!(await ownKid(service, user.id, params.id))) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
   const b = await request.json().catch(() => ({}));
-  const allowed = ['display_name', 'avatar_color', 'date_of_birth', 'max_daily_minutes', 'reading_level'];
+  const allowed = [
+    'display_name',
+    'avatar_color',
+    'date_of_birth',
+    'max_daily_minutes',
+    'reading_level',
+  ];
   const update = {};
   for (const k of allowed) if (b[k] !== undefined) update[k] = b[k];
   if (b.paused !== undefined) {
@@ -40,14 +49,18 @@ export async function PATCH(request, { params }) {
   if (Object.keys(update).length === 0) return NextResponse.json({ ok: true });
 
   const { error } = await service.from('kid_profiles').update(update).eq('id', params.id);
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'kids.id', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, { route: 'kids.id', fallbackStatus: 400 });
   return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(request, { params }) {
   let user;
-  try { user = await requirePermission('kids.profile.delete'); }
-  catch (err) { return NextResponse.json({ error: err.message }, { status: err.status || 401 }); }
+  try {
+    user = await requirePermission('kids.profile.delete');
+  } catch (err) {
+    return NextResponse.json({ error: err.message }, { status: err.status || 401 });
+  }
 
   // Require explicit ?confirm=1 so an accidental DELETE fetch can't wipe a
   // kid profile. Client passes confirm=1 after the user OKs the modal.
@@ -57,7 +70,7 @@ export async function DELETE(request, { params }) {
   }
 
   const service = createServiceClient();
-  if (!await ownKid(service, user.id, params.id)) {
+  if (!(await ownKid(service, user.id, params.id))) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
   // Soft-delete: flip is_active so reading history, streaks, and achievements

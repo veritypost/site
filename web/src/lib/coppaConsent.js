@@ -22,6 +22,7 @@ export function validateConsentPayload(consent) {
     return 'Parent or guardian full name required';
   }
   if (consent.ack !== true) return 'Consent acknowledgment required';
-  if (consent.version !== COPPA_CONSENT_VERSION) return 'Consent version out of date — reload the page';
+  if (consent.version !== COPPA_CONSENT_VERSION)
+    return 'Consent version out of date — reload the page';
   return null;
 }

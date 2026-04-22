@@ -9,8 +9,9 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // Body: { category_id, reason, description? }
 export async function POST(request, { params }) {
   let user;
-  try { user = await requirePermission('comments.supervisor_flag'); }
-  catch (err) {
+  try {
+    user = await requirePermission('comments.supervisor_flag');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
@@ -28,6 +29,10 @@ export async function POST(request, { params }) {
     p_reason: reason,
     p_description: description || null,
   });
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'comments.id.flag', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'comments.id.flag',
+      fallbackStatus: 400,
+    });
   return NextResponse.json({ report_id: data });
 }

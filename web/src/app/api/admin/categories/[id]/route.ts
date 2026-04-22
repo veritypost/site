@@ -31,8 +31,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   const service = createServiceClient();
   let existing;
-  try { existing = await loadCategory(service, id); }
-  catch (err) {
+  try {
+    existing = await loadCategory(service, id);
+  } catch (err) {
     console.error('[admin.categories.patch.load]', err);
     return NextResponse.json({ error: 'Could not load category' }, { status: 500 });
   }
@@ -42,8 +43,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const permKey = isSub ? 'admin.subcategories.manage' : 'admin.categories.manage';
 
   let actor;
-  try { actor = await requirePermission(permKey); }
-  catch (err) { return permissionError(err); }
+  try {
+    actor = await requirePermission(permKey);
+  } catch (err) {
+    return permissionError(err);
+  }
   void actor;
 
   const update: { is_active?: boolean; sort_order?: number; name?: string; slug?: string } = {};
@@ -78,8 +82,9 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
 
   const service = createServiceClient();
   let existing;
-  try { existing = await loadCategory(service, id); }
-  catch (err) {
+  try {
+    existing = await loadCategory(service, id);
+  } catch (err) {
     console.error('[admin.categories.delete.load]', err);
     return NextResponse.json({ error: 'Could not load category' }, { status: 500 });
   }
@@ -89,8 +94,11 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   const permKey = isSub ? 'admin.subcategories.manage' : 'admin.categories.manage';
 
   let actor;
-  try { actor = await requirePermission(permKey); }
-  catch (err) { return permissionError(err); }
+  try {
+    actor = await requirePermission(permKey);
+  } catch (err) {
+    return permissionError(err);
+  }
   void actor;
 
   // Audit first so a dangling row is always traceable. If the delete

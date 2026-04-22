@@ -76,7 +76,8 @@ function pickState(user: UserRow | null | undefined): BannerState | null {
   if (user.frozen_at) {
     return {
       severity: 'high',
-      message: 'Your Verity Score is frozen. Resubscribe to a paid plan to continue tracking progress.',
+      message:
+        'Your Verity Score is frozen. Resubscribe to a paid plan to continue tracking progress.',
       ctaLabel: 'Resubscribe',
       ctaHref: '/billing',
     };
@@ -106,9 +107,10 @@ export default function AccountStateBanner({ user }: AccountStateBannerProps) {
   const state = pickState(user);
   if (!state) return null;
 
-  const palette = state.severity === 'high'
-    ? { bg: C.redBg, border: C.redBorder, text: C.redText }
-    : { bg: C.amberBg, border: C.amberBorder, text: C.amberText };
+  const palette =
+    state.severity === 'high'
+      ? { bg: C.redBg, border: C.redBorder, text: C.redText }
+      : { bg: C.amberBg, border: C.amberBorder, text: C.amberText };
 
   return (
     <div

@@ -10,7 +10,11 @@
 export const PASSWORD_MIN_LENGTH = 8;
 
 export const PASSWORD_REQS = [
-  { id: 'len', label: `At least ${PASSWORD_MIN_LENGTH} characters`, test: (p) => p.length >= PASSWORD_MIN_LENGTH },
+  {
+    id: 'len',
+    label: `At least ${PASSWORD_MIN_LENGTH} characters`,
+    test: (p) => p.length >= PASSWORD_MIN_LENGTH,
+  },
   { id: 'upper', label: 'One uppercase letter', test: (p) => /[A-Z]/.test(p) },
   { id: 'num', label: 'One number', test: (p) => /[0-9]/.test(p) },
 ];
@@ -19,7 +23,9 @@ export const PASSWORD_REQS = [
 // strict policy can spread this onto PASSWORD_REQS. Server validation uses
 // the base set only so we don't surface a rule the user's form doesn't show.
 export const PASSWORD_SPECIAL_REQ = {
-  id: 'special', label: 'One special character', test: (p) => /[^A-Za-z0-9]/.test(p),
+  id: 'special',
+  label: 'One special character',
+  test: (p) => /[^A-Za-z0-9]/.test(p),
 };
 
 // Server-side guard used by POST /api/auth/signup and similar routes.
@@ -35,10 +41,14 @@ export function validatePasswordServer(pw) {
 
 function passwordFailureMessage(id) {
   switch (id) {
-    case 'len':   return `Password must be at least ${PASSWORD_MIN_LENGTH} characters`;
-    case 'upper': return 'Password must include an uppercase letter';
-    case 'num':   return 'Password must include a number';
-    default:      return 'Password does not meet requirements';
+    case 'len':
+      return `Password must be at least ${PASSWORD_MIN_LENGTH} characters`;
+    case 'upper':
+      return 'Password must include an uppercase letter';
+    case 'num':
+      return 'Password must include a number';
+    default:
+      return 'Password does not meet requirements';
   }
 }
 

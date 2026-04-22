@@ -10,8 +10,9 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // for free users trying to sneak these fields in.
 export async function PATCH(request, { params }) {
   let user;
-  try { user = await requirePermission('bookmarks.note.edit'); }
-  catch (err) {
+  try {
+    user = await requirePermission('bookmarks.note.edit');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
@@ -22,8 +23,10 @@ export async function PATCH(request, { params }) {
   // Verify ownership before the paid-feature check so we can return the
   // right status code.
   const { data: bm } = await service
-    .from('bookmarks').select('id, user_id')
-    .eq('id', params.id).maybeSingle();
+    .from('bookmarks')
+    .select('id, user_id')
+    .eq('id', params.id)
+    .maybeSingle();
   if (!bm || bm.user_id !== user.id) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
@@ -31,7 +34,10 @@ export async function PATCH(request, { params }) {
   if (notes !== undefined || collection_id !== undefined) {
     const { data: isPaid } = await service.rpc('_user_is_paid', { p_user_id: user.id });
     if (!isPaid) {
-      return NextResponse.json({ error: 'Collections and notes are available on paid plans' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Collections and notes are available on paid plans' },
+        { status: 403 }
+      );
     }
   }
 
@@ -41,15 +47,17 @@ export async function PATCH(request, { params }) {
   if (Object.keys(update).length === 0) return NextResponse.json({ ok: true });
 
   const { error } = await service.from('bookmarks').update(update).eq('id', params.id);
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'bookmarks.id', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, { route: 'bookmarks.id', fallbackStatus: 400 });
   return NextResponse.json({ ok: true });
 }
 
 // DELETE /api/bookmarks/[id]
 export async function DELETE(_request, { params }) {
   let user;
-  try { user = await requirePermission('article.bookmark.remove'); }
-  catch (err) {
+  try {
+    user = await requirePermission('article.bookmark.remove');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
@@ -60,6 +68,7 @@ export async function DELETE(_request, { params }) {
     .delete()
     .eq('id', params.id)
     .eq('user_id', user.id);
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'bookmarks.id', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, { route: 'bookmarks.id', fallbackStatus: 400 });
   return NextResponse.json({ ok: true });
 }

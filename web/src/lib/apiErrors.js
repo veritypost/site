@@ -8,21 +8,25 @@
 // server logs for debugging.
 
 const PG_ERROR_MAP = Object.freeze({
-  '23505': { status: 409, client: 'Conflict: record already exists' },
-  '23503': { status: 400, client: 'Invalid reference' },
-  '23514': { status: 400, client: 'Constraint violation' },
+  23505: { status: 409, client: 'Conflict: record already exists' },
+  23503: { status: 400, client: 'Invalid reference' },
+  23514: { status: 400, client: 'Constraint violation' },
   '22P02': { status: 400, client: 'Malformed input' },
-  '22023': { status: 400, client: 'Invalid argument' },
-  '42501': { status: 403, client: 'Forbidden' },
+  22023: { status: 400, client: 'Invalid argument' },
+  42501: { status: 403, client: 'Forbidden' },
   '42P01': { status: 500, client: 'Internal error' },
-  'PGRST116': { status: 404, client: 'Not found' },
+  PGRST116: { status: 404, client: 'Not found' },
 });
 
 // Map a Supabase / Postgres error object to a safe client response.
 // Logs the raw shape with the route name so server-side debugging is
 // still possible.
 export function safeErrorResponse(NextResponse, err, options = {}) {
-  const { route = 'unknown', fallbackStatus = 500, fallbackMessage = 'Internal server error' } = options;
+  const {
+    route = 'unknown',
+    fallbackStatus = 500,
+    fallbackMessage = 'Internal server error',
+  } = options;
   const code = err?.code || err?.details?.code;
   const mapped = code && PG_ERROR_MAP[code];
 

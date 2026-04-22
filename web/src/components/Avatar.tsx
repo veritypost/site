@@ -24,8 +24,7 @@ export default function Avatar({ user, size = 32 }: AvatarProps) {
   const fallbackOuter = user?.avatar_color || '#777777';
   const outer = user?.avatar?.outer || fallbackOuter;
   const inner = user?.avatar?.inner || 'transparent';
-  const initials = (user?.avatar?.initials
-    || (user?.username ? user.username[0] : '?'))
+  const initials = (user?.avatar?.initials || (user?.username ? user.username[0] : '?'))
     .toString()
     .slice(0, 3)
     .toUpperCase();

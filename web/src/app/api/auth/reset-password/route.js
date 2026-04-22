@@ -15,7 +15,12 @@ export async function POST(request) {
     }
 
     const ip = await getClientIp();
-    const ipHit = await checkRateLimit(supabase, { key: `reset:ip:${ip}`, policyKey: 'reset_password_ip', max: 5, windowSec: 3600 });
+    const ipHit = await checkRateLimit(supabase, {
+      key: `reset:ip:${ip}`,
+      policyKey: 'reset_password_ip',
+      max: 5,
+      windowSec: 3600,
+    });
     if (ipHit.limited) {
       return NextResponse.json({ ok: true });
     }

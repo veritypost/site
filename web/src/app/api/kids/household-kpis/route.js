@@ -6,31 +6,38 @@ import { createServiceClient } from '@/lib/supabase/server';
 
 export async function GET() {
   let user;
-  try { user = await requirePermission('kids.parent.household_kpis'); }
-  catch (err) { return NextResponse.json({ error: err.message }, { status: err.status || 401 }); }
+  try {
+    user = await requirePermission('kids.parent.household_kpis');
+  } catch (err) {
+    return NextResponse.json({ error: err.message }, { status: err.status || 401 });
+  }
 
   const service = createServiceClient();
   const sinceIso = new Date(Date.now() - 7 * 86400000).toISOString();
 
   const [{ data: coAdultRows }, { data: kidRows }, { data: ownerRow }] = await Promise.all([
-    service.from('subscriptions')
+    service
+      .from('subscriptions')
       .select('user_id')
       .eq('family_owner_id', user.id)
       .eq('status', 'active'),
-    service.from('kid_profiles')
+    service
+      .from('kid_profiles')
       .select('id, display_name, streak_current')
       .eq('parent_user_id', user.id),
-    service.from('users')
+    service
+      .from('users')
       .select('id, username, display_name, streak_current')
       .eq('id', user.id)
       .maybeSingle(),
   ]);
 
-  const adultIds = [user.id, ...((coAdultRows || []).map(r => r.user_id).filter(Boolean))];
-  const kidIds = (kidRows || []).map(k => k.id);
+  const adultIds = [user.id, ...(coAdultRows || []).map((r) => r.user_id).filter(Boolean)];
+  const kidIds = (kidRows || []).map((k) => k.id);
 
   const [readsRes, quizRes] = await Promise.all([
-    service.from('reading_log')
+    service
+      .from('reading_log')
       .select('time_spent_seconds, completed, user_id, kid_profile_id')
       .gte('created_at', sinceIso)
       .eq('completed', true)
@@ -38,16 +45,21 @@ export async function GET() {
         [
           `user_id.in.(${adultIds.join(',')})`,
           kidIds.length ? `kid_profile_id.in.(${kidIds.join(',')})` : null,
-        ].filter(Boolean).join(',')
+        ]
+          .filter(Boolean)
+          .join(',')
       ),
-    service.from('quiz_attempts')
+    service
+      .from('quiz_attempts')
       .select('user_id, kid_profile_id, article_id, attempt_number, is_correct')
       .gte('created_at', sinceIso)
       .or(
         [
           `user_id.in.(${adultIds.join(',')})`,
           kidIds.length ? `kid_profile_id.in.(${kidIds.join(',')})` : null,
-        ].filter(Boolean).join(',')
+        ]
+          .filter(Boolean)
+          .join(',')
       ),
   ]);
 
@@ -79,7 +91,8 @@ export async function GET() {
   }
   if (adultIds.length > 1) {
     const coIds = adultIds.slice(1);
-    const { data: coRows } = await service.from('users')
+    const { data: coRows } = await service
+      .from('users')
       .select('display_name, username, streak_current')
       .in('id', coIds);
     for (const r of coRows || []) {

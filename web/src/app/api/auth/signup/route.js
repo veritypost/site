@@ -27,7 +27,12 @@ export async function POST(request) {
     }
 
     const ip = await getClientIp();
-    const hit = await checkRateLimit(supabase, { key: `signup:ip:${ip}`, policyKey: 'signup_ip', max: 5, windowSec: 3600 });
+    const hit = await checkRateLimit(supabase, {
+      key: `signup:ip:${ip}`,
+      policyKey: 'signup_ip',
+      max: 5,
+      windowSec: 3600,
+    });
     if (hit.limited) {
       return NextResponse.json({ error: 'Too many signup attempts' }, { status: 429 });
     }
@@ -56,18 +61,21 @@ export async function POST(request) {
       // Route all three writes through service-role.
       const service = createServiceClient();
 
-      await service.from('users').upsert({
-        id: userId,
-        email,
-        email_verified: false,
-        display_name: trimmedName || null,
-        metadata: {
-          age_confirmed_at: nowIso,
-          terms_accepted_at: nowIso,
-          terms_version: '2026-01',
-          full_name: trimmedName || null,
+      await service.from('users').upsert(
+        {
+          id: userId,
+          email,
+          email_verified: false,
+          display_name: trimmedName || null,
+          metadata: {
+            age_confirmed_at: nowIso,
+            terms_accepted_at: nowIso,
+            terms_version: '2026-01',
+            full_name: trimmedName || null,
+          },
         },
-      }, { onConflict: 'id' });
+        { onConflict: 'id' }
+      );
 
       const { data: userRole } = await service
         .from('roles')

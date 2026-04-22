@@ -17,8 +17,9 @@ import { createClient, createServiceClient } from '@/lib/supabase/server';
 // pattern used by /api/admin/users/[id]/roles (grant path).
 export async function PATCH(request, { params }) {
   let actor;
-  try { actor = await requirePermission('admin.moderation.role.grant'); }
-  catch (err) {
+  try {
+    actor = await requirePermission('admin.moderation.role.grant');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -69,19 +70,14 @@ export async function PATCH(request, { params }) {
   if (!roleRow) return NextResponse.json({ error: 'Role not found' }, { status: 404 });
 
   // Replace: drop existing user_roles rows, then insert the single new row.
-  const { error: delErr } = await service
-    .from('user_roles')
-    .delete()
-    .eq('user_id', targetId);
+  const { error: delErr } = await service.from('user_roles').delete().eq('user_id', targetId);
   if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
 
-  const { error: insErr } = await service
-    .from('user_roles')
-    .insert({
-      user_id: targetId,
-      role_id: roleRow.id,
-      assigned_by: actor.id,
-    });
+  const { error: insErr } = await service.from('user_roles').insert({
+    user_id: targetId,
+    role_id: roleRow.id,
+    assigned_by: actor.id,
+  });
   if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
 
   // Audit + perms bump.
@@ -93,7 +89,9 @@ export async function PATCH(request, { params }) {
       target_id: targetId,
       metadata: { role: role_name },
     });
-  } catch { /* best-effort */ }
+  } catch {
+    /* best-effort */
+  }
 
   const { error: bumpErr } = await service.rpc('bump_user_perms_version', {
     p_user_id: targetId,

@@ -59,13 +59,9 @@ export async function hashPinPbkdf2(pin, saltHex) {
   }
   const pinBytes = new TextEncoder().encode(pin);
   const saltBytes = fromHex(saltHex);
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    pinBytes,
-    { name: 'PBKDF2' },
-    false,
-    ['deriveBits']
-  );
+  const keyMaterial = await crypto.subtle.importKey('raw', pinBytes, { name: 'PBKDF2' }, false, [
+    'deriveBits',
+  ]);
   const derived = await crypto.subtle.deriveBits(
     {
       name: 'PBKDF2',

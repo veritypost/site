@@ -7,8 +7,9 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 
 // GET /api/admin/moderation/reports?status=pending&supervisor=true
 export async function GET(request) {
-  try { await requirePermission('admin.moderation.reports.bulk_resolve'); }
-  catch (err) {
+  try {
+    await requirePermission('admin.moderation.reports.bulk_resolve');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -28,6 +29,10 @@ export async function GET(request) {
   if (supervisorOnly) q = q.eq('is_supervisor_flag', true);
 
   const { data, error } = await q;
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.moderation.reports', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'admin.moderation.reports',
+      fallbackStatus: 400,
+    });
   return NextResponse.json({ reports: data || [] });
 }

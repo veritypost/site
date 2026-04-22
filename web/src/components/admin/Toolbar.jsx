@@ -16,14 +16,7 @@ import { ADMIN_C, S } from '../../lib/adminPalette';
  * @param {object} [props.style]
  * @param {React.ReactNode} [props.children] Shorthand for `left`.
  */
-export default function Toolbar({
-  left,
-  center,
-  right,
-  bordered = false,
-  style,
-  children,
-}) {
+export default function Toolbar({ left, center, right, bordered = false, style, children }) {
   return (
     <div
       style={{
@@ -51,9 +44,7 @@ export default function Toolbar({
       >
         {left ?? children}
       </div>
-      {center && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: S[2] }}>{center}</div>
-      )}
+      {center && <div style={{ display: 'flex', alignItems: 'center', gap: S[2] }}>{center}</div>}
       {right && (
         <div
           style={{

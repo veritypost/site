@@ -74,9 +74,13 @@ function LockedCard({ capability, onClick }: LockedCardProps) {
     <button
       onClick={onClick}
       style={{
-        width: '100%', padding: 28, textAlign: 'center',
-        background: 'var(--card)', border: '1px solid var(--border)',
-        borderRadius: 12, cursor: 'pointer',
+        width: '100%',
+        padding: 28,
+        textAlign: 'center',
+        background: 'var(--card)',
+        border: '1px solid var(--border)',
+        borderRadius: 12,
+        cursor: 'pointer',
       }}
     >
       <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--white)', marginBottom: 6 }}>
@@ -85,10 +89,19 @@ function LockedCard({ capability, onClick }: LockedCardProps) {
       <div style={{ fontSize: 13, color: 'var(--dim)', marginBottom: 16, lineHeight: 1.5 }}>
         {capability.lock_message || 'Tap to unlock.'}
       </div>
-      <span style={{
-        display: 'inline-block', padding: '9px 18px', borderRadius: 8,
-        background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 600,
-      }}>Unlock</span>
+      <span
+        style={{
+          display: 'inline-block',
+          padding: '9px 18px',
+          borderRadius: 8,
+          background: 'var(--accent)',
+          color: '#fff',
+          fontSize: 13,
+          fontWeight: 600,
+        }}
+      >
+        Unlock
+      </span>
     </button>
   );
 }
@@ -114,7 +127,9 @@ export function PermissionGateInline({ permission, section, children }: Permissi
         style={{ opacity: 0.5, cursor: 'pointer', pointerEvents: 'auto' }}
         role="button"
         tabIndex={0}
-      >{children}</span>
+      >
+        {children}
+      </span>
       <LockModal open={modalOpen} onClose={() => setModalOpen(false)} capability={cap} />
     </>
   );

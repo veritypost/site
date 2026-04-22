@@ -30,12 +30,34 @@ export default function RouteError({ error, reset }) {
       <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
         <button
           onClick={() => reset()}
-          style={{ padding: '10px 18px', borderRadius: 8, border: 'none', background: '#111', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
-        >Try again</button>
+          style={{
+            padding: '10px 18px',
+            borderRadius: 8,
+            border: 'none',
+            background: '#111',
+            color: '#fff',
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          Try again
+        </button>
         <a
           href="/"
-          style={{ padding: '10px 18px', borderRadius: 8, border: '1px solid #e5e5e5', background: 'transparent', color: '#111', fontSize: 14, fontWeight: 600, textDecoration: 'none' }}
-        >Go home</a>
+          style={{
+            padding: '10px 18px',
+            borderRadius: 8,
+            border: '1px solid #e5e5e5',
+            background: 'transparent',
+            color: '#111',
+            fontSize: 14,
+            fontWeight: 600,
+            textDecoration: 'none',
+          }}
+        >
+          Go home
+        </a>
       </div>
     </div>
   );

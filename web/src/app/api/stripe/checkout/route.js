@@ -17,8 +17,9 @@ import { checkRateLimit } from '@/lib/rateLimit';
 // forwarded host/proto, matching how middleware already resolves origin.
 export async function POST(request) {
   let user;
-  try { user = await requirePermission('billing.upgrade.checkout'); }
-  catch (err) {
+  try {
+    user = await requirePermission('billing.upgrade.checkout');
+  } catch (err) {
     console.error('[stripe.checkout] auth:', err?.message);
     if (err.status) return NextResponse.json({ error: 'Forbidden' }, { status: err.status });
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
@@ -36,7 +37,10 @@ export async function POST(request) {
     windowSec: 3600,
   });
   if (rate.limited) {
-    return NextResponse.json({ error: 'Too many checkout attempts. Try again later.' }, { status: 429, headers: { 'Retry-After': '3600' } });
+    return NextResponse.json(
+      { error: 'Too many checkout attempts. Try again later.' },
+      { status: 429, headers: { 'Retry-After': '3600' } }
+    );
   }
 
   const { plan_name } = await request.json().catch(() => ({}));
@@ -48,11 +52,17 @@ export async function POST(request) {
     .maybeSingle();
   if (!plan) return NextResponse.json({ error: 'Unknown plan' }, { status: 404 });
   if (!plan.stripe_price_id) {
-    return NextResponse.json({ error: `plan "${plan_name}" has no stripe_price_id configured` }, { status: 400 });
+    return NextResponse.json(
+      { error: `plan "${plan_name}" has no stripe_price_id configured` },
+      { status: 400 }
+    );
   }
 
   const { data: me } = await service
-    .from('users').select('id, stripe_customer_id, email').eq('id', user.id).maybeSingle();
+    .from('users')
+    .select('id, stripe_customer_id, email')
+    .eq('id', user.id)
+    .maybeSingle();
 
   const origin = request.nextUrl.origin;
   try {

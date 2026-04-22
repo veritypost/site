@@ -8,10 +8,14 @@ import { v2LiveGuard } from '@/lib/featureFlags';
 import { safeErrorResponse } from '@/lib/apiErrors';
 
 export async function POST(request) {
-  const blocked = await v2LiveGuard(); if (blocked) return blocked;
+  const blocked = await v2LiveGuard();
+  if (blocked) return blocked;
   let user;
-  try { user = await requirePermission('quiz.attempt.start'); }
-  catch (err) { return NextResponse.json({ error: err.message }, { status: err.status || 401 }); }
+  try {
+    user = await requirePermission('quiz.attempt.start');
+  } catch (err) {
+    return NextResponse.json({ error: err.message }, { status: err.status || 401 });
+  }
 
   const { article_id, kid_profile_id } = await request.json().catch(() => ({}));
   if (!article_id) {

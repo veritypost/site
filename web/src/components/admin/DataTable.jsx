@@ -65,10 +65,7 @@ export default function DataTable({
   const [focusIdx, setFocusIdx] = useState(-1);
   const tableRef = useRef(null);
 
-  const keyFor = useCallback(
-    (row, i) => (rowKey ? rowKey(row, i) : row?.id ?? i),
-    [rowKey],
-  );
+  const keyFor = useCallback((row, i) => (rowKey ? rowKey(row, i) : (row?.id ?? i)), [rowKey]);
 
   const sorted = useMemo(() => {
     if (!sortState.key) return rows;
@@ -154,7 +151,9 @@ export default function DataTable({
               e.currentTarget.style.boxShadow = `inset 0 0 0 2px ${ADMIN_C.ring}`;
             }
           }}
-          onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
+          onBlur={(e) => {
+            e.currentTarget.style.boxShadow = 'none';
+          }}
           role="grid"
           aria-rowcount={sorted.length}
           style={{
@@ -235,55 +234,61 @@ export default function DataTable({
               {!loading && !hasRows && (
                 <tr>
                   <td colSpan={columns.length} style={{ padding: 0 }}>
-                    {empty ?? <EmptyState title="No results" description="Nothing matches the current filter." />}
+                    {empty ?? (
+                      <EmptyState
+                        title="No results"
+                        description="Nothing matches the current filter."
+                      />
+                    )}
                   </td>
                 </tr>
               )}
 
-              {hasRows && pageRows.map((row, i) => {
-                const focused = focusIdx === i;
-                return (
-                  <tr
-                    key={keyFor(row, i)}
-                    onClick={() => onRowClick?.(row)}
-                    onMouseEnter={(e) => {
-                      if (!focused) e.currentTarget.style.background = ADMIN_C.hover;
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!focused) e.currentTarget.style.background = 'transparent';
-                    }}
-                    style={{
-                      cursor: onRowClick ? 'pointer' : 'default',
-                      background: focused ? ADMIN_C.hover : 'transparent',
-                      boxShadow: focused ? `inset 2px 0 0 ${ADMIN_C.accent}` : 'none',
-                      transition: 'background 90ms ease',
-                    }}
-                  >
-                    {columns.map((col) => {
-                      const content = col.render ? col.render(row) : row?.[col.key];
-                      return (
-                        <td
-                          key={col.key}
-                          style={{
-                            padding: `${cellPadY}px ${cellPadX}px`,
-                            borderBottom: `1px solid ${ADMIN_C.divider}`,
-                            color: ADMIN_C.white,
-                            textAlign: col.align || 'left',
-                            verticalAlign: 'middle',
-                            maxWidth: col.truncate ? 0 : undefined,
-                            whiteSpace: col.truncate ? 'nowrap' : undefined,
-                            overflow: col.truncate ? 'hidden' : undefined,
-                            textOverflow: col.truncate ? 'ellipsis' : undefined,
-                            width: col.width,
-                          }}
-                        >
-                          {content ?? <span style={{ color: ADMIN_C.muted }}>—</span>}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                );
-              })}
+              {hasRows &&
+                pageRows.map((row, i) => {
+                  const focused = focusIdx === i;
+                  return (
+                    <tr
+                      key={keyFor(row, i)}
+                      onClick={() => onRowClick?.(row)}
+                      onMouseEnter={(e) => {
+                        if (!focused) e.currentTarget.style.background = ADMIN_C.hover;
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!focused) e.currentTarget.style.background = 'transparent';
+                      }}
+                      style={{
+                        cursor: onRowClick ? 'pointer' : 'default',
+                        background: focused ? ADMIN_C.hover : 'transparent',
+                        boxShadow: focused ? `inset 2px 0 0 ${ADMIN_C.accent}` : 'none',
+                        transition: 'background 90ms ease',
+                      }}
+                    >
+                      {columns.map((col) => {
+                        const content = col.render ? col.render(row) : row?.[col.key];
+                        return (
+                          <td
+                            key={col.key}
+                            style={{
+                              padding: `${cellPadY}px ${cellPadX}px`,
+                              borderBottom: `1px solid ${ADMIN_C.divider}`,
+                              color: ADMIN_C.white,
+                              textAlign: col.align || 'left',
+                              verticalAlign: 'middle',
+                              maxWidth: col.truncate ? 0 : undefined,
+                              whiteSpace: col.truncate ? 'nowrap' : undefined,
+                              overflow: col.truncate ? 'hidden' : undefined,
+                              textOverflow: col.truncate ? 'ellipsis' : undefined,
+                              width: col.width,
+                            }}
+                          >
+                            {content ?? <span style={{ color: ADMIN_C.muted }}>—</span>}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
             </tbody>
           </table>
         </div>
@@ -306,7 +311,10 @@ export default function DataTable({
             <span>Rows per page</span>
             <select
               value={pageSize}
-              onChange={(e) => { setPageSize(Number(e.target.value)); setPage(0); }}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setPage(0);
+              }}
               style={{
                 padding: '2px 6px',
                 fontSize: F.sm,
@@ -328,7 +336,8 @@ export default function DataTable({
               {sorted.length === 0
                 ? '0'
                 : `${currentPage * pageSize + 1}–${Math.min(sorted.length, (currentPage + 1) * pageSize)}`}
-              {' of '}{sorted.length}
+              {' of '}
+              {sorted.length}
             </span>
             <Button
               size="sm"

@@ -48,7 +48,9 @@ export default function CommentComposer({
       setCanMention(hasPermission('comments.mention.insert'));
       setPermsLoaded(true);
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
       const { data } = await supabase
         .from('users')
@@ -56,9 +58,16 @@ export default function CommentComposer({
         .eq('id', user.id)
         .maybeSingle();
       if (!data) return;
-      const muteActive = !!data.is_muted && (data.mute_level ?? 0) >= 1 && (!data.muted_until || new Date(data.muted_until) > new Date());
+      const muteActive =
+        !!data.is_muted &&
+        (data.mute_level ?? 0) >= 1 &&
+        (!data.muted_until || new Date(data.muted_until) > new Date());
       if (data.is_banned || muteActive) {
-        setMuteState({ banned: !!data.is_banned, muted_until: data.muted_until, mute_level: data.mute_level });
+        setMuteState({
+          banned: !!data.is_banned,
+          muted_until: data.muted_until,
+          mute_level: data.mute_level,
+        });
       }
     })();
   }, [parentId]);
@@ -68,10 +77,7 @@ export default function CommentComposer({
     const supabase = createClient();
     const names = Array.from(new Set([...text.matchAll(MENTION_RE)].map((m) => m[1])));
     if (names.length === 0) return [];
-    const { data } = await supabase
-      .from('users')
-      .select('id, username')
-      .in('username', names);
+    const { data } = await supabase.from('users').select('id, username').in('username', names);
     return (data || [])
       .filter((u): u is { id: string; username: string } => !!u.username)
       .map((u) => ({ user_id: u.id, username: u.username }));
@@ -99,7 +105,12 @@ export default function CommentComposer({
       const res = await fetch('/api/comments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ article_id: articleId, body: trimmed, parent_id: parentId, mentions }),
+        body: JSON.stringify({
+          article_id: articleId,
+          body: trimmed,
+          parent_id: parentId,
+          mentions,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Could not post');
@@ -137,11 +148,15 @@ export default function CommentComposer({
       />
       <div style={footerStyle}>
         <span>
-          {canMention ? 'Tip: type @username to mention.' : '@mentions are available on paid plans.'}
+          {canMention
+            ? 'Tip: type @username to mention.'
+            : '@mentions are available on paid plans.'}
         </span>
         <span style={{ flex: 1 }} />
         {onCancel && (
-          <button onClick={onCancel} style={cancelBtnStyle}>Cancel</button>
+          <button onClick={onCancel} style={cancelBtnStyle}>
+            Cancel
+          </button>
         )}
         <button
           onClick={submit}
@@ -151,7 +166,9 @@ export default function CommentComposer({
             background: body.trim() && !busy ? 'var(--accent, #111)' : '#ccc',
             cursor: body.trim() && !busy ? 'pointer' : 'default',
           }}
-        >{busy ? 'Posting\u2026' : 'Post'}</button>
+        >
+          {busy ? 'Posting\u2026' : 'Post'}
+        </button>
       </div>
       {error && <div style={{ fontSize: 12, color: '#dc2626', marginTop: 6 }}>{error}</div>}
     </div>
@@ -159,29 +176,51 @@ export default function CommentComposer({
 }
 
 const containerStyle: CSSProperties = {
-  border: '1px solid var(--border, #e5e5e5)', borderRadius: 12,
-  padding: '10px 12px', background: 'var(--card, #f7f7f7)',
+  border: '1px solid var(--border, #e5e5e5)',
+  borderRadius: 12,
+  padding: '10px 12px',
+  background: 'var(--card, #f7f7f7)',
   marginBottom: 16,
 };
 const textareaStyle: CSSProperties = {
-  width: '100%', background: 'transparent', border: 'none',
-  color: 'var(--white, #111)', fontSize: 14, outline: 'none',
-  resize: 'vertical', fontFamily: 'inherit',
+  width: '100%',
+  background: 'transparent',
+  border: 'none',
+  color: 'var(--white, #111)',
+  fontSize: 14,
+  outline: 'none',
+  resize: 'vertical',
+  fontFamily: 'inherit',
 };
 const footerStyle: CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: 8, marginTop: 6,
-  fontSize: 11, color: 'var(--dim, #666)',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  marginTop: 6,
+  fontSize: 11,
+  color: 'var(--dim, #666)',
 };
 const cancelBtnStyle: CSSProperties = {
-  background: 'none', border: 'none', fontSize: 12,
-  color: 'var(--dim, #666)', cursor: 'pointer',
+  background: 'none',
+  border: 'none',
+  fontSize: 12,
+  color: 'var(--dim, #666)',
+  cursor: 'pointer',
 };
 const postBtnStyle: CSSProperties = {
-  padding: '6px 14px', borderRadius: 8, border: 'none',
-  color: '#fff', fontSize: 12, fontWeight: 700,
+  padding: '6px 14px',
+  borderRadius: 8,
+  border: 'none',
+  color: '#fff',
+  fontSize: 12,
+  fontWeight: 700,
 };
 const muteBannerStyle: CSSProperties = {
-  border: '1px solid #fecaca', borderRadius: 12,
-  padding: '10px 14px', background: '#fef2f2',
-  marginBottom: 16, fontSize: 13, color: '#991b1b',
+  border: '1px solid #fecaca',
+  borderRadius: 12,
+  padding: '10px 14px',
+  background: '#fef2f2',
+  marginBottom: 16,
+  fontSize: 13,
+  color: '#991b1b',
 };

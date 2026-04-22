@@ -56,7 +56,8 @@ export const STORIES: Story[] = [
   },
   {
     id: 's3',
-    title: 'The Fed\u2019s quiet pivot on balance-sheet runoff, and why markets haven\u2019t noticed',
+    title:
+      'The Fed\u2019s quiet pivot on balance-sheet runoff, and why markets haven\u2019t noticed',
     dek: 'Minutes from the March meeting reveal a sharper internal debate than the official statement let on. The dollar is already responding.',
     byline: 'Jordan Wong',
     minutes: 8,

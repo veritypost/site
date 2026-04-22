@@ -26,7 +26,8 @@ function safeShortString(value, max = 80) {
 }
 
 export async function POST(request) {
-  const blocked = await v2LiveGuard(); if (blocked) return blocked;
+  const blocked = await v2LiveGuard();
+  if (blocked) return blocked;
   const b = await request.json().catch(() => ({}));
 
   const adUnitId = safeUuid(b.ad_unit_id);
@@ -36,7 +37,9 @@ export async function POST(request) {
   }
 
   const supabase = await createClient();
-  const { data: { user: authUser } } = await supabase.auth.getUser();
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser();
 
   const service = createServiceClient();
   const ip = await getClientIp();
@@ -46,7 +49,11 @@ export async function POST(request) {
     max: 300,
     windowSec: 60,
   });
-  if (rl.limited) return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': '60' } });
+  if (rl.limited)
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': '60' } }
+    );
 
   const { data, error } = await service.rpc('log_ad_impression', {
     p_ad_unit_id: adUnitId,
@@ -58,6 +65,7 @@ export async function POST(request) {
     p_page: safeShortString(b.page, 80) || 'unknown',
     p_position: safeShortString(b.position, 40) || 'unknown',
   });
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'ads/impression', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, { route: 'ads/impression', fallbackStatus: 400 });
   return NextResponse.json({ impression_id: data });
 }

@@ -9,10 +9,14 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // POST /api/recap/[id]/submit — grade a recap attempt.
 // Body: { answers: [{ question_id, selected_answer:int }] }
 export async function POST(request, { params }) {
-  const blocked = await v2LiveGuard(); if (blocked) return blocked;
+  const blocked = await v2LiveGuard();
+  if (blocked) return blocked;
   let user;
-  try { user = await requirePermission('recap.list.view'); }
-  catch (err) { return NextResponse.json({ error: err.message }, { status: err.status || 401 }); }
+  try {
+    user = await requirePermission('recap.list.view');
+  } catch (err) {
+    return NextResponse.json({ error: err.message }, { status: err.status || 401 });
+  }
 
   const { answers } = await request.json().catch(() => ({}));
   if (!Array.isArray(answers) || answers.length === 0) {
@@ -26,6 +30,10 @@ export async function POST(request, { params }) {
     p_recap_quiz_id: params.id,
     p_answers: answers,
   });
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'recap.id.submit', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'recap.id.submit',
+      fallbackStatus: 400,
+    });
   return NextResponse.json(data);
 }

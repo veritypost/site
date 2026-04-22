@@ -8,7 +8,7 @@ import { permissionError, recordAdminAction, requireAdminOutranks } from '@/lib/
 
 export async function DELETE(
   _request: Request,
-  { params }: { params: { id: string; sessionId: string } },
+  { params }: { params: { id: string; sessionId: string } }
 ) {
   const targetId = params?.id;
   const sessionId = params?.sessionId;
@@ -17,8 +17,11 @@ export async function DELETE(
   }
 
   let actor;
-  try { actor = await requirePermission('admin.users.devices.unlink'); }
-  catch (err) { return permissionError(err); }
+  try {
+    actor = await requirePermission('admin.users.devices.unlink');
+  } catch (err) {
+    return permissionError(err);
+  }
 
   // Rank guard: unlinking a device force-signs-out the target, which
   // is a real escalation surface against a higher-ranked admin.

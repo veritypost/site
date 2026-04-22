@@ -15,8 +15,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
 
   let actor;
-  try { actor = await requirePermission('admin.feeds.manage'); }
-  catch (err) { return permissionError(err); }
+  try {
+    actor = await requirePermission('admin.feeds.manage');
+  } catch (err) {
+    return permissionError(err);
+  }
   void actor;
 
   const body = (await request.json().catch(() => ({}))) as PatchBody;
@@ -49,7 +52,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       .select('is_active')
       .eq('id', id)
       .maybeSingle();
-    const { error } = await service.from('feeds').update({ is_active: body.is_active }).eq('id', id);
+    const { error } = await service
+      .from('feeds')
+      .update({ is_active: body.is_active })
+      .eq('id', id);
     if (error) {
       console.error('[admin.feeds.toggle]', error.message);
       return NextResponse.json({ error: 'Could not toggle feed' }, { status: 500 });
@@ -72,8 +78,11 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
 
   let actor;
-  try { actor = await requirePermission('admin.feeds.manage'); }
-  catch (err) { return permissionError(err); }
+  try {
+    actor = await requirePermission('admin.feeds.manage');
+  } catch (err) {
+    return permissionError(err);
+  }
   void actor;
 
   const service = createServiceClient();

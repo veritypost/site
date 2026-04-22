@@ -73,7 +73,10 @@ type CategoryScoreRow = Tables<'category_scores'>;
 type AchievementRow = Tables<'achievements'>;
 type UserAchievementRow = Tables<'user_achievements'>;
 
-type ReadingLogJoined = Pick<Tables<'reading_log'>, 'id' | 'created_at' | 'completed' | 'article_id'> & {
+type ReadingLogJoined = Pick<
+  Tables<'reading_log'>,
+  'id' | 'created_at' | 'completed' | 'article_id'
+> & {
   articles: { title: string | null; slug: string | null } | null;
 };
 
@@ -88,9 +91,23 @@ type BookmarkJoined = Pick<Tables<'bookmarks'>, 'id' | 'created_at' | 'article_i
 type ActivityFilter = 'all' | 'articles' | 'comments' | 'bookmarks';
 
 type ActivityItem =
-  | { kind: 'article';  id: string; when: string; title: string; slug: string | null; completed: boolean }
-  | { kind: 'comment';  id: string; when: string; title: string; slug: string | null; body: string }
-  | { kind: 'bookmark'; id: string; when: string; title: string; slug: string | null; notes: string | null };
+  | {
+      kind: 'article';
+      id: string;
+      when: string;
+      title: string;
+      slug: string | null;
+      completed: boolean;
+    }
+  | { kind: 'comment'; id: string; when: string; title: string; slug: string | null; body: string }
+  | {
+      kind: 'bookmark';
+      id: string;
+      when: string;
+      title: string;
+      slug: string | null;
+      notes: string | null;
+    };
 
 // ---------------------------------------------------------------
 // Helpers
@@ -186,7 +203,7 @@ function ProfilePageInner() {
       qs.set('tab', next);
       router.replace(`/profile?${qs.toString()}`, { scroll: false });
     },
-    [router, searchParams],
+    [router, searchParams]
   );
 
   // -------------------------------------------------------------
@@ -195,7 +212,9 @@ function ProfilePageInner() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser();
       if (cancelled) return;
 
       if (!authUser) {
@@ -224,11 +243,11 @@ function ProfilePageInner() {
       setScoreTiers(tiers);
 
       setPerms({
-        viewOwn:       hasPermission('profile.header_stats'),
-        activity:      hasPermission('profile.activity'),
-        categories:    hasPermission('profile.categories'),
-        milestones:    hasPermission('profile.achievements'),
-        cardShare:     hasPermission('profile.card_share'),
+        viewOwn: hasPermission('profile.header_stats'),
+        activity: hasPermission('profile.activity'),
+        categories: hasPermission('profile.categories'),
+        milestones: hasPermission('profile.achievements'),
+        cardShare: hasPermission('profile.card_share'),
         messagesInbox: hasPermission('messages.inbox.view'),
         bookmarksList: hasPermission('bookmarks.list.view'),
       });
@@ -236,103 +255,117 @@ function ProfilePageInner() {
       setAuthResolved(true);
       setLoading(false);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [router, supabase]);
 
   // -------------------------------------------------------------
   // Lazy loaders per tab
   // -------------------------------------------------------------
-  const loadActivity = useCallback(async (uid: string) => {
-    const [r, c, b] = await Promise.all([
-      supabase
-        .from('reading_log')
-        .select('id, created_at, completed, article_id, articles(title, slug)')
-        .eq('user_id', uid)
-        .is('kid_profile_id', null)
-        .order('created_at', { ascending: false })
-        .limit(100),
-      supabase
-        .from('comments')
-        .select('id, body, created_at, article_id, articles(title, slug)')
-        .eq('user_id', uid)
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false })
-        .limit(50),
-      supabase
-        .from('bookmarks')
-        .select('id, created_at, article_id, notes, articles(title, slug)')
-        .eq('user_id', uid)
-        .order('created_at', { ascending: false })
-        .limit(50),
-    ]);
+  const loadActivity = useCallback(
+    async (uid: string) => {
+      const [r, c, b] = await Promise.all([
+        supabase
+          .from('reading_log')
+          .select('id, created_at, completed, article_id, articles(title, slug)')
+          .eq('user_id', uid)
+          .is('kid_profile_id', null)
+          .order('created_at', { ascending: false })
+          .limit(100),
+        supabase
+          .from('comments')
+          .select('id, body, created_at, article_id, articles(title, slug)')
+          .eq('user_id', uid)
+          .is('deleted_at', null)
+          .order('created_at', { ascending: false })
+          .limit(50),
+        supabase
+          .from('bookmarks')
+          .select('id, created_at, article_id, notes, articles(title, slug)')
+          .eq('user_id', uid)
+          .order('created_at', { ascending: false })
+          .limit(50),
+      ]);
 
-    setReads((r.data ?? []) as unknown as ReadingLogJoined[]);
-    setComments((c.data ?? []) as unknown as CommentJoined[]);
-    setBookmarks((b.data ?? []) as unknown as BookmarkJoined[]);
-    setActivityLoaded(true);
-  }, [supabase]);
+      setReads((r.data ?? []) as unknown as ReadingLogJoined[]);
+      setComments((c.data ?? []) as unknown as CommentJoined[]);
+      setBookmarks((b.data ?? []) as unknown as BookmarkJoined[]);
+      setActivityLoaded(true);
+    },
+    [supabase]
+  );
 
-  const loadCategories = useCallback(async (uid: string) => {
-    const [cats, scores, prefs] = await Promise.all([
-      supabase
-        .from('categories')
-        .select('*')
-        .eq('is_active', true)
-        .is('parent_id', null)
-        .not('slug', 'like', 'kids-%')
-        .order('sort_order'),
-      supabase
-        .from('category_scores')
-        .select('*')
-        .eq('user_id', uid)
-        .is('kid_profile_id', null),
-      supabase
-        .from('user_preferred_categories')
-        .select('category_id')
-        .eq('user_id', uid),
-    ]);
+  const loadCategories = useCallback(
+    async (uid: string) => {
+      const [cats, scores, prefs] = await Promise.all([
+        supabase
+          .from('categories')
+          .select('*')
+          .eq('is_active', true)
+          .is('parent_id', null)
+          .not('slug', 'like', 'kids-%')
+          .order('sort_order'),
+        supabase.from('category_scores').select('*').eq('user_id', uid).is('kid_profile_id', null),
+        supabase.from('user_preferred_categories').select('category_id').eq('user_id', uid),
+      ]);
 
-    setCategories((cats.data ?? []) as CategoryRow[]);
-    setCategoryScores((scores.data ?? []) as CategoryScoreRow[]);
-    setPreferredCategoryIds(new Set((prefs.data ?? []).map((r) => r.category_id)));
-    setCategoriesLoaded(true);
-  }, [supabase]);
+      setCategories((cats.data ?? []) as CategoryRow[]);
+      setCategoryScores((scores.data ?? []) as CategoryScoreRow[]);
+      setPreferredCategoryIds(new Set((prefs.data ?? []).map((r) => r.category_id)));
+      setCategoriesLoaded(true);
+    },
+    [supabase]
+  );
 
-  const loadMilestones = useCallback(async (uid: string) => {
-    const [all, mine] = await Promise.all([
-      supabase
-        .from('achievements')
-        .select('*')
-        .eq('is_active', true)
-        .eq('is_secret', false)
-        .order('category')
-        .order('sort_order'),
-      supabase
-        .from('user_achievements')
-        .select('achievement_id, earned_at')
-        .eq('user_id', uid)
-        .is('kid_profile_id', null),
-    ]);
+  const loadMilestones = useCallback(
+    async (uid: string) => {
+      const [all, mine] = await Promise.all([
+        supabase
+          .from('achievements')
+          .select('*')
+          .eq('is_active', true)
+          .eq('is_secret', false)
+          .order('category')
+          .order('sort_order'),
+        supabase
+          .from('user_achievements')
+          .select('achievement_id, earned_at')
+          .eq('user_id', uid)
+          .is('kid_profile_id', null),
+      ]);
 
-    setAchievements((all.data ?? []) as AchievementRow[]);
-    const map: Record<string, string> = {};
-    for (const row of (mine.data ?? []) as Pick<UserAchievementRow, 'achievement_id' | 'earned_at'>[]) {
-      map[row.achievement_id] = row.earned_at;
-    }
-    setEarnedMap(map);
-    setMilestonesLoaded(true);
-  }, [supabase]);
+      setAchievements((all.data ?? []) as AchievementRow[]);
+      const map: Record<string, string> = {};
+      for (const row of (mine.data ?? []) as Pick<
+        UserAchievementRow,
+        'achievement_id' | 'earned_at'
+      >[]) {
+        map[row.achievement_id] = row.earned_at;
+      }
+      setEarnedMap(map);
+      setMilestonesLoaded(true);
+    },
+    [supabase]
+  );
 
   useEffect(() => {
     if (!authUserId) return;
-    if (tab === 'activity'   && !activityLoaded   && perms.activity)   loadActivity(authUserId);
+    if (tab === 'activity' && !activityLoaded && perms.activity) loadActivity(authUserId);
     if (tab === 'categories' && !categoriesLoaded && perms.categories) loadCategories(authUserId);
     if (tab === 'milestones' && !milestonesLoaded && perms.milestones) loadMilestones(authUserId);
   }, [
-    tab, authUserId,
-    activityLoaded, categoriesLoaded, milestonesLoaded,
-    perms.activity, perms.categories, perms.milestones,
-    loadActivity, loadCategories, loadMilestones,
+    tab,
+    authUserId,
+    activityLoaded,
+    categoriesLoaded,
+    milestonesLoaded,
+    perms.activity,
+    perms.categories,
+    perms.milestones,
+    loadActivity,
+    loadCategories,
+    loadMilestones,
   ]);
 
   // -------------------------------------------------------------
@@ -341,25 +374,66 @@ function ProfilePageInner() {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const target = e.target as HTMLElement | null;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+      if (
+        target &&
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+      )
+        return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
       if (chordRef.current.awaitG) {
         chordRef.current.awaitG = false;
-        if (chordRef.current.timer) { clearTimeout(chordRef.current.timer); chordRef.current.timer = null; }
-        if (e.key === 'a') { e.preventDefault(); switchTab('activity');   return; }
-        if (e.key === 'c') { e.preventDefault(); switchTab('categories'); return; }
-        if (e.key === 'm') { e.preventDefault(); switchTab('milestones'); return; }
-        if (e.key === 'o') { e.preventDefault(); switchTab('overview');   return; }
+        if (chordRef.current.timer) {
+          clearTimeout(chordRef.current.timer);
+          chordRef.current.timer = null;
+        }
+        if (e.key === 'a') {
+          e.preventDefault();
+          switchTab('activity');
+          return;
+        }
+        if (e.key === 'c') {
+          e.preventDefault();
+          switchTab('categories');
+          return;
+        }
+        if (e.key === 'm') {
+          e.preventDefault();
+          switchTab('milestones');
+          return;
+        }
+        if (e.key === 'o') {
+          e.preventDefault();
+          switchTab('overview');
+          return;
+        }
       }
 
-      if (e.key === '1') { e.preventDefault(); switchTab('overview');   return; }
-      if (e.key === '2') { e.preventDefault(); switchTab('activity');   return; }
-      if (e.key === '3') { e.preventDefault(); switchTab('categories'); return; }
-      if (e.key === '4') { e.preventDefault(); switchTab('milestones'); return; }
+      if (e.key === '1') {
+        e.preventDefault();
+        switchTab('overview');
+        return;
+      }
+      if (e.key === '2') {
+        e.preventDefault();
+        switchTab('activity');
+        return;
+      }
+      if (e.key === '3') {
+        e.preventDefault();
+        switchTab('categories');
+        return;
+      }
+      if (e.key === '4') {
+        e.preventDefault();
+        switchTab('milestones');
+        return;
+      }
       if (e.key === 'g') {
         chordRef.current.awaitG = true;
-        chordRef.current.timer = setTimeout(() => { chordRef.current.awaitG = false; }, 900);
+        chordRef.current.timer = setTimeout(() => {
+          chordRef.current.awaitG = false;
+        }, 900);
       }
     }
     window.addEventListener('keydown', onKey);
@@ -377,7 +451,16 @@ function ProfilePageInner() {
       <Page maxWidth={960}>
         <PageHeader hideBreadcrumb title="Profile" subtitle={<SkeletonBar width={160} />} />
         <PageSection>
-          <div style={{ display: 'flex', alignItems: 'center', gap: S[2], padding: S[8], justifyContent: 'center', color: ADMIN_C.dim }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: S[2],
+              padding: S[8],
+              justifyContent: 'center',
+              color: ADMIN_C.dim,
+            }}
+          >
             <Spinner />
             <span style={{ fontSize: F.sm }}>Loading your profile</span>
           </div>
@@ -389,11 +472,19 @@ function ProfilePageInner() {
   if (!user) {
     return (
       <Page maxWidth={960}>
-        <PageHeader hideBreadcrumb title="Profile" subtitle="Your reading, activity, and achievements" />
+        <PageHeader
+          hideBreadcrumb
+          title="Profile"
+          subtitle="Your reading, activity, and achievements"
+        />
         <EmptyState
           title="We couldn't load your profile"
           description="Something went wrong retrieving your account. Try refreshing, or head back home."
-          cta={<Button variant="primary" onClick={() => router.replace('/')}>Back to home</Button>}
+          cta={
+            <Button variant="primary" onClick={() => router.replace('/')}>
+              Back to home
+            </Button>
+          }
         />
       </Page>
     );
@@ -402,11 +493,19 @@ function ProfilePageInner() {
   if (!perms.viewOwn && !user.email_verified) {
     return (
       <Page maxWidth={960}>
-        <PageHeader hideBreadcrumb title="Profile" subtitle="Verify your email to unlock your profile" />
+        <PageHeader
+          hideBreadcrumb
+          title="Profile"
+          subtitle="Verify your email to unlock your profile"
+        />
         <EmptyState
           title="Verify your email"
           description="Confirm your email to see your reading history, categories, and achievements."
-          cta={<Button variant="primary" onClick={() => router.push('/verify-email')}>Verify email</Button>}
+          cta={
+            <Button variant="primary" onClick={() => router.push('/verify-email')}>
+              Verify email
+            </Button>
+          }
         />
       </Page>
     );
@@ -429,7 +528,7 @@ function ProfilePageInner() {
 
       <Tabs tab={tab} onChange={switchTab} />
 
-      {tab === 'overview'   && (
+      {tab === 'overview' && (
         <OverviewTab
           user={user}
           tierInfo={tierInfo}
@@ -439,8 +538,8 @@ function ProfilePageInner() {
           bookmarksList={perms.bookmarksList}
         />
       )}
-      {tab === 'activity'   && (
-        perms.activity ? (
+      {tab === 'activity' &&
+        (perms.activity ? (
           <ActivityTab
             loaded={activityLoaded}
             reads={reads}
@@ -449,10 +548,11 @@ function ProfilePageInner() {
             filter={activityFilter}
             setFilter={setActivityFilter}
           />
-        ) : <LockedTab name="Activity" />
-      )}
-      {tab === 'categories' && (
-        perms.categories ? (
+        ) : (
+          <LockedTab name="Activity" />
+        ))}
+      {tab === 'categories' &&
+        (perms.categories ? (
           <CategoriesTab
             loaded={categoriesLoaded}
             categories={categories}
@@ -461,10 +561,11 @@ function ProfilePageInner() {
             selected={selectedCategory}
             setSelected={setSelectedCategory}
           />
-        ) : <LockedTab name="Categories" />
-      )}
-      {tab === 'milestones' && (
-        perms.milestones ? (
+        ) : (
+          <LockedTab name="Categories" />
+        ))}
+      {tab === 'milestones' &&
+        (perms.milestones ? (
           <MilestonesTab
             loaded={milestonesLoaded}
             achievements={achievements}
@@ -473,8 +574,9 @@ function ProfilePageInner() {
             scoreTiers={scoreTiers}
             verityScore={user.verity_score}
           />
-        ) : <LockedTab name="Milestones" />
-      )}
+        ) : (
+          <LockedTab name="Milestones" />
+        ))}
     </Page>
   );
 }
@@ -521,8 +623,12 @@ function Tabs({ tab, onChange }: { tab: TabId; onChange: (t: TabId) => void }) {
               whiteSpace: 'nowrap',
               transition: 'color 120ms ease, border-color 120ms ease',
             }}
-            onMouseEnter={(e) => { if (!active) e.currentTarget.style.color = ADMIN_C.soft; }}
-            onMouseLeave={(e) => { if (!active) e.currentTarget.style.color = ADMIN_C.dim; }}
+            onMouseEnter={(e) => {
+              if (!active) e.currentTarget.style.color = ADMIN_C.soft;
+            }}
+            onMouseLeave={(e) => {
+              if (!active) e.currentTarget.style.color = ADMIN_C.dim;
+            }}
           >
             {TAB_LABELS[id]}
           </button>
@@ -536,7 +642,12 @@ function Tabs({ tab, onChange }: { tab: TabId; onChange: (t: TabId) => void }) {
 // Overview tab
 // ===============================================================
 function OverviewTab({
-  user, tierInfo, scoreTiers, cardShare, messagesInbox, bookmarksList,
+  user,
+  tierInfo,
+  scoreTiers,
+  cardShare,
+  messagesInbox,
+  bookmarksList,
 }: {
   user: UserRow;
   tierInfo: ScoreTier | null;
@@ -551,19 +662,17 @@ function OverviewTab({
   const nextT = nextTier(tierInfo, scoreTiers);
   const minScore = tierInfo?.min_score ?? 0;
   const range = nextT ? nextT.min_score - minScore : 0;
-  const progress = nextT && range > 0
-    ? Math.min(1, Math.max(0, (score - minScore) / range))
-    : 1;
+  const progress = nextT && range > 0 ? Math.min(1, Math.max(0, (score - minScore) / range)) : 1;
   const memberSince = user.created_at
     ? new Date(user.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
     : '';
 
   const stats: Array<{ label: string; value: string | number }> = [
-    { label: 'Articles read',    value: (user.articles_read_count ?? 0).toLocaleString() },
+    { label: 'Articles read', value: (user.articles_read_count ?? 0).toLocaleString() },
     { label: 'Quizzes completed', value: (user.quizzes_completed_count ?? 0).toLocaleString() },
-    { label: 'Comments',         value: (user.comment_count ?? 0).toLocaleString() },
-    { label: 'Followers',        value: (user.followers_count ?? 0).toLocaleString() },
-    { label: 'Following',        value: (user.following_count ?? 0).toLocaleString() },
+    { label: 'Comments', value: (user.comment_count ?? 0).toLocaleString() },
+    { label: 'Followers', value: (user.followers_count ?? 0).toLocaleString() },
+    { label: 'Following', value: (user.following_count ?? 0).toLocaleString() },
   ];
 
   // Role badges — surface expert / educator / journalist / public-figure
@@ -610,30 +719,48 @@ function OverviewTab({
 
           <div style={{ flex: 1, minWidth: 220 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: S[2], flexWrap: 'wrap' }}>
-              <div style={{ fontSize: F.xl, fontWeight: 600, color: ADMIN_C.white, letterSpacing: '-0.01em' }}>
+              <div
+                style={{
+                  fontSize: F.xl,
+                  fontWeight: 600,
+                  color: ADMIN_C.white,
+                  letterSpacing: '-0.01em',
+                }}
+              >
                 {user.display_name || user.username || 'Reader'}
               </div>
               <Badge variant="neutral" dot style={{ borderColor: tierColor, color: tierColor }}>
                 {tierLabel}
               </Badge>
               {roleBadges.map((b) => (
-                <Badge key={b.label} variant={b.variant}>{b.label}</Badge>
+                <Badge key={b.label} variant={b.variant}>
+                  {b.label}
+                </Badge>
               ))}
             </div>
             {user.username && (
               <div style={{ fontSize: F.sm, color: ADMIN_C.dim, marginTop: S[1] }}>
-                @{user.username}{memberSince ? ` · Member since ${memberSince}` : ''}
+                @{user.username}
+                {memberSince ? ` · Member since ${memberSince}` : ''}
               </div>
             )}
             {user.bio && (
-              <div style={{ fontSize: F.sm, color: ADMIN_C.soft, marginTop: S[2], lineHeight: 1.5, maxWidth: 520 }}>
+              <div
+                style={{
+                  fontSize: F.sm,
+                  color: ADMIN_C.soft,
+                  marginTop: S[2],
+                  lineHeight: 1.5,
+                  maxWidth: 520,
+                }}
+              >
                 {user.bio}
               </div>
             )}
             <div style={{ display: 'flex', gap: S[6], marginTop: S[3], flexWrap: 'wrap' }}>
-              <ScoreBlock label="Verity score"  value={score.toLocaleString()} />
+              <ScoreBlock label="Verity score" value={score.toLocaleString()} />
               <ScoreBlock label="Current streak" value={`${user.streak_current ?? 0}d`} />
-              <ScoreBlock label="Best streak"    value={`${user.streak_best ?? 0}d`} />
+              <ScoreBlock label="Best streak" value={`${user.streak_best ?? 0}d`} />
             </div>
           </div>
         </div>
@@ -653,16 +780,27 @@ function OverviewTab({
               lineHeight: 1.4,
             }}
           >
-            Score frozen on {new Date(user.frozen_at).toLocaleDateString()}. Resubscribe to resume tracking progress.
+            Score frozen on {new Date(user.frozen_at).toLocaleDateString()}. Resubscribe to resume
+            tracking progress.
           </div>
         )}
 
         {/* Tier progress */}
         {nextT && (
           <div style={{ marginTop: S[4] }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: F.xs, color: ADMIN_C.dim, marginBottom: S[1] }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                fontSize: F.xs,
+                color: ADMIN_C.dim,
+                marginBottom: S[1],
+              }}
+            >
               <span>Progress to {nextT.display_name}</span>
-              <span>{score.toLocaleString()} / {nextT.min_score.toLocaleString()}</span>
+              <span>
+                {score.toLocaleString()} / {nextT.min_score.toLocaleString()}
+              </span>
             </div>
             <ProgressBar value={progress} color={tierColor} />
           </div>
@@ -690,11 +828,7 @@ function OverviewTab({
               />
             )}
             {bookmarksList && (
-              <QuickLink
-                href="/bookmarks"
-                label="Bookmarks"
-                description="Articles you've saved"
-              />
+              <QuickLink href="/bookmarks" label="Bookmarks" description="Articles you've saved" />
             )}
           </div>
         </PageSection>
@@ -720,7 +854,8 @@ function OverviewTab({
                   size="sm"
                   onClick={() => {
                     const url = `${window.location.origin}/card/${user.username}`;
-                    if (navigator.share) navigator.share({ url, title: 'My Verity Post profile' }).catch(() => {});
+                    if (navigator.share)
+                      navigator.share({ url, title: 'My Verity Post profile' }).catch(() => {});
                     else navigator.clipboard?.writeText(url).catch(() => {});
                   }}
                 >
@@ -738,7 +873,15 @@ function OverviewTab({
             size="sm"
             title="Set a username to get your card"
             description="Your public profile card uses your username as the URL."
-            cta={<Button variant="primary" size="sm" onClick={() => window.location.assign('/profile/settings/profile')}>Set username</Button>}
+            cta={
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => window.location.assign('/profile/settings/profile')}
+              >
+                Set username
+              </Button>
+            }
           />
         )}
       </PageSection>
@@ -764,10 +907,26 @@ function OverviewTab({
 function ScoreBlock({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div style={{ fontSize: F.xxl, fontWeight: 600, color: ADMIN_C.white, letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+      <div
+        style={{
+          fontSize: F.xxl,
+          fontWeight: 600,
+          color: ADMIN_C.white,
+          letterSpacing: '-0.02em',
+          lineHeight: 1.1,
+        }}
+      >
         {value}
       </div>
-      <div style={{ fontSize: F.xs, color: ADMIN_C.dim, textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 2 }}>
+      <div
+        style={{
+          fontSize: F.xs,
+          color: ADMIN_C.dim,
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em',
+          marginTop: 2,
+        }}
+      >
         {label}
       </div>
     </div>
@@ -775,7 +934,9 @@ function ScoreBlock({ label, value }: { label: string; value: string }) {
 }
 
 function QuickLink({
-  href, label, description,
+  href,
+  label,
+  description,
 }: {
   href: string;
   label: string;
@@ -796,18 +957,36 @@ function QuickLink({
         color: 'inherit',
         transition: 'background 120ms ease, border-color 120ms ease',
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = ADMIN_C.hover; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = ADMIN_C.bg; }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = ADMIN_C.hover;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = ADMIN_C.bg;
+      }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: S[2] }}>
-        <span style={{ fontSize: F.md, fontWeight: 600, color: ADMIN_C.white, letterSpacing: '-0.01em' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: S[2],
+        }}
+      >
+        <span
+          style={{
+            fontSize: F.md,
+            fontWeight: 600,
+            color: ADMIN_C.white,
+            letterSpacing: '-0.01em',
+          }}
+        >
           {label}
         </span>
-        <span aria-hidden="true" style={{ color: ADMIN_C.muted, fontSize: F.lg }}>›</span>
+        <span aria-hidden="true" style={{ color: ADMIN_C.muted, fontSize: F.lg }}>
+          ›
+        </span>
       </div>
-      <div style={{ fontSize: F.xs, color: ADMIN_C.dim }}>
-        {description}
-      </div>
+      <div style={{ fontSize: F.xs, color: ADMIN_C.dim }}>{description}</div>
     </Link>
   );
 }
@@ -839,12 +1018,7 @@ function ProgressBar({ value, color }: { value: number; color: string }) {
   );
 }
 
-function ProfileCardPreview({
-  user, tierInfo,
-}: {
-  user: UserRow;
-  tierInfo: ScoreTier | null;
-}) {
+function ProfileCardPreview({ user, tierInfo }: { user: UserRow; tierInfo: ScoreTier | null }) {
   const tierColor = tierInfo?.color_hex || ADMIN_C.muted;
   const tierLabel = tierInfo?.display_name || 'Newcomer';
   return (
@@ -862,16 +1036,40 @@ function ProfileCardPreview({
     >
       <Avatar user={user} size={56} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: F.lg, fontWeight: 600, color: ADMIN_C.white, letterSpacing: '-0.01em' }}>
+        <div
+          style={{
+            fontSize: F.lg,
+            fontWeight: 600,
+            color: ADMIN_C.white,
+            letterSpacing: '-0.01em',
+          }}
+        >
           {user.display_name || user.username}
         </div>
         <div style={{ fontSize: F.sm, color: ADMIN_C.dim }}>
           @{user.username} · <span style={{ color: tierColor, fontWeight: 600 }}>{tierLabel}</span>
         </div>
-        <div style={{ display: 'flex', gap: S[3], marginTop: S[2], fontSize: F.xs, color: ADMIN_C.soft }}>
-          <span><strong style={{ color: ADMIN_C.white }}>{(user.verity_score ?? 0).toLocaleString()}</strong> score</span>
-          <span><strong style={{ color: ADMIN_C.white }}>{user.streak_current ?? 0}d</strong> streak</span>
-          <span><strong style={{ color: ADMIN_C.white }}>{user.articles_read_count ?? 0}</strong> read</span>
+        <div
+          style={{
+            display: 'flex',
+            gap: S[3],
+            marginTop: S[2],
+            fontSize: F.xs,
+            color: ADMIN_C.soft,
+          }}
+        >
+          <span>
+            <strong style={{ color: ADMIN_C.white }}>
+              {(user.verity_score ?? 0).toLocaleString()}
+            </strong>{' '}
+            score
+          </span>
+          <span>
+            <strong style={{ color: ADMIN_C.white }}>{user.streak_current ?? 0}d</strong> streak
+          </span>
+          <span>
+            <strong style={{ color: ADMIN_C.white }}>{user.articles_read_count ?? 0}</strong> read
+          </span>
         </div>
       </div>
     </div>
@@ -882,7 +1080,12 @@ function ProfileCardPreview({
 // Activity tab
 // ===============================================================
 function ActivityTab({
-  loaded, reads, comments, bookmarks, filter, setFilter,
+  loaded,
+  reads,
+  comments,
+  bookmarks,
+  filter,
+  setFilter,
 }: {
   loaded: boolean;
   reads: ReadingLogJoined[];
@@ -934,9 +1137,9 @@ function ActivityTab({
   }, [reads, comments, bookmarks, filter]);
 
   const FILTERS: Array<{ id: ActivityFilter; label: string }> = [
-    { id: 'all',       label: 'All' },
-    { id: 'articles',  label: 'Articles' },
-    { id: 'comments',  label: 'Comments' },
+    { id: 'all', label: 'All' },
+    { id: 'articles', label: 'Articles' },
+    { id: 'comments', label: 'Comments' },
     { id: 'bookmarks', label: 'Bookmarks' },
   ];
 
@@ -962,9 +1165,17 @@ function ActivityTab({
       {!loaded && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: S[2] }}>
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} style={{ display: 'flex', gap: S[3], padding: `${S[2]}px 0`, borderBottom: `1px solid ${ADMIN_C.divider}` }}>
+            <div
+              key={i}
+              style={{
+                display: 'flex',
+                gap: S[3],
+                padding: `${S[2]}px 0`,
+                borderBottom: `1px solid ${ADMIN_C.divider}`,
+              }}
+            >
               <SkeletonBar width={72} />
-              <SkeletonBar width={`${50 + (i * 7) % 35}%`} />
+              <SkeletonBar width={`${50 + ((i * 7) % 35)}%`} />
             </div>
           ))}
         </div>
@@ -974,7 +1185,11 @@ function ActivityTab({
         <EmptyState
           title="No activity yet"
           description="Read an article, leave a comment, or save a bookmark to see it here."
-          cta={<Button variant="primary" onClick={() => window.location.assign('/browse')}>Start reading</Button>}
+          cta={
+            <Button variant="primary" onClick={() => window.location.assign('/browse')}>
+              Start reading
+            </Button>
+          }
         />
       )}
 
@@ -992,9 +1207,11 @@ function ActivityTab({
 function ActivityRow({ item }: { item: ActivityItem }) {
   const href = item.slug ? `/story/${item.slug}` : '#';
   const kindBadge =
-    item.kind === 'article'  ? { label: item.completed ? 'Read' : 'Started', variant: 'info' as const }
-    : item.kind === 'comment' ? { label: 'Comment',                           variant: 'success' as const }
-    : { label: 'Bookmark', variant: 'neutral' as const };
+    item.kind === 'article'
+      ? { label: item.completed ? 'Read' : 'Started', variant: 'info' as const }
+      : item.kind === 'comment'
+        ? { label: 'Comment', variant: 'success' as const }
+        : { label: 'Bookmark', variant: 'neutral' as const };
 
   return (
     <Link
@@ -1009,10 +1226,21 @@ function ActivityRow({ item }: { item: ActivityItem }) {
       }}
     >
       <div style={{ flexShrink: 0, paddingTop: 2 }}>
-        <Badge variant={kindBadge.variant} size="xs">{kindBadge.label}</Badge>
+        <Badge variant={kindBadge.variant} size="xs">
+          {kindBadge.label}
+        </Badge>
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: F.md, color: ADMIN_C.white, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <div
+          style={{
+            fontSize: F.md,
+            color: ADMIN_C.white,
+            fontWeight: 500,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
           {item.title}
         </div>
         {item.kind === 'comment' && (
@@ -1037,7 +1265,12 @@ function ActivityRow({ item }: { item: ActivityItem }) {
 // Categories tab
 // ===============================================================
 function CategoriesTab({
-  loaded, categories, scores, preferred, selected, setSelected,
+  loaded,
+  categories,
+  scores,
+  preferred,
+  selected,
+  setSelected,
 }: {
   loaded: boolean;
   categories: CategoryRow[];
@@ -1057,7 +1290,16 @@ function CategoriesTab({
       <PageSection title="Your categories">
         <div style={{ display: 'flex', flexDirection: 'column', gap: S[2] }}>
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} style={{ display: 'flex', gap: S[3], padding: S[3], border: `1px solid ${ADMIN_C.divider}`, borderRadius: 10 }}>
+            <div
+              key={i}
+              style={{
+                display: 'flex',
+                gap: S[3],
+                padding: S[3],
+                border: `1px solid ${ADMIN_C.divider}`,
+                borderRadius: 10,
+              }}
+            >
               <SkeletonBar width={140} />
               <div style={{ flex: 1 }} />
               <SkeletonBar width={60} />
@@ -1074,7 +1316,14 @@ function CategoriesTab({
         <EmptyState
           title="No categories yet"
           description="Choose topics you care about to personalize your feed and unlock category scoring."
-          cta={<Button variant="primary" onClick={() => window.location.assign('/profile/settings/feed')}>Pick categories</Button>}
+          cta={
+            <Button
+              variant="primary"
+              onClick={() => window.location.assign('/profile/settings/feed')}
+            >
+              Pick categories
+            </Button>
+          }
         />
       </PageSection>
     );
@@ -1086,7 +1335,11 @@ function CategoriesTab({
         title="Your categories"
         description="Your per-category scores and preferred topics. Click a row to see the category drilldown."
         aside={
-          <Button variant="ghost" size="sm" onClick={() => window.location.assign('/profile/settings/feed')}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => window.location.assign('/profile/settings/feed')}
+          >
             Edit preferences
           </Button>
         }
@@ -1116,47 +1369,83 @@ function CategoriesTab({
                   color: 'inherit',
                   transition: 'background 120ms ease, border-color 120ms ease',
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = ADMIN_C.hover; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = ADMIN_C.bg; }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = ADMIN_C.hover;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = ADMIN_C.bg;
+                }}
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: S[2] }}>
-                    <span style={{ fontSize: F.md, fontWeight: 600, color: ADMIN_C.white }}>{c.name}</span>
-                    {isPref && <Badge variant="info" size="xs">Preferred</Badge>}
+                    <span style={{ fontSize: F.md, fontWeight: 600, color: ADMIN_C.white }}>
+                      {c.name}
+                    </span>
+                    {isPref && (
+                      <Badge variant="info" size="xs">
+                        Preferred
+                      </Badge>
+                    )}
                   </div>
                   <div style={{ fontSize: F.xs, color: ADMIN_C.dim, marginTop: 2 }}>
                     {reads.toLocaleString()} read · {quizzes.toLocaleString()} quizzes correct
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: F.lg, fontWeight: 600, color: ADMIN_C.white, letterSpacing: '-0.01em' }}>
+                  <div
+                    style={{
+                      fontSize: F.lg,
+                      fontWeight: 600,
+                      color: ADMIN_C.white,
+                      letterSpacing: '-0.01em',
+                    }}
+                  >
                     {score.toLocaleString()}
                   </div>
-                  <div style={{ fontSize: F.xs, color: ADMIN_C.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  <div
+                    style={{
+                      fontSize: F.xs,
+                      color: ADMIN_C.muted,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.06em',
+                    }}
+                  >
                     Score
                   </div>
                 </div>
-                <span aria-hidden="true" style={{ color: ADMIN_C.muted, fontSize: F.lg }}>›</span>
+                <span aria-hidden="true" style={{ color: ADMIN_C.muted, fontSize: F.lg }}>
+                  ›
+                </span>
               </button>
             );
           })}
         </div>
       </PageSection>
 
-      {selected && <CategoryDrillModal category={selected} score={byCategory[selected.id]} onClose={() => setSelected(null)} />}
+      {selected && (
+        <CategoryDrillModal
+          category={selected}
+          score={byCategory[selected.id]}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </>
   );
 }
 
 function CategoryDrillModal({
-  category, score, onClose,
+  category,
+  score,
+  onClose,
 }: {
   category: CategoryRow;
   score: CategoryScoreRow | undefined;
   onClose: () => void;
 }) {
   useEffect(() => {
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose(); }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+    }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
@@ -1190,24 +1479,50 @@ function CategoryDrillModal({
           boxShadow: '0 16px 48px rgba(0,0,0,0.12)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: S[4] }}>
-          <div style={{ fontSize: F.xl, fontWeight: 600, color: ADMIN_C.white, letterSpacing: '-0.01em' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: S[4],
+          }}
+        >
+          <div
+            style={{
+              fontSize: F.xl,
+              fontWeight: 600,
+              color: ADMIN_C.white,
+              letterSpacing: '-0.01em',
+            }}
+          >
             {category.name}
           </div>
-          <Button variant="ghost" size="sm" onClick={onClose}>Close</Button>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            Close
+          </Button>
         </div>
         {category.description && (
           <div style={{ fontSize: F.sm, color: ADMIN_C.dim, marginBottom: S[4], lineHeight: 1.5 }}>
             {category.description}
           </div>
         )}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: S[3] }}>
-          <StatCard label="Score"     value={(score?.score ?? 0).toLocaleString()} />
-          <StatCard label="Read"      value={(score?.articles_read ?? 0).toLocaleString()} />
-          <StatCard label="Quizzes"   value={(score?.quizzes_correct ?? 0).toLocaleString()} />
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+            gap: S[3],
+          }}
+        >
+          <StatCard label="Score" value={(score?.score ?? 0).toLocaleString()} />
+          <StatCard label="Read" value={(score?.articles_read ?? 0).toLocaleString()} />
+          <StatCard label="Quizzes" value={(score?.quizzes_correct ?? 0).toLocaleString()} />
         </div>
         <div style={{ marginTop: S[4] }}>
-          <Button variant="primary" block onClick={() => window.location.assign(`/category/${category.id}`)}>
+          <Button
+            variant="primary"
+            block
+            onClick={() => window.location.assign(`/category/${category.id}`)}
+          >
             Browse {category.name}
           </Button>
         </div>
@@ -1220,7 +1535,12 @@ function CategoryDrillModal({
 // Milestones tab
 // ===============================================================
 function MilestonesTab({
-  loaded, achievements, earnedMap, tierInfo, scoreTiers, verityScore,
+  loaded,
+  achievements,
+  earnedMap,
+  tierInfo,
+  scoreTiers,
+  verityScore,
 }: {
   loaded: boolean;
   achievements: AchievementRow[];
@@ -1235,9 +1555,7 @@ function MilestonesTab({
   const nextT = nextTier(tierInfo, scoreTiers);
   const minScore = tierInfo?.min_score ?? 0;
   const range = nextT ? nextT.min_score - minScore : 0;
-  const progress = nextT && range > 0
-    ? Math.min(1, Math.max(0, (score - minScore) / range))
-    : 1;
+  const progress = nextT && range > 0 ? Math.min(1, Math.max(0, (score - minScore) / range)) : 1;
 
   const grouped = useMemo(() => {
     const buckets: Record<string, AchievementRow[]> = {};
@@ -1262,9 +1580,18 @@ function MilestonesTab({
             padding: S[4],
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: S[2] }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: S[2],
+            }}
+          >
             <div>
-              <div style={{ fontSize: F.lg, fontWeight: 600, color: ADMIN_C.white }}>{tierLabel}</div>
+              <div style={{ fontSize: F.lg, fontWeight: 600, color: ADMIN_C.white }}>
+                {tierLabel}
+              </div>
               <div style={{ fontSize: F.xs, color: ADMIN_C.dim, marginTop: 2 }}>
                 {!nextT
                   ? 'Top tier reached'
@@ -1281,12 +1608,23 @@ function MilestonesTab({
 
       <PageSection
         title="Achievements"
-        description={loaded ? `${totalEarned} of ${achievements.length} earned` : 'Earned and available badges'}
+        description={
+          loaded ? `${totalEarned} of ${achievements.length} earned` : 'Earned and available badges'
+        }
       >
         {!loaded && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: S[3] }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+              gap: S[3],
+            }}
+          >
             {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} style={{ padding: S[4], border: `1px solid ${ADMIN_C.divider}`, borderRadius: 10 }}>
+              <div
+                key={i}
+                style={{ padding: S[4], border: `1px solid ${ADMIN_C.divider}`, borderRadius: 10 }}
+              >
                 <SkeletonBar width="60%" />
                 <div style={{ height: S[2] }} />
                 <SkeletonBar width="90%" />
@@ -1299,51 +1637,95 @@ function MilestonesTab({
           <EmptyState
             title="No achievements yet"
             description="Complete a quiz or hit your first streak to start collecting badges."
-            cta={<Button variant="primary" onClick={() => window.location.assign('/')}>Take a quiz</Button>}
+            cta={
+              <Button variant="primary" onClick={() => window.location.assign('/')}>
+                Take a quiz
+              </Button>
+            }
           />
         )}
 
-        {loaded && grouped.map(([group, items]) => (
-          <div key={group} style={{ marginBottom: S[6] }}>
-            <div style={{ fontSize: F.xs, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: ADMIN_C.dim, marginBottom: S[2] }}>
-              {group}
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: S[3] }}>
-              {items.map((a) => {
-                const earnedAt = earnedMap[a.id] ?? null;
-                const isEarned = !!earnedAt;
-                return (
-                  <div
-                    key={a.id}
-                    style={{
-                      padding: S[4],
-                      border: `1px solid ${ADMIN_C.divider}`,
-                      borderRadius: 10,
-                      background: isEarned ? ADMIN_C.bg : ADMIN_C.card,
-                      opacity: isEarned ? 1 : 0.72,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: S[1],
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: S[2] }}>
-                      <div style={{ fontSize: F.md, fontWeight: 600, color: ADMIN_C.white }}>{a.name}</div>
-                      {isEarned
-                        ? <Badge variant="success" size="xs">Earned</Badge>
-                        : <Badge variant="ghost" size="xs">Locked</Badge>}
+        {loaded &&
+          grouped.map(([group, items]) => (
+            <div key={group} style={{ marginBottom: S[6] }}>
+              <div
+                style={{
+                  fontSize: F.xs,
+                  fontWeight: 700,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  color: ADMIN_C.dim,
+                  marginBottom: S[2],
+                }}
+              >
+                {group}
+              </div>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                  gap: S[3],
+                }}
+              >
+                {items.map((a) => {
+                  const earnedAt = earnedMap[a.id] ?? null;
+                  const isEarned = !!earnedAt;
+                  return (
+                    <div
+                      key={a.id}
+                      style={{
+                        padding: S[4],
+                        border: `1px solid ${ADMIN_C.divider}`,
+                        borderRadius: 10,
+                        background: isEarned ? ADMIN_C.bg : ADMIN_C.card,
+                        opacity: isEarned ? 1 : 0.72,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: S[1],
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'flex-start',
+                          gap: S[2],
+                        }}
+                      >
+                        <div style={{ fontSize: F.md, fontWeight: 600, color: ADMIN_C.white }}>
+                          {a.name}
+                        </div>
+                        {isEarned ? (
+                          <Badge variant="success" size="xs">
+                            Earned
+                          </Badge>
+                        ) : (
+                          <Badge variant="ghost" size="xs">
+                            Locked
+                          </Badge>
+                        )}
+                      </div>
+                      <div style={{ fontSize: F.sm, color: ADMIN_C.dim, lineHeight: 1.45 }}>
+                        {a.description}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: F.xs,
+                          color: ADMIN_C.muted,
+                          marginTop: 'auto',
+                          paddingTop: S[2],
+                        }}
+                      >
+                        {isEarned
+                          ? `Earned ${timeAgo(earnedAt)}`
+                          : `${a.points_reward} pts · ${a.rarity}`}
+                      </div>
                     </div>
-                    <div style={{ fontSize: F.sm, color: ADMIN_C.dim, lineHeight: 1.45 }}>{a.description}</div>
-                    <div style={{ fontSize: F.xs, color: ADMIN_C.muted, marginTop: 'auto', paddingTop: S[2] }}>
-                      {isEarned
-                        ? `Earned ${timeAgo(earnedAt)}`
-                        : `${a.points_reward} pts · ${a.rarity}`}
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
       </PageSection>
     </>
   );
@@ -1358,7 +1740,11 @@ function LockedTab({ name }: { name: string }) {
       <EmptyState
         title={`${name} is unavailable`}
         description="Verify your email or upgrade your plan to unlock this tab."
-        cta={<Button variant="primary" onClick={() => window.location.assign('/verify-email')}>Verify email</Button>}
+        cta={
+          <Button variant="primary" onClick={() => window.location.assign('/verify-email')}>
+            Verify email
+          </Button>
+        }
       />
     </PageSection>
   );

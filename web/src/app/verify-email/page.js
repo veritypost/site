@@ -40,7 +40,9 @@ export default function VerifyEmailPage() {
     // auth.users.email_confirmed_at (which Supabase may auto-set at signup
     // when "Confirm email" is OFF). Ask the app layer instead.
     const checkVerified = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
       if (!cancelled && user.email) setUserEmail(user.email);
 
@@ -55,7 +57,9 @@ export default function VerifyEmailPage() {
 
     checkVerified();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'USER_UPDATED' || event === 'SIGNED_IN') checkVerified();
     });
 
@@ -87,7 +91,11 @@ export default function VerifyEmailPage() {
       setCooldown(60);
       const interval = setInterval(() => {
         setCooldown((prev) => {
-          if (prev <= 1) { clearInterval(interval); setResending(false); return 0; }
+          if (prev <= 1) {
+            clearInterval(interval);
+            setResending(false);
+            return 0;
+          }
           return prev - 1;
         });
       }, 1000);
@@ -131,12 +139,51 @@ export default function VerifyEmailPage() {
 
   if (verified) {
     return (
-      <div style={{ minHeight: '100vh', backgroundColor: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-        <div style={{ backgroundColor: C.card, border: `1px solid ${C.border}`, borderRadius: '18px', padding: '48px 36px', width: '100%', maxWidth: '420px', boxSizing: 'border-box', textAlign: 'center' }}>
-          <h2 style={{ fontSize: '24px', fontWeight: '700', color: C.text, margin: '0 0 10px 0' }}>Email verified!</h2>
-          <p style={{ fontSize: '14px', color: C.dim, margin: '0 0 28px 0', lineHeight: '1.6' }}>Welcome to Verity Post. Your account is ready.</p>
-          <button type="button" onClick={() => window.location.href = '/welcome'}
-            style={{ width: '100%', padding: '13px', fontSize: '15px', fontWeight: '600', color: '#fff', backgroundColor: C.success, border: 'none', borderRadius: '10px', cursor: 'pointer', fontFamily: 'inherit' }}>
+      <div
+        style={{
+          minHeight: '100vh',
+          backgroundColor: C.bg,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '24px 16px',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        }}
+      >
+        <div
+          style={{
+            backgroundColor: C.card,
+            border: `1px solid ${C.border}`,
+            borderRadius: '18px',
+            padding: '48px 36px',
+            width: '100%',
+            maxWidth: '420px',
+            boxSizing: 'border-box',
+            textAlign: 'center',
+          }}
+        >
+          <h2 style={{ fontSize: '24px', fontWeight: '700', color: C.text, margin: '0 0 10px 0' }}>
+            Email verified!
+          </h2>
+          <p style={{ fontSize: '14px', color: C.dim, margin: '0 0 28px 0', lineHeight: '1.6' }}>
+            Welcome to Verity Post. Your account is ready.
+          </p>
+          <button
+            type="button"
+            onClick={() => (window.location.href = '/welcome')}
+            style={{
+              width: '100%',
+              padding: '13px',
+              fontSize: '15px',
+              fontWeight: '600',
+              color: '#fff',
+              backgroundColor: C.success,
+              border: 'none',
+              borderRadius: '10px',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
             Continue
           </button>
         </div>
@@ -145,54 +192,139 @@ export default function VerifyEmailPage() {
   }
 
   return (
-    <div style={{
-      minHeight: '100vh', backgroundColor: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: '24px 16px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', boxSizing: 'border-box',
-    }}>
-      <div style={{ backgroundColor: C.card, border: `1px solid ${C.border}`, borderRadius: '18px', padding: '40px 36px', width: '100%', maxWidth: '420px', boxSizing: 'border-box', textAlign: 'center' }}>
-        <div style={{ fontSize: '20px', fontWeight: '800', color: C.accent, letterSpacing: '-0.5px', marginBottom: '28px', textAlign: 'left' }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        backgroundColor: C.bg,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '24px 16px',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        boxSizing: 'border-box',
+      }}
+    >
+      <div
+        style={{
+          backgroundColor: C.card,
+          border: `1px solid ${C.border}`,
+          borderRadius: '18px',
+          padding: '40px 36px',
+          width: '100%',
+          maxWidth: '420px',
+          boxSizing: 'border-box',
+          textAlign: 'center',
+        }}
+      >
+        <div
+          style={{
+            fontSize: '20px',
+            fontWeight: '800',
+            color: C.accent,
+            letterSpacing: '-0.5px',
+            marginBottom: '28px',
+            textAlign: 'left',
+          }}
+        >
           Verity Post
         </div>
 
         {error && (
-          <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '12px 14px', marginBottom: '16px', textAlign: 'left' }}>
+          <div
+            style={{
+              backgroundColor: '#fef2f2',
+              border: '1px solid #fecaca',
+              borderRadius: '10px',
+              padding: '12px 14px',
+              marginBottom: '16px',
+              textAlign: 'left',
+            }}
+          >
             <p style={{ margin: 0, fontSize: '13px', color: '#dc2626' }}>{error}</p>
           </div>
         )}
 
-        <h1 style={{ fontSize: '24px', fontWeight: '700', color: C.text, margin: '0 0 10px 0' }}>Verify your email</h1>
-        <p style={{ fontSize: '14px', color: C.dim, margin: '0 0 4px 0', lineHeight: '1.6' }}>We sent a verification link to</p>
-        <p style={{ fontSize: '15px', fontWeight: '600', color: C.text, margin: '0 0 24px 0' }}>{userEmail ? maskEmail(userEmail) : '...'}</p>
+        <h1 style={{ fontSize: '24px', fontWeight: '700', color: C.text, margin: '0 0 10px 0' }}>
+          Verify your email
+        </h1>
+        <p style={{ fontSize: '14px', color: C.dim, margin: '0 0 4px 0', lineHeight: '1.6' }}>
+          We sent a verification link to
+        </p>
+        <p style={{ fontSize: '15px', fontWeight: '600', color: C.text, margin: '0 0 24px 0' }}>
+          {userEmail ? maskEmail(userEmail) : '...'}
+        </p>
 
-        <div style={{ backgroundColor: C.bg, border: `1px solid ${C.border}`, borderRadius: '10px', padding: '14px 16px', marginBottom: '22px', textAlign: 'left' }}>
-          <p style={{ margin: '0 0 4px 0', fontSize: '13px', color: C.text, fontWeight: '600' }}>Didn&apos;t get it?</p>
+        <div
+          style={{
+            backgroundColor: C.bg,
+            border: `1px solid ${C.border}`,
+            borderRadius: '10px',
+            padding: '14px 16px',
+            marginBottom: '22px',
+            textAlign: 'left',
+          }}
+        >
+          <p style={{ margin: '0 0 4px 0', fontSize: '13px', color: C.text, fontWeight: '600' }}>
+            Didn&apos;t get it?
+          </p>
           <p style={{ margin: 0, fontSize: '13px', color: C.dim, lineHeight: '1.5' }}>
-            Check your spam folder, or wait a minute and try resending. The link expires after 24 hours.
+            Check your spam folder, or wait a minute and try resending. The link expires after 24
+            hours.
           </p>
         </div>
 
-        <button type="button" onClick={handleResend} disabled={cooldown > 0 || resending}
+        <button
+          type="button"
+          onClick={handleResend}
+          disabled={cooldown > 0 || resending}
           style={{
-            width: '100%', padding: '13px', fontSize: '15px', fontWeight: '600', fontFamily: 'inherit',
+            width: '100%',
+            padding: '13px',
+            fontSize: '15px',
+            fontWeight: '600',
+            fontFamily: 'inherit',
             color: cooldown > 0 ? C.dim : '#fff',
             backgroundColor: cooldown > 0 ? C.bg : C.accent,
             border: cooldown > 0 ? `1px solid ${C.border}` : 'none',
-            borderRadius: '10px', cursor: cooldown > 0 ? 'not-allowed' : 'pointer', marginBottom: '14px', transition: 'all 0.15s',
-          }}>
+            borderRadius: '10px',
+            cursor: cooldown > 0 ? 'not-allowed' : 'pointer',
+            marginBottom: '14px',
+            transition: 'all 0.15s',
+          }}
+        >
           {cooldown > 0 ? `Resend in ${cooldown}s` : resending ? 'Sending...' : 'Resend Email'}
         </button>
 
         {!changeEmail ? (
           <>
-            <button type="button" onClick={() => setChangeEmail(true)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: C.accent, fontWeight: '500', fontFamily: 'inherit', textDecoration: 'underline' }}>
+            <button
+              type="button"
+              onClick={() => setChangeEmail(true)}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '13px',
+                color: C.accent,
+                fontWeight: '500',
+                fontFamily: 'inherit',
+                textDecoration: 'underline',
+              }}
+            >
               Change email address
             </button>
             {/* Escape hatch: signed up with an inaccessible email + both other */}
             {/* actions failing = stuck. /logout handles server-side cleanup. */}
             <div style={{ marginTop: '14px' }}>
-              <a href="/logout"
-                style={{ fontSize: '12px', color: C.dim, fontFamily: 'inherit', textDecoration: 'underline' }}>
+              <a
+                href="/logout"
+                style={{
+                  fontSize: '12px',
+                  color: C.dim,
+                  fontFamily: 'inherit',
+                  textDecoration: 'underline',
+                }}
+              >
                 Use a different account
               </a>
             </div>
@@ -206,15 +338,59 @@ export default function VerifyEmailPage() {
               onChange={(e) => setNewEmail(e.target.value)}
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
-              style={{ width: '100%', padding: '11px 14px', fontSize: '14px', color: C.text, backgroundColor: C.bg, border: `1.5px solid ${focused ? C.accent : C.border}`, borderRadius: '10px', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', marginBottom: '10px' }}
+              style={{
+                width: '100%',
+                padding: '11px 14px',
+                fontSize: '14px',
+                color: C.text,
+                backgroundColor: C.bg,
+                border: `1.5px solid ${focused ? C.accent : C.border}`,
+                borderRadius: '10px',
+                outline: 'none',
+                boxSizing: 'border-box',
+                fontFamily: 'inherit',
+                marginBottom: '10px',
+              }}
             />
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button type="button" onClick={() => { setChangeEmail(false); setNewEmail(''); }}
-                style={{ flex: 1, padding: '10px', fontSize: '13px', fontWeight: '500', color: C.text, backgroundColor: C.bg, border: `1px solid ${C.border}`, borderRadius: '8px', cursor: 'pointer', fontFamily: 'inherit' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setChangeEmail(false);
+                  setNewEmail('');
+                }}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  color: C.text,
+                  backgroundColor: C.bg,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
                 Cancel
               </button>
-              <button type="button" onClick={handleUpdateEmail} disabled={updateLoading || !newEmail}
-                style={{ flex: 1, padding: '10px', fontSize: '13px', fontWeight: '600', color: '#fff', backgroundColor: updateLoading || !newEmail ? '#cccccc' : C.accent, border: 'none', borderRadius: '8px', cursor: updateLoading || !newEmail ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
+              <button
+                type="button"
+                onClick={handleUpdateEmail}
+                disabled={updateLoading || !newEmail}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  color: '#fff',
+                  backgroundColor: updateLoading || !newEmail ? '#cccccc' : C.accent,
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: updateLoading || !newEmail ? 'not-allowed' : 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
                 {updateLoading ? 'Updating...' : 'Update Email'}
               </button>
             </div>

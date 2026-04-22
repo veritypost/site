@@ -22,14 +22,17 @@ export async function POST(request) {
     if (rate.limited) {
       return NextResponse.json(
         { error: 'Too many reports. Try again in an hour.' },
-        { status: 429, headers: { 'Retry-After': '3600' } },
+        { status: 429, headers: { 'Retry-After': '3600' } }
       );
     }
 
     const { targetType, targetId, reason, description } = await request.json();
 
     if (!targetType || !targetId || !reason) {
-      return NextResponse.json({ error: 'targetType, targetId, and reason are required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'targetType, targetId, and reason are required' },
+        { status: 400 }
+      );
     }
 
     const { data: report, error: insertError } = await supabase

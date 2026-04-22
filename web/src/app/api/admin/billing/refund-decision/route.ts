@@ -13,20 +13,29 @@ type Body = { invoice_id?: string; decision?: Decision };
 
 export async function POST(request: Request) {
   let actor;
-  try { actor = await requirePermission('admin.billing.refund'); }
-  catch (err) { return permissionError(err); }
+  try {
+    actor = await requirePermission('admin.billing.refund');
+  } catch (err) {
+    return permissionError(err);
+  }
   void actor;
 
   const body = (await request.json().catch(() => ({}))) as Body;
   const invoiceId = typeof body.invoice_id === 'string' ? body.invoice_id : '';
   const decision = body.decision as Decision | undefined;
   if (!invoiceId || !decision || !ALLOWED.has(decision)) {
-    return NextResponse.json({ error: 'invoice_id and decision (approved|denied|partial) required' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'invoice_id and decision (approved|denied|partial) required' },
+      { status: 400 }
+    );
   }
 
-  const statusMarker = decision === 'approved' ? 'approved_pending_stripe'
-    : decision === 'denied' ? 'rejected'
-    : decision;
+  const statusMarker =
+    decision === 'approved'
+      ? 'approved_pending_stripe'
+      : decision === 'denied'
+        ? 'rejected'
+        : decision;
 
   const service = createServiceClient();
   const { data: current } = await service

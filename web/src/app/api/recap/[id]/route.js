@@ -5,8 +5,9 @@ import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 
 export async function GET(_request, { params }) {
-  try { await requirePermission('recap.list.view'); }
-  catch (err) {
+  try {
+    await requirePermission('recap.list.view');
+  } catch (err) {
     return NextResponse.json({ error: err.message }, { status: err.status || 401 });
   }
 
@@ -26,9 +27,9 @@ export async function GET(_request, { params }) {
     .order('sort_order');
 
   // Strip is_correct from options before returning.
-  const safeQuestions = (questions || []).map(q => ({
+  const safeQuestions = (questions || []).map((q) => ({
     ...q,
-    options: (q.options || []).map(o => ({ text: o.text })),
+    options: (q.options || []).map((o) => ({ text: o.text })),
   }));
 
   return NextResponse.json({ recap, questions: safeQuestions });

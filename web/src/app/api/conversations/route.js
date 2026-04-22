@@ -13,8 +13,9 @@ import { createServiceClient } from '@/lib/supabase/server';
 // single SECURITY DEFINER transaction so we never leave half-built convos.
 export async function POST(request) {
   let user;
-  try { user = await requirePermission('messages.dm.compose'); }
-  catch (err) {
+  try {
+    user = await requirePermission('messages.dm.compose');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
@@ -31,15 +32,23 @@ export async function POST(request) {
   });
   if (error) {
     const msg = error.message || '';
-    const status = msg.includes('paid plan') ? 403
-      : msg.includes('muted') || msg.includes('banned') ? 403
-      : msg.includes('not found') ? 404
-      : msg.includes('yourself') ? 400
-      : 400;
-    const userMsg = status === 404 ? 'Recipient not found.'
-      : status === 403 ? 'You cannot start a conversation with this user.'
-      : msg.includes('yourself') ? 'You cannot message yourself.'
-      : 'Could not start conversation';
+    const status = msg.includes('paid plan')
+      ? 403
+      : msg.includes('muted') || msg.includes('banned')
+        ? 403
+        : msg.includes('not found')
+          ? 404
+          : msg.includes('yourself')
+            ? 400
+            : 400;
+    const userMsg =
+      status === 404
+        ? 'Recipient not found.'
+        : status === 403
+          ? 'You cannot start a conversation with this user.'
+          : msg.includes('yourself')
+            ? 'You cannot message yourself.'
+            : 'Could not start conversation';
     console.error('[conversations.post]', error);
     return NextResponse.json({ error: userMsg }, { status });
   }

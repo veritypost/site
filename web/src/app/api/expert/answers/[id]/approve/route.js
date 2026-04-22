@@ -9,8 +9,9 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // to visible. D3: 30-day probation.
 export async function POST(_request, { params }) {
   let user;
-  try { user = await requirePermission('admin.expert.answers.approve'); }
-  catch (err) {
+  try {
+    user = await requirePermission('admin.expert.answers.approve');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -20,6 +21,10 @@ export async function POST(_request, { params }) {
     p_editor_id: user.id,
     p_comment_id: params.id,
   });
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'expert.answers.id.approve', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'expert.answers.id.approve',
+      fallbackStatus: 400,
+    });
   return NextResponse.json({ ok: true });
 }

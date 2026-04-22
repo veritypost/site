@@ -29,8 +29,9 @@ export async function generateMetadata({ params }) {
   const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://veritypost.com';
   const name = target.display_name || target.username;
   const title = `${name} on Verity Post`;
-  const description = target.bio?.slice(0, 160)
-    || `View ${target.username}'s Verity Post profile — quiz-gated news discussion.`;
+  const description =
+    target.bio?.slice(0, 160) ||
+    `View ${target.username}'s Verity Post profile — quiz-gated news discussion.`;
   const path = `/u/${username}`;
   const ogImage = { url: `${base}/card/${username}/opengraph-image`, alt: `${name} profile card` };
 

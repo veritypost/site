@@ -11,10 +11,12 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // article's quiz can tag (D16). The RPC autopins the comment once
 // threshold is reached.
 export async function POST(_request, { params }) {
-  const blocked = await v2LiveGuard(); if (blocked) return blocked;
+  const blocked = await v2LiveGuard();
+  if (blocked) return blocked;
   let user;
-  try { user = await requirePermission('comments.context_tag'); }
-  catch (err) {
+  try {
+    user = await requirePermission('comments.context_tag');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
@@ -24,6 +26,10 @@ export async function POST(_request, { params }) {
     p_user_id: user.id,
     p_comment_id: params.id,
   });
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'comments.id.context_tag', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'comments.id.context_tag',
+      fallbackStatus: 400,
+    });
   return NextResponse.json(data);
 }

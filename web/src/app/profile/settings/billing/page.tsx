@@ -19,9 +19,10 @@ export default async function SettingsBillingRedirect({
 }: {
   searchParams?: SP | Promise<SP>;
 }): Promise<never> {
-  const sp = (searchParams && typeof (searchParams as Promise<SP>).then === 'function'
-    ? await (searchParams as Promise<SP>)
-    : (searchParams as SP | undefined)) || {};
+  const sp =
+    (searchParams && typeof (searchParams as Promise<SP>).then === 'function'
+      ? await (searchParams as Promise<SP>)
+      : (searchParams as SP | undefined)) || {};
   const qs = new URLSearchParams();
   const pass = (k: string) => {
     const v = sp[k];

@@ -13,8 +13,9 @@ import { MOD_ROLES } from '@/lib/roles';
 // POST — kid submits a question. Body: { kid_profile_id, question_text }
 export async function GET(_request, { params }) {
   let user;
-  try { user = await requirePermission('expert.session.questions.view'); }
-  catch (err) {
+  try {
+    user = await requirePermission('expert.session.questions.view');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
@@ -37,7 +38,11 @@ export async function GET(_request, { params }) {
     .select('*, kid_profiles(id, parent_user_id, display_name, avatar_color)')
     .eq('session_id', params.id)
     .order('created_at');
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'expert_sessions.id.questions', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'expert_sessions.id.questions',
+      fallbackStatus: 400,
+    });
 
   const questions = (data || []).map((row) => {
     const isParentOfKid = row.kid_profiles?.parent_user_id === user.id;
@@ -57,22 +62,29 @@ export async function GET(_request, { params }) {
 
 export async function POST(request, { params }) {
   let user;
-  try { user = await requirePermission('kids_expert.question.ask'); }
-  catch (err) {
+  try {
+    user = await requirePermission('kids_expert.question.ask');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
 
   const { kid_profile_id, question_text } = await request.json().catch(() => ({}));
   if (!kid_profile_id || !question_text) {
-    return NextResponse.json({ error: 'kid_profile_id and question_text required' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'kid_profile_id and question_text required' },
+      { status: 400 }
+    );
   }
 
   const service = createServiceClient();
 
   // Confirm the parent owns this kid profile.
   const { data: kid } = await service
-    .from('kid_profiles').select('id, parent_user_id').eq('id', kid_profile_id).maybeSingle();
+    .from('kid_profiles')
+    .select('id, parent_user_id')
+    .eq('id', kid_profile_id)
+    .maybeSingle();
   if (!kid || kid.parent_user_id !== user.id) {
     return NextResponse.json({ error: 'Kid profile not accessible' }, { status: 403 });
   }
@@ -87,6 +99,10 @@ export async function POST(request, { params }) {
     })
     .select('id')
     .single();
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'expert_sessions.id.questions', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'expert_sessions.id.questions',
+      fallbackStatus: 400,
+    });
   return NextResponse.json({ id: data.id });
 }

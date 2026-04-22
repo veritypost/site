@@ -31,12 +31,12 @@
 import { createClient } from './supabase/client';
 import { SECTIONS, DENY_MODE, LOCK_REASON } from './permissionKeys';
 
-const sectionCache = new Map();   // section -> { rows, fetchedAt, version }
-let allPermsCache = null;         // Map<permission_key, row> — null means "never loaded"
+const sectionCache = new Map(); // section -> { rows, fetchedAt, version }
+let allPermsCache = null; // Map<permission_key, row> — null means "never loaded"
 let allPermsFetchedAt = 0;
 let allPermsInflight = null;
 let versionState = { user_version: 0, global_version: 0, checkedAt: 0 };
-let inflight = new Map();         // section -> Promise (dedupe concurrent fetches)
+let inflight = new Map(); // section -> Promise (dedupe concurrent fetches)
 
 // --------- Cache control ---------
 export function invalidate() {
@@ -120,27 +120,25 @@ export async function refreshAllPermissions() {
 // --------- Legacy path: section fetch ---------
 export async function getCapabilities(section) {
   if (sectionCache.has(section)) return sectionCache.get(section).rows;
-  if (inflight.has(section))     return inflight.get(section);
+  if (inflight.has(section)) return inflight.get(section);
 
   const supabase = createClient();
   const args = { p_section: section };
 
-  const p = supabase
-    .rpc('get_my_capabilities', args)
-    .then(({ data, error }) => {
-      inflight.delete(section);
-      if (error) {
-        console.warn('[permissions] get_my_capabilities failed', section, error);
-        return [];
-      }
-      const rows = Array.isArray(data) ? data : [];
-      sectionCache.set(section, {
-        rows,
-        fetchedAt: Date.now(),
-        version: versionState.global_version,
-      });
-      return rows;
+  const p = supabase.rpc('get_my_capabilities', args).then(({ data, error }) => {
+    inflight.delete(section);
+    if (error) {
+      console.warn('[permissions] get_my_capabilities failed', section, error);
+      return [];
+    }
+    const rows = Array.isArray(data) ? data : [];
+    sectionCache.set(section, {
+      rows,
+      fetchedAt: Date.now(),
+      version: versionState.global_version,
     });
+    return rows;
+  });
   inflight.set(section, p);
   return p;
 }

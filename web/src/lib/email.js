@@ -22,12 +22,13 @@ function escapeHtml(str) {
 // treat it as a header, not HTML.
 export function renderTemplate(tpl, variables = {}, opts = {}) {
   const htmlMode = opts.html !== false; // default true
-  const replace = (s, html) => s.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => {
-    const v = variables[k];
-    if (v === undefined || v === null) return '';
-    const str = String(v);
-    return html ? escapeHtml(str) : str;
-  });
+  const replace = (s, html) =>
+    s.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => {
+      const v = variables[k];
+      if (v === undefined || v === null) return '';
+      const str = String(v);
+      return html ? escapeHtml(str) : str;
+    });
   return {
     subject: replace(tpl.subject || '', false),
     html: replace(tpl.body_html || '', htmlMode),

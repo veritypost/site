@@ -53,7 +53,12 @@ async function stripeFetch(path, { method = 'GET', body, idempotencyKey } = {}) 
 }
 
 export async function createCheckoutSession({
-  userId, customerId, priceId, planName, successUrl, cancelUrl,
+  userId,
+  customerId,
+  priceId,
+  planName,
+  successUrl,
+  cancelUrl,
 }) {
   const body = {
     mode: 'subscription',
@@ -96,25 +101,30 @@ export function verifyWebhook(rawBody, signatureHeader) {
 
   // Format: t=TIMESTAMP,v1=SIG[,v1=SIG...]
   const parts = Object.fromEntries(
-    signatureHeader.split(',').map(p => {
+    signatureHeader.split(',').map((p) => {
       const eq = p.indexOf('=');
       return [p.slice(0, eq), p.slice(eq + 1)];
     })
   );
   const timestamp = parts.t;
-  const signatures = signatureHeader.split(',')
-    .filter(p => p.startsWith('v1='))
-    .map(p => p.slice(3));
+  const signatures = signatureHeader
+    .split(',')
+    .filter((p) => p.startsWith('v1='))
+    .map((p) => p.slice(3));
   if (!timestamp || signatures.length === 0) throw new Error('malformed signature');
 
   const payload = `${timestamp}.${rawBody}`;
   const expected = crypto.createHmac('sha256', whsec).update(payload).digest('hex');
 
-  const match = signatures.some(sig => {
+  const match = signatures.some((sig) => {
     try {
-      return sig.length === expected.length
-        && crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
-    } catch { return false; }
+      return (
+        sig.length === expected.length &&
+        crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))
+      );
+    } catch {
+      return false;
+    }
   });
   if (!match) throw new Error('signature mismatch');
 
@@ -125,7 +135,7 @@ export function verifyWebhook(rawBody, signatureHeader) {
   // finite number first.
   const tSec = Number(timestamp);
   if (!Number.isFinite(tSec)) throw new Error('timestamp not a finite number');
-  const ageSec = (Date.now() / 1000) - tSec;
+  const ageSec = Date.now() / 1000 - tSec;
   // Accept small future-skew (up to 30s, covers NTP drift) but reject
   // anything older than 5 minutes.
   if (ageSec < -30) throw new Error('timestamp too far in the future');

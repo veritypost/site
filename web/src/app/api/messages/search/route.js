@@ -11,8 +11,9 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // Paid-only per D11; the page gate already blocks free users, this is belt.
 export async function GET(request) {
   let user;
-  try { user = await requirePermission('messages.search'); }
-  catch (err) {
+  try {
+    user = await requirePermission('messages.search');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
@@ -34,7 +35,9 @@ export async function GET(request) {
 
   let builder = service
     .from('users')
-    .select('id, username, avatar_color, verity_score, is_expert, user_roles!inner(roles!inner(name))')
+    .select(
+      'id, username, avatar_color, verity_score, is_expert, user_roles!inner(roles!inner(name))'
+    )
     .ilike('username', `%${safeQ}%`)
     .neq('id', user.id)
     .limit(20);
@@ -43,12 +46,19 @@ export async function GET(request) {
   }
 
   const { data, error } = await builder;
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'messages.search', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'messages.search',
+      fallbackStatus: 400,
+    });
 
   return NextResponse.json({
-    users: (data || []).map(u => ({
-      id: u.id, username: u.username, avatar_color: u.avatar_color,
-      verity_score: u.verity_score, is_expert: u.is_expert,
+    users: (data || []).map((u) => ({
+      id: u.id,
+      username: u.username,
+      avatar_color: u.avatar_color,
+      verity_score: u.verity_score,
+      is_expert: u.is_expert,
     })),
   });
 }

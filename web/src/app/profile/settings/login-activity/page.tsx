@@ -7,6 +7,8 @@ import { useRouter } from 'next/navigation';
 
 export default function SettingsLoginActivityRedirect(): null {
   const router = useRouter();
-  useEffect(() => { router.replace('/profile/settings#login-activity'); }, [router]);
+  useEffect(() => {
+    router.replace('/profile/settings#login-activity');
+  }, [router]);
   return null;
 }

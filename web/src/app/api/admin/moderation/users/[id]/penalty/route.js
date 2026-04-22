@@ -18,14 +18,16 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // an actor does not strictly outrank themselves.
 export async function POST(request, { params }) {
   let user;
-  try { user = await requirePermission('admin.moderation.penalty.warn'); }
-  catch (err) {
+  try {
+    user = await requirePermission('admin.moderation.penalty.warn');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   const { level, reason } = await request.json().catch(() => ({}));
-  if (!level || !reason) return NextResponse.json({ error: 'level and reason required' }, { status: 400 });
+  if (!level || !reason)
+    return NextResponse.json({ error: 'level and reason required' }, { status: 400 });
   const levelNum = Number(level);
   if (!Number.isInteger(levelNum) || levelNum < 1 || levelNum > 4) {
     return NextResponse.json({ error: 'level must be 1..4' }, { status: 400 });
@@ -54,6 +56,10 @@ export async function POST(request, { params }) {
     p_level: levelNum,
     p_reason: reason,
   });
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.moderation.users.id.penalty', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'admin.moderation.users.id.penalty',
+      fallbackStatus: 400,
+    });
   return NextResponse.json({ warning_id: data });
 }

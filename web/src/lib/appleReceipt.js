@@ -41,9 +41,9 @@ function loadRootCert() {
   } catch {
     throw new Error(
       'Apple Root CA - G3 cert not found. Run:\n' +
-      '  curl -o web/src/lib/certs/apple-root-ca-g3.der \\\n' +
-      '    https://www.apple.com/certificateauthority/AppleRootCA-G3.cer\n' +
-      'or set APPLE_ROOT_CA_DER_BASE64.'
+        '  curl -o web/src/lib/certs/apple-root-ca-g3.der \\\n' +
+        '    https://www.apple.com/certificateauthority/AppleRootCA-G3.cer\n' +
+        'or set APPLE_ROOT_CA_DER_BASE64.'
     );
   }
   cachedRootCert = new crypto.X509Certificate(der);
@@ -78,7 +78,7 @@ function parseJws(jwsString) {
 // signed by the vendored Apple Root CA. Node's X509Certificate.verify(key)
 // checks the cert's signature against the issuer's public key.
 function verifyChain(x5c) {
-  const certs = x5c.map(b64 => new crypto.X509Certificate(Buffer.from(b64, 'base64')));
+  const certs = x5c.map((b64) => new crypto.X509Certificate(Buffer.from(b64, 'base64')));
   const root = loadRootCert();
 
   for (let i = 0; i < certs.length - 1; i += 1) {

@@ -11,8 +11,9 @@ import { checkRateLimit } from '@/lib/rateLimit';
 //         portfolio_urls[], sample_responses[3], category_ids[] }
 export async function POST(request) {
   let user;
-  try { user = await requirePermission('expert.application.apply'); }
-  catch (err) {
+  try {
+    user = await requirePermission('expert.application.apply');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
@@ -30,7 +31,7 @@ export async function POST(request) {
   if (rate.limited) {
     return NextResponse.json(
       { error: 'Too many applications. Try again later.' },
-      { status: 429, headers: { 'Retry-After': '3600' } },
+      { status: 429, headers: { 'Retry-After': '3600' } }
     );
   }
 

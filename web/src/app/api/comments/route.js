@@ -11,7 +11,8 @@ import { v2LiveGuard } from '@/lib/featureFlags';
 // mentions is an array of { user_id, username }; the RPC strips it
 // for free-tier users (D21).
 export async function POST(request) {
-  const blocked = await v2LiveGuard(); if (blocked) return blocked;
+  const blocked = await v2LiveGuard();
+  if (blocked) return blocked;
   let user;
   try {
     user = await requirePermission('comments.post');
@@ -49,9 +50,14 @@ export async function POST(request) {
   // Re-fetch the row so the client gets the full shape (counts etc.).
   const { data: full } = await service
     .from('comments')
-    .select('*, users!user_id(id, username, avatar_color, avatar_url, is_verified_public_figure, is_expert, plans(tier))')
+    .select(
+      '*, users!user_id(id, username, avatar_color, avatar_url, is_verified_public_figure, is_expert, plans(tier))'
+    )
     .eq('id', data.id)
     .maybeSingle();
 
-  return NextResponse.json({ comment: full || { id: data.id }, scoring: scoring?.error ? null : scoring });
+  return NextResponse.json({
+    comment: full || { id: data.id },
+    scoring: scoring?.error ? null : scoring,
+  });
 }

@@ -190,12 +190,24 @@ export default function PublicProfilePage() {
       setUser(decorated);
 
       // Check current user auth + follow/block status
-      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser();
       if (authUser) {
         setCurrentUser(authUser);
         const [followRes, blockRes] = await Promise.all([
-          supabase.from('follows').select('id').eq('follower_id', authUser.id).eq('following_id', targetId).maybeSingle(),
-          supabase.from('blocked_users').select('id').eq('blocker_id', authUser.id).eq('blocked_id', targetId).maybeSingle(),
+          supabase
+            .from('follows')
+            .select('id')
+            .eq('follower_id', authUser.id)
+            .eq('following_id', targetId)
+            .maybeSingle(),
+          supabase
+            .from('blocked_users')
+            .select('id')
+            .eq('blocker_id', authUser.id)
+            .eq('blocked_id', targetId)
+            .maybeSingle(),
         ]);
         if (followRes.data) setIsFollowing(true);
         if (blockRes.data) setIsBlocked(true);
@@ -223,11 +235,13 @@ export default function PublicProfilePage() {
       }
       const attemptList = Object.values(attempts);
       const totalQuizzes = attemptList.length;
-      const accuracy = totalQuizzes > 0
-        ? Math.round(
-            attemptList.reduce((sum, a) => sum + (a.total ? (a.correct / a.total) * 100 : 0), 0) / totalQuizzes,
-          )
-        : 0;
+      const accuracy =
+        totalQuizzes > 0
+          ? Math.round(
+              attemptList.reduce((sum, a) => sum + (a.total ? (a.correct / a.total) * 100 : 0), 0) /
+                totalQuizzes
+            )
+          : 0;
 
       setStats([
         { label: 'Quick Checks', value: totalQuizzes },
@@ -243,14 +257,19 @@ export default function PublicProfilePage() {
         .eq('user_id', targetId)
         .order('created_at', { ascending: false });
 
-      type BadgeRow = { id: string; achievements: { name: string | null; description: string | null } | null };
+      type BadgeRow = {
+        id: string;
+        achievements: { name: string | null; description: string | null } | null;
+      };
       const typedBadges = (badgesData as unknown as BadgeRow[] | null) || [];
-      setBadges(typedBadges.map((b) => ({
-        id: b.id,
-        icon: '',
-        name: b.achievements?.name || '',
-        desc: b.achievements?.description || '',
-      })));
+      setBadges(
+        typedBadges.map((b) => ({
+          id: b.id,
+          icon: '',
+          name: b.achievements?.name || '',
+          desc: b.achievements?.description || '',
+        }))
+      );
 
       // Fetch recent activity from reading_log, quiz_attempts (v2 per-answer
       // rows grouped per attempt), and comments.
@@ -277,14 +296,19 @@ export default function PublicProfilePage() {
       ]);
 
       const activityItems: ActivityItem[] = [];
-      (readingRes.data || []).forEach((r) => activityItems.push({
-        id: 'r-' + r.id,
-        text: 'Read an article',
-        time: r.created_at ? new Date(r.created_at).toLocaleDateString() : '',
-        icon: '',
-      }));
+      (readingRes.data || []).forEach((r) =>
+        activityItems.push({
+          id: 'r-' + r.id,
+          text: 'Read an article',
+          time: r.created_at ? new Date(r.created_at).toLocaleDateString() : '',
+          icon: '',
+        })
+      );
       // Group quiz answers by (article_id, attempt_number) -> one item per attempt.
-      const quizAttempts: Record<string, { key: string; correct: number; total: number; created_at: string | null }> = {};
+      const quizAttempts: Record<
+        string,
+        { key: string; correct: number; total: number; created_at: string | null }
+      > = {};
       for (const row of quizRes.data || []) {
         const key = `${row.article_id}:${row.attempt_number}`;
         if (!quizAttempts[key]) {
@@ -294,22 +318,30 @@ export default function PublicProfilePage() {
         if (row.is_correct) quizAttempts[key].correct++;
       }
       Object.values(quizAttempts)
-        .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+        .sort(
+          (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+        )
         .slice(0, 5)
-        .forEach((q) => activityItems.push({
-          id: 'q-' + q.key,
-          text: `Scored ${q.correct}/${q.total} on a quiz`,
-          time: q.created_at ? new Date(q.created_at).toLocaleDateString() : '',
+        .forEach((q) =>
+          activityItems.push({
+            id: 'q-' + q.key,
+            text: `Scored ${q.correct}/${q.total} on a quiz`,
+            time: q.created_at ? new Date(q.created_at).toLocaleDateString() : '',
+            icon: '',
+          })
+        );
+      (commentsRes.data || []).forEach((c) =>
+        activityItems.push({
+          id: 'c-' + c.id,
+          text: 'Posted a comment',
+          time: c.created_at ? new Date(c.created_at).toLocaleDateString() : '',
           icon: '',
-        }));
-      (commentsRes.data || []).forEach((c) => activityItems.push({
-        id: 'c-' + c.id,
-        text: 'Posted a comment',
-        time: c.created_at ? new Date(c.created_at).toLocaleDateString() : '',
-        icon: '',
-      }));
+        })
+      );
 
-      activityItems.sort((a, b) => new Date(b.time || 0).getTime() - new Date(a.time || 0).getTime());
+      activityItems.sort(
+        (a, b) => new Date(b.time || 0).getTime() - new Date(a.time || 0).getTime()
+      );
       setRecentActivity(activityItems.slice(0, 5));
 
       setLoading(false);
@@ -325,14 +357,16 @@ export default function PublicProfilePage() {
     setFollowLoading(true);
     try {
       if (isFollowing) {
-        await supabase.from('follows')
+        await supabase
+          .from('follows')
           .delete()
           .eq('follower_id', currentUser.id)
           .eq('following_id', user.id);
         setIsFollowing(false);
         setFollowerCount((prev) => Math.max(0, prev - 1));
       } else {
-        await supabase.from('follows')
+        await supabase
+          .from('follows')
           .insert({ follower_id: currentUser.id, following_id: user.id });
         setIsFollowing(true);
         setFollowerCount((prev) => prev + 1);
@@ -349,18 +383,21 @@ export default function PublicProfilePage() {
     setBlockLoading(true);
     try {
       if (isBlocked) {
-        await supabase.from('blocked_users')
+        await supabase
+          .from('blocked_users')
           .delete()
           .eq('blocker_id', currentUser.id)
           .eq('blocked_id', user.id);
         setIsBlocked(false);
       } else {
-        await supabase.from('blocked_users')
+        await supabase
+          .from('blocked_users')
           .insert({ blocker_id: currentUser.id, blocked_id: user.id });
         setIsBlocked(true);
         // Also unfollow if following
         if (isFollowing) {
-          await supabase.from('follows')
+          await supabase
+            .from('follows')
             .delete()
             .eq('follower_id', currentUser.id)
             .eq('following_id', user.id);
@@ -378,7 +415,15 @@ export default function PublicProfilePage() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div
+        style={{
+          minHeight: '100vh',
+          background: C.bg,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
         <div style={{ fontSize: 16, color: C.dim }}>Loading...</div>
       </div>
     );
@@ -386,10 +431,20 @@ export default function PublicProfilePage() {
 
   if (error) {
     return (
-      <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div
+        style={{
+          minHeight: '100vh',
+          background: C.bg,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 16, color: '#ef4444', marginBottom: 12 }}>{error}</div>
-          <a href="/" style={{ fontSize: 14, color: C.accent, textDecoration: 'none' }}>Go home</a>
+          <a href="/" style={{ fontSize: 14, color: C.accent, textDecoration: 'none' }}>
+            Go home
+          </a>
         </div>
       </div>
     );
@@ -418,30 +473,72 @@ export default function PublicProfilePage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        background: C.bg,
+        color: C.text,
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      }}
+    >
       {/* R13-T4 (Crew 7): offset below the global top bar via the
           `--vp-top-bar-h` custom property set on NavWrapper's wrapper,
           and dropped the duplicate "verity post" wordmark (the global
           top bar already owns it) — leaves just the functional Back
           chip, right-aligned. */}
-      <header style={{
-        position: 'sticky', top: 'var(--vp-top-bar-h, 0px)', zIndex: 50, background: C.bg,
-        borderBottom: '1px solid ' + C.border, display: 'flex',
-        alignItems: 'center', justifyContent: 'flex-end', padding: '0 20px', height: 44,
-      }}>
-        <a href="/profile" style={{ fontSize: 12, color: C.dim, textDecoration: 'none', border: '1px solid ' + C.border, borderRadius: 20, padding: '5px 12px' }}>Back</a>
+      <header
+        style={{
+          position: 'sticky',
+          top: 'var(--vp-top-bar-h, 0px)',
+          zIndex: 50,
+          background: C.bg,
+          borderBottom: '1px solid ' + C.border,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          padding: '0 20px',
+          height: 44,
+        }}
+      >
+        <a
+          href="/profile"
+          style={{
+            fontSize: 12,
+            color: C.dim,
+            textDecoration: 'none',
+            border: '1px solid ' + C.border,
+            borderRadius: 20,
+            padding: '5px 12px',
+          }}
+        >
+          Back
+        </a>
       </header>
 
       <div style={{ maxWidth: 720, margin: '0 auto' }}>
         {/* Profile Header */}
         <div style={{ textAlign: 'center', padding: '32px 20px 24px' }}>
-          <div style={{
-            width: 80, height: 80, borderRadius: '50%', background: avatarColor,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 28, fontWeight: 700, color: '#fff', margin: '0 auto 16px',
-            boxShadow: `0 4px 20px ${avatarColor}40`,
-          }}>{initials}</div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: C.text, margin: '0 0 4px' }}>{displayName}</h1>
+          <div
+            style={{
+              width: 80,
+              height: 80,
+              borderRadius: '50%',
+              background: avatarColor,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 28,
+              fontWeight: 700,
+              color: '#fff',
+              margin: '0 auto 16px',
+              boxShadow: `0 4px 20px ${avatarColor}40`,
+            }}
+          >
+            {initials}
+          </div>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: C.text, margin: '0 0 4px' }}>
+            {displayName}
+          </h1>
           <p style={{ fontSize: 13, color: C.dim, margin: '0 0 4px' }}>@{user?.username || ''}</p>
           {user?.is_expert && canSeeExpert && (
             <p style={{ fontSize: 12, color: C.success, fontWeight: 700, margin: '0 0 4px' }}>
@@ -451,19 +548,36 @@ export default function PublicProfilePage() {
           )}
           {canSeeScore && (
             <p style={{ fontSize: 12, color: C.dim, margin: '0 0 4px' }}>
-              {'Verity Score: '}<span style={{ color: C.accent, fontWeight: 700 }}>{score}</span>
+              {'Verity Score: '}
+              <span style={{ color: C.accent, fontWeight: 700 }}>{score}</span>
               {memberSince ? ` | Member since ${memberSince}` : ''}
             </p>
           )}
           {!canSeeScore && memberSince && (
-            <p style={{ fontSize: 12, color: C.dim, margin: '0 0 4px' }}>Member since {memberSince}</p>
+            <p style={{ fontSize: 12, color: C.dim, margin: '0 0 4px' }}>
+              Member since {memberSince}
+            </p>
           )}
           <p style={{ fontSize: 12, color: C.dim, margin: '0 0 6px' }}>
-            <span style={{ marginRight: 12 }}><strong style={{ color: C.text }}>{followerCount}</strong>{' followers'}</span>
-            <span><strong style={{ color: C.text }}>{user?._followingCount || 0}</strong>{' following'}</span>
+            <span style={{ marginRight: 12 }}>
+              <strong style={{ color: C.text }}>{followerCount}</strong>
+              {' followers'}
+            </span>
+            <span>
+              <strong style={{ color: C.text }}>{user?._followingCount || 0}</strong>
+              {' following'}
+            </span>
           </p>
           {user?.bio && (
-            <p style={{ fontSize: 13, color: C.dim, maxWidth: 340, margin: '0 auto 16px', lineHeight: 1.5 }}>
+            <p
+              style={{
+                fontSize: 13,
+                color: C.dim,
+                maxWidth: 340,
+                margin: '0 auto 16px',
+                lineHeight: 1.5,
+              }}
+            >
               {user.bio}
             </p>
           )}
@@ -498,12 +612,16 @@ export default function PublicProfilePage() {
               </a>
             )}
             {!isSelf && (
-              <button onClick={handleBlock} disabled={blockLoading} style={{
-                ...actionButton,
-                background: isBlocked ? '#fef2f2' : C.card,
-                color: isBlocked ? '#dc2626' : C.dim,
-                border: '1px solid ' + (isBlocked ? '#fca5a5' : C.border),
-              }}>
+              <button
+                onClick={handleBlock}
+                disabled={blockLoading}
+                style={{
+                  ...actionButton,
+                  background: isBlocked ? '#fef2f2' : C.card,
+                  color: isBlocked ? '#dc2626' : C.dim,
+                  border: '1px solid ' + (isBlocked ? '#fca5a5' : C.border),
+                }}
+              >
                 {blockLoading ? '...' : isBlocked ? 'Unblock' : 'Block'}
               </button>
             )}
@@ -516,13 +634,23 @@ export default function PublicProfilePage() {
             {TABS.map((tab) => {
               const active = tab.label === 'Overview';
               return (
-                <a key={tab.label} href={tab.href} style={{
-                  padding: '7px 16px', borderRadius: 99, fontSize: 13, fontWeight: 600,
-                  whiteSpace: 'nowrap', textDecoration: 'none',
-                  background: active ? '#111111' : 'transparent',
-                  color: active ? '#fff' : '#666666',
-                  border: active ? 'none' : '1px solid #e5e5e5',
-                }}>{tab.label}</a>
+                <a
+                  key={tab.label}
+                  href={tab.href}
+                  style={{
+                    padding: '7px 16px',
+                    borderRadius: 99,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    whiteSpace: 'nowrap',
+                    textDecoration: 'none',
+                    background: active ? '#111111' : 'transparent',
+                    color: active ? '#fff' : '#666666',
+                    border: active ? 'none' : '1px solid #e5e5e5',
+                  }}
+                >
+                  {tab.label}
+                </a>
               );
             })}
           </div>
@@ -531,13 +659,28 @@ export default function PublicProfilePage() {
         <div style={{ padding: '24px 20px 80px' }}>
           {/* Stats Grid */}
           {stats.length > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 28 }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(2, 1fr)',
+                gap: 12,
+                marginBottom: 28,
+              }}
+            >
               {stats.map((stat) => (
-                <div key={stat.label} style={{
-                  background: C.card, border: '1px solid ' + C.border,
-                  borderRadius: 14, padding: '20px 16px', textAlign: 'center',
-                }}>
-                  <div style={{ fontSize: 26, fontWeight: 700, color: C.text, marginBottom: 4 }}>{stat.value}</div>
+                <div
+                  key={stat.label}
+                  style={{
+                    background: C.card,
+                    border: '1px solid ' + C.border,
+                    borderRadius: 14,
+                    padding: '20px 16px',
+                    textAlign: 'center',
+                  }}
+                >
+                  <div style={{ fontSize: 26, fontWeight: 700, color: C.text, marginBottom: 4 }}>
+                    {stat.value}
+                  </div>
                   <div style={{ fontSize: 11, color: C.dim }}>{stat.label}</div>
                 </div>
               ))}
@@ -546,11 +689,35 @@ export default function PublicProfilePage() {
 
           {/* Verity Score — only when viewer is permitted to see the number. */}
           {canSeeScore && (
-            <div style={{ background: C.card, border: '1px solid ' + C.border, borderRadius: 16, padding: 24, marginBottom: 28, textAlign: 'center' }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 16 }}>Verity Score</div>
-              <div style={{ fontSize: 42, fontWeight: 800, color: C.accent, marginBottom: 4 }}>{score}</div>
+            <div
+              style={{
+                background: C.card,
+                border: '1px solid ' + C.border,
+                borderRadius: 16,
+                padding: 24,
+                marginBottom: 28,
+                textAlign: 'center',
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: C.dim,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  marginBottom: 16,
+                }}
+              >
+                Verity Score
+              </div>
+              <div style={{ fontSize: 42, fontWeight: 800, color: C.accent, marginBottom: 4 }}>
+                {score}
+              </div>
               {user?.verity_rank_percentile && (
-                <p style={{ fontSize: 12, color: C.dim, margin: 0 }}>Top {user.verity_rank_percentile}% of all readers</p>
+                <p style={{ fontSize: 12, color: C.dim, margin: 0 }}>
+                  Top {user.verity_rank_percentile}% of all readers
+                </p>
               )}
             </div>
           )}
@@ -558,16 +725,34 @@ export default function PublicProfilePage() {
           {/* Topic Breakdown */}
           {topics.length > 0 && (
             <div style={{ marginBottom: 28 }}>
-              <h2 style={{ fontSize: 15, fontWeight: 700, color: C.text, margin: '0 0 14px' }}>Topic Expertise</h2>
-              <div style={{ background: C.card, border: '1px solid ' + C.border, borderRadius: 14, padding: 16 }}>
+              <h2 style={{ fontSize: 15, fontWeight: 700, color: C.text, margin: '0 0 14px' }}>
+                Topic Expertise
+              </h2>
+              <div
+                style={{
+                  background: C.card,
+                  border: '1px solid ' + C.border,
+                  borderRadius: 14,
+                  padding: 16,
+                }}
+              >
                 {topics.map((t) => (
                   <div key={t.topic} style={{ marginBottom: 12 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                    <div
+                      style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}
+                    >
                       <span style={{ fontSize: 12, color: C.text }}>{t.topic}</span>
                       <span style={{ fontSize: 11, color: C.dim }}>{t.pct}%</span>
                     </div>
                     <div style={{ height: 6, borderRadius: 3, background: C.border }}>
-                      <div style={{ height: '100%', width: t.pct + '%', borderRadius: 3, background: C.accent }} />
+                      <div
+                        style={{
+                          height: '100%',
+                          width: t.pct + '%',
+                          borderRadius: 3,
+                          background: C.accent,
+                        }}
+                      />
                     </div>
                   </div>
                 ))}
@@ -578,15 +763,26 @@ export default function PublicProfilePage() {
           {/* Badges */}
           {badges.length > 0 && (
             <div style={{ marginBottom: 28 }}>
-              <h2 style={{ fontSize: 15, fontWeight: 700, color: C.text, margin: '0 0 14px' }}>Badges</h2>
+              <h2 style={{ fontSize: 15, fontWeight: 700, color: C.text, margin: '0 0 14px' }}>
+                Badges
+              </h2>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                 {badges.map((badge) => (
-                  <div key={badge.id} style={{
-                    background: C.card, border: '1px solid ' + C.border,
-                    borderRadius: 12, padding: '12px 14px', flex: '1 1 120px', textAlign: 'center',
-                  }}>
+                  <div
+                    key={badge.id}
+                    style={{
+                      background: C.card,
+                      border: '1px solid ' + C.border,
+                      borderRadius: 12,
+                      padding: '12px 14px',
+                      flex: '1 1 120px',
+                      textAlign: 'center',
+                    }}
+                  >
                     <div style={{ fontSize: 26, marginBottom: 4 }}>{badge.icon}</div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: C.text, marginBottom: 2 }}>{badge.name}</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: C.text, marginBottom: 2 }}>
+                      {badge.name}
+                    </div>
                     <div style={{ fontSize: 10, color: C.dim }}>{badge.desc}</div>
                   </div>
                 ))}
@@ -597,17 +793,44 @@ export default function PublicProfilePage() {
           {/* Recent Activity */}
           {recentActivity.length > 0 && (
             <div>
-              <h2 style={{ fontSize: 15, fontWeight: 700, color: C.text, margin: '0 0 14px' }}>Recent Activity</h2>
-              <div style={{ background: C.card, border: '1px solid ' + C.border, borderRadius: 14, overflow: 'hidden' }}>
+              <h2 style={{ fontSize: 15, fontWeight: 700, color: C.text, margin: '0 0 14px' }}>
+                Recent Activity
+              </h2>
+              <div
+                style={{
+                  background: C.card,
+                  border: '1px solid ' + C.border,
+                  borderRadius: 14,
+                  overflow: 'hidden',
+                }}
+              >
                 {recentActivity.map((item, i) => (
-                  <div key={item.id} style={{
-                    display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px',
-                    borderBottom: i < recentActivity.length - 1 ? '1px solid ' + C.border : 'none',
-                  }}>
-                    <span style={{
-                      width: 32, height: 32, borderRadius: '50%', background: '#e8e8ff',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0,
-                    }}>{item.icon}</span>
+                  <div
+                    key={item.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      padding: '14px 16px',
+                      borderBottom:
+                        i < recentActivity.length - 1 ? '1px solid ' + C.border : 'none',
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: '50%',
+                        background: '#e8e8ff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 14,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {item.icon}
+                    </span>
                     <div style={{ flex: 1 }}>
                       <p style={{ fontSize: 13, color: C.text, margin: 0 }}>{item.text}</p>
                     </div>

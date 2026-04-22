@@ -34,9 +34,17 @@
 // feed the shared admin component library under
 // `site/src/components/admin/`.
 export const ADMIN_C = {
-  bg: '#ffffff', card: '#f7f7f7', border: '#222222',
-  white: '#111111', dim: '#666666', soft: '#444444', muted: '#999999',
-  accent: '#111111', success: '#22c55e', warn: '#f59e0b', danger: '#ef4444',
+  bg: '#ffffff',
+  card: '#f7f7f7',
+  border: '#222222',
+  white: '#111111',
+  dim: '#666666',
+  soft: '#444444',
+  muted: '#999999',
+  accent: '#111111',
+  success: '#22c55e',
+  warn: '#f59e0b',
+  danger: '#ef4444',
   // Focus ring: 2px accent outline at 40% alpha. Rendered via
   // `box-shadow: 0 0 0 2px var(--ring)` in inline styles.
   ring: 'rgba(17,17,17,0.40)',
@@ -49,9 +57,15 @@ export const ADMIN_C = {
 };
 
 export const ADMIN_C_LIGHT = {
-  bg: '#ffffff', card: '#f7f7f7', border: '#e5e5e5',
-  text: '#111111', dim: '#666666', accent: '#111111',
-  success: '#16a34a', warn: '#b45309', danger: '#dc2626',
+  bg: '#ffffff',
+  card: '#f7f7f7',
+  border: '#e5e5e5',
+  text: '#111111',
+  dim: '#666666',
+  accent: '#111111',
+  success: '#16a34a',
+  warn: '#b45309',
+  danger: '#dc2626',
 };
 
 // Spacing scale — a 4px base unit. Keys are multipliers (S[4] === 16px).

@@ -60,7 +60,9 @@ export default function Modal({
     if (!open || typeof document === 'undefined') return undefined;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
+    return () => {
+      document.body.style.overflow = prev;
+    };
   }, [open]);
 
   if (!open) return null;
@@ -68,7 +70,9 @@ export default function Modal({
   return (
     <div
       role="presentation"
-      onClick={(e) => { if (e.target === e.currentTarget) attemptClose(); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) attemptClose();
+      }}
       style={{
         position: 'fixed',
         inset: 0,
@@ -124,16 +128,21 @@ export default function Modal({
               </h2>
             )}
             {description && (
-              <p style={{ margin: `${S[1]}px 0 0`, fontSize: F.sm, color: ADMIN_C.dim, lineHeight: 1.5 }}>
+              <p
+                style={{
+                  margin: `${S[1]}px 0 0`,
+                  fontSize: F.sm,
+                  color: ADMIN_C.dim,
+                  lineHeight: 1.5,
+                }}
+              >
                 {description}
               </p>
             )}
           </div>
         )}
 
-        <div style={{ padding: S[4], fontSize: F.base, lineHeight: 1.5 }}>
-          {children}
-        </div>
+        <div style={{ padding: S[4], fontSize: F.base, lineHeight: 1.5 }}>{children}</div>
 
         {footer && (
           <div

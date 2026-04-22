@@ -18,19 +18,8 @@ import TextInput from './TextInput';
  * @param {boolean} [props.block]
  * @param {object} [props.style]
  */
-const NumberInput = forwardRef(function NumberInput(
-  { step = 1, ...rest },
-  ref,
-) {
-  return (
-    <TextInput
-      ref={ref}
-      type="number"
-      step={step}
-      inputMode="decimal"
-      {...rest}
-    />
-  );
+const NumberInput = forwardRef(function NumberInput({ step = 1, ...rest }, ref) {
+  return <TextInput ref={ref} type="number" step={step} inputMode="decimal" {...rest} />;
 });
 
 export default NumberInput;

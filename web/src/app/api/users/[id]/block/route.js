@@ -9,8 +9,12 @@ import { checkRateLimit } from '@/lib/rateLimit';
 // D39: available to all verified users.
 export async function POST(request, { params }) {
   let user;
-  try { user = await requirePermission('settings.privacy.blocked_users.manage'); }
-  catch (err) { if (err.status) return NextResponse.json({ error: err.message }, { status: err.status }); return NextResponse.json({ error: 'Internal error' }, { status: 500 }); }
+  try {
+    user = await requirePermission('settings.privacy.blocked_users.manage');
+  } catch (err) {
+    if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+  }
 
   if (!user.email_verified) {
     return NextResponse.json({ error: 'verify email to block' }, { status: 403 });
@@ -30,7 +34,10 @@ export async function POST(request, { params }) {
     windowSec: 60,
   });
   if (rate.limited) {
-    return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': '60' } });
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': '60' } }
+    );
   }
 
   const { data: existing } = await service

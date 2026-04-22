@@ -43,7 +43,9 @@ function getSessionId(): string {
   let id = sessionStorage.getItem(SESSION_KEY);
   if (!id) {
     id = safeUUID();
-    try { sessionStorage.setItem(SESSION_KEY, id); } catch {}
+    try {
+      sessionStorage.setItem(SESSION_KEY, id);
+    } catch {}
   }
   return id;
 }
@@ -53,7 +55,9 @@ function getDeviceId(): string {
   let id = localStorage.getItem(DEVICE_KEY);
   if (!id) {
     id = safeUUID();
-    try { localStorage.setItem(DEVICE_KEY, id); } catch {}
+    try {
+      localStorage.setItem(DEVICE_KEY, id);
+    } catch {}
   }
   return id;
 }
@@ -119,7 +123,11 @@ async function flush(reason: 'interval' | 'visibility' | 'pagehide' | 'size' | '
   const useBeacon = reason === 'visibility' || reason === 'pagehide';
 
   try {
-    if (useBeacon && typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+    if (
+      useBeacon &&
+      typeof navigator !== 'undefined' &&
+      typeof navigator.sendBeacon === 'function'
+    ) {
       const blob = new Blob([body], { type: 'application/json' });
       const ok = navigator.sendBeacon(BATCH_ENDPOINT, blob);
       if (!ok) {
@@ -178,7 +186,7 @@ interface TrackOptions {
 export function track(
   event_name: string,
   event_category: EventCategory,
-  opts: TrackOptions = {},
+  opts: TrackOptions = {}
 ): void {
   if (typeof window === 'undefined') return;
   installListeners();

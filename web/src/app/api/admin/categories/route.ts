@@ -24,12 +24,16 @@ export async function POST(request: Request) {
   const permKey = isSub ? 'admin.subcategories.manage' : 'admin.categories.manage';
 
   let actor;
-  try { actor = await requirePermission(permKey); }
-  catch (err) { return permissionError(err); }
+  try {
+    actor = await requirePermission(permKey);
+  } catch (err) {
+    return permissionError(err);
+  }
 
   const name = typeof body.name === 'string' ? body.name.trim() : '';
   const slug = typeof body.slug === 'string' ? body.slug.trim() : '';
-  if (!name || !slug) return NextResponse.json({ error: 'name and slug required' }, { status: 400 });
+  if (!name || !slug)
+    return NextResponse.json({ error: 'name and slug required' }, { status: 400 });
 
   const row = {
     name,
@@ -41,11 +45,7 @@ export async function POST(request: Request) {
   };
 
   const service = createServiceClient();
-  const { data, error } = await service
-    .from('categories')
-    .insert(row)
-    .select('*')
-    .single();
+  const { data, error } = await service.from('categories').insert(row).select('*').single();
   if (error || !data) {
     console.error('[admin.categories.create]', error?.message || 'no row');
     return NextResponse.json({ error: 'Could not create category' }, { status: 500 });

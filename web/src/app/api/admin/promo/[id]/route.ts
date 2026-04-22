@@ -11,8 +11,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
 
   let actor;
-  try { actor = await requirePermission('admin.promo.edit'); }
-  catch (err) { return permissionError(err); }
+  try {
+    actor = await requirePermission('admin.promo.edit');
+  } catch (err) {
+    return permissionError(err);
+  }
   void actor;
 
   const body = (await request.json().catch(() => ({}))) as PatchBody;
@@ -28,7 +31,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     .maybeSingle();
   if (!prior) return NextResponse.json({ error: 'Promo not found' }, { status: 404 });
 
-  const { error } = await service.from('promo_codes').update({ is_active: body.is_active }).eq('id', id);
+  const { error } = await service
+    .from('promo_codes')
+    .update({ is_active: body.is_active })
+    .eq('id', id);
   if (error) {
     console.error('[admin.promo.patch]', error.message);
     return NextResponse.json({ error: 'Could not update promo' }, { status: 500 });
@@ -50,8 +56,11 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
 
   let actor;
-  try { actor = await requirePermission('admin.promo.revoke'); }
-  catch (err) { return permissionError(err); }
+  try {
+    actor = await requirePermission('admin.promo.revoke');
+  } catch (err) {
+    return permissionError(err);
+  }
   void actor;
 
   const service = createServiceClient();

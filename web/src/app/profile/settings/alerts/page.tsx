@@ -7,6 +7,8 @@ import { useRouter } from 'next/navigation';
 
 export default function SettingsAlertsRedirect(): null {
   const router = useRouter();
-  useEffect(() => { router.replace('/profile/settings#alerts'); }, [router]);
+  useEffect(() => {
+    router.replace('/profile/settings#alerts');
+  }, [router]);
   return null;
 }

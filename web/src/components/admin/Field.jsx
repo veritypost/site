@@ -57,7 +57,11 @@ export default function Field({
           }}
         >
           {label}
-          {required && <span aria-hidden="true" style={{ color: ADMIN_C.danger, marginLeft: 2 }}>*</span>}
+          {required && (
+            <span aria-hidden="true" style={{ color: ADMIN_C.danger, marginLeft: 2 }}>
+              *
+            </span>
+          )}
         </label>
       )}
 

@@ -27,7 +27,8 @@ const TYPE_TO_TEMPLATE = {
 const BATCH_SIZE = 50;
 
 async function run(request) {
-  if (!verifyCronAuth(request).ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!verifyCronAuth(request).ok)
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   if (!process.env.RESEND_API_KEY) {
     return NextResponse.json({ error: 'RESEND_API_KEY not configured', sent: 0 }, { status: 503 });
   }
@@ -47,19 +48,30 @@ async function run(request) {
   }
   if (!queued?.length) return NextResponse.json({ sent: 0 });
 
-  const userIds = [...new Set(queued.map(n => n.user_id))];
+  const userIds = [...new Set(queued.map((n) => n.user_id))];
   const [{ data: users }, { data: prefs }, { data: templates }] = await Promise.all([
     service.from('users').select('id, email, username, email_verified').in('id', userIds),
-    service.from('alert_preferences').select('user_id, alert_type, channel_email, is_enabled').in('user_id', userIds),
-    service.from('email_templates').select('*').in('key', Object.values(TYPE_TO_TEMPLATE)).eq('is_active', true),
+    service
+      .from('alert_preferences')
+      .select('user_id, alert_type, channel_email, is_enabled')
+      .in('user_id', userIds),
+    service
+      .from('email_templates')
+      .select('*')
+      .in('key', Object.values(TYPE_TO_TEMPLATE))
+      .eq('is_active', true),
   ]);
 
-  const userById = Object.fromEntries((users || []).map(u => [u.id, u]));
+  const userById = Object.fromEntries((users || []).map((u) => [u.id, u]));
   const prefKey = (uid, type) => `${uid}:${type}`;
-  const prefsMap = Object.fromEntries((prefs || []).map(p => [prefKey(p.user_id, p.alert_type), p]));
-  const templateByKey = Object.fromEntries((templates || []).map(t => [t.key, t]));
+  const prefsMap = Object.fromEntries(
+    (prefs || []).map((p) => [prefKey(p.user_id, p.alert_type), p])
+  );
+  const templateByKey = Object.fromEntries((templates || []).map((t) => [t.key, t]));
 
-  let sent = 0, skipped = 0, failed = 0;
+  let sent = 0,
+    skipped = 0,
+    failed = 0;
 
   for (const n of queued) {
     const u = userById[n.user_id];
@@ -67,13 +79,21 @@ async function run(request) {
     const tpl = templateByKey[TYPE_TO_TEMPLATE[n.type]];
 
     // Skip conditions: unverified, missing email, user opted out, no template.
-    if (!u || !u.email_verified || !u.email || !tpl
-        || (pref && (pref.is_enabled === false || pref.channel_email === false))) {
-      await service.from('notifications').update({
-        email_sent: true, // stop retrying
-        email_sent_at: new Date().toISOString(),
-        metadata: { ...(n.metadata || {}), email_skip_reason: 'ineligible' },
-      }).eq('id', n.id);
+    if (
+      !u ||
+      !u.email_verified ||
+      !u.email ||
+      !tpl ||
+      (pref && (pref.is_enabled === false || pref.channel_email === false))
+    ) {
+      await service
+        .from('notifications')
+        .update({
+          email_sent: true, // stop retrying
+          email_sent_at: new Date().toISOString(),
+          metadata: { ...(n.metadata || {}), email_skip_reason: 'ineligible' },
+        })
+        .eq('id', n.id);
       skipped++;
       continue;
     }
@@ -97,14 +117,21 @@ async function run(request) {
         fromEmail: rendered.fromEmail,
         replyTo: rendered.replyTo,
       });
-      await service.from('notifications').update({
-        email_sent: true, email_sent_at: new Date().toISOString(),
-      }).eq('id', n.id);
+      await service
+        .from('notifications')
+        .update({
+          email_sent: true,
+          email_sent_at: new Date().toISOString(),
+        })
+        .eq('id', n.id);
       sent++;
     } catch (err) {
-      await service.from('notifications').update({
-        metadata: { ...(n.metadata || {}), email_error: err.message },
-      }).eq('id', n.id);
+      await service
+        .from('notifications')
+        .update({
+          metadata: { ...(n.metadata || {}), email_error: err.message },
+        })
+        .eq('id', n.id);
       failed++;
     }
   }

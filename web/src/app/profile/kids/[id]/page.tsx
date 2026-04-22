@@ -11,12 +11,21 @@ import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/perm
 import type { Tables } from '@/types/database-helpers';
 
 const C = {
-  card: '#f7f7f7', border: '#e5e5e5', text: '#111', dim: '#666',
-  accent: '#111', success: '#16a34a', warn: '#b45309', danger: '#dc2626',
+  card: '#f7f7f7',
+  border: '#e5e5e5',
+  text: '#111',
+  dim: '#666',
+  accent: '#111',
+  success: '#16a34a',
+  warn: '#b45309',
+  danger: '#dc2626',
 } as const;
 
 type KidRow = Tables<'kid_profiles'>;
-type QuizAttemptRow = Pick<Tables<'quiz_attempts'>, 'article_id' | 'attempt_number' | 'is_correct' | 'created_at'>;
+type QuizAttemptRow = Pick<
+  Tables<'quiz_attempts'>,
+  'article_id' | 'attempt_number' | 'is_correct' | 'created_at'
+>;
 type AchievementRow = Pick<Tables<'user_achievements'>, 'id' | 'earned_at'> & {
   achievements?: Pick<Tables<'achievements'>, 'key' | 'name' | 'icon_name'> | null;
 };
@@ -26,7 +35,10 @@ type ReadingRow = Pick<Tables<'reading_log'>, 'id' | 'created_at' | 'completed'>
 type QuestionRow = Pick<Tables<'kid_expert_questions'>, 'id' | 'created_at' | 'question_text'> & {
   kid_expert_sessions?: Pick<Tables<'kid_expert_sessions'>, 'title'> | null;
 };
-type SessionRow = Pick<Tables<'kid_expert_sessions'>, 'id' | 'title' | 'scheduled_at' | 'duration_minutes'> & {
+type SessionRow = Pick<
+  Tables<'kid_expert_sessions'>,
+  'id' | 'title' | 'scheduled_at' | 'duration_minutes'
+> & {
   categories?: Pick<Tables<'categories'>, 'name'> | null;
 };
 
@@ -71,7 +83,12 @@ export default function KidDashboardPage() {
   const supabase = createClient();
   const [loading, setLoading] = useState<boolean>(true);
   const [kid, setKid] = useState<KidRow | null>(null);
-  const [stats, setStats] = useState<StatsState>({ reads7d: 0, quizzesTotal: 0, recentAttempts: [], achievements: [] });
+  const [stats, setStats] = useState<StatsState>({
+    reads7d: 0,
+    quizzesTotal: 0,
+    recentAttempts: [],
+    achievements: [],
+  });
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [upcoming, setUpcoming] = useState<SessionRow[]>([]);
   const [error, setError] = useState<string>('');
@@ -85,8 +102,13 @@ export default function KidDashboardPage() {
 
   async function load() {
     setError('');
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.push('/'); return; }
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      router.push('/');
+      return;
+    }
 
     await refreshAllPermissions();
     await refreshIfStale();
@@ -98,11 +120,11 @@ export default function KidDashboardPage() {
     setCanUseFreeze(hasPermission('kids.streak.freeze.use'));
     setCanToggleLeaderboard(hasPermission('kids.parent.global_leaderboard_opt_in'));
 
-    const { data: k } = await supabase
-      .from('kid_profiles')
-      .select('*')
-      .eq('id', id).maybeSingle();
-    if (!k || k.parent_user_id !== user.id) { router.push('/profile/kids'); return; }
+    const { data: k } = await supabase.from('kid_profiles').select('*').eq('id', id).maybeSingle();
+    if (!k || k.parent_user_id !== user.id) {
+      router.push('/profile/kids');
+      return;
+    }
     setKid(k);
 
     const since7d = new Date(Date.now() - 7 * 86400000).toISOString();
@@ -117,19 +139,61 @@ export default function KidDashboardPage() {
       { data: questionTimeline },
       { data: sessions },
     ] = await Promise.all([
-      supabase.from('reading_log').select('id', { count: 'exact', head: true }).eq('kid_profile_id', id).gte('created_at', since7d),
-      supabase.from('quiz_attempts').select('id', { count: 'exact', head: true }).eq('kid_profile_id', id),
-      supabase.from('quiz_attempts').select('article_id, attempt_number, is_correct, created_at').eq('kid_profile_id', id).order('created_at', { ascending: false }).limit(60),
-      supabase.from('user_achievements').select('id, earned_at, achievements(key, name, icon_name)').eq('kid_profile_id', id).order('earned_at', { ascending: false }).limit(20),
-      supabase.from('reading_log').select('id, created_at, completed, articles(title, slug)').eq('kid_profile_id', id).eq('completed', true).gte('created_at', since30d).order('created_at', { ascending: false }).limit(25),
-      supabase.from('kid_expert_questions').select('id, created_at, question_text, kid_expert_sessions(title)').eq('kid_profile_id', id).gte('created_at', since30d).order('created_at', { ascending: false }).limit(25),
-      supabase.from('kid_expert_sessions').select('id, title, scheduled_at, duration_minutes, categories(name)').gte('scheduled_at', new Date().toISOString()).eq('is_active', true).order('scheduled_at', { ascending: true }).limit(5),
+      supabase
+        .from('reading_log')
+        .select('id', { count: 'exact', head: true })
+        .eq('kid_profile_id', id)
+        .gte('created_at', since7d),
+      supabase
+        .from('quiz_attempts')
+        .select('id', { count: 'exact', head: true })
+        .eq('kid_profile_id', id),
+      supabase
+        .from('quiz_attempts')
+        .select('article_id, attempt_number, is_correct, created_at')
+        .eq('kid_profile_id', id)
+        .order('created_at', { ascending: false })
+        .limit(60),
+      supabase
+        .from('user_achievements')
+        .select('id, earned_at, achievements(key, name, icon_name)')
+        .eq('kid_profile_id', id)
+        .order('earned_at', { ascending: false })
+        .limit(20),
+      supabase
+        .from('reading_log')
+        .select('id, created_at, completed, articles(title, slug)')
+        .eq('kid_profile_id', id)
+        .eq('completed', true)
+        .gte('created_at', since30d)
+        .order('created_at', { ascending: false })
+        .limit(25),
+      supabase
+        .from('kid_expert_questions')
+        .select('id, created_at, question_text, kid_expert_sessions(title)')
+        .eq('kid_profile_id', id)
+        .gte('created_at', since30d)
+        .order('created_at', { ascending: false })
+        .limit(25),
+      supabase
+        .from('kid_expert_sessions')
+        .select('id, title, scheduled_at, duration_minutes, categories(name)')
+        .gte('scheduled_at', new Date().toISOString())
+        .eq('is_active', true)
+        .order('scheduled_at', { ascending: true })
+        .limit(5),
     ]);
 
     const byAttempt: Record<string, AttemptSummary> = {};
     for (const a of (recentAttempts as QuizAttemptRow[] | null) || []) {
       const key = `${a.article_id}:${a.attempt_number}`;
-      if (!byAttempt[key]) byAttempt[key] = { article_id: a.article_id as string, attempt_number: a.attempt_number, at: a.created_at, correct: 0 };
+      if (!byAttempt[key])
+        byAttempt[key] = {
+          article_id: a.article_id as string,
+          attempt_number: a.attempt_number,
+          at: a.created_at,
+          correct: 0,
+        };
       if (a.is_correct) byAttempt[key].correct += 1;
     }
     const attemptSummaries = Object.values(byAttempt);
@@ -180,23 +244,37 @@ export default function KidDashboardPage() {
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, [id]);
+  useEffect(() => {
+    load();
+  }, [id]);
 
   async function useFreeze() {
     if (freezeBusy) return;
-    setFreezeBusy(true); setError(''); setFlash('');
+    setFreezeBusy(true);
+    setError('');
+    setFlash('');
     try {
-      const res = await fetch(`/api/kids/${id}/streak-freeze`, { method: 'POST', credentials: 'include' });
+      const res = await fetch(`/api/kids/${id}/streak-freeze`, {
+        method: 'POST',
+        credentials: 'include',
+      });
       const data = await res.json();
-      if (!res.ok) { setError(data?.error || 'Freeze failed'); return; }
+      if (!res.ok) {
+        setError(data?.error || 'Freeze failed');
+        return;
+      }
       setFlash(`Streak freeze used. ${data.remaining}/${data.cap} left this week.`);
       load();
-    } finally { setFreezeBusy(false); }
+    } finally {
+      setFreezeBusy(false);
+    }
   }
 
   async function togglePause() {
     if (!kid || pauseBusy) return;
-    setPauseBusy(true); setError(''); setFlash('');
+    setPauseBusy(true);
+    setError('');
+    setFlash('');
     const nextPaused = !kid.paused_at;
     try {
       const res = await fetch(`/api/kids/${id}`, {
@@ -219,7 +297,9 @@ export default function KidDashboardPage() {
 
   async function toggleLeaderboard() {
     if (!kid || leaderboardBusy) return;
-    setLeaderboardBusy(true); setError(''); setFlash('');
+    setLeaderboardBusy(true);
+    setError('');
+    setFlash('');
     const next = !kid.global_leaderboard_opt_in;
     try {
       const res = await fetch(`/api/kids/${id}`, {
@@ -233,9 +313,10 @@ export default function KidDashboardPage() {
         setError(d?.error || 'Could not change leaderboard setting');
         return;
       }
-      setFlash(next
-        ? `${kid.display_name} will appear on the global leaderboard.`
-        : `${kid.display_name} is off the global leaderboard.`
+      setFlash(
+        next
+          ? `${kid.display_name} will appear on the global leaderboard.`
+          : `${kid.display_name} is off the global leaderboard.`
       );
       load();
     } finally {
@@ -254,11 +335,18 @@ export default function KidDashboardPage() {
         <a
           href="/profile/settings/billing"
           style={{
-            display: 'inline-block', padding: '10px 18px', borderRadius: 9,
-            background: C.accent, color: '#fff', fontSize: 13, fontWeight: 700,
+            display: 'inline-block',
+            padding: '10px 18px',
+            borderRadius: 9,
+            background: C.accent,
+            color: '#fff',
+            fontSize: 13,
+            fontWeight: 700,
             textDecoration: 'none',
           }}
-        >Upgrade to Family</a>
+        >
+          Upgrade to Family
+        </a>
       </div>
     );
   }
@@ -268,10 +356,27 @@ export default function KidDashboardPage() {
 
   return (
     <div style={{ maxWidth: 820, margin: '0 auto', padding: '24px 16px 80px' }}>
-      <a href="/profile/kids" style={{ fontSize: 12, color: C.dim, textDecoration: 'none' }}>&larr; All kids</a>
+      <a href="/profile/kids" style={{ fontSize: 12, color: C.dim, textDecoration: 'none' }}>
+        &larr; All kids
+      </a>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8, marginBottom: 16 }}>
-        <div style={{ width: 56, height: 56, borderRadius: '50%', background: kid.avatar_color || C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 22, fontWeight: 700 }}>
+      <div
+        style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8, marginBottom: 16 }}
+      >
+        <div
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: '50%',
+            background: kid.avatar_color || C.accent,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#fff',
+            fontSize: 22,
+            fontWeight: 700,
+          }}
+        >
           {(kid.display_name || '?').charAt(0).toUpperCase()}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -286,20 +391,60 @@ export default function KidDashboardPage() {
           onClick={togglePause}
           disabled={pauseBusy}
           style={{
-            padding: '8px 14px', borderRadius: 9,
+            padding: '8px 14px',
+            borderRadius: 9,
             border: `1px solid ${paused ? C.success : C.border}`,
             background: paused ? C.success : 'transparent',
             color: paused ? '#fff' : C.text,
-            fontSize: 13, fontWeight: 700,
-            cursor: pauseBusy ? 'default' : 'pointer', opacity: pauseBusy ? 0.5 : 1,
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: pauseBusy ? 'default' : 'pointer',
+            opacity: pauseBusy ? 0.5 : 1,
           }}
-        >{pauseBusy ? '\u2026' : paused ? 'Resume access' : 'Pause access'}</button>
+        >
+          {pauseBusy ? '\u2026' : paused ? 'Resume access' : 'Pause access'}
+        </button>
       </div>
 
-      {flash && <div style={{ background: '#ecfdf5', border: `1px solid ${C.success}`, color: C.success, borderRadius: 10, padding: 10, fontSize: 13, marginBottom: 10 }}>{flash}</div>}
-      {error && <div style={{ background: '#fef2f2', border: `1px solid ${C.danger}`, color: C.danger, borderRadius: 10, padding: 10, fontSize: 13, marginBottom: 10 }}>{error}</div>}
+      {flash && (
+        <div
+          style={{
+            background: '#ecfdf5',
+            border: `1px solid ${C.success}`,
+            color: C.success,
+            borderRadius: 10,
+            padding: 10,
+            fontSize: 13,
+            marginBottom: 10,
+          }}
+        >
+          {flash}
+        </div>
+      )}
+      {error && (
+        <div
+          style={{
+            background: '#fef2f2',
+            border: `1px solid ${C.danger}`,
+            color: C.danger,
+            borderRadius: 10,
+            padding: 10,
+            fontSize: 13,
+            marginBottom: 10,
+          }}
+        >
+          {error}
+        </div>
+      )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, marginBottom: 16 }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+          gap: 10,
+          marginBottom: 16,
+        }}
+      >
         <Stat label="Reads (7d)" value={stats.reads7d} />
         <Stat label="Quizzes total" value={stats.quizzesTotal} />
         <Stat label="Best streak" value={kid.streak_best || 0} />
@@ -308,7 +453,20 @@ export default function KidDashboardPage() {
 
       {canUseFreeze && (
         <div style={{ display: 'flex', gap: 6, marginBottom: 20, flexWrap: 'wrap' }}>
-          <button onClick={useFreeze} disabled={freezeBusy} style={{ padding: '8px 14px', borderRadius: 8, border: `1px solid ${C.border}`, background: 'transparent', fontSize: 12, fontWeight: 600, cursor: freezeBusy ? 'default' : 'pointer', opacity: freezeBusy ? 0.5 : 1 }}>
+          <button
+            onClick={useFreeze}
+            disabled={freezeBusy}
+            style={{
+              padding: '8px 14px',
+              borderRadius: 8,
+              border: `1px solid ${C.border}`,
+              background: 'transparent',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: freezeBusy ? 'default' : 'pointer',
+              opacity: freezeBusy ? 0.5 : 1,
+            }}
+          >
             {freezeBusy ? 'Freezing\u2026' : 'Use a streak freeze'}
           </button>
         </div>
@@ -334,7 +492,9 @@ export default function KidDashboardPage() {
 
       <Section title="Activity">
         {timeline.length === 0 ? (
-          <Empty>Nothing yet &mdash; activity shows up here as soon as {kid.display_name} starts reading.</Empty>
+          <Empty>
+            Nothing yet &mdash; activity shows up here as soon as {kid.display_name} starts reading.
+          </Empty>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {timeline.map((ev, i) => (
@@ -349,13 +509,18 @@ export default function KidDashboardPage() {
           <Empty>No sessions scheduled right now.</Empty>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {upcoming.map(s => (
+            {upcoming.map((s) => (
               <div
                 key={s.id}
                 style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  background: C.card, border: `1px solid ${C.border}`,
-                  borderRadius: 10, padding: '10px 12px', color: C.text,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  background: C.card,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 10,
+                  padding: '10px 12px',
+                  color: C.text,
                   gap: 12,
                 }}
               >
@@ -376,28 +541,49 @@ export default function KidDashboardPage() {
       <Section title="Recent quiz attempts">
         {stats.recentAttempts.length ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {stats.recentAttempts.map(a => (
-              <div key={`${a.article_id}:${a.attempt_number}`} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 12px', fontSize: 12, color: C.text, display: 'flex', justifyContent: 'space-between' }}>
+            {stats.recentAttempts.map((a) => (
+              <div
+                key={`${a.article_id}:${a.attempt_number}`}
+                style={{
+                  background: C.card,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 8,
+                  padding: '8px 12px',
+                  fontSize: 12,
+                  color: C.text,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                }}
+              >
                 <span>Attempt #{a.attempt_number}</span>
-                <span style={{ color: a.correct >= 3 ? C.success : C.danger, fontWeight: 700 }}>{a.correct}/5</span>
+                <span style={{ color: a.correct >= 3 ? C.success : C.danger, fontWeight: 700 }}>
+                  {a.correct}/5
+                </span>
                 <span style={{ color: C.dim }}>{new Date(a.at).toLocaleDateString()}</span>
               </div>
             ))}
           </div>
-        ) : <Empty>No quiz activity yet.</Empty>}
+        ) : (
+          <Empty>No quiz activity yet.</Empty>
+        )}
       </Section>
 
       <Section title="Achievements">
         {stats.achievements.length ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 }}>
-            {stats.achievements.map(a => (
-              <Badge
-                key={a.id}
-                name={a.achievements?.name || a.achievements?.key || 'Badge'}
-              />
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+              gap: 10,
+            }}
+          >
+            {stats.achievements.map((a) => (
+              <Badge key={a.id} name={a.achievements?.name || a.achievements?.key || 'Badge'} />
             ))}
           </div>
-        ) : <Empty>Nothing earned yet.</Empty>}
+        ) : (
+          <Empty>Nothing earned yet.</Empty>
+        )}
       </Section>
     </div>
   );
@@ -405,8 +591,17 @@ export default function KidDashboardPage() {
 
 function Stat({ label, value }: { label: string; value: number | string }) {
   return (
-    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px' }}>
-      <div style={{ fontSize: 10, color: C.dim, textTransform: 'uppercase', fontWeight: 700 }}>{label}</div>
+    <div
+      style={{
+        background: C.card,
+        border: `1px solid ${C.border}`,
+        borderRadius: 10,
+        padding: '10px 12px',
+      }}
+    >
+      <div style={{ fontSize: 10, color: C.dim, textTransform: 'uppercase', fontWeight: 700 }}>
+        {label}
+      </div>
       <div style={{ fontSize: 20, fontWeight: 800 }}>{value}</div>
     </div>
   );
@@ -415,7 +610,18 @@ function Stat({ label, value }: { label: string; value: number | string }) {
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div style={{ marginBottom: 24 }}>
-      <h3 style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, color: C.dim, margin: '0 0 8px' }}>{title}</h3>
+      <h3
+        style={{
+          fontSize: 13,
+          fontWeight: 700,
+          textTransform: 'uppercase',
+          letterSpacing: 0.4,
+          color: C.dim,
+          margin: '0 0 8px',
+        }}
+      >
+        {title}
+      </h3>
       {children}
     </div>
   );
@@ -425,19 +631,35 @@ function Empty({ children }: { children: ReactNode }) {
   return <div style={{ fontSize: 13, color: C.dim }}>{children}</div>;
 }
 
-function LeaderboardOptIn({ enabled, busy, onToggle }: { enabled: boolean; busy: boolean; onToggle: () => void }) {
+function LeaderboardOptIn({
+  enabled,
+  busy,
+  onToggle,
+}: {
+  enabled: boolean;
+  busy: boolean;
+  onToggle: () => void;
+}) {
   return (
-    <div style={{
-      background: C.card, border: `1px solid ${C.border}`,
-      borderRadius: 12, padding: '14px 16px',
-      display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap',
-    }}>
+    <div
+      style={{
+        background: C.card,
+        border: `1px solid ${C.border}`,
+        borderRadius: 12,
+        padding: '14px 16px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 14,
+        flexWrap: 'wrap',
+      }}
+    >
       <div style={{ flex: 1, minWidth: 220 }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>
           Show on global leaderboard
         </div>
         <div style={{ fontSize: 12, color: C.dim, marginTop: 4, lineHeight: 1.5 }}>
-          Off by default. Let other kids on Verity Post see your kid&rsquo;s first name and score on the kids-only global board.
+          Off by default. Let other kids on Verity Post see your kid&rsquo;s first name and score on
+          the kids-only global board.
         </div>
       </div>
       <button
@@ -445,16 +667,20 @@ function LeaderboardOptIn({ enabled, busy, onToggle }: { enabled: boolean; busy:
         disabled={busy}
         aria-pressed={enabled}
         style={{
-          minWidth: 88, padding: '8px 16px',
+          minWidth: 88,
+          padding: '8px 16px',
           borderRadius: 999,
           border: `1px solid ${enabled ? C.success : C.border}`,
           background: enabled ? C.success : 'transparent',
           color: enabled ? '#fff' : C.text,
-          fontSize: 13, fontWeight: 700,
+          fontSize: 13,
+          fontWeight: 700,
           cursor: busy ? 'default' : 'pointer',
           opacity: busy ? 0.5 : 1,
         }}
-      >{busy ? '\u2026' : enabled ? 'On' : 'Off'}</button>
+      >
+        {busy ? '\u2026' : enabled ? 'On' : 'Off'}
+      </button>
     </div>
   );
 }
@@ -470,23 +696,53 @@ function TimelineRow({ event }: { event: TimelineEvent }) {
   const meta = KIND_META[event.kind] || KIND_META.read;
   const body = (
     <>
-      <span style={{
-        fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4,
-        padding: '2px 8px', borderRadius: 999,
-        background: meta.bg, color: meta.fg,
-        flex: '0 0 auto',
-      }}>{meta.label}</span>
-      <span style={{ fontSize: 13, color: C.text, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{event.label}</span>
+      <span
+        style={{
+          fontSize: 10,
+          fontWeight: 700,
+          textTransform: 'uppercase',
+          letterSpacing: 0.4,
+          padding: '2px 8px',
+          borderRadius: 999,
+          background: meta.bg,
+          color: meta.fg,
+          flex: '0 0 auto',
+        }}
+      >
+        {meta.label}
+      </span>
+      <span
+        style={{
+          fontSize: 13,
+          color: C.text,
+          flex: 1,
+          minWidth: 0,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {event.label}
+      </span>
       <span style={{ fontSize: 11, color: C.dim, flex: '0 0 auto' }}>{timeAgo(event.at)}</span>
     </>
   );
   const style: CSSProperties = {
-    display: 'flex', alignItems: 'center', gap: 10,
-    background: C.card, border: `1px solid ${C.border}`,
-    borderRadius: 8, padding: '8px 12px',
-    textDecoration: 'none', color: 'inherit',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    background: C.card,
+    border: `1px solid ${C.border}`,
+    borderRadius: 8,
+    padding: '8px 12px',
+    textDecoration: 'none',
+    color: 'inherit',
   };
-  return event.href
-    ? <a href={event.href} style={style}>{body}</a>
-    : <div style={style}>{body}</div>;
+  return event.href ? (
+    <a href={event.href} style={style}>
+      {body}
+    </a>
+  ) : (
+    <div style={style}>{body}</div>
+  );
 }

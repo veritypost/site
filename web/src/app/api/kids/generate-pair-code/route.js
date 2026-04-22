@@ -18,8 +18,11 @@ export async function POST(request) {
     const supabase = await createClient();
 
     let user;
-    try { user = await requireAuth(); }
-    catch (err) { return NextResponse.json({ error: err.message }, { status: err.status || 401 }); }
+    try {
+      user = await requireAuth();
+    } catch (err) {
+      return NextResponse.json({ error: err.message }, { status: err.status || 401 });
+    }
 
     // Rate-limit: 10 codes per minute per authenticated parent (NOT per-IP,
     // so parents behind shared NAT don't compete with each other).
@@ -31,27 +34,37 @@ export async function POST(request) {
       windowSec: 60,
     });
     if (rate.limited) {
-      return NextResponse.json({ error: 'Too many codes generated. Wait a minute.' }, { status: 429, headers: { 'Retry-After': '60' } });
+      return NextResponse.json(
+        { error: 'Too many codes generated. Wait a minute.' },
+        { status: 429, headers: { 'Retry-After': '60' } }
+      );
     }
 
     let body;
-    try { body = await request.json(); }
-    catch { return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 }); }
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
 
     const { kid_profile_id } = body || {};
     if (!kid_profile_id || typeof kid_profile_id !== 'string') {
       return NextResponse.json({ error: 'kid_profile_id is required' }, { status: 400 });
     }
 
-    const { data, error } = await supabase
-      .rpc('generate_kid_pair_code', { p_kid_profile_id: kid_profile_id });
+    const { data, error } = await supabase.rpc('generate_kid_pair_code', {
+      p_kid_profile_id: kid_profile_id,
+    });
 
     if (error) {
       if (error.message && error.message.toLowerCase().includes('not owned')) {
         return NextResponse.json({ error: 'Kid profile not owned by you' }, { status: 403 });
       }
       console.error('[kids-generate-pair-code]', error);
-      return NextResponse.json({ error: 'Could not generate a pair code. Try again.' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Could not generate a pair code. Try again.' },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({

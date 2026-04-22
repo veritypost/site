@@ -96,8 +96,8 @@ export default function PairDeviceButton({ kidId }: Props) {
       {!pair && (
         <>
           <p style={{ fontSize: 13, color: C.dim, margin: 0, lineHeight: 1.5 }}>
-            Generate an 8-character code and type it into the Verity Post Kids
-            app on your child&apos;s device. The code expires in 15 minutes.
+            Generate an 8-character code and type it into the Verity Post Kids app on your
+            child&apos;s device. The code expires in 15 minutes.
           </p>
           <button
             onClick={generate}
@@ -203,13 +203,10 @@ export default function PairDeviceButton({ kidId }: Props) {
           </div>
 
           <p style={{ fontSize: 12, color: C.dim, margin: 0, lineHeight: 1.5 }}>
-            Open <strong>Verity Post Kids</strong> on your child&apos;s device and
-            enter this code in the pairing screen. Anyone with this code can pair
-            as {' '}
-            {kidId
-              ? <>your child</>
-              : <>them</>}
-            , so share it directly with your child, not in group chats.
+            Open <strong>Verity Post Kids</strong> on your child&apos;s device and enter this code
+            in the pairing screen. Anyone with this code can pair as{' '}
+            {kidId ? <>your child</> : <>them</>}, so share it directly with your child, not in
+            group chats.
           </p>
         </>
       )}

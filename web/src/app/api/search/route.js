@@ -20,7 +20,9 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // Strip PostgREST filter-delimiter chars + wildcards so user input
 // can't break out of the enclosing .or()/.ilike() pattern.
 function sanitizeIlikeTerm(s) {
-  return String(s || '').replace(/[,.%*()"\\]/g, ' ').trim();
+  return String(s || '')
+    .replace(/[,.%*()"\\]/g, ' ')
+    .trim();
 }
 
 export async function GET(request) {
@@ -43,7 +45,9 @@ export async function GET(request) {
   const service = createServiceClient();
   let query = service
     .from('articles')
-    .select('id, title, slug, excerpt, published_at, category_id, is_kids_safe, categories!fk_articles_category_id(name)')
+    .select(
+      'id, title, slug, excerpt, published_at, category_id, is_kids_safe, categories!fk_articles_category_id(name)'
+    )
     .eq('status', 'published')
     .limit(50)
     .order('published_at', { ascending: false });
@@ -65,24 +69,24 @@ export async function GET(request) {
     query = query.textSearch('search_tsv', q, { type: 'websearch', config: 'english' });
     // Per-filter gates so an admin can revoke one field without
     // disabling the whole advanced experience.
-    if (category && await hasPermissionServer('search.advanced.category')) {
+    if (category && (await hasPermissionServer('search.advanced.category'))) {
       query = query.eq('category_id', category);
     }
-    if (subcategory && await hasPermissionServer('search.advanced.subcategory')) {
+    if (subcategory && (await hasPermissionServer('search.advanced.subcategory'))) {
       query = query.eq('subcategory_id', subcategory);
     }
-    if ((from || to) && await hasPermissionServer('search.advanced.date_range')) {
+    if ((from || to) && (await hasPermissionServer('search.advanced.date_range'))) {
       if (from) query = query.gte('published_at', from);
-      if (to)   query = query.lte('published_at', to);
+      if (to) query = query.lte('published_at', to);
     }
-    if (source && await hasPermissionServer('search.advanced.source')) {
+    if (source && (await hasPermissionServer('search.advanced.source'))) {
       // Source filter requires a join through the sources table.
       const { data: srcArticleIds } = await service
         .from('sources')
         .select('article_id')
         .ilike('publisher', `%${source}%`)
         .limit(500);
-      const ids = (srcArticleIds || []).map(r => r.article_id);
+      const ids = (srcArticleIds || []).map((r) => r.article_id);
       if (ids.length === 0) return NextResponse.json({ articles: [], applied: { source } });
       query = query.in('id', ids);
     }
@@ -91,7 +95,8 @@ export async function GET(request) {
   }
 
   const { data, error } = await query;
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'search', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, { route: 'search', fallbackStatus: 400 });
 
   return NextResponse.json({
     articles: data || [],

@@ -13,8 +13,9 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // is revoked. Admin UI grants/revokes route through here.
 export async function POST(request) {
   let actor;
-  try { actor = await requirePermission('admin.permissions.assign_to_user'); }
-  catch (err) {
+  try {
+    actor = await requirePermission('admin.permissions.assign_to_user');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -47,12 +48,12 @@ export async function POST(request) {
     expires_at: expires_at ?? null,
     reason: reason ?? null,
   };
-  const { data, error } = await service
-    .from('user_permission_sets')
-    .insert(row)
-    .select()
-    .single();
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.permissions.user_grants', fallbackStatus: 400 });
+  const { data, error } = await service.from('user_permission_sets').insert(row).select().single();
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'admin.permissions.user_grants',
+      fallbackStatus: 400,
+    });
 
   try {
     await service.from('audit_log').insert({
@@ -62,7 +63,9 @@ export async function POST(request) {
       target_id: user_id,
       metadata: { permission_set_id, expires_at: row.expires_at, reason: row.reason },
     });
-  } catch { /* best-effort */ }
+  } catch {
+    /* best-effort */
+  }
 
   const { error: bumpErr } = await service.rpc('bump_user_perms_version', {
     p_user_id: user_id,
@@ -74,8 +77,9 @@ export async function POST(request) {
 
 export async function DELETE(request) {
   let actor;
-  try { actor = await requirePermission('admin.permissions.assign_to_user'); }
-  catch (err) {
+  try {
+    actor = await requirePermission('admin.permissions.assign_to_user');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -107,7 +111,11 @@ export async function DELETE(request) {
     .delete()
     .eq('user_id', user_id)
     .eq('permission_set_id', permission_set_id);
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.permissions.user_grants', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'admin.permissions.user_grants',
+      fallbackStatus: 400,
+    });
 
   try {
     await service.from('audit_log').insert({
@@ -117,7 +125,9 @@ export async function DELETE(request) {
       target_id: user_id,
       metadata: { permission_set_id },
     });
-  } catch { /* best-effort */ }
+  } catch {
+    /* best-effort */
+  }
 
   const { error: bumpErr } = await service.rpc('bump_user_perms_version', {
     p_user_id: user_id,

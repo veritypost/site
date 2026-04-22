@@ -29,15 +29,19 @@ const ALLOWED_TYPES = new Set(['system', 'breaking', 'achievement', 'streak', 'a
 
 export async function POST(request: Request) {
   let actor;
-  try { actor = await requirePermission('admin.settings.edit'); }
-  catch (err) { return permissionError(err); }
+  try {
+    actor = await requirePermission('admin.settings.edit');
+  } catch (err) {
+    return permissionError(err);
+  }
 
   const body = (await request.json().catch(() => ({}))) as Body;
   const title = typeof body.title === 'string' ? body.title.trim() : '';
   const text = typeof body.body === 'string' ? body.body.trim() : '';
   const type = typeof body.type === 'string' && ALLOWED_TYPES.has(body.type) ? body.type : 'system';
   const recipient: 'all' | 'specific' = body.recipient === 'specific' ? 'specific' : 'all';
-  if (!title || !text) return NextResponse.json({ error: 'title and body required' }, { status: 400 });
+  if (!title || !text)
+    return NextResponse.json({ error: 'title and body required' }, { status: 400 });
 
   const service = createServiceClient();
 

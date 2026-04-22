@@ -36,7 +36,9 @@ async function resolveAuthedClient(client) {
 
 export async function getUser(client) {
   const supabase = await resolveAuthedClient(client);
-  const { data: { user: authUser } } = await supabase.auth.getUser();
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser();
   if (!authUser) return null;
 
   const { data: profile } = await supabase
@@ -99,7 +101,9 @@ export async function getUserRoles(client, userId) {
   const supabase = await resolveClient(client);
   let id = userId;
   if (!id) {
-    const { data: { user: authUser } } = await supabase.auth.getUser();
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser();
     id = authUser?.id;
   }
   if (!id) return [];

@@ -22,8 +22,9 @@ import { EDITOR_ROLES } from '@/lib/roles';
 
 export async function POST(request, { params }) {
   let user;
-  try { user = await requirePermission('kids_expert.question.answer'); }
-  catch (err) {
+  try {
+    user = await requirePermission('kids_expert.question.answer');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
@@ -65,6 +66,10 @@ export async function POST(request, { params }) {
       answered_at: new Date().toISOString(),
     })
     .eq('id', params.id);
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'expert_sessions.questions.id.answer', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'expert_sessions.questions.id.answer',
+      fallbackStatus: 400,
+    });
   return NextResponse.json({ ok: true });
 }

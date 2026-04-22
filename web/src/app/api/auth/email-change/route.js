@@ -14,8 +14,11 @@ import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 // hits the new inbox even if the client-side updateUser call dropped.
 export async function POST(request) {
   let user;
-  try { user = await requireAuth(); }
-  catch { return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 }); }
+  try {
+    user = await requireAuth();
+  } catch {
+    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+  }
 
   const { email } = await request.json().catch(() => ({}));
   if (!email || typeof email !== 'string' || !email.includes('@')) {
@@ -24,9 +27,17 @@ export async function POST(request) {
 
   const supabase = await createClient();
   const ip = await getClientIp();
-  const hit = await checkRateLimit(supabase, { key: `email_change:user:${user.id}:${ip}`, policyKey: 'email_change', max: 3, windowSec: 3600 });
+  const hit = await checkRateLimit(supabase, {
+    key: `email_change:user:${user.id}:${ip}`,
+    policyKey: 'email_change',
+    max: 3,
+    windowSec: 3600,
+  });
   if (hit.limited) {
-    return NextResponse.json({ error: 'Too many email-change attempts. Try again later.' }, { status: 429 });
+    return NextResponse.json(
+      { error: 'Too many email-change attempts. Try again later.' },
+      { status: 429 }
+    );
   }
 
   const service = createServiceClient();

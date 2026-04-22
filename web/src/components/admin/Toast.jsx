@@ -21,11 +21,11 @@ import { ADMIN_C, F, S } from '../../lib/adminPalette';
 const ToastContext = createContext(null);
 
 const VARIANT_COLORS = {
-  neutral: { border: ADMIN_C.border,  accent: ADMIN_C.accent },
-  success: { border: '#16a34a',       accent: '#16a34a' },
-  warn:    { border: '#b45309',       accent: '#b45309' },
-  danger:  { border: ADMIN_C.danger,  accent: ADMIN_C.danger },
-  info:    { border: '#2563eb',       accent: '#2563eb' },
+  neutral: { border: ADMIN_C.border, accent: ADMIN_C.accent },
+  success: { border: '#16a34a', accent: '#16a34a' },
+  warn: { border: '#b45309', accent: '#b45309' },
+  danger: { border: ADMIN_C.danger, accent: ADMIN_C.danger },
+  info: { border: '#2563eb', accent: '#2563eb' },
 };
 
 /**
@@ -42,21 +42,24 @@ export function ToastProvider({ children, position = 'bottom' }) {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const push = useCallback((input) => {
-    const t = typeof input === 'string' ? { message: input } : (input || {});
-    const id = t.id || (Date.now() + Math.random());
-    const item = {
-      id,
-      message: t.message,
-      variant: t.variant || 'neutral',
-      duration: t.duration ?? (t.variant === 'danger' ? 6000 : 4000),
-    };
-    setToasts((prev) => [...prev, item]);
-    if (item.duration > 0) {
-      setTimeout(() => dismiss(id), item.duration);
-    }
-    return id;
-  }, [dismiss]);
+  const push = useCallback(
+    (input) => {
+      const t = typeof input === 'string' ? { message: input } : input || {};
+      const id = t.id || Date.now() + Math.random();
+      const item = {
+        id,
+        message: t.message,
+        variant: t.variant || 'neutral',
+        duration: t.duration ?? (t.variant === 'danger' ? 6000 : 4000),
+      };
+      setToasts((prev) => [...prev, item]);
+      if (item.duration > 0) {
+        setTimeout(() => dismiss(id), item.duration);
+      }
+      return id;
+    },
+    [dismiss]
+  );
 
   const api = { push, dismiss };
 

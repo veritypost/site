@@ -72,36 +72,36 @@ import type { Tables, TableInsert, DbClient } from '@/types/database-helpers';
 // key actually read from `hasPermission(...)`.
 
 const PERM = {
-  SECTION_EXPERT_VIEW:        'settings.expert.view',
-  SECTION_SUPERVISOR_VIEW:    'settings.supervisor.view',
-  SECTION_BILLING_VIEW:       'billing.view.plan',
-  ACTION_EMAILS_ADD:          'settings.emails.add_secondary',
-  ACTION_EMAILS_SET_PRIMARY:  'settings.emails.set_primary',
-  ACTION_EMAILS_DELETE:       'settings.emails.delete_secondary',
-  ACTION_PASSWORD_CHANGE:     'settings.account.change_password',
-  ACTION_SESSIONS_REVOKE:     'settings.account.sessions.revoke',
+  SECTION_EXPERT_VIEW: 'settings.expert.view',
+  SECTION_SUPERVISOR_VIEW: 'settings.supervisor.view',
+  SECTION_BILLING_VIEW: 'billing.view.plan',
+  ACTION_EMAILS_ADD: 'settings.emails.add_secondary',
+  ACTION_EMAILS_SET_PRIMARY: 'settings.emails.set_primary',
+  ACTION_EMAILS_DELETE: 'settings.emails.delete_secondary',
+  ACTION_PASSWORD_CHANGE: 'settings.account.change_password',
+  ACTION_SESSIONS_REVOKE: 'settings.account.sessions.revoke',
   ACTION_SESSIONS_REVOKE_ALL: 'settings.account.sessions.revoke_all_other',
-  ACTION_FEED_CAT_TOGGLE:     'settings.feed.category_toggle',
-  ACTION_FEED_HIDE_LOWCRED:   'settings.feed.hide_low_cred',
-  ACTION_ALERTS_VIEW:         'settings.alerts.view',
-  ACTION_A11Y_TTS:            'settings.a11y.tts_per_article',
-  ACTION_A11Y_TEXT_SIZE:      'settings.a11y.text_size',
-  ACTION_A11Y_REDUCE_MOTION:  'settings.a11y.reduce_motion',
-  ACTION_A11Y_HIGH_CONTRAST:  'settings.a11y.high_contrast',
-  ACTION_BLOCKED_LIST:        'settings.blocked.list',
-  ACTION_BLOCKED_UNBLOCK:     'settings.blocked.unblock',
-  ACTION_DATA_EXPORT:         'settings.data.request_export',
-  ACTION_DATA_DELETE:         'settings.data.request_deletion',
-  ACTION_DATA_DELETE_CANCEL:  'settings.data.deletion.cancel',
-  ACTION_SUPERVISOR_OPT_IN:   'settings.supervisor.opt_in',
+  ACTION_FEED_CAT_TOGGLE: 'settings.feed.category_toggle',
+  ACTION_FEED_HIDE_LOWCRED: 'settings.feed.hide_low_cred',
+  ACTION_ALERTS_VIEW: 'settings.alerts.view',
+  ACTION_A11Y_TTS: 'settings.a11y.tts_per_article',
+  ACTION_A11Y_TEXT_SIZE: 'settings.a11y.text_size',
+  ACTION_A11Y_REDUCE_MOTION: 'settings.a11y.reduce_motion',
+  ACTION_A11Y_HIGH_CONTRAST: 'settings.a11y.high_contrast',
+  ACTION_BLOCKED_LIST: 'settings.blocked.list',
+  ACTION_BLOCKED_UNBLOCK: 'settings.blocked.unblock',
+  ACTION_DATA_EXPORT: 'settings.data.request_export',
+  ACTION_DATA_DELETE: 'settings.data.request_deletion',
+  ACTION_DATA_DELETE_CANCEL: 'settings.data.deletion.cancel',
+  ACTION_SUPERVISOR_OPT_IN: 'settings.supervisor.opt_in',
   ACTION_BILLING_CHANGE_PLAN: 'billing.change_plan',
-  ACTION_BILLING_CANCEL:      'billing.cancel.own',
-  ACTION_BILLING_RESUB:       'billing.resubscribe',
-  ACTION_BILLING_PORTAL:      'billing.portal.open',
-  ACTION_BILLING_PROMO:       'billing.promo.redeem',
-  ACTION_BILLING_INVOICE_DL:  'settings.billing.view', // no dedicated "invoice download"
-  ACTION_EXPERT_VACATION:     'settings.expert.vacation_mode',
-  ACTION_EXPERT_WATCHLIST:    'settings.expert.category_watchlist',
+  ACTION_BILLING_CANCEL: 'billing.cancel.own',
+  ACTION_BILLING_RESUB: 'billing.resubscribe',
+  ACTION_BILLING_PORTAL: 'billing.portal.open',
+  ACTION_BILLING_PROMO: 'billing.promo.redeem',
+  ACTION_BILLING_INVOICE_DL: 'settings.billing.view', // no dedicated "invoice download"
+  ACTION_EXPERT_VACATION: 'settings.expert.vacation_mode',
+  ACTION_EXPERT_WATCHLIST: 'settings.expert.category_watchlist',
   // Spec-only keys we could NOT find in DB (flagged in report):
   //   settings.profile.edit.own
   //   settings.expert.edit
@@ -159,9 +159,18 @@ type BlockedRow = {
 };
 type SessionRow = Pick<
   Tables<'user_sessions'>,
-  'id' | 'started_at' | 'ended_at' | 'is_active' | 'ip_address'
-  | 'browser_name' | 'browser_version' | 'os_name' | 'device_model' | 'device_type'
-  | 'country_code' | 'city'
+  | 'id'
+  | 'started_at'
+  | 'ended_at'
+  | 'is_active'
+  | 'ip_address'
+  | 'browser_name'
+  | 'browser_version'
+  | 'os_name'
+  | 'device_model'
+  | 'device_type'
+  | 'country_code'
+  | 'city'
 >;
 type DataRequestRow = Pick<
   Tables<'data_requests'>,
@@ -169,17 +178,27 @@ type DataRequestRow = Pick<
 >;
 type InvoiceRow = Pick<
   Tables<'invoices'>,
-  'id' | 'stripe_invoice_id' | 'created_at' | 'amount_cents' | 'currency' | 'status' | 'invoice_url' | 'invoice_pdf_url'
+  | 'id'
+  | 'stripe_invoice_id'
+  | 'created_at'
+  | 'amount_cents'
+  | 'currency'
+  | 'status'
+  | 'invoice_url'
+  | 'invoice_pdf_url'
 >;
 type PlanRow = Pick<Tables<'plans'>, 'id' | 'tier' | 'billing_period' | 'price_cents' | 'name'>;
-type PlanFeatureRow = Pick<
-  Tables<'plan_features'>,
-  'plan_id' | 'feature_name' | 'is_enabled'
->;
+type PlanFeatureRow = Pick<Tables<'plan_features'>, 'plan_id' | 'feature_name' | 'is_enabled'>;
 type SubscriptionRow = Pick<
   Tables<'subscriptions'>,
-  'id' | 'status' | 'current_period_end' | 'created_at' | 'stripe_payment_method_id'
-  | 'source' | 'apple_original_transaction_id' | 'google_purchase_token'
+  | 'id'
+  | 'status'
+  | 'current_period_end'
+  | 'created_at'
+  | 'stripe_payment_method_id'
+  | 'source'
+  | 'apple_original_transaction_id'
+  | 'google_purchase_token'
 >;
 type ExpertApplicationRow = Tables<'expert_applications'>;
 type CategorySupervisorRow = Pick<
@@ -198,13 +217,17 @@ type AlertType =
 type AlertChannel = 'channel_push' | 'channel_email' | 'channel_in_app';
 
 const ALERT_ROWS: { key: AlertType; label: string; desc: string }[] = [
-  { key: 'breaking_news',         label: 'Breaking news',         desc: 'Fast-moving stories.' },
-  { key: 'reply_to_me',           label: 'Replies to me',         desc: 'Someone replied to your comment.' },
-  { key: 'mention',               label: '@mentions',             desc: 'You were tagged in a comment.' },
-  { key: 'expert_answered_me',    label: 'Expert answered me',    desc: 'An expert replied to your Ask.' },
+  { key: 'breaking_news', label: 'Breaking news', desc: 'Fast-moving stories.' },
+  { key: 'reply_to_me', label: 'Replies to me', desc: 'Someone replied to your comment.' },
+  { key: 'mention', label: '@mentions', desc: 'You were tagged in a comment.' },
+  {
+    key: 'expert_answered_me',
+    label: 'Expert answered me',
+    desc: 'An expert replied to your Ask.',
+  },
   { key: 'weekly_reading_report', label: 'Weekly reading report', desc: 'Your week in review.' },
-  { key: 'kid_trial_ending',      label: 'Kid trial ending',      desc: 'Day-6 + expiry notices.' },
-  { key: 'appeal_outcome',        label: 'Appeal outcome',        desc: 'Moderator decisions on your appeals.' },
+  { key: 'kid_trial_ending', label: 'Kid trial ending', desc: 'Day-6 + expiry notices.' },
+  { key: 'appeal_outcome', label: 'Appeal outcome', desc: 'Moderator decisions on your appeals.' },
 ];
 
 // NOTE: web has no service worker / VAPID / PushSubscription wiring yet,
@@ -215,8 +238,8 @@ const ALERT_ROWS: { key: AlertType; label: string; desc: string }[] = [
 // TODO(web-push): drop the hint once a web Push pipeline ships.
 const ALERT_CHANNELS: { key: AlertChannel; label: string }[] = [
   { key: 'channel_in_app', label: 'In-app' },
-  { key: 'channel_push',   label: 'Push (iOS only)' },
-  { key: 'channel_email',  label: 'Email' },
+  { key: 'channel_push', label: 'Push (iOS only)' },
+  { key: 'channel_email', label: 'Email' },
 ];
 
 const TEXT_SIZES: { value: 'sm' | 'md' | 'lg' | 'xl'; label: string }[] = [
@@ -234,8 +257,8 @@ const TEXT_SIZES: { value: 'sm' | 'md' | 'lg' | 'xl'; label: string }[] = [
 interface SubsectionDef {
   id: string;
   label: string;
-  keywords: string;       // search corpus
-  gateKey?: string;       // permission key that hides this subsection entirely
+  keywords: string; // search corpus
+  gateKey?: string; // permission key that hides this subsection entirely
 }
 
 interface SectionDef {
@@ -250,28 +273,64 @@ const SECTIONS: SectionDef[] = [
     id: 'account',
     label: 'Account',
     subsections: [
-      { id: 'profile',       label: 'Profile',        keywords: 'profile display name username bio avatar banner visibility' },
-      { id: 'emails',        label: 'Emails',         keywords: 'email primary verified secondary add remove' },
-      { id: 'password',      label: 'Password',       keywords: 'password change security', gateKey: PERM.ACTION_PASSWORD_CHANGE },
-      { id: 'login-activity', label: 'Sign-in activity', keywords: 'sessions devices ip sign out everywhere' },
+      {
+        id: 'profile',
+        label: 'Profile',
+        keywords: 'profile display name username bio avatar banner visibility',
+      },
+      { id: 'emails', label: 'Emails', keywords: 'email primary verified secondary add remove' },
+      {
+        id: 'password',
+        label: 'Password',
+        keywords: 'password change security',
+        gateKey: PERM.ACTION_PASSWORD_CHANGE,
+      },
+      {
+        id: 'login-activity',
+        label: 'Sign-in activity',
+        keywords: 'sessions devices ip sign out everywhere',
+      },
     ],
   },
   {
     id: 'preferences',
     label: 'Preferences',
     subsections: [
-      { id: 'feed',          label: 'Feed',           keywords: 'feed categories kid safe low credibility' },
-      { id: 'alerts',        label: 'Alerts',         keywords: 'alerts notifications push email in-app breaking mentions', gateKey: PERM.ACTION_ALERTS_VIEW },
-      { id: 'accessibility', label: 'Accessibility',  keywords: 'a11y tts text size motion contrast screen reader' },
+      { id: 'feed', label: 'Feed', keywords: 'feed categories kid safe low credibility' },
+      {
+        id: 'alerts',
+        label: 'Alerts',
+        keywords: 'alerts notifications push email in-app breaking mentions',
+        gateKey: PERM.ACTION_ALERTS_VIEW,
+      },
+      {
+        id: 'accessibility',
+        label: 'Accessibility',
+        keywords: 'a11y tts text size motion contrast screen reader',
+      },
     ],
   },
   {
     id: 'privacy',
     label: 'Privacy & Safety',
     subsections: [
-      { id: 'blocked',       label: 'Blocked users',  keywords: 'blocked users unblock', gateKey: PERM.ACTION_BLOCKED_LIST },
-      { id: 'data',          label: 'Data & export',  keywords: 'data export download gdpr ccpa delete account' },
-      { id: 'supervisor',    label: 'Supervisor',     keywords: 'supervisor category moderation opt in', gateKey: PERM.SECTION_SUPERVISOR_VIEW },
+      {
+        id: 'blocked',
+        label: 'Blocked users',
+        keywords: 'blocked users unblock',
+        gateKey: PERM.ACTION_BLOCKED_LIST,
+      },
+      {
+        id: 'data',
+        label: 'Data & export',
+        keywords: 'data export download gdpr ccpa delete account',
+      },
+      {
+        id: 'supervisor',
+        label: 'Supervisor',
+        keywords: 'supervisor category moderation opt in',
+        gateKey: PERM.SECTION_SUPERVISOR_VIEW,
+      },
     ],
   },
   {
@@ -279,10 +338,19 @@ const SECTIONS: SectionDef[] = [
     label: 'Billing',
     gateKey: PERM.SECTION_BILLING_VIEW,
     subsections: [
-      { id: 'plan',           label: 'Plan',             keywords: 'plan subscription renewal cancel resume' },
-      { id: 'payment-method', label: 'Payment method',   keywords: 'card stripe portal payment method' },
-      { id: 'invoices',       label: 'Invoices',         keywords: 'invoice billing history download pdf' },
-      { id: 'promo',          label: 'Promo codes',      keywords: 'promo coupon code redeem', gateKey: PERM.ACTION_BILLING_PROMO },
+      { id: 'plan', label: 'Plan', keywords: 'plan subscription renewal cancel resume' },
+      {
+        id: 'payment-method',
+        label: 'Payment method',
+        keywords: 'card stripe portal payment method',
+      },
+      { id: 'invoices', label: 'Invoices', keywords: 'invoice billing history download pdf' },
+      {
+        id: 'promo',
+        label: 'Promo codes',
+        keywords: 'promo coupon code redeem',
+        gateKey: PERM.ACTION_BILLING_PROMO,
+      },
     ],
   },
   {
@@ -290,18 +358,36 @@ const SECTIONS: SectionDef[] = [
     label: 'Expert',
     gateKey: PERM.SECTION_EXPERT_VIEW,
     subsections: [
-      { id: 'expert-profile',   label: 'Expertise & credentials', keywords: 'expert title organization credentials bio' },
-      { id: 'expert-vacation',  label: 'Vacation mode',           keywords: 'expert vacation pause answers', gateKey: PERM.ACTION_EXPERT_VACATION },
-      { id: 'expert-watchlist', label: 'Category watchlist',      keywords: 'expert categories watchlist notify', gateKey: PERM.ACTION_EXPERT_WATCHLIST },
+      {
+        id: 'expert-profile',
+        label: 'Expertise & credentials',
+        keywords: 'expert title organization credentials bio',
+      },
+      {
+        id: 'expert-vacation',
+        label: 'Vacation mode',
+        keywords: 'expert vacation pause answers',
+        gateKey: PERM.ACTION_EXPERT_VACATION,
+      },
+      {
+        id: 'expert-watchlist',
+        label: 'Category watchlist',
+        keywords: 'expert categories watchlist notify',
+        gateKey: PERM.ACTION_EXPERT_WATCHLIST,
+      },
     ],
   },
   {
     id: 'danger',
     label: 'Danger zone',
     subsections: [
-      { id: 'delete-account',   label: 'Delete account',     keywords: 'delete account remove erase' },
-      { id: 'signout',          label: 'Sign out',           keywords: 'sign out logout log out this device' },
-      { id: 'signout-everywhere', label: 'Sign out everywhere', keywords: 'sign out everywhere sessions revoke all' },
+      { id: 'delete-account', label: 'Delete account', keywords: 'delete account remove erase' },
+      { id: 'signout', label: 'Sign out', keywords: 'sign out logout log out this device' },
+      {
+        id: 'signout-everywhere',
+        label: 'Sign out everywhere',
+        keywords: 'sign out everywhere sessions revoke all',
+      },
     ],
   },
 ];
@@ -312,7 +398,11 @@ const SECTIONS: SectionDef[] = [
 
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return new Date(iso).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
 }
 
 function formatRelative(iso: string | null | undefined): string {
@@ -395,7 +485,9 @@ function SettingsInner(): ReactElement {
   useEffect(() => {
     let alive = true;
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!alive) return;
       if (!user) {
         router.replace('/login?next=/profile/settings');
@@ -411,7 +503,9 @@ function SettingsInner(): ReactElement {
       // Fire a stale check so bumps land without a hard reload.
       void refreshIfStale();
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [router, supabase]);
 
   // Post-Stripe-checkout landing. /profile/settings/billing preserves
@@ -447,11 +541,7 @@ function SettingsInner(): ReactElement {
 
   const reloadUser = useCallback(async () => {
     if (!userId) return;
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle();
+    const { data, error } = await supabase.from('users').select('*').eq('id', userId).maybeSingle();
     if (error) {
       pushToast({ message: error.message, variant: 'danger' });
       setLoadingUser(false);
@@ -461,7 +551,9 @@ function SettingsInner(): ReactElement {
     setLoadingUser(false);
   }, [supabase, userId, pushToast]);
 
-  useEffect(() => { if (userId) void reloadUser(); }, [userId, reloadUser]);
+  useEffect(() => {
+    if (userId) void reloadUser();
+  }, [userId, reloadUser]);
 
   // ---------- search ----------
   const [search, setSearch] = useState('');
@@ -470,7 +562,11 @@ function SettingsInner(): ReactElement {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === '/' && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
+      if (
+        e.key === '/' &&
+        !(e.target instanceof HTMLInputElement) &&
+        !(e.target instanceof HTMLTextAreaElement)
+      ) {
         e.preventDefault();
         searchRef.current?.focus();
       } else if (e.key === 'Escape' && document.activeElement === searchRef.current) {
@@ -491,7 +587,10 @@ function SettingsInner(): ReactElement {
       if (section.gateKey && !hasPermission(section.gateKey)) continue;
       for (const sub of section.subsections) {
         if (sub.gateKey && !hasPermission(sub.gateKey)) continue;
-        if (!q) { out.add(`${section.id}:${sub.id}`); continue; }
+        if (!q) {
+          out.add(`${section.id}:${sub.id}`);
+          continue;
+        }
         const corpus = `${section.label} ${sub.label} ${sub.keywords}`.toLowerCase();
         if (corpus.includes(q)) out.add(`${section.id}:${sub.id}`);
       }
@@ -499,15 +598,18 @@ function SettingsInner(): ReactElement {
     return out;
   }, [debouncedSearch, permsReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const isSubVisible = useCallback((sectionId: string, subId: string) =>
-    visibleSet.has(`${sectionId}:${subId}`), [visibleSet]);
+  const isSubVisible = useCallback(
+    (sectionId: string, subId: string) => visibleSet.has(`${sectionId}:${subId}`),
+    [visibleSet]
+  );
 
   // ---------- dirty tracking + beforeunload ----------
   const [dirtyKeys, setDirtyKeys] = useState<Set<string>>(new Set());
   const markDirty = useCallback((k: string, dirty: boolean) => {
     setDirtyKeys((prev) => {
       const next = new Set(prev);
-      if (dirty) next.add(k); else next.delete(k);
+      if (dirty) next.add(k);
+      else next.delete(k);
       return next;
     });
   }, []);
@@ -590,9 +692,7 @@ function SettingsInner(): ReactElement {
               placeholder={isMobile ? 'Search settings' : 'Search settings   /'}
               value={search}
               onChange={(e: ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
-              style={isMobile
-                ? { width: '100%', maxWidth: '100%' }
-                : { maxWidth: 280 }}
+              style={isMobile ? { width: '100%', maxWidth: '100%' } : { maxWidth: 280 }}
             />
           </div>
         }
@@ -621,7 +721,10 @@ function SettingsInner(): ReactElement {
           <MobileSidebar
             open={mobileNavOpen}
             onToggle={() => setMobileNavOpen((v) => !v)}
-            onPick={(id) => { setMobileNavOpen(false); scrollTo(id); }}
+            onPick={(id) => {
+              setMobileNavOpen(false);
+              scrollTo(id);
+            }}
             visibleSet={visibleSet}
           />
         </aside>
@@ -631,14 +734,12 @@ function SettingsInner(): ReactElement {
           {/* 1. Account */}
           {(() => {
             const hasAny =
-              isSubVisible('account', 'profile')
-              || isSubVisible('account', 'emails')
-              || isSubVisible('account', 'password')
-              || isSubVisible('account', 'login-activity');
+              isSubVisible('account', 'profile') ||
+              isSubVisible('account', 'emails') ||
+              isSubVisible('account', 'password') ||
+              isSubVisible('account', 'login-activity');
             if (!hasAny) return null;
-            return (
-              <SectionWrapper id="account" title="Account" />
-            );
+            return <SectionWrapper id="account" title="Account" />;
           })()}
           {isSubVisible('account', 'profile') && (
             <ProfileCard
@@ -684,9 +785,9 @@ function SettingsInner(): ReactElement {
           {/* 2. Preferences */}
           {(() => {
             const hasAny =
-              isSubVisible('preferences', 'feed')
-              || isSubVisible('preferences', 'alerts')
-              || isSubVisible('preferences', 'accessibility');
+              isSubVisible('preferences', 'feed') ||
+              isSubVisible('preferences', 'alerts') ||
+              isSubVisible('preferences', 'accessibility');
             if (!hasAny) return null;
             return <SectionWrapper id="preferences" title="Preferences" />;
           })()}
@@ -702,10 +803,7 @@ function SettingsInner(): ReactElement {
             />
           )}
           {isSubVisible('preferences', 'alerts') && (
-            <AlertsCard
-              highlight={highlight === 'alerts'}
-              pushToast={pushToast}
-            />
+            <AlertsCard highlight={highlight === 'alerts'} pushToast={pushToast} />
           )}
           {isSubVisible('preferences', 'accessibility') && (
             <AccessibilityCard
@@ -722,9 +820,9 @@ function SettingsInner(): ReactElement {
           {/* 3. Privacy & Safety */}
           {(() => {
             const hasAny =
-              isSubVisible('privacy', 'blocked')
-              || isSubVisible('privacy', 'data')
-              || isSubVisible('privacy', 'supervisor');
+              isSubVisible('privacy', 'blocked') ||
+              isSubVisible('privacy', 'data') ||
+              isSubVisible('privacy', 'supervisor');
             if (!hasAny) return null;
             return <SectionWrapper id="privacy" title="Privacy & Safety" />;
           })()}
@@ -758,17 +856,17 @@ function SettingsInner(): ReactElement {
           {/* 4. Billing */}
           {(() => {
             const hasAny =
-              isSubVisible('billing', 'plan')
-              || isSubVisible('billing', 'payment-method')
-              || isSubVisible('billing', 'invoices')
-              || isSubVisible('billing', 'promo');
+              isSubVisible('billing', 'plan') ||
+              isSubVisible('billing', 'payment-method') ||
+              isSubVisible('billing', 'invoices') ||
+              isSubVisible('billing', 'promo');
             if (!hasAny) return null;
             return <SectionWrapper id="billing" title="Billing" />;
           })()}
-          {(isSubVisible('billing', 'plan')
-            || isSubVisible('billing', 'payment-method')
-            || isSubVisible('billing', 'invoices')
-            || isSubVisible('billing', 'promo')) && (
+          {(isSubVisible('billing', 'plan') ||
+            isSubVisible('billing', 'payment-method') ||
+            isSubVisible('billing', 'invoices') ||
+            isSubVisible('billing', 'promo')) && (
             <BillingBundle
               userId={userId}
               highlightPlan={highlight === 'plan'}
@@ -787,9 +885,9 @@ function SettingsInner(): ReactElement {
           {/* 5. Expert */}
           {(() => {
             const hasAny =
-              isSubVisible('expert', 'expert-profile')
-              || isSubVisible('expert', 'expert-vacation')
-              || isSubVisible('expert', 'expert-watchlist');
+              isSubVisible('expert', 'expert-profile') ||
+              isSubVisible('expert', 'expert-vacation') ||
+              isSubVisible('expert', 'expert-watchlist');
             if (!hasAny) return null;
             return <SectionWrapper id="expert" title="Expert" />;
           })()}
@@ -824,7 +922,9 @@ function SettingsInner(): ReactElement {
           )}
 
           {/* 6. Danger zone — always renders (unaffected by search unless filtered) */}
-          {(isSubVisible('danger', 'delete-account') || isSubVisible('danger', 'signout') || isSubVisible('danger', 'signout-everywhere')) && (
+          {(isSubVisible('danger', 'delete-account') ||
+            isSubVisible('danger', 'signout') ||
+            isSubVisible('danger', 'signout-everywhere')) && (
             <SectionWrapper id="danger" title="Danger zone" tone="danger" />
           )}
           {isSubVisible('danger', 'delete-account') && (
@@ -837,9 +937,7 @@ function SettingsInner(): ReactElement {
               onChanged={reloadUser}
             />
           )}
-          {isSubVisible('danger', 'signout') && (
-            <SignOutCard highlight={highlight === 'signout'} />
-          )}
+          {isSubVisible('danger', 'signout') && <SignOutCard highlight={highlight === 'signout'} />}
           {isSubVisible('danger', 'signout-everywhere') && (
             <SignOutEverywhereCard
               highlight={highlight === 'signout-everywhere'}
@@ -924,7 +1022,9 @@ function DesktopSidebar({
       }}
     >
       {SECTIONS.map((section) => {
-        const visibleSubs = section.subsections.filter((s) => visibleSet.has(`${section.id}:${s.id}`));
+        const visibleSubs = section.subsections.filter((s) =>
+          visibleSet.has(`${section.id}:${s.id}`)
+        );
         if (visibleSubs.length === 0) return null;
         return (
           <div key={section.id} style={{ marginBottom: S[2] }}>
@@ -964,8 +1064,12 @@ function DesktopSidebar({
                   cursor: 'pointer',
                   borderRadius: 4,
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = C.bg; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = C.bg;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                }}
               >
                 {sub.label}
               </button>
@@ -989,10 +1093,7 @@ function MobileSidebar({
   visibleSet: Set<string>;
 }): ReactElement {
   return (
-    <div
-      className="vp-settings-mobile-nav"
-      style={{ display: 'none', marginBottom: S[4] }}
-    >
+    <div className="vp-settings-mobile-nav" style={{ display: 'none', marginBottom: S[4] }}>
       <button
         type="button"
         onClick={onToggle}
@@ -1014,29 +1115,39 @@ function MobileSidebar({
         }}
       >
         <span>Jump to section</span>
-        <span aria-hidden style={{ color: C.dim, fontSize: F.xs, fontWeight: 700 }}>{open ? 'Close' : 'Open'}</span>
+        <span aria-hidden style={{ color: C.dim, fontSize: F.xs, fontWeight: 700 }}>
+          {open ? 'Close' : 'Open'}
+        </span>
       </button>
       {open && (
-        <div style={{
-          marginTop: S[1],
-          border: `1px solid ${C.border}`,
-          borderRadius: 8,
-          background: C.bg,
-          padding: S[2],
-        }}>
+        <div
+          style={{
+            marginTop: S[1],
+            border: `1px solid ${C.border}`,
+            borderRadius: 8,
+            background: C.bg,
+            padding: S[2],
+          }}
+        >
           {SECTIONS.map((section) => {
-            const visibleSubs = section.subsections.filter((s) => visibleSet.has(`${section.id}:${s.id}`));
+            const visibleSubs = section.subsections.filter((s) =>
+              visibleSet.has(`${section.id}:${s.id}`)
+            );
             if (visibleSubs.length === 0) return null;
             return (
               <div key={section.id} style={{ marginBottom: S[2] }}>
-                <div style={{
-                  fontSize: F.xs,
-                  fontWeight: 700,
-                  color: C.dim,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.06em',
-                  padding: `${S[1]}px ${S[2]}px`,
-                }}>{section.label}</div>
+                <div
+                  style={{
+                    fontSize: F.xs,
+                    fontWeight: 700,
+                    color: C.dim,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                    padding: `${S[1]}px ${S[2]}px`,
+                  }}
+                >
+                  {section.label}
+                </div>
                 {visibleSubs.map((sub) => (
                   <button
                     key={sub.id}
@@ -1071,7 +1182,15 @@ function MobileSidebar({
 // Section header (plain anchor) + Card shell
 // ---------------------------------------------------------------------------
 
-function SectionWrapper({ id, title, tone }: { id: string; title: string; tone?: 'danger' }): ReactElement {
+function SectionWrapper({
+  id,
+  title,
+  tone,
+}: {
+  id: string;
+  title: string;
+  tone?: 'danger';
+}): ReactElement {
   return (
     <h2
       id={id}
@@ -1101,7 +1220,15 @@ interface CardProps {
   tone?: 'danger';
 }
 
-function Card({ id, title, description, highlight, aside, children, tone }: CardProps): ReactElement {
+function Card({
+  id,
+  title,
+  description,
+  highlight,
+  aside,
+  children,
+  tone,
+}: CardProps): ReactElement {
   const isDanger = tone === 'danger';
   return (
     <section
@@ -1118,15 +1245,27 @@ function Card({ id, title, description, highlight, aside, children, tone }: Card
         scrollMarginTop: S[6],
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: S[3], justifyContent: 'space-between', flexWrap: 'wrap' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: S[3],
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+        }}
+      >
         <div style={{ minWidth: 0, flex: '1 1 220px' }}>
-          <h3 style={{
-            margin: 0,
-            fontSize: F.lg,
-            fontWeight: 600,
-            letterSpacing: '-0.01em',
-            color: isDanger ? C.danger : C.text,
-          }}>{title}</h3>
+          <h3
+            style={{
+              margin: 0,
+              fontSize: F.lg,
+              fontWeight: 600,
+              letterSpacing: '-0.01em',
+              color: isDanger ? C.danger : C.text,
+            }}
+          >
+            {title}
+          </h3>
           {description && (
             <p style={{ margin: `${S[1]}px 0 0`, fontSize: F.sm, color: C.dim, lineHeight: 1.5 }}>
               {description}
@@ -1142,14 +1281,16 @@ function Card({ id, title, description, highlight, aside, children, tone }: Card
 
 function Row({ children, last }: { children: ReactNode; last?: boolean }): ReactElement {
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: S[3],
-      padding: `${S[3]}px 0`,
-      borderBottom: last ? 'none' : `1px solid ${C.divider || C.border}`,
-      flexWrap: 'wrap',
-    }}>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: S[3],
+        padding: `${S[3]}px 0`,
+        borderBottom: last ? 'none' : `1px solid ${C.divider || C.border}`,
+        flexWrap: 'wrap',
+      }}
+    >
       {children}
     </div>
   );
@@ -1157,14 +1298,18 @@ function Row({ children, last }: { children: ReactNode; last?: boolean }): React
 
 function FieldLabel({ children }: { children: ReactNode }): ReactElement {
   return (
-    <div style={{
-      fontSize: F.xs,
-      fontWeight: 600,
-      color: C.dim,
-      textTransform: 'uppercase',
-      letterSpacing: '0.04em',
-      marginBottom: 4,
-    }}>{children}</div>
+    <div
+      style={{
+        fontSize: F.xs,
+        fontWeight: 600,
+        color: C.dim,
+        textTransform: 'uppercase',
+        letterSpacing: '0.04em',
+        marginBottom: 4,
+      }}
+    >
+      {children}
+    </div>
   );
 }
 
@@ -1172,7 +1317,10 @@ function FieldLabel({ children }: { children: ReactNode }): ReactElement {
 // 1A. Profile
 // ---------------------------------------------------------------------------
 
-type Pusher = (input: { message: ReactNode; variant?: 'neutral' | 'success' | 'warn' | 'danger' | 'info' }) => void;
+type Pusher = (input: {
+  message: ReactNode;
+  variant?: 'neutral' | 'success' | 'warn' | 'danger' | 'info';
+}) => void;
 
 interface ProfileCardProps {
   user: UserRow | null;
@@ -1186,30 +1334,49 @@ interface ProfileCardProps {
 }
 
 const AVATAR_COLORS = [
-  '#111111', '#22c55e', '#ef4444', '#f59e0b', '#3b82f6',
-  '#ec4899', '#444444', '#14b8a6', '#f97316', '#0ea5e9',
-  '#10b981', '#a855f7', '#64748b',
+  '#111111',
+  '#22c55e',
+  '#ef4444',
+  '#f59e0b',
+  '#3b82f6',
+  '#ec4899',
+  '#444444',
+  '#14b8a6',
+  '#f97316',
+  '#0ea5e9',
+  '#10b981',
+  '#a855f7',
+  '#64748b',
 ];
 
 type AvatarMode = 'initials' | 'upload';
 
-function ProfileCard({ user, loading, highlight, markDirty, onSaved, pushToast, supabase, userId }: ProfileCardProps): ReactElement {
+function ProfileCard({
+  user,
+  loading,
+  highlight,
+  markDirty,
+  onSaved,
+  pushToast,
+  supabase,
+  userId,
+}: ProfileCardProps): ReactElement {
   const [editing, setEditing] = useState(false);
   const [displayName, setDisplayName] = useState('');
-  const [bio, setBio]                 = useState('');
-  const [username, setUsername]       = useState('');
-  const [avatarUrl, setAvatarUrl]     = useState<string>('');
-  const [avatarMode, setAvatarMode]   = useState<AvatarMode>('initials');
+  const [bio, setBio] = useState('');
+  const [username, setUsername] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string>('');
+  const [avatarMode, setAvatarMode] = useState<AvatarMode>('initials');
   const [avatarOuter, setAvatarOuter] = useState<string>('#111111');
   const [avatarInner, setAvatarInner] = useState<string | null>(null);
   const [avatarInitials, setAvatarInitials] = useState<string>('');
   const [initialsError, setInitialsError] = useState('');
-  const [bannerUrl, setBannerUrl]     = useState<string>('');
+  const [bannerUrl, setBannerUrl] = useState<string>('');
   const [profileVisibility, setProfileVisibility] = useState<string>('public');
-  const [showActivity, setShowActivity]             = useState(true);
-  const [showOnLeaderboard, setShowOnLeaderboard]   = useState(true);
-  const [allowMessages, setAllowMessages]           = useState(true);
-  const [dmReadReceipts, setDmReadReceipts]         = useState(true);
+  const [showActivity, setShowActivity] = useState(true);
+  const [showOnLeaderboard, setShowOnLeaderboard] = useState(true);
+  const [allowMessages, setAllowMessages] = useState(true);
+  const [dmReadReceipts, setDmReadReceipts] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const snapshot = useRef('');
@@ -1225,8 +1392,7 @@ function ProfileCard({ user, loading, highlight, markDirty, onSaved, pushToast, 
     const av = meta.avatar || {};
     setAvatarOuter(av.outer || user.avatar_color || '#111111');
     setAvatarInner(av.inner ?? null);
-    const seed = av.initials
-      || (user.username ? user.username.slice(0, 1).toUpperCase() : '');
+    const seed = av.initials || (user.username ? user.username.slice(0, 1).toUpperCase() : '');
     setAvatarInitials(seed);
     // Prefer "upload" mode only when there's no initials payload AND a url exists.
     setAvatarMode(user.avatar_url && !av.initials ? 'upload' : 'initials');
@@ -1255,14 +1421,31 @@ function ProfileCard({ user, loading, highlight, markDirty, onSaved, pushToast, 
   }, [user]);
 
   const current = JSON.stringify({
-    displayName, bio, username, avatarUrl, avatarMode, avatarOuter, avatarInner, avatarInitials,
-    bannerUrl, profileVisibility, showActivity, showOnLeaderboard, allowMessages, dmReadReceipts,
+    displayName,
+    bio,
+    username,
+    avatarUrl,
+    avatarMode,
+    avatarOuter,
+    avatarInner,
+    avatarInitials,
+    bannerUrl,
+    profileVisibility,
+    showActivity,
+    showOnLeaderboard,
+    allowMessages,
+    dmReadReceipts,
   });
   const dirty = editing && current !== snapshot.current;
-  useEffect(() => { markDirty(dirty); }, [dirty, markDirty]);
+  useEffect(() => {
+    markDirty(dirty);
+  }, [dirty, markDirty]);
 
   const setInitialsSafe = (raw: string) => {
-    const clean = raw.replace(/[^A-Za-z0-9]/g, '').slice(0, 3).toUpperCase();
+    const clean = raw
+      .replace(/[^A-Za-z0-9]/g, '')
+      .slice(0, 3)
+      .toUpperCase();
     setAvatarInitials(clean);
     setInitialsError(raw.length > 0 && clean.length === 0 ? 'Letters and numbers only.' : '');
   };
@@ -1289,7 +1472,7 @@ function ProfileCard({ user, loading, highlight, markDirty, onSaved, pushToast, 
       bio: bio || null,
       // When in "initials" mode, clear avatar_url so renderers fall back
       // to the initials+color block; in "upload" mode we keep the url.
-      avatar_url: avatarMode === 'upload' ? (avatarUrl || null) : null,
+      avatar_url: avatarMode === 'upload' ? avatarUrl || null : null,
       avatar_color: avatarOuter,
       banner_url: bannerUrl || null,
       profile_visibility: profileVisibility,
@@ -1301,7 +1484,10 @@ function ProfileCard({ user, loading, highlight, markDirty, onSaved, pushToast, 
     };
     const { error } = await supabase.rpc('update_own_profile', { p_fields: patch });
     setSaving(false);
-    if (error) { pushToast({ message: error.message, variant: 'danger' }); return; }
+    if (error) {
+      pushToast({ message: error.message, variant: 'danger' });
+      return;
+    }
     pushToast({ message: 'Profile saved', variant: 'success' });
     setEditing(false);
     markDirty(false);
@@ -1318,7 +1504,9 @@ function ProfileCard({ user, loading, highlight, markDirty, onSaved, pushToast, 
     const av = meta.avatar || {};
     setAvatarOuter(av.outer || user.avatar_color || '#111111');
     setAvatarInner(av.inner ?? null);
-    setAvatarInitials(av.initials || (user.username ? user.username.slice(0, 1).toUpperCase() : ''));
+    setAvatarInitials(
+      av.initials || (user.username ? user.username.slice(0, 1).toUpperCase() : '')
+    );
     setAvatarMode(user.avatar_url && !av.initials ? 'upload' : 'initials');
     setBannerUrl(user.banner_url || '');
     setProfileVisibility(user.profile_visibility || 'public');
@@ -1333,7 +1521,10 @@ function ProfileCard({ user, loading, highlight, markDirty, onSaved, pushToast, 
     // Stores under avatars/<userId>/<timestamp>-<filename>.
     const path = `${userId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
     const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
-    if (error) { pushToast({ message: error.message, variant: 'danger' }); return; }
+    if (error) {
+      pushToast({ message: error.message, variant: 'danger' });
+      return;
+    }
     const { data } = supabase.storage.from('avatars').getPublicUrl(path);
     if (data?.publicUrl) setAvatarUrl(data.publicUrl);
   };
@@ -1355,12 +1546,15 @@ function ProfileCard({ user, loading, highlight, markDirty, onSaved, pushToast, 
       const { data } = supabase.storage.from('banners').getPublicUrl(path);
       if (data?.publicUrl) setBannerUrl(data.publicUrl);
     } catch {
-      pushToast({ message: 'Banner upload is not configured yet — contact admin.', variant: 'danger' });
+      pushToast({
+        message: 'Banner upload is not configured yet — contact admin.',
+        variant: 'danger',
+      });
     }
   };
 
   const previewInitials = avatarInitials || (username || '?').slice(0, 1).toUpperCase();
-  const previewInnerBg  = avatarInner || 'transparent';
+  const previewInnerBg = avatarInner || 'transparent';
   const previewTextColor = avatarInner ? '#111111' : avatarOuter;
 
   return (
@@ -1369,30 +1563,52 @@ function ProfileCard({ user, loading, highlight, markDirty, onSaved, pushToast, 
       title="Profile"
       description="Visible to other readers on Verity Post."
       highlight={highlight}
-      aside={!editing && (
-        <Button size="sm" onClick={() => setEditing(true)}>Edit</Button>
-      )}
+      aside={
+        !editing && (
+          <Button size="sm" onClick={() => setEditing(true)}>
+            Edit
+          </Button>
+        )
+      }
     >
       {loading ? (
         <SkeletonBar width={240} />
       ) : !editing ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: S[3] }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: S[3],
+          }}
+        >
           <SummaryRow label="Display name" value={displayName || '—'} />
-          <SummaryRow label="Username"     value={username ? `@${username}` : '—'} />
-          <SummaryRow label="Visibility"   value={profileVisibility} />
-          <SummaryRow label="Bio"          value={bio || '—'} />
+          <SummaryRow label="Username" value={username ? `@${username}` : '—'} />
+          <SummaryRow label="Visibility" value={profileVisibility} />
+          <SummaryRow label="Bio" value={bio || '—'} />
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: S[3] }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: S[3] }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gap: S[3],
+            }}
+          >
             <div>
               <FieldLabel>Display name</FieldLabel>
-              <TextInput value={displayName} onChange={(e: ChangeEvent<HTMLInputElement>) => setDisplayName(e.target.value)} maxLength={80} />
+              <TextInput
+                value={displayName}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setDisplayName(e.target.value)}
+                maxLength={80}
+              />
             </div>
             <div>
               <FieldLabel>Username</FieldLabel>
               <TextInput value={username} disabled />
-              <div style={{ fontSize: F.xs, color: C.dim, marginTop: 2 }}>Usernames cannot be changed.</div>
+              <div style={{ fontSize: F.xs, color: C.dim, marginTop: 2 }}>
+                Usernames cannot be changed.
+              </div>
             </div>
           </div>
           <div>
@@ -1400,26 +1616,45 @@ function ProfileCard({ user, loading, highlight, markDirty, onSaved, pushToast, 
             <Textarea
               rows={3}
               value={bio}
-              onChange={(e: ChangeEvent<HTMLTextAreaElement>) => { if (e.target.value.length <= 280) setBio(e.target.value); }}
+              onChange={(e: ChangeEvent<HTMLTextAreaElement>) => {
+                if (e.target.value.length <= 280) setBio(e.target.value);
+              }}
             />
-            <div style={{ textAlign: 'right', fontSize: F.xs, color: bio.length > 250 ? C.danger : C.dim }}>
+            <div
+              style={{
+                textAlign: 'right',
+                fontSize: F.xs,
+                color: bio.length > 250 ? C.danger : C.dim,
+              }}
+            >
               {bio.length}/280
             </div>
           </div>
           <div>
             <FieldLabel>Avatar</FieldLabel>
             {/* Mode toggle: initials + color vs uploaded photo. */}
-            <div role="radiogroup" aria-label="Avatar style" style={{ display: 'flex', gap: S[2], marginBottom: S[2] }}>
+            <div
+              role="radiogroup"
+              aria-label="Avatar style"
+              style={{ display: 'flex', gap: S[2], marginBottom: S[2] }}
+            >
               {(['initials', 'upload'] as const).map((m) => (
-                <label key={m} style={{
-                  display: 'inline-flex', alignItems: 'center', gap: S[1],
-                  fontSize: F.sm, color: C.text, cursor: 'pointer',
-                  padding: `${S[1]}px ${S[3]}px`,
-                  border: `1px solid ${avatarMode === m ? C.accent : C.border}`,
-                  borderRadius: 999,
-                  background: avatarMode === m ? '#f6f4ff' : C.bg,
-                  fontWeight: 600,
-                }}>
+                <label
+                  key={m}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: S[1],
+                    fontSize: F.sm,
+                    color: C.text,
+                    cursor: 'pointer',
+                    padding: `${S[1]}px ${S[3]}px`,
+                    border: `1px solid ${avatarMode === m ? C.accent : C.border}`,
+                    borderRadius: 999,
+                    background: avatarMode === m ? '#f6f4ff' : C.bg,
+                    fontWeight: 600,
+                  }}
+                >
                   <input
                     type="radio"
                     name="avatar-mode"
@@ -1433,18 +1668,27 @@ function ProfileCard({ user, loading, highlight, markDirty, onSaved, pushToast, 
             </div>
 
             {avatarMode === 'initials' ? (
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: S[4], flexWrap: 'wrap' }}>
+              <div
+                style={{ display: 'flex', alignItems: 'flex-start', gap: S[4], flexWrap: 'wrap' }}
+              >
                 {/* Live preview: ring color + inner fill + initials */}
-                <div style={{
-                  width: 88, height: 88, borderRadius: '50%',
-                  background: previewInnerBg,
-                  border: `3px solid ${avatarOuter}`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 26, fontWeight: 700,
-                  color: previewTextColor,
-                  letterSpacing: previewInitials.length > 1 ? '-0.03em' : 0,
-                  flexShrink: 0,
-                }}>
+                <div
+                  style={{
+                    width: 88,
+                    height: 88,
+                    borderRadius: '50%',
+                    background: previewInnerBg,
+                    border: `3px solid ${avatarOuter}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 26,
+                    fontWeight: 700,
+                    color: previewTextColor,
+                    letterSpacing: previewInitials.length > 1 ? '-0.03em' : 0,
+                    flexShrink: 0,
+                  }}
+                >
                   {previewInitials}
                 </div>
                 <div style={{ flex: 1, minWidth: 220 }}>
@@ -1456,7 +1700,13 @@ function ProfileCard({ user, loading, highlight, markDirty, onSaved, pushToast, 
                     maxLength={3}
                     style={{ textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.04em' }}
                   />
-                  <div style={{ fontSize: F.xs, color: initialsError ? C.danger : C.dim, marginTop: 4 }}>
+                  <div
+                    style={{
+                      fontSize: F.xs,
+                      color: initialsError ? C.danger : C.dim,
+                      marginTop: 4,
+                    }}
+                  >
                     {initialsError || 'Letters and numbers only.'}
                   </div>
 
@@ -1471,10 +1721,14 @@ function ProfileCard({ user, loading, highlight, markDirty, onSaved, pushToast, 
                           onClick={() => setAvatarOuter(c)}
                           aria-label={`Ring color ${c}`}
                           style={{
-                            width: 26, height: 26, borderRadius: '50%',
+                            width: 26,
+                            height: 26,
+                            borderRadius: '50%',
                             background: c,
-                            border: avatarOuter === c ? `3px solid ${C.text}` : `1px solid ${C.border}`,
-                            cursor: 'pointer', padding: 0,
+                            border:
+                              avatarOuter === c ? `3px solid ${C.text}` : `1px solid ${C.border}`,
+                            cursor: 'pointer',
+                            padding: 0,
                           }}
                         />
                       ))}
@@ -1490,10 +1744,14 @@ function ProfileCard({ user, loading, highlight, markDirty, onSaved, pushToast, 
                         onClick={() => setAvatarInner(null)}
                         aria-label="Transparent inner fill"
                         style={{
-                          width: 26, height: 26, borderRadius: '50%',
+                          width: 26,
+                          height: 26,
+                          borderRadius: '50%',
                           background: `repeating-linear-gradient(45deg, #fff, #fff 3px, ${C.border} 3px, ${C.border} 6px)`,
-                          border: avatarInner === null ? `3px solid ${C.text}` : `1px solid ${C.border}`,
-                          cursor: 'pointer', padding: 0,
+                          border:
+                            avatarInner === null ? `3px solid ${C.text}` : `1px solid ${C.border}`,
+                          cursor: 'pointer',
+                          padding: 0,
                         }}
                       />
                       {AVATAR_COLORS.map((c) => (
@@ -1504,10 +1762,14 @@ function ProfileCard({ user, loading, highlight, markDirty, onSaved, pushToast, 
                           onClick={() => setAvatarInner(c)}
                           aria-label={`Inner color ${c}`}
                           style={{
-                            width: 26, height: 26, borderRadius: '50%',
+                            width: 26,
+                            height: 26,
+                            borderRadius: '50%',
                             background: c,
-                            border: avatarInner === c ? `3px solid ${C.text}` : `1px solid ${C.border}`,
-                            cursor: 'pointer', padding: 0,
+                            border:
+                              avatarInner === c ? `3px solid ${C.text}` : `1px solid ${C.border}`,
+                            cursor: 'pointer',
+                            padding: 0,
                           }}
                         />
                       ))}
@@ -1517,28 +1779,48 @@ function ProfileCard({ user, loading, highlight, markDirty, onSaved, pushToast, 
               </div>
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: S[3] }}>
-                <div style={{
-                  width: 56, height: 56, borderRadius: '50%',
-                  border: `1px solid ${C.border}`,
-                  backgroundImage: avatarUrl ? `url(${avatarUrl})` : undefined,
-                  backgroundSize: 'cover', backgroundPosition: 'center',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: C.dim, fontSize: F.xs,
-                  background: avatarUrl ? undefined : C.card,
-                }}>{!avatarUrl && 'None'}</div>
+                <div
+                  style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: '50%',
+                    border: `1px solid ${C.border}`,
+                    backgroundImage: avatarUrl ? `url(${avatarUrl})` : undefined,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: C.dim,
+                    fontSize: F.xs,
+                    background: avatarUrl ? undefined : C.card,
+                  }}
+                >
+                  {!avatarUrl && 'None'}
+                </div>
                 <label style={{ cursor: 'pointer' }}>
                   <input
-                    type="file" accept="image/*"
-                    onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleAvatarUpload(f); }}
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) void handleAvatarUpload(f);
+                    }}
                     style={{ display: 'none' }}
                   />
-                  <span style={{
-                    display: 'inline-block',
-                    padding: `${S[1]}px ${S[3]}px`,
-                    border: `1px solid ${C.border}`,
-                    borderRadius: 6,
-                    fontSize: F.sm, color: C.text, background: C.bg,
-                  }}>Upload image</span>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      padding: `${S[1]}px ${S[3]}px`,
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 6,
+                      fontSize: F.sm,
+                      color: C.text,
+                      background: C.bg,
+                    }}
+                  >
+                    Upload image
+                  </span>
                 </label>
               </div>
             )}
@@ -1546,29 +1828,52 @@ function ProfileCard({ user, loading, highlight, markDirty, onSaved, pushToast, 
 
           <div>
             <FieldLabel>Banner</FieldLabel>
-            <div style={{ display: 'flex', alignItems: 'center', gap: S[3], flexWrap: 'wrap', maxWidth: '100%' }}>
-              <div style={{
-                width: 96, height: 36, borderRadius: 6,
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: S[3],
+                flexWrap: 'wrap',
                 maxWidth: '100%',
-                border: `1px solid ${C.border}`,
-                backgroundImage: bannerUrl ? `url(${bannerUrl})` : undefined,
-                backgroundSize: 'cover', backgroundPosition: 'center',
-                background: bannerUrl ? undefined : C.card,
-                flexShrink: 0,
-              }} />
+              }}
+            >
+              <div
+                style={{
+                  width: 96,
+                  height: 36,
+                  borderRadius: 6,
+                  maxWidth: '100%',
+                  border: `1px solid ${C.border}`,
+                  backgroundImage: bannerUrl ? `url(${bannerUrl})` : undefined,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  background: bannerUrl ? undefined : C.card,
+                  flexShrink: 0,
+                }}
+              />
               <label style={{ cursor: 'pointer' }}>
                 <input
-                  type="file" accept="image/*"
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleBannerUpload(f); }}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void handleBannerUpload(f);
+                  }}
                   style={{ display: 'none' }}
                 />
-                <span style={{
-                  display: 'inline-block',
-                  padding: `${S[1]}px ${S[3]}px`,
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 6,
-                  fontSize: F.sm, color: C.text, background: C.bg,
-                }}>Upload image</span>
+                <span
+                  style={{
+                    display: 'inline-block',
+                    padding: `${S[1]}px ${S[3]}px`,
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 6,
+                    fontSize: F.sm,
+                    color: C.text,
+                    background: C.bg,
+                  }}
+                >
+                  Upload image
+                </span>
               </label>
             </div>
           </div>
@@ -1579,16 +1884,34 @@ function ProfileCard({ user, loading, highlight, markDirty, onSaved, pushToast, 
               value={profileVisibility}
               onChange={(e: ChangeEvent<HTMLSelectElement>) => setProfileVisibility(e.target.value)}
               options={[
-                { value: 'public',    label: 'Public — anyone can view' },
+                { value: 'public', label: 'Public — anyone can view' },
                 { value: 'followers', label: 'Followers — only people who follow you' },
-                { value: 'private',   label: 'Private — only you' },
+                { value: 'private', label: 'Private — only you' },
               ]}
             />
           </div>
 
           {/* Privacy sub-section — columns verified on `users` via MCP. */}
-          <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: S[3], display: 'flex', flexDirection: 'column', gap: S[3] }}>
-            <div style={{ fontSize: F.sm, fontWeight: 700, color: C.text, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Privacy</div>
+          <div
+            style={{
+              borderTop: `1px solid ${C.border}`,
+              paddingTop: S[3],
+              display: 'flex',
+              flexDirection: 'column',
+              gap: S[3],
+            }}
+          >
+            <div
+              style={{
+                fontSize: F.sm,
+                fontWeight: 700,
+                color: C.text,
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+              }}
+            >
+              Privacy
+            </div>
             <Switch
               checked={showActivity}
               onChange={setShowActivity}
@@ -1615,9 +1938,16 @@ function ProfileCard({ user, loading, highlight, markDirty, onSaved, pushToast, 
             />
           </div>
 
-          <div className="vp-settings-actions" style={{ display: 'flex', gap: S[2], flexWrap: 'wrap' }}>
-            <Button variant="primary" onClick={handleSave} loading={saving}>Save changes</Button>
-            <Button variant="ghost" onClick={handleCancel} disabled={saving}>Cancel</Button>
+          <div
+            className="vp-settings-actions"
+            style={{ display: 'flex', gap: S[2], flexWrap: 'wrap' }}
+          >
+            <Button variant="primary" onClick={handleSave} loading={saving}>
+              Save changes
+            </Button>
+            <Button variant="ghost" onClick={handleCancel} disabled={saving}>
+              Cancel
+            </Button>
           </div>
         </div>
       )}
@@ -1628,7 +1958,18 @@ function ProfileCard({ user, loading, highlight, markDirty, onSaved, pushToast, 
 function SummaryRow({ label, value }: { label: string; value: ReactNode }): ReactElement {
   return (
     <div>
-      <div style={{ fontSize: F.xs, fontWeight: 600, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 2 }}>{label}</div>
+      <div
+        style={{
+          fontSize: F.xs,
+          fontWeight: 600,
+          color: C.dim,
+          textTransform: 'uppercase',
+          letterSpacing: '0.04em',
+          marginBottom: 2,
+        }}
+      >
+        {label}
+      </div>
       <div style={{ fontSize: F.base, color: C.text, wordBreak: 'break-word' }}>{value}</div>
     </div>
   );
@@ -1662,9 +2003,9 @@ function EmailsCard({
   // Email notifications block (C5). No dedicated `notification_prefs`
   // column on `users`, so we persist the three flags under
   // metadata.notification_prefs — flagged for owner.
-  const [newsletter, setNewsletter]           = useState(true);
-  const [commentReplies, setCommentReplies]   = useState(true);
-  const [securityAlerts, setSecurityAlerts]   = useState(true);
+  const [newsletter, setNewsletter] = useState(true);
+  const [commentReplies, setCommentReplies] = useState(true);
+  const [securityAlerts, setSecurityAlerts] = useState(true);
   const [savingNotif, setSavingNotif] = useState(false);
   const notifSnap = useRef('');
 
@@ -1681,7 +2022,9 @@ function EmailsCard({
   }, [user]);
 
   const notifCurrent = JSON.stringify({
-    n: newsletter, r: commentReplies, s: securityAlerts,
+    n: newsletter,
+    r: commentReplies,
+    s: securityAlerts,
   });
   const notifDirty = notifCurrent !== notifSnap.current;
 
@@ -1693,46 +2036,84 @@ function EmailsCard({
       ...(prevMeta || {}),
       notification_prefs: {
         ...(prevMeta.notification_prefs || {}),
-        newsletter, commentReplies, securityAlerts,
+        newsletter,
+        commentReplies,
+        securityAlerts,
       },
     };
     const { error } = await supabase.rpc('update_own_profile', { p_fields: { metadata: merged } });
     setSavingNotif(false);
-    if (error) { pushToast({ message: error.message, variant: 'danger' }); return; }
+    if (error) {
+      pushToast({ message: error.message, variant: 'danger' });
+      return;
+    }
     pushToast({ message: 'Email notifications saved.', variant: 'success' });
     notifSnap.current = notifCurrent;
     await onSaved();
   };
 
   return (
-    <Card id="emails" title="Emails" highlight={highlight}
-      description="Your primary email is where login links and receipts go.">
+    <Card
+      id="emails"
+      title="Emails"
+      highlight={highlight}
+      description="Your primary email is where login links and receipts go."
+    >
       <Row>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 600, fontSize: F.base, wordBreak: 'break-all' }}>{authEmail}</div>
+          <div style={{ fontWeight: 600, fontSize: F.base, wordBreak: 'break-all' }}>
+            {authEmail}
+          </div>
           <div style={{ display: 'flex', gap: S[2], marginTop: 4, alignItems: 'center' }}>
-            <Badge variant="success" dot size="xs">Verified</Badge>
+            <Badge variant="success" dot size="xs">
+              Verified
+            </Badge>
             <span style={{ fontSize: F.xs, color: C.dim }}>Primary</span>
           </div>
         </div>
-        <Button size="sm" disabled>Change</Button>
+        <Button size="sm" disabled>
+          Change
+        </Button>
       </Row>
       {/* Secondary email support: deferred. Re-enable when /api/account/emails exists. */}
       {false && (
         <Row>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 600, fontSize: F.base }}>Add secondary email</div>
-            <div style={{ fontSize: F.sm, color: C.dim }}>Backup or category-specific notifications.</div>
+            <div style={{ fontSize: F.sm, color: C.dim }}>
+              Backup or category-specific notifications.
+            </div>
           </div>
           <span title="Secondary-email endpoint not yet built.">
-            <Button size="sm" disabled>Add email</Button>
+            <Button size="sm" disabled>
+              Add email
+            </Button>
           </span>
         </Row>
       )}
 
       {/* C5: Email notification preferences. */}
-      <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: S[3], marginTop: S[2], display: 'flex', flexDirection: 'column', gap: S[3] }}>
-        <div style={{ fontSize: F.sm, fontWeight: 700, color: C.text, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Email notifications</div>
+      <div
+        style={{
+          borderTop: `1px solid ${C.border}`,
+          paddingTop: S[3],
+          marginTop: S[2],
+          display: 'flex',
+          flexDirection: 'column',
+          gap: S[3],
+        }}
+      >
+        <div
+          style={{
+            fontSize: F.sm,
+            fontWeight: 700,
+            color: C.text,
+            textTransform: 'uppercase',
+            letterSpacing: '0.04em',
+          }}
+        >
+          Email notifications
+        </div>
         <Switch
           checked={newsletter}
           onChange={setNewsletter}
@@ -1752,7 +2133,14 @@ function EmailsCard({
           hint="New-device sign-ins, password changes, and deletion notices."
         />
         <div>
-          <Button variant="primary" onClick={saveNotifs} loading={savingNotif} disabled={!notifDirty}>Save changes</Button>
+          <Button
+            variant="primary"
+            onClick={saveNotifs}
+            loading={savingNotif}
+            disabled={!notifDirty}
+          >
+            Save changes
+          </Button>
         </div>
       </div>
     </Card>
@@ -1778,53 +2166,107 @@ function PasswordCard({
 }): ReactElement {
   const canChange = hasPermission(PERM.ACTION_PASSWORD_CHANGE);
   const [current, setCurrent] = useState('');
-  const [next, setNext]       = useState('');
+  const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
-  const [busy, setBusy]       = useState(false);
+  const [busy, setBusy] = useState(false);
   const [showCurrent, setShowCurrent] = useState(false);
-  const [showNew,     setShowNew]     = useState(false);
+  const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
   const dirty = !!(current || next || confirm);
-  useEffect(() => { markDirty(dirty); }, [dirty, markDirty]);
+  useEffect(() => {
+    markDirty(dirty);
+  }, [dirty, markDirty]);
 
-  const reqs = useMemo(() => [
-    { ok: next.length >= 8,                           label: '8+ characters' },
-    { ok: /[A-Z]/.test(next),                         label: 'An uppercase letter' },
-    { ok: /[a-z]/.test(next),                         label: 'A lowercase letter' },
-    { ok: /[0-9]/.test(next),                         label: 'A number' },
-  ], [next]);
+  const reqs = useMemo(
+    () => [
+      { ok: next.length >= 8, label: '8+ characters' },
+      { ok: /[A-Z]/.test(next), label: 'An uppercase letter' },
+      { ok: /[a-z]/.test(next), label: 'A lowercase letter' },
+      { ok: /[0-9]/.test(next), label: 'A number' },
+    ],
+    [next]
+  );
   const match = next && next === confirm;
   const canSubmit = !!current && reqs.every((r) => r.ok) && match && !busy && canChange;
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
     setBusy(true);
-    const { error: signErr } = await supabase.auth.signInWithPassword({ email: authEmail, password: current });
-    if (signErr) { setBusy(false); pushToast({ message: 'Current password is incorrect.', variant: 'danger' }); return; }
+    const { error: signErr } = await supabase.auth.signInWithPassword({
+      email: authEmail,
+      password: current,
+    });
+    if (signErr) {
+      setBusy(false);
+      pushToast({ message: 'Current password is incorrect.', variant: 'danger' });
+      return;
+    }
     const { error: upErr } = await supabase.auth.updateUser({ password: next });
-    if (upErr) { setBusy(false); pushToast({ message: upErr.message, variant: 'danger' }); return; }
+    if (upErr) {
+      setBusy(false);
+      pushToast({ message: upErr.message, variant: 'danger' });
+      return;
+    }
     // Sign out every other session — a stolen cookie stops working
     // the moment the owner rotates their password.
-    try { await supabase.auth.signOut({ scope: 'others' }); } catch { /* best-effort */ }
+    try {
+      await supabase.auth.signOut({ scope: 'others' });
+    } catch {
+      /* best-effort */
+    }
     setBusy(false);
-    setCurrent(''); setNext(''); setConfirm('');
+    setCurrent('');
+    setNext('');
+    setConfirm('');
     markDirty(false);
     pushToast({ message: 'Password updated. Other sessions signed out.', variant: 'success' });
   };
 
   return (
-    <Card id="password" title="Password" highlight={highlight}
-      description="Choose a strong password to keep your account secure.">
+    <Card
+      id="password"
+      title="Password"
+      highlight={highlight}
+      description="Choose a strong password to keep your account secure."
+    >
       {!canChange && (
-        <div style={{ padding: S[3], background: C.card, border: `1px solid ${C.border}`, borderRadius: 6, fontSize: F.sm, color: C.dim, marginBottom: S[3] }}>
+        <div
+          style={{
+            padding: S[3],
+            background: C.card,
+            border: `1px solid ${C.border}`,
+            borderRadius: 6,
+            fontSize: F.sm,
+            color: C.dim,
+            marginBottom: S[3],
+          }}
+        >
           Password changes are disabled for your account.
         </div>
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: S[3], maxWidth: 480 }}>
-        <PwField label="Current password" value={current} onChange={setCurrent} show={showCurrent} toggleShow={() => setShowCurrent((s) => !s)} />
-        <PwField label="New password"     value={next}    onChange={setNext}    show={showNew}     toggleShow={() => setShowNew((s) => !s)} />
-        <PwField label="Confirm new password" value={confirm} onChange={setConfirm} show={showConfirm} toggleShow={() => setShowConfirm((s) => !s)} />
+        <PwField
+          label="Current password"
+          value={current}
+          onChange={setCurrent}
+          show={showCurrent}
+          toggleShow={() => setShowCurrent((s) => !s)}
+        />
+        <PwField
+          label="New password"
+          value={next}
+          onChange={setNext}
+          show={showNew}
+          toggleShow={() => setShowNew((s) => !s)}
+        />
+        <PwField
+          label="Confirm new password"
+          value={confirm}
+          onChange={setConfirm}
+          show={showConfirm}
+          toggleShow={() => setShowConfirm((s) => !s)}
+        />
         {!!confirm && !match && (
           <div style={{ fontSize: F.sm, color: C.danger }}>Passwords do not match.</div>
         )}
@@ -1846,9 +2288,17 @@ function PasswordCard({
 }
 
 function PwField({
-  label, value, onChange, show, toggleShow,
+  label,
+  value,
+  onChange,
+  show,
+  toggleShow,
 }: {
-  label: string; value: string; onChange: (v: string) => void; show: boolean; toggleShow: () => void;
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  show: boolean;
+  toggleShow: () => void;
 }): ReactElement {
   return (
     <div>
@@ -1862,10 +2312,15 @@ function PwField({
             type="button"
             onClick={toggleShow}
             style={{
-              background: 'transparent', border: 'none',
-              color: C.dim, fontSize: F.xs, cursor: 'pointer',
+              background: 'transparent',
+              border: 'none',
+              color: C.dim,
+              fontSize: F.xs,
+              cursor: 'pointer',
             }}
-          >{show ? 'Hide' : 'Show'}</button>
+          >
+            {show ? 'Hide' : 'Show'}
+          </button>
         }
       />
     </div>
@@ -1901,7 +2356,9 @@ function LoginActivityCard({
       // `audit_log`; the rows here are richer (browser/os/device/geo).
       const { data, error } = await supabase
         .from('user_sessions')
-        .select('id, started_at, ended_at, is_active, ip_address, browser_name, browser_version, os_name, device_model, device_type, country_code, city')
+        .select(
+          'id, started_at, ended_at, is_active, ip_address, browser_name, browser_version, os_name, device_model, device_type, country_code, city'
+        )
         .eq('user_id', userId)
         .order('started_at', { ascending: false })
         .limit(20);
@@ -1910,7 +2367,9 @@ function LoginActivityCard({
       setRows((data as SessionRow[] | null) || []);
       setLoading(false);
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [supabase, userId, pushToast]);
 
   const revokeAll = async () => {
@@ -1932,26 +2391,41 @@ function LoginActivityCard({
       highlight={highlight}
       description="Showing recent sessions on your account."
       aside={
-        <Button size="sm" variant="danger" disabled={!canRevokeAll} onClick={() => setConfirmAll(true)}>
+        <Button
+          size="sm"
+          variant="danger"
+          disabled={!canRevokeAll}
+          onClick={() => setConfirmAll(true)}
+        >
           Sign out everywhere
         </Button>
       }
     >
       {loading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: S[2] }}>
-          <SkeletonBar width="60%" /><SkeletonBar width="80%" /><SkeletonBar width="40%" />
+          <SkeletonBar width="60%" />
+          <SkeletonBar width="80%" />
+          <SkeletonBar width="40%" />
         </div>
       ) : rows.length === 0 ? (
-        <EmptyState size="sm" title="No sessions yet" description="We'll list devices here after your next sign-in." />
+        <EmptyState
+          size="sm"
+          title="No sessions yet"
+          description="We'll list devices here after your next sign-in."
+        />
       ) : (
         <div>
           {rows.map((r, i) => {
             // M6: show "City, CC · Browser on OS" (fall back to IP when geo missing).
             const geoParts = [r.city, r.country_code].filter(Boolean).join(', ');
             const browserOnOs = [
-              r.browser_name ? `${r.browser_name}${r.browser_version ? ` ${r.browser_version}` : ''}` : null,
+              r.browser_name
+                ? `${r.browser_name}${r.browser_version ? ` ${r.browser_version}` : ''}`
+                : null,
               r.os_name ? `on ${r.os_name}` : null,
-            ].filter(Boolean).join(' ');
+            ]
+              .filter(Boolean)
+              .join(' ');
             const locPart = geoParts || r.ip_address || 'Unknown location';
             return (
               <Row key={r.id} last={i === rows.length - 1}>
@@ -1959,13 +2433,32 @@ function LoginActivityCard({
                   <div style={{ fontSize: F.base, fontWeight: 600 }}>
                     {r.device_model || r.os_name || r.browser_name || 'Unknown device'}
                   </div>
-                  <div style={{ fontSize: F.xs, color: C.dim, display: 'flex', gap: S[2], flexWrap: 'wrap' }}>
-                    <span>{locPart}{browserOnOs ? ` · ${browserOnOs}` : ''}</span>
+                  <div
+                    style={{
+                      fontSize: F.xs,
+                      color: C.dim,
+                      display: 'flex',
+                      gap: S[2],
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <span>
+                      {locPart}
+                      {browserOnOs ? ` · ${browserOnOs}` : ''}
+                    </span>
                     {/* M3: "Last active" was mislabelled — this column is started_at. */}
                     <span>Started {formatRelative(r.started_at)}</span>
                   </div>
                 </div>
-                {r.is_active ? <Badge variant="success" size="xs" dot>Active</Badge> : <Badge variant="neutral" size="xs">Ended</Badge>}
+                {r.is_active ? (
+                  <Badge variant="success" size="xs" dot>
+                    Active
+                  </Badge>
+                ) : (
+                  <Badge variant="neutral" size="xs">
+                    Ended
+                  </Badge>
+                )}
               </Row>
             );
           })}
@@ -1990,7 +2483,13 @@ function LoginActivityCard({
 // ---------------------------------------------------------------------------
 
 function FeedCard({
-  user, highlight, supabase, pushToast, userId, onSaved, markDirty,
+  user,
+  highlight,
+  supabase,
+  pushToast,
+  userId,
+  onSaved,
+  markDirty,
 }: {
   user: UserRow | null;
   highlight: boolean;
@@ -2000,17 +2499,17 @@ function FeedCard({
   onSaved: () => Promise<void> | void;
   markDirty: (d: boolean) => void;
 }): ReactElement {
-  const canEditCats    = hasPermission(PERM.ACTION_FEED_CAT_TOGGLE);
+  const canEditCats = hasPermission(PERM.ACTION_FEED_CAT_TOGGLE);
   const canHideLowCred = hasPermission(PERM.ACTION_FEED_HIDE_LOWCRED);
 
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [selectedCats, setSelectedCats] = useState<Set<string>>(new Set());
-  const [kidSafe, setKidSafe]           = useState(false);
-  const [hideLowCred, setHideLowCred]   = useState(true);
-  const [showBreaking, setShowBreaking]       = useState(true);
-  const [showTrending, setShowTrending]       = useState(true);
+  const [kidSafe, setKidSafe] = useState(false);
+  const [hideLowCred, setHideLowCred] = useState(true);
+  const [showBreaking, setShowBreaking] = useState(true);
+  const [showTrending, setShowTrending] = useState(true);
   const [showRecommended, setShowRecommended] = useState(false);
-  const [minScore, setMinScore]               = useState<number>(0);
+  const [minScore, setMinScore] = useState<number>(0);
   const [display, setDisplay] = useState<'compact' | 'comfortable'>('comfortable');
   const [saving, setSaving] = useState(false);
   const snapshot = useRef('');
@@ -2026,7 +2525,9 @@ function FeedCard({
       if (!alive) return;
       setCategories((data as CategoryRow[] | null) || []);
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [supabase]);
 
   useEffect(() => {
@@ -2056,15 +2557,24 @@ function FeedCard({
 
   const currentKey = JSON.stringify({
     cats: [...selectedCats].sort(),
-    kidSafe, hideLowCred, showBreaking, showTrending, showRecommended, minScore, display,
+    kidSafe,
+    hideLowCred,
+    showBreaking,
+    showTrending,
+    showRecommended,
+    minScore,
+    display,
   });
   const dirty = currentKey !== snapshot.current;
-  useEffect(() => { markDirty(dirty); }, [dirty, markDirty]);
+  useEffect(() => {
+    markDirty(dirty);
+  }, [dirty, markDirty]);
 
   const toggleCat = (id: string) => {
     setSelectedCats((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
@@ -2075,9 +2585,13 @@ function FeedCard({
     // M16: re-read metadata immediately before writing so concurrent edits
     // on a different sub-key (a11y, expertWatchlist) don't get clobbered.
     const { data: fresh } = await supabase
-      .from('users').select('metadata').eq('id', userId).maybeSingle();
-    const freshMeta = (fresh as { metadata?: Record<string, unknown> } | null)?.metadata as SettingsMeta | null;
-    const prevFeed = (freshMeta?.feed) || {};
+      .from('users')
+      .select('metadata')
+      .eq('id', userId)
+      .maybeSingle();
+    const freshMeta = (fresh as { metadata?: Record<string, unknown> } | null)
+      ?.metadata as SettingsMeta | null;
+    const prevFeed = freshMeta?.feed || {};
     const merged = {
       ...(freshMeta || {}),
       feed: {
@@ -2094,44 +2608,58 @@ function FeedCard({
     };
     const { error } = await supabase.rpc('update_own_profile', { p_fields: { metadata: merged } });
     setSaving(false);
-    if (error) { pushToast({ message: error.message, variant: 'danger' }); return; }
+    if (error) {
+      pushToast({ message: error.message, variant: 'danger' });
+      return;
+    }
     pushToast({ message: 'Feed preferences saved.', variant: 'success' });
     markDirty(false);
     await onSaved();
   };
 
   return (
-    <Card id="feed" title="Feed" highlight={highlight}
-      description="Tune what shows up in your feed.">
+    <Card
+      id="feed"
+      title="Feed"
+      highlight={highlight}
+      description="Tune what shows up in your feed."
+    >
       <div style={{ display: 'flex', flexDirection: 'column', gap: S[3] }}>
         <div>
           <FieldLabel>Preferred categories</FieldLabel>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: S[1] }}>
             {categories.length === 0 ? (
               <SkeletonBar width={180} />
-            ) : categories.map((c) => {
-              const active = selectedCats.has(c.id);
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  disabled={!canEditCats}
-                  onClick={() => toggleCat(c.id)}
-                  style={{
-                    padding: `${S[1]}px ${S[3]}px`,
-                    borderRadius: 999,
-                    border: `1px solid ${active ? C.accent : C.border}`,
-                    background: active ? C.accent : C.bg,
-                    color: active ? '#fff' : C.text,
-                    fontSize: F.sm, fontWeight: 500,
-                    cursor: canEditCats ? 'pointer' : 'not-allowed',
-                    opacity: canEditCats ? 1 : 0.6,
-                  }}
-                >{c.name}</button>
-              );
-            })}
+            ) : (
+              categories.map((c) => {
+                const active = selectedCats.has(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    disabled={!canEditCats}
+                    onClick={() => toggleCat(c.id)}
+                    style={{
+                      padding: `${S[1]}px ${S[3]}px`,
+                      borderRadius: 999,
+                      border: `1px solid ${active ? C.accent : C.border}`,
+                      background: active ? C.accent : C.bg,
+                      color: active ? '#fff' : C.text,
+                      fontSize: F.sm,
+                      fontWeight: 500,
+                      cursor: canEditCats ? 'pointer' : 'not-allowed',
+                      opacity: canEditCats ? 1 : 0.6,
+                    }}
+                  >
+                    {c.name}
+                  </button>
+                );
+              })
+            )}
           </div>
-          <div style={{ fontSize: F.xs, color: C.dim, marginTop: 4 }}>{selectedCats.size} selected</div>
+          <div style={{ fontSize: F.xs, color: C.dim, marginTop: 4 }}>
+            {selectedCats.size} selected
+          </div>
         </div>
         <Switch
           checked={kidSafe}
@@ -2164,7 +2692,13 @@ function FeedCard({
           label="Show recommended"
           hint="Mix in articles based on your reading history."
         />
-        <div style={{ display: 'grid', gap: S[3], gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+        <div
+          style={{
+            display: 'grid',
+            gap: S[3],
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          }}
+        >
           <div>
             <FieldLabel>Minimum credibility score (0–100)</FieldLabel>
             <NumberInput
@@ -2186,16 +2720,20 @@ function FeedCard({
             <FieldLabel>Display density</FieldLabel>
             <Select
               value={display}
-              onChange={(e: ChangeEvent<HTMLSelectElement>) => setDisplay(e.target.value as 'compact' | 'comfortable')}
+              onChange={(e: ChangeEvent<HTMLSelectElement>) =>
+                setDisplay(e.target.value as 'compact' | 'comfortable')
+              }
               options={[
-                { value: 'compact',     label: 'Compact' },
+                { value: 'compact', label: 'Compact' },
                 { value: 'comfortable', label: 'Comfortable' },
               ]}
             />
           </div>
         </div>
         <div>
-          <Button variant="primary" onClick={handleSave} loading={saving} disabled={!dirty}>Save changes</Button>
+          <Button variant="primary" onClick={handleSave} loading={saving} disabled={!dirty}>
+            Save changes
+          </Button>
         </div>
       </div>
     </Card>
@@ -2229,30 +2767,35 @@ function AlertsCard({
         setPrefs(byType);
       } catch (err) {
         pushToast({ message: 'Could not load alerts.', variant: 'danger' });
-      } finally { if (alive) setLoading(false); }
+      } finally {
+        if (alive) setLoading(false);
+      }
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [pushToast]);
 
   const update = async (type: AlertType, patch: Partial<AlertPrefRow>) => {
     const prev = prefs[type];
     // Optimistic: write locally, rollback on error.
     const merged: AlertPrefRow = {
-      ...(prev || ({
-        id: '',
-        user_id: '',
-        alert_type: type,
-        channel_email: true,
-        channel_in_app: true,
-        channel_push: true,
-        channel_sms: false,
-        frequency: null,
-        is_enabled: true,
-        quiet_hours_end: null,
-        quiet_hours_start: null,
-        created_at: '',
-        updated_at: '',
-      } satisfies AlertPrefRow)),
+      ...(prev ||
+        ({
+          id: '',
+          user_id: '',
+          alert_type: type,
+          channel_email: true,
+          channel_in_app: true,
+          channel_push: true,
+          channel_sms: false,
+          frequency: null,
+          is_enabled: true,
+          quiet_hours_end: null,
+          quiet_hours_start: null,
+          created_at: '',
+          updated_at: '',
+        } satisfies AlertPrefRow)),
       ...patch,
       alert_type: type,
     };
@@ -2271,28 +2814,35 @@ function AlertsCard({
     } catch {
       if (prev) setPrefs((p) => ({ ...p, [type]: prev }));
       pushToast({ message: 'Network error', variant: 'danger' });
-    } finally { setSavingKey(''); }
+    } finally {
+      setSavingKey('');
+    }
   };
 
   const isMobile = useIsMobile();
 
   return (
-    <Card id="alerts" title="Alerts" highlight={highlight}
-      description="Choose where each alert type shows up. In-app is on by default.">
+    <Card
+      id="alerts"
+      title="Alerts"
+      highlight={highlight}
+      description="Choose where each alert type shows up. In-app is on by default."
+    >
       {/* Web push is not yet wired (no SW/VAPID). Push preferences set
           here are respected by the iOS app but are a no-op on web. */}
-      <div style={{
-        fontSize: F.xs,
-        color: C.dim,
-        background: C.bg,
-        border: `1px dashed ${C.border}`,
-        borderRadius: 6,
-        padding: S[2],
-        marginBottom: S[3],
-      }}>
-        Note: Push delivery is iOS-only for now. Enabling Push on web saves your
-        preference so the iOS app will honour it, but the web app itself does
-        not send push notifications yet.
+      <div
+        style={{
+          fontSize: F.xs,
+          color: C.dim,
+          background: C.bg,
+          border: `1px dashed ${C.border}`,
+          borderRadius: 6,
+          padding: S[2],
+          marginBottom: S[3],
+        }}
+      >
+        Note: Push delivery is iOS-only for now. Enabling Push on web saves your preference so the
+        iOS app will honour it, but the web app itself does not send push notifications yet.
       </div>
       {loading ? (
         <SkeletonBar width={220} />
@@ -2317,10 +2867,14 @@ function AlertsCard({
                   gap: S[2],
                 }}
               >
-                <div style={{
-                  display: 'flex', alignItems: 'flex-start', gap: S[2],
-                  justifyContent: 'space-between',
-                }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: S[2],
+                    justifyContent: 'space-between',
+                  }}
+                >
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{ fontSize: F.base, fontWeight: 600 }}>{r.label}</div>
                     <div style={{ fontSize: F.xs, color: C.dim }}>{r.desc}</div>
@@ -2331,20 +2885,28 @@ function AlertsCard({
                     onChange={(next) => update(r.key, { is_enabled: next })}
                   />
                 </div>
-                <div style={{
-                  display: 'flex', flexDirection: 'column', gap: S[2],
-                  paddingTop: S[2], borderTop: `1px solid ${C.border}`,
-                  opacity: enabled ? 1 : 0.55,
-                }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: S[2],
+                    paddingTop: S[2],
+                    borderTop: `1px solid ${C.border}`,
+                    opacity: enabled ? 1 : 0.55,
+                  }}
+                >
                   {ALERT_CHANNELS.map((ch) => {
                     const on = pref ? (pref[ch.key] as boolean | undefined) !== false : true;
                     return (
                       <label
                         key={ch.key}
                         style={{
-                          display: 'flex', alignItems: 'center',
+                          display: 'flex',
+                          alignItems: 'center',
                           justifyContent: 'space-between',
-                          gap: S[2], fontSize: F.sm, color: C.text,
+                          gap: S[2],
+                          fontSize: F.sm,
+                          color: C.text,
                           minHeight: 32,
                         }}
                       >
@@ -2352,7 +2914,9 @@ function AlertsCard({
                         <Checkbox
                           checked={on}
                           disabled={!enabled || savingKey === r.key}
-                          onChange={(e: ChangeEvent<HTMLInputElement>) => update(r.key, { [ch.key]: e.target.checked } as Partial<AlertPrefRow>)}
+                          onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                            update(r.key, { [ch.key]: e.target.checked } as Partial<AlertPrefRow>)
+                          }
                         />
                       </label>
                     );
@@ -2370,7 +2934,9 @@ function AlertsCard({
                 <th style={thStyle}>Alert</th>
                 <th style={thStyle}>Enabled</th>
                 {ALERT_CHANNELS.map((c) => (
-                  <th key={c.key} style={{ ...thStyle, width: 90 }}>{c.label}</th>
+                  <th key={c.key} style={{ ...thStyle, width: 90 }}>
+                    {c.label}
+                  </th>
                 ))}
               </tr>
             </thead>
@@ -2398,7 +2964,9 @@ function AlertsCard({
                           <Checkbox
                             checked={on}
                             disabled={!enabled || savingKey === r.key}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => update(r.key, { [ch.key]: e.target.checked } as Partial<AlertPrefRow>)}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                              update(r.key, { [ch.key]: e.target.checked } as Partial<AlertPrefRow>)
+                            }
                           />
                         </td>
                       );
@@ -2415,13 +2983,20 @@ function AlertsCard({
 }
 
 const thStyle: CSSProperties = {
-  fontSize: F.xs, fontWeight: 700, color: C.dim, textAlign: 'left',
-  padding: `${S[2]}px ${S[2]}px`, borderBottom: `1px solid ${C.border}`,
-  textTransform: 'uppercase', letterSpacing: '0.04em',
+  fontSize: F.xs,
+  fontWeight: 700,
+  color: C.dim,
+  textAlign: 'left',
+  padding: `${S[2]}px ${S[2]}px`,
+  borderBottom: `1px solid ${C.border}`,
+  textTransform: 'uppercase',
+  letterSpacing: '0.04em',
 };
 const tdStyle: CSSProperties = {
-  padding: `${S[3]}px ${S[2]}px`, borderBottom: `1px solid ${C.border}`,
-  fontSize: F.base, verticalAlign: 'middle',
+  padding: `${S[3]}px ${S[2]}px`,
+  borderBottom: `1px solid ${C.border}`,
+  fontSize: F.base,
+  verticalAlign: 'middle',
 };
 
 // ---------------------------------------------------------------------------
@@ -2429,7 +3004,13 @@ const tdStyle: CSSProperties = {
 // ---------------------------------------------------------------------------
 
 function AccessibilityCard({
-  user, highlight, supabase, pushToast, userId, onSaved, markDirty,
+  user,
+  highlight,
+  supabase,
+  pushToast,
+  userId,
+  onSaved,
+  markDirty,
 }: {
   user: UserRow | null;
   highlight: boolean;
@@ -2439,13 +3020,13 @@ function AccessibilityCard({
   onSaved: () => Promise<void> | void;
   markDirty: (d: boolean) => void;
 }): ReactElement {
-  const canEditTts       = hasPermission(PERM.ACTION_A11Y_TTS);
-  const canEditTextSize  = hasPermission(PERM.ACTION_A11Y_TEXT_SIZE);
-  const canEditMotion    = hasPermission(PERM.ACTION_A11Y_REDUCE_MOTION);
-  const canEditContrast  = hasPermission(PERM.ACTION_A11Y_HIGH_CONTRAST);
+  const canEditTts = hasPermission(PERM.ACTION_A11Y_TTS);
+  const canEditTextSize = hasPermission(PERM.ACTION_A11Y_TEXT_SIZE);
+  const canEditMotion = hasPermission(PERM.ACTION_A11Y_REDUCE_MOTION);
+  const canEditContrast = hasPermission(PERM.ACTION_A11Y_HIGH_CONTRAST);
 
-  const [ttsDefault, setTtsDefault]   = useState(false);
-  const [textSize, setTextSize]       = useState<'sm' | 'md' | 'lg' | 'xl'>('md');
+  const [ttsDefault, setTtsDefault] = useState(false);
+  const [textSize, setTextSize] = useState<'sm' | 'md' | 'lg' | 'xl'>('md');
   const [reduceMotion, setReduceMotion] = useState(false);
   const [highContrast, setHighContrast] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -2468,7 +3049,9 @@ function AccessibilityCard({
 
   const currentKey = JSON.stringify({ ttsDefault, textSize, reduceMotion, highContrast });
   const dirty = currentKey !== snapshot.current;
-  useEffect(() => { markDirty(dirty); }, [dirty, markDirty]);
+  useEffect(() => {
+    markDirty(dirty);
+  }, [dirty, markDirty]);
 
   const handleSave = async () => {
     if (!user) return;
@@ -2476,23 +3059,34 @@ function AccessibilityCard({
     // M16: re-read metadata immediately before write so a concurrent
     // feed/expertWatchlist save doesn't clobber us.
     const { data: fresh } = await supabase
-      .from('users').select('metadata').eq('id', userId).maybeSingle();
-    const freshMeta = (fresh as { metadata?: Record<string, unknown> } | null)?.metadata as SettingsMeta | null;
+      .from('users')
+      .select('metadata')
+      .eq('id', userId)
+      .maybeSingle();
+    const freshMeta = (fresh as { metadata?: Record<string, unknown> } | null)
+      ?.metadata as SettingsMeta | null;
     const merged = {
       ...(freshMeta || {}),
       a11y: { ttsDefault, textSize, reduceMotion, highContrast },
     };
     const { error } = await supabase.rpc('update_own_profile', { p_fields: { metadata: merged } });
     setSaving(false);
-    if (error) { pushToast({ message: error.message, variant: 'danger' }); return; }
+    if (error) {
+      pushToast({ message: error.message, variant: 'danger' });
+      return;
+    }
     pushToast({ message: 'Accessibility saved.', variant: 'success' });
     markDirty(false);
     await onSaved();
   };
 
   return (
-    <Card id="accessibility" title="Accessibility" highlight={highlight}
-      description="Text-to-speech, motion, contrast, and text size.">
+    <Card
+      id="accessibility"
+      title="Accessibility"
+      highlight={highlight}
+      description="Text-to-speech, motion, contrast, and text size."
+    >
       <div style={{ display: 'flex', flexDirection: 'column', gap: S[3] }}>
         <Switch
           label="Text-to-speech by default"
@@ -2506,7 +3100,9 @@ function AccessibilityCard({
           <Select
             value={textSize}
             disabled={!canEditTextSize}
-            onChange={(e: ChangeEvent<HTMLSelectElement>) => setTextSize(e.target.value as typeof textSize)}
+            onChange={(e: ChangeEvent<HTMLSelectElement>) =>
+              setTextSize(e.target.value as typeof textSize)
+            }
             options={TEXT_SIZES}
           />
         </div>
@@ -2525,7 +3121,9 @@ function AccessibilityCard({
           onChange={setHighContrast}
         />
         <div>
-          <Button variant="primary" onClick={handleSave} loading={saving} disabled={!dirty}>Save changes</Button>
+          <Button variant="primary" onClick={handleSave} loading={saving} disabled={!dirty}>
+            Save changes
+          </Button>
         </div>
       </div>
     </Card>
@@ -2537,7 +3135,10 @@ function AccessibilityCard({
 // ---------------------------------------------------------------------------
 
 function BlockedCard({
-  userId, highlight, supabase, pushToast,
+  userId,
+  highlight,
+  supabase,
+  pushToast,
 }: {
   userId: string;
   highlight: boolean;
@@ -2553,28 +3154,39 @@ function BlockedCard({
     setLoading(true);
     const { data, error } = await supabase
       .from('blocked_users')
-      .select('id, created_at, reason, blocked:users!fk_blocked_users_blocked_id(id, username, avatar_color)')
+      .select(
+        'id, created_at, reason, blocked:users!fk_blocked_users_blocked_id(id, username, avatar_color)'
+      )
       .eq('blocker_id', userId)
       .order('created_at', { ascending: false });
     if (error) pushToast({ message: error.message, variant: 'danger' });
-    setRows(((data as unknown) as BlockedRow[] | null) || []);
+    setRows((data as unknown as BlockedRow[] | null) || []);
     setLoading(false);
   }, [supabase, userId, pushToast]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const unblock = async (id: string) => {
     setBusy(id);
     const { error } = await supabase.from('blocked_users').delete().eq('id', id);
     setBusy('');
-    if (error) { pushToast({ message: error.message, variant: 'danger' }); return; }
+    if (error) {
+      pushToast({ message: error.message, variant: 'danger' });
+      return;
+    }
     setRows((prev) => prev.filter((r) => r.id !== id));
     pushToast({ message: 'Unblocked.', variant: 'success' });
   };
 
   return (
-    <Card id="blocked" title="Blocked users" highlight={highlight}
-      description="People you've blocked cannot see your profile, message you, or reply to your comments.">
+    <Card
+      id="blocked"
+      title="Blocked users"
+      highlight={highlight}
+      description="People you've blocked cannot see your profile, message you, or reply to your comments."
+    >
       {loading ? (
         <SkeletonBar width={200} />
       ) : rows.length === 0 ? (
@@ -2583,17 +3195,29 @@ function BlockedCard({
         <div>
           {rows.map((r, i) => (
             <Row key={r.id} last={i === rows.length - 1}>
-              <div style={{
-                width: 28, height: 28, borderRadius: '50%',
-                background: r.blocked?.avatar_color || C.accent,
-                color: '#fff',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: F.sm, fontWeight: 700,
-              }}>{(r.blocked?.username || '?').charAt(0).toUpperCase()}</div>
+              <div
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: '50%',
+                  background: r.blocked?.avatar_color || C.accent,
+                  color: '#fff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: F.sm,
+                  fontWeight: 700,
+                }}
+              >
+                {(r.blocked?.username || '?').charAt(0).toUpperCase()}
+              </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: F.base, fontWeight: 600 }}>@{r.blocked?.username || 'unknown'}</div>
+                <div style={{ fontSize: F.base, fontWeight: 600 }}>
+                  @{r.blocked?.username || 'unknown'}
+                </div>
                 <div style={{ fontSize: F.xs, color: C.dim }}>
-                  Blocked {formatDate(r.created_at)}{r.reason ? ` · ${r.reason}` : ''}
+                  Blocked {formatDate(r.created_at)}
+                  {r.reason ? ` · ${r.reason}` : ''}
                 </div>
               </div>
               <Button
@@ -2601,7 +3225,9 @@ function BlockedCard({
                 disabled={!canUnblock || busy === r.id}
                 loading={busy === r.id}
                 onClick={() => unblock(r.id)}
-              >Unblock</Button>
+              >
+                Unblock
+              </Button>
             </Row>
           ))}
         </div>
@@ -2615,7 +3241,10 @@ function BlockedCard({
 // ---------------------------------------------------------------------------
 
 function DataExportCard({
-  userId, highlight, supabase, pushToast,
+  userId,
+  highlight,
+  supabase,
+  pushToast,
 }: {
   userId: string;
   highlight: boolean;
@@ -2642,16 +3271,23 @@ function DataExportCard({
     setLoading(false);
   }, [supabase, userId, pushToast]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const requestExport = async () => {
     setBusy('export');
     const payload: TableInsert<'data_requests'> = {
-      user_id: userId, type: 'export', status: 'pending',
+      user_id: userId,
+      type: 'export',
+      status: 'pending',
     };
     const { error } = await supabase.from('data_requests').insert(payload);
     setBusy('');
-    if (error) { pushToast({ message: error.message, variant: 'danger' }); return; }
+    if (error) {
+      pushToast({ message: error.message, variant: 'danger' });
+      return;
+    }
     pushToast({ message: 'Data export requested.', variant: 'success' });
     await load();
   };
@@ -2661,22 +3297,41 @@ function DataExportCard({
   // scheduling, session invalidation, the works). We now keep ONE entry
   // point — the Danger Zone card — and point at it from here.
 
-  const activeExport = requests.find((r) => r.type === 'export' && r.status !== 'completed' && r.status !== 'cancelled');
+  const activeExport = requests.find(
+    (r) => r.type === 'export' && r.status !== 'completed' && r.status !== 'cancelled'
+  );
 
   return (
-    <Card id="data" title="Data & export" highlight={highlight}
-      description="Download a copy of your data. Account deletion lives in the Danger zone below.">
+    <Card
+      id="data"
+      title="Data & export"
+      highlight={highlight}
+      description="Download a copy of your data. Account deletion lives in the Danger zone below."
+    >
       {loading ? <SkeletonBar width={260} /> : null}
-      <div style={{ display: 'grid', gap: S[3], gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
+      <div
+        style={{
+          display: 'grid',
+          gap: S[3],
+          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+        }}
+      >
         <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: S[3] }}>
           <div style={{ fontSize: F.base, fontWeight: 600 }}>Data export</div>
           <div style={{ fontSize: F.sm, color: C.dim, marginBottom: S[2] }}>
             We'll email a download link when the bundle is ready (up to 30 days per GDPR).
           </div>
           {activeExport ? (
-            <Badge variant="info" size="xs">{activeExport.status}</Badge>
+            <Badge variant="info" size="xs">
+              {activeExport.status}
+            </Badge>
           ) : (
-            <Button size="sm" onClick={requestExport} loading={busy === 'export'} disabled={!canExport}>
+            <Button
+              size="sm"
+              onClick={requestExport}
+              loading={busy === 'export'}
+              disabled={!canExport}
+            >
               Request data export
             </Button>
           )}
@@ -2689,12 +3344,28 @@ function DataExportCard({
             {requests.slice(0, 5).map((r, i) => (
               <Row key={r.id} last={i === Math.min(5, requests.length) - 1}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: F.base, fontWeight: 600 }}>{r.type === 'export' ? 'Export' : 'Deletion'}</div>
+                  <div style={{ fontSize: F.base, fontWeight: 600 }}>
+                    {r.type === 'export' ? 'Export' : 'Deletion'}
+                  </div>
                   <div style={{ fontSize: F.xs, color: C.dim }}>{formatDate(r.created_at)}</div>
                 </div>
-                <Badge variant={r.status === 'completed' ? 'success' : r.status === 'failed' ? 'danger' : 'info'} size="xs">{r.status}</Badge>
+                <Badge
+                  variant={
+                    r.status === 'completed' ? 'success' : r.status === 'failed' ? 'danger' : 'info'
+                  }
+                  size="xs"
+                >
+                  {r.status}
+                </Badge>
                 {r.type === 'export' && r.download_url && (
-                  <a href={r.download_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: F.sm, color: C.accent, fontWeight: 600 }}>Download</a>
+                  <a
+                    href={r.download_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ fontSize: F.sm, color: C.accent, fontWeight: 600 }}
+                  >
+                    Download
+                  </a>
                 )}
               </Row>
             ))}
@@ -2721,7 +3392,10 @@ interface SupervisorRow {
 }
 
 function SupervisorCard({
-  userId, highlight, supabase, pushToast,
+  userId,
+  highlight,
+  supabase,
+  pushToast,
 }: {
   userId: string;
   highlight: boolean;
@@ -2738,44 +3412,57 @@ function SupervisorCard({
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [{ data: settingRow }, { data: cats }, { data: scores }, { data: sups }] = await Promise.all([
-      supabase.from('settings').select('value').eq('key', 'supervisor_eligibility_score').maybeSingle(),
-      supabase.from('categories').select('id, name').eq('is_active', true).order('name'),
-      supabase.from('category_scores').select('category_id, score').eq('user_id', userId),
-      supabase.from('category_supervisors').select('category_id, is_active, opted_in_at, opted_out_at').eq('user_id', userId),
-    ]);
+    const [{ data: settingRow }, { data: cats }, { data: scores }, { data: sups }] =
+      await Promise.all([
+        supabase
+          .from('settings')
+          .select('value')
+          .eq('key', 'supervisor_eligibility_score')
+          .maybeSingle(),
+        supabase.from('categories').select('id, name').eq('is_active', true).order('name'),
+        supabase.from('category_scores').select('category_id, score').eq('user_id', userId),
+        supabase
+          .from('category_supervisors')
+          .select('category_id, is_active, opted_in_at, opted_out_at')
+          .eq('user_id', userId),
+      ]);
     const th = Number((settingRow as { value?: string } | null)?.value || 500);
     setThreshold(th);
 
     const scoreMap = new Map<string, number>();
-    for (const s of (scores as { category_id: string; score: number }[] | null) || []) scoreMap.set(s.category_id, s.score);
+    for (const s of (scores as { category_id: string; score: number }[] | null) || [])
+      scoreMap.set(s.category_id, s.score);
     const supMap = new Map<string, CategorySupervisorRow>();
     for (const s of (sups as CategorySupervisorRow[] | null) || []) supMap.set(s.category_id, s);
 
-    const next: SupervisorRow[] = ((cats as { id: string; name: string }[] | null) || []).map((c) => {
-      const sup = supMap.get(c.id);
-      const score = scoreMap.get(c.id) || 0;
-      // M11: 7-day cooldown starts at opted_out_at.
-      const optedOut = sup?.opted_out_at ? new Date(sup.opted_out_at) : null;
-      const cooldownEnds = optedOut
-        ? new Date(optedOut.getTime() + 7 * 24 * 60 * 60 * 1000)
-        : null;
-      const inCooldown = cooldownEnds ? cooldownEnds > new Date() : false;
-      return {
-        id: c.id,
-        name: c.name,
-        score,
-        eligible: score >= th,
-        opted_in: !!sup?.is_active && !sup.opted_out_at,
-        opted_in_at: sup?.opted_in_at || null,
-        cooldown_ends_at: inCooldown && cooldownEnds ? cooldownEnds.toISOString() : null,
-      };
-    });
+    const next: SupervisorRow[] = ((cats as { id: string; name: string }[] | null) || []).map(
+      (c) => {
+        const sup = supMap.get(c.id);
+        const score = scoreMap.get(c.id) || 0;
+        // M11: 7-day cooldown starts at opted_out_at.
+        const optedOut = sup?.opted_out_at ? new Date(sup.opted_out_at) : null;
+        const cooldownEnds = optedOut
+          ? new Date(optedOut.getTime() + 7 * 24 * 60 * 60 * 1000)
+          : null;
+        const inCooldown = cooldownEnds ? cooldownEnds > new Date() : false;
+        return {
+          id: c.id,
+          name: c.name,
+          score,
+          eligible: score >= th,
+          opted_in: !!sup?.is_active && !sup.opted_out_at,
+          opted_in_at: sup?.opted_in_at || null,
+          cooldown_ends_at: inCooldown && cooldownEnds ? cooldownEnds.toISOString() : null,
+        };
+      }
+    );
     setRows(next);
     setLoading(false);
   }, [supabase, userId]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const optIn = async (id: string) => {
     setBusy(id);
@@ -2792,7 +3479,9 @@ function SupervisorCard({
         pushToast({ message: 'You are now supervising this category.', variant: 'success' });
         await load();
       }
-    } finally { setBusy(''); }
+    } finally {
+      setBusy('');
+    }
   };
 
   const confirmOptOut = async () => {
@@ -2812,39 +3501,69 @@ function SupervisorCard({
         setPendingOptOut(null);
         await load();
       }
-    } finally { setBusy(''); }
+    } finally {
+      setBusy('');
+    }
   };
 
   return (
-    <Card id="supervisor" title="Category supervisor" highlight={highlight}
-      description={`Eligibility threshold: ${threshold} per category. Supervisors flag comments to the moderator queue; they have no direct moderation power.`}>
+    <Card
+      id="supervisor"
+      title="Category supervisor"
+      highlight={highlight}
+      description={`Eligibility threshold: ${threshold} per category. Supervisors flag comments to the moderator queue; they have no direct moderation power.`}
+    >
       {loading ? (
         <SkeletonBar width={200} />
       ) : rows.length === 0 ? (
-        <EmptyState size="sm" title="No categories available" description="Category list is empty." />
+        <EmptyState
+          size="sm"
+          title="No categories available"
+          description="Category list is empty."
+        />
       ) : (
         <div>
           {rows.map((r, i) => (
             <Row key={r.id} last={i === rows.length - 1}>
               <div style={{ flex: '1 1 160px', minWidth: 0 }}>
-                <div style={{
-                  fontSize: F.base, fontWeight: 600,
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                }}>{r.name}</div>
+                <div
+                  style={{
+                    fontSize: F.base,
+                    fontWeight: 600,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {r.name}
+                </div>
                 <div style={{ fontSize: F.xs, color: r.eligible ? C.success : C.dim }}>
-                  Score {r.score}{r.eligible ? ' — eligible' : ` — need ${threshold - r.score} more`}
+                  Score {r.score}
+                  {r.eligible ? ' — eligible' : ` — need ${threshold - r.score} more`}
                 </div>
               </div>
               {r.opted_in ? (
-                <Button size="sm" loading={busy === r.id} onClick={() => setPendingOptOut(r)}>Step down</Button>
+                <Button size="sm" loading={busy === r.id} onClick={() => setPendingOptOut(r)}>
+                  Step down
+                </Button>
               ) : r.cooldown_ends_at ? (
                 <span style={{ fontSize: F.xs, color: C.warn, textAlign: 'right', maxWidth: 220 }}>
                   Recently stepped down — reapply after {formatDate(r.cooldown_ends_at)}
                 </span>
               ) : r.eligible ? (
-                <Button size="sm" variant="primary" disabled={!canOptIn} loading={busy === r.id} onClick={() => optIn(r.id)}>Opt in</Button>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  disabled={!canOptIn}
+                  loading={busy === r.id}
+                  onClick={() => optIn(r.id)}
+                >
+                  Opt in
+                </Button>
               ) : (
-                <Badge variant="neutral" size="xs">Not eligible</Badge>
+                <Badge variant="neutral" size="xs">
+                  Not eligible
+                </Badge>
               )}
             </Row>
           ))}
@@ -2853,13 +3572,17 @@ function SupervisorCard({
       <ConfirmDialog
         open={!!pendingOptOut}
         title="Step down from this category?"
-        message={pendingOptOut
-          ? `You will stop supervising "${pendingOptOut.name}". A 7-day cooldown applies before you can re-apply.`
-          : ''}
+        message={
+          pendingOptOut
+            ? `You will stop supervising "${pendingOptOut.name}". A 7-day cooldown applies before you can re-apply.`
+            : ''
+        }
         confirmLabel="Step down"
         variant="danger"
         busy={!!pendingOptOut && busy === pendingOptOut.id}
-        onCancel={() => { if (!pendingOptOut || busy !== pendingOptOut.id) setPendingOptOut(null); }}
+        onCancel={() => {
+          if (!pendingOptOut || busy !== pendingOptOut.id) setPendingOptOut(null);
+        }}
         onConfirm={confirmOptOut}
       />
     </Card>
@@ -2871,9 +3594,17 @@ function SupervisorCard({
 // ---------------------------------------------------------------------------
 
 function BillingBundle({
-  userId, highlightPlan, highlightPayment, highlightInvoices, highlightPromo,
-  showPlan, showPayment, showInvoices, showPromo,
-  supabase, pushToast,
+  userId,
+  highlightPlan,
+  highlightPayment,
+  highlightInvoices,
+  highlightPromo,
+  showPlan,
+  showPayment,
+  showInvoices,
+  showPromo,
+  supabase,
+  pushToast,
 }: {
   userId: string;
   highlightPlan: boolean;
@@ -2887,15 +3618,23 @@ function BillingBundle({
   supabase: DbClient;
   pushToast: Pusher;
 }): ReactElement {
-  const canChange  = hasPermission(PERM.ACTION_BILLING_CHANGE_PLAN);
-  const canCancel  = hasPermission(PERM.ACTION_BILLING_CANCEL);
-  const canResub   = hasPermission(PERM.ACTION_BILLING_RESUB);
-  const canPortal  = hasPermission(PERM.ACTION_BILLING_PORTAL);
-  const canPromo   = hasPermission(PERM.ACTION_BILLING_PROMO);
-  const isMobile   = useIsMobile();
+  const canChange = hasPermission(PERM.ACTION_BILLING_CHANGE_PLAN);
+  const canCancel = hasPermission(PERM.ACTION_BILLING_CANCEL);
+  const canResub = hasPermission(PERM.ACTION_BILLING_RESUB);
+  const canPortal = hasPermission(PERM.ACTION_BILLING_PORTAL);
+  const canPromo = hasPermission(PERM.ACTION_BILLING_PROMO);
+  const isMobile = useIsMobile();
 
   const [loading, setLoading] = useState(true);
-  const [userBilling, setUserBilling] = useState<Pick<UserRow, 'plan_id' | 'plan_status' | 'frozen_at' | 'frozen_verity_score' | 'plan_grace_period_ends_at' | 'stripe_customer_id'> | null>(null);
+  const [userBilling, setUserBilling] = useState<Pick<
+    UserRow,
+    | 'plan_id'
+    | 'plan_status'
+    | 'frozen_at'
+    | 'frozen_verity_score'
+    | 'plan_grace_period_ends_at'
+    | 'stripe_customer_id'
+  > | null>(null);
   const [subscription, setSubscription] = useState<SubscriptionRow | null>(null);
   const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
   const [plans, setPlans] = useState<PlanRow[]>([]);
@@ -2910,21 +3649,37 @@ function BillingBundle({
     (async () => {
       try {
         const [uq, sq, iq, pq, pfq] = await Promise.all([
-          supabase.from('users')
-            .select('plan_id, plan_status, frozen_at, frozen_verity_score, plan_grace_period_ends_at, stripe_customer_id')
-            .eq('id', userId).maybeSingle(),
-          supabase.from('subscriptions')
-            .select('id, status, current_period_end, created_at, stripe_payment_method_id, source, apple_original_transaction_id, google_purchase_token')
-            .eq('user_id', userId).eq('status', 'active')
-            .order('created_at', { ascending: false }).maybeSingle(),
-          supabase.from('invoices')
-            .select('id, stripe_invoice_id, created_at, amount_cents, currency, status, invoice_url, invoice_pdf_url')
-            .eq('user_id', userId).order('created_at', { ascending: false }),
-          supabase.from('plans')
+          supabase
+            .from('users')
+            .select(
+              'plan_id, plan_status, frozen_at, frozen_verity_score, plan_grace_period_ends_at, stripe_customer_id'
+            )
+            .eq('id', userId)
+            .maybeSingle(),
+          supabase
+            .from('subscriptions')
+            .select(
+              'id, status, current_period_end, created_at, stripe_payment_method_id, source, apple_original_transaction_id, google_purchase_token'
+            )
+            .eq('user_id', userId)
+            .eq('status', 'active')
+            .order('created_at', { ascending: false })
+            .maybeSingle(),
+          supabase
+            .from('invoices')
+            .select(
+              'id, stripe_invoice_id, created_at, amount_cents, currency, status, invoice_url, invoice_pdf_url'
+            )
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false }),
+          supabase
+            .from('plans')
             .select('id, tier, billing_period, price_cents, name')
-            .eq('is_active', true).order('sort_order'),
+            .eq('is_active', true)
+            .order('sort_order'),
           // M10: plan feature bullets — restore the per-plan features list.
-          supabase.from('plan_features')
+          supabase
+            .from('plan_features')
             .select('plan_id, feature_name, is_enabled')
             .eq('is_enabled', true),
         ]);
@@ -2936,16 +3691,20 @@ function BillingBundle({
         setPlanFeatures((pfq.data as PlanFeatureRow[] | null) || []);
       } catch (err) {
         if (alive) pushToast({ message: 'Could not load billing info.', variant: 'danger' });
-      } finally { if (alive) setLoading(false); }
+      } finally {
+        if (alive) setLoading(false);
+      }
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [supabase, userId, pushToast]);
 
   const resolved = resolveUserTier(userBilling, plans);
   const currentTier: string = resolved.tier;
   const planState: string = resolved.state;
   const isPaidActive = planState === 'active' && currentTier !== 'free';
-  const isGrace  = planState === 'grace';
+  const isGrace = planState === 'grace';
   const isFrozen = planState === 'frozen';
 
   const handleChangePlan = async (tier: string) => {
@@ -2964,13 +3723,20 @@ function BillingBundle({
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Checkout failed';
       pushToast({ message: msg, variant: 'danger' });
-    } finally { setBusy(''); }
+    } finally {
+      setBusy('');
+    }
   };
 
   // M9: restore the labels from the legacy billing page. Returns the label
   // / button tone / busy flag for a given tier card button, or null when
   // no button is appropriate (e.g. the "current plan" slot).
-  type PlanAction = { label: string; onClick: () => void; tone: 'primary' | 'secondary' | 'danger'; busy: boolean };
+  type PlanAction = {
+    label: string;
+    onClick: () => void;
+    tone: 'primary' | 'secondary' | 'danger';
+    busy: boolean;
+  };
   const actionFor = (tier: string): PlanAction | null => {
     // Frozen: every paid tier becomes "Resubscribe".
     if (isFrozen) {
@@ -3004,7 +3770,12 @@ function BillingBundle({
     if (tier === currentTier) return null;
     if (tier === 'free') {
       return isPaidActive
-        ? { label: 'Cancel to free', onClick: () => setConfirmCancel(true), tone: 'danger', busy: false }
+        ? {
+            label: 'Cancel to free',
+            onClick: () => setConfirmCancel(true),
+            tone: 'danger',
+            busy: false,
+          }
         : null;
     }
     const tName = (TIERS as Record<string, { name: string }>)[tier]?.name || tier;
@@ -3033,7 +3804,8 @@ function BillingBundle({
     const list = planFeatures
       .filter((pf) => pf.plan_id === p.id && pf.feature_name)
       .map((pf) => pf.feature_name as string);
-    if (list.length) featuresByTier[p.tier] = Array.from(new Set([...(featuresByTier[p.tier] || []), ...list]));
+    if (list.length)
+      featuresByTier[p.tier] = Array.from(new Set([...(featuresByTier[p.tier] || []), ...list]));
   }
 
   const handleCancel = async () => {
@@ -3042,12 +3814,17 @@ function BillingBundle({
       const res = await fetch('/api/billing/cancel', { method: 'POST' });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || 'Cancel failed');
-      pushToast({ message: 'Subscription cancelled. 7-day grace period started.', variant: 'success' });
+      pushToast({
+        message: 'Subscription cancelled. 7-day grace period started.',
+        variant: 'success',
+      });
       setConfirmCancel(false);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Cancel failed';
       pushToast({ message: msg, variant: 'danger' });
-    } finally { setBusy(''); }
+    } finally {
+      setBusy('');
+    }
   };
 
   const handlePortal = async () => {
@@ -3055,12 +3832,17 @@ function BillingBundle({
     try {
       const res = await fetch('/api/stripe/portal', { method: 'POST' });
       const data = await res.json().catch(() => ({}));
-      if (res.ok && data?.url) { window.location.href = data.url; return; }
+      if (res.ok && data?.url) {
+        window.location.href = data.url;
+        return;
+      }
       // Q2: forward the server's specific error string instead of a generic
       // fallback, so Stripe users who fall through (e.g. missing customer id)
       // see the actionable message from /api/stripe/portal.
       pushToast({ message: data?.error || 'Could not open billing portal.', variant: 'danger' });
-    } finally { setBusy(''); }
+    } finally {
+      setBusy('');
+    }
   };
 
   // Q2: derive which store manages the current subscription so the "Manage
@@ -3097,7 +3879,9 @@ function BillingBundle({
         pushToast({ message: data?.message || 'Promo applied.', variant: 'success' });
         setPromoCode('');
       }
-    } finally { setBusy(''); }
+    } finally {
+      setBusy('');
+    }
   };
 
   const priceLabel = (tier: string, c: 'monthly' | 'annual'): string => {
@@ -3106,11 +3890,12 @@ function BillingBundle({
     return p ? (c === 'annual' ? `${formatCents(p.cents)}/yr` : `${formatCents(p.cents)}/mo`) : '—';
   };
 
-  if (loading) return (
-    <Card id="plan" title="Billing" description="Loading your plan…">
-      <SkeletonBar width={200} />
-    </Card>
-  );
+  if (loading)
+    return (
+      <Card id="plan" title="Billing" description="Loading your plan…">
+        <SkeletonBar width={200} />
+      </Card>
+    );
 
   return (
     <>
@@ -3121,18 +3906,28 @@ function BillingBundle({
           highlight={highlightPlan}
           aside={
             canPortal && showStripePortalUI ? (
-              <Button size="sm" loading={busy === 'portal'} onClick={handlePortal}>Open Stripe portal</Button>
+              <Button size="sm" loading={busy === 'portal'} onClick={handlePortal}>
+                Open Stripe portal
+              </Button>
             ) : canPortal && showAppleIapUI ? (
               <Button
                 size="sm"
-                onClick={() => { window.location.href = 'itms-apps://apps.apple.com/account/subscriptions'; }}
+                onClick={() => {
+                  window.location.href = 'itms-apps://apps.apple.com/account/subscriptions';
+                }}
               >
                 Manage on App Store
               </Button>
             ) : canPortal && showGoogleIapUI ? (
               <Button
                 size="sm"
-                onClick={() => { window.open('https://play.google.com/store/account/subscriptions', '_blank', 'noopener,noreferrer'); }}
+                onClick={() => {
+                  window.open(
+                    'https://play.google.com/store/account/subscriptions',
+                    '_blank',
+                    'noopener,noreferrer'
+                  );
+                }}
               >
                 Manage on Google Play
               </Button>
@@ -3141,73 +3936,142 @@ function BillingBundle({
           description="Your current subscription and upgrade / cancel options."
         >
           {isFrozen && (
-            <div style={{ background: '#fef2f2', border: `1px solid ${C.danger}`, borderRadius: 8, padding: S[3], marginBottom: S[3] }}>
-              <div style={{ fontWeight: 700, color: C.danger, fontSize: F.base }}>Profile frozen</div>
+            <div
+              style={{
+                background: '#fef2f2',
+                border: `1px solid ${C.danger}`,
+                borderRadius: 8,
+                padding: S[3],
+                marginBottom: S[3],
+              }}
+            >
+              <div style={{ fontWeight: 700, color: C.danger, fontSize: F.base }}>
+                Profile frozen
+              </div>
               <div style={{ fontSize: F.sm, marginTop: 4 }}>
-                Your Verity Score is held at {userBilling?.frozen_verity_score ?? '—'}. Resubscribe to unfreeze.
+                Your Verity Score is held at {userBilling?.frozen_verity_score ?? '—'}. Resubscribe
+                to unfreeze.
               </div>
             </div>
           )}
           {isGrace && (
-            <div style={{ background: '#fffbeb', border: `1px solid ${C.warn}`, borderRadius: 8, padding: S[3], marginBottom: S[3] }}>
+            <div
+              style={{
+                background: '#fffbeb',
+                border: `1px solid ${C.warn}`,
+                borderRadius: 8,
+                padding: S[3],
+                marginBottom: S[3],
+              }}
+            >
               <div style={{ fontWeight: 700, color: C.warn, fontSize: F.base }}>Grace period</div>
               <div style={{ fontSize: F.sm, marginTop: 4 }}>
-                {daysUntil(userBilling?.plan_grace_period_ends_at) ?? '—'} days until freeze ({formatDate(userBilling?.plan_grace_period_ends_at)}).
+                {daysUntil(userBilling?.plan_grace_period_ends_at) ?? '—'} days until freeze (
+                {formatDate(userBilling?.plan_grace_period_ends_at)}).
               </div>
             </div>
           )}
 
-          <div style={{
-            background: 'linear-gradient(135deg,#111 0%,#222 100%)',
-            color: '#fff', borderRadius: 10, padding: S[4],
-            display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: S[3],
-            marginBottom: S[4],
-          }}>
+          <div
+            style={{
+              background: 'linear-gradient(135deg,#111 0%,#222 100%)',
+              color: '#fff',
+              borderRadius: 10,
+              padding: S[4],
+              display: 'flex',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: S[3],
+              marginBottom: S[4],
+            }}
+          >
             <div>
-              <div style={{ fontSize: F.xs, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', opacity: 0.8 }}>
+              <div
+                style={{
+                  fontSize: F.xs,
+                  fontWeight: 700,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  opacity: 0.8,
+                }}
+              >
                 Current plan
               </div>
-              <div style={{ fontSize: F.xxl, fontWeight: 700 }}>{(TIERS as Record<string, { name: string }>)[currentTier]?.name || 'Free'}</div>
+              <div style={{ fontSize: F.xxl, fontWeight: 700 }}>
+                {(TIERS as Record<string, { name: string }>)[currentTier]?.name || 'Free'}
+              </div>
               <div style={{ opacity: 0.85, fontSize: F.sm, marginTop: 4 }}>
                 {isPaidActive && resolved.planRow?.billing_period
                   ? `${formatCents(resolved.planRow.price_cents)} · Billed ${resolved.planRow.billing_period === 'year' ? 'annually' : 'monthly'}`
-                  : currentTier === 'free' ? 'No subscription' : '—'}
-                {subscription?.current_period_end && !isFrozen ? ` · Next: ${formatDate(subscription.current_period_end)}` : ''}
+                  : currentTier === 'free'
+                    ? 'No subscription'
+                    : '—'}
+                {subscription?.current_period_end && !isFrozen
+                  ? ` · Next: ${formatDate(subscription.current_period_end)}`
+                  : ''}
               </div>
             </div>
             {isPaidActive && !isGrace && (
-              <Button variant="danger" size="md" onClick={() => setConfirmCancel(true)} disabled={!canCancel}>
+              <Button
+                variant="danger"
+                size="md"
+                onClick={() => setConfirmCancel(true)}
+                disabled={!canCancel}
+              >
                 Cancel
               </Button>
             )}
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: S[3], flexWrap: 'wrap', gap: S[2] }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: S[3],
+              flexWrap: 'wrap',
+              gap: S[2],
+            }}
+          >
             <div style={{ fontSize: F.base, fontWeight: 600 }}>Change plan</div>
-            <div style={{ display: 'inline-flex', border: `1px solid ${C.border}`, borderRadius: 999, padding: 2, background: C.card }}>
+            <div
+              style={{
+                display: 'inline-flex',
+                border: `1px solid ${C.border}`,
+                borderRadius: 999,
+                padding: 2,
+                background: C.card,
+              }}
+            >
               {(['monthly', 'annual'] as const).map((c) => (
                 <button
                   key={c}
                   type="button"
                   onClick={() => setCycle(c)}
                   style={{
-                    padding: `${S[1]}px ${S[3]}px`, border: 'none',
+                    padding: `${S[1]}px ${S[3]}px`,
+                    border: 'none',
                     borderRadius: 999,
                     background: cycle === c ? C.accent : 'transparent',
                     color: cycle === c ? '#fff' : C.text,
-                    fontSize: F.sm, fontWeight: 600, cursor: 'pointer',
+                    fontSize: F.sm,
+                    fontWeight: 600,
+                    cursor: 'pointer',
                   }}
-                >{c === 'annual' ? `Annual · save ~${annualSavingsPercent('verity')}%` : 'Monthly'}</button>
+                >
+                  {c === 'annual' ? `Annual · save ~${annualSavingsPercent('verity')}%` : 'Monthly'}
+                </button>
               ))}
             </div>
           </div>
 
-          <div style={{
-            display: 'grid', gap: S[2],
-            gridTemplateColumns: isMobile
-              ? '1fr'
-              : 'repeat(auto-fit, minmax(220px, 1fr))',
-          }}>
+          <div
+            style={{
+              display: 'grid',
+              gap: S[2],
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))',
+            }}
+          >
             {TIER_ORDER.map((tier) => {
               const t = (TIERS as Record<string, { name: string; tagline: string }>)[tier];
               const isCurrent = tier === currentTier && !isFrozen;
@@ -3217,27 +4081,62 @@ function BillingBundle({
               const needsResubPerm = isFrozen && tier !== 'free';
               const isCancelAction = action?.tone === 'danger';
               const disabledByPerm =
-                (needsResubPerm && !canResub)
-                || (!needsResubPerm && !isCancelAction && !canChange)
-                || (isCancelAction && !canCancel);
+                (needsResubPerm && !canResub) ||
+                (!needsResubPerm && !isCancelAction && !canChange) ||
+                (isCancelAction && !canCancel);
               const features = featuresByTier[tier] || [];
               return (
-                <div key={tier} style={{
-                  border: `1px solid ${isCurrent ? C.accent : C.border}`,
-                  borderRadius: 8, padding: S[3], background: isCurrent ? '#f6f4ff' : C.bg,
-                  display: 'flex', flexDirection: 'column', gap: S[1],
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div
+                  key={tier}
+                  style={{
+                    border: `1px solid ${isCurrent ? C.accent : C.border}`,
+                    borderRadius: 8,
+                    padding: S[3],
+                    background: isCurrent ? '#f6f4ff' : C.bg,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: S[1],
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
                     <div style={{ fontSize: F.base, fontWeight: 700 }}>{t.name}</div>
-                    {isCurrent && <Badge size="xs" variant="info">Current</Badge>}
+                    {isCurrent && (
+                      <Badge size="xs" variant="info">
+                        Current
+                      </Badge>
+                    )}
                   </div>
                   <div style={{ fontSize: F.xs, color: C.dim, minHeight: 28 }}>{t.tagline}</div>
                   <div style={{ fontSize: F.lg, fontWeight: 700 }}>{priceLabel(tier, cycle)}</div>
                   {/* M10: per-plan feature bullets from `plan_features`. */}
                   {features.length > 0 && (
-                    <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <ul
+                      style={{
+                        margin: 0,
+                        padding: 0,
+                        listStyle: 'none',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 2,
+                      }}
+                    >
                       {features.map((f) => (
-                        <li key={f} style={{ display: 'flex', gap: 6, alignItems: 'flex-start', fontSize: F.xs, color: C.text }}>
+                        <li
+                          key={f}
+                          style={{
+                            display: 'flex',
+                            gap: 6,
+                            alignItems: 'flex-start',
+                            fontSize: F.xs,
+                            color: C.text,
+                          }}
+                        >
                           <span style={{ color: C.success, fontWeight: 700, marginTop: 1 }}>+</span>
                           <span style={{ lineHeight: 1.35 }}>{f}</span>
                         </li>
@@ -3293,7 +4192,8 @@ function BillingBundle({
                 <>
                   <div style={{ fontSize: F.base, fontWeight: 600 }}>Billed by Apple</div>
                   <div style={{ fontSize: F.xs, color: C.dim }}>
-                    Your subscription is managed in your App Store account. Open Settings &gt; Subscriptions on your iPhone, or use the button to jump straight there.
+                    Your subscription is managed in your App Store account. Open Settings &gt;
+                    Subscriptions on your iPhone, or use the button to jump straight there.
                   </div>
                 </>
               ) : showGoogleIapUI ? (
@@ -3306,10 +4206,14 @@ function BillingBundle({
               ) : subscription?.stripe_payment_method_id ? (
                 <>
                   <div style={{ fontSize: F.base, fontWeight: 600 }}>Card on file</div>
-                  <div style={{
-                    fontSize: F.xs, color: C.dim, fontFamily: 'monospace',
-                    wordBreak: 'break-all',
-                  }}>
+                  <div
+                    style={{
+                      fontSize: F.xs,
+                      color: C.dim,
+                      fontFamily: 'monospace',
+                      wordBreak: 'break-all',
+                    }}
+                  >
                     {subscription.stripe_payment_method_id}
                   </div>
                 </>
@@ -3318,20 +4222,39 @@ function BillingBundle({
               )}
             </div>
             {showAppleIapUI ? (
-              <Button size="sm" disabled={!canPortal}
-                onClick={() => { window.location.href = 'itms-apps://apps.apple.com/account/subscriptions'; }}
-                style={isMobile ? { width: '100%' } : undefined}>
+              <Button
+                size="sm"
+                disabled={!canPortal}
+                onClick={() => {
+                  window.location.href = 'itms-apps://apps.apple.com/account/subscriptions';
+                }}
+                style={isMobile ? { width: '100%' } : undefined}
+              >
                 Manage on App Store
               </Button>
             ) : showGoogleIapUI ? (
-              <Button size="sm" disabled={!canPortal}
-                onClick={() => { window.open('https://play.google.com/store/account/subscriptions', '_blank', 'noopener,noreferrer'); }}
-                style={isMobile ? { width: '100%' } : undefined}>
+              <Button
+                size="sm"
+                disabled={!canPortal}
+                onClick={() => {
+                  window.open(
+                    'https://play.google.com/store/account/subscriptions',
+                    '_blank',
+                    'noopener,noreferrer'
+                  );
+                }}
+                style={isMobile ? { width: '100%' } : undefined}
+              >
                 Manage on Google Play
               </Button>
             ) : (
-              <Button size="sm" disabled={!canPortal} loading={busy === 'portal'} onClick={handlePortal}
-                style={isMobile ? { width: '100%' } : undefined}>
+              <Button
+                size="sm"
+                disabled={!canPortal}
+                loading={busy === 'portal'}
+                onClick={handlePortal}
+                style={isMobile ? { width: '100%' } : undefined}
+              >
                 Update payment method
               </Button>
             )}
@@ -3340,8 +4263,12 @@ function BillingBundle({
       )}
 
       {showInvoices && (
-        <Card id="invoices" title="Invoices" highlight={highlightInvoices}
-          description="Download PDFs of past Stripe invoices.">
+        <Card
+          id="invoices"
+          title="Invoices"
+          highlight={highlightInvoices}
+          description="Download PDFs of past Stripe invoices."
+        >
           {invoices.length === 0 ? (
             <EmptyState size="sm" title="No invoices yet" />
           ) : isMobile ? (
@@ -3358,7 +4285,14 @@ function BillingBundle({
                     gap: S[1],
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: S[2], alignItems: 'flex-start' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      gap: S[2],
+                      alignItems: 'flex-start',
+                    }}
+                  >
                     <div style={{ fontWeight: 600, fontSize: F.base }}>
                       {formatCents(inv.amount_cents, { currency: inv.currency })}
                     </div>
@@ -3366,24 +4300,31 @@ function BillingBundle({
                       {inv.status || 'unknown'}
                     </Badge>
                   </div>
-                  <div style={{ fontSize: F.xs, color: C.dim }}>
-                    {formatDate(inv.created_at)}
-                  </div>
-                  <div style={{
-                    fontSize: F.xs, color: C.dim, fontFamily: 'monospace',
-                    wordBreak: 'break-all',
-                  }}>
+                  <div style={{ fontSize: F.xs, color: C.dim }}>{formatDate(inv.created_at)}</div>
+                  <div
+                    style={{
+                      fontSize: F.xs,
+                      color: C.dim,
+                      fontFamily: 'monospace',
+                      wordBreak: 'break-all',
+                    }}
+                  >
                     {inv.stripe_invoice_id || inv.id.slice(0, 12)}
                   </div>
                   {(inv.invoice_url || inv.invoice_pdf_url) && (
                     <a
                       href={inv.invoice_url || inv.invoice_pdf_url || '#'}
-                      target="_blank" rel="noopener noreferrer"
+                      target="_blank"
+                      rel="noopener noreferrer"
                       style={{
-                        fontSize: F.sm, color: C.accent, fontWeight: 600,
+                        fontSize: F.sm,
+                        color: C.accent,
+                        fontWeight: 600,
                         marginTop: S[1],
                       }}
-                    >Download PDF</a>
+                    >
+                      Download PDF
+                    </a>
                   )}
                 </div>
               ))}
@@ -3403,21 +4344,38 @@ function BillingBundle({
                 <tbody>
                   {invoices.map((inv) => (
                     <tr key={inv.id}>
-                      <td style={{ ...tdStyle, fontFamily: 'monospace', color: C.dim, fontSize: F.xs }}>
+                      <td
+                        style={{
+                          ...tdStyle,
+                          fontFamily: 'monospace',
+                          color: C.dim,
+                          fontSize: F.xs,
+                        }}
+                      >
                         {inv.stripe_invoice_id || inv.id.slice(0, 12)}
                       </td>
                       <td style={tdStyle}>{formatDate(inv.created_at)}</td>
-                      <td style={{ ...tdStyle, fontWeight: 600 }}>{formatCents(inv.amount_cents, { currency: inv.currency })}</td>
+                      <td style={{ ...tdStyle, fontWeight: 600 }}>
+                        {formatCents(inv.amount_cents, { currency: inv.currency })}
+                      </td>
                       <td style={tdStyle}>
                         <Badge size="xs" variant={inv.status === 'paid' ? 'success' : 'neutral'}>
                           {inv.status || 'unknown'}
                         </Badge>
                       </td>
                       <td style={{ ...tdStyle, textAlign: 'right' }}>
-                        {(inv.invoice_url || inv.invoice_pdf_url) ? (
-                          <a href={inv.invoice_url || inv.invoice_pdf_url || '#'} target="_blank" rel="noopener noreferrer"
-                            style={{ fontSize: F.sm, color: C.accent, fontWeight: 600 }}>Download</a>
-                        ) : <span style={{ color: C.dim }}>—</span>}
+                        {inv.invoice_url || inv.invoice_pdf_url ? (
+                          <a
+                            href={inv.invoice_url || inv.invoice_pdf_url || '#'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ fontSize: F.sm, color: C.accent, fontWeight: 600 }}
+                          >
+                            Download
+                          </a>
+                        ) : (
+                          <span style={{ color: C.dim }}>—</span>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -3429,24 +4387,38 @@ function BillingBundle({
       )}
 
       {showPromo && (
-        <Card id="promo" title="Promo codes" highlight={highlightPromo}
-          description="Have a code? Redeem it here.">
-          <div style={{
-            display: 'flex', gap: S[2],
-            maxWidth: isMobile ? '100%' : 420,
-            width: '100%',
-            flexWrap: 'wrap',
-            flexDirection: isMobile ? 'column' : 'row',
-            alignItems: isMobile ? 'stretch' : 'center',
-          }}>
+        <Card
+          id="promo"
+          title="Promo codes"
+          highlight={highlightPromo}
+          description="Have a code? Redeem it here."
+        >
+          <div
+            style={{
+              display: 'flex',
+              gap: S[2],
+              maxWidth: isMobile ? '100%' : 420,
+              width: '100%',
+              flexWrap: 'wrap',
+              flexDirection: isMobile ? 'column' : 'row',
+              alignItems: isMobile ? 'stretch' : 'center',
+            }}
+          >
             <TextInput
               placeholder="ENTER CODE"
               value={promoCode}
               disabled={!canPromo}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => setPromoCode(e.target.value.toUpperCase())}
+              onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                setPromoCode(e.target.value.toUpperCase())
+              }
               style={{ fontFamily: 'monospace', letterSpacing: 1, width: '100%' }}
             />
-            <Button variant="primary" disabled={!canPromo || !promoCode.trim()} loading={busy === 'promo'} onClick={handlePromo}>
+            <Button
+              variant="primary"
+              disabled={!canPromo || !promoCode.trim()}
+              loading={busy === 'promo'}
+              onClick={handlePromo}
+            >
               Apply
             </Button>
           </div>
@@ -3461,7 +4433,13 @@ function BillingBundle({
 // ---------------------------------------------------------------------------
 
 function ExpertProfileCard({
-  user, userId, highlight, supabase, pushToast, onSaved, markDirty,
+  user,
+  userId,
+  highlight,
+  supabase,
+  pushToast,
+  onSaved,
+  markDirty,
 }: {
   user: UserRow | null;
   userId: string;
@@ -3472,8 +4450,8 @@ function ExpertProfileCard({
   markDirty: (d: boolean) => void;
 }): ReactElement {
   const [title, setTitle] = useState('');
-  const [org, setOrg]     = useState('');
-  const [bio, setBio]     = useState('');
+  const [org, setOrg] = useState('');
+  const [bio, setBio] = useState('');
   const [application, setApplication] = useState<ExpertApplicationRow | null>(null);
   const [saving, setSaving] = useState(false);
   const snapshot = useRef('');
@@ -3483,7 +4461,11 @@ function ExpertProfileCard({
     setTitle(user.expert_title || '');
     setOrg(user.expert_organization || '');
     setBio(user.bio || '');
-    snapshot.current = JSON.stringify({ title: user.expert_title || '', org: user.expert_organization || '', bio: user.bio || '' });
+    snapshot.current = JSON.stringify({
+      title: user.expert_title || '',
+      org: user.expert_organization || '',
+      bio: user.bio || '',
+    });
   }, [user]);
 
   useEffect(() => {
@@ -3498,12 +4480,16 @@ function ExpertProfileCard({
         .maybeSingle();
       if (alive) setApplication((data as ExpertApplicationRow | null) || null);
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [supabase, userId]);
 
   const currentKey = JSON.stringify({ title, org, bio });
   const dirty = currentKey !== snapshot.current;
-  useEffect(() => { markDirty(dirty); }, [dirty, markDirty]);
+  useEffect(() => {
+    markDirty(dirty);
+  }, [dirty, markDirty]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -3515,14 +4501,19 @@ function ExpertProfileCard({
       },
     });
     setSaving(false);
-    if (error) { pushToast({ message: error.message, variant: 'danger' }); return; }
+    if (error) {
+      pushToast({ message: error.message, variant: 'danger' });
+      return;
+    }
     pushToast({ message: 'Expert profile saved.', variant: 'success' });
     markDirty(false);
     await onSaved();
   };
 
   const credList = Array.isArray(application?.credentials)
-    ? (application?.credentials as { text?: string }[]).map((c) => (typeof c === 'string' ? c : c?.text || '')).filter(Boolean)
+    ? (application?.credentials as { text?: string }[])
+        .map((c) => (typeof c === 'string' ? c : c?.text || ''))
+        .filter(Boolean)
     : [];
 
   // C1: only users with an APPROVED expert_applications row get the edit
@@ -3533,8 +4524,12 @@ function ExpertProfileCard({
 
   if (!isApproved) {
     return (
-      <Card id="expert-profile" title="Expertise & credentials" highlight={highlight}
-        description="Experts answer reader questions in their approved categories.">
+      <Card
+        id="expert-profile"
+        title="Expertise & credentials"
+        highlight={highlight}
+        description="Experts answer reader questions in their approved categories."
+      >
         <EmptyState
           size="md"
           title="Apply to become an expert"
@@ -3543,7 +4538,12 @@ function ExpertProfileCard({
             // Q8: `/signup/expert` now detects authed sessions and skips
             // the create-account step, so signed-in free users land
             // straight on the credentials form with email pre-filled.
-            <Button variant="primary" onClick={() => { window.location.href = '/signup/expert'; }}>
+            <Button
+              variant="primary"
+              onClick={() => {
+                window.location.href = '/signup/expert';
+              }}
+            >
               Start application
             </Button>
           }
@@ -3553,34 +4553,67 @@ function ExpertProfileCard({
   }
 
   return (
-    <Card id="expert-profile" title="Expertise & credentials" highlight={highlight}
-      description="Shown on your expert byline and in category answers.">
-      <div style={{ display: 'grid', gap: S[3], gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
+    <Card
+      id="expert-profile"
+      title="Expertise & credentials"
+      highlight={highlight}
+      description="Shown on your expert byline and in category answers."
+    >
+      <div
+        style={{
+          display: 'grid',
+          gap: S[3],
+          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+        }}
+      >
         <div>
           <FieldLabel>Expert title</FieldLabel>
-          <TextInput value={title} onChange={(e: ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)} />
+          <TextInput
+            value={title}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)}
+          />
         </div>
         <div>
           <FieldLabel>Organization</FieldLabel>
-          <TextInput value={org} onChange={(e: ChangeEvent<HTMLInputElement>) => setOrg(e.target.value)} />
+          <TextInput
+            value={org}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setOrg(e.target.value)}
+          />
         </div>
       </div>
       <div style={{ marginTop: S[3] }}>
         <FieldLabel>Bio</FieldLabel>
-        <Textarea value={bio} onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setBio(e.target.value)} rows={3} />
+        <Textarea
+          value={bio}
+          onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setBio(e.target.value)}
+          rows={3}
+        />
       </div>
       {credList.length > 0 && (
         <div style={{ marginTop: S[3] }}>
           <FieldLabel>Credentials (from application)</FieldLabel>
-          <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <ul
+            style={{
+              margin: 0,
+              padding: 0,
+              listStyle: 'none',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 4,
+            }}
+          >
             {credList.map((c, i) => (
-              <li key={i} style={{ fontSize: F.sm, color: C.text }}>- {c}</li>
+              <li key={i} style={{ fontSize: F.sm, color: C.text }}>
+                - {c}
+              </li>
             ))}
           </ul>
         </div>
       )}
       <div style={{ marginTop: S[3] }}>
-        <Button variant="primary" onClick={handleSave} loading={saving} disabled={!dirty}>Save changes</Button>
+        <Button variant="primary" onClick={handleSave} loading={saving} disabled={!dirty}>
+          Save changes
+        </Button>
       </div>
     </Card>
   );
@@ -3591,7 +4624,12 @@ function ExpertProfileCard({
 // ---------------------------------------------------------------------------
 
 function ExpertVacationCard({
-  user, userId, highlight, supabase, pushToast, onSaved,
+  user,
+  userId,
+  highlight,
+  supabase,
+  pushToast,
+  onSaved,
 }: {
   user: UserRow | null;
   userId: string;
@@ -3611,23 +4649,41 @@ function ExpertVacationCard({
     // M16: re-read metadata right before write to avoid clobbering
     // sibling sub-keys (feed, a11y, expertWatchlist).
     const { data: fresh } = await supabase
-      .from('users').select('metadata').eq('id', userId).maybeSingle();
-    const freshMeta = (fresh as { metadata?: Record<string, unknown> } | null)?.metadata as SettingsMeta | null;
+      .from('users')
+      .select('metadata')
+      .eq('id', userId)
+      .maybeSingle();
+    const freshMeta = (fresh as { metadata?: Record<string, unknown> } | null)
+      ?.metadata as SettingsMeta | null;
     const merged = { ...(freshMeta || {}), expertVacation: next };
     const { error } = await supabase.rpc('update_own_profile', { p_fields: { metadata: merged } });
     setBusy(false);
-    if (error) { pushToast({ message: error.message, variant: 'danger' }); return; }
-    pushToast({ message: next ? 'Vacation mode on. Ask-an-expert requests are paused.' : 'Vacation mode off.', variant: 'success' });
+    if (error) {
+      pushToast({ message: error.message, variant: 'danger' });
+      return;
+    }
+    pushToast({
+      message: next ? 'Vacation mode on. Ask-an-expert requests are paused.' : 'Vacation mode off.',
+      variant: 'success',
+    });
     await onSaved();
   };
 
   return (
-    <Card id="expert-vacation" title="Vacation mode" highlight={highlight}
-      description="Pause incoming Ask-an-expert requests without losing your badge.">
+    <Card
+      id="expert-vacation"
+      title="Vacation mode"
+      highlight={highlight}
+      description="Pause incoming Ask-an-expert requests without losing your badge."
+    >
       <Row last>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: F.base, fontWeight: 600 }}>{on ? 'On — questions paused' : 'Off — accepting questions'}</div>
-          <div style={{ fontSize: F.xs, color: C.dim }}>Your profile still shows the expert badge.</div>
+          <div style={{ fontSize: F.base, fontWeight: 600 }}>
+            {on ? 'On — questions paused' : 'Off — accepting questions'}
+          </div>
+          <div style={{ fontSize: F.xs, color: C.dim }}>
+            Your profile still shows the expert badge.
+          </div>
         </div>
         <Switch checked={on} disabled={busy} onChange={toggle} />
       </Row>
@@ -3640,7 +4696,10 @@ function ExpertVacationCard({
 // ---------------------------------------------------------------------------
 
 function ExpertWatchlistCard({
-  userId, highlight, supabase, pushToast,
+  userId,
+  highlight,
+  supabase,
+  pushToast,
 }: {
   userId: string;
   highlight: boolean;
@@ -3661,18 +4720,31 @@ function ExpertWatchlistCard({
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (!app) { setCats([]); setLoading(false); return; }
+    if (!app) {
+      setCats([]);
+      setLoading(false);
+      return;
+    }
     // 2) find its approved categories
     const { data: catRows } = await supabase
       .from('expert_application_categories')
       .select('category_id, categories:categories(id, name)')
       .eq('application_id', (app as { id: string }).id);
     // 3) find existing watchlist (stored in users.metadata.expertWatchlist)
-    const { data: user } = await supabase.from('users').select('metadata').eq('id', userId).maybeSingle();
+    const { data: user } = await supabase
+      .from('users')
+      .select('metadata')
+      .eq('id', userId)
+      .maybeSingle();
     const watched = new Set<string>(
-      ((user as { metadata?: { expertWatchlist?: string[] } } | null)?.metadata?.expertWatchlist) || [],
+      (user as { metadata?: { expertWatchlist?: string[] } } | null)?.metadata?.expertWatchlist ||
+        []
     );
-    const list = ((catRows as { category_id: string; categories: { id: string; name: string } | null }[] | null) || [])
+    const list = (
+      (catRows as
+        | { category_id: string; categories: { id: string; name: string } | null }[]
+        | null) || []
+    )
       .map((row) => row.categories)
       .filter((c): c is { id: string; name: string } => !!c)
       .map((c) => ({ id: c.id, name: c.name, watched: watched.has(c.id) }));
@@ -3680,14 +4752,20 @@ function ExpertWatchlistCard({
     setLoading(false);
   }, [supabase, userId]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const toggle = async (id: string) => {
     const prev = cats;
-    const nextCats = cats.map((c) => c.id === id ? { ...c, watched: !c.watched } : c);
+    const nextCats = cats.map((c) => (c.id === id ? { ...c, watched: !c.watched } : c));
     setCats(nextCats);
     const watched = nextCats.filter((c) => c.watched).map((c) => c.id);
-    const { data: u } = await supabase.from('users').select('metadata').eq('id', userId).maybeSingle();
+    const { data: u } = await supabase
+      .from('users')
+      .select('metadata')
+      .eq('id', userId)
+      .maybeSingle();
     const prevMeta = (u as { metadata?: Record<string, unknown> } | null)?.metadata || {};
     const merged = { ...prevMeta, expertWatchlist: watched };
     const { error } = await supabase.rpc('update_own_profile', { p_fields: { metadata: merged } });
@@ -3700,12 +4778,20 @@ function ExpertWatchlistCard({
   };
 
   return (
-    <Card id="expert-watchlist" title="Category watchlist" highlight={highlight}
-      description="Get notified when new questions land in your approved categories.">
+    <Card
+      id="expert-watchlist"
+      title="Category watchlist"
+      highlight={highlight}
+      description="Get notified when new questions land in your approved categories."
+    >
       {loading ? (
         <SkeletonBar width={200} />
       ) : cats.length === 0 ? (
-        <EmptyState size="sm" title="No approved categories" description="Your expert application hasn't been approved in any category yet." />
+        <EmptyState
+          size="sm"
+          title="No approved categories"
+          description="Your expert application hasn't been approved in any category yet."
+        />
       ) : (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: S[1] }}>
           {cats.map((c) => (
@@ -3714,13 +4800,18 @@ function ExpertWatchlistCard({
               type="button"
               onClick={() => toggle(c.id)}
               style={{
-                padding: `${S[1]}px ${S[3]}px`, borderRadius: 999,
+                padding: `${S[1]}px ${S[3]}px`,
+                borderRadius: 999,
                 border: `1px solid ${c.watched ? C.accent : C.border}`,
                 background: c.watched ? C.accent : C.bg,
                 color: c.watched ? '#fff' : C.text,
-                fontSize: F.sm, fontWeight: 500, cursor: 'pointer',
+                fontSize: F.sm,
+                fontWeight: 500,
+                cursor: 'pointer',
               }}
-            >{c.name}</button>
+            >
+              {c.name}
+            </button>
           ))}
         </div>
       )}
@@ -3733,7 +4824,12 @@ function ExpertWatchlistCard({
 // ---------------------------------------------------------------------------
 
 function DeleteAccountCard({
-  userId, highlight, supabase, pushToast, userRow, onChanged,
+  userId,
+  highlight,
+  supabase,
+  pushToast,
+  userRow,
+  onChanged,
 }: {
   userId: string;
   highlight: boolean;
@@ -3750,7 +4846,9 @@ function DeleteAccountCard({
   const [typed, setTyped] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const pending = userRow?.deletion_scheduled_for ? daysUntil(userRow.deletion_scheduled_for) : null;
+  const pending = userRow?.deletion_scheduled_for
+    ? daysUntil(userRow.deletion_scheduled_for)
+    : null;
 
   const startDelete = async () => {
     if (typed !== 'DELETE') return;
@@ -3761,11 +4859,17 @@ function DeleteAccountCard({
         const d = await res.json().catch(() => ({}));
         pushToast({ message: d?.error || 'Could not schedule deletion', variant: 'danger' });
       } else {
-        pushToast({ message: 'Account scheduled for deletion. 30-day grace period started.', variant: 'success' });
-        setOpen(false); setTyped('');
+        pushToast({
+          message: 'Account scheduled for deletion. 30-day grace period started.',
+          variant: 'success',
+        });
+        setOpen(false);
+        setTyped('');
         await onChanged();
       }
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   };
 
   const cancelDelete = async () => {
@@ -3779,26 +4883,47 @@ function DeleteAccountCard({
         pushToast({ message: 'Deletion cancelled.', variant: 'success' });
         await onChanged();
       }
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
-    <Card id="delete-account" title="Delete account" highlight={highlight} tone="danger"
-      description="Permanently delete your account and all data. 30-day grace period — sign in to cancel.">
+    <Card
+      id="delete-account"
+      title="Delete account"
+      highlight={highlight}
+      tone="danger"
+      description="Permanently delete your account and all data. 30-day grace period — sign in to cancel."
+    >
       {pending !== null ? (
         <Row last>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: F.base, fontWeight: 600, color: C.danger }}>Scheduled for deletion</div>
-            <div style={{ fontSize: F.xs, color: C.dim }}>{pending} day{pending === 1 ? '' : 's'} remaining. After that your data will be erased.</div>
+            <div style={{ fontSize: F.base, fontWeight: 600, color: C.danger }}>
+              Scheduled for deletion
+            </div>
+            <div style={{ fontSize: F.xs, color: C.dim }}>
+              {pending} day{pending === 1 ? '' : 's'} remaining. After that your data will be
+              erased.
+            </div>
           </div>
-          <Button variant="secondary" disabled={!canCancel} loading={busy} onClick={cancelDelete}
-            style={isMobile ? { width: '100%' } : undefined}>
+          <Button
+            variant="secondary"
+            disabled={!canCancel}
+            loading={busy}
+            onClick={cancelDelete}
+            style={isMobile ? { width: '100%' } : undefined}
+          >
             Cancel deletion
           </Button>
         </Row>
       ) : (
-        <Button variant="danger" disabled={!canDelete} onClick={() => setOpen(true)}
-          style={isMobile ? { width: '100%' } : undefined}>
+        <Button
+          variant="danger"
+          disabled={!canDelete}
+          onClick={() => setOpen(true)}
+          style={isMobile ? { width: '100%' } : undefined}
+        >
           Delete my account
         </Button>
       )}
@@ -3827,8 +4952,15 @@ function DeleteAccountCard({
         confirmLabel={typed === 'DELETE' ? 'Yes, delete my account' : 'Type DELETE to continue'}
         variant="danger"
         busy={busy}
-        onCancel={() => { if (!busy) { setOpen(false); setTyped(''); } }}
-        onConfirm={() => { if (typed === 'DELETE') void startDelete(); }}
+        onCancel={() => {
+          if (!busy) {
+            setOpen(false);
+            setTyped('');
+          }
+        }}
+        onConfirm={() => {
+          if (typed === 'DELETE') void startDelete();
+        }}
       />
     </Card>
   );
@@ -3841,10 +4973,20 @@ function DeleteAccountCard({
 function SignOutCard({ highlight }: { highlight: boolean }): ReactElement {
   const isMobile = useIsMobile();
   return (
-    <Card id="signout" title="Sign out" highlight={highlight} tone="danger"
-      description="Sign out of this device. You'll need to sign in again to access your account.">
-      <Button variant="danger" onClick={() => { window.location.href = '/logout'; }}
-        style={isMobile ? { width: '100%' } : undefined}>
+    <Card
+      id="signout"
+      title="Sign out"
+      highlight={highlight}
+      tone="danger"
+      description="Sign out of this device. You'll need to sign in again to access your account."
+    >
+      <Button
+        variant="danger"
+        onClick={() => {
+          window.location.href = '/logout';
+        }}
+        style={isMobile ? { width: '100%' } : undefined}
+      >
         Sign out
       </Button>
     </Card>
@@ -3856,7 +4998,9 @@ function SignOutCard({ highlight }: { highlight: boolean }): ReactElement {
 // ---------------------------------------------------------------------------
 
 function SignOutEverywhereCard({
-  highlight, supabase, pushToast,
+  highlight,
+  supabase,
+  pushToast,
 }: {
   highlight: boolean;
   supabase: DbClient;
@@ -3870,16 +5014,26 @@ function SignOutEverywhereCard({
   const signOut = async () => {
     setBusy(true);
     const { error } = await supabase.auth.signOut({ scope: 'others' });
-    setBusy(false); setOpen(false);
+    setBusy(false);
+    setOpen(false);
     if (error) pushToast({ message: error.message, variant: 'danger' });
     else pushToast({ message: 'Signed out of every other session.', variant: 'success' });
   };
 
   return (
-    <Card id="signout-everywhere" title="Sign out everywhere" highlight={highlight} tone="danger"
-      description="Invalidate every session except this one. Useful after a stolen device.">
-      <Button variant="danger" disabled={!canRevokeAll} onClick={() => setOpen(true)}
-        style={isMobile ? { width: '100%' } : undefined}>
+    <Card
+      id="signout-everywhere"
+      title="Sign out everywhere"
+      highlight={highlight}
+      tone="danger"
+      description="Invalidate every session except this one. Useful after a stolen device."
+    >
+      <Button
+        variant="danger"
+        disabled={!canRevokeAll}
+        onClick={() => setOpen(true)}
+        style={isMobile ? { width: '100%' } : undefined}
+      >
         Sign out of every other session
       </Button>
       <ConfirmDialog

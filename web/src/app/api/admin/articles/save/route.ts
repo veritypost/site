@@ -57,8 +57,11 @@ export async function POST(request: Request) {
   const permKey = isUpdate ? 'admin.articles.edit.any' : 'admin.articles.create';
 
   let actor;
-  try { actor = await requirePermission(permKey); }
-  catch (err) { return permissionError(err); }
+  try {
+    actor = await requirePermission(permKey);
+  } catch (err) {
+    return permissionError(err);
+  }
 
   const service = createServiceClient();
 
@@ -135,29 +138,33 @@ export async function POST(request: Request) {
 
   // Sources — replace all.
   await service.from('sources').delete().eq('article_id', articleId!);
-  const sourceRows = (body.sources || []).filter((s) => {
-    const publisher = (s as { publisher?: string }).publisher;
-    const url = (s as { url?: string }).url;
-    const title = (s as { title?: string }).title;
-    return publisher || url || title;
-  }).map((s, i) => ({
-    article_id: articleId!,
-    sort_order: (s as { sort_order?: number }).sort_order ?? i,
-    ...s,
-  }));
+  const sourceRows = (body.sources || [])
+    .filter((s) => {
+      const publisher = (s as { publisher?: string }).publisher;
+      const url = (s as { url?: string }).url;
+      const title = (s as { title?: string }).title;
+      return publisher || url || title;
+    })
+    .map((s, i) => ({
+      article_id: articleId!,
+      sort_order: (s as { sort_order?: number }).sort_order ?? i,
+      ...s,
+    }));
   if (sourceRows.length > 0) {
     await service.from('sources').insert(sourceRows);
   }
 
   // Quizzes — replace all.
   await service.from('quizzes').delete().eq('article_id', articleId!);
-  const quizRows = (body.quizzes || []).filter((q) => {
-    const qt = (q as { question_text?: string }).question_text;
-    return typeof qt === 'string' && qt.trim().length > 0;
-  }).map((q) => ({
-    article_id: articleId!,
-    ...q,
-  }));
+  const quizRows = (body.quizzes || [])
+    .filter((q) => {
+      const qt = (q as { question_text?: string }).question_text;
+      return typeof qt === 'string' && qt.trim().length > 0;
+    })
+    .map((q) => ({
+      article_id: articleId!,
+      ...q,
+    }));
   if (quizRows.length > 0) {
     // @ts-expect-error — bulk insert of flexible quiz rows; generated
     // types insist on full required fields per-row but runtime accepts.

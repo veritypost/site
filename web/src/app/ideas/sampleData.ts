@@ -8,8 +8,7 @@ export const SAMPLE = {
   byline: 'By Verity Editorial',
   readMinutes: 4,
   published: 'April 20, 2026',
-  lede:
-    'In a 5-4 decision issued Tuesday, the Court left in place the statutory framework that has governed federal wiretaps for two decades, declining to adopt the sweeping Fourth Amendment arguments raised by a coalition of civil-liberties groups.',
+  lede: 'In a 5-4 decision issued Tuesday, the Court left in place the statutory framework that has governed federal wiretaps for two decades, declining to adopt the sweeping Fourth Amendment arguments raised by a coalition of civil-liberties groups.',
   body: [
     'Writing for the majority, Chief Justice Roberts said the framework\u2019s "long-standing judicial and congressional oversight" continued to provide the constitutional balance the petitioners sought to overturn. The ruling does not modify the underlying statute; it affirms a lower-court interpretation that narrowed the circumstances under which evidence gathered under the framework can be challenged at trial.',
     'The decision turns on a narrow procedural question: whether defendants in federal criminal cases may seek pre-trial disclosure of the specific statutory authority cited by the government when applying for a wiretap. The majority answered no, holding that existing disclosure rules already satisfy due-process requirements.',
@@ -21,22 +20,19 @@ export const SAMPLE = {
       author: '@liz_22',
       verity: 148,
       when: '2h ago',
-      text:
-        'The framing here misses that Justice Kagan\u2019s dissent hinged on procedural scrutiny, not substantive Fourth Amendment doctrine. That matters for how the 2027 reauthorization fight plays out \u2014 Congress can\u2019t lean on the Court to do its oversight work anymore.',
+      text: 'The framing here misses that Justice Kagan\u2019s dissent hinged on procedural scrutiny, not substantive Fourth Amendment doctrine. That matters for how the 2027 reauthorization fight plays out \u2014 Congress can\u2019t lean on the Court to do its oversight work anymore.',
     },
     {
       author: '@m_jackson',
       verity: 87,
       when: '4h ago',
-      text:
-        'Worth reading the underlying Ninth Circuit opinion if you want to understand how narrow this actually is. The Court didn\u2019t reach the Fourth Amendment question at all.',
+      text: 'Worth reading the underlying Ninth Circuit opinion if you want to understand how narrow this actually is. The Court didn\u2019t reach the Fourth Amendment question at all.',
     },
     {
       author: '@quiet_reader',
       verity: 203,
       when: '5h ago',
-      text:
-        'One thing the majority did signal, almost in passing, is that it sees the sunset provision as doing constitutional work. That\u2019s a subtle but important reframe \u2014 the statute\u2019s expiration becomes part of the due-process calculus.',
+      text: 'One thing the majority did signal, almost in passing, is that it sees the sunset provision as doing constitutional work. That\u2019s a subtle but important reframe \u2014 the statute\u2019s expiration becomes part of the due-process calculus.',
     },
   ],
 };

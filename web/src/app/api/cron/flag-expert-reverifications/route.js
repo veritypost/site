@@ -15,10 +15,17 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 async function run(request) {
-  if (!verifyCronAuth(request).ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!verifyCronAuth(request).ok)
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   const service = createServiceClient();
-  const { data, error } = await service.rpc('flag_expert_reverifications_due', { p_warning_days: 30 });
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'cron.flag_expert_reverifications', fallbackStatus: 500 });
+  const { data, error } = await service.rpc('flag_expert_reverifications_due', {
+    p_warning_days: 30,
+  });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'cron.flag_expert_reverifications',
+      fallbackStatus: 500,
+    });
   return NextResponse.json({ flagged_count: data, ran_at: new Date().toISOString() });
 }
 

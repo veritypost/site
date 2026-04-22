@@ -52,10 +52,12 @@ export function withCronLog(name, handler) {
           duration_ms: durationMs,
           status_code: statusCode,
         },
-        processing_status: caught ? 'failed' : (statusCode >= 500 ? 'failed' : 'processed'),
+        processing_status: caught ? 'failed' : statusCode >= 500 ? 'failed' : 'processed',
         processing_error: caught
-          ? (caught.message || String(caught))
-          : (statusCode >= 500 ? `non-2xx status ${statusCode}` : null),
+          ? caught.message || String(caught)
+          : statusCode >= 500
+            ? `non-2xx status ${statusCode}`
+            : null,
         processing_duration_ms: durationMs,
         processed_at: new Date().toISOString(),
         signature_valid: true,
@@ -70,17 +72,16 @@ export function withCronLog(name, handler) {
       throw caught;
     }
     if (statusCode >= 500) {
-      await captureMessage(
-        `cron ${name} returned ${statusCode}`,
-        'error',
-        { cron: name, duration_ms: durationMs, status_code: statusCode }
-      );
+      await captureMessage(`cron ${name} returned ${statusCode}`, 'error', {
+        cron: name,
+        duration_ms: durationMs,
+        status_code: statusCode,
+      });
     } else if (durationMs > 30_000) {
-      await captureMessage(
-        `cron ${name} completed in ${durationMs}ms`,
-        'warning',
-        { cron: name, duration_ms: durationMs }
-      );
+      await captureMessage(`cron ${name} completed in ${durationMs}ms`, 'warning', {
+        cron: name,
+        duration_ms: durationMs,
+      });
     }
     return response;
   };

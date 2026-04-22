@@ -14,8 +14,9 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // own subscription.
 export async function POST(request) {
   let user;
-  try { user = await requirePermission('admin.billing.cancel'); }
-  catch (err) {
+  try {
+    user = await requirePermission('admin.billing.cancel');
+  } catch (err) {
     if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -43,6 +44,10 @@ export async function POST(request) {
     p_user_id: user_id,
     p_reason: reason || 'admin cancel',
   });
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'admin.billing.cancel', fallbackStatus: 400 });
+  if (error)
+    return safeErrorResponse(NextResponse, error, {
+      route: 'admin.billing.cancel',
+      fallbackStatus: 400,
+    });
   return NextResponse.json(data);
 }
