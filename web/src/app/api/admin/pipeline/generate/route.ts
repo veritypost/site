@@ -47,6 +47,7 @@ import {
 } from '@/lib/pipeline/errors';
 import { scrapeArticle } from '@/lib/pipeline/scrape-article';
 import { cleanText } from '@/lib/pipeline/clean-text';
+import { checkPlagiarism, rewriteForPlagiarism } from '@/lib/pipeline/plagiarism-check';
 import {
   EDITORIAL_GUIDE,
   CATEGORY_PROMPTS,
@@ -359,51 +360,6 @@ const QuizVerifySchema = z.object({
     )
     .default([]),
 });
-
-// ----------------------------------------------------------------------------
-// Plagiarism check — ported inline from snapshot plagiarismCheck.js
-// ----------------------------------------------------------------------------
-
-function getNgrams(text: string, n: number): Set<string> {
-  const words = text
-    .toLowerCase()
-    .replace(/[^\w\s]/g, '')
-    .split(/\s+/)
-    .filter(Boolean);
-  const ngrams = new Set<string>();
-  for (let i = 0; i <= words.length - n; i++) {
-    ngrams.add(words.slice(i, i + n).join(' '));
-  }
-  return ngrams;
-}
-
-function checkPlagiarism(
-  aiOutput: string,
-  sourceTexts: Array<{ outlet: string; text: string }>,
-  ngramSize: number,
-  flagPct: number
-): {
-  maxOverlap: number;
-  flagged: boolean;
-  results: Array<{ outlet: string; similarity: number }>;
-} {
-  if (!aiOutput || sourceTexts.length === 0) return { maxOverlap: 0, flagged: false, results: [] };
-  const outputNgrams = getNgrams(aiOutput, ngramSize);
-  if (outputNgrams.size === 0) return { maxOverlap: 0, flagged: false, results: [] };
-  const results: Array<{ outlet: string; similarity: number }> = [];
-  for (const src of sourceTexts) {
-    if (!src.text || src.text.length < 50) continue;
-    const srcNgrams = getNgrams(src.text, ngramSize);
-    let overlap = 0;
-    for (const g of outputNgrams) {
-      if (srcNgrams.has(g)) overlap++;
-    }
-    const similarity = Math.round((overlap / outputNgrams.size) * 100);
-    results.push({ outlet: src.outlet, similarity });
-  }
-  const maxOverlap = results.length > 0 ? Math.max(...results.map((r) => r.similarity)) : 0;
-  return { maxOverlap, flagged: maxOverlap > flagPct, results };
-}
 
 // ----------------------------------------------------------------------------
 // Source-article corpus assembly — F7-DECISIONS invariant #8 (prompt injection)
@@ -1126,8 +1082,11 @@ Return JSON:
     stepTimings[groundingStepName] = Date.now() - groundingStart;
 
     // ────────────────────────────────────────────────────────────────────────
-    // 9h. plagiarism_check — deterministic n-gram scan; flag but do not rewrite.
-    //     Rewrite loop deferred (TODO — tracked below).
+    // 9h. plagiarism_check — deterministic n-gram scan + Haiku rewrite loop.
+    //     If maxOverlap >= rewrite_pct, ask Haiku to rephrase, then re-check
+    //     once. Keep rewrite only when second pass's overlap is strictly lower.
+    //     Rewrite failures are non-fatal (snapshot parity); CostCapExceeded /
+    //     Aborted propagate via rewriteForPlagiarism's rethrow contract.
     // ────────────────────────────────────────────────────────────────────────
     const plagStart = Date.now();
     const plagStepName: Step = 'plagiarism_check';
@@ -1143,18 +1102,44 @@ Return JSON:
       settings.plagiarism_ngram_size,
       settings.plagiarism_flag_pct
     );
-    if (plagResult.flagged) {
+    let finalPlagOverlap = plagResult.maxOverlap;
+    if (plagResult.maxOverlap >= settings.plagiarism_rewrite_pct) {
+      const flaggedOutlets = plagResult.results
+        .filter((r) => r.similarity >= settings.plagiarism_rewrite_pct)
+        .map((r) => r.outlet);
+      const rewriteRes = await rewriteForPlagiarism({
+        body: finalBodyMarkdown,
+        sourceTexts: sourceTexts.map((s) => ({ outlet: s.outlet, text: s.text })),
+        flaggedOutlets,
+        model: HAIKU_MODEL,
+        pipeline_run_id: runId,
+        cluster_id,
+        signal: req.signal,
+      });
+      totalCostUsd += rewriteRes.cost_usd;
+      if (rewriteRes.rewritten) {
+        const secondCheck = checkPlagiarism(
+          rewriteRes.body,
+          sourceTexts.map((s) => ({ outlet: s.outlet, text: s.text })),
+          settings.plagiarism_ngram_size,
+          settings.plagiarism_flag_pct
+        );
+        if (secondCheck.maxOverlap < plagResult.maxOverlap) {
+          finalBodyMarkdown = rewriteRes.body;
+          finalPlagOverlap = secondCheck.maxOverlap;
+        }
+      }
+    }
+    if (finalPlagOverlap > settings.plagiarism_flag_pct) {
       pipelineLog.warn(`newsroom.generate.${plagStepName}`, {
         run_id: runId,
         cluster_id,
         audience,
         step: plagStepName,
-        max_overlap_pct: plagResult.maxOverlap,
+        first_pass_overlap_pct: plagResult.maxOverlap,
+        final_overlap_pct: finalPlagOverlap,
         flag_threshold_pct: settings.plagiarism_flag_pct,
       });
-      // TODO(F7-followup): LLM rewrite pass when maxOverlap > rewrite_pct.
-      // Snapshot L466-L485 has the shape; defer to a follow-up task to keep
-      // Task 10 surface tight. Filed tracker in final report.
     }
     stepTimings[plagStepName] = Date.now() - plagStart;
 
