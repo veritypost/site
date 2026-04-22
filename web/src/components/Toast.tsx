@@ -1,7 +1,7 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified shared_components 2026-04-18
 'use client';
-import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useCallback, useContext, useState, ReactNode } from 'react';
 
 type ToastTone = 'info' | 'success' | 'error';
 

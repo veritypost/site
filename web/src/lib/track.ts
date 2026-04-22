@@ -92,14 +92,14 @@ function getUtmParams(): Partial<TrackEvent> {
 // ---------- Buffer + flush ----------
 
 let buffer: TrackEvent[] = [];
-let flushTimer: ReturnType<typeof setInterval> | null = null;
+let _flushTimer: ReturnType<typeof setInterval> | null = null;
 let listenersInstalled = false;
 
 function installListeners(): void {
   if (listenersInstalled || typeof window === 'undefined') return;
   listenersInstalled = true;
 
-  flushTimer = setInterval(() => {
+  _flushTimer = setInterval(() => {
     void flush('interval');
   }, FLUSH_INTERVAL_MS);
 

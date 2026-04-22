@@ -10,7 +10,7 @@ import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { permissionError } from '@/lib/adminMutation';
-import * as Sentry from '@sentry/nextjs';
+import { captureWithRedact } from '@/lib/pipeline/redact';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -61,7 +61,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
   if (runErr) {
     console.error('[admin.pipeline.runs.detail]', runErr.message);
-    Sentry.captureException(runErr);
+    captureWithRedact(runErr);
     return NextResponse.json({ error: 'Could not load run' }, { status: 500 });
   }
   if (!run) {

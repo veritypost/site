@@ -23,7 +23,7 @@ import { requirePermission } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction } from '@/lib/adminMutation';
-import * as Sentry from '@sentry/nextjs';
+import { captureWithRedact } from '@/lib/pipeline/redact';
 import type { Database, Json } from '@/types/database';
 import { preCluster, getClusterOverlapPct, type ClusterInputArticle } from '@/lib/pipeline/cluster';
 import {
@@ -165,7 +165,7 @@ export async function POST() {
     .single();
   if (runErr || !runRow) {
     console.error('[newsroom.ingest.run] pipeline_runs insert failed:', runErr?.message);
-    Sentry.captureException(runErr ?? new Error('pipeline_runs insert returned no row'));
+    captureWithRedact(runErr ?? new Error('pipeline_runs insert returned no row'));
     return NextResponse.json({ error: 'Could not start ingest run' }, { status: 500 });
   }
   const runId = runRow.id as string;
@@ -479,7 +479,7 @@ export async function POST() {
         } catch (err) {
           const message = err instanceof Error ? err.message : 'unknown error';
           console.error('[newsroom.ingest.run] cluster persist failed:', message);
-          Sentry.captureException(err);
+          captureWithRedact(err);
           summary.clusterErrors.push({
             title: cluster.title || '(untitled)',
             error: message,
@@ -536,7 +536,7 @@ export async function POST() {
       .eq('id', runId);
     if (updateErr) {
       console.error('[newsroom.ingest.run] run update failed:', updateErr.message);
-      Sentry.captureException(updateErr);
+      captureWithRedact(updateErr);
     }
 
     // 12. Audit log — best-effort via SECDEF RPC on cookie-scoped client
@@ -574,7 +574,7 @@ export async function POST() {
     const completedAt = new Date();
     const durationMs = completedAt.getTime() - startedAtMs;
     console.error('[newsroom.ingest.run] run failed:', message);
-    Sentry.captureException(err);
+    captureWithRedact(err);
 
     await service
       .from('pipeline_runs')

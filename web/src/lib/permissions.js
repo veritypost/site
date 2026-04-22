@@ -33,7 +33,7 @@ import { SECTIONS, DENY_MODE, LOCK_REASON } from './permissionKeys';
 
 const sectionCache = new Map(); // section -> { rows, fetchedAt, version }
 let allPermsCache = null; // Map<permission_key, row> — null means "never loaded"
-let allPermsFetchedAt = 0;
+let _allPermsFetchedAt = 0;
 let allPermsInflight = null;
 let versionState = { user_version: 0, global_version: 0, checkedAt: 0 };
 let inflight = new Map(); // section -> Promise (dedupe concurrent fetches)
@@ -43,7 +43,7 @@ export function invalidate() {
   sectionCache.clear();
   inflight.clear();
   allPermsCache = null;
-  allPermsFetchedAt = 0;
+  _allPermsFetchedAt = 0;
   allPermsInflight = null;
   versionState = { user_version: 0, global_version: 0, checkedAt: 0 };
 }
@@ -72,7 +72,7 @@ export async function refreshIfStale() {
     // round-trip they didn't ask for; hasPermission readers will see the fresh
     // data once the fetch lands.
     allPermsCache = null;
-    allPermsFetchedAt = 0;
+    _allPermsFetchedAt = 0;
     allPermsInflight = null;
     refreshAllPermissions().catch(() => {});
   } else {
@@ -91,7 +91,7 @@ export async function refreshAllPermissions() {
       const userId = auth?.user?.id;
       if (!userId) {
         allPermsCache = new Map();
-        allPermsFetchedAt = Date.now();
+        _allPermsFetchedAt = Date.now();
         return allPermsCache;
       }
       const { data, error } = await supabase.rpc('compute_effective_perms', { p_user_id: userId });
@@ -107,7 +107,7 @@ export async function refreshAllPermissions() {
         }
       }
       allPermsCache = next;
-      allPermsFetchedAt = Date.now();
+      _allPermsFetchedAt = Date.now();
       return allPermsCache;
     } finally {
       allPermsInflight = null;

@@ -1,7 +1,7 @@
 // @admin-verified 2026-04-18
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useState } from 'react';
 import { ADMIN_C, F, S } from '../../lib/adminPalette';
 
 // Admin toast system. Separate from the user-facing toast at
