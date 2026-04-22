@@ -14,7 +14,8 @@
  *      finally normally handles this reset; this sweep catches the case
  *      where the lambda was killed before its finally ran.
  *
- *   3. Orphan locks: feed_clusters rows with locked_until < now() are
+ *   3. Orphan locks: feed_clusters rows where locked_at is older than
+ *      15 minutes (> the RPC's 10-minute TTL + 5-minute grace) are
  *      cleared (locked_by/locked_at/generation_state → NULL). Double-
  *      insurance against release_cluster_lock failures.
  *
@@ -95,14 +96,19 @@ async function run(request: Request) {
     }
   }
 
-  // 3. Orphan locks (migration 116 STAGED — columns may not exist yet)
+  // 3. Orphan locks. Migration 116 has no `locked_until` column; lock expiry
+  //    is computed from locked_at + TTL (default 600s in claim_cluster_lock
+  //    RPC). Cron sweeps locks older than 15 min — exceeds RPC's TTL so we
+  //    only catch truly stuck locks, not live ones mid-grace.
+  const lockThresholdIso = new Date(now.getTime() - 15 * 60 * 1000).toISOString();
   let orphanLocksCount = 0;
   let orphanLocksErrCode: string | null = null;
   try {
     const { data, error } = await service
       .from('feed_clusters')
       .update({ locked_by: null, locked_at: null, generation_state: null } as never)
-      .lt('locked_until', now.toISOString())
+      .not('locked_at', 'is', null)
+      .lt('locked_at', lockThresholdIso)
       .select('id');
     if (error) {
       console.error('[cron.pipeline-cleanup.orphan_locks]', error.message);

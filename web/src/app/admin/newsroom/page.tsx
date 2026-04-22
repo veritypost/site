@@ -47,9 +47,13 @@ type ClusterRow = Pick<
   Tables<'feed_clusters'>,
   'id' | 'title' | 'summary' | 'is_breaking' | 'created_at' | 'updated_at'
 >;
+// Migration 116 adds locked_by + locked_at (NOT locked_until — lock expiry is
+// computed inside the RPC via locked_at + TTL). For card UI we only need
+// locked_by to toggle the Locked badge + Unlock button. locked_at is rendered
+// as a tooltip so admin sees how long a lock has been held.
 type ClusterWithLock = ClusterRow & {
   locked_by?: string | null;
-  locked_until?: string | null;
+  locked_at?: string | null;
 };
 
 const PAGE_SIZE = 20;
@@ -148,25 +152,25 @@ function NewsroomAdminInner() {
       const ids = baseRows.map((r) => r.id);
       const lockMap: Record<
         string,
-        { locked_by: string | null; locked_until: string | null }
+        { locked_by: string | null; locked_at: string | null }
       > = {};
 
       if (ids.length > 0) {
         const lockRes = await supabase
           .from('feed_clusters')
-          .select('id, locked_by, locked_until')
+          .select('id, locked_by, locked_at')
           .in('id', ids);
         const { data: lockData, error: lockErr } = lockRes as unknown as {
           data: Array<{
             id: string;
             locked_by: string | null;
-            locked_until: string | null;
+            locked_at: string | null;
           }> | null;
           error: { code?: string; message?: string } | null;
         };
         if (!lockErr && lockData) {
           for (const l of lockData) {
-            lockMap[l.id] = { locked_by: l.locked_by, locked_until: l.locked_until };
+            lockMap[l.id] = { locked_by: l.locked_by, locked_at: l.locked_at };
           }
         }
         // If lockErr (e.g. column not found pre-migration 116), silently
@@ -350,8 +354,8 @@ function NewsroomAdminInner() {
                       {locked && (
                         <span
                           title={
-                            c.locked_until
-                              ? `Locked until ${new Date(c.locked_until).toLocaleString()}`
+                            c.locked_at
+                              ? `Locked ${relativeTime(c.locked_at)} (auto-expires after 10 min via RPC TTL)`
                               : 'Cluster is locked; another run is in progress.'
                           }
                         >

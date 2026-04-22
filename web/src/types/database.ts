@@ -4693,10 +4693,14 @@ export type Database = {
           category_id: string | null
           created_at: string
           expires_at: string | null
+          generation_state: string | null
           id: string
           is_active: boolean
           is_breaking: boolean
           keywords: string[] | null
+          last_generation_run_id: string | null
+          locked_at: string | null
+          locked_by: string | null
           primary_article_id: string | null
           similarity_threshold: number | null
           summary: string | null
@@ -4707,10 +4711,14 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           expires_at?: string | null
+          generation_state?: string | null
           id?: string
           is_active?: boolean
           is_breaking?: boolean
           keywords?: string[] | null
+          last_generation_run_id?: string | null
+          locked_at?: string | null
+          locked_by?: string | null
           primary_article_id?: string | null
           similarity_threshold?: number | null
           summary?: string | null
@@ -4721,10 +4729,14 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           expires_at?: string | null
+          generation_state?: string | null
           id?: string
           is_active?: boolean
           is_breaking?: boolean
           keywords?: string[] | null
+          last_generation_run_id?: string | null
+          locked_at?: string | null
+          locked_by?: string | null
           primary_article_id?: string | null
           similarity_threshold?: number | null
           summary?: string | null
@@ -4732,6 +4744,20 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "feed_clusters_last_gen_run_fkey"
+            columns: ["last_generation_run_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feed_clusters_locked_by_fkey"
+            columns: ["locked_by"]
+            isOneToOne: false
+            referencedRelation: "pipeline_runs"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "fk_feed_clusters_category_id"
             columns: ["category_id"]
@@ -5974,6 +6000,36 @@ export type Database = {
           },
         ]
       }
+      kids_waitlist: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          ip_prefix: string | null
+          source: string | null
+          unsubscribed_at: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          ip_prefix?: string | null
+          source?: string | null
+          unsubscribed_at?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          ip_prefix?: string | null
+          source?: string | null
+          unsubscribed_at?: string | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       media_assets: {
         Row: {
           alt_text: string | null
@@ -6656,6 +6712,7 @@ export type Database = {
           duration_ms: number | null
           error_message: string | null
           error_stack: string | null
+          error_type: string | null
           feed_id: string | null
           freeform_instructions: string | null
           id: string
@@ -6683,6 +6740,7 @@ export type Database = {
           duration_ms?: number | null
           error_message?: string | null
           error_stack?: string | null
+          error_type?: string | null
           feed_id?: string | null
           freeform_instructions?: string | null
           id?: string
@@ -6710,6 +6768,7 @@ export type Database = {
           duration_ms?: number | null
           error_message?: string | null
           error_stack?: string | null
+          error_type?: string | null
           feed_id?: string | null
           freeform_instructions?: string | null
           id?: string
@@ -10190,6 +10249,14 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      claim_cluster_lock: {
+        Args: { p_cluster_id: string; p_locked_by: string; p_ttl_sec?: number }
+        Returns: {
+          acquired: boolean
+          locked_at: string
+          locked_by: string
+        }[]
+      }
       claim_next_export_request: {
         Args: never
         Returns: {
@@ -10478,6 +10545,14 @@ export type Database = {
       }
       my_perms_version: { Args: never; Returns: Json }
       owns_kid_profile: { Args: { profile_id: string }; Returns: boolean }
+      persist_generated_article: {
+        Args: { p_payload: Json }
+        Returns: {
+          article_id: string
+          audience: string
+          slug: string
+        }[]
+      }
       pipeline_today_cost_usd: { Args: never; Returns: number }
       post_back_channel_message: {
         Args: {
@@ -10581,6 +10656,10 @@ export type Database = {
           p_reviewer_id: string
         }
         Returns: undefined
+      }
+      release_cluster_lock: {
+        Args: { p_cluster_id: string; p_locked_by: string }
+        Returns: boolean
       }
       rename_bookmark_collection: {
         Args: {
