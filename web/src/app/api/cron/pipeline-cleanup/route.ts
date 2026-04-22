@@ -58,7 +58,7 @@ async function run(request: Request) {
         error_message: 'Orphaned run — auto-cleanup',
         error_type: 'abort',
         // duration_ms intentionally NULL — per-row compute needs an RPC; acceptable.
-      } as never)
+      })
       .eq('status', 'running')
       .lt('started_at', thresholdIso)
       .select('id');

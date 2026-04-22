@@ -90,8 +90,8 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
         duration_ms: durationMs,
         error_message: ERROR_MSG,
         error_type: ERROR_TYPE,
-        output_summary: { cancelled_by_admin: true, error_type: ERROR_TYPE } as unknown as Json,
-      } as never)
+        output_summary: { cancelled_by_admin: true, error_type: ERROR_TYPE } as Json,
+      })
       .eq('id', params.id)
       .eq('status', 'running');
   } catch (markErr) {

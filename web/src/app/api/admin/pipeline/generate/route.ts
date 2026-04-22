@@ -1583,8 +1583,8 @@ Empty array if all correct.`;
               : null,
           error_message: finalErrorMessage,
           error_stack: finalErrorStack,
-          error_type: finalErrorType, // migration 120 STAGED — column exists post-apply
-        } as never)
+          error_type: finalErrorType,
+        })
         .eq('id', runId)
         .eq('status', 'running');
     } catch (updateErr) {
@@ -1659,10 +1659,6 @@ async function failRun(
 ): Promise<void> {
   try {
     const completedAt = new Date();
-    // error_type column added in migration 120 STAGED. Route dual-writes the
-    // real column AND the legacy output_summary stash for one cycle (backward
-    // compat for any in-flight consumers pre-apply). Follow-up removes the
-    // legacy stash + `as never` cast after owner runs types:gen post-apply.
     await service
       .from('pipeline_runs')
       .update({
@@ -1672,9 +1668,8 @@ async function failRun(
         total_cost_usd: totalCostUsd,
         items_failed: 1,
         error_message: errorMessage.slice(0, 2000),
-        error_type: errorType, // migration 120 STAGED — column exists post-apply
-        output_summary: { error_type: errorType } as unknown as Json, // one-cycle compat
-      } as never)
+        error_type: errorType,
+      })
       .eq('id', runId);
   } catch (err) {
     console.error('[newsroom.generate.failRun]', err);

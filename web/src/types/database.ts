@@ -6741,6 +6741,7 @@ export type Database = {
           duration_ms: number | null
           error_message: string | null
           error_stack: string | null
+          error_type: string | null
           feed_id: string | null
           freeform_instructions: string | null
           id: string
@@ -6768,6 +6769,7 @@ export type Database = {
           duration_ms?: number | null
           error_message?: string | null
           error_stack?: string | null
+          error_type?: string | null
           feed_id?: string | null
           freeform_instructions?: string | null
           id?: string
@@ -6795,6 +6797,7 @@ export type Database = {
           duration_ms?: number | null
           error_message?: string | null
           error_stack?: string | null
+          error_type?: string | null
           feed_id?: string | null
           freeform_instructions?: string | null
           id?: string
