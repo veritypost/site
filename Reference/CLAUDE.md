@@ -10,7 +10,7 @@ No recaps, no tutorials, no "here's what I found." Just be oriented and act.
 
 ## Be thorough
 
-This isn't a one-shot project. Things are drifted. Half-finished work hides. Every claim needs verification against actual code plus actual DB state. When you check something, check it. When you fix something, fix all of it — adjacent callers, tests, docs, the permissions xlsx if perm-related, the DONE.md entry, the task count. Don't cut corners. Don't assume. If you're not sure, read one more file.
+This isn't a one-shot project. Things are drifted. Half-finished work hides. Every claim needs verification against actual code plus actual DB state. When you check something, check it. When you fix something, fix all of it — adjacent callers, tests, docs, the permissions xlsx if perm-related, the FIX_SESSION_1.md SHIPPED block, the active-item count. Don't cut corners. Don't assume. If you're not sure, read one more file.
 
 Thorough over fast. Verified over clever. Complete over partial.
 
@@ -34,7 +34,7 @@ Launch-ready on all three surfaces: web, adult iOS, kids iOS. Every task, every 
 
 **Current Apple block**: the owner does not yet have an Apple Developer account. That gates *publishing* both iOS apps (App Store Connect products, APNs `.p8` auth key, Universal Links via `apple-app-site-association`, TestFlight). It does **not** gate development — xcodebuild works locally, both iOS apps must stay green, code + pair flow + IAP wiring stay production-ready so the moment the developer account is active, the only outstanding steps are the Apple Console ones.
 
-Treat every Apple-dependent task (TASKS.md T-033, T-034, T-035, T-036, T-037, T-038 and any new ones) as "ready to execute the hour the dev account lands" — specs are documented, code paths are complete, fallback URLs are wired. Don't block other work waiting for Apple; don't forget the Apple path is pending either.
+Treat every Apple-dependent item (the Apple-block entries in `Current Projects/FIX_SESSION_1.md` and any new ones) as "ready to execute the hour the dev account lands" — specs are documented, code paths are complete, fallback URLs are wired. Don't block other work waiting for Apple; don't forget the Apple path is pending either.
 
 Web launch has no equivalent block — it ships when the P0 list closes.
 
@@ -55,7 +55,7 @@ Know this. Work like this is the product, not a pile of routes.
 
 Three apps, one DB. All connected via Supabase (`fyiwulqphgmoqullmrfn`).
 
-- **Web — adult only.** Next.js 15 app router, TypeScript. Path: `web/`. Marketing, reader, comments, bookmarks, profile, settings, billing, all admin. Has no kid-facing UI.
+- **Web — adult only.** Next.js app router (version declared in `web/package.json`), TypeScript. Path: `web/`. Marketing, reader, comments, bookmarks, profile, settings, billing, all admin. Has no kid-facing UI.
 - **Adult iOS.** SwiftUI, iOS 17+. Path: `VerityPost/`. Reader, social, billing, parent-side kid management.
 - **Kids iOS.** SwiftUI, iOS 17+. Path: `VerityPostKids/`. Pair-code auth (custom-minted JWT, not GoTrue), kid-safe reader, quizzes, streaks, expert Q&A. COPPA-constrained.
 
@@ -68,20 +68,17 @@ Three apps, one DB. All connected via Supabase (`fyiwulqphgmoqullmrfn`).
 - `Reference/STATUS.md` — live state narrative: what exists, what's locked, what's shipped
 - `Current Projects/FIX_SESSION_1.md` — canonical audit tracker (absorbed the retired `TASKS.md` + `proposedideas/07-owner-next-actions.md`). Per-item `SHIPPED <date>` blocks replace the old `DONE.md` append-a-line workflow
 - `DONE.md` — retired; ship status is tracked inline in `Current Projects/FIX_SESSION_1.md` via per-item `SHIPPED <date>` blocks plus the Session folder's `COMPLETED_TASKS_<YYYY-MM-DD>.md`
-- Most recent session log: `Sessions/<MM-DD-YYYY>/Session <N>/SESSION_LOG_<YYYY-MM-DD>.md`. Sort `Sessions/` by mtime to find the latest (as of this writing, `Sessions/04-21-2026/Session 1/SESSION_LOG_2026-04-21.md`)
+- Most recent session log: `Sessions/<MM-DD-YYYY>/Session <N>/SESSION_LOG_<YYYY-MM-DD>.md`. Sort `Sessions/` by mtime to find the latest.
 
 ## The repo
 
 ```
 /
-├── STATUS.md             current state
-├── TASKS.md              active work, T-001…T-101
-├── DONE.md               shipped log, by area
-├── README.md             repo map
-├── CLAUDE.md             this file
+├── STATUS.md → Reference/STATUS.md  (symlink)
+├── CLAUDE.md → Reference/CLAUDE.md  (symlink; edit the target)
 ├── .git-blame-ignore-revs  autofix-sweep SHAs ignored in blame (FIX_SESSION_1 #20)
 │
-├── web/                  Next.js 15 app router — adult web + all API
+├── web/                  Next.js app router (see web/package.json) — adult web + all API
 │   ├── next.config.js    Sentry config (build fails without SENTRY_DSN in prod env)
 │   ├── .eslintrc.json    ESLint config — legacy format, forced by Next 14 autodiscover (#20)
 │   ├── .prettierrc.json  Prettier config — singleQuote, trailingComma es5, printWidth 100 (#20)
@@ -92,26 +89,26 @@ Three apps, one DB. All connected via Supabase (`fyiwulqphgmoqullmrfn`).
 │       ├── middleware.js         auth + CORS + CSP + /kids/* redirect + public-path gate
 │       ├── app/
 │       │   ├── layout.js         metadata, fonts, PermissionsProvider mount
-│       │   ├── page.tsx          home feed (FALLBACK_CATEGORIES hardcode still there — T-017)
+│       │   ├── page.tsx          home feed (FALLBACK_CATEGORIES hardcode still there — tracked in FIX_SESSION_1.md)
 │       │   ├── story/[slug]/     article reader, quiz-gated comments
 │       │   ├── profile/
 │       │   │   ├── settings/     the 3800-line settings page — giant, careful edits
 │       │   │   └── kids/         parent-side kid management
-│       │   ├── admin/            39 pages, @admin-verified LOCK — no edits without approval
+│       │   ├── admin/            @admin-verified LOCK — no edits without approval
 │       │   ├── login/ signup/ verify-email/ welcome/ forgot-password/ reset-password/
 │       │   ├── leaderboard/ bookmarks/ messages/ notifications/ search/
 │       │   ├── kids-app/         anon landing for /kids/* redirect
 │       │   └── api/              (see below)
 │       ├── lib/                  the machinery — where the patterns live
 │       ├── components/           shared React kit (LockModal, PermissionGate, Toast, DataTable, etc.)
-│       └── types/database.ts     generated Supabase types, 8900 lines
+│       └── types/database.ts     generated Supabase types (large; regenerated from schema)
 │
 ├── web/src/app/api/              route groups
 │   ├── auth/                     login, signup, callback, reset, verify, resolve-username, check-email
 │   ├── kids/                     pair, generate-pair-code, [id], verify-pin, reset-pin, set-pin, trial
 │   ├── admin/                    users, moderation, permissions, billing, stories, ingest, pipeline, …
 │   ├── stripe/                   checkout, webhook, portal
-│   ├── billing/                  cancel, change-plan, resubscribe (still DB-only, not Stripe-synced — T-060)
+│   ├── billing/                  cancel, change-plan, resubscribe (still DB-only, not Stripe-synced — tracked in FIX_SESSION_1.md)
 │   ├── comments/ follows/ bookmarks/ reports/ appeals/ messages/ conversations/ quiz/ recap/
 │   ├── family/ expert/ expert-sessions/ notifications/ push/
 │   ├── cron/                     send-emails, send-push, sweep-kid-trials, anonymize-users
@@ -127,7 +124,7 @@ Three apps, one DB. All connected via Supabase (`fyiwulqphgmoqullmrfn`).
 │       ├── HomeView/StoryDetailView/LoginView/SignupView/ForgotPasswordView.swift
 │       ├── ProfileView/ProfileSubViews/SettingsView.swift
 │       ├── FamilyViews.swift     kid management from parent
-│       ├── KidsAppLauncher.swift deep-links into VerityPostKids (fallback URL still TODO — T-037)
+│       ├── KidsAppLauncher.swift deep-links into VerityPostKids (fallback URL still TODO — Apple-block item in FIX_SESSION_1.md)
 │       ├── MessagesView/AlertsView/BookmarksView/LeaderboardView.swift
 │       ├── SubscriptionView/StoreManager.swift  StoreKit products
 │       ├── ExpertQueueView/RecapView.swift
@@ -140,7 +137,7 @@ Three apps, one DB. All connected via Supabase (`fyiwulqphgmoqullmrfn`).
 │   └── VerityPostKids/
 │       ├── VerityPostKidsApp.swift   entry
 │       ├── KidsAppRoot.swift         tab shell
-│       ├── KidsAppState.swift        in-memory state (dual-source risk w/ DB — T-044)
+│       ├── KidsAppState.swift        in-memory state (dual-source risk w/ DB — tracked in FIX_SESSION_1.md)
 │       ├── KidsAuth.swift            JWT session
 │       ├── PairCodeView.swift        code entry
 │       ├── PairingClient.swift       custom JWT pair (bypasses GoTrue)
@@ -153,14 +150,14 @@ Three apps, one DB. All connected via Supabase (`fyiwulqphgmoqullmrfn`).
 │       └── PrivacyInfo.xcprivacy
 │
 ├── schema/                       DB migrations, applied sequentially
-│   ├── 005_*.sql … 099_*.sql
-│   ├── 100_backfill_admin_rank_rpcs_*.sql   backfill of live RPCs, not a real migration (T-042)
+│   ├── NNN_*.sql             sequentially numbered, applied in order (see `ls schema/`)
+│   ├── 100_backfill_admin_rank_rpcs_*.sql   backfill of live RPCs, not a real migration (tracked in FIX_SESSION_1.md)
 │   └── reset_and_rebuild_v2.sql             DR rebuild from scratch
 │
 ├── scripts/
 │   └── import-permissions.js     rebuilds permission matrix from xlsx → Supabase
 │
-├── supabase/ test-data/ docs/ Archived/ 05-Working/
+├── Reference/ Current Projects/ Future Projects/ Unconfirmed Projects/ Completed Projects/ Sessions/ Archived/ supabase/ scripts/
 ```
 
 ## The machinery (stay fluent in these)
@@ -168,9 +165,9 @@ Three apps, one DB. All connected via Supabase (`fyiwulqphgmoqullmrfn`).
 - `web/src/lib/auth.js` — `requireAuth`, `requirePermission`, `requireVerifiedEmail`. Throws with `.status`. Caller's job to return the right status.
 - `web/src/lib/permissions.js` — `hasPermission`, `invalidate`, `refreshAllPermissions`. Dual cache (section + full) — stale-fallthrough is a known risk.
 - `web/src/lib/roles.js` — canonical `OWNER_ROLES`, `ADMIN_ROLES`, `EDITOR_ROLES`, `MOD_ROLES`, `EXPERT_ROLES`. Files that re-enumerate these are drift.
-- `web/src/lib/plans.js` — tier order, pricing, feature flags. Most of this should be DB-driven (T-016).
+- `web/src/lib/plans.js` — tier order, pricing, feature flags. Most of this should be DB-driven (tracked in FIX_SESSION_1.md).
 - `web/src/lib/rateLimit.js` — `checkRateLimit(svc, {key, max, windowSec})`. Fail-closed in prod, fail-open in dev.
-- `web/src/lib/supabase/{client,server}.js` — `createClient` (user JWT, RLS applies), `createServiceClient` (service role, bypasses RLS), `createClientFromToken` (bearer).
+- `web/src/lib/supabase/{client,server}.ts` — `createClient` (user JWT, RLS applies), `createServiceClient` (service role, bypasses RLS), `createClientFromToken` (bearer).
 - `web/src/lib/featureFlags.js` — `isV2Live`, `v2LiveGuard`. Fails closed now.
 - `web/src/middleware.js` — runs on every matched request. `auth.getUser()` only on protected + `/kids/*` paths.
 
@@ -196,7 +193,7 @@ Key RPCs: `require_outranks`, `caller_can_assign_role`, `compute_effective_perms
 
 ## DB is the default, always
 
-If a Supabase table has the data, code reads from it. Before you hardcode any config-looking value, query the DB first. This is the single most-violated rule in this codebase — a large fraction of outstanding tasks in TASKS.md boil down to "there's a hardcoded copy of data that already lives in a table."
+If a Supabase table has the data, code reads from it. Before you hardcode any config-looking value, query the DB first. This is the single most-violated rule in this codebase — a large fraction of outstanding items in `Current Projects/FIX_SESSION_1.md` boil down to "there's a hardcoded copy of data that already lives in a table."
 
 When you introduce a new config-like value, the default is a DB table + a 60s-cached helper — not a constant in a lib file.
 
@@ -209,7 +206,7 @@ When you introduce a new config-like value, the default is a DB table + a 60s-ca
 **The rule**: xlsx and DB must stay 1:1 at all times.
 
 - If you edit the xlsx → run `--apply` in the same session to land the change.
-- If you mutate a permission row directly in SQL (e.g. `UPDATE permissions SET requires_verified=true WHERE key='...'`) → update the xlsx the same session, or open a reconcile task in TASKS.md. Otherwise the next `--apply` will undo your edit.
+- If you mutate a permission row directly in SQL (e.g. `UPDATE permissions SET requires_verified=true WHERE key='...'`) → update the xlsx the same session, or open a reconcile item in `Current Projects/FIX_SESSION_1.md`. Otherwise the next `--apply` will undo your edit.
 - Before any perm-related work, verify the two are in sync. If they aren't, reconcile before making new changes.
 
 There's no second xlsx. `permissions_matrix.xlsx` was deleted 2026-04-20. `permissions.xlsx` is the only canonical source.
@@ -219,11 +216,11 @@ There's no second xlsx. `permissions_matrix.xlsx` was deleted 2026-04-20. `permi
 - File markers: `@migrated-to-permissions <date>` = file moved to new perms system. `@admin-verified <date>` = LOCKED, do not edit without approval.
 - Service client for mutations. User client for reads-under-RLS.
 - Generic error strings in API responses; real errors go to server logs + Sentry.
-- Commit style: `T-<id>: <short title>`. Every commit references a task.
+- Commit style: `<area>(#<item>): <short title>` (Conventional Commits with FIX_SESSION_1 item ID). Every commit references an item.
 
 ## Brand / UX rules
 
-- **No emojis in adult surfaces.** Ever. Adult web, adult iOS, admin pages, error messages, toasts, email bodies, commit messages for adult code, OG meta text — all plain text. Also no emojis in the dev docs (`STATUS.md`, `TASKS.md`, `DONE.md`, `CLAUDE.md`, session logs) — keep the voice consistent throughout. The **Kids iOS app** is the only surface where emojis are intentional (playful — children). If you see one leak into an adult surface, it's a defect — log it.
+- **No emojis in adult surfaces.** Ever. Adult web, adult iOS, admin pages, error messages, toasts, email bodies, commit messages for adult code, OG meta text — all plain text. Also no emojis in the dev docs (`Reference/STATUS.md`, `Current Projects/FIX_SESSION_1.md`, `Reference/CLAUDE.md`, session logs) — keep the voice consistent throughout. The **Kids iOS app** is the only surface where emojis are intentional (playful — children). If you see one leak into an adult surface, it's a defect — log it.
 - **Paid tier names are canonical**: `verity`, `verity_pro`, `verity_family`, `verity_family_xl`. Display labels map from DB — never ad-hoc short forms like "Pro+" in copy.
 - **Dates are ISO in code, human-readable in UI.** No inventing formats.
 
@@ -235,11 +232,11 @@ There's no second xlsx. `permissions_matrix.xlsx` was deleted 2026-04-20. `permi
 
 ## How work enters
 
-- Owner drops a bug in conversation ("got a 404 at X") → you ADD a task to TASKS.md with next free T-ID. No permission ask.
+- Owner drops a bug in conversation ("got a 404 at X") → you ADD an item to `Current Projects/FIX_SESSION_1.md` with the next free item number. No permission ask.
 - Owner names a task → classify risk, execute.
-- You find something while working → log it as a new task so it doesn't get lost.
+- You find something while working → log it as a new item so it doesn't get lost.
 
-Before claiming a new bug, grep `/DONE.md` by file:line. If it's logged, the fix shipped — surface the entry and move on. Only re-raise with evidence of regression.
+Before claiming a new bug, grep `Current Projects/FIX_SESSION_1.md` for `SHIPPED` blocks by file:line. If it's logged, the fix shipped — surface the entry and move on. Only re-raise with evidence of regression.
 
 ## Risk tiers
 
@@ -254,18 +251,17 @@ Don't over-ceremony the small stuff. Don't under-rigor the big stuff.
 
 When a fix ships:
 1. Typecheck green. Build green if iOS touched. DB verified if touched.
-2. Commit `T-<id>: <short title>`.
-3. REMOVE the task block from `TASKS.md` (no checkmarks).
-4. APPEND one line to `/DONE.md` in the matching area section.
-5. Update task counts at top of TASKS.md.
+2. Commit `<area>(#<item>): <short title>`.
+3. Add a `SHIPPED <YYYY-MM-DD>` block to the item in `Current Projects/FIX_SESSION_1.md` (date + commit SHA + files touched).
+4. Append a line to the current session folder's `COMPLETED_TASKS_<YYYY-MM-DD>.md`.
 
-Either it's in DONE.md or it's still open. No third state.
+Either it has a SHIPPED block or it's still open. No third state.
 
 ## What not to do
 
 - No recap back to the owner — they know the product, don't narrate it
-- No pre-planning work you won't ship this sprint — TASKS.md is live state
-- No re-flagging DONE.md items without proving regression
+- No pre-planning work you won't ship this sprint — `Current Projects/FIX_SESSION_1.md` is live state
+- No re-flagging SHIPPED items without proving regression
 - No committing without acceptance criteria met
 - No silent scope expansion — pause and name it if the task grew
 - No hardcoded values when a DB table already holds them
@@ -274,4 +270,4 @@ Either it's in DONE.md or it's still open. No third state.
 
 ## Start
 
-Stay current: read STATUS.md, top of TASKS.md, DONE.md headers, the `lib/` layer, `middleware.js`. Then say "Ready." Wait for direction.
+Stay current: read `Reference/STATUS.md`, top of `Current Projects/FIX_SESSION_1.md`, the `lib/` layer, `middleware.js`. Then say "Ready." Wait for direction.
