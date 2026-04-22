@@ -335,15 +335,23 @@ const QuizOptionSchema = z.object({
   text: z.string().min(1),
   is_correct: z.boolean().optional(),
 });
-const QuizQuestionSchema = z.object({
-  question_text: z.string().min(1),
-  options: z.array(QuizOptionSchema).min(2).max(6),
-  explanation: z.string().optional().nullable(),
-  correct_index: z.number().int().min(0).optional(),
-  correct_answer: z.number().int().min(0).optional(),
-  difficulty: z.string().optional().nullable(),
-  points: z.number().optional(),
-});
+const QuizQuestionSchema = z
+  .object({
+    question_text: z.string().min(1),
+    options: z.array(QuizOptionSchema).min(2).max(6),
+    explanation: z.string().optional().nullable(),
+    correct_index: z.number().int().min(0).optional(),
+    correct_answer: z.number().int().min(0).optional(),
+    difficulty: z.string().optional().nullable(),
+    points: z.number().optional(),
+  })
+  // Reject multi-correct questions. Zero is_correct flags is allowed (the
+  // normalizer falls back to correct_index / correct_answer); two or more
+  // is always an LLM bug and would silently ship a quiz with the wrong
+  // single-answer behavior.
+  .refine((q) => q.options.filter((o) => o.is_correct).length <= 1, {
+    message: 'Question must not have more than one is_correct=true option',
+  });
 const QuizSchema = z.union([
   z.array(QuizQuestionSchema),
   z.object({ questions: z.array(QuizQuestionSchema) }),
@@ -591,29 +599,40 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'No discovery items available in cluster' }, { status: 400 });
   }
 
-  // Audience peek: join feeds.audience to confirm all items match request audience
+  // Audience peek: join feeds.audience to confirm all items match request audience.
+  // Fail-closed: if no item resolves a feed_id, the audience cannot be verified —
+  // refuse rather than risk an adult-tagged cluster passing as audience='kid'.
   const feedIds = Array.from(new Set(items.map((i) => i.feed_id).filter((v): v is string => !!v)));
-  if (feedIds.length > 0) {
-    const { data: feedsData, error: feedsErr } = await service
-      .from('feeds')
-      .select('id, audience')
-      .in('id', feedIds);
-    if (feedsErr) {
-      await failRun(service, runId, startedAtMs, 'unknown', feedsErr.message, 0);
-      return NextResponse.json({ error: 'Feeds lookup failed' }, { status: 500 });
-    }
-    const mismatched = (feedsData ?? []).filter((f) => f.audience !== audience);
-    if (mismatched.length > 0) {
-      await failRun(
-        service,
-        runId,
-        startedAtMs,
-        'schema_validation',
-        'Cluster contains items from feeds with a different audience',
-        0
-      );
-      return NextResponse.json({ error: 'mixed_audience' }, { status: 422 });
-    }
+  if (feedIds.length === 0) {
+    await failRun(
+      service,
+      runId,
+      startedAtMs,
+      'schema_validation',
+      'Cluster items have no resolvable feed_id — audience cannot be verified',
+      0
+    );
+    return NextResponse.json({ error: 'audience_unverifiable' }, { status: 422 });
+  }
+  const { data: feedsData, error: feedsErr } = await service
+    .from('feeds')
+    .select('id, audience')
+    .in('id', feedIds);
+  if (feedsErr) {
+    await failRun(service, runId, startedAtMs, 'unknown', feedsErr.message, 0);
+    return NextResponse.json({ error: 'Feeds lookup failed' }, { status: 500 });
+  }
+  const mismatched = (feedsData ?? []).filter((f) => f.audience !== audience);
+  if (mismatched.length > 0) {
+    await failRun(
+      service,
+      runId,
+      startedAtMs,
+      'schema_validation',
+      'Cluster contains items from feeds with a different audience',
+      0
+    );
+    return NextResponse.json({ error: 'mixed_audience' }, { status: 422 });
   }
 
   // 8. Acquire cluster lock
@@ -1556,6 +1575,10 @@ Empty array if all correct.`;
       // final_error_type into output_summary for one cycle for backward compat
       // with any in-flight consumers. error_stack + error_message +
       // prompt_fingerprint are migration-114 columns.
+      // Status guard: only overwrite if no other code path (cancel route,
+      // cron orphan-cleanup) has already terminalized this row. Without the
+      // guard, a late-arriving lambda would stomp the cancel/abort state
+      // the admin or cron explicitly set.
       await service
         .from('pipeline_runs')
         .update({
@@ -1565,8 +1588,8 @@ Empty array if all correct.`;
           items_processed: items.length,
           items_created: finalStatus === 'completed' ? 1 : 0,
           items_failed: finalStatus === 'completed' ? 0 : 1,
-          step_timings_ms: stepTimings as unknown as Json,
-          output_summary: outputSummary as unknown as Json,
+          step_timings_ms: stepTimings as Json,
+          output_summary: outputSummary as Json,
           total_cost_usd: totalCostUsd,
           prompt_fingerprint:
             promptParts.length > 0
@@ -1580,7 +1603,8 @@ Empty array if all correct.`;
           error_stack: finalErrorStack,
           error_type: finalErrorType, // migration 120 STAGED — column exists post-apply
         } as never)
-        .eq('id', runId);
+        .eq('id', runId)
+        .eq('status', 'running');
     } catch (updateErr) {
       console.error('[newsroom.generate.finally.run-update]', updateErr);
     }
@@ -1675,18 +1699,15 @@ async function failRun(
   }
 }
 
+// Note: permission_denied / rate_limit / kill_switch return their HTTP
+// status directly before any pipeline_runs row is inserted, so they
+// never round-trip through this switch.
 function statusForError(errorType: string | null): number {
   switch (errorType) {
     case 'cost_cap_exceeded':
       return 402;
     case 'cluster_locked':
       return 409;
-    case 'permission_denied':
-      return 403;
-    case 'rate_limit':
-      return 429;
-    case 'kill_switch':
-      return 503;
     case 'abort':
       return 499;
     case 'scrape_empty':
@@ -1705,16 +1726,14 @@ function statusForError(errorType: string | null): number {
   }
 }
 
+// Same caveat as statusForError: rate_limit / kill_switch / permission_denied
+// never reach this switch — they short-circuit before failRun is called.
 function safeErrorMessage(errorType: string | null): string {
   switch (errorType) {
     case 'cost_cap_exceeded':
       return 'Pipeline cost cap exceeded';
     case 'cluster_locked':
       return 'Cluster currently generating';
-    case 'rate_limit':
-      return 'Too many requests';
-    case 'kill_switch':
-      return 'Generation disabled';
     case 'abort':
       return 'Request aborted';
     case 'scrape_empty':
