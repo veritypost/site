@@ -1,28 +1,128 @@
-// Phase 1 Task 2 STUB — Task 3 (F7 migration 114) replaces with full cap
-// enforcement + pipeline_costs aggregation.
-// TODO(F7-PIPELINE-COST-CAP): Task 3 re-writes this file with:
-//   - real checkCostCap reading settings.pipeline.daily_cost_usd_cap
-//     + settings.pipeline.per_run_cost_usd_cap
-//   - real getTodayCumulativeUsd summing pipeline_costs for today
-//   - soft-alert at 50% threshold (F7-DECISIONS-LOCKED.md §4)
-//
-// Until Task 3 lands, cost cap is UNENFORCED. Do not deploy Task 2 without
-// Task 3 also landing — cap invariant in F7-DECISIONS-LOCKED.md §3.2 invariant #3.
+/**
+ * Pipeline cost tracker — F7 Phase 1 Task 3 (replaces Task 2 stub).
+ *
+ * Two public entry points:
+ *   - estimateCostUsd — char/4 heuristic pre-call estimate (used by call-model
+ *     before it makes any SDK call).
+ *   - checkCostCap    — aggregates today's cumulative spend from
+ *     pipeline_costs via the pipeline_today_cost_usd() RPC, reads caps from
+ *     the `settings` table, and throws CostCapExceededError on breach. Also
+ *     enforces the per-run cap.
+ *
+ * FAILS CLOSED on any DB/RPC error: throws CostCapExceededError with
+ * cap_usd = -1 sentinel so upstream handlers can distinguish an infrastructure
+ * miss from a real cap breach. Never returns ok on failure — F7-DECISIONS
+ * invariant #3 (cost cap cannot be silently bypassed).
+ *
+ * Cap values are cached 60s to avoid hammering `settings` on every LLM call.
+ *
+ * CostCapExceededError is imported from ./errors (NOT ./call-model) to break
+ * the runtime circular import between this file and call-model.ts.
+ */
 
-import type { Provider } from './call-model';
+import { createServiceClient } from '@/lib/supabase/server';
+import { CostCapExceededError, type Provider } from './errors';
+
+// ----------------------------------------------------------------------------
+// Types
+// ----------------------------------------------------------------------------
 
 interface PricingRow {
   input_price_per_1m_tokens: number;
   output_price_per_1m_tokens: number;
 }
 
-/**
- * Char-heuristic token estimate + pricing lookup. Task 3 hooks this into
- * the real pipeline_costs aggregator.
- */
+interface Caps {
+  daily_usd: number;
+  per_run_usd: number;
+  soft_alert_pct: number;
+  expiresAt: number;
+}
+
+// ----------------------------------------------------------------------------
+// Caps cache (60s)
+// ----------------------------------------------------------------------------
+
+const CAPS_TTL_MS = 60_000;
+let _capsCache: Caps | null = null;
+
+async function getCaps(): Promise<Caps> {
+  const now = Date.now();
+  if (_capsCache && _capsCache.expiresAt > now) return _capsCache;
+
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from('settings')
+    .select('key, value, value_type')
+    .in('key', [
+      'pipeline.daily_cost_usd_cap',
+      'pipeline.per_run_cost_usd_cap',
+      'pipeline.daily_cost_soft_alert_pct',
+    ]);
+
+  if (error || !data) {
+    // fail closed — re-throw via checkCostCap
+    throw new Error(
+      `[cost-tracker:getCaps] settings fetch failed: ${error?.message ?? 'no data'}`
+    );
+  }
+
+  const byKey = new Map<string, { value: string; value_type: string }>();
+  for (const row of data) {
+    byKey.set(row.key as string, {
+      value: row.value as string,
+      value_type: row.value_type as string,
+    });
+  }
+
+  const parseNum = (key: string): number => {
+    const r = byKey.get(key);
+    if (!r) throw new Error(`[cost-tracker:getCaps] setting ${key} missing`);
+    const n = Number(r.value);
+    if (!Number.isFinite(n)) {
+      throw new Error(`[cost-tracker:getCaps] setting ${key} not a number: ${r.value}`);
+    }
+    return n;
+  };
+
+  const caps: Caps = {
+    daily_usd: parseNum('pipeline.daily_cost_usd_cap'),
+    per_run_usd: parseNum('pipeline.per_run_cost_usd_cap'),
+    soft_alert_pct: parseNum('pipeline.daily_cost_soft_alert_pct'),
+    expiresAt: now + CAPS_TTL_MS,
+  };
+  _capsCache = caps;
+  return caps;
+}
+
+// ----------------------------------------------------------------------------
+// Today cumulative spend — RPC pipeline_today_cost_usd()
+// ----------------------------------------------------------------------------
+
+export async function getTodayCumulativeUsd(): Promise<number> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase.rpc('pipeline_today_cost_usd');
+  if (error) {
+    throw new Error(
+      `[cost-tracker:getTodayCumulativeUsd] RPC failed: ${error.message}`
+    );
+  }
+  const n = Number(data);
+  if (!Number.isFinite(n)) {
+    throw new Error(
+      `[cost-tracker:getTodayCumulativeUsd] RPC returned non-numeric: ${String(data)}`
+    );
+  }
+  return n;
+}
+
+// ----------------------------------------------------------------------------
+// Pre-call char-heuristic estimate (unchanged from Task 2 stub)
+// ----------------------------------------------------------------------------
+
 export async function estimateCostUsd(
-  provider: Provider,
-  model: string,
+  _provider: Provider,
+  _model: string,
   system: string,
   prompt: string,
   max_tokens: number,
@@ -30,15 +130,74 @@ export async function estimateCostUsd(
 ): Promise<number> {
   const input_est = Math.ceil((system.length + prompt.length) / 4);
   const output_est = max_tokens;
-  return (input_est * pricing.input_price_per_1m_tokens + output_est * pricing.output_price_per_1m_tokens) / 1_000_000;
+  return (
+    (input_est * pricing.input_price_per_1m_tokens +
+      output_est * pricing.output_price_per_1m_tokens) /
+    1_000_000
+  );
 }
 
-/**
- * STUB: always returns ok. Task 3 replaces with real cap enforcement.
- */
+// ----------------------------------------------------------------------------
+// Cap enforcement — fail CLOSED on any DB/RPC error
+// ----------------------------------------------------------------------------
+
+const FAIL_CLOSED_SENTINEL = -1;
+
 export async function checkCostCap(estimated_cost_usd: number): Promise<void> {
-  if (process.env.NODE_ENV !== 'production') {
-    console.warn('[cost-tracker:stub] cap UNENFORCED — Task 3 (F7 migration 114) not yet landed. est=$', estimated_cost_usd.toFixed(6));
+  if (!Number.isFinite(estimated_cost_usd) || estimated_cost_usd < 0) {
+    throw new CostCapExceededError(
+      `[cost-tracker] invalid estimate: ${estimated_cost_usd}`,
+      estimated_cost_usd,
+      FAIL_CLOSED_SENTINEL
+    );
   }
-  // intentional no-op; Task 3 replaces
+
+  let caps: Caps;
+  let today_usd: number;
+  try {
+    [caps, today_usd] = await Promise.all([getCaps(), getTodayCumulativeUsd()]);
+  } catch (err) {
+    // Fail CLOSED — F7-DECISIONS invariant #3
+    console.error('[cost-tracker:checkCostCap] fail-closed', err);
+    throw new CostCapExceededError(
+      `[cost-tracker] cap check unavailable; failing closed`,
+      estimated_cost_usd,
+      FAIL_CLOSED_SENTINEL
+    );
+  }
+
+  if (estimated_cost_usd > caps.per_run_usd) {
+    throw new CostCapExceededError(
+      `[cost-tracker] per-run cap breached: est=$${estimated_cost_usd.toFixed(
+        6
+      )} > cap=$${caps.per_run_usd.toFixed(2)}`,
+      estimated_cost_usd,
+      caps.per_run_usd
+    );
+  }
+
+  const projected = today_usd + estimated_cost_usd;
+  if (projected > caps.daily_usd) {
+    throw new CostCapExceededError(
+      `[cost-tracker] daily cap breached: today=$${today_usd.toFixed(
+        6
+      )} + est=$${estimated_cost_usd.toFixed(6)} = $${projected.toFixed(
+        6
+      )} > cap=$${caps.daily_usd.toFixed(2)}`,
+      estimated_cost_usd,
+      caps.daily_usd
+    );
+  }
+
+  // Soft alert — non-blocking log only
+  const pct = (projected / caps.daily_usd) * 100;
+  if (pct >= caps.soft_alert_pct) {
+    console.warn('[cost-tracker:soft-alert] daily spend at', {
+      today_usd,
+      projected_usd: projected,
+      cap_usd: caps.daily_usd,
+      pct: Math.round(pct),
+      soft_alert_pct: caps.soft_alert_pct,
+    });
+  }
 }

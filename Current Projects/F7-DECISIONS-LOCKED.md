@@ -404,8 +404,40 @@ Full F7 PM §3a four-agent flow completed:
 
 Known pending (resolve in Task 3): 6 new tsc errors on `ai_models` table access — table doesn't exist in `types/database.ts` yet. Task 3 must run `npm run types:gen` after applying migration 114 to clear them. 2 ESLint warnings on unused `pricing` params fixed by `_pricing` rename post-verify.
 
-### Phase 1 Task 3 — cost-tracker.ts + migration 114 + ai_models catalog + settings seeds — PENDING
-Blocked on §3i owner "apply" for live DB writes. See execution plan for migration 114 scope (ai_models, kid_articles + kid_sources + kid_timelines + kid_quizzes, discovery_items + kid_discovery_items, ai_prompt_overrides, pipeline_runs schema additions, feeds.audience column, articles_block_kid_jwt RLS + kid-side mirrors, 17 settings rows, new rate_limits rows, kid_quizzes.retention_policy column, pipeline_costs cache/cluster/error columns + backfill from metadata JSONB).
+### Phase 1 Task 3 — cost-tracker.ts + migration 114 + ai_models catalog + settings seeds — SHIPPED 2026-04-22 (code + migration staged; apply pending)
+
+Files created/modified (staged, migration NOT yet applied per §3i):
+- NEW `schema/114_f7_foundation.sql` (651 lines, BEGIN/COMMIT wrapped) — creates 8 tables (ai_models, ai_prompt_overrides, kid_articles, kid_sources, kid_timelines, kid_quizzes, discovery_items, kid_discovery_items); ALTERs 5 existing (articles + 4 audit cols, pipeline_runs + 8 cols, pipeline_costs + 7 cols + 5 metadata→column backfills, feeds + audience 2-step NOT NULL/CHECK, categories + category_density); 21 RLS policies (4 RESTRICTIVE `*_block_kid_jwt` on adult articles/sources/timelines/quizzes; kid-table read + admin + block-adult triples; discovery + kid_discovery + ai_models + ai_prompt_overrides admin reads); seeds (settings 19 rows, ai_models 4 rows, rate_limits 2 rows); RPC `pipeline_today_cost_usd()` SECURITY DEFINER UTC-day; trigger function `tg_set_updated_at()` attached to 8 tables.
+- NEW `schema/115_rollback_f7_foundation.sql` (128 lines) — idempotent reverse, BEGIN/COMMIT, 38 IF EXISTS, explicit key-list deletes.
+- NEW `web/src/lib/pipeline/errors.ts` (58 lines) — 5 error classes lifted from call-model.ts + `Provider` type. Breaks runtime circular import.
+- MODIFIED `web/src/lib/pipeline/call-model.ts` (421 lines, down from 437) — removed 5 class defs; imports used classes from `./errors`; `export * from './errors'` for back-compat.
+- REWRITE `web/src/lib/pipeline/cost-tracker.ts` (203 lines) — replaces Task 2 stub. `getTodayCumulativeUsd()` calls `rpc('pipeline_today_cost_usd')`; `checkCostCap()` reads `pipeline.daily_cost_usd_cap` from settings (60s cached) + sums today; throws `CostCapExceededError` on breach; **fails CLOSED on DB error** (sentinel `cap_usd=-1` per F7 invariant #3).
+
+Full F7 PM §3a four-agent flow completed:
+- Agents 1+2 parallel investigators deeply verified live schema via SQL (subcategories non-existence, articles 64 cols + no RESTRICTIVE policy, pipeline_runs missing 8 F7 cols, settings text+value_type discriminator, `public.is_kid_delegated()` exists from schema/099)
+- Agent 3 serial reviewer resolved 14 open questions (subcategories FK, audit cols, category_density deferred seed, RPC vs direct SELECT, errors.ts refactor, fail-closed, per-run cap location, settings count=19, kid-RLS unrestricted, explicit DDL, seed prices, reading_level dropped, polymorphic FK option (c), manual SQL probes)
+- Agent 4 adversary caught 8 real correctness bugs (wrong cache col names, bare `is_kid_delegated()`, missing NOT NULL DEFAULT on pipeline_costs.audience, missing `tg_set_updated_at` trigger fn, missing BEGIN/COMMIT, bare Haiku name, missing UNIQUE on ai_prompt_overrides, wrong timezone `current_date` vs `now() AT TIME ZONE 'UTC'`)
+- Agent 5 Implementation absorbed all 8 fixes verbatim with 3 honest deviations (used only `admin.system.view` perm key since others don't exist; `compute_effective_perms` column is `permission_key` not `perm_key`; kid_articles needed ~60-col explicit mirror)
+- Post-impl VERIFY: SHIPPED (all 24 checks pass with line-number confirmation)
+- Post-impl REGRESSION: CLEAN (circular-import cleanly broken, 0 at-risk kid-JWT callers, no seed collisions, metadata keys match column names byte-for-byte)
+
+**Apply steps for owner (see `Sessions/04-22-2026/Session 1/SESSION_LOG_2026-04-22.md` for run-book):**
+1. Review `schema/114_f7_foundation.sql` locally.
+2. Paste into Supabase SQL editor for project `fyiwulqphgmoqullmrfn` → Run.
+3. Verify post-apply: `SELECT count(*) FROM ai_models` (expect 4), `SELECT count(*) FROM settings WHERE key LIKE 'pipeline.%' OR key LIKE 'ai.%'` (expect 19), `SELECT count(*) FROM rate_limits WHERE key LIKE 'newsroom_%'` (expect 2), `SELECT pipeline_today_cost_usd()` (expect 0).
+4. `cd web && npm run types:gen` → commits regenerated `src/types/database.ts`.
+5. `cd web && npx tsc --noEmit` → expect only the 2 pre-existing kids-waitlist baseline errors; 6 ai_models + 1 RPC errors gone.
+6. RLS probe via SQL editor: `SET request.jwt.claims TO '{"is_kid_delegated":true,"sub":"test"}'; SELECT count(*) FROM articles;` → expect 0.
+
+Current tsc: 9 errors (2 baseline + 6 ai_models pending-apply + 1 RPC-name pending-types-regen).
+
+Known adjacent concerns tracked but not blockers:
+- CLAUDE.md tree missing `web/src/lib/pipeline/` entry — doc-sync carryover from Tasks 1-3, address in next doc pass.
+- `compute_effective_perms` returns both granted=true and granted=false rows; RLS policies correctly filter.
+- `categories.category_density` column nullable with no seed — Phase 3 orchestrator must handle null with "default 5 events" fallback (documented in column COMMENT).
+
+### Phase 1 Task 4 — exit verification — PENDING (blocked on migration apply)
+Requires: migration 114 applied via Supabase SQL editor → `npm run types:gen` → full tsc clean → eslint clean → manual RLS probe (kid-JWT blocked on articles, adult-JWT allowed, service-role unaffected) → Phase 1 exit criteria checklist verified against F7-DECISIONS-LOCKED.md. Gate for Phase 2 kickoff.
 
 ### Phase 1 Task 3 — migration 114 + cost-tracker + settings seeds — PENDING
 Blocked on §3i owner "apply" for live DB writes.
