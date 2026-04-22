@@ -122,8 +122,21 @@ export async function POST(request: NextRequest) {
 
   // ON CONFLICT DO NOTHING on email — duplicates look identical to success,
   // preventing enumeration. `data` distinguishes new vs. existing for logs only.
-  const { data, error } = await service
-    .from('kids_waitlist')
+  // Table not in generated Database types until migration 112 applies + types:gen —
+  // cast matches the pattern used for post-generation RPCs in adminMutation.ts:38-43.
+  const { data, error } = await (
+    service.from as unknown as (rel: string) => {
+      upsert: (
+        values: Record<string, unknown>,
+        opts: { onConflict: string; ignoreDuplicates: boolean }
+      ) => {
+        select: (cols: string) => Promise<{
+          data: Array<{ id: string }> | null;
+          error: { message: string; code?: string } | null;
+        }>;
+      };
+    }
+  )('kids_waitlist')
     .upsert(
       { email, source, ip_prefix, user_agent: ua },
       { onConflict: 'email', ignoreDuplicates: true }
