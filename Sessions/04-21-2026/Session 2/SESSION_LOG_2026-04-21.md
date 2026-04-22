@@ -72,7 +72,7 @@ Chronological log of what happened in Session 2. Append only.
 - `Reference/STATUS.md` got new "Dev tooling" section.
 - `Reference/CLAUDE.md` repo tree updated (added `.git-blame-ignore-revs` at root, `web/.eslintrc.json`, `web/.prettierrc.json`, `web/.prettierignore`, `web/.husky/pre-commit` — note Husky lives at `web/.husky/`, NOT repo root).
 - This file plus `COMPLETED_TASKS_2026-04-21.md` and `FOLLOW_UPS_FROM_SHIP_2026-04-21.md` created.
-- Commit 4 (`SHA4`) lands docs + Session 2 artifacts + ignore-revs.
+- Commit 4 (`bfff379`) lands docs + Session 2 artifacts + ignore-revs.
 
 ### 2026-04-21 — final state
 - 4 commits ahead of `origin/main` (NOT pushed — PM directive).
