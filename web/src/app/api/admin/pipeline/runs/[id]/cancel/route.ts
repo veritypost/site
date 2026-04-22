@@ -8,10 +8,12 @@
  * polling between every callModel site in generate/route.ts (separate task).
  *
  * Race semantics: the UPDATE re-checks `status='running'` to avoid stomping
- * a finally block that beat us. If cancel fires first and generate's worker
- * later reaches its own finally, generate WILL overwrite (its finally is not
- * status-gated). This asymmetry is correct — generate's finally must complete
- * its bookkeeping (lock release, discovery reset, cost accounting) regardless.
+ * a finally block that beat us. Generate's main finally now carries the same
+ * `.eq('status','running')` guard (route.ts pipeline_runs UPDATE in finally
+ * block c), so the asymmetry from Task 18 is closed — whichever path
+ * terminalizes the row first wins, and the loser's UPDATE no-ops cleanly
+ * without stomping cancel/cron-orphan state. Lock release + discovery reset
+ * still run unconditionally because they are idempotent.
  *
  * Audit: pipeline_cancel action recorded against the run id; newValue carries
  * was_status + was_started_at for forensic context.
@@ -25,7 +27,7 @@ import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { permissionError, recordAdminAction } from '@/lib/adminMutation';
-import * as Sentry from '@sentry/nextjs';
+import { captureWithRedact } from '@/lib/pipeline/redact';
 import type { Json } from '@/types/database';
 
 export const runtime = 'nodejs';
@@ -59,7 +61,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
 
   if (fetchErr) {
     console.error('[admin.pipeline.runs.cancel.fetch]', fetchErr);
-    Sentry.captureException(fetchErr);
+    captureWithRedact(fetchErr);
     return NextResponse.json({ error: 'Could not load run' }, { status: 500 });
   }
 
@@ -90,13 +92,13 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
         duration_ms: durationMs,
         error_message: ERROR_MSG,
         error_type: ERROR_TYPE,
-        output_summary: { cancelled_by_admin: true, error_type: ERROR_TYPE } as Json,
+        output_summary: { cancelled_by_admin: true } as Json,
       })
       .eq('id', params.id)
       .eq('status', 'running');
   } catch (markErr) {
     console.error('[admin.pipeline.runs.cancel.mark]', markErr);
-    Sentry.captureException(markErr);
+    captureWithRedact(markErr);
     return NextResponse.json({ error: 'Cancel failed' }, { status: 500 });
   }
 

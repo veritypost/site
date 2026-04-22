@@ -20,7 +20,7 @@ import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { permissionError, recordAdminAction } from '@/lib/adminMutation';
-import * as Sentry from '@sentry/nextjs';
+import { captureWithRedact } from '@/lib/pipeline/redact';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -45,20 +45,20 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     return NextResponse.json({ error: 'Invalid run id' }, { status: 400 });
   }
 
-  // 3. Load the failed run. Select output_summary for legacy error_type extraction
-  // (migration 120 adds a first-class error_type column — STAGED pending owner apply).
+  // 3. Load the failed run. error_type is read from the dedicated column
+  // (migration 120 applied; the one-cycle output_summary stash was dropped).
   const service = createServiceClient();
   const { data: run, error: runErr } = await service
     .from('pipeline_runs')
     .select(
-      'id, status, pipeline_type, cluster_id, audience, provider, model, freeform_instructions, output_summary'
+      'id, status, pipeline_type, cluster_id, audience, provider, model, freeform_instructions, error_type'
     )
     .eq('id', params.id)
     .maybeSingle();
 
   if (runErr) {
     console.error('[admin.pipeline.runs.retry]', runErr.message);
-    Sentry.captureException(runErr);
+    captureWithRedact(runErr);
     return NextResponse.json({ error: 'Could not load run' }, { status: 500 });
   }
   if (!run) {
@@ -97,7 +97,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     });
   } catch (fetchErr) {
     console.error('[admin.pipeline.runs.retry.fetch]', fetchErr);
-    Sentry.captureException(fetchErr);
+    captureWithRedact(fetchErr);
     return NextResponse.json({ error: 'Retry dispatch failed' }, { status: 500 });
   }
 
@@ -110,13 +110,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   }
   const newRunId = typeof bodyJson.run_id === 'string' ? bodyJson.run_id : null;
 
-  // 6. Extract original failure reason for audit forensics. Until migration 120
-  // lands the first-class error_type column, read legacy stash from output_summary.
-  const outputSummary = (run.output_summary ?? {}) as Record<string, unknown>;
-  const originalErrorType =
-    (outputSummary.error_type as string | undefined) ??
-    (outputSummary.final_error_type as string | undefined) ??
-    null;
+  // 6. Extract original failure reason for audit forensics from the dedicated
+  // error_type column (migration 120). Legacy output_summary stash is gone.
+  const originalErrorType = run.error_type ?? null;
 
   // 7. Audit only when generate actually spawned a new run.
   if (response.ok && newRunId) {

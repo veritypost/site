@@ -54,6 +54,13 @@ export async function rewriteForPlagiarism(params: {
   pipeline_run_id: string;
   cluster_id: string | null;
   signal?: AbortSignal;
+  /**
+   * Optional Layer 1 admin override appended to the rewrite system prompt.
+   * Caller passes `promptOverrides.get('plagiarism_check')` from the route's
+   * fetched override map. Empty/undefined leaves the base prompt unchanged.
+   * Wrapping format mirrors composeSystemPrompt() in lib/pipeline/prompt-overrides.
+   */
+  additionalInstructions?: string;
 }): Promise<{
   body: string;
   cost_usd: number;
@@ -63,7 +70,10 @@ export async function rewriteForPlagiarism(params: {
   const start = Date.now();
   const outletsList =
     params.flaggedOutlets.length > 0 ? params.flaggedOutlets.join(', ') : 'source articles';
-  const system = `You are rewriting a news article because it was TOO SIMILAR to source articles (${outletsList}). Every single sentence must be 100% original. Same facts, completely different words, sentence structure, and phrasing. Do not copy ANY phrase longer than 3 words from any source.`;
+  const baseSystem = `You are rewriting a news article because it was TOO SIMILAR to source articles (${outletsList}). Every single sentence must be 100% original. Same facts, completely different words, sentence structure, and phrasing. Do not copy ANY phrase longer than 3 words from any source.`;
+  const system = params.additionalInstructions
+    ? `${baseSystem.trimEnd()}\n\nADDITIONAL INSTRUCTIONS (admin-set):\n${params.additionalInstructions}`
+    : baseSystem;
   const prompt = `ORIGINAL ARTICLE (too similar to sources):\n${params.body}\n\nRewrite this article with completely original language. Same facts, different words entirely. Return ONLY the rewritten article text, no JSON, no markup.`;
 
   try {

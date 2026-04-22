@@ -37,6 +37,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction } from '@/lib/adminMutation';
 import * as Sentry from '@sentry/nextjs';
+import { captureWithRedact } from '@/lib/pipeline/redact';
 import { callModel } from '@/lib/pipeline/call-model';
 import {
   ModelNotSupportedError,
@@ -550,7 +551,7 @@ export async function POST(req: Request) {
       error_type: 'unknown',
       error_message: runErr?.message ?? 'pipeline_runs insert returned no row',
     });
-    Sentry.captureException(runErr ?? new Error('pipeline_runs insert failed'));
+    captureWithRedact(runErr ?? new Error('pipeline_runs insert failed'));
     return NextResponse.json({ error: 'Could not start generate run' }, { status: 500 });
   }
   const runId = runRow.id as string;
@@ -1143,6 +1144,7 @@ Return JSON:
         pipeline_run_id: runId,
         cluster_id,
         signal: req.signal,
+        additionalInstructions: promptOverrides.get('plagiarism_check'),
       });
       totalCostUsd += rewriteRes.cost_usd;
       if (rewriteRes.rewritten) {
@@ -1506,7 +1508,7 @@ Empty array if all correct.`;
       error_type: finalErrorType,
       error_message: finalErrorMessage,
     });
-    Sentry.captureException(err, {
+    captureWithRedact(err, {
       tags: {
         pipeline_type: 'generate',
         audience,
@@ -1551,12 +1553,11 @@ Empty array if all correct.`;
       const outputSummary: Record<string, unknown> = {
         article_id: articleId,
         slug,
-        final_error_type: finalErrorType, // one-cycle legacy stash — migration 120 promotes to real column
       };
-      // error_type is now a real column (migration 120 STAGED). We still write
-      // final_error_type into output_summary for one cycle for backward compat
-      // with any in-flight consumers. error_stack + error_message +
-      // prompt_fingerprint are migration-114 columns.
+      // error_type lives in the dedicated column (migration 120 applied).
+      // The one-cycle output_summary.final_error_type stash was dropped — no
+      // remaining consumers; retry route reads error_type column directly.
+      // error_stack + error_message + prompt_fingerprint are migration-114 columns.
       // Status guard: only overwrite if no other code path (cancel route,
       // cron orphan-cleanup) has already terminalized this row. Without the
       // guard, a late-arriving lambda would stomp the cancel/abort state
