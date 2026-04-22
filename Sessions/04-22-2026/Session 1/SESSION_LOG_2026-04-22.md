@@ -128,4 +128,23 @@ All four streams shipped in separate bundled commits this session.
 - `2d63621` — Phase 4 Task 21 cluster detail page (see above).
 
 ### Starting point for next session
-Read `Sessions/04-22-2026/Session 1/NEXT_SESSION_PROMPT.md` (refreshed 2026-04-22) — describes Phase 4 Tasks 22-30 scope + established 3-agent flow + known follow-ups (F2 plagiarism overrides, E2 redact.ts).
+Read `Sessions/04-22-2026/Session 1/NEXT_SESSION_PROMPT.md` (refreshed 2026-04-22) — F7 marked complete + 4 deferred follow-ups closed (F2, E2, P2-A, Task 16 stash) + smoke-test runbook at `F7_SMOKE_TEST_RUNBOOK.md`.
+
+### Phase 4 batch + final cleanup (after the original close)
+- 6 parallel agents shipped Tasks 22-29 (`b250695` modal, `1f19e42` article flow, `d366911` observability list, `a53a260` run detail, `16822db` cost tracker, `f5be651` settings UI).
+- Task 30 (manual ingest button) verified — Task 20 Refresh feeds already covers it.
+- `aa3d337` — fixed observability link drift + COMPLETED_TASKS / NEXT_SESSION_PROMPT sync.
+- `c786b66` — surfaced F7 pages in admin hub (was invisible navigation; admin index didn't link to any of the new pages).
+
+### Vercel deploy thrash
+- Multiple deploy attempts failed because the `*/5 * * * *` pipeline-cleanup cron requires Pro tier; project is on Hobby. Production had been frozen at commit `271e3d7` for hours.
+- `1cdbadd` — cron schedule downgraded to daily (`0 6 * * *`); unblocked all subsequent deploys.
+- GitHub-Vercel webhook also reconnected mid-session (auto-deploy had silently broken after consecutive failures).
+
+### Final follow-up cleanup
+- `6132de7` — closed F2 + P2-A + Task 16 stash.
+- `d49a5aa` — finished `captureWithRedact` wiring + 4 baseline lint warnings cleared.
+- `bb48426` — `web/.gitignore` for `.vercel/` local link metadata.
+
+### Final commit count
+Session ran from morning Phase 1 Task 1 (`df7b598`) through end-of-session post-deploy cleanup (`bb48426`) — ~50 commits including the 4 deploy nudges + the 7 F7 migrations applied + types regen rounds.

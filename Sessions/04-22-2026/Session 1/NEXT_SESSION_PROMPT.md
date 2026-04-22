@@ -69,10 +69,14 @@ Pipeline is fully reachable end-to-end through normal admin flow:
 
 ## KNOWN FOLLOW-UPS (open)
 
-- **F2 follow-up** — in `web/src/lib/pipeline/plagiarism-check.ts`, the rewrite LLM call doesn't yet receive Layer 1 prompt overrides. Minor; wire when touching the file for another reason.
-- **E2** — `web/src/lib/pipeline/redact.ts` (Phase 1 pre-flight item #6) not yet built. Wrap `Sentry.captureException` payloads with a PII scrubber. Add as a Phase 4 task.
-- **View/Generate nav targets** in Task 20 newsroom page point at `/admin/newsroom/clusters/:id` and `/admin/pipeline/runs/:id`. Both currently 404. Task 21 + Task 27 resolve them.
-- Untracked `Future Projects/verity-living-edition.html` in the working tree — unrelated to F7, not committed.
+- ~~**F2** — Layer 1 prompt overrides into plagiarism rewrite~~ — SHIPPED `6132de7`.
+- ~~**E2** — `web/src/lib/pipeline/redact.ts` PII scrubber~~ — SHIPPED `6132de7` + `d49a5aa` (helper built + wired into all 6 F7 routes).
+- ~~**Task 16 follow-up** — drop legacy `output_summary.error_type` stash~~ — SHIPPED `6132de7`.
+- ~~**P2-A** — generate finally status guard~~ — was already in place; only stale comment in cancel route updated (`6132de7`).
+- **Vercel Hobby tier** — `*/5 * * * *` cron downgraded to daily (`0 6 * * *`) in commit `1cdbadd` because Hobby tier rejects per-minute crons. When owner upgrades to Pro, restore the per-minute schedule with a one-line edit in `web/vercel.json`. Trade-off documented in `cron/pipeline-cleanup/route.ts` TSDoc.
+- **Snapshot timeline-as-content architecture NOT ported** — F7 builds flat articles per generate run; the snapshot's `timeline_entries`-as-primary-content + `add-to-timeline` mini-pipeline (story accumulates updates over time) was deliberately scoped out. If owner wants running stories, that's a Phase 5 architecture task. Surfaced 2026-04-22 from snapshot inspection.
+- **Legacy `/admin/pipeline/page.tsx`** is `@admin-verified` LOCKED and coexists with the new F7 surfaces. Future cleanup (delete + redirect to `/admin/newsroom`) requires owner approval per the lock.
+- Untracked `Future Projects/verity-living-edition.html` was added to `.gitignore` in commit `9aca4e6` — no longer noise.
 
 ---
 
@@ -91,10 +95,10 @@ Dead casts + types: after every migration apply, `cd web && npm run types:gen` a
 
 ## START
 
-F7 is complete. Next session is freeform — read the 7 docs above, say "Ready," wait for direction. Likely candidates for Phase 5+ work:
+F7 is complete. All known follow-ups closed. Next session is freeform — read the 7 docs above, say "Ready," wait for direction. Likely candidates:
 
-1. **Click-through audit** of all Phase 4 admin pages (owner-led; PM provides dev-server boot + diff context)
-2. **Build `web/src/lib/pipeline/redact.ts`** (E2 deferred from cleanup) — Sentry payload PII scrubber per F7-DECISIONS Phase 1 pre-flight item #6
-3. **Wire Layer 1 prompt overrides into plagiarism rewrite** (F2 deferred — `web/src/lib/pipeline/plagiarism-check.ts` rewrite call doesn't yet receive overrides; minor)
-4. **Phase 5 — content + reader UX** (F1/F2/F3/F4 from Future Projects — sources above headline, reading receipt, earned-chrome comments, quiet home feed)
-5. **Other launch-blocker items** in `Current Projects/FIX_SESSION_1.md`
+1. **Click-through smoke test** of all Phase 4 admin pages on the live deploy. Runbook at `Sessions/04-22-2026/Session 1/F7_SMOKE_TEST_RUNBOOK.md`. PM can boot a dev server + walk owner through the 9 pages.
+2. **Phase 5 — running stories architecture** (the timeline-as-content port from snapshot) — biggest open product question. F7 builds flat articles; snapshot's design accumulates a story over time via timeline entries with their own quizzes + comments. Substantial new work. Owner picks priority.
+3. **Phase 5 — reader UX cluster** (F1/F2/F3/F4 from Future Projects — sources above headline, reading receipt, earned-chrome comments, quiet home feed).
+4. **Pre-launch blockers** in `Current Projects/FIX_SESSION_1.md` — Apple Developer account (iOS), AdSense + ads.txt, Stripe live audit, Sentry activation, CSP enforce flip, HIBP, quiz content (10 questions per published article).
+5. **Vercel Pro upgrade** — restore per-minute cron schedule in `vercel.json` for prompt orphan recovery.
