@@ -103,8 +103,9 @@ All 10 Phase 3 tasks shipped:
 - Task 18 — `POST /api/admin/pipeline/runs/:id/cancel`
 - Task 19 — `GET /api/cron/pipeline-cleanup` orphan-sweep cron
 
-### Phase 4 start (Task 20)
-Task 20 shipped: `web/src/app/admin/newsroom/page.tsx` (474 lines). Cluster card grid, Generate adult / Generate kid / Unlock / View buttons, Refresh feeds + Pipeline runs nav, offset paginated. Phase 4 continues with Tasks 21+ (cluster detail, run detail UI) in a future session.
+### Phase 4 Tasks 20 + 21
+- Task 20 shipped: `web/src/app/admin/newsroom/page.tsx` (474 lines). Cluster card grid, Generate adult / Generate kid / Unlock / View buttons, Refresh feeds + Pipeline runs nav, offset paginated.
+- Task 21 shipped: `web/src/app/admin/newsroom/clusters/[id]/page.tsx` (711 lines, SHA `2d63621`). Cluster detail page — header + discovery items grid + generation history list. Unblocks the View button on Task 20. Phase 4 continues with Tasks 22-30 (generation modal, article review/edit/publish, observability dashboards, settings UI) in a future session.
 
 ### Migrations applied + types regenerated this session
 All 5 staged F7 migrations applied to live `fyiwulqphgmoqullmrfn`: **112** (kids_waitlist), **116** (cluster locks + perms + RPCs), **118** (persist_generated_article RPC), **120** (pipeline_runs.error_type column), **124** (kids_summary drop / hygiene). Plus migration **122** (FK constraints) applied. `npm run types:gen` regenerated `web/src/types/database.ts` post-apply; the full owner apply queue is now empty.
@@ -119,3 +120,12 @@ End-of-session audit dispatched 5 audit agents + 4 independent verifiers + 2 pla
 - **DOC1-DOC6** — documentation drift sync (this stream — CLAUDE.md tree adds `pipeline/`, STATUS.md TODO→FIX_SESSION_1, F7-DECISIONS-LOCKED phase rollups, this runbook step-vocab + changelog, this session log catch-up, COMPLETED_TASKS staged-section update)
 
 All four streams shipped in separate bundled commits this session.
+
+### Post-stream cleanup + defaults (after all 4 streams + cross-verifier)
+- `82bbf19` — 5 deferred `as never` casts cleaned post migration 120 apply (generate route × 2, cancel, cron; also `src/types/database.ts` regen captured in same commit). Final `as never` count: 0 across all touched files.
+- `2a45c11` — Owner-decision defaults applied without blocking owner: E1 (F7-DECISIONS §8 quiz_verification reconciled to match code's throw-and-regenerate), E3 (FIX_SESSION_1 F7 entry gutted to stub-link F7-DECISIONS-LOCKED as canonical), E5 ratified Option A inline-in-ingest (already shipped 238045b), E6 retry internal-fetch kept. E2 redact.ts PII scrubber deferred as Phase 4 follow-up; E4 Vercel tier assumed Pro. Archived `NEXT_SESSION_PROMPT.md` to `_superseded/`, 7 FACTS sheets to `_facts-archive/`. Wrote fresh next-session prompt for Phase 4 Tasks 22-30.
+- `9aca4e6` — STATUS.md refresh (F7 pipeline rows added to platforms + key-machinery tables) + `.gitignore` entry for `Future Projects/*.html` scratch mockups.
+- `2d63621` — Phase 4 Task 21 cluster detail page (see above).
+
+### Starting point for next session
+Read `Sessions/04-22-2026/Session 1/NEXT_SESSION_PROMPT.md` (refreshed 2026-04-22) — describes Phase 4 Tasks 22-30 scope + established 3-agent flow + known follow-ups (F2 plagiarism overrides, E2 redact.ts).
