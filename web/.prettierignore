@@ -10,3 +10,9 @@ public
 # (admin `as any` cleanup) lands on un-formatted ground for clean git blame.
 # Remove this block after #16 ships, then run `npm run format` to back-fill.
 src/app/admin
+
+# PERMANENT: pipeline prompt content is verbatim-ported from the snapshot
+# (months of prompt engineering). Prettier must not reflow template-literal
+# whitespace, quote style, or special chars (═══, em dashes, curly quotes).
+# See F7-DECISIONS-LOCKED.md §3.4 Layer 0 "verbatim rule."
+src/lib/pipeline
