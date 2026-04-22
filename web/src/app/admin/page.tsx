@@ -24,8 +24,12 @@ type HubGroup = { group: string; desc: string; items: HubPage[] };
 const PAGES: HubGroup[] = [
   { group: 'Content Pipeline', desc: 'How articles get made — from RSS ingestion through AI generation to publish', items: [
     { href: '/admin/feeds', title: 'RSS Feeds', desc: 'Feed management, health monitoring, failure tracking, re-pull' },
-    { href: '/admin/ingest', title: 'Source Ingest', desc: 'RSS-clustered article drafts queued for editorial review' },
-    { href: '/admin/pipeline', title: 'AI Pipeline', desc: 'Article generation runs, prompts, and cost dashboard' },
+    { href: '/admin/newsroom', title: 'Newsroom', desc: 'F7: cluster grid home — Refresh feeds, Generate, Unlock, View per cluster' },
+    { href: '/admin/pipeline/runs', title: 'Pipeline Runs', desc: 'F7: observability — every generate/ingest run with filters, cost, duration' },
+    { href: '/admin/pipeline/costs', title: 'Pipeline Costs', desc: 'F7: today-vs-cap, per-model breakdown, 30-day chart, outliers' },
+    { href: '/admin/pipeline/settings', title: 'Pipeline Settings', desc: 'F7: kill switches, cost caps, cluster/story-match/plagiarism thresholds' },
+    { href: '/admin/ingest', title: 'Source Ingest (legacy)', desc: 'Older ingest shell — superseded by Newsroom for F7 runs' },
+    { href: '/admin/pipeline', title: 'AI Pipeline (legacy)', desc: 'Older pipeline shell — superseded by Pipeline Runs + Costs + Settings' },
     { href: '/admin/stories', title: 'Articles', desc: 'Browse all articles with status filters, categories, and source counts' },
     { href: '/admin/story-manager', title: 'Article Manager', desc: 'Full article editor — timeline, quizzes, sources, AI generation' },
     { href: '/admin/kids-story-manager', title: 'Kids Article Manager', desc: 'Kids-mode article editor — simplified content for younger audiences' },
