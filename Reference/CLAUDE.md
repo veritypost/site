@@ -79,9 +79,15 @@ Three apps, one DB. All connected via Supabase (`fyiwulqphgmoqullmrfn`).
 ├── DONE.md               shipped log, by area
 ├── README.md             repo map
 ├── CLAUDE.md             this file
+├── .git-blame-ignore-revs  autofix-sweep SHAs ignored in blame (FIX_SESSION_1 #20)
 │
 ├── web/                  Next.js 15 app router — adult web + all API
 │   ├── next.config.js    Sentry config (build fails without SENTRY_DSN in prod env)
+│   ├── .eslintrc.json    ESLint config — legacy format, forced by Next 14 autodiscover (#20)
+│   ├── .prettierrc.json  Prettier config — singleQuote, trailingComma es5, printWidth 100 (#20)
+│   ├── .prettierignore   excludes generated types + temporary src/app/admin/ until #16 ships (#20)
+│   ├── .husky/
+│   │   └── pre-commit    runs `cd web && npx lint-staged` (#20). Husky lives at web/.husky/, NOT repo root.
 │   └── src/
 │       ├── middleware.js         auth + CORS + CSP + /kids/* redirect + public-path gate
 │       ├── app/

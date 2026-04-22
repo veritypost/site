@@ -57,6 +57,10 @@ Three apps, one DB, shared Supabase.
 | `web/src/lib/cronAuth.js` | `verifyCronAuth` — `x-vercel-cron` header OR constant-time bearer |
 | `schema/reset_and_rebuild_v2.sql` | canonical DR replay (see `TODO.md` — drift known) |
 
+## Dev tooling
+
+- **Lint/format/hook:** ESLint 8 + Prettier 3 + Husky 9 (`web/.husky/`) — shipped 2026-04-21 (FIX_SESSION_1 #20). Configs: `web/.eslintrc.json` (legacy `.eslintrc.*` format, forced by Next 14 autodiscover), `web/.prettierrc.json`, `web/.prettierignore` (temporary `src/app/admin/` exclusion until #16). Scripts: `npm run lint`, `lint:fix`, `format`, `format:check`. Pre-commit runs `lint-staged`. `.git-blame-ignore-revs` at repo root for autofix-sweep commits.
+
 ## Canonical route shape
 
 Every mutation route:

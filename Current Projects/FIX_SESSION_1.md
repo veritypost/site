@@ -886,7 +886,7 @@ Fixes #4 + #12 + #13 + #14 + #20 in one pass.
 
 ---
 
-### 20. ESLint + Prettier + pre-commit hook
+### 20. ESLint + Prettier + pre-commit hook **[SHIPPED 2026-04-21]**
 **Problem:** Zero lint/format tooling — no `.eslintrc*`, `.prettierrc*`, `eslint.config.*`, `prettier.config.*` anywhere. Several classes of issues found in this audit would've been caught automatically (unused imports, inconsistent formatting, etc.).
 
 **Target:**
@@ -896,6 +896,51 @@ Fixes #4 + #12 + #13 + #14 + #20 in one pass.
 4. Add `package.json` scripts: `lint`, `format`, `lint:fix`
 
 **Effort:** ~1-2 hrs setup + fix whatever first-run surfaces.
+
+**SHIPPED 2026-04-21** (Session 2 — process: 4 pre-impl agents -> 13 fresh agents on 3 divergences (4 each) + 1 verifier on TS version -> implementation -> 2 post-impl):
+
+**Files added:**
+- `web/.eslintrc.json` (legacy `.eslintrc.*` format, see deviation note below)
+- `web/.prettierrc.json` (singleQuote, trailingComma es5, printWidth 100)
+- `web/.prettierignore` (excludes generated `src/types/database.ts`; temporary `src/app/admin` exclusion until #16 ships)
+- `web/.husky/pre-commit` (runs `cd web && npx lint-staged`)
+- `.git-blame-ignore-revs` at repo root (lists SHA3 autofix sweep)
+- `web/package.json` scripts: `lint`, `lint:fix`, `format`, `format:check`, `prepare`
+- `web/package.json` `lint-staged` block
+
+**Resolutions made (during pre-impl divergence sweep):**
+- Husky lives at `web/.husky/` (4/4 unanimous fresh agents) — repo root has no `package.json`, web is the only Node app
+- `@next/next/no-img-element` set to `warn` (3/1 fresh agents) — only 2 sites currently violate, both have follow-up tasks
+- Ship order #20 -> #16 -> #17, `src/app/admin/` excluded from autofix sweep (4/4 unanimous fresh agents) — keeps clean ground for #16's as-any cleanup
+- `@typescript-eslint/parser` v8 (not v7) for TS 6.0.3 compat (verifier finding — TS 6.0.3 is the actual installed version in `web/package.json:48`)
+- `.eslintrc.json` legacy forced by Next 14 (verified by adversary at `node_modules/next/dist/lib/eslint/runLintCheck.js:134-242` — Next 14's `next lint` only autodiscovers legacy `.eslintrc.*` configs, not flat `eslint.config.js`)
+- 23 launch-hide sites got inline `eslint-disable-next-line react-hooks/rules-of-hooks` rather than downgrading the rule (Option B, owner directive)
+
+**Lint baseline after ship:** 0 errors, 149 warnings.
+
+**Hard gates:**
+- `tsc --noEmit`: green
+- `next build`: green with env stubs (`.env.local` absent in dev — pre-existing dev-environment issue, not regression; verified by stash + rebuild without autofix shows identical failure)
+- pre-commit hook smoke-test: lint-staged fired correctly, prevented empty smoke commit
+
+**Spec deviations:**
+- Spec at line 893 said `eslint.config.js` (flat) — shipped legacy `.eslintrc.json` because Next 14's `next lint` only autodiscovers the legacy format
+
+**Dissent noted:** 1/4 fresh agents preferred `error + inline disables` for `no-img-element`; majority chose `warn` because the violations are queued for follow-up tasks (next/image migration gated on F5/F6 advertiser-host `remotePatterns` decision).
+
+**Commits:**
+- `761c049` — configs + tooling
+- `6b7868f` — 23 launch-hide rules-of-hooks disables across 3 files (recap, recap/[id], welcome) + 1 no-unused-expressions fix in admin/words (ternary-as-statement -> if/else)
+- `162ce6d` — autofix sweep (327 files, formatting only)
+- (commit 4 ships in same group as docs)
+
+**Follow-up tasks opened:**
+- Migrate `web/src/components/Ad.jsx:133` `<img>` -> `next/image` (gated on F5/F6 advertiser-host `remotePatterns` decision)
+- Migrate `web/src/app/card/[username]/page.js:110` `<img>` -> `next/image` AND `.js`->`.tsx` in same change
+- Audit 45 pre-existing `// eslint-disable*` directives
+- Hand-clean 149 residual lint warnings (unused vars, exhaustive-deps, unescaped entities)
+- After #16 ships: remove `src/app/admin` exclusion from `web/.prettierignore`, run `npm run format`, commit as small admin-only formatting pass
+- Refactor launch-hide pattern globally: move `if (LAUNCH_HIDE) return null;` to AFTER hook declarations across all 11 launch-hides catalogued in `Sessions/04-21-2026/Session 1/KILL_SWITCH_INVENTORY_2026-04-21.md`. When each site is fixed, the inline `eslint-disable` comment from this round comes off in the same diff.
 
 ---
 

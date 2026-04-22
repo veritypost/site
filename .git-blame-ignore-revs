@@ -1,0 +1,5 @@
+# Commits whose only purpose is mechanical formatting (Prettier/ESLint --fix sweeps).
+# Configure GitHub to honor this: Repo Settings -> "Ignore revisions in blame view by default" -> enable.
+# Local: git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+162ce6dcabe042ac8f2cd9b5ce0cfcf4e96d7105  # FIX_SESSION_1 #20 autofix sweep (2026-04-21)
