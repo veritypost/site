@@ -1124,41 +1124,15 @@ These are **feature-level work**, not fixes. Rolled up here for full-scope visib
 
 ---
 
-### F7. Pipeline restructure (`F7-pipeline-restructure.md`)
-**What:** Refactor AI article pipeline — rename `/admin/pipeline` → `/admin/newsroom` and `/admin/ingest` → `/admin/discover`; port JS snapshot prompts to TS; implement user-initiated Discover UI; add historical-context feature; kids content on same row with `is_kid` flags.
+### F7. Pipeline restructure
 
-**Verified 2026-04-21 (2 agents): LEGIT XL.**
+**STATUS (2026-04-22): IN ACTIVE EXECUTION. Phases 1+2+3 shipped (Tasks 1-19); Phase 4 Task 20 shipped. Tracker moved.**
 
-**Current state:**
-- `/admin/pipeline` + `/admin/ingest` exist as shells; `/admin/newsroom` + `/admin/discover` do NOT exist
-- `web/src/lib/pipeline/` directory does NOT exist
-- Zero `/api/newsroom/*` or `/api/discover/*` routes
-- All proposed schema columns missing: `discovery_items`, `discovery_groups`, `articles.historical_context`, `articles.kids_{headline,body,excerpt,slug,historical_context,reading_time_minutes}`, `quizzes.is_kid`, `timelines.is_kid / is_current`
-- Supporting infra already present in types.ts: `pipeline_runs`, `pipeline_costs`, `feed_clusters` tables; `settings` key-value table ready for `ai.enabled` + cost-cap
+Canonical live tracker: `Current Projects/F7-DECISIONS-LOCKED.md` (owner decisions locked + Phase progress in its SHIPPED-log section).
+Per-task SHAs + deviations: `Sessions/04-22-2026/Session 1/COMPLETED_TASKS_2026-04-22.md`.
+Master audit + cleanup plan: `Sessions/04-22-2026/Session 1/MASTER_CLEANUP_PLAN.md`.
 
-**JS snapshot** (ready for TS port): `/Users/veritypost/Desktop/verity-post-pipeline-snapshot/existingstorystructure/lib/editorial-guide.js` (53 KB, 1094 lines, contains 11 snapshot prompts). Plus `pipeline.js` utility algorithms.
-
-**Deliverables:**
-1. New migration `schema/NNN_pipeline_restructure.sql` (discovery tables + columns + flags)
-2. `web/src/lib/editorial/` prompt library + helpers (`call-model.ts`, `cost.ts`, `kill-switch.ts`, `plagiarism.ts`, `scrape.ts`)
-3. `/api/newsroom/*` endpoints (pipeline steps) + `/api/discover/*` (scan/group/dismiss) + cron endpoints
-4. `/admin/newsroom` + `/admin/discover` pages with Workbench panel
-5. Story Manager + Kids Story Manager form extensions
-6. Reader: historical-context disclosure in `web/src/app/story/[slug]/page.tsx`
-
-**Scope:** ~17 hrs focused (§11's 20-task build order).
-
-**Owner decisions (§12, all pending):**
-1. Confirm page renames
-2. Kids data model: single-row + `kids_*` columns + `is_kid` flags (recommended) vs. separate rows
-3. `/admin/stories` fate: delete or redirect
-4. Model provider v1: Anthropic-only (recommended) vs. multi-provider
-5. `feed_clusters`: stay (recommended) vs. retire
-6. Cron schedules: 15min ingest / 10min pipeline / 60min discovery-sweep
-7. Cost cap: $75/day default
-8. Workbench web-research tab: phase 2, not v1 (recommended)
-
-**Kids-iOS connection:** Kids iOS is live and validates the kids_* columns pattern — authors need one editorial flow that surfaces kid-appropriate content on the same row.
+**Previous "current state" / "deliverables" / "owner decisions" bullets retired** — all 8 Phase-0 decisions are locked in F7-DECISIONS-LOCKED.md (§Decision 1-8); `web/src/lib/pipeline/` directory exists with 13 files; all proposed schema columns exist; migrations 112/114/116/118/120/122/124 all applied live. Remaining work: Phase 4 Tasks 21-30 (admin UI surfaces). Do NOT maintain duplicate state in this entry.
 
 ---
 

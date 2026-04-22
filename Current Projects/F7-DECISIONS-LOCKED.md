@@ -345,7 +345,7 @@ The F7 build diverges from the snapshot in specific places. Flagging so no imple
    - `source_grounding` — NEW from audit; claim-to-source map; runs after core gen pass
    - `plagiarism_check` — non-LLM, 4-gram comparison
    - `quiz` — 5-question comprehension quiz
-   - `quiz_verification` — Haiku fact-check; patches wrong correct-indices
+   - `quiz_verification` — Haiku fact-check; on any mismatch the run fails and operator regenerates (spec reconciled 2026-04-22 to match `generate/route.ts:1338-1343` behavior — earlier "patches" wording was aspirational; implementation chose throw-and-regenerate for safety)
 
    **Editorial review is NOT a separate step** — snapshot's `REVIEW_PROMPT` is defined but never called by the orchestrator. Dropped from F7 (see Divergence D-editorial). Layer 0 baseline imports 9 of 10 exports accordingly.
 
