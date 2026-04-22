@@ -35,6 +35,10 @@
     {
       "path": "/api/cron/flag-expert-reverifications",
       "schedule": "30 4 * * 1"
+    },
+    {
+      "path": "/api/cron/pipeline-cleanup",
+      "schedule": "*/5 * * * *"
     }
   ]
 }
