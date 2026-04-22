@@ -48,6 +48,7 @@ import {
 import { scrapeArticle } from '@/lib/pipeline/scrape-article';
 import { cleanText } from '@/lib/pipeline/clean-text';
 import { checkPlagiarism, rewriteForPlagiarism } from '@/lib/pipeline/plagiarism-check';
+import { fetchPromptOverrides, composeSystemPrompt } from '@/lib/pipeline/prompt-overrides';
 import {
   EDITORIAL_GUIDE,
   CATEGORY_PROMPTS,
@@ -677,6 +678,22 @@ export async function POST(req: Request) {
   const settings = await getGenerateSettings(service);
 
   try {
+    // Layer 1 prompt overrides — fetched once per run before any LLM call.
+    // Fail-OPEN inside the helper; empty Map preserves pre-Task-15 behavior.
+    const promptOverrides = await fetchPromptOverrides(
+      service,
+      clusterRow.category_id ?? null,
+      null,
+      audience
+    );
+    pipelineLog.info('newsroom.generate.prompt_overrides', {
+      run_id: runId,
+      cluster_id,
+      audience,
+      override_count: promptOverrides.size,
+      override_steps: Array.from(promptOverrides.keys()),
+    });
+
     // ────────────────────────────────────────────────────────────────────────
     // 9a. audience_safety_check (kid only)
     // ────────────────────────────────────────────────────────────────────────
@@ -708,7 +725,7 @@ export async function POST(req: Request) {
       const result = await callModel({
         provider: 'anthropic',
         model: HAIKU_MODEL,
-        system: AUDIENCE_PROMPT,
+        system: composeSystemPrompt(AUDIENCE_PROMPT, promptOverrides.get('audience_safety_check')),
         prompt: userTurn,
         max_tokens: 400,
         pipeline_run_id: runId,
@@ -908,7 +925,7 @@ ${catListText}`;
       callModel({
         provider,
         model,
-        system: HEADLINE_PROMPT,
+        system: composeSystemPrompt(HEADLINE_PROMPT, promptOverrides.get('headline')),
         prompt: headlineUser,
         max_tokens: 600,
         pipeline_run_id: runId,
@@ -919,7 +936,7 @@ ${catListText}`;
       callModel({
         provider,
         model,
-        system: HEADLINE_PROMPT,
+        system: composeSystemPrompt(HEADLINE_PROMPT, promptOverrides.get('summary')),
         prompt: summaryUser,
         max_tokens: 400,
         pipeline_run_id: runId,
@@ -930,7 +947,7 @@ ${catListText}`;
       callModel({
         provider,
         model,
-        system: CATEGORIZATION_PROMPT,
+        system: composeSystemPrompt(CATEGORIZATION_PROMPT, promptOverrides.get('categorization')),
         prompt: categorizationUser,
         max_tokens: 200,
         pipeline_run_id: runId,
@@ -997,7 +1014,7 @@ ${corpus}`;
     const bodyRes = await callModel({
       provider,
       model,
-      system: bodySystem,
+      system: composeSystemPrompt(bodySystem, promptOverrides.get('body')),
       prompt: bodyUser,
       max_tokens: 3000,
       pipeline_run_id: runId,
@@ -1049,7 +1066,7 @@ Return JSON:
       const groundingRes = await callModel({
         provider: 'anthropic',
         model: HAIKU_MODEL,
-        system: groundingSystem,
+        system: composeSystemPrompt(groundingSystem, promptOverrides.get('source_grounding')),
         prompt: groundingUser,
         max_tokens: 1500,
         pipeline_run_id: runId,
@@ -1164,7 +1181,7 @@ Return JSON:
     const timelineRes = await callModel({
       provider,
       model,
-      system: timelineSystem,
+      system: composeSystemPrompt(timelineSystem, promptOverrides.get('timeline')),
       prompt: timelineUser,
       max_tokens: 2000,
       pipeline_run_id: runId,
@@ -1207,7 +1224,7 @@ Return JSON:
         const sanRes = await callModel({
           provider: 'anthropic',
           model: HAIKU_MODEL,
-          system: sanitizerSystem,
+          system: composeSystemPrompt(sanitizerSystem, promptOverrides.get('kid_url_sanitizer')),
           prompt: sanitizerUser,
           max_tokens: 3000,
           pipeline_run_id: runId,
@@ -1250,7 +1267,7 @@ Return JSON:
     const quizRes = await callModel({
       provider,
       model,
-      system: quizSystem,
+      system: composeSystemPrompt(quizSystem, promptOverrides.get('quiz')),
       prompt: quizUser,
       max_tokens: 2000,
       pipeline_run_id: runId,
@@ -1308,7 +1325,7 @@ Empty array if all correct.`;
     const verifyRes = await callModel({
       provider: 'anthropic',
       model: HAIKU_MODEL,
-      system: verifySystem,
+      system: composeSystemPrompt(verifySystem, promptOverrides.get('quiz_verification')),
       prompt: verifyUser,
       max_tokens: 1000,
       pipeline_run_id: runId,
