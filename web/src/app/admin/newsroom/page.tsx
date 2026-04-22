@@ -5,9 +5,10 @@
  *   - Breaking / Locked badges, title (fallback "Untitled cluster")
  *   - Summary (200-char truncate)
  *   - Relative time
- *   - Generate adult / Generate kid buttons (disabled if locked)
+ *   - Generate button — opens Task 22 GenerationModal (audience picker +
+ *     freeform instructions + live progress polling). Disabled if locked.
  *   - Unlock button (only if locked_by != null)
- *   - View link -> /admin/newsroom/clusters/:id (Task 21 — not yet built; renders 404)
+ *   - View link -> /admin/newsroom/clusters/:id (Task 21 detail page)
  *
  * Header:
  *   - Refresh feeds -> POST /api/newsroom/ingest/run
@@ -20,7 +21,11 @@
  *   - Migration 120 (pipeline_runs.error_type column) — STAGED. Generate
  *     POST errors on cleanup writes until applied + types regenerated.
  *   - Task 21: cluster detail page (View button 404s).
- *   - Task 22: generation modal (Generate buttons fire directly v1; Task 22 swaps for modal).
+ *   - Task 22: generation modal — LIVE. Per-card Generate button opens
+ *     GenerationModal with audience picker + freeform instructions +
+ *     live polling. Replaces the inline "Generate adult" / "Generate
+ *     kid" split. Completion redirects to Task 23 article review
+ *     (/admin/articles/:id/review — currently 404 scaffold).
  *   - Task 27: run detail page (success-navigate path lands on /admin/pipeline/runs/:id 404).
  *
  * Auth: client-side ADMIN_ROLES gate matching settings page.
@@ -40,6 +45,7 @@ import Button from '@/components/admin/Button';
 import Badge from '@/components/admin/Badge';
 import EmptyState from '@/components/admin/EmptyState';
 import Spinner from '@/components/admin/Spinner';
+import GenerationModal from '@/components/admin/GenerationModal';
 import { ToastProvider, useToast } from '@/components/admin/Toast';
 import { ADMIN_C, F, S } from '@/lib/adminPalette';
 import type { Tables } from '@/types/database-helpers';
@@ -101,6 +107,13 @@ function NewsroomAdminInner() {
   const [hasMore, setHasMore] = useState(false);
   const [busyId, setBusyId] = useState<string>('');
   const [busyRefresh, setBusyRefresh] = useState(false);
+
+  // Task 22: single Generate button per card opens this modal, which handles
+  // audience choice + freeform instructions + live progress. We track the
+  // target cluster here instead of inside GenerationModal so closing + reopening
+  // against a different cluster is a clean remount (modal resets state on
+  // `open` or `clusterId` change).
+  const [genTarget, setGenTarget] = useState<{ id: string; title: string } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -209,32 +222,12 @@ function NewsroomAdminInner() {
     }
   }
 
-  async function generate(cluster_id: string, audience: 'adult' | 'kid') {
-    const key = `${cluster_id}:${audience}`;
-    setBusyId(key);
-    try {
-      const res = await fetch('/api/admin/pipeline/generate', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cluster_id, audience }),
-      });
-      const json = (await res.json().catch(() => ({}))) as {
-        run_id?: string;
-        error?: string;
-      };
-      if (res.ok && json.run_id) {
-        toast.push({ message: 'Generation started.', variant: 'success' });
-        router.push(`/admin/pipeline/runs/${json.run_id}`);
-        return;
-      }
-      const runIdHint = json.run_id ? ` (run ${json.run_id.slice(0, 8)})` : '';
-      toast.push({
-        message: `Could not start generation${runIdHint}.`,
-        variant: 'danger',
-      });
-    } finally {
-      setBusyId('');
-    }
+  function openGenerate(cluster_id: string, cluster_title: string) {
+    setGenTarget({ id: cluster_id, title: cluster_title });
+  }
+
+  function closeGenerate() {
+    setGenTarget(null);
   }
 
   async function unlock(cluster_id: string) {
@@ -288,7 +281,7 @@ function NewsroomAdminInner() {
     <Page>
       <PageHeader
         title="Newsroom"
-        subtitle="Active clusters from ingest. Generate adult or kid coverage from any cluster."
+        subtitle="Active clusters from ingest. Open Generate to pick audience and kick off a run."
         actions={headerActions}
       />
 
@@ -314,8 +307,6 @@ function NewsroomAdminInner() {
             >
               {clusters.map((c) => {
                 const locked = !!c.locked_by;
-                const generateAdultKey = `${c.id}:adult`;
-                const generateKidKey = `${c.id}:kid`;
                 const unlockKey = `${c.id}:unlock`;
                 const title = (c.title && c.title.trim()) || 'Untitled cluster';
                 return (
@@ -399,26 +390,13 @@ function NewsroomAdminInner() {
                       <Button
                         variant="primary"
                         size="sm"
-                        loading={busyId === generateAdultKey}
                         disabled={locked || busyId !== ''}
-                        onClick={() => generate(c.id, 'adult')}
+                        onClick={() => openGenerate(c.id, title)}
                         title={
                           locked ? 'Cluster is locked; another run is in progress.' : undefined
                         }
                       >
-                        Generate adult
-                      </Button>
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        loading={busyId === generateKidKey}
-                        disabled={locked || busyId !== ''}
-                        onClick={() => generate(c.id, 'kid')}
-                        title={
-                          locked ? 'Cluster is locked; another run is in progress.' : undefined
-                        }
-                      >
-                        Generate kid
+                        Generate
                       </Button>
                       {locked && (
                         <Button
@@ -467,6 +445,19 @@ function NewsroomAdminInner() {
           </>
         )}
       </PageSection>
+
+      <GenerationModal
+        open={genTarget !== null}
+        clusterId={genTarget?.id ?? ''}
+        clusterTitle={genTarget?.title ?? null}
+        onClose={closeGenerate}
+        onRunSettled={() => {
+          // Refresh to pick up lock + generation_state changes. Completion
+          // navigates to the article review page so this mostly fires on
+          // failure/cancel.
+          void load(true);
+        }}
+      />
     </Page>
   );
 }

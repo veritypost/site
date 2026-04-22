@@ -12,13 +12,16 @@
  *     desc by started_at; status badge + audience + cost + relative
  *     time + link to /admin/pipeline/runs/:id (Task 27 — not yet built;
  *     renders 404, acceptable scaffold))
- *   - Header actions: Generate adult, Generate kid, Unlock (locked
- *     only), Back to newsroom
+ *   - Header actions: Generate (opens Task 22 GenerationModal with
+ *     audience picker + freeform instructions + live progress),
+ *     Unlock (locked only), Back to newsroom
  *
  * Audience inference: feed_clusters has no audience column. We count
  * items per side (adult vs kid discovery tables) to label the cluster
- * audience-of-record. Both Generate buttons remain enabled regardless
- * — the API will reject if a side has no items.
+ * audience-of-record. The Generate modal lets the admin pick either
+ * audience regardless — the API rejects if the chosen side has no items
+ * (audience_unverifiable / mixed_audience / no-items guards at
+ * generate/route.ts L599-635).
  *
  * Data load: Promise.all over five parallel queries (cluster, category,
  * adult items, kid items, runs). Bad UUIDs and missing rows render an
@@ -30,8 +33,8 @@
  *     permissions) — LIVE.
  *   - Migration 120 (pipeline_runs.error_type column) — LIVE per
  *     information_schema verification 2026-04-22.
- *   - Task 22: generation modal (Generate buttons fire directly; Task
- *     22 swaps for confirm-modal + freeform instructions).
+ *   - Task 22: generation modal — LIVE. Header Generate opens
+ *     GenerationModal with audience + freeform instructions + polling.
  *   - Task 27: run detail page (history rows nav to
  *     /admin/pipeline/runs/:id which currently 404s).
  *   - Stretch: per-item delete-from-cluster button — deferred to a
@@ -54,6 +57,7 @@ import Button from '@/components/admin/Button';
 import Badge from '@/components/admin/Badge';
 import EmptyState from '@/components/admin/EmptyState';
 import Spinner from '@/components/admin/Spinner';
+import GenerationModal from '@/components/admin/GenerationModal';
 import { ToastProvider, useToast } from '@/components/admin/Toast';
 import { ADMIN_C, F, S } from '@/lib/adminPalette';
 import type { Tables } from '@/types/database-helpers';
@@ -178,6 +182,10 @@ function ClusterDetailInner() {
   const [items, setItems] = useState<ItemWithSource[]>([]);
   const [runs, setRuns] = useState<RunRow[]>([]);
   const [busy, setBusy] = useState<string>('');
+  // Task 22: one Generate button in the header opens GenerationModal. Kept
+  // as a boolean here (not an id) because the cluster is already known from
+  // the route.
+  const [generateOpen, setGenerateOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -284,33 +292,13 @@ function ClusterDetailInner() {
     setNotFound(false);
   }
 
-  async function generate(audience: 'adult' | 'kid') {
+  function openGenerate() {
     if (!cluster) return;
-    const key = `gen:${audience}`;
-    setBusy(key);
-    try {
-      const res = await fetch('/api/admin/pipeline/generate', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cluster_id: cluster.id, audience }),
-      });
-      const json = (await res.json().catch(() => ({}))) as {
-        run_id?: string;
-        error?: string;
-      };
-      if (res.ok && json.run_id) {
-        toast.push({ message: 'Generation started.', variant: 'success' });
-        router.push(`/admin/pipeline/runs/${json.run_id}`);
-        return;
-      }
-      const runIdHint = json.run_id ? ` (run ${json.run_id.slice(0, 8)})` : '';
-      toast.push({
-        message: `Could not start generation${runIdHint}.`,
-        variant: 'danger',
-      });
-    } finally {
-      setBusy('');
-    }
+    setGenerateOpen(true);
+  }
+
+  function closeGenerate() {
+    setGenerateOpen(false);
   }
 
   async function unlock() {
@@ -386,22 +374,11 @@ function ClusterDetailInner() {
       <Button
         variant="primary"
         size="md"
-        loading={busy === 'gen:adult'}
         disabled={locked || busy !== ''}
-        onClick={() => generate('adult')}
+        onClick={openGenerate}
         title={locked ? 'Cluster is locked; another run is in progress.' : undefined}
       >
-        Generate adult
-      </Button>
-      <Button
-        variant="primary"
-        size="md"
-        loading={busy === 'gen:kid'}
-        disabled={locked || busy !== ''}
-        onClick={() => generate('kid')}
-        title={locked ? 'Cluster is locked; another run is in progress.' : undefined}
-      >
-        Generate kid
+        Generate
       </Button>
       {locked && (
         <Button
@@ -706,6 +683,19 @@ function ClusterDetailInner() {
           </div>
         )}
       </PageSection>
+
+      <GenerationModal
+        open={generateOpen}
+        clusterId={cluster.id}
+        clusterTitle={title}
+        onClose={closeGenerate}
+        onRunSettled={() => {
+          // Refresh cluster + runs so the new run appears in history and
+          // lock badge updates. Completion navigates to article review so
+          // this mostly fires on failure/cancel.
+          void load();
+        }}
+      />
     </Page>
   );
 }
