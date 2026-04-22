@@ -74,8 +74,14 @@ Chronological log of what happened in Session 2. Append only.
 - This file plus `COMPLETED_TASKS_2026-04-21.md` and `FOLLOW_UPS_FROM_SHIP_2026-04-21.md` created.
 - Commit 4 (`bfff379`) lands docs + Session 2 artifacts + ignore-revs.
 
+### 2026-04-21 — Commit 5 (SHA substitution doc fix)
+- After Commit 4 landed, noticed Session 2 artifacts referenced `<SHA4>` placeholder instead of the real `bfff379` hash.
+- Commit 5 (`2902626`) substituted the real SHA into Session 2 artifacts (2-line doc-only fix).
+
 ### 2026-04-21 — final state
-- 4 commits ahead of `origin/main` (NOT pushed — PM directive).
-- Lint baseline: 0 errors, 149 warnings (warnings handled separately).
+- **5 commits** ahead of `origin/main` (NOT pushed — PM directive). SHAs: `761c049`, `6b7868f`, `162ce6d`, `bfff379`, `2902626`.
+- Lint baseline: 0 errors, 149 warnings (warnings handled separately, see FOLLOW_UPS_FROM_SHIP).
 - tsc green, next build green (with env stubs), pre-commit hook proven.
 - Working tree clean (only `Future Projects/` untracked, pre-existing).
+- **Husky bootstrap quirk for new clones:** anyone cloning the repo will need to either run `cd web && npm install` (which fires `prepare` to set `core.hooksPath` via Husky v9 side-effect) OR manually run `git config core.hooksPath web/.husky` once. `core.hooksPath` is local git config, not committed. Worth a README note in a future task.
+- **Build env vars:** `npm run build` requires Supabase env vars (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`) at prerender time. Pre-existing dev-environment quirk, not a regression from #20. Vercel has these set in Production.

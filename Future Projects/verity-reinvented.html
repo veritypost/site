@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verity</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+:root{
+  --serif:'Playfair Display',Georgia,serif;
+  --sans:'Inter',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);color:#111;background:#fff;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+
+/* ============================================================
+   ACT 1 — THE BILLBOARD
+   The entire first screen is ONE headline. Nothing else.
+   This is the editorial statement: one story matters today.
+   ============================================================ */
+.billboard{
+  min-height:100vh;
+  display:flex;flex-direction:column;justify-content:flex-end;
+  padding:0 clamp(24px,4vw,64px) clamp(40px,6vh,80px);
+  position:relative;
+}
+.bill-mast{
+  position:absolute;top:0;left:0;right:0;
+  padding:24px clamp(24px,4vw,64px);
+  display:flex;align-items:baseline;justify-content:space-between;
+}
+.bill-mast .wm{font-family:var(--serif);font-size:28px;font-weight:900;letter-spacing:-1px}
+.bill-mast .dt{font-size:12px;color:#888;font-weight:500}
+.bill-mast .pip{
+  display:inline-block;width:6px;height:6px;border-radius:50%;
+  background:#d97706;margin-right:4px;vertical-align:middle;
+  animation:pip 2.5s ease-in-out infinite;
+}
+@keyframes pip{0%,100%{opacity:.3;transform:scale(1)}50%{opacity:1;transform:scale(1.4)}}
+.bill-mast .ed{font-size:11px;color:#aaa;margin-left:12px}
+.bill-mast .ed a{color:#777;text-decoration:underline;text-underline-offset:2px}
+
+.bill-ey{
+  font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
+  color:#999;margin-bottom:16px;
+}
+.bill-hl{
+  font-family:var(--serif);
+  font-size:clamp(42px,7.5vw,96px);
+  line-height:1.0;letter-spacing:-3px;font-weight:900;
+  max-width:1000px;margin-bottom:24px;
+}
+.bill-deck{
+  font-family:var(--serif);font-size:clamp(18px,2.2vw,26px);
+  line-height:1.35;color:#555;font-style:italic;font-weight:400;
+  max-width:700px;margin-bottom:32px;
+}
+.bill-also{font-size:12px;color:#aaa;margin-bottom:16px}
+.bill-also a{color:#777;text-decoration:underline;text-underline-offset:2px;margin:0 4px}
+.bill-scroll{
+  font-size:11px;letter-spacing:2px;text-transform:uppercase;
+  color:#ccc;font-weight:700;
+  display:flex;align-items:center;gap:8px;
+  animation:float 2s ease-in-out infinite;
+}
+.bill-scroll .arrow{font-size:16px}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}
+
+/* ============================================================
+   ACT 2 — THE EDITION (after scroll)
+   ============================================================ */
+.edition{
+  max-width:1200px;margin:0 auto;
+  padding:0 clamp(24px,4vw,64px) 0;
+}
+
+/* ---- Edition header ---- */
+.ed-head{
+  padding:48px 0 20px;
+  border-bottom:3px solid #111;margin-bottom:32px;
+  display:flex;align-items:baseline;justify-content:space-between;
+}
+.ed-head .wm{font-family:var(--serif);font-size:44px;font-weight:900;letter-spacing:-1.5px}
+.ed-head .tagline{font-size:12px;color:#999;max-width:340px;line-height:1.45}
+
+/* ---- Hero expanded + side stack ---- */
+.grid-top{
+  display:grid;grid-template-columns:1fr 380px;gap:0;margin-bottom:0;
+}
+.hero-deep{
+  padding-right:36px;border-right:1px solid #e5e5e5;padding-bottom:32px;
+}
+.hero-deep .ey{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#aaa;margin-bottom:8px}
+.hero-deep .sum{
+  font-family:var(--serif);font-size:18px;line-height:1.6;color:#333;margin-bottom:20px;
+}
+/* Timeline */
+.tl{padding:14px 0;border-top:1px solid #f0f0f0;border-bottom:1px solid #f0f0f0;margin-bottom:16px}
+.tl-h{font-size:9px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;color:#bbb;margin-bottom:8px}
+.tl-r{display:flex;align-items:baseline;gap:10px;padding:3px 0;font-size:13px}
+.tl-d{font-family:var(--mono);font-size:10px;font-weight:600;color:#999;min-width:94px}
+.tl-e{color:#555}
+.tl-now .tl-d{color:#111}
+.tl-now .tl-e{color:#111;font-weight:700}
+.tl-more{font-size:10px;color:#bbb;margin-top:4px}
+/* Defection */
+.df{font-size:12px;color:#999}
+.df a{color:#666;text-decoration:underline;text-decoration-color:#ddd}
+.df .dl{font-weight:700;color:#aaa;margin-right:2px}
+
+/* ---- Quiz tease ---- */
+.quiz-tease{
+  margin-top:20px;padding:16px 20px;
+  background:#fafafa;border:1px solid #eee;border-radius:4px;
+}
+.qt-label{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#bbb;margin-bottom:8px}
+.qt-q{font-family:var(--serif);font-size:16px;line-height:1.4;color:#333;font-weight:600;margin-bottom:10px}
+.qt-a{
+  display:inline-block;padding:6px 16px;border:1px solid #ddd;border-radius:100px;
+  font-size:12px;font-weight:600;color:#888;cursor:pointer;transition:.15s;
+}
+.qt-a:hover{border-color:#111;color:#111}
+
+/* ---- Side column ---- */
+.side{padding-left:32px;display:flex;flex-direction:column}
+.ss{padding:20px 0;border-bottom:1px solid #f0f0f0}
+.ss:first-child{padding-top:0}
+.ss:last-child{border-bottom:none}
+.ss .ey{font-size:9px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:#bbb;margin-bottom:4px}
+.ss h2{font-family:var(--serif);font-size:21px;line-height:1.12;letter-spacing:-0.3px;font-weight:800;margin-bottom:6px}
+.ss p{font-size:13px;line-height:1.45;color:#666}
+.ss .df{margin-top:6px}
+.dtag{
+  display:inline-block;font-size:7px;font-weight:800;letter-spacing:1px;
+  text-transform:uppercase;color:#fff;background:#111;
+  padding:2px 6px;border-radius:2px;margin-left:6px;vertical-align:middle;
+}
+.upd{
+  font-style:italic;font-size:13px;color:#777;margin-top:4px;
+  padding-left:10px;border-left:2px solid #ddd;line-height:1.45;
+}
+
+/* ============================================================
+   CONVERSATION SPOTLIGHT — DARK ZONE
+   ============================================================ */
+.convo{
+  margin:40px calc(-1 * clamp(24px,4vw,64px)) 0;
+  padding:48px clamp(24px,4vw,64px);
+  background:#0a0a0a;color:#fff;
+  position:relative;
+}
+.convo::before{
+  content:'';position:absolute;top:0;left:clamp(24px,4vw,64px);
+  width:60px;height:3px;background:#fff;
+}
+.c-top{
+  display:flex;align-items:baseline;justify-content:space-between;
+  margin-bottom:24px;
+}
+.c-label{font-size:9px;font-weight:800;letter-spacing:2.5px;text-transform:uppercase;color:#555}
+.c-badge{
+  font-size:8px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;
+  color:#444;background:rgba(255,255,255,0.06);padding:3px 8px;border-radius:2px;
+}
+.c-on{font-size:12px;color:#555;margin-bottom:20px;font-weight:500}
+.c-on em{font-style:normal;color:#888}
+.c-quote{
+  font-family:var(--serif);font-size:clamp(22px,3vw,34px);line-height:1.3;
+  font-style:italic;font-weight:400;color:#eee;letter-spacing:-0.5px;
+  max-width:900px;margin-bottom:20px;
+}
+.c-who{font-size:14px;color:#666;font-weight:500}
+.c-who strong{color:#999;font-weight:700}
+.c-foot{
+  margin-top:28px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.06);
+  display:flex;align-items:center;justify-content:space-between;
+  font-size:12px;color:#444;
+}
+.c-foot a{color:#666;text-decoration:underline;text-underline-offset:2px}
+.c-num{font-family:var(--mono);font-size:28px;font-weight:700;color:#333;margin-right:10px;line-height:1}
+.c-num-row{display:flex;align-items:center;gap:8px}
+.c-num-label{font-size:11px;color:#555;line-height:1.3}
+
+/* ============================================================
+   THREE-ACROSS
+   ============================================================ */
+.three{
+  max-width:1200px;margin:0 auto;
+  padding:36px clamp(24px,4vw,64px) 0;
+  display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;
+  border-top:3px solid #111;
+}
+.tc{padding:0 28px 28px 0;border-right:1px solid #e5e5e5}
+.tc:nth-child(2){padding-left:28px}
+.tc:last-child{border-right:none;padding-right:0;padding-left:28px}
+.tc .ey{font-size:9px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:#bbb;margin-bottom:4px}
+.tc h3{font-family:var(--serif);font-size:20px;line-height:1.12;letter-spacing:-0.2px;font-weight:800;margin-bottom:6px}
+.tc p{font-size:13px;line-height:1.4;color:#666}
+.tc .df{margin-top:6px}
+/* Quiz tease compact */
+.qt-mini{margin-top:12px;font-size:12px;color:#aaa;font-style:italic}
+.qt-mini strong{color:#777;font-style:normal;font-weight:600}
+
+/* ============================================================
+   FEED END
+   ============================================================ */
+.fend{
+  max-width:1200px;margin:0 auto;
+  padding:36px clamp(24px,4vw,64px);text-align:center;
+  border-top:3px solid #111;margin-top:36px;
+}
+.fend .ph{font-family:var(--serif);font-size:18px;color:#888;font-style:italic;margin-bottom:6px}
+.fend .lk{font-size:13px;color:#aaa}
+.fend .lk a{color:#111;text-decoration:underline}
+
+/* ============================================================
+   THE WIRE — DARK
+   ============================================================ */
+.wire-zone{
+  margin-top:48px;background:#0a0a0a;color:#fff;
+  padding:36px clamp(24px,4vw,64px) 48px;
+  margin-left:calc(-50vw + 50%);margin-right:calc(-50vw + 50%);
+  width:100vw;
+}
+.wire-inner{max-width:1200px;margin:0 auto}
+.wire-hd{
+  font-size:9px;font-weight:800;letter-spacing:2.5px;text-transform:uppercase;
+  color:#444;padding-bottom:12px;border-bottom:1px solid #1a1a1a;margin-bottom:8px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.wire-hd .wire-count{font-family:var(--mono);font-size:10px;color:#333}
+.wire-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 32px}
+.wi{
+  display:flex;align-items:baseline;gap:8px;
+  padding:7px 0;border-bottom:1px solid #151515;font-size:13px;cursor:pointer;
+  transition:.1s;
+}
+.wi:hover{background:#111;margin:0 -6px;padding-left:6px;padding-right:6px;border-radius:2px}
+.wi .wc{
+  font-family:var(--mono);font-size:9px;font-weight:600;
+  color:#333;min-width:60px;flex-shrink:0;letter-spacing:.5px;
+}
+.wi .wh{font-family:var(--serif);font-size:13px;font-weight:500;color:#777;line-height:1.25}
+.wi .wa{margin-left:auto;font-size:9px;color:#2a2a2a;flex-shrink:0;white-space:nowrap}
+.wi:hover .wh{color:#ccc}
+.wi:hover .wc{color:#555}
+.wi:hover .wa{color:#444}
+.wire-end{
+  text-align:center;padding:20px 0 0;font-size:11px;color:#333;
+  border-top:1px solid #1a1a1a;margin-top:8px;
+}
+.wire-end a{color:#555;text-decoration:underline}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media(max-width:900px){
+  .grid-top{grid-template-columns:1fr}
+  .hero-deep{border-right:none;padding-right:0;padding-bottom:24px;border-bottom:2px solid #111}
+  .side{padding-left:0;padding-top:20px}
+  .three{grid-template-columns:1fr}
+  .tc{border-right:none;padding:16px 0;border-bottom:1px solid #eee}
+  .tc:nth-child(2),.tc:last-child{padding-left:0}
+  .wire-grid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:600px){
+  .bill-hl{letter-spacing:-1.5px}
+  .wire-grid{grid-template-columns:1fr}
+  .ed-head{flex-direction:column;gap:8px}
+}
+</style>
+</head>
+<body>
+
+<!-- ================================================================
+     ACT 1: THE BILLBOARD
+     The ENTIRE first screen is ONE headline. Nothing else competes.
+     This is the thing no news app does. They all hedge. Verity commits.
+     ================================================================ -->
+<section class="billboard">
+  <div class="bill-mast">
+    <div>
+      <span class="wm">Verity</span>
+    </div>
+    <div style="display:flex;align-items:baseline;gap:12px">
+      <span class="dt"><span class="pip"></span>Wednesday, April 22, 2026</span>
+      <span class="ed">Curated by <a href="#">Elena Martinez</a></span>
+    </div>
+  </div>
+
+  <div class="bill-ey">Law · Constitutional</div>
+  <h1 class="bill-hl">Supreme Court overturns Chevron, ending 40 years of agency deference</h1>
+  <p class="bill-deck">The 6-3 ruling reshapes the balance between Congress, the courts, and every federal agency — and immediately threatens pending EPA, SEC, and FTC regulations worth $2.1 trillion.</p>
+  <div class="bill-also"><span class="dl" style="font-weight:700;color:#aaa">Also covered by</span><a href="#">AP</a> · <a href="#">Reuters</a> · <a href="#">SCOTUSblog</a> · <a href="#">Full opinion (PDF)</a></div>
+  <div class="bill-scroll"><span class="arrow">↓</span> Today's edition</div>
+</section>
+
+<!-- ================================================================
+     ACT 2: THE EDITION
+     Scroll down and you're in the newspaper. The hero expands.
+     The side column stacks supporting stories. The grid is the judgment.
+     ================================================================ -->
+<section class="edition">
+
+  <div class="ed-head">
+    <div class="wm">Verity</div>
+    <div class="tagline">The news site where the comments are worth reading — because commenters proved they read the article.</div>
+  </div>
+
+  <div class="grid-top">
+
+    <!-- HERO — expanded with full summary + timeline + quiz tease -->
+    <div class="hero-deep">
+      <div class="ey">Law · Constitutional · Lead story</div>
+      <p class="sum">The U.S. Supreme Court ruled 6-3 on Wednesday in Loper Bright Enterprises v. Raimondo that federal agencies do not have inherent authority to interpret ambiguous statutes in their favor. Chief Justice Roberts, writing for the majority, held that courts must exercise independent judgment in determining the meaning of statutory provisions. The ruling overturns Chevron U.S.A. v. Natural Resources Defense Council, the 1984 precedent that required courts to defer to reasonable agency interpretations of ambiguous laws. Justice Kagan, in dissent, wrote that the decision "guts Congress's ability to delegate technical decisions to expert agencies."</p>
+
+      <div class="tl">
+        <div class="tl-h">How we got here</div>
+        <div class="tl-r"><span class="tl-d">Jun 25, 1984</span><span class="tl-e">Supreme Court establishes Chevron deference</span></div>
+        <div class="tl-r"><span class="tl-d">Jun 28, 2019</span><span class="tl-e">Roberts defends narrower deference in Kisor v. Wilkie</span></div>
+        <div class="tl-r"><span class="tl-d">Jan 17, 2024</span><span class="tl-e">Court grants cert in Loper Bright</span></div>
+        <div class="tl-r"><span class="tl-d">Jan 17, 2025</span><span class="tl-e">Oral arguments — 2 hours 40 minutes</span></div>
+        <div class="tl-r tl-now"><span class="tl-d">Apr 22, 2026</span><span class="tl-e">Court overturns Chevron in 6-3 ruling</span></div>
+        <div class="tl-more">Next: Senate caucus response at 4 p.m. ET →</div>
+      </div>
+
+      <div class="df"><span class="dl">Also:</span> <a href="#">AP</a> · <a href="#">Reuters</a> · <a href="#">SCOTUSblog</a> · <a href="#">Opinion (PDF)</a></div>
+
+      <div class="quiz-tease">
+        <div class="qt-label">Before you comment — can you answer this?</div>
+        <div class="qt-q">What 1984 precedent did the Court overturn, and what did it require courts to do?</div>
+        <a href="#" class="qt-a">Read the article → Take the quiz → Join 47 verified readers discussing</a>
+      </div>
+    </div>
+
+    <!-- SIDE COLUMN — 3 supporting stories -->
+    <div class="side">
+
+      <article class="ss">
+        <div class="ey">Economy · Markets</div>
+        <h2>Dow drops 640 points as markets reprice regulatory certainty</h2>
+        <p>S&P 500 fell 2.1%; Nasdaq dropped 2.7%. VIX hit 28.4, highest since October. Utilities and energy led the decline as investors recalculated pending federal rules.</p>
+        <div class="df"><span class="dl">Also:</span> <a href="#">Bloomberg</a> · <a href="#">FT</a></div>
+      </article>
+
+      <article class="ss">
+        <div class="ey">Politics · Congress</div>
+        <h2>Senate calls emergency caucus to draft legislative response</h2>
+        <p>Three bills codifying EPA, FTC, and SEC authority expected before Friday. Session begins 4 p.m. ET.</p>
+        <div class="df"><span class="dl">Also:</span> <a href="#">Politico</a> · <a href="#">C-SPAN</a></div>
+      </article>
+
+      <article class="ss">
+        <div class="ey">World · India <span class="dtag">Developing</span></div>
+        <h2>Gujarat chemical plant explosion death toll rises to 23</h2>
+        <p class="upd">Updated: Labor ministry orders full safety audit. Two additional witnesses on record today. Toll expected to rise.</p>
+        <div class="df"><span class="dl">Also:</span> <a href="#">Reuters</a> · <a href="#">The Hindu</a></div>
+      </article>
+
+    </div>
+  </div>
+
+</section>
+
+<!-- ================================================================
+     THE CONVERSATION SPOTLIGHT
+     Full-bleed dark zone. One verified comment. The product thesis
+     as a daily visual moment. The comment is LONG and SUBSTANTIVE —
+     proof that quiz-gated discussions produce better discourse.
+     ================================================================ -->
+<section class="convo">
+  <div style="max-width:1200px;margin:0 auto">
+    <div class="c-top">
+      <div class="c-label">Today's reader insight</div>
+      <div class="c-badge">Verified · Passed Quiz</div>
+    </div>
+    <div class="c-on">On: <em>Supreme Court overturns Chevron doctrine in 6-3 ruling</em></div>
+    <div class="c-quote">"Roberts authored Kisor v. Wilkie in 2019 defending a narrower version of deference. Something shifted between 2019 and this opinion — the Court doesn't explain what. Read the Kisor concurrence alongside today's majority and the doctrinal reversal is sharper than any commentator has noted. The dissent catches it but buries it in footnote 14."</div>
+    <div class="c-who"><strong>Margaret Chen</strong> · Constitutional law professor, UC Berkeley</div>
+    <div class="c-foot">
+      <div class="c-num-row">
+        <span class="c-num">47</span>
+        <span class="c-num-label">readers passed the quiz<br>on this article</span>
+      </div>
+      <a href="#">Read the full conversation →</a>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================
+     THREE-ACROSS
+     ================================================================ -->
+<section class="three">
+
+  <article class="tc">
+    <div class="ey">Environment</div>
+    <h3>EPA pauses three emissions rules pending Chevron review</h3>
+    <p>Power plant rule, methane fee, and PFAS drinking water standard all suspended. No timeline.</p>
+    <div class="df"><span class="dl">Also:</span> <a href="#">AP</a> · <a href="#">E&E News</a></div>
+    <div class="qt-mini"><strong>Quiz question:</strong> Which three rules did EPA suspend?</div>
+  </article>
+
+  <article class="tc">
+    <div class="ey">World · Trade</div>
+    <h3>EU says Chevron ruling creates "regulatory vacuum" for trade</h3>
+    <p>Commissioner Dombrovskis seeking written assurances from U.S. that bilateral commitments hold.</p>
+    <div class="df"><span class="dl">Also:</span> <a href="#">FT</a> · <a href="#">EC statement</a></div>
+  </article>
+
+  <article class="tc">
+    <div class="ey">Science · Climate</div>
+    <h3>March 2026 confirmed warmest March in recorded history</h3>
+    <p>NOAA: 1.64°C above 20th-century average, exceeding 2024 record by 0.08°C. Acceleration is accelerating.</p>
+    <div class="df"><span class="dl">Also:</span> <a href="#">NOAA data</a> · <a href="#">BBC</a></div>
+    <div class="qt-mini"><strong>Quiz question:</strong> By how much did March 2026 exceed the previous record?</div>
+  </article>
+
+</section>
+
+<!-- ================================================================
+     FEED END
+     ================================================================ -->
+<div class="fend">
+  <p class="ph">That's today's front page.</p>
+  <p class="lk"><a href="#">Yesterday's edition →</a> &nbsp; <a href="#">Browse the archive →</a></p>
+</div>
+
+<!-- ================================================================
+     THE WIRE — FULL DARK ZONE
+     A Bloomberg-terminal-inspired dense ticker of everything else.
+     The shift from light to dark is the design. Curated = light.
+     Complete = dark. Two zones. Two purposes.
+     ================================================================ -->
+<section class="wire-zone">
+  <div class="wire-inner">
+    <div class="wire-hd">
+      <span>The Wire — Everything else published today</span>
+      <span class="wire-count">24 stories</span>
+    </div>
+    <div class="wire-grid">
+      <div class="wi"><span class="wc">ECONOMY</span><span class="wh">Manufacturing output +0.3% in March</span><span class="wa">AP</span></div>
+      <div class="wi"><span class="wc">HEALTH</span><span class="wh">CDC: opioid deaths down 12% YoY</span><span class="wa">Reuters</span></div>
+      <div class="wi"><span class="wc">WORLD</span><span class="wh">S. Korea, Philippines sign defense pact</span><span class="wa">Yonhap</span></div>
+      <div class="wi"><span class="wc">TECH</span><span class="wh">Qualcomm settles Arm patent dispute</span><span class="wa">Bloomberg</span></div>
+      <div class="wi"><span class="wc">POLITICS</span><span class="wh">House passes VA funding 388-41</span><span class="wa">Politico</span></div>
+      <div class="wi"><span class="wc">BUSINESS</span><span class="wh">Costco Q2 beats; same-store +6.8%</span><span class="wa">WSJ</span></div>
+      <div class="wi"><span class="wc">SCIENCE</span><span class="wh">Webb: biosignature found on K2-18b</span><span class="wa">Nature</span></div>
+      <div class="wi"><span class="wc">WORLD</span><span class="wh">Brazil upholds social media regulation</span><span class="wa">Guardian</span></div>
+      <div class="wi"><span class="wc">EDUCATION</span><span class="wh">California signs AI literacy bill</span><span class="wa">EdWeek</span></div>
+      <div class="wi"><span class="wc">ECONOMY</span><span class="wh">Home sales -2.4%; median $398K</span><span class="wa">NAR</span></div>
+      <div class="wi"><span class="wc">HEALTH</span><span class="wh">WHO drops mpox from emergency list</span><span class="wa">WHO</span></div>
+      <div class="wi"><span class="wc">SPORTS</span><span class="wh">IOC confirms Brisbane 2032 venues</span><span class="wa">IOC</span></div>
+      <div class="wi"><span class="wc">TECH</span><span class="wh">EU opens DMA probe into Meta</span><span class="wa">FT</span></div>
+      <div class="wi"><span class="wc">WORLD</span><span class="wh">UN extends S. Sudan mandate 12 mo</span><span class="wa">Reuters</span></div>
+      <div class="wi"><span class="wc">BUSINESS</span><span class="wh">Boeing delivers 38 aircraft in March</span><span class="wa">AP</span></div>
+      <div class="wi"><span class="wc">TECH</span><span class="wh">FTC delays cloud market review vote</span><span class="wa">The Info</span></div>
+      <div class="wi"><span class="wc">WORLD</span><span class="wh">Australian PM in Jakarta for trade talks</span><span class="wa">ABC AU</span></div>
+      <div class="wi"><span class="wc">HEALTH</span><span class="wh">Phase 3 universal flu vaccine hits endpoint</span><span class="wa">NEJM</span></div>
+    </div>
+    <div class="wire-end">End of today's wire · <a href="#">Full archive →</a></div>
+  </div>
+</section>
+
+</body>
+</html>

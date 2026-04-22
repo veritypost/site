@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verity — Adult Home Page (Preview)</title>
+<style>
+:root {
+  --neutral-0: #ffffff;
+  --neutral-50: #fafafa;
+  --neutral-100: #f5f5f5;
+  --neutral-200: #e5e5e5;
+  --neutral-300: #d4d4d4;
+  --neutral-500: #777777;
+  --neutral-600: #5a5a5a;
+  --neutral-700: #444444;
+  --neutral-800: #333333;
+  --neutral-900: #111111;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
+  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+  --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-6: 24px; --space-8: 32px; --space-12: 48px; --space-16: 64px;
+  --radius-2: 8px; --radius-3: 12px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: var(--font-sans); color: var(--neutral-900); background: var(--neutral-0); -webkit-font-smoothing: antialiased; line-height: 1.5; }
+a { color: var(--neutral-900); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:hover { text-decoration-thickness: 2px; }
+.shell { max-width: 720px; margin: 0 auto; padding: var(--space-6); }
+.masthead { border-bottom: 1px solid var(--neutral-200); padding: var(--space-4) 0 var(--space-3) 0; margin-bottom: var(--space-6); display: flex; align-items: baseline; gap: var(--space-6); }
+.masthead .wordmark { font-family: var(--font-serif); font-size: 34px; font-weight: 700; letter-spacing: -0.8px; line-height: 1; }
+.masthead .date { font-size: 13px; color: var(--neutral-600); margin-left: auto; }
+.eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; color: var(--neutral-500); margin-bottom: var(--space-3); }
+h1.headline { font-family: var(--font-serif); font-size: 40px; line-height: 1.1; letter-spacing: -0.8px; font-weight: 700; margin: 0 0 var(--space-4) 0; }
+h3.headline { font-family: var(--font-serif); font-size: 22px; line-height: 1.2; letter-spacing: -0.3px; font-weight: 700; margin: 0; }
+.deck { font-size: 20px; line-height: 1.4; color: var(--neutral-700); margin: 0 0 var(--space-6) 0; font-weight: 400; }
+.feed { display: flex; flex-direction: column; gap: 0; }
+.feed article { padding: var(--space-8) 0; border-top: 1px solid var(--neutral-200); }
+.feed article:first-child { border-top: none; }
+.feed article.hero { padding-top: 0; padding-bottom: var(--space-12); border-bottom: 2px solid var(--neutral-900); }
+.feed .breaking { background: var(--neutral-900); color: var(--neutral-0); padding: var(--space-2) var(--space-3); margin-bottom: var(--space-6); font-size: 12px; font-weight: 600; letter-spacing: 1px; display: flex; gap: var(--space-3); align-items: center; }
+.feed .breaking .label { background: var(--neutral-0); color: var(--neutral-900); padding: 1px 6px; letter-spacing: 0.5px; }
+.card-summary { font-size: 15px; line-height: 1.5; color: var(--neutral-700); margin: var(--space-3) 0; }
+.card-summary.prose { font-family: var(--font-serif); font-size: 17px; color: var(--neutral-900); }
+.feed-end { text-align: center; padding: var(--space-12) 0; font-size: 14px; color: var(--neutral-500); border-top: 1px solid var(--neutral-200); }
+.feed-end a { color: var(--neutral-900); }
+.feed-end p { margin: 0 0 var(--space-3) 0; }
+
+/* Annotations */
+.annotation { background: #fffbeb; border: 1px dashed #f59e0b; border-radius: 8px; padding: 12px 16px; margin: 16px 0; font-size: 13px; color: #78350f; line-height: 1.5; }
+.annotation strong { font-weight: 700; }
+.page-label { text-align: center; padding: 20px; background: var(--neutral-50); border-bottom: 1px solid var(--neutral-200); font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: var(--neutral-500); }
+</style>
+</head>
+<body>
+
+<div class="page-label">VERITY — ADULT HOME PAGE SPEC PREVIEW</div>
+
+<div class="shell">
+
+  <div class="annotation">
+    <strong>MASTHEAD:</strong> Just two things — the "Verity" wordmark (big, serif, bold) and today's date. No editor name shown to readers. No logo, no nav bar, no search. This strip says "this is a publication."
+  </div>
+
+  <header class="masthead">
+    <div class="wordmark">Verity</div>
+    <div class="date">Wednesday, April 22, 2026</div>
+  </header>
+
+  <div class="feed">
+
+    <div class="annotation">
+      <strong>BREAKING STRIP (conditional):</strong> Only appears when a Senior Editor flags something as breaking. Dark bar, white text, headline only. No timestamp. Rate-limited so it doesn't become a habit.
+    </div>
+
+    <div class="breaking">
+      <span class="label">BREAKING</span>
+      <span>Senate Finance Committee issues Treasury subpoenas in 18-10 vote</span>
+    </div>
+
+    <div class="annotation">
+      <strong>HERO — SLOT 0:</strong> One story gets the big treatment. 40pt serif headline, a deck (subtitle), and a prose summary paragraph. No image (unless truly exceptional). No byline, no read time, no timestamp, no sourcing row, no corrections count. Pure typography. This is the Verity signature — restraint over decoration.
+    </div>
+
+    <article class="hero">
+      <div class="eyebrow">Law · Supreme Court</div>
+      <h1 class="headline">Supreme Court hears TikTok divestment challenge; ruling expected before January 19 deadline</h1>
+      <p class="deck">The 2-hour, 40-minute argument concerned the April 2024 law requiring ByteDance to sell TikTok's U.S. operations or face a ban.</p>
+      <p class="card-summary prose">The U.S. Supreme Court heard 2 hours and 40 minutes of oral argument on Friday in <em>TikTok Inc. v. Garland</em>, the challenge to the law requiring ByteDance to divest TikTok's U.S. operations or face a ban by January 19. The D.C. Circuit upheld the law unanimously on December 6. TikTok has approximately 170 million U.S. users; if the Court does not stay or reverse the D.C. Circuit ruling, federal prohibition takes effect unless a qualifying divestment is completed.</p>
+    </article>
+
+    <div class="annotation">
+      <strong>SUPPORTING STORIES — SLOTS 1–7:</strong> Seven stories, all treated equally. Each gets an eyebrow (category), a 22pt serif headline, and a short summary paragraph. Separated by thin hairline dividers. No card backgrounds, no shadows, no chrome — whitespace does the containment. No byline, read time, timestamp, or metadata of any kind.
+    </div>
+
+    <article>
+      <div class="eyebrow">Economy · Monetary Policy</div>
+      <h3 class="headline">Fed cuts rates 25 basis points in 11-1 vote; Hammack dissents citing inflation</h3>
+      <p class="card-summary">The Federal Reserve lowered the federal funds rate to a 4.00–4.25% range, its second cut of the year. Cleveland Fed President Beth Hammack cast the sole dissenting vote, saying the inflation trajectory did not yet justify easing.</p>
+    </article>
+
+    <article>
+      <div class="eyebrow">Politics · Investigations</div>
+      <h3 class="headline">Senate Finance Committee votes to subpoena Treasury records</h3>
+      <p class="card-summary">Chair Lindsey Graves said the subpoenas will seek internal guidance memos, communications with OFAC, and correspondence with three firms previously identified in a Treasury inspector general report.</p>
+    </article>
+
+    <article>
+      <div class="eyebrow">World · Middle East</div>
+      <h3 class="headline">Shipping traffic through Strait of Hormuz drops 18% after Iran closure order</h3>
+      <p class="card-summary">Tanker operators redirected vessels through longer alternative routes after Iran's Revolutionary Guards declared the strait closed. Brent crude settled at $108.40 per barrel, up from $92 before the order.</p>
+    </article>
+
+    <article>
+      <div class="eyebrow">Technology</div>
+      <h3 class="headline">Chipmaker TSMC confirms six-week production halt at Hsinchu facility</h3>
+      <p class="card-summary">The halt follows a water-supply disruption affecting the advanced 3-nanometer line, which produces chips for Apple and Nvidia. TSMC said customer deliveries will be delayed by four to eight weeks.</p>
+    </article>
+
+    <article>
+      <div class="eyebrow">Science · Research</div>
+      <h3 class="headline">Australian researchers publish sunlight-activated plastic recycling method</h3>
+      <p class="card-summary">A team at the University of New South Wales reported a catalyst that breaks PET bottles into reusable monomers using only sunlight. The team estimates the process could reduce recycling energy costs by 40%.</p>
+    </article>
+
+    <article>
+      <div class="eyebrow">Education · Legal</div>
+      <h3 class="headline">Federal judge blocks admissions data mandate in 17 states</h3>
+      <p class="card-summary">A federal judge in Massachusetts issued a preliminary injunction blocking the Department of Education from requiring universities to collect racial demographic data on applicants.</p>
+    </article>
+
+    <article>
+      <div class="eyebrow">Sports · NCAA</div>
+      <h3 class="headline">UCLA defeats South Carolina 79-51 to win NCAA women's basketball championship</h3>
+      <p class="card-summary">The Bruins held the Gamecocks to 31% shooting in the largest margin of victory in a women's championship game since 1986. Senior Lauren Betts had 24 points and 12 rebounds.</p>
+    </article>
+
+  </div>
+
+  <div class="annotation">
+    <strong>BOTTOM BLOCK:</strong> The page ends here. No infinite scroll, no "Load More." Just a clear sign-off and links to the archive and the full chronological feed.
+  </div>
+
+  <div class="feed-end">
+    <p>That's today's front page.</p>
+    <p><a href="#">See yesterday's archive →</a> &nbsp; <a href="#">Browse all recent articles →</a></p>
+  </div>
+
+  <div class="annotation" style="margin-top: 40px;">
+    <strong>WHAT'S NOT HERE (by design):</strong><br>
+    No category filter pills · No search bar · No ads · No "for you" section · No social sharing counts · No "most read" ranking · No newsletter signup modal · No infinite scroll · No streak/gamification · No images (unless exceptional)
+  </div>
+
+</div>
+</body>
+</html>

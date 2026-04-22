@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verity</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,500&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --n0:#fff;--n50:#fafafa;--n100:#f5f5f5;--n150:#f0f0f0;--n200:#e5e5e5;
+  --n300:#d4d4d4;--n400:#a3a3a3;--n500:#777;--n600:#5a5a5a;--n700:#444;
+  --n800:#2a2a2a;--n900:#111;--n950:#0a0a0a;
+  --serif:'Playfair Display',Georgia,serif;
+  --sans:'Inter',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+  --pulse:#fffcf5;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sans);color:var(--n900);background:var(--n0);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* ===== PAGE ===== */
+.page{max-width:1120px;margin:0 auto;padding:0 28px 100px}
+
+/* ===== MASTHEAD ===== */
+.mast{
+  padding:28px 0 14px;display:flex;align-items:baseline;
+  background:var(--pulse);margin:0 -8px;padding-left:8px;padding-right:8px;
+  border-radius:2px;transition:background 3s;
+}
+.mast .wm{font-family:var(--serif);font-size:52px;font-weight:900;letter-spacing:-2px;line-height:1}
+.mast .right{margin-left:auto;text-align:right}
+.mast .dt{font-size:13px;color:var(--n600);font-weight:500}
+.mast .ed{font-size:11px;color:var(--n500);margin-top:2px}
+.mast .ed a{color:var(--n700);text-decoration:underline;text-underline-offset:2px}
+.pip{
+  display:inline-block;width:6px;height:6px;border-radius:50%;
+  background:#d97706;margin-right:5px;vertical-align:middle;
+  animation:pip 2.5s ease-in-out infinite;
+}
+@keyframes pip{0%,100%{opacity:.3;transform:scale(1)}50%{opacity:1;transform:scale(1.4)}}
+.mast-rule{height:1px;background:var(--n900);margin-bottom:4px}
+.pos{font-size:12px;color:var(--n500);padding:8px 0 20px;border-bottom:1px solid var(--n200);margin-bottom:28px;letter-spacing:0.2px}
+
+/* ===== EYEBROW ===== */
+.ey{font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--n400);margin-bottom:5px}
+
+/* ===== MAIN GRID ===== */
+.front{
+  display:grid;
+  grid-template-columns:1fr 340px;
+  grid-template-rows:auto auto;
+  gap:0;
+}
+.hero-col{
+  grid-row:1/2;grid-column:1/2;
+  padding-right:32px;border-right:1px solid var(--n200);
+  padding-bottom:28px;
+}
+.side-col{
+  grid-row:1/2;grid-column:2/2;
+  padding-left:28px;
+  display:flex;flex-direction:column;
+}
+
+/* ===== HERO ===== */
+.hero .ey{margin-bottom:8px}
+.hero h1{
+  font-family:var(--serif);font-size:58px;line-height:1.02;
+  letter-spacing:-2.2px;font-weight:900;margin-bottom:14px;
+}
+.hero .deck{
+  font-family:var(--serif);font-size:21px;line-height:1.35;
+  color:var(--n600);margin-bottom:18px;font-weight:400;font-style:italic;
+}
+.hero .summary{
+  font-family:var(--serif);font-size:17px;line-height:1.6;color:var(--n800);
+  margin-bottom:16px;
+}
+/* timeline fragment */
+.tl{margin-top:14px;padding-top:12px;border-top:1px solid var(--n150)}
+.tl-head{font-size:9px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:var(--n400);margin-bottom:6px}
+.tl-r{display:flex;align-items:baseline;gap:8px;padding:2px 0;font-size:12px;line-height:1.4}
+.tl-d{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--n500);min-width:90px;flex-shrink:0}
+.tl-e{color:var(--n700)}
+.tl-now .tl-d{color:var(--n900)}
+.tl-now .tl-e{color:var(--n900);font-weight:600}
+.tl-more{font-size:10px;color:var(--n400);margin-top:3px}
+/* defection */
+.df{margin-top:10px;font-size:11px;color:var(--n500)}
+.df a{color:var(--n600);text-decoration:underline;text-decoration-color:var(--n300);text-underline-offset:2px}
+.df .dl{font-weight:600;color:var(--n400)}
+
+/* ===== SIDE STORIES ===== */
+.side-story{padding:18px 0;border-bottom:1px solid var(--n150)}
+.side-story:first-child{padding-top:0}
+.side-story:last-child{border-bottom:none}
+.side-story h2{
+  font-family:var(--serif);font-size:20px;line-height:1.15;
+  letter-spacing:-0.3px;font-weight:800;margin-bottom:6px;
+}
+.side-story .ss{font-size:13px;line-height:1.45;color:var(--n600)}
+.side-story .df{margin-top:6px}
+.side-story .tl{margin-top:8px;padding-top:8px}
+/* developing tag */
+.dtag{
+  display:inline-block;font-size:8px;font-weight:700;letter-spacing:1px;
+  text-transform:uppercase;color:var(--n0);background:var(--n800);
+  padding:2px 5px;border-radius:2px;margin-left:6px;vertical-align:middle;
+}
+.upd{
+  font-style:italic;font-size:13px;color:var(--n600);margin-top:4px;
+  padding-left:10px;border-left:2px solid var(--n300);line-height:1.4;
+}
+
+/* ===== MID ROW (3-col) ===== */
+.mid-row{
+  grid-column:1/-1;
+  display:grid;grid-template-columns:1fr 1fr 1fr;
+  gap:0;padding-top:24px;border-top:2px solid var(--n900);
+}
+.mid-card{padding:20px 24px 20px 0;border-right:1px solid var(--n200)}
+.mid-card:first-child{padding-left:0}
+.mid-card:last-child{border-right:none;padding-right:0;padding-left:24px}
+.mid-card:nth-child(2){padding-left:24px}
+.mid-card h3{
+  font-family:var(--serif);font-size:19px;line-height:1.15;
+  letter-spacing:-0.2px;font-weight:800;margin-bottom:6px;
+}
+.mid-card .ms{font-size:13px;line-height:1.4;color:var(--n600)}
+.mid-card .df{margin-top:6px}
+
+/* ===== CONVERSATION SPOTLIGHT ===== */
+.convo-spot{
+  margin-top:36px;padding:28px 32px;
+  background:var(--n950);color:var(--n0);border-radius:4px;
+  position:relative;overflow:hidden;
+}
+.convo-spot::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,var(--n0) 0%,var(--n0) 30%,transparent 30%);
+}
+.convo-spot .c-label{
+  font-size:9px;font-weight:700;letter-spacing:2px;
+  text-transform:uppercase;color:var(--n400);margin-bottom:16px;
+  display:flex;align-items:center;gap:8px;
+}
+.convo-spot .c-badge{
+  background:rgba(255,255,255,0.12);padding:2px 7px;border-radius:2px;
+  font-size:8px;letter-spacing:1px;color:var(--n300);
+}
+.convo-spot .c-story{
+  font-size:11px;color:var(--n400);margin-bottom:12px;font-weight:500;
+}
+.convo-spot .c-story em{font-style:normal;color:var(--n300)}
+.convo-spot blockquote{
+  font-family:var(--serif);font-size:22px;line-height:1.4;
+  font-weight:400;color:var(--n0);margin-bottom:14px;
+  letter-spacing:-0.3px;font-style:italic;
+}
+.convo-spot .c-who{font-size:13px;color:var(--n400);font-weight:500}
+.convo-spot .c-who strong{color:var(--n300);font-weight:700}
+.convo-spot .c-footer{
+  margin-top:18px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.08);
+  font-size:12px;color:var(--n500);display:flex;justify-content:space-between;
+}
+.convo-spot .c-footer a{color:var(--n400);text-decoration:underline;text-underline-offset:2px}
+
+/* ===== FEED END ===== */
+.fend{
+  text-align:center;padding:36px 0 28px;
+  border-top:2px solid var(--n900);margin-top:36px;
+}
+.fend .phrase{font-family:var(--serif);font-size:17px;color:var(--n600);font-style:italic;margin-bottom:6px}
+.fend .links{font-size:13px;color:var(--n500)}
+.fend .links a{color:var(--n900);text-decoration:underline}
+
+/* ===== THE WIRE ===== */
+.wire{margin-top:24px}
+.wire-hd{
+  font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
+  color:var(--n400);padding-bottom:8px;border-bottom:1px solid var(--n200);margin-bottom:4px;
+}
+.wire-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 24px}
+.wire-item{
+  display:flex;align-items:baseline;gap:6px;
+  padding:5px 0;border-bottom:1px solid var(--n100);font-size:12px;cursor:pointer;
+}
+.wire-item:hover{background:var(--n50);margin:0 -4px;padding-left:4px;padding-right:4px}
+.wire-cat{
+  font-family:var(--mono);font-size:9px;font-weight:600;
+  color:var(--n400);min-width:56px;flex-shrink:0;letter-spacing:0.5px;
+}
+.wire-hl{font-family:var(--serif);font-size:12px;font-weight:500;color:var(--n700);line-height:1.3}
+.wire-end{
+  text-align:center;padding:20px 0;font-size:11px;color:var(--n400);
+  border-top:1px solid var(--n200);margin-top:8px;
+}
+
+/* ===== ANNOTATIONS ===== */
+.ann{
+  background:#fefce8;border:1px dashed #ca8a04;border-radius:4px;
+  padding:8px 12px;margin:8px 0;font-size:11px;color:#713f12;line-height:1.5;
+  display:none;
+}
+.ann strong{font-weight:700}
+body.notes .ann{display:block}
+.ann-bar{
+  position:sticky;top:0;z-index:100;background:var(--n900);color:var(--n0);
+  padding:8px 28px;display:flex;align-items:center;gap:10px;font-size:11px;
+}
+.ann-bar .al{opacity:0.4;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;font-weight:700}
+.abtn{
+  background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);
+  color:white;padding:4px 12px;border-radius:100px;font-size:10px;
+  font-weight:700;cursor:pointer;font-family:var(--sans);margin-left:auto;
+}
+.abtn:hover{background:rgba(255,255,255,0.18)}
+.abtn.on{background:white;color:var(--n900)}
+
+/* ===== RESPONSIVE ===== */
+@media(max-width:860px){
+  .front{grid-template-columns:1fr;grid-template-rows:auto auto auto}
+  .hero-col{border-right:none;padding-right:0;padding-bottom:24px;border-bottom:2px solid var(--n900)}
+  .side-col{padding-left:0;padding-top:20px}
+  .mid-row{grid-template-columns:1fr}
+  .mid-card{border-right:none;padding:16px 0;border-bottom:1px solid var(--n200)}
+  .mid-card:last-child{border-bottom:none;padding-left:0}
+  .mid-card:nth-child(2){padding-left:0}
+  .hero h1{font-size:38px;letter-spacing:-1.2px}
+  .mast .wm{font-size:36px}
+  .wire-grid{grid-template-columns:1fr}
+  .convo-spot blockquote{font-size:18px}
+  .page{padding:0 16px 80px}
+}
+@media(max-width:480px){
+  .hero h1{font-size:30px;letter-spacing:-0.8px}
+  .hero .deck{font-size:17px}
+  .mast .wm{font-size:30px}
+}
+</style>
+</head>
+<body>
+
+<div class="ann-bar">
+  <span class="al">Verity Front Page V3</span>
+  <button class="abtn" onclick="document.body.classList.toggle('notes');this.classList.toggle('on')">Annotations</button>
+</div>
+
+<div class="page">
+
+  <!-- ===== MASTHEAD ===== -->
+  <div class="ann"><strong>MASTHEAD:</strong> The warm cream background = editor touched this recently. The amber pip pulses. Wordmark is 52pt Playfair Display — heavy, authoritative, unmistakably editorial. This isn't a tech product. It's a publication.</div>
+
+  <header class="mast">
+    <div class="wm">Verity</div>
+    <div class="right">
+      <div class="dt"><span class="pip"></span>Wednesday, April 22, 2026</div>
+      <div class="ed">Curated by <a href="#">Elena Martinez</a></div>
+    </div>
+  </header>
+  <div class="mast-rule"></div>
+  <div class="pos">The news site where the comments are worth reading — because commenters proved they read the article.</div>
+
+  <!-- ===== FRONT PAGE GRID ===== -->
+  <div class="ann"><strong>THE GRID — THIS IS THE BREAK:</strong> Not a vertical stack. A newspaper-style composition. Hero on the left at 58pt. Three tight stories stacked on the right at 20pt. The contrast ratio is ~3:1 — Drudge-level hierarchy. You see 4 stories simultaneously, at dramatically different scales. The layout IS editorial judgment.</div>
+
+  <div class="front">
+
+    <!-- LEFT: HERO -->
+    <div class="hero-col">
+      <article class="hero">
+        <div class="ey">Law · Constitutional</div>
+        <h1>Supreme Court overturns Chevron doctrine in 6-3 ruling, ending 40 years of agency deference</h1>
+        <p class="deck">The decision reshapes the balance of power between Congress, the courts, and federal agencies — and immediately threatens pending EPA, SEC, and FTC regulations.</p>
+        <p class="summary">The U.S. Supreme Court ruled 6-3 on Wednesday in Loper Bright Enterprises v. Raimondo that federal agencies do not have inherent authority to interpret ambiguous statutes in their favor. Chief Justice Roberts, writing for the majority, held that courts must exercise independent judgment in determining the meaning of statutory provisions rather than deferring to agency interpretations. The ruling overturns Chevron U.S.A. v. Natural Resources Defense Council, the 1984 precedent that had become one of the most-cited cases in administrative law.</p>
+
+        <div class="tl">
+          <div class="tl-head">How we got here</div>
+          <div class="tl-r"><span class="tl-d">Jun 25, 1984</span><span class="tl-e">Supreme Court establishes Chevron deference doctrine</span></div>
+          <div class="tl-r"><span class="tl-d">Jan 17, 2024</span><span class="tl-e">Court grants cert in Loper Bright Enterprises v. Raimondo</span></div>
+          <div class="tl-r"><span class="tl-d">Jan 17, 2025</span><span class="tl-e">Oral arguments; 2 hours 40 minutes</span></div>
+          <div class="tl-r tl-now"><span class="tl-d">Apr 22, 2026</span><span class="tl-e">Court overturns Chevron in 6-3 ruling</span></div>
+          <div class="tl-more">3 more events in full timeline →</div>
+        </div>
+        <div class="df"><span class="dl">Also:</span> <a href="#">AP</a> · <a href="#">Reuters</a> · <a href="#">SCOTUSblog</a> · <a href="#">Opinion (PDF)</a></div>
+      </article>
+    </div>
+
+    <!-- RIGHT: STACKED STORIES -->
+    <div class="side-col">
+
+      <div class="ann"><strong>SIDE COLUMN:</strong> Three stories stacked tight with hairlines between them. 20pt headlines next to the hero's 58pt. The size difference is the editorial judgment — these matter, but they're not THE story. Each still carries a timeline fragment and defection links. Dense, scannable, serious.</div>
+
+      <article class="side-story">
+        <div class="ey">Economy · Markets</div>
+        <h2>Dow drops 640 points as markets reprice regulatory certainty</h2>
+        <p class="ss">S&P 500 fell 2.1%; Nasdaq dropped 2.7%. The VIX hit 28.4, its highest since October. Utilities and energy led the decline as investors recalculated the enforceability of pending federal rules.</p>
+        <div class="df"><span class="dl">Also:</span> <a href="#">Bloomberg</a> · <a href="#">FT</a></div>
+      </article>
+
+      <article class="side-story">
+        <div class="ey">Politics · Congress</div>
+        <h2>Senate calls emergency caucus session to draft legislative response</h2>
+        <p class="ss">Three bills codifying agency authorities expected before Friday. The session begins at 4 p.m. ET; leadership aides say the bills will target EPA, FTC, and SEC authority specifically.</p>
+        <div class="tl">
+          <div class="tl-r tl-now"><span class="tl-d">Apr 22, 4:00p</span><span class="tl-e">Caucus convenes — drafting begins</span></div>
+        </div>
+        <div class="df"><span class="dl">Also:</span> <a href="#">Politico</a> · <a href="#">C-SPAN</a></div>
+      </article>
+
+      <article class="side-story">
+        <div class="ey">World · India <span class="dtag">Developing</span></div>
+        <h2>Gujarat chemical plant explosion death toll rises to 23</h2>
+        <p class="upd">Updated: Indian labor ministry announces full safety audit of all chemical facilities in the district. Two additional witnesses provided on-record statements today.</p>
+        <div class="tl">
+          <div class="tl-r"><span class="tl-d">Apr 20</span><span class="tl-e">Explosion; 9 confirmed dead</span></div>
+          <div class="tl-r tl-now"><span class="tl-d">Apr 22</span><span class="tl-e">Toll at 23; ministry orders audit</span></div>
+        </div>
+        <div class="df"><span class="dl">Also:</span> <a href="#">Reuters</a> · <a href="#">The Hindu</a></div>
+      </article>
+    </div>
+
+    <!-- BOTTOM ROW: 3 ACROSS -->
+    <div class="mid-row">
+
+      <div class="ann" style="grid-column:1/-1"><strong>THREE-ACROSS ROW:</strong> Like a newspaper's below-the-fold. Three stories at equal weight. The grid creates a visual rhythm — hero (massive) → side stack (medium) → three-across (compact). Three tiers of hierarchy, all visible on one screen. This is a COMPOSITION, not a scroll.</div>
+
+      <article class="mid-card">
+        <div class="ey">Environment · Regulation</div>
+        <h3>EPA pauses three pending emissions rules pending legal review</h3>
+        <p class="ms">Power plant rule, methane fee, and PFAS drinking water standard all suspended. No timeline for resumption.</p>
+        <div class="df"><span class="dl">Also:</span> <a href="#">AP</a> · <a href="#">E&E News</a></div>
+      </article>
+
+      <article class="mid-card">
+        <div class="ey">World · Trade</div>
+        <h3>EU trade commissioner says ruling creates "regulatory vacuum"</h3>
+        <p class="ms">Dombrovskis will seek written assurances from U.S. counterparts that bilateral commitments remain enforceable.</p>
+        <div class="df"><span class="dl">Also:</span> <a href="#">FT</a> · <a href="#">EC statement</a></div>
+      </article>
+
+      <article class="mid-card">
+        <div class="ey">Science · Climate</div>
+        <h3>NOAA confirms March 2026 was warmest March in recorded history</h3>
+        <p class="ms">1.64°C above the 20th-century average, exceeding March 2024's record by 0.08°C.</p>
+        <div class="df"><span class="dl">Also:</span> <a href="#">NOAA data</a> · <a href="#">BBC</a></div>
+      </article>
+
+    </div>
+
+  </div><!-- /front -->
+
+  <!-- ===== CONVERSATION SPOTLIGHT ===== -->
+  <div class="ann"><strong>THE CONVERSATION SPOTLIGHT — THE THING NO ONE ELSE CAN DO:</strong> A full-width dark block showcasing the most compelling reader comment from today's stories. This person PASSED THE QUIZ. Their insight is substantive, specific, and actually adds to the reporting. This is the product thesis — "comments worth reading" — as a VISUAL MOMENT on the front page. Not a tagline. Proof. Every day, a new one. No other product has verified comments to surface. If someone copies this, they need the entire quiz-gate infrastructure to fill it.</div>
+
+  <div class="convo-spot">
+    <div class="c-label">
+      Today's reader insight
+      <span class="c-badge">VERIFIED · PASSED QUIZ</span>
+    </div>
+    <div class="c-story">On: <em>Supreme Court overturns Chevron doctrine in 6-3 ruling</em></div>
+    <blockquote>"Roberts authored Kisor v. Wilkie in 2019 defending a narrower version of deference. Something shifted between 2019 and this opinion — the Court doesn't explain what. Read the Kisor concurrence alongside today's majority opinion and the doctrinal reversal is sharper than any commentator has noted."</blockquote>
+    <div class="c-who"><strong>Margaret Chen</strong> · Constitutional law professor, UC Berkeley</div>
+    <div class="c-footer">
+      <span>47 readers passed the quiz on this article</span>
+      <a href="#">Read the full conversation →</a>
+    </div>
+  </div>
+
+  <!-- ===== FEED END ===== -->
+  <div class="fend">
+    <p class="phrase">That's today's front page.</p>
+    <p class="links"><a href="#">See yesterday's edition →</a> &nbsp; <a href="#">Browse the archive →</a></p>
+  </div>
+
+  <!-- ===== THE WIRE ===== -->
+  <div class="ann"><strong>THE WIRE:</strong> Three-column dense ticker. Every additional story published today, each with a monospace category tag. The three-column layout continues the newspaper DNA — it's not a feed, it's a page. Even at this density, the grid structure communicates "this was organized by a human."</div>
+
+  <div class="wire">
+    <div class="wire-hd">The Wire — All stories published today</div>
+    <div class="wire-grid">
+      <div class="wire-item"><span class="wire-cat">ECONOMY</span><span class="wire-hl">Manufacturing output rose 0.3% in March</span></div>
+      <div class="wire-item"><span class="wire-cat">HEALTH</span><span class="wire-hl">CDC: opioid deaths down 12% year-over-year</span></div>
+      <div class="wire-item"><span class="wire-cat">WORLD</span><span class="wire-hl">S. Korea, Philippines sign defense pact</span></div>
+      <div class="wire-item"><span class="wire-cat">TECH</span><span class="wire-hl">Qualcomm settles Arm patent dispute</span></div>
+      <div class="wire-item"><span class="wire-cat">POLITICS</span><span class="wire-hl">House passes VA funding bill 388-41</span></div>
+      <div class="wire-item"><span class="wire-cat">BUSINESS</span><span class="wire-hl">Costco Q2 beats; same-store sales +6.8%</span></div>
+      <div class="wire-item"><span class="wire-cat">SCIENCE</span><span class="wire-hl">Webb telescope: biosignature on K2-18b</span></div>
+      <div class="wire-item"><span class="wire-cat">WORLD</span><span class="wire-hl">Brazil upholds social media regulation law</span></div>
+      <div class="wire-item"><span class="wire-cat">EDUCATION</span><span class="wire-hl">California signs AI literacy curriculum bill</span></div>
+      <div class="wire-item"><span class="wire-cat">ECONOMY</span><span class="wire-hl">Home sales fell 2.4%; median price $398K</span></div>
+      <div class="wire-item"><span class="wire-cat">HEALTH</span><span class="wire-hl">WHO removes mpox from emergency status</span></div>
+      <div class="wire-item"><span class="wire-cat">SPORTS</span><span class="wire-hl">IOC confirms Brisbane 2032 venues</span></div>
+      <div class="wire-item"><span class="wire-cat">TECH</span><span class="wire-hl">EU opens DMA probe into Meta compliance</span></div>
+      <div class="wire-item"><span class="wire-cat">WORLD</span><span class="wire-hl">UN extends South Sudan mandate 12 months</span></div>
+      <div class="wire-item"><span class="wire-cat">BUSINESS</span><span class="wire-hl">Boeing delivers 38 aircraft in March</span></div>
+    </div>
+    <div class="wire-end">End of today's wire · 24 stories · <a href="#" style="color:var(--n700);text-decoration:underline">Full archive →</a></div>
+  </div>
+
+</div>
+
+<script>
+// annotation toggle only
+</script>
+</body>
+</html>
