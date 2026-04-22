@@ -3289,6 +3289,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "discovery_items_cluster_id_fkey"
+            columns: ["cluster_id"]
+            isOneToOne: false
+            referencedRelation: "feed_clusters"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "discovery_items_feed_id_fkey"
             columns: ["feed_id"]
             isOneToOne: false
@@ -5359,7 +5366,15 @@ export type Database = {
           visibility?: string
           word_count?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "kid_articles_cluster_id_fkey"
+            columns: ["cluster_id"]
+            isOneToOne: false
+            referencedRelation: "feed_clusters"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       kid_category_permissions: {
         Row: {
@@ -5452,6 +5467,13 @@ export type Database = {
             columns: ["article_id"]
             isOneToOne: false
             referencedRelation: "kid_articles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kid_discovery_items_cluster_id_fkey"
+            columns: ["cluster_id"]
+            isOneToOne: false
+            referencedRelation: "feed_clusters"
             referencedColumns: ["id"]
           },
           {
@@ -6701,6 +6723,13 @@ export type Database = {
             referencedRelation: "pipeline_runs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "pipeline_costs_cluster_id_fkey"
+            columns: ["cluster_id"]
+            isOneToOne: false
+            referencedRelation: "feed_clusters"
+            referencedColumns: ["id"]
+          },
         ]
       }
       pipeline_runs: {
@@ -6712,7 +6741,6 @@ export type Database = {
           duration_ms: number | null
           error_message: string | null
           error_stack: string | null
-          error_type: string | null
           feed_id: string | null
           freeform_instructions: string | null
           id: string
@@ -6740,7 +6768,6 @@ export type Database = {
           duration_ms?: number | null
           error_message?: string | null
           error_stack?: string | null
-          error_type?: string | null
           feed_id?: string | null
           freeform_instructions?: string | null
           id?: string
@@ -6768,7 +6795,6 @@ export type Database = {
           duration_ms?: number | null
           error_message?: string | null
           error_stack?: string | null
-          error_type?: string | null
           feed_id?: string | null
           freeform_instructions?: string | null
           id?: string
@@ -6808,6 +6834,13 @@ export type Database = {
             columns: ["triggered_by_user"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_runs_cluster_id_fkey"
+            columns: ["cluster_id"]
+            isOneToOne: false
+            referencedRelation: "feed_clusters"
             referencedColumns: ["id"]
           },
         ]

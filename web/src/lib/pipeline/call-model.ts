@@ -32,6 +32,7 @@ import {
   AbortedError,
   type Provider,
 } from './errors';
+import { pipelineLog } from './logger';
 
 // 2. Back-compat re-export — error classes moved to ./errors on 2026-04-22
 // (F7 Phase 1 Task 3) to break circular import between call-model + cost-tracker.
@@ -297,26 +298,31 @@ async function writePipelineCost(row: {
 }): Promise<void> {
   try {
     const supabase = createServiceClient();
+    // F7 — write the dedicated columns added in migration 114
+    // (cache_read_input_tokens, cache_creation_input_tokens, cluster_id,
+    // error_type, retry_count). They were stuffed in metadata jsonb and the
+    // typed columns sat at default 0/null forever. `audience` defaults to
+    // 'adult' at the DB level so omitting it is fine for adult-side runs;
+    // kid-side wiring would need plumbing audience through CallModelParams
+    // (out of scope here — separate task).
     const { error } = await supabase.from('pipeline_costs').insert({
       pipeline_run_id: row.pipeline_run_id,
       provider: row.provider,
       model: row.model,
       step: row.step,
       article_id: row.article_id,
+      cluster_id: row.cluster_id,
       input_tokens: row.usage.input_tokens,
       output_tokens: row.usage.output_tokens,
       total_tokens: row.usage.input_tokens + row.usage.output_tokens, // NOT NULL
+      cache_read_input_tokens: row.usage.cache_read_input_tokens,
+      cache_creation_input_tokens: row.usage.cache_creation_input_tokens,
       cost_usd: row.cost_usd,
       latency_ms: row.latency_ms,
       success: row.success,
       error_message: row.error_message,
-      metadata: {
-        cache_read_input_tokens: row.usage.cache_read_input_tokens,
-        cache_creation_input_tokens: row.usage.cache_creation_input_tokens,
-        cluster_id: row.cluster_id,
-        error_type: row.error_type,
-        retry_count: row.retry_count,
-      },
+      error_type: row.error_type,
+      retry_count: row.retry_count,
     });
     if (error) {
       console.error('[call-model:cost-write] failed', {
@@ -403,14 +409,21 @@ export async function callModel(params: CallModelParams): Promise<CallModelResul
 
   if (thrown) throw thrown;
 
-  console.log('[call-model] call', {
+  // F10 — emit through the structured logger so the line follows the
+  // newsroom.<area>.<step> taxonomy (runbook §3) and lands as JSON in
+  // log aggregation, not a bare console.log shape.
+  pipelineLog.info('call-model.call', {
+    run_id: params.pipeline_run_id,
+    cluster_id: params.cluster_id ?? undefined,
+    step: params.step_name,
+    duration_ms: latency_ms,
+    cost_usd,
+    tokens_in: usage.input_tokens,
+    tokens_out: usage.output_tokens,
+    cache_read_input_tokens: usage.cache_read_input_tokens,
+    cache_creation_input_tokens: usage.cache_creation_input_tokens,
     provider: params.provider,
     model: params.model,
-    step: params.step_name,
-    latency_ms,
-    cost_usd,
-    input_tokens: usage.input_tokens,
-    output_tokens: usage.output_tokens,
     cache_hit_ratio:
       usage.input_tokens > 0
         ? Math.round((usage.cache_read_input_tokens / (usage.input_tokens + usage.cache_read_input_tokens)) * 100)

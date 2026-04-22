@@ -110,7 +110,13 @@ export async function checkRateLimit(supabase, { key, policyKey, max, windowSec 
   let effectiveWindow = windowSec;
   if (policyKey) {
     const policy = await getRateLimit(supabase, policyKey, { max, windowSec });
-    if (policy.disabled) return { limited: false, remaining: Infinity, reason: 'policy_disabled' };
+    if (policy.disabled)
+      return {
+        limited: false,
+        remaining: Infinity,
+        windowSec: effectiveWindow,
+        reason: 'policy_disabled',
+      };
     effectiveMax = policy.max;
     effectiveWindow = policy.windowSec;
   }
@@ -123,29 +129,47 @@ export async function checkRateLimit(supabase, { key, policyKey, max, windowSec 
     if (error) {
       if (DEV_FAIL_OPEN) {
         console.warn('[rateLimit] RPC error in dev, failing open:', error.message);
-        return { limited: false, remaining: effectiveMax, reason: 'dev_fail_open' };
+        return {
+          limited: false,
+          remaining: effectiveMax,
+          windowSec: effectiveWindow,
+          reason: 'dev_fail_open',
+        };
       }
       console.error('[rateLimit] RPC error, failing closed:', error.message);
-      return { limited: true, remaining: 0, reason: 'rpc_error' };
+      return { limited: true, remaining: 0, windowSec: effectiveWindow, reason: 'rpc_error' };
     }
     if (!data || typeof data !== 'object') {
       if (DEV_FAIL_OPEN) {
         console.warn('[rateLimit] malformed RPC response in dev, failing open');
-        return { limited: false, remaining: effectiveMax, reason: 'dev_fail_open' };
+        return {
+          limited: false,
+          remaining: effectiveMax,
+          windowSec: effectiveWindow,
+          reason: 'dev_fail_open',
+        };
       }
       console.error('[rateLimit] malformed RPC response, failing closed');
-      return { limited: true, remaining: 0, reason: 'malformed' };
+      return { limited: true, remaining: 0, windowSec: effectiveWindow, reason: 'malformed' };
     }
     return {
       limited: Boolean(data.limited),
       remaining: Number.isFinite(data.remaining) ? data.remaining : 0,
+      // F11 — surface the effective window so callers can derive Retry-After
+      // from the DB-tuned policy instead of hardcoding the fallback literal.
+      windowSec: effectiveWindow,
     };
   } catch (err) {
     if (DEV_FAIL_OPEN) {
       console.warn('[rateLimit] threw in dev, failing open:', err?.message || err);
-      return { limited: false, remaining: effectiveMax, reason: 'dev_fail_open' };
+      return {
+        limited: false,
+        remaining: effectiveMax,
+        windowSec: effectiveWindow,
+        reason: 'dev_fail_open',
+      };
     }
     console.error('[rateLimit] threw, failing closed:', err?.message || err);
-    return { limited: true, remaining: 0, reason: 'threw' };
+    return { limited: true, remaining: 0, windowSec: effectiveWindow, reason: 'threw' };
   }
 }

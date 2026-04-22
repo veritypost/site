@@ -19,7 +19,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Database } from '@/types/database';
+import type { Database, Json } from '@/types/database';
 
 // ---------------------------------------------------------------------------
 // Payload types
@@ -86,7 +86,10 @@ export interface PersistArticlePayload {
   seo_title?: string | null;
   seo_description?: string | null;
   seo_keywords?: string[];
-  kids_summary?: string | null; // kid audience only
+  // kids_summary intentionally absent — migration 124 removed the dead
+  // branch from persist_generated_article. The articles.kids_summary
+  // column still exists and is written by other surfaces (admin save,
+  // legacy ai/generate route), but the F7 persist RPC no longer reads it.
   metadata?: Record<string, unknown>;
   sources: PersistArticleSource[];
   timeline: PersistArticleTimelineEntry[];
@@ -130,19 +133,11 @@ export async function persistGeneratedArticle(
   service: SupabaseClient<Database>,
   payload: PersistArticlePayload
 ): Promise<PersistArticleResult> {
-  // persist_generated_article isn't in the generated Database.Functions
-  // enum until `npm run types:gen` runs post-migration. Cast-to-bypass
-  // mirrors the adminMutation.ts pattern for post-generation RPCs.
-  const rpc = service.rpc as unknown as (
-    fn: string,
-    args: { p_payload: unknown }
-  ) => Promise<{
-    data: PersistArticleResult[] | PersistArticleResult | null;
-    error: { message: string; code?: string; details?: unknown } | null;
-  }>;
-
-  const { data, error } = await rpc('persist_generated_article', {
-    p_payload: payload as unknown,
+  // RPC is in the generated Database.Functions enum post-types:gen.
+  // PersistArticlePayload is a typed surface for callers; the RPC accepts
+  // jsonb and validates internally — `as unknown as Json` is the bridge.
+  const { data, error } = await service.rpc('persist_generated_article', {
+    p_payload: payload as unknown as Json,
   });
 
   if (error) {
@@ -160,5 +155,5 @@ export async function persistGeneratedArticle(
   if (!row) {
     throw new PersistArticleError('persist_generated_article returned no row');
   }
-  return row;
+  return row as PersistArticleResult;
 }

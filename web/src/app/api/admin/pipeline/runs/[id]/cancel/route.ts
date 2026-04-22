@@ -102,12 +102,10 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
 
   if (run.cluster_id) {
     try {
-      await (
-        service.rpc as unknown as (
-          fn: string,
-          args: Record<string, unknown>
-        ) => Promise<{ error: { message: string } | null }>
-      )('release_cluster_lock', { p_cluster_id: run.cluster_id, p_locked_by: params.id });
+      await service.rpc('release_cluster_lock', {
+        p_cluster_id: run.cluster_id,
+        p_locked_by: params.id,
+      });
     } catch (lockErr) {
       console.error('[admin.pipeline.runs.cancel.unlock]', lockErr);
     }

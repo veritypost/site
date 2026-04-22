@@ -125,7 +125,10 @@ export async function POST() {
     return NextResponse.json({ error: 'Ingestion disabled' }, { status: 503 });
   }
 
-  // 3. Rate limit — DB policy drives effective max/window via policyKey
+  // 3. Rate limit — DB policy `newsroom_ingest` is authoritative; the
+  // max/windowSec args here are FALLBACK only (used pre-seed or when the
+  // rate_limits row is missing). Retry-After tracks the effective window
+  // so a runtime policy retune lands in the response without a code edit.
   const rl = await checkRateLimit(service, {
     key: `newsroom_ingest:user:${actorId}`,
     policyKey: 'newsroom_ingest',
@@ -135,7 +138,7 @@ export async function POST() {
   if (rl.limited) {
     return NextResponse.json(
       { error: 'Too many requests' },
-      { status: 429, headers: { 'Retry-After': '600' } }
+      { status: 429, headers: { 'Retry-After': String(rl.windowSec ?? 600) } }
     );
   }
 

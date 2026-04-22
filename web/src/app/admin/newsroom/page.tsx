@@ -13,14 +13,15 @@
  *   - Refresh feeds -> POST /api/newsroom/ingest/run
  *   - Pipeline runs -> navigate to /admin/pipeline
  *
- * STAGED dependencies (this page is scaffolding — works fully post-apply):
- *   - Migration 116: feed_clusters.locked_* columns (lock UI gracefully degrades pre-apply)
- *   - Migration 116: admin.pipeline.run_generate permission (Generate POST returns 403 pre-apply)
- *   - Migration 118: persist_generated_article RPC (Generate POST errors mid-chain pre-apply)
- *   - Migration 120: pipeline_runs.error_type column (Generate POST errors on cleanup pre-apply)
- *   - Task 21: cluster detail page (View button 404s)
- *   - Task 22: generation modal (Generate buttons fire directly v1; Task 22 swaps for modal)
- *   - Task 27: run detail page (success-navigate path lands on /admin/pipeline/runs/:id 404)
+ * Dependency status:
+ *   - Migration 116 (feed_clusters.locked_* columns) — LIVE.
+ *   - Migration 116 (admin.pipeline.run_generate permission) — LIVE.
+ *   - Migration 118 (persist_generated_article RPC) — LIVE.
+ *   - Migration 120 (pipeline_runs.error_type column) — STAGED. Generate
+ *     POST errors on cleanup writes until applied + types regenerated.
+ *   - Task 21: cluster detail page (View button 404s).
+ *   - Task 22: generation modal (Generate buttons fire directly v1; Task 22 swaps for modal).
+ *   - Task 27: run detail page (success-navigate path lands on /admin/pipeline/runs/:id 404).
  *
  * Auth: client-side ADMIN_ROLES gate matching settings page.
  */
@@ -47,10 +48,11 @@ type ClusterRow = Pick<
   Tables<'feed_clusters'>,
   'id' | 'title' | 'summary' | 'is_breaking' | 'created_at' | 'updated_at'
 >;
-// Migration 116 adds locked_by + locked_at (NOT locked_until — lock expiry is
-// computed inside the RPC via locked_at + TTL). For card UI we only need
-// locked_by to toggle the Locked badge + Unlock button. locked_at is rendered
-// as a tooltip so admin sees how long a lock has been held.
+// feed_clusters has locked_by + locked_at (migration 116, live — NOT a
+// locked_until column; lock expiry is computed inside the RPC via
+// locked_at + TTL). For card UI we only need locked_by to toggle the
+// Locked badge + Unlock button. locked_at is rendered as a tooltip so
+// admin sees how long a lock has been held.
 type ClusterWithLock = ClusterRow & {
   locked_by?: string | null;
   locked_at?: string | null;
@@ -156,26 +158,18 @@ function NewsroomAdminInner() {
       > = {};
 
       if (ids.length > 0) {
-        const lockRes = await supabase
+        const { data: lockData, error: lockErr } = await supabase
           .from('feed_clusters')
           .select('id, locked_by, locked_at')
           .in('id', ids);
-        const { data: lockData, error: lockErr } = lockRes as unknown as {
-          data: Array<{
-            id: string;
-            locked_by: string | null;
-            locked_at: string | null;
-          }> | null;
-          error: { code?: string; message?: string } | null;
-        };
         if (!lockErr && lockData) {
           for (const l of lockData) {
             lockMap[l.id] = { locked_by: l.locked_by, locked_at: l.locked_at };
           }
         }
-        // If lockErr (e.g. column not found pre-migration 116), silently
-        // degrade: cards render without lock badges and Generate stays
-        // enabled. This is the documented STAGED-dependency behavior.
+        // If lockErr surfaces we silently degrade: cards render without
+        // lock badges and Generate stays enabled. feed_clusters.locked_*
+        // columns are live (migration 116) so this is defensive only.
       }
 
       const merged: ClusterWithLock[] = baseRows.map((r) => ({

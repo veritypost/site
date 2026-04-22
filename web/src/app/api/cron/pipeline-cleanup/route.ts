@@ -80,7 +80,7 @@ async function run(request: Request) {
     try {
       const { data, error } = await service
         .from(table)
-        .update({ state: 'clustered', updated_at: now.toISOString() } as never)
+        .update({ state: 'clustered', updated_at: now.toISOString() })
         .eq('state', 'generating')
         .lt('updated_at', thresholdIso)
         .select('id');
@@ -106,7 +106,7 @@ async function run(request: Request) {
   try {
     const { data, error } = await service
       .from('feed_clusters')
-      .update({ locked_by: null, locked_at: null, generation_state: null } as never)
+      .update({ locked_by: null, locked_at: null, generation_state: null })
       .not('locked_at', 'is', null)
       .lt('locked_at', lockThresholdIso)
       .select('id');

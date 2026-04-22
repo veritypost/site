@@ -636,15 +636,7 @@ export async function POST(req: Request) {
   }
 
   // 8. Acquire cluster lock
-  const { data: lockData, error: lockErr } = await (
-    service.rpc as unknown as (
-      fn: string,
-      args: Record<string, unknown>
-    ) => Promise<{
-      data: Array<{ acquired: boolean; locked_by: string | null; locked_at: string | null }> | null;
-      error: { message: string } | null;
-    }>
-  )('claim_cluster_lock', {
+  const { data: lockData, error: lockErr } = await service.rpc('claim_cluster_lock', {
     p_cluster_id: cluster_id,
     p_locked_by: runId,
     p_ttl_sec: 600,
@@ -1488,24 +1480,16 @@ Empty array if all correct.`;
       article_id: articleId,
     });
 
-    // 9q. Update cluster
+    // 9q. Update cluster — last_generation_run_id column is live
+    // (migration 116) and typed, so this folds into the primary update.
     await service
       .from('feed_clusters')
       .update({
         primary_article_id: articleId,
+        last_generation_run_id: runId,
         updated_at: new Date().toISOString(),
       })
       .eq('id', cluster_id);
-    // last_generation_run_id column lives in migration 116 (staged).
-    // Run a second best-effort update so it lands post-apply without
-    // breaking pre-apply.
-    await (
-      service.from('feed_clusters').update as unknown as (v: Record<string, unknown>) => {
-        eq: (col: string, val: string) => Promise<{ error: { message: string } | null }>;
-      }
-    )({ last_generation_run_id: runId })
-      .eq('id', cluster_id)
-      .catch(() => undefined);
 
     finalStatus = 'completed';
   } catch (err) {
@@ -1551,12 +1535,10 @@ Empty array if all correct.`;
 
     // b. Release cluster lock
     try {
-      await (
-        service.rpc as unknown as (
-          fn: string,
-          args: Record<string, unknown>
-        ) => Promise<{ error: { message: string } | null }>
-      )('release_cluster_lock', { p_cluster_id: cluster_id, p_locked_by: runId });
+      await service.rpc('release_cluster_lock', {
+        p_cluster_id: cluster_id,
+        p_locked_by: runId,
+      });
     } catch (lockReleaseErr) {
       console.error('[newsroom.generate.finally.unlock]', lockReleaseErr);
     }
