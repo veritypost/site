@@ -38,7 +38,7 @@
     },
     {
       "path": "/api/cron/pipeline-cleanup",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 6 * * *"
     }
   ]
 }
