@@ -25,6 +25,14 @@ import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction } from '@/lib/adminMutation';
 import * as Sentry from '@sentry/nextjs';
 import type { Database, Json } from '@/types/database';
+import { preCluster, getClusterOverlapPct, type ClusterInputArticle } from '@/lib/pipeline/cluster';
+import {
+  findBestMatch,
+  loadStoryMatchCandidates,
+  loadKidStoryMatchCandidates,
+  getStoryMatchOverlapPct,
+  type StoryCandidate,
+} from '@/lib/pipeline/story-match';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -304,6 +312,188 @@ export async function POST() {
     const { inserted: kidInserted, skipped: kidSkipped } =
       await processAudience<KidDiscoveryInsert>(kidItems, 'kid_discovery_items');
 
+    // ----------------------------------------------------------------------
+    // 10b. Clustering orchestration (F7 Phase 2 wire-up — closes F1).
+    //
+    // Runs preCluster + story-match dedupe per audience over the last 6 hours
+    // of pending discovery items. Match-against-existing-article -> mark items
+    // 'ignored' (no cluster row). No match -> insert feed_clusters row +
+    // mark items 'clustered' with cluster_id. Singletons stay 'pending'.
+    //
+    // Per-cluster failures are caught and recorded into clusterErrors; one
+    // bad cluster never aborts the batch. Adult and kid candidate pools are
+    // isolated (kid clusters never see adult articles and vice versa).
+    // ----------------------------------------------------------------------
+
+    interface ClusteringSummary {
+      itemsConsidered: number;
+      clustersCreated: number;
+      singletons: number;
+      matchedExisting: number;
+      itemsIgnored: number;
+      clusterErrors: { title: string; error: string }[];
+    }
+
+    const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
+    const clusterThresholdPct = await getClusterOverlapPct();
+    const storyMatchThresholdPct = await getStoryMatchOverlapPct();
+
+    async function clusterAudience(
+      table: 'discovery_items' | 'kid_discovery_items',
+      loadCandidates: () => Promise<StoryCandidate[]>
+    ): Promise<{ summary: ClusteringSummary; durationMs: number; storyMatchMs: number }> {
+      const audienceStart = Date.now();
+      const summary: ClusteringSummary = {
+        itemsConsidered: 0,
+        clustersCreated: 0,
+        singletons: 0,
+        matchedExisting: 0,
+        itemsIgnored: 0,
+        clusterErrors: [],
+      };
+
+      // Load candidates ONCE per audience (kid candidates only for kid clusters).
+      const storyMatchStart = Date.now();
+      const candidates = await loadCandidates();
+      const storyMatchMs = Date.now() - storyMatchStart;
+
+      // Pull recently-fetched pending items for this audience.
+      const cutoffIso = new Date(Date.now() - SIX_HOURS_MS).toISOString();
+      const query =
+        table === 'discovery_items'
+          ? service
+              .from('discovery_items')
+              .select('id, raw_title, metadata')
+              .eq('state', 'pending')
+              .gte('fetched_at', cutoffIso)
+              .order('fetched_at', { ascending: false })
+          : service
+              .from('kid_discovery_items')
+              .select('id, raw_title, metadata')
+              .eq('state', 'pending')
+              .gte('fetched_at', cutoffIso)
+              .order('fetched_at', { ascending: false });
+      const { data: pendingRows, error: pendingErr } = await query;
+      if (pendingErr) {
+        summary.clusterErrors.push({
+          title: '[load-pending]',
+          error: `${table} pending lookup failed: ${pendingErr.message}`,
+        });
+        return { summary, durationMs: Date.now() - audienceStart, storyMatchMs };
+      }
+
+      const rows = pendingRows ?? [];
+      summary.itemsConsidered = rows.length;
+      if (rows.length === 0) {
+        return { summary, durationMs: Date.now() - audienceStart, storyMatchMs };
+      }
+
+      // Build cluster input. Items without a usable title become singletons
+      // (preCluster handles 0-keyword articles), but we keep them in the input
+      // so their state isn't disturbed.
+      const inputs: ClusterInputArticle[] = rows.map((r) => {
+        const md = (r.metadata ?? {}) as { outlet?: string | null };
+        return {
+          id: r.id,
+          title: r.raw_title ?? '',
+          outlet_name: md.outlet ?? null,
+        };
+      });
+
+      const { clusters, singletons } = preCluster(inputs, clusterThresholdPct);
+      summary.singletons = singletons.length;
+
+      for (const cluster of clusters) {
+        try {
+          const match = findBestMatch(cluster.keywords, candidates, storyMatchThresholdPct);
+          const itemIds = cluster.articles.map((a) => a.id);
+
+          if (match.matchedArticleId) {
+            // Existing-story duplicate: mark items 'ignored', no cluster row.
+            const updateRes =
+              table === 'discovery_items'
+                ? await service
+                    .from('discovery_items')
+                    .update({ state: 'ignored', updated_at: new Date().toISOString() })
+                    .in('id', itemIds)
+                : await service
+                    .from('kid_discovery_items')
+                    .update({ state: 'ignored', updated_at: new Date().toISOString() })
+                    .in('id', itemIds);
+            if (updateRes.error) {
+              throw new Error(`mark-ignored failed: ${updateRes.error.message}`);
+            }
+            summary.matchedExisting += 1;
+            summary.itemsIgnored += itemIds.length;
+            continue;
+          }
+
+          // Net-new story: insert feed_clusters row, then link items.
+          const { data: clusterRow, error: clusterErr } = await service
+            .from('feed_clusters')
+            .insert({
+              title: cluster.title,
+              summary: '',
+              keywords: cluster.keywords,
+              is_active: true,
+              is_breaking: false,
+              generation_state: 'clustered',
+              primary_article_id: null,
+              category_id: null,
+              similarity_threshold: clusterThresholdPct,
+            })
+            .select('id')
+            .single();
+          if (clusterErr || !clusterRow) {
+            throw new Error(
+              `feed_clusters insert failed: ${clusterErr?.message ?? 'no row returned'}`
+            );
+          }
+
+          const linkRes =
+            table === 'discovery_items'
+              ? await service
+                  .from('discovery_items')
+                  .update({
+                    cluster_id: clusterRow.id,
+                    state: 'clustered',
+                    updated_at: new Date().toISOString(),
+                  })
+                  .in('id', itemIds)
+              : await service
+                  .from('kid_discovery_items')
+                  .update({
+                    cluster_id: clusterRow.id,
+                    state: 'clustered',
+                    updated_at: new Date().toISOString(),
+                  })
+                  .in('id', itemIds);
+          if (linkRes.error) {
+            throw new Error(`link-cluster failed: ${linkRes.error.message}`);
+          }
+
+          summary.clustersCreated += 1;
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'unknown error';
+          console.error('[newsroom.ingest.run] cluster persist failed:', message);
+          Sentry.captureException(err);
+          summary.clusterErrors.push({
+            title: cluster.title || '(untitled)',
+            error: message,
+          });
+        }
+      }
+
+      return { summary, durationMs: Date.now() - audienceStart, storyMatchMs };
+    }
+
+    const adultClusterRun = await clusterAudience('discovery_items', () =>
+      loadStoryMatchCandidates(service)
+    );
+    const kidClusterRun = await clusterAudience('kid_discovery_items', () =>
+      loadKidStoryMatchCandidates(service)
+    );
+
     // 11. Mark run completed
     const completedAt = new Date();
     const durationMs = completedAt.getTime() - startedAtMs;
@@ -317,6 +507,15 @@ export async function POST() {
       kidInserted,
       adultSkipped,
       kidSkipped,
+      clusteringAdult: adultClusterRun.summary,
+      clusteringKid: kidClusterRun.summary,
+    } as unknown as Json;
+
+    const stepTimings: Json = {
+      cluster_adult_ms: adultClusterRun.durationMs,
+      cluster_kid_ms: kidClusterRun.durationMs,
+      story_match_adult_ms: adultClusterRun.storyMatchMs,
+      story_match_kid_ms: kidClusterRun.storyMatchMs,
     } as unknown as Json;
 
     const { error: updateErr } = await service
@@ -329,6 +528,7 @@ export async function POST() {
         items_created: itemsCreated,
         items_failed: feedsFailed,
         output_summary: output,
+        step_timings_ms: stepTimings,
       })
       .eq('id', runId);
     if (updateErr) {
@@ -341,7 +541,14 @@ export async function POST() {
       action: 'newsroom.ingest.run',
       targetTable: 'pipeline_runs',
       targetId: runId,
-      newValue: { itemsCreated, durationMs },
+      newValue: {
+        itemsCreated,
+        durationMs,
+        adultClustersCreated: adultClusterRun.summary.clustersCreated,
+        adultMatchedExisting: adultClusterRun.summary.matchedExisting,
+        kidClustersCreated: kidClusterRun.summary.clustersCreated,
+        kidMatchedExisting: kidClusterRun.summary.matchedExisting,
+      },
     });
 
     // 13. Response
@@ -355,6 +562,8 @@ export async function POST() {
       kidInserted,
       skippedDuplicates,
       durationMs,
+      clusteringAdult: adultClusterRun.summary,
+      clusteringKid: kidClusterRun.summary,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'unknown error';
