@@ -11,6 +11,7 @@ type CreateBody = {
   url?: string;
   feed_type?: string;
   is_active?: boolean;
+  audience?: 'adult' | 'kid' | string; // F7 migration 114 — routes feed into adult vs kid pool
 };
 
 export async function POST(request: Request) {
@@ -27,6 +28,8 @@ export async function POST(request: Request) {
   const url = typeof body.url === 'string' ? body.url.trim() : '';
   if (!name || !url) return NextResponse.json({ error: 'name and url required' }, { status: 400 });
 
+  const rawAudience = typeof body.audience === 'string' ? body.audience : 'adult';
+  const audience: 'adult' | 'kid' = rawAudience === 'kid' ? 'kid' : 'adult';
   const row = {
     name,
     source_name:
@@ -37,6 +40,7 @@ export async function POST(request: Request) {
     feed_type: typeof body.feed_type === 'string' && body.feed_type ? body.feed_type : 'rss',
     is_active: body.is_active !== false,
     error_count: 0,
+    audience, // F7 migration 114 — feeds.audience NOT NULL, defaults to 'adult'; admin can tag 'kid' to route into kid pool
   };
 
   const service = createServiceClient();
