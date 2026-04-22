@@ -200,7 +200,8 @@ export default function WordsAdmin() {
               onChange={(e) => setNewWord(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
-                  newWord.includes(',') ? addBulk() : addSingle();
+                  if (newWord.includes(',')) addBulk();
+                  else addSingle();
                 }
               }}
               placeholder="Add word (or comma-separated)"

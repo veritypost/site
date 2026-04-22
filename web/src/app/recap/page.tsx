@@ -43,10 +43,14 @@ const LAUNCH_HIDE_RECAP = true;
 export default function RecapListPage() {
   if (LAUNCH_HIDE_RECAP) return null;
 
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- launch-hide pattern; remove when feature unhides (FIX_SESSION_1 launch-hides)
   const [loading, setLoading] = useState<boolean>(true);
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- launch-hide pattern; remove when feature unhides (FIX_SESSION_1 launch-hides)
   const [recaps, setRecaps] = useState<RecapRow[]>([]);
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- launch-hide pattern; remove when feature unhides (FIX_SESSION_1 launch-hides)
   const [canView, setCanView] = useState<boolean>(true);
 
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- launch-hide pattern; remove when feature unhides (FIX_SESSION_1 launch-hides)
   useEffect(() => {
     (async () => {
       await refreshAllPermissions();
@@ -79,10 +83,7 @@ export default function RecapListPage() {
         <p style={{ fontSize: 14, color: C.dim, lineHeight: 1.6, marginBottom: 20 }}>
           Test what you kept up with this week. See which articles you missed.
         </p>
-        <a
-          href="/profile/settings/billing"
-          style={upgradeBtn}
-        >
+        <a href="/profile/settings/billing" style={upgradeBtn}>
           Upgrade
         </a>
       </div>
@@ -93,38 +94,44 @@ export default function RecapListPage() {
     <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px 80px' }}>
       <h1 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 4px' }}>This week&apos;s recap</h1>
       <p style={{ fontSize: 13, color: C.dim, marginTop: 0, marginBottom: 20 }}>
-        A quick test on the past 7 days of coverage. Anything you miss, we surface so you can catch up.
+        A quick test on the past 7 days of coverage. Anything you miss, we surface so you can catch
+        up.
       </p>
 
       {recaps.length === 0 ? (
         <div style={{ padding: 40, textAlign: 'center', color: C.dim, fontSize: 13 }}>
           No recaps ready yet. Check back later.
         </div>
-      ) : recaps.map((r) => {
-        const done = !!r.my_attempt;
-        return (
-          <a
-            key={r.id}
-            href={`/recap/${r.id}`}
-            style={{
-              display: 'block',
-              background: C.card,
-              border: `1px solid ${done ? C.success : C.border}`,
-              borderRadius: 12,
-              padding: 14,
-              marginBottom: 10,
-              textDecoration: 'none',
-              color: C.text,
-            }}
-          >
-            <div style={{ fontSize: 15, fontWeight: 700 }}>{r.title}</div>
-            <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>
-              {r.categories?.name || 'All categories'} · Week of {new Date(r.week_start).toLocaleDateString()}
-              {done && r.my_attempt && ` · Completed ${r.my_attempt.score}/${r.my_attempt.total_questions}`}
-            </div>
-          </a>
-        );
-      })}
+      ) : (
+        recaps.map((r) => {
+          const done = !!r.my_attempt;
+          return (
+            <a
+              key={r.id}
+              href={`/recap/${r.id}`}
+              style={{
+                display: 'block',
+                background: C.card,
+                border: `1px solid ${done ? C.success : C.border}`,
+                borderRadius: 12,
+                padding: 14,
+                marginBottom: 10,
+                textDecoration: 'none',
+                color: C.text,
+              }}
+            >
+              <div style={{ fontSize: 15, fontWeight: 700 }}>{r.title}</div>
+              <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>
+                {r.categories?.name || 'All categories'} · Week of{' '}
+                {new Date(r.week_start).toLocaleDateString()}
+                {done &&
+                  r.my_attempt &&
+                  ` · Completed ${r.my_attempt.score}/${r.my_attempt.total_questions}`}
+              </div>
+            </a>
+          );
+        })
+      )}
     </div>
   );
 }

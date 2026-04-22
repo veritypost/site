@@ -69,17 +69,27 @@ const LAUNCH_HIDE_RECAP = true;
 export default function RecapPlayer() {
   if (LAUNCH_HIDE_RECAP) return null;
 
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- launch-hide pattern; remove when feature unhides (FIX_SESSION_1 launch-hides)
   const params = useParams<{ id: string }>();
   const id = params?.id;
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- launch-hide pattern; remove when feature unhides (FIX_SESSION_1 launch-hides)
   const [loading, setLoading] = useState<boolean>(true);
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- launch-hide pattern; remove when feature unhides (FIX_SESSION_1 launch-hides)
   const [recap, setRecap] = useState<RecapRow | null>(null);
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- launch-hide pattern; remove when feature unhides (FIX_SESSION_1 launch-hides)
   const [questions, setQuestions] = useState<RecapQuestion[]>([]);
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- launch-hide pattern; remove when feature unhides (FIX_SESSION_1 launch-hides)
   const [answers, setAnswers] = useState<Record<string, number>>({});
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- launch-hide pattern; remove when feature unhides (FIX_SESSION_1 launch-hides)
   const [result, setResult] = useState<SubmitResponse | null>(null);
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- launch-hide pattern; remove when feature unhides (FIX_SESSION_1 launch-hides)
   const [articleSlugs, setArticleSlugs] = useState<Record<string, string>>({});
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- launch-hide pattern; remove when feature unhides (FIX_SESSION_1 launch-hides)
   const [error, setError] = useState<string>('');
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- launch-hide pattern; remove when feature unhides (FIX_SESSION_1 launch-hides)
   const [busy, setBusy] = useState<boolean>(false);
 
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- launch-hide pattern; remove when feature unhides (FIX_SESSION_1 launch-hides)
   useEffect(() => {
     if (!id) return;
     (async () => {
@@ -123,11 +133,13 @@ export default function RecapPlayer() {
     }
     setResult(data);
 
-    const articleIds = Array.from(new Set(
-      (data.results || [])
-        .map((r) => r.article_id)
-        .filter((v): v is string => typeof v === 'string' && v.length > 0)
-    ));
+    const articleIds = Array.from(
+      new Set(
+        (data.results || [])
+          .map((r) => r.article_id)
+          .filter((v): v is string => typeof v === 'string' && v.length > 0)
+      )
+    );
     if (articleIds.length > 0) {
       const supabase = createClient();
       const { data: rows } = await supabase
@@ -147,14 +159,18 @@ export default function RecapPlayer() {
   if (loading) return <div style={{ padding: 40, color: C.dim }}>Loading…</div>;
   if (!recap) return <div style={{ padding: 40, color: C.dim }}>{error || 'Not found'}</div>;
 
-  const allAnswered = questions.length > 0 && questions.every((q) => typeof answers[q.id] === 'number');
+  const allAnswered =
+    questions.length > 0 && questions.every((q) => typeof answers[q.id] === 'number');
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px 80px' }}>
-      <a href="/recap" style={{ fontSize: 12, color: C.dim, textDecoration: 'none' }}>← All recaps</a>
+      <a href="/recap" style={{ fontSize: 12, color: C.dim, textDecoration: 'none' }}>
+        ← All recaps
+      </a>
       <h1 style={{ fontSize: 22, fontWeight: 800, margin: '6px 0 4px' }}>{recap.title}</h1>
       <div style={{ fontSize: 12, color: C.dim, marginBottom: 20 }}>
-        Week of {new Date(recap.week_start).toLocaleDateString()} · {recap.categories?.name || 'All categories'}
+        Week of {new Date(recap.week_start).toLocaleDateString()} ·{' '}
+        {recap.categories?.name || 'All categories'}
       </div>
 
       {error && <div style={{ fontSize: 12, color: C.danger, marginBottom: 10 }}>{error}</div>}
@@ -172,7 +188,9 @@ export default function RecapPlayer() {
                 marginBottom: 10,
               }}
             >
-              <div style={{ fontSize: 11, fontWeight: 700, color: C.dim, marginBottom: 4 }}>Question {qi + 1}</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.dim, marginBottom: 4 }}>
+                Question {qi + 1}
+              </div>
               <div style={{ fontSize: 14, marginBottom: 10 }}>{q.question_text}</div>
               {q.options.map((opt, oi) => {
                 const selected = answers[q.id] === oi;
@@ -235,7 +253,8 @@ export default function RecapPlayer() {
             {result.articles_missed && result.articles_missed.length > 0 && (
               <div style={{ fontSize: 13, color: C.text, marginTop: 6 }}>
                 You missed <b>{result.articles_missed.length}</b> article
-                {result.articles_missed.length === 1 ? '' : 's'} this week — surfaced below so you can catch up.
+                {result.articles_missed.length === 1 ? '' : 's'} this week — surfaced below so you
+                can catch up.
               </div>
             )}
           </div>
