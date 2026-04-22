@@ -382,8 +382,30 @@ The F7 build diverges from the snapshot in specific places. Flagging so no imple
 - Post-impl VERIFY: SHIPPED. Post-impl REGRESSION: CLEAN with 3 non-blocking adjacent concerns (prettierignore addressed in this commit; CLAUDE.md tree entry deferred to next doc-sync; `/admin/pipeline/page.tsx:34` coincidental string-literal `'EDITORIAL_GUIDE'` as UI label noted).
 - tsc clean for new file; 2 pre-existing baseline errors unchanged.
 
-### Phase 1 Task 2 — call-model.ts multi-provider helper — PENDING
-Blocked on `npm install @anthropic-ai/sdk openai` approval (both SDKs missing from `web/package.json` as of 2026-04-22).
+### Phase 1 Task 2 — call-model.ts multi-provider helper — SHIPPED 2026-04-22
+
+SDKs installed: `@anthropic-ai/sdk@^0.90.0` + `openai@^6.34.0`. `ANTHROPIC_API_KEY=` added to `web/.env.example`.
+
+Files created:
+- `web/src/lib/pipeline/call-model.ts` (437 lines) — single `callModel()` entry point routing Anthropic + OpenAI; DB-driven pricing from `ai_models` (60s cached); Anthropic prompt caching (5-min ephemeral); retry envelope (3 attempts, backoff [1000,4000,15000]ms ±20% jitter); abort-aware `sleep()` honors AbortSignal; `pipeline_costs` row written in `finally` block populating all NOT NULL columns on both success and failure paths; cache fields + cluster_id + error_type + retry_count stashed in `metadata` JSONB (Task 3 migration 114 adds real columns + backfills); lazy SDK init so module load is side-effect-free; kill switches NOT checked here (orchestrator's concern per invariant #6).
+- `web/src/lib/pipeline/cost-tracker.ts` (44 lines) — STUB. `checkCostCap()` no-ops with dev warning; `estimateCostUsd()` uses char/4 heuristic × pricing. Task 3 replaces both with real cap enforcement + pipeline_costs aggregation.
+
+Error classes exported: `ModelNotSupportedError`, `CostCapExceededError`, `ProviderAPIError`, `RetryExhaustedError`, `AbortedError`.
+
+Full F7 PM §3a four-agent flow completed:
+- Agents 1 + 2 parallel investigators returned convergent gameplans with real SDK-type reading
+- Agent 3 serial reviewer resolved 8 open questions (pipeline_run_id nullability, cache-cols→metadata interim, stub cost-tracker, retry semantics, OpenAI max_completion_tokens, TTL 60s, finally with nested try/catch, AbortSignal deferred)
+- Agent 4 adversary caught 2 real correctness bugs:
+  1. `sleep()` must be abort-aware or AbortSignal support is cosmetic
+  2. `pipeline_costs` INSERT must populate total_tokens/success/model/provider on EVERY path (all NOT NULL)
+- Agent 5 Implementation absorbed both fixes verbatim
+- Post-impl VERIFY: SHIPPED (all 12 checks pass with line-number confirmation)
+- Post-impl REGRESSION: CLEAN (no callers yet, OpenAI stub unaffected because it uses raw fetch not the SDK, npm audit vulns all pre-existing, RLS on pipeline_costs enabled, circular import is type-only and safe)
+
+Known pending (resolve in Task 3): 6 new tsc errors on `ai_models` table access — table doesn't exist in `types/database.ts` yet. Task 3 must run `npm run types:gen` after applying migration 114 to clear them. 2 ESLint warnings on unused `pricing` params fixed by `_pricing` rename post-verify.
+
+### Phase 1 Task 3 — cost-tracker.ts + migration 114 + ai_models catalog + settings seeds — PENDING
+Blocked on §3i owner "apply" for live DB writes. See execution plan for migration 114 scope (ai_models, kid_articles + kid_sources + kid_timelines + kid_quizzes, discovery_items + kid_discovery_items, ai_prompt_overrides, pipeline_runs schema additions, feeds.audience column, articles_block_kid_jwt RLS + kid-side mirrors, 17 settings rows, new rate_limits rows, kid_quizzes.retention_policy column, pipeline_costs cache/cluster/error columns + backfill from metadata JSONB).
 
 ### Phase 1 Task 3 — migration 114 + cost-tracker + settings seeds — PENDING
 Blocked on §3i owner "apply" for live DB writes.
