@@ -17,8 +17,9 @@ Verity Post is a permission-driven news platform (web + iOS) whose admin console
 | iOS adult | `VerityPost/` | SwiftUI, iOS 17+ |
 | iOS kids | `VerityPostKids/` | SwiftUI, iOS 17+ (COPPA, custom JWT) |
 | Admin console | `web/src/app/admin/*` + `web/src/app/api/admin/*` | 39 pages + 27 DS components, `@admin-verified` LOCKED |
-| Database | Supabase project `fyiwulqphgmoqullmrfn` | 114 tables |
+| Database | Supabase project `fyiwulqphgmoqullmrfn` | 100+ tables (use MCP for live count) |
 | Hosting | Vercel | Deploys on push to `main` (verified 2026-04-21) |
+| AI pipeline | `web/src/lib/pipeline/` + `web/src/app/api/admin/pipeline/*` + `web/src/app/api/newsroom/*` | F7 — 13 helper files, 12-step orchestrator, end-to-end live as of 2026-04-22 |
 
 ## Permission system (product DNA)
 
@@ -55,6 +56,10 @@ Three apps, one DB, shared Supabase.
 | `web/src/lib/appleReceipt.js` | Apple StoreKit 2 JWS chain verify (ES256, vendored root CA) |
 | `web/src/lib/kidPin.js` | PBKDF2 100k / salted kid PIN hashing + legacy SHA-256 rehash |
 | `web/src/lib/cronAuth.js` | `verifyCronAuth` — `x-vercel-cron` header OR constant-time bearer |
+| `web/src/lib/pipeline/*` | F7 AI pipeline — 12-step orchestrator helpers (cluster, story-match, scrape, clean-text, editorial-guide, call-model, cost-tracker, persist-article, plagiarism-check, prompt-overrides, render-body, errors, logger) |
+| `web/src/app/api/newsroom/ingest/run/route.ts` | F7 ingest — RSS poll → discovery_items → preCluster → story-match → feed_clusters (audience-routed; manual-trigger from /admin/newsroom) |
+| `web/src/app/api/admin/pipeline/generate/route.ts` | F7 12-step generate orchestrator — cluster lock → audience_safety_check → headline+summary+categorization → body → grounding → plagiarism → timeline → quiz → quiz_verification → persist |
+| `web/src/app/api/cron/pipeline-cleanup/route.ts` | F7 every-5-min orphan sweep (runs > 10 min stale, items in `generating` > 10 min, locks > 15 min) |
 | `schema/reset_and_rebuild_v2.sql` | canonical DR replay (see `Current Projects/FIX_SESSION_1.md` — drift known) |
 
 ## Dev tooling
