@@ -396,6 +396,6 @@ to execute. Picks marked [x] are recommendations, not yet acted on.
 - §2.3 (post-launch) DR migration list reconciliation
 - §2.4 (post-launch) 30-day perm cleanup
 
-**Still owner-only:**
-- §6.3 — `00-C` (Supabase URL typo) and `00-J` (remove ex-dev from Vercel
-  team) need owner dashboard checks. Reply with `done` / `still open`.
+**Still owner-only:** RESOLVED 2026-04-23 — owner confirmed both checked.
+`00-C` (Supabase URL) + `00-J` (Vercel ex-dev removal) marked SHIPPED in
+FIX_SESSION_1.

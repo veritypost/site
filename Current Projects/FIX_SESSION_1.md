@@ -137,6 +137,8 @@ Everything else is post-launch polish or parked per owner.
 
 **Effort:** 2 min + redeploy time
 
+**SHIPPED 2026-04-23 (owner-side):** Owner confirmed Vercel `NEXT_PUBLIC_SUPABASE_URL` is correct. Supabase calls succeed in prod.
+
 ---
 
 ### 00-D — Sentry activation
@@ -236,6 +238,8 @@ Based on `.env.example` rewrite from 2026-04-20. Each is optional; document-by-d
 **Verdict: REAL and WORTH DOING** (security-critical).
 
 **Effort:** 30 sec.
+
+**SHIPPED 2026-04-23 (owner-side):** Owner confirmed ex-dev removed from Vercel team.
 
 ---
 
