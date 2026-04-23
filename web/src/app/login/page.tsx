@@ -2,7 +2,7 @@
 // @feature-verified system_auth 2026-04-18
 'use client';
 
-import { Suspense, useState, FormEvent, CSSProperties } from 'react';
+import { Suspense, useEffect, useState, FormEvent, CSSProperties } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '../../lib/supabase/client';
 import { resolveNext } from '@/lib/authRedirect';
@@ -23,7 +23,9 @@ const C = {
   dim: '#666666',
   accent: '#111111',
   success: '#22c55e',
-  danger: '#ef4444',
+  // DA-055 — canonical `--danger`. `#ef4444` fails AA on `#fef2f2` bg;
+  // `#b91c1c` pushes above 7:1 contrast and matches web globals.css.
+  danger: '#b91c1c',
 } as const;
 
 type FocusField = 'identifier' | 'password' | null;
@@ -45,21 +47,39 @@ export default function LoginPage() {
 function LoginPageInner() {
   const searchParams = useSearchParams();
   const nextParam = resolveNext(searchParams?.get('next') ?? null);
+  const toastParam = searchParams?.get('toast') ?? null;
+  const emailParam = searchParams?.get('email') ?? null;
   usePageViewTrack('login');
   // Single input accepts either an email or a username. If the typed
   // value contains `@`, we route through Supabase signin directly;
   // otherwise we POST to /api/auth/resolve-username first and use the
   // returned email.
-  const [identifier, setIdentifier] = useState<string>('');
+  const [identifier, setIdentifier] = useState<string>(emailParam ?? '');
   const [password, setPassword] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [focused, setFocused] = useState<FocusField>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  // Inbound ?toast=... query-string notices from other flows. Currently
+  // the reset-password page bounces here with toast=reset_invalid when a
+  // recovery link is missing or expired, so the user gets a clean reason
+  // for the redirect instead of a silent landing.
+  useEffect(() => {
+    if (!toastParam) return;
+    if (toastParam === 'reset_invalid') {
+      setNotice(
+        'That reset link has expired or already been used. Enter your email below to get a new one.'
+      );
+    } else if (toastParam === 'password_updated') {
+      setNotice('Password updated. Sign in with your new password.');
+    }
+  }, [toastParam]);
 
   const field = (name: Exclude<FocusField, null>): CSSProperties => ({
     width: '100%',
-    padding: '11px 14px',
+    padding: '12px 14px',
     fontSize: '15px',
     color: C.text,
     backgroundColor: C.bg,
@@ -69,6 +89,7 @@ function LoginPageInner() {
     boxSizing: 'border-box',
     fontFamily: 'inherit',
     transition: 'border-color 0.15s',
+    minHeight: '44px',
   });
 
   const handleOAuth = async (provider: OAuthProvider) => {
@@ -216,6 +237,8 @@ function LoginPageInner() {
     }
   };
 
+  const canSubmit = !loading && identifier.trim().length > 0 && password.length > 0;
+
   return (
     <div
       style={{
@@ -224,7 +247,7 @@ function LoginPageInner() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '24px 16px',
+        padding: '32px 16px',
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         boxSizing: 'border-box',
       }}
@@ -236,7 +259,7 @@ function LoginPageInner() {
           borderRadius: '18px',
           padding: '40px 36px',
           width: '100%',
-          maxWidth: '420px',
+          maxWidth: '480px',
           boxSizing: 'border-box',
         }}
       >
@@ -255,11 +278,29 @@ function LoginPageInner() {
         </a>
 
         <h1 style={{ fontSize: '26px', fontWeight: 700, color: C.text, margin: '0 0 6px 0' }}>
-          Welcome back
+          Welcome back.
         </h1>
-        <p style={{ fontSize: '14px', color: C.dim, margin: '0 0 28px 0' }}>
-          Sign in to your account to continue reading
+        <p style={{ fontSize: '14px', color: C.dim, margin: '0 0 24px 0' }}>
+          Sign in to your account to keep reading.
         </p>
+
+        {notice && (
+          <div
+            role="status"
+            style={{
+              padding: '10px 14px',
+              borderRadius: 10,
+              background: '#fef3c7',
+              border: '1px solid #fcd34d',
+              color: '#78350f',
+              fontSize: 13,
+              marginBottom: 16,
+              lineHeight: 1.5,
+            }}
+          >
+            {notice}
+          </div>
+        )}
 
         {error && (
           <div
@@ -267,7 +308,7 @@ function LoginPageInner() {
             role="alert"
             style={{
               padding: '10px 14px',
-              borderRadius: 8,
+              borderRadius: 10,
               background: '#fef2f2',
               border: `1px solid ${C.danger}33`,
               color: C.danger,
@@ -279,12 +320,95 @@ function LoginPageInner() {
           </div>
         )}
 
+        {/* Apple HIG — Sign in with Apple sits above password fields. */}
+        <div
+          style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '18px' }}
+        >
+          <button
+            type="button"
+            onClick={() => handleOAuth('apple')}
+            style={{
+              width: '100%',
+              minHeight: '44px',
+              padding: '12px',
+              fontSize: '15px',
+              fontWeight: 600,
+              color: '#ffffff',
+              backgroundColor: '#000000',
+              border: '1px solid #000000',
+              borderRadius: '10px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              fontFamily: 'inherit',
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#ffffff" aria-hidden="true">
+              <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
+            </svg>
+            Sign in with Apple
+          </button>
+          <button
+            type="button"
+            onClick={() => handleOAuth('google')}
+            style={{
+              width: '100%',
+              minHeight: '44px',
+              padding: '12px',
+              fontSize: '15px',
+              fontWeight: 500,
+              color: C.text,
+              backgroundColor: C.bg,
+              border: `1px solid ${C.border}`,
+              borderRadius: '10px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              fontFamily: 'inherit',
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+              <path
+                d="M44.5 20H24v8.5h11.8C34.7 33.9 30.1 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 5.1 29.6 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21c10.5 0 20-7.6 20-21 0-1.3-.2-2.7-.5-4z"
+                fill="#FFC107"
+              />
+              <path
+                d="M6.3 14.7l7 5.1C15.1 16 19.2 13 24 13c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 5.1 29.6 3 24 3c-7.6 0-14.2 4.3-17.7 11.7z"
+                fill="#FF3D00"
+              />
+              <path
+                d="M24 45c5.5 0 10.4-1.9 14.3-5.1l-6.6-5.6C29.6 35.9 26.9 37 24 37c-6.1 0-10.7-3.1-11.8-8.5l-7 5.4C8.9 41.1 15.9 45 24 45z"
+                fill="#4CAF50"
+              />
+              <path
+                d="M44.5 20H24v8.5h11.8c-.5 2.7-2 5-4.2 6.5l6.6 5.6C41.8 37.3 45 31 45 24c0-1.3-.2-2.7-.5-4z"
+                fill="#1976D2"
+              />
+            </svg>
+            Continue with Google
+          </button>
+        </div>
+
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            marginBottom: '18px',
+          }}
+        >
+          <div style={{ flex: 1, height: '1px', backgroundColor: C.border }} />
+          <span style={{ fontSize: '12px', color: C.dim, whiteSpace: 'nowrap' }}>
+            or sign in with email
+          </span>
+          <div style={{ flex: 1, height: '1px', backgroundColor: C.border }} />
+        </div>
+
         <form onSubmit={handleSubmit} aria-describedby={error ? 'login-form-error' : undefined}>
-          {/* DA-057 / DA-058 — inputs have matching id + htmlFor so
-              clicking the label focuses the field and screen readers
-              announce the label on focus. Error banner above carries
-              id="login-form-error" and the form aria-describedby
-              threads it into focus announcements. */}
           <div style={{ marginBottom: '14px' }}>
             <label
               htmlFor="login-identifier"
@@ -311,10 +435,11 @@ function LoginPageInner() {
               autoComplete="username"
               autoCapitalize="none"
               spellCheck={false}
+              inputMode="email"
             />
           </div>
 
-          <div style={{ marginBottom: '10px' }}>
+          <div style={{ marginBottom: '8px' }}>
             <label
               htmlFor="login-password"
               style={{
@@ -332,17 +457,14 @@ function LoginPageInner() {
                 id="login-password"
                 name="password"
                 type={showPassword ? 'text' : 'password'}
-                placeholder="••••••••"
+                placeholder="Your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onFocus={() => setFocused('password')}
                 onBlur={() => setFocused(null)}
-                style={{ ...field('password'), paddingRight: '56px' }}
+                style={{ ...field('password'), paddingRight: '60px' }}
                 autoComplete="current-password"
               />
-              {/* DA-009 / DA-056 — show-password toggle has an
-                  aria-label + aria-pressed state so screen readers
-                  announce it as a toggle button. */}
               <button
                 type="button"
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
@@ -350,7 +472,7 @@ function LoginPageInner() {
                 onClick={() => setShowPassword(!showPassword)}
                 style={{
                   position: 'absolute',
-                  right: '14px',
+                  right: '10px',
                   top: '50%',
                   transform: 'translateY(-50%)',
                   background: 'none',
@@ -359,6 +481,8 @@ function LoginPageInner() {
                   fontSize: '12px',
                   color: C.dim,
                   fontFamily: 'inherit',
+                  padding: '6px 8px',
+                  minHeight: '32px',
                 }}
               >
                 {showPassword ? 'Hide' : 'Show'}
@@ -376,7 +500,12 @@ function LoginPageInner() {
           >
             <a
               href="/forgot-password"
-              style={{ fontSize: '13px', color: C.accent, fontWeight: 500, textDecoration: 'none' }}
+              style={{
+                fontSize: '13px',
+                color: C.accent,
+                fontWeight: 500,
+                textDecoration: 'none',
+              }}
             >
               Forgot password?
             </a>
@@ -384,108 +513,52 @@ function LoginPageInner() {
 
           <button
             type="submit"
-            disabled={loading || !identifier || !password}
+            disabled={!canSubmit}
             style={{
               width: '100%',
+              minHeight: '48px',
               padding: '13px',
               fontSize: '15px',
               fontWeight: 600,
               color: '#fff',
-              backgroundColor: loading || !identifier || !password ? '#cccccc' : C.accent,
+              backgroundColor: !canSubmit ? '#cccccc' : C.accent,
               border: 'none',
               borderRadius: '10px',
-              cursor: loading || !identifier || !password ? 'not-allowed' : 'pointer',
-              marginBottom: '20px',
+              cursor: !canSubmit ? 'not-allowed' : 'pointer',
+              marginBottom: '22px',
               fontFamily: 'inherit',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
             }}
           >
-            {loading ? 'Signing in...' : 'Sign in'}
+            {loading && (
+              <span
+                aria-hidden="true"
+                style={{
+                  width: 14,
+                  height: 14,
+                  border: '2px solid rgba(255,255,255,0.4)',
+                  borderTopColor: '#fff',
+                  borderRadius: '50%',
+                  display: 'inline-block',
+                  animation: 'vpSpin 0.7s linear infinite',
+                }}
+              />
+            )}
+            {loading ? 'Signing in…' : 'Sign in'}
           </button>
+          <style>{`@keyframes vpSpin{to{transform:rotate(360deg)}}`}</style>
         </form>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
-          <div style={{ flex: 1, height: '1px', backgroundColor: C.border }} />
-          <span style={{ fontSize: '12px', color: C.dim, whiteSpace: 'nowrap' }}>
-            or sign in with
-          </span>
-          <div style={{ flex: 1, height: '1px', backgroundColor: C.border }} />
-        </div>
-
-        <div style={{ display: 'flex', gap: '10px', marginBottom: '24px' }}>
-          <button
-            type="button"
-            onClick={() => handleOAuth('google')}
-            style={{
-              flex: 1,
-              padding: '11px',
-              fontSize: '14px',
-              fontWeight: 500,
-              color: C.text,
-              backgroundColor: C.bg,
-              border: `1px solid ${C.border}`,
-              borderRadius: '10px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              fontFamily: 'inherit',
-            }}
-          >
-            <svg width="16" height="16" viewBox="0 0 48 48" fill="none">
-              <path
-                d="M44.5 20H24v8.5h11.8C34.7 33.9 30.1 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 5.1 29.6 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21c10.5 0 20-7.6 20-21 0-1.3-.2-2.7-.5-4z"
-                fill="#FFC107"
-              />
-              <path
-                d="M6.3 14.7l7 5.1C15.1 16 19.2 13 24 13c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 5.1 29.6 3 24 3c-7.6 0-14.2 4.3-17.7 11.7z"
-                fill="#FF3D00"
-              />
-              <path
-                d="M24 45c5.5 0 10.4-1.9 14.3-5.1l-6.6-5.6C29.6 35.9 26.9 37 24 37c-6.1 0-10.7-3.1-11.8-8.5l-7 5.4C8.9 41.1 15.9 45 24 45z"
-                fill="#4CAF50"
-              />
-              <path
-                d="M44.5 20H24v8.5h11.8c-.5 2.7-2 5-4.2 6.5l6.6 5.6C41.8 37.3 45 31 45 24c0-1.3-.2-2.7-.5-4z"
-                fill="#1976D2"
-              />
-            </svg>
-            Google
-          </button>
-          <button
-            type="button"
-            onClick={() => handleOAuth('apple')}
-            style={{
-              flex: 1,
-              padding: '11px',
-              fontSize: '14px',
-              fontWeight: 500,
-              color: C.text,
-              backgroundColor: C.bg,
-              border: `1px solid ${C.border}`,
-              borderRadius: '10px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              fontFamily: 'inherit',
-            }}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill={C.text}>
-              <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
-            </svg>
-            Apple
-          </button>
-        </div>
-
         <p style={{ textAlign: 'center', fontSize: '13px', color: C.dim, margin: 0 }}>
-          Don&apos;t have an account?{' '}
+          New here?{' '}
           <a
             href="/signup"
             style={{ color: C.accent, fontWeight: 600, fontSize: '13px', textDecoration: 'none' }}
           >
-            Sign up
+            Create an account
           </a>
         </p>
       </div>
