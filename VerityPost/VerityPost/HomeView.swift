@@ -146,10 +146,10 @@ struct HomeView: View {
                         .padding(.top, 60)
                     } else if filteredStories.isEmpty {
                         VStack(spacing: 8) {
-                            Text("No stories found")
+                            Text("No stories yet")
                                 .font(.system(.callout, design: .default, weight: .semibold))
                                 .foregroundColor(VP.text)
-                            Text("Check back soon for new stories, or try a different category.")
+                            Text("No stories in this category yet. Try another or check back soon.")
                                 .font(.footnote)
                                 .foregroundColor(VP.dim)
                                 .multilineTextAlignment(.center)
@@ -273,7 +273,10 @@ struct HomeView: View {
                         Image(systemName: showSearch ? "xmark" : "magnifyingglass")
                             .font(.headline)
                             .foregroundColor(VP.dim)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
+                    .accessibilityLabel(showSearch ? "Close search" : "Search stories")
                 }
             }
         }

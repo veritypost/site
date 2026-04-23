@@ -174,6 +174,7 @@ struct KidsAppRoot: View {
         .buttonStyle(.plain)
         .padding(.leading, 20)
         .padding(.top, 60)
+        .accessibilityLabel("Close")
     }
 }
 

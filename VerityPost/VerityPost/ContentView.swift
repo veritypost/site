@@ -6,20 +6,51 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject var auth: AuthViewModel
 
+    // Animated splash state — drives a 500-700ms branded fade-in while
+    // the session-check task runs in the background. Kept cheap: a single
+    // opacity + scale transition, no network coupling, so it completes
+    // even on a cold start with no connectivity.
+    @State private var splashLogoOpacity: Double = 0
+    @State private var splashWordmarkOpacity: Double = 0
+    @State private var splashLogoScale: CGFloat = 0.92
+
     var body: some View {
         Group {
             if auth.isLoading {
-                // Splash
+                // Splash — branded fade-in. VP tile scales + fades, wordmark
+                // follows at +200ms, ProgressView appears at +500ms so it
+                // never flashes ahead of the branding.
                 ZStack {
                     VP.bg.ignoresSafeArea()
-                    VStack(spacing: 12) {
+                    VStack(spacing: 14) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(VP.text)
+                                .frame(width: 64, height: 64)
+                                .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
+                            Text("VP")
+                                .font(.system(.title, design: .default, weight: .black))
+                                .foregroundColor(.white)
+                        }
+                        .opacity(splashLogoOpacity)
+                        .scaleEffect(splashLogoScale)
+                        .accessibilityHidden(true)
+
                         Text("Verity Post")
                             .font(.system(.largeTitle, design: .default, weight: .bold))
                             .tracking(-1)
                             .foregroundColor(VP.text)
+                            .opacity(splashWordmarkOpacity)
+
                         ProgressView()
+                            .tint(VP.dim)
+                            .opacity(splashWordmarkOpacity)
+                            .padding(.top, 4)
                     }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Verity Post. Loading.")
                 }
+                .onAppear { runSplashIntro() }
             } else if auth.splashTimedOut {
                 // Fallback when the session check couldn't complete.
                 ZStack {
@@ -73,6 +104,19 @@ struct ContentView: View {
             PushRegistration.shared.setCurrentUser(newId)
         }
         .preferredColorScheme(.light)
+    }
+
+    // 600ms branded splash sequence. Skips re-running if the splash is
+    // hidden and re-shown (state is preserved on the View).
+    private func runSplashIntro() {
+        guard splashLogoOpacity == 0 else { return }
+        withAnimation(.easeOut(duration: 0.35)) {
+            splashLogoOpacity = 1
+            splashLogoScale = 1.0
+        }
+        withAnimation(.easeOut(duration: 0.35).delay(0.15)) {
+            splashWordmarkOpacity = 1
+        }
     }
 }
 
@@ -164,20 +208,26 @@ struct MainTabView: View {
             Button("Sign in") { showLogin = true }
                 .font(.system(.footnote, design: .default, weight: .semibold))
                 .foregroundColor(.white)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(Color.white.opacity(0.18))
-                .cornerRadius(6)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 44)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.white.opacity(0.18))
+                )
             Button {
                 auth.sessionExpired = false
             } label: {
                 Image(systemName: "xmark")
-                    .font(.system(.caption2, design: .default, weight: .bold))
+                    .font(.system(.caption, design: .default, weight: .bold))
                     .foregroundColor(.white)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
+            .accessibilityLabel("Dismiss session expired banner")
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.leading, 16)
+        .padding(.trailing, 4)
+        .padding(.vertical, 4)
         .background(VP.accent)
     }
 }

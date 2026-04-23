@@ -57,21 +57,35 @@ struct GreetingScene: View {
     }
 
     var body: some View {
+        // Read the actual top inset from GeometryReader so the band's
+        // greeting text always clears the Dynamic Island (54pt) / notch
+        // (47pt) / older devices (20pt) without hardcoding any of them.
+        GeometryReader { proxy in
+            let topInset = proxy.safeAreaInsets.top
+            mainContent(topInset: topInset)
+        }
+    }
+
+    private func mainContent(topInset: CGFloat) -> some View {
         ZStack(alignment: .top) {
             K.bg.ignoresSafeArea()
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
-                    band
+                    band(topInset: topInset)
                         .offset(y: bandOffset)
                         .opacity(bandOpacity)
 
-                    streakCard
-                        .padding(.horizontal, 20)
-                        .padding(.top, 20)
-                        .offset(y: streakOffset)
-                        .opacity(streakOpacity)
-                        .onTapGesture { onStreakTap?() }
+                    Button { onStreakTap?() } label: {
+                        streakCard
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 20)
+                    .offset(y: streakOffset)
+                    .opacity(streakOpacity)
+                    .accessibilityLabel("\(streakDays) day streak. \(streakSubtext). View streak details.")
+                    .accessibilityHint("Opens your streak details")
 
                     categoryGrid
                         .padding(.horizontal, 20)
@@ -99,8 +113,13 @@ struct GreetingScene: View {
 
     // MARK: Band
 
-    private var band: some View {
-        ZStack(alignment: .bottomLeading) {
+    private func band(topInset: CGFloat) -> some View {
+        // Floor to 24 so previews / non-safe-area contexts still get a
+        // reasonable header inset; cap at 80 so the unlikely XL inset
+        // doesn't push content off-screen.
+        let chromeInset = max(min(topInset + 28, 80), 28)
+        let bandHeight: CGFloat = 192 + chromeInset
+        return ZStack(alignment: .bottomLeading) {
             LinearGradient(
                 colors: [K.teal, K.tealDark, K.purple],
                 startPoint: .topLeading,
@@ -167,9 +186,9 @@ struct GreetingScene: View {
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 28)
-            .padding(.top, 70)
+            .padding(.top, chromeInset)
         }
-        .frame(height: 220)
+        .frame(height: bandHeight)
         .clipShape(
             UnevenRoundedRectangle(
                 cornerRadii: .init(bottomLeading: 28, bottomTrailing: 28)

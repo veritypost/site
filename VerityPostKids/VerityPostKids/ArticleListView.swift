@@ -59,6 +59,7 @@ struct ArticleListView: View {
                             .clipShape(Circle())
                             .overlay(Circle().strokeBorder(K.border, lineWidth: 1))
                     }
+                    .accessibilityLabel("Close articles")
                 }
             }
             .fullScreenCover(item: $openArticle) { article in
@@ -69,17 +70,31 @@ struct ArticleListView: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 14) {
             Image(systemName: "newspaper")
                 .font(.system(.largeTitle, weight: .bold))
                 .foregroundStyle(K.dim)
-            Text("No articles here yet.\nCheck back soon!")
+                .accessibilityHidden(true)
+            Text("No articles in this category yet.\nTry another or go back home.")
                 .font(.system(.subheadline, design: .rounded, weight: .medium))
                 .foregroundStyle(K.dim)
                 .multilineTextAlignment(.center)
+
+            Button { onClose() } label: {
+                Text("Go Home")
+                    .font(.system(.subheadline, design: .rounded, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: 180, minHeight: 44)
+                    .background(K.teal)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 4)
+            .accessibilityLabel("Go back to home")
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 60)
+        .padding(.vertical, 50)
+        .padding(.horizontal, 20)
         .background(K.card)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }

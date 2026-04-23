@@ -89,11 +89,19 @@ struct PairCodeView: View {
                 .disabled(!canSubmit || isPairing || isLockedOut)
                 .opacity((canSubmit && !isLockedOut) ? 1.0 : 0.6)
 
-                Text("The grown-up can make a code in the Verity Post app or on veritypost.com.")
-                    .font(.system(.caption, design: .rounded, weight: .medium))
-                    .foregroundStyle(K.dim)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 8)
+                VStack(spacing: 8) {
+                    Text("Ask a grown-up to sign in at veritypost.com, open the kids dashboard, and tap \u{201C}Get a pair code.\u{201D} They\u{2019}ll read out an 8-character code for you to type in here.")
+                        .font(.system(.caption, design: .rounded, weight: .medium))
+                        .foregroundStyle(K.dim)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 8)
+
+                    Link("Need help?", destination: URL(string: "mailto:support@veritypost.com?subject=Kids%20app%20pair%20code%20help")!)
+                        .font(.system(.caption, design: .rounded, weight: .semibold))
+                        .foregroundStyle(K.teal)
+                        .frame(minHeight: 44)
+                        .accessibilityLabel("Need help — email support")
+                }
 
                 Spacer()
             }
