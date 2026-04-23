@@ -99,32 +99,10 @@ export async function setUser(userId, extra) {
   Sentry.setUser(userId ? { id: userId, ...(extra || {}) } : null);
 }
 
-// ---- Cron heartbeat ------------------------------------------------
-// Y6 (cron observability): explicit phase markers (start/end/error) on
-// top of the existing withCronLog wrapper. withCronLog writes one row
-// per run with event_type='cron:NAME'; logCronHeartbeat writes
-// event_type='cron:NAME:PHASE' rows so an operator can tell "fired but
-// died early" from "never fired" from "fired clean" without inferring
-// from a single end-of-run row.
-//
-// Insert is best-effort: any failure is swallowed (console.error only)
-// so a webhook_log outage cannot bring down a cron job.
-export async function logCronHeartbeat(name, phase, payload) {
-  try {
-    const { createServiceClient } = await import('@/lib/supabase/server');
-    const service = createServiceClient();
-    await service.from('webhook_log').insert({
-      source: 'cron',
-      event_type: `cron:${name}:${phase}`,
-      payload: payload ?? {},
-    });
-  } catch (err) {
-    console.error(
-      `[observability.heartbeat] cron:${name}:${phase} insert failed:`,
-      err?.message || err
-    );
-  }
-}
+// logCronHeartbeat lives in lib/cronHeartbeat.js — split out because
+// this module is imported by ObservabilityInit.tsx (client) and
+// webpack was pulling @/lib/supabase/server (with next/headers) into
+// the client bundle. Cron routes import from cronHeartbeat directly.
 
 // ---- Analytics stubs (deferred) -----------------------------------
 // PostHog wiring is intentionally out of scope for the rapid repair

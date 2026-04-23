@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { verifyCronAuth } from '@/lib/cronAuth';
 import { withCronLog } from '@/lib/cronLog';
-import { logCronHeartbeat } from '@/lib/observability';
+import { logCronHeartbeat } from '@/lib/cronHeartbeat';
 import { safeErrorResponse } from '@/lib/apiErrors';
 
 const CRON_NAME = 'freeze-grace';

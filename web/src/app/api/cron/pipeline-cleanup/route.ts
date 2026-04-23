@@ -41,7 +41,7 @@ import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { verifyCronAuth } from '@/lib/cronAuth';
 import { withCronLog } from '@/lib/cronLog';
-import { logCronHeartbeat } from '@/lib/observability';
+import { logCronHeartbeat } from '@/lib/cronHeartbeat';
 
 const CRON_NAME = 'pipeline-cleanup';
 

@@ -5,7 +5,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { renderTemplate, sendEmail } from '@/lib/email';
 import { verifyCronAuth } from '@/lib/cronAuth';
 import { withCronLog } from '@/lib/cronLog';
-import { logCronHeartbeat } from '@/lib/observability';
+import { logCronHeartbeat } from '@/lib/cronHeartbeat';
 
 const CRON_NAME = 'send-emails';
 

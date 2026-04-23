@@ -5,7 +5,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { withApnsSession, resolveApnsEnv } from '@/lib/apns';
 import { verifyCronAuth } from '@/lib/cronAuth';
 import { withCronLog } from '@/lib/cronLog';
-import { logCronHeartbeat } from '@/lib/observability';
+import { logCronHeartbeat } from '@/lib/cronHeartbeat';
 import { getPlanLimitValue } from '@/lib/plans';
 
 const CRON_NAME = 'send-push';
