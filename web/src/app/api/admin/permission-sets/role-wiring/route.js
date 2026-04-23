@@ -1,4 +1,3 @@
-// @admin-verified 2026-04-23
 // @migrated-to-permissions 2026-04-19
 // @feature-verified admin_api 2026-04-19
 import { NextResponse } from 'next/server';

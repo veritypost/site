@@ -1,4 +1,3 @@
-// @admin-verified 2026-04-23
 'use client';
 
 // Word lists admin — reserved_usernames + blocked_words. Writes go

@@ -1,4 +1,3 @@
-// @admin-verified 2026-04-23
 'use client';
 
 // Admin review surface for GDPR/CCPA data requests (exports + deletions).

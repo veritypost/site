@@ -1,4 +1,3 @@
-// @admin-verified 2026-04-23
 'use client';
 
 import { ADMIN_C, F, S } from '../../lib/adminPalette';

@@ -1,4 +1,3 @@
-// @admin-verified 2026-04-23
 'use client';
 
 // /admin/users/[id]/permissions -- user-centric permissions console.

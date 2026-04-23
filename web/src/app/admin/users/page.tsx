@@ -1,4 +1,3 @@
-// @admin-verified 2026-04-23
 'use client';
 
 // Users admin — the most-used admin page. List + search + role/plan

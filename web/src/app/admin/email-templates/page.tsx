@@ -1,4 +1,3 @@
-// @admin-verified 2026-04-23
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';

@@ -16,7 +16,7 @@ Verity Post is a permission-driven news platform (web + iOS) whose admin console
 | Web (adult, desktop + mobile) | `web/` | Next.js 14 app router, TypeScript |
 | iOS adult | `VerityPost/` | SwiftUI, iOS 17+ |
 | iOS kids | `VerityPostKids/` | SwiftUI, iOS 17+ (COPPA, custom JWT) |
-| Admin console | `web/src/app/admin/*` + `web/src/app/api/admin/*` | 39 pages + 27 DS components, `@admin-verified` LOCKED |
+| Admin console | `web/src/app/admin/*` + `web/src/app/api/admin/*` | 39 pages + 27 DS components, highest blast radius — every change runs the 6-agent ship pattern |
 | Database | Supabase project `fyiwulqphgmoqullmrfn` | 100+ tables (use MCP for live count) |
 | Hosting | Vercel | Deploys on push to `main` (verified 2026-04-21) |
 | AI pipeline | `web/src/lib/pipeline/` + `web/src/app/api/admin/pipeline/*` + `web/src/app/api/newsroom/*` | F7 — 13 helper files, 12-step orchestrator, end-to-end live; Newsroom redesign 2026-04-22 (`b269e17`): single-page workspace with adult/kid tabs, dynamic taxonomy + prompt-preset library, inline cluster mutations (move/merge/split/dismiss), 14-day auto-archive |
@@ -84,4 +84,4 @@ Rate-limited 429 responses include `Retry-After: <windowSec>`.
 
 ## Test accounts
 
-After superadmin removal (TODO #1): **19 test + 30 community + 2 kids** (Emma, Liam under `test_family`). Seeds in `test-data/accounts.json`. Script: `scripts/seed-test-accounts.js` (path-broken — TODO #2).
+After superadmin removal (TODO #1): **19 test + 30 community + 2 kids** (Emma, Liam under `test_family`). Seeds in `test-data/accounts.json`. Manual SQL is the canonical seed path; `scripts/seed-test-accounts.js` was retired (file already absent on disk; verified 2026-04-23).

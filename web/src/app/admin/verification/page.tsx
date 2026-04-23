@@ -1,4 +1,3 @@
-// @admin-verified 2026-04-23
 'use client';
 
 // D3: editorial review of expert / educator / journalist applications.

@@ -1,4 +1,3 @@
-// @admin-verified 2026-04-23
 'use client';
 
 // Admin settings page. Light-themed (ADMIN_C_LIGHT parity retained via

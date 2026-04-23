@@ -1,4 +1,3 @@
-// @admin-verified 2026-04-23
 'use client';
 
 // Access codes + access requests admin. Two tabs, one table each,

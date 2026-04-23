@@ -94,7 +94,7 @@ Three apps, one DB. All connected via Supabase (`fyiwulqphgmoqullmrfn`).
 │       │   ├── profile/
 │       │   │   ├── settings/     the 3800-line settings page — giant, careful edits
 │       │   │   └── kids/         parent-side kid management
-│       │   ├── admin/            @admin-verified LOCK — no edits without approval
+│       │   ├── admin/            highest blast radius — every change runs the 6-agent ship pattern
 │       │   ├── login/ signup/ verify-email/ welcome/ forgot-password/ reset-password/
 │       │   ├── leaderboard/ bookmarks/ messages/ notifications/ search/
 │       │   ├── kids-app/         anon landing for /kids/* redirect
@@ -214,7 +214,8 @@ There's no second xlsx. `permissions_matrix.xlsx` was deleted 2026-04-20. `permi
 
 ## Conventions to internalize
 
-- File markers: `@migrated-to-permissions <date>` = file moved to new perms system. `@admin-verified <date>` = LOCKED, do not edit without approval.
+- File markers: `@migrated-to-permissions <date>` = file moved to new perms system.
+- **Admin code = highest blast radius.** Every change in `web/src/app/admin/`, `web/src/app/api/admin/`, `web/src/components/admin/`, or `web/src/middleware.js` runs the 6-agent ship pattern (4 pre-impl + 2 post-impl). No exceptions, no special markers — the rule applies categorically because the surface is sensitive.
 - Service client for mutations. User client for reads-under-RLS.
 - Generic error strings in API responses; real errors go to server logs + Sentry.
 - Commit style: `<area>(#<item>): <short title>` (Conventional Commits with FIX_SESSION_1 item ID). Every commit references an item.
@@ -266,7 +267,6 @@ Either it has a SHIPPED block or it's still open. No third state.
 - No committing without acceptance criteria met
 - No silent scope expansion — pause and name it if the task grew
 - No hardcoded values when a DB table already holds them
-- No touching `@admin-verified` files without approval
 - No skipping Phase 1 on a new session
 
 ## Start
