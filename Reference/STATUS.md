@@ -20,6 +20,7 @@ Verity Post is a permission-driven news platform (web + iOS) whose admin console
 | Database | Supabase project `fyiwulqphgmoqullmrfn` | 100+ tables (use MCP for live count) |
 | Hosting | Vercel | Deploys on push to `main` (verified 2026-04-21) |
 | AI pipeline | `web/src/lib/pipeline/` + `web/src/app/api/admin/pipeline/*` + `web/src/app/api/newsroom/*` | F7 — 13 helper files, 12-step orchestrator, end-to-end live; Newsroom redesign 2026-04-22 (`b269e17`): single-page workspace with adult/kid tabs, dynamic taxonomy + prompt-preset library, inline cluster mutations (move/merge/split/dismiss), 14-day auto-archive |
+| Profile + Leaderboard | `web/src/app/profile/page.tsx` + `web/src/app/u/[username]/page.tsx` + `web/src/lib/leaderboardPeriod.ts` + `VerityPost/VerityPost/{ProfileView,PublicProfileView,LeaderboardView,LeaderboardPeriod}.swift` | Audit-consensus parity pass 2026-04-23 (SHA TBD), 7-agent review — canonical 5-stat set (Articles read / Quizzes passed / Comments / Followers / Following) on all 4 surfaces with comma-thousands formatting, public-profile stats gated on `users.show_activity`, shared `LeaderboardPeriod` (rolling -7d / -30d / null) replaces inline date math + iOS calendar-bucket shape |
 
 ## Permission system (product DNA)
 
