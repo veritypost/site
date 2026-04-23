@@ -1098,14 +1098,14 @@ export default function StoryPage() {
                         fontSize: 10,
                         fontWeight: 800,
                         color: '#ffffff',
-                        background: '#ef4444',
+                        background: 'var(--breaking)',
                         padding: '2px 6px',
                         borderRadius: 4,
                         letterSpacing: '0.05em',
                         textTransform: 'uppercase',
                       }}
                     >
-                      Breaking
+                      BREAKING
                     </span>
                   )}
                   {story.is_developing && (
@@ -1567,7 +1567,7 @@ export default function StoryPage() {
                   }}
                 />
                 {reportError && (
-                  <div role="alert" style={{ marginTop: 8, fontSize: 12, color: '#ef4444' }}>
+                  <div role="alert" style={{ marginTop: 8, fontSize: 12, color: 'var(--danger)' }}>
                     {reportError}
                   </div>
                 )}

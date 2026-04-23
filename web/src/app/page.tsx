@@ -834,7 +834,7 @@ export default function HomePage() {
                       cursor: 'pointer',
                       fontSize: 12,
                       fontWeight: 600,
-                      color: '#ef4444',
+                      color: 'var(--danger)',
                     }}
                   >
                     Clear all
@@ -1047,7 +1047,7 @@ export default function HomePage() {
         >
           <div
             style={{
-              background: '#ef4444',
+              background: 'var(--breaking)',
               color: '#fff',
               padding: '10px 16px',
               overflow: 'hidden',
@@ -1294,7 +1294,7 @@ export default function HomePage() {
                               fontSize: 10,
                               fontWeight: 800,
                               color: '#ffffff',
-                              background: '#ef4444',
+                              background: 'var(--breaking)',
                               padding: '2px 6px',
                               borderRadius: 4,
                               letterSpacing: '0.05em',

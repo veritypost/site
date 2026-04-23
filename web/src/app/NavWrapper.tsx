@@ -503,7 +503,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
                       width: 8,
                       height: 8,
                       borderRadius: 4,
-                      background: '#dc2626',
+                      background: 'var(--danger)',
                     }}
                   />
                 )}

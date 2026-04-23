@@ -18,7 +18,7 @@ export default function Error({ error, reset }) {
 
   return (
     <div style={{ padding: '40px', textAlign: 'center' }}>
-      <p style={{ color: '#ef4444', marginBottom: '16px' }}>
+      <p style={{ color: '#b91c1c', marginBottom: '16px' }}>
         Failed to load article. Please try again.
       </p>
       <button

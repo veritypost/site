@@ -51,6 +51,12 @@
      on that background and keeps readable contrast on white too. */
   --danger: #b91c1c;
   --wrong: #b91c1c;
+  /* C10 — saturated alert red used by the BREAKING banner (home + story).
+     Distinct from `--danger` text because the banner runs white text on
+     the colored fill at large weight — passes AA at the saturated hue
+     and the punchier red is the signal we want for "live news". Mirrors
+     iOS `VP.breaking` exactly. */
+  --breaking: #ef4444;
   /* DA-068 — `--purple` was defined as black (#111111), which confused
      cross-referencing. Token removed from this chunk; audit callers
      before deleting entirely. */

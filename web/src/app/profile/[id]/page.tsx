@@ -441,7 +441,7 @@ export default function PublicProfilePage() {
         }}
       >
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 16, color: '#ef4444', marginBottom: 12 }}>{error}</div>
+          <div style={{ fontSize: 16, color: 'var(--danger)', marginBottom: 12 }}>{error}</div>
           <a href="/" style={{ fontSize: 14, color: C.accent, textDecoration: 'none' }}>
             Go home
           </a>

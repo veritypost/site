@@ -18,8 +18,14 @@ enum VP {
     static let right = Color(hex: "22c55e")
     static let warn = Color(hex: "f59e0b")
     static let amber = Color(hex: "f59e0b")
-    static let danger = Color(hex: "ef4444")
-    static let wrong = Color(hex: "ef4444")
+    // C10 / DA-055 — canonical `--danger` matches web globals.css. `#ef4444`
+    // fails AA on the pale-red backgrounds used for error copy (`#fef2f2`);
+    // `#b91c1c` pushes the ratio above 7:1. The saturated alert-red now
+    // lives on `breaking` for the home banner and other "breaking news"
+    // signals that want the punchier hue.
+    static let danger = Color(hex: "b91c1c")
+    static let wrong = Color(hex: "b91c1c")
+    static let breaking = Color(hex: "ef4444")
     static let purple = Color(hex: "111111")
     static let tlLine = Color(hex: "e5e5e5")
     static let tlDot = Color(hex: "d4d4d4")

@@ -330,7 +330,7 @@ struct StoryDetailView: View {
                     .font(.system(.caption2, design: .default, weight: .semibold))
                     .tracking(1)
                     .foregroundColor(VP.accent)
-                if story.isBreaking == true { badge("BREAKING", color: VP.wrong) }
+                if story.isBreaking == true { badge("BREAKING", color: VP.breaking) }
                 if story.isDeveloping == true { badge("DEVELOPING", color: VP.amber) }
                 Spacer()
             }
