@@ -87,3 +87,79 @@ export async function awardPoints(
   if (error) return { awarded: false, error: error.message };
   return data;
 }
+
+// scoreDailyLogin — award the `daily_login` rule (1 pt / day, max_per_day=1)
+// and advance the streak. Called from the auth login + OAuth callback routes
+// after the session is confirmed. Idempotent: the daily synthetic-key dedupe
+// in score_events guarantees one award per local-day; `advance_streak` is
+// itself a same-day no-op.
+//
+// Both calls are best-effort — scoring failure must not block login. The
+// caller wraps this in try/catch and tags the console.error.
+export async function scoreDailyLogin(service, { userId }) {
+  if (!userId) return { awarded: false, error: 'userId required' };
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: pointsData, error: pointsErr } = await service.rpc('award_points', {
+    p_action: 'daily_login',
+    p_user_id: userId,
+    p_kid_profile_id: null,
+    p_article_id: null,
+    p_category_id: null,
+    p_source_type: 'manual',
+    p_source_id: null,
+    p_synthetic_key: `daily_login:${today}`,
+  });
+  if (pointsErr) return { awarded: false, error: pointsErr.message };
+
+  const { data: streakData, error: streakErr } = await service.rpc('advance_streak', {
+    p_user_id: userId,
+    p_kid_profile_id: null,
+  });
+  if (streakErr) return { ...pointsData, streak: null, streakError: streakErr.message };
+  return { ...pointsData, streak: streakData };
+}
+
+// scoreReceiveUpvote — award the `receive_upvote` rule to the comment
+// author when the actor's vote flips into upvote territory. Caller is
+// responsible for the no-self-vote guard and for confirming the prior
+// state was not already an upvote (we should only award on a fresh
+// up-flip, not on a re-affirm or a downvote).
+//
+// Idempotency: even if the actor up→down→up the same comment, we only
+// want to award once per (actor, comment). Pre-checks score_events for
+// an existing row before awarding.
+export async function scoreReceiveUpvote(service, { actorId, authorId, commentId }) {
+  if (!actorId || !authorId || !commentId) {
+    return { awarded: false, error: 'actorId, authorId, commentId required' };
+  }
+  if (actorId === authorId) return { awarded: false, reason: 'self_vote' };
+
+  // Dedupe: source_type='comment_vote', source_id=commentId, but indexed
+  // by (recipient user_id, action, source_type, source_id). A second actor
+  // upvoting the same comment must still award the author. Use the
+  // synthetic-key path keyed by actor:comment so each (actor, comment)
+  // pair awards at most once for the author.
+  const syntheticKey = `receive_upvote:${actorId}:${commentId}`;
+  const { data: existing } = await service
+    .from('score_events')
+    .select('id')
+    .eq('user_id', authorId)
+    .eq('action', 'receive_upvote')
+    .filter('metadata->>key', 'eq', syntheticKey)
+    .limit(1)
+    .maybeSingle();
+  if (existing) return { awarded: false, reason: 'already_awarded' };
+
+  const { data, error } = await service.rpc('award_points', {
+    p_action: 'receive_upvote',
+    p_user_id: authorId,
+    p_kid_profile_id: null,
+    p_article_id: null,
+    p_category_id: null,
+    p_source_type: 'comment_vote',
+    p_source_id: null,
+    p_synthetic_key: syntheticKey,
+  });
+  if (error) return { awarded: false, error: error.message };
+  return data;
+}

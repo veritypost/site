@@ -96,6 +96,9 @@ struct StoryDetailView: View {
     @State private var reportTargetCommentId: String? = nil
     @State private var blockTargetUser: (id: String, username: String?)? = nil
     @State private var moderationToast: String? = nil
+    // Article-level report (overflow menu in nav bar). Boolean drives the
+    // confirmation dialog; the article id is `story.id` so no payload needed.
+    @State private var showReportArticle: Bool = false
 
     // D17: TTS is now permission-gated (`article.tts.play`).
     @StateObject private var tts = TTSPlayer()
@@ -171,6 +174,21 @@ struct StoryDetailView: View {
                         .foregroundColor(isBookmarked ? VP.accent : VP.text)
                 }
                 .buttonStyle(.bordered)
+
+                // Apple Guideline 1.2 — UGC requires "Report" on every piece
+                // of user-visible content the app surfaces, including the
+                // article itself. Overflow menu so it stays out of the way.
+                Menu {
+                    Button("Report article", role: .destructive) {
+                        showReportArticle = true
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .foregroundColor(VP.dim)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel("More options")
             }
         }
         .alert("Bookmark limit reached", isPresented: $showUpgradeAlert) {
@@ -200,6 +218,20 @@ struct StoryDetailView: View {
             Button("Cancel", role: .cancel) { reportTargetCommentId = nil }
         } message: {
             Text("Tell us why. A moderator will review it.")
+        }
+        .confirmationDialog(
+            "Report article",
+            isPresented: $showReportArticle,
+            titleVisibility: .visible
+        ) {
+            ForEach(ReportReason.allCases) { reason in
+                Button(reason.label) {
+                    Task { await submitArticleReport(reason: reason) }
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Tell us why. Our team reviews these within 24 hours.")
         }
         .confirmationDialog(
             blockTargetUser.map { "Block @\($0.username ?? "user")?" } ?? "Block user?",
@@ -1685,6 +1717,13 @@ struct StoryDetailView: View {
         let ok = await ReportService.submit(targetType: .comment, targetId: commentId, reason: reason)
         await MainActor.run {
             flashModerationToast(ok ? "Thanks for the report. We\u{2019}ll review it." : "Couldn\u{2019}t send report. Try again.")
+        }
+    }
+
+    private func submitArticleReport(reason: ReportReason) async {
+        let ok = await ReportService.submit(targetType: .article, targetId: story.id, reason: reason)
+        await MainActor.run {
+            flashModerationToast(ok ? "Thanks for reporting. Our team reviews these within 24 hours." : "Couldn\u{2019}t send report. Try again.")
         }
     }
 

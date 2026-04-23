@@ -545,6 +545,7 @@ function ProfilePageInner() {
           cardShare={perms.cardShare}
           messagesInbox={perms.messagesInbox}
           bookmarksList={perms.bookmarksList}
+          family={perms.family}
         />
       )}
       {tab === 'activity' &&
@@ -657,6 +658,7 @@ function OverviewTab({
   cardShare,
   messagesInbox,
   bookmarksList,
+  family,
 }: {
   user: UserRow;
   tierInfo: ScoreTier | null;
@@ -664,6 +666,7 @@ function OverviewTab({
   cardShare: boolean;
   messagesInbox: boolean;
   bookmarksList: boolean;
+  family: boolean;
 }) {
   const score = user.verity_score || 0;
   const tierColor = tierInfo?.color_hex || ADMIN_C.muted;
@@ -816,11 +819,15 @@ function OverviewTab({
         )}
       </PageSection>
 
-      {/* Quick links — discoverable entries for Messages + Bookmarks
-          (otherwise reachable only by URL). Messages is pro-gated on
-          `messages.inbox.view` so free users don't hit the upgrade
-          dead-end; Bookmarks is free+ via `bookmarks.list.view`. */}
-      {(messagesInbox || bookmarksList) && (
+      {/* Quick links — discoverable entries for Messages + Bookmarks +
+          Family (otherwise reachable only by URL or the header Kids
+          shortcut). Each tile is permission-gated:
+            - messages.inbox.view (paid)
+            - bookmarks.list.view (free+)
+            - settings.family.view (paid family plans)
+          Y5-#6: Family tile added; the /profile/family dashboard was
+          previously only linked from /profile/kids. */}
+      {(messagesInbox || bookmarksList || family) && (
         <PageSection title="My stuff">
           <div
             style={{
@@ -838,6 +845,13 @@ function OverviewTab({
             )}
             {bookmarksList && (
               <QuickLink href="/bookmarks" label="Bookmarks" description="Articles you've saved" />
+            )}
+            {family && (
+              <QuickLink
+                href="/profile/family"
+                label="Family"
+                description="Manage your family plan and seats"
+              />
             )}
           </div>
         </PageSection>

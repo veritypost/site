@@ -62,7 +62,9 @@ export default function MyCardPage() {
   if (state === 'locked') {
     return (
       <div style={{ maxWidth: 480, margin: '0 auto', padding: '48px 16px', textAlign: 'center' }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--white)', margin: '0 0 8px' }}>
+        <h1
+          style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 8px' }}
+        >
           Profile Card
         </h1>
         <p style={{ fontSize: 14, color: 'var(--dim)', margin: '0 0 20px' }}>
@@ -95,7 +97,9 @@ export default function MyCardPage() {
   if (state === 'no_username') {
     return (
       <div style={{ maxWidth: 480, margin: '0 auto', padding: '48px 16px', textAlign: 'center' }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--white)', margin: '0 0 8px' }}>
+        <h1
+          style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 8px' }}
+        >
           Set a username first
         </h1>
         <p style={{ fontSize: 14, color: 'var(--dim)', margin: '0 0 20px' }}>

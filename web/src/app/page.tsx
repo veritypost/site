@@ -46,6 +46,11 @@ type HomeStory = Pick<
   | 'subcategory_id'
   | 'is_breaking'
   | 'published_at'
+  // Y5-#5 — cover image for home card thumbnails. Optional on the row;
+  // we render a category-tinted fallback block when null so the card
+  // shape stays consistent across stories with and without imagery.
+  | 'cover_image_url'
+  | 'cover_image_alt'
 >;
 
 // Category / subcategory projection. DB rows plus fallbacks share this shape.
@@ -106,6 +111,94 @@ function CategoryBadge({ name }: { name: string }) {
     >
       {stripKidsTag(name)}
     </span>
+  );
+}
+
+// Y5-#5 — deterministic tint per category. Categories table doesn't
+// store a color column, so we hash the category name (or article title
+// when no category is attached) to a stable hue and render a soft
+// 16:9 block. Result: missing-image cards still feel intentional and
+// distinguishable instead of a generic gray placeholder.
+function tintFromString(seed: string): string {
+  let h = 0;
+  for (let i = 0; i < seed.length; i += 1) {
+    h = (h * 31 + seed.charCodeAt(i)) | 0;
+  }
+  const hue = Math.abs(h) % 360;
+  return `hsl(${hue}, 28%, 88%)`;
+}
+
+function CardThumbnail({
+  url,
+  alt,
+  seed,
+  label,
+}: {
+  url: string | null | undefined;
+  alt: string | null | undefined;
+  seed: string;
+  label: string;
+}) {
+  const wrapStyle: CSSProperties = {
+    position: 'relative',
+    width: '100%',
+    aspectRatio: '16 / 9',
+    overflow: 'hidden',
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    background: tintFromString(seed),
+  };
+  if (url) {
+    return (
+      <div style={wrapStyle}>
+        {/* Raw <img> not next/image: cover_image_url hosts vary per
+            source, next/image would need `images.domains` or a remote
+            pattern list maintained in next.config.js. Home feed cards
+            are lazy + below-the-fold; LCP is the top card which can
+            upgrade later. Same rationale as the existing Ad.jsx
+            treatment. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={url}
+          alt={alt || label || ''}
+          loading="lazy"
+          decoding="async"
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            display: 'block',
+          }}
+        />
+      </div>
+    );
+  }
+  // Fallback: tinted block + the category/title label as a watermark
+  // so the empty visual still carries information about the story.
+  return (
+    <div
+      style={{
+        ...wrapStyle,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+      }}
+      aria-hidden="true"
+    >
+      <span
+        style={{
+          fontSize: 13,
+          fontWeight: 700,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          color: 'rgba(17, 17, 17, 0.45)',
+          textAlign: 'center',
+        }}
+      >
+        {label || 'Verity Post'}
+      </span>
+    </div>
   );
 }
 
@@ -232,7 +325,10 @@ export default function HomePage() {
         supabase
           .from('articles')
           .select(
-            'id, title, slug, excerpt, category_id, subcategory_id, is_breaking, published_at'
+            // Y5-#5 — cover_image_url + cover_image_alt added so home
+            // cards can render a 16:9 thumbnail (or a category-tinted
+            // fallback block when the URL is null).
+            'id, title, slug, excerpt, category_id, subcategory_id, is_breaking, published_at, cover_image_url, cover_image_alt'
           )
           .eq('status', 'published')
           .order('published_at', { ascending: false })
@@ -330,7 +426,11 @@ export default function HomePage() {
 
     let query = supabase
       .from('articles')
-      .select('id, title, slug, excerpt, category_id, subcategory_id, published_at')
+      .select(
+        // Y5-#5 — keep search-result rows shaped like feed rows so the
+        // CardThumbnail component reads the same fields either way.
+        'id, title, slug, excerpt, category_id, subcategory_id, published_at, cover_image_url, cover_image_alt'
+      )
       .eq('status', 'published')
       .order('published_at', { ascending: false })
       .limit(50);
@@ -1170,6 +1270,20 @@ export default function HomePage() {
                       cursor: 'pointer',
                     }}
                   >
+                    <CardThumbnail
+                      url={story.cover_image_url}
+                      alt={story.cover_image_alt || story.title || ''}
+                      seed={
+                        (story.category_id && categoryMap[story.category_id]?.name) ||
+                        story.title ||
+                        story.id
+                      }
+                      label={
+                        (story.category_id &&
+                          stripKidsTag(categoryMap[story.category_id]?.name || '')) ||
+                        ''
+                      }
+                    />
                     <div style={{ padding: '14px 16px' }}>
                       <div
                         style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}

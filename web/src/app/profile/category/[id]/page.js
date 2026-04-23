@@ -106,7 +106,14 @@ export default function ProfileCategoryDrillIn() {
 
       {!loading && !error && category && (
         <>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--white)', margin: '0 0 4px' }}>
+          <h1
+            style={{
+              fontSize: 22,
+              fontWeight: 700,
+              color: 'var(--text-primary)',
+              margin: '0 0 4px',
+            }}
+          >
             {category.name}
           </h1>
           <div style={{ fontSize: 12, color: 'var(--dim)', marginBottom: 20 }}>
@@ -141,7 +148,12 @@ export default function ProfileCategoryDrillIn() {
                 }}
               >
                 <div
-                  style={{ fontSize: 14, fontWeight: 600, color: 'var(--white)', marginBottom: 10 }}
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: 'var(--text-primary)',
+                    marginBottom: 10,
+                  }}
                 >
                   {row.name}
                 </div>

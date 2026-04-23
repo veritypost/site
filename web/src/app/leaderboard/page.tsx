@@ -314,7 +314,7 @@ export default function LeaderboardPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <Avatar user={me} size={28} />
               <div>
-                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--white)' }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
                   Your rank
                 </span>
                 <span style={{ fontSize: 13, color: 'var(--dim)', marginLeft: 6 }}>
@@ -381,7 +381,7 @@ export default function LeaderboardPage() {
                   padding: '5px 12px',
                   borderRadius: 14,
                   border: period === p ? 'none' : '1px solid var(--border)',
-                  background: period === p ? 'var(--white)' : 'transparent',
+                  background: period === p ? 'var(--text-primary)' : 'transparent',
                   color: period === p ? 'var(--bg)' : 'var(--dim)',
                   fontSize: 11,
                   fontWeight: 500,
@@ -561,7 +561,7 @@ export default function LeaderboardPage() {
                       }}
                     />
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--white)' }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
                         {u.username}
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--dim)' }}>
@@ -647,7 +647,7 @@ export default function LeaderboardPage() {
                       style={{
                         fontSize: 14,
                         fontWeight: 600,
-                        color: 'var(--white)',
+                        color: 'var(--text-primary)',
                         display: 'flex',
                         alignItems: 'center',
                         gap: 6,
@@ -720,7 +720,7 @@ export default function LeaderboardPage() {
                         style={{
                           fontSize: 14,
                           fontWeight: 600,
-                          color: 'var(--white)',
+                          color: 'var(--text-primary)',
                           display: 'flex',
                           alignItems: 'center',
                           gap: 6,
@@ -798,7 +798,9 @@ export default function LeaderboardPage() {
                           }}
                         />
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--white)' }}>
+                          <div
+                            style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}
+                          >
                             {u.username}
                           </div>
                           <div style={{ fontSize: 11, color: 'var(--dim)' }}>

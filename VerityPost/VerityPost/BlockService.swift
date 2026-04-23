@@ -137,7 +137,7 @@ final class BlockService: ObservableObject {
 // Reusable across StoryDetailView (comments), DMThreadView (conversation),
 // and PublicProfileView (user). Maps to POST /api/reports
 // { targetType, targetId, reason, description }.
-enum ReportTargetType: String { case comment, conversation, user }
+enum ReportTargetType: String { case comment, conversation, user, article }
 enum ReportReason: String, CaseIterable, Identifiable {
     case spam = "spam"
     case harassment = "harassment"

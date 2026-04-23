@@ -36,6 +36,11 @@ struct HomeView: View {
     @State private var hasMoreStories = true
     @State private var showRegistrationWall = false
 
+    // Breaking-news banner — dismissed banner ids stored as a comma-joined
+    // string in @AppStorage so each article only reappears if explicitly un-
+    // dismissed by clearing app storage. Set semantics, list serialization.
+    @AppStorage("home.breaking_dismissed") private var dismissedBreakingCSV: String = ""
+
     // Search overlay
     @State private var showSearch = false
     @State private var searchText = ""
@@ -158,6 +163,16 @@ struct HomeView: View {
                         .padding(.top, 60)
                     } else {
                         LazyVStack(spacing: 0) {
+                            // Breaking-news banner — top of feed when an
+                            // unbroken-and-undismissed `is_breaking` story is
+                            // present and the viewer has the permission.
+                            if canViewBreakingBanner, let breaking = visibleBreakingStory {
+                                NavigationLink(value: breaking) {
+                                    breakingBanner(for: breaking)
+                                }
+                                .buttonStyle(.plain)
+                            }
+
                             // Recap card (users with recap permission; self-hides if no recap).
                             if canSeeRecap {
                                 HomeRecapCard()
@@ -310,6 +325,71 @@ struct HomeView: View {
             result = result.filter { $0.subcategoryId == sub }
         }
         return result
+    }
+
+    // MARK: - Breaking-news banner
+
+    /// Article ids the viewer dismissed (parsed from @AppStorage CSV).
+    private var dismissedBreakingIds: Set<String> {
+        Set(dismissedBreakingCSV.split(separator: ",").map { String($0) }.filter { !$0.isEmpty })
+    }
+
+    /// First breaking story in the current filtered feed that the viewer has
+    /// not already dismissed. nil hides the banner entirely.
+    private var visibleBreakingStory: Story? {
+        let dismissed = dismissedBreakingIds
+        return filteredStories.first(where: { $0.isBreaking == true && !dismissed.contains($0.id) })
+    }
+
+    /// Persist a dismissal — appends to the CSV (set-semantics, no dupes).
+    private func dismissBreaking(_ id: String) {
+        var set = dismissedBreakingIds
+        set.insert(id)
+        dismissedBreakingCSV = set.sorted().joined(separator: ",")
+    }
+
+    @ViewBuilder
+    private func breakingBanner(for story: Story) -> some View {
+        // 80-char truncation per spec; SwiftUI's lineLimit handles tail trim
+        // but we cap upstream so the banner stays a single line on every
+        // device width.
+        let raw = story.title ?? "Breaking news"
+        let truncated = raw.count > 80 ? String(raw.prefix(80)) + "\u{2026}" : raw
+
+        HStack(alignment: .center, spacing: 10) {
+            Text("BREAKING")
+                .font(.system(.caption2, design: .default, weight: .heavy))
+                .tracking(0.5)
+                .foregroundColor(VP.danger)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(RoundedRectangle(cornerRadius: 4).fill(Color.white))
+            Text(truncated)
+                .font(.system(.footnote, design: .default, weight: .semibold))
+                .foregroundColor(.white)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+            Spacer(minLength: 0)
+            Button {
+                dismissBreaking(story.id)
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(.caption, design: .default, weight: .bold))
+                    .foregroundColor(.white)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Dismiss breaking news banner")
+        }
+        .padding(.leading, 16)
+        .padding(.trailing, 4)
+        .padding(.vertical, 4)
+        .background(VP.danger)
+        .cornerRadius(10)
+        .padding(.horizontal, 16)
+        .padding(.top, 6)
+        .padding(.bottom, 4)
     }
 
     // MARK: - Permission-aware slot gating

@@ -4,6 +4,9 @@ import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { verifyCronAuth } from '@/lib/cronAuth';
 import { withCronLog } from '@/lib/cronLog';
+import { logCronHeartbeat } from '@/lib/observability';
+
+const CRON_NAME = 'process-data-exports';
 
 // Auth: CRON_SECRET via verifyCronAuth. Fail-closed 403.
 // Phase 19.1: picks up verified pending export requests, snapshots
@@ -22,14 +25,17 @@ async function run(request) {
   if (!verifyCronAuth(request).ok) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
+  await logCronHeartbeat(CRON_NAME, 'start');
   const service = createServiceClient();
 
   const { data: claimed, error: claimErr } = await service.rpc('claim_next_export_request');
   if (claimErr) {
     console.error('[cron.process-data-exports] claim failed:', claimErr);
+    await logCronHeartbeat(CRON_NAME, 'error', { error: claimErr.message, stage: 'claim' });
     return NextResponse.json({ error: 'Claim failed' }, { status: 500 });
   }
   if (!claimed || !claimed.id) {
+    await logCronHeartbeat(CRON_NAME, 'end', { processed: 0 });
     return NextResponse.json({ processed: 0, ran_at: new Date().toISOString() });
   }
 
@@ -81,6 +87,11 @@ async function run(request) {
       p_metadata: { data_request_id: claimed.id, expires_at: expiresAt },
     });
 
+    await logCronHeartbeat(CRON_NAME, 'end', {
+      processed: 1,
+      request_id: claimed.id,
+      size_bytes: size,
+    });
     return NextResponse.json({
       processed: 1,
       request_id: claimed.id,
@@ -97,6 +108,10 @@ async function run(request) {
       })
       .eq('id', claimed.id);
     console.error('[cron.process-data-exports] worker error:', err);
+    await logCronHeartbeat(CRON_NAME, 'error', {
+      error: err?.message || String(err),
+      request_id: claimed.id,
+    });
     return NextResponse.json({ error: 'Worker error', request_id: claimed.id }, { status: 500 });
   }
 }

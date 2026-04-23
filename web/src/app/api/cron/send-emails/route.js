@@ -5,6 +5,9 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { renderTemplate, sendEmail } from '@/lib/email';
 import { verifyCronAuth } from '@/lib/cronAuth';
 import { withCronLog } from '@/lib/cronLog';
+import { logCronHeartbeat } from '@/lib/observability';
+
+const CRON_NAME = 'send-emails';
 
 // Auth: CRON_SECRET via verifyCronAuth. Fail-closed 403.
 // Email delivery worker. Processes unsent notifications in small
@@ -29,7 +32,18 @@ const BATCH_SIZE = 50;
 async function run(request) {
   if (!verifyCronAuth(request).ok)
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  await logCronHeartbeat(CRON_NAME, 'start');
+  try {
+    return await runInner();
+  } catch (err) {
+    await logCronHeartbeat(CRON_NAME, 'error', { error: err?.message || String(err) });
+    throw err;
+  }
+}
+
+async function runInner() {
   if (!process.env.RESEND_API_KEY) {
+    await logCronHeartbeat(CRON_NAME, 'error', { error: 'RESEND_API_KEY not configured' });
     return NextResponse.json({ error: 'RESEND_API_KEY not configured', sent: 0 }, { status: 503 });
   }
 
@@ -44,9 +58,13 @@ async function run(request) {
     .limit(BATCH_SIZE);
   if (loadErr) {
     console.error('[cron.send-emails] load failed:', loadErr);
+    await logCronHeartbeat(CRON_NAME, 'error', { error: loadErr.message, stage: 'load' });
     return NextResponse.json({ error: 'Load failed' }, { status: 500 });
   }
-  if (!queued?.length) return NextResponse.json({ sent: 0 });
+  if (!queued?.length) {
+    await logCronHeartbeat(CRON_NAME, 'end', { sent: 0, batch: 0 });
+    return NextResponse.json({ sent: 0 });
+  }
 
   const userIds = [...new Set(queued.map((n) => n.user_id))];
   const [{ data: users }, { data: prefs }, { data: templates }] = await Promise.all([
@@ -136,6 +154,7 @@ async function run(request) {
     }
   }
 
+  await logCronHeartbeat(CRON_NAME, 'end', { sent, skipped, failed, batch: queued.length });
   return NextResponse.json({ sent, skipped, failed, batch: queued.length });
 }
 

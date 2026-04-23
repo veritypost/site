@@ -86,7 +86,14 @@ export default function ContactPage() {
               textAlign: 'center',
             }}
           >
-            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--white)', marginBottom: 8 }}>
+            <div
+              style={{
+                fontSize: 16,
+                fontWeight: 700,
+                color: 'var(--text-primary)',
+                marginBottom: 8,
+              }}
+            >
               Message sent
             </div>
             <div style={{ fontSize: 13, color: 'var(--dim)', marginBottom: 16 }}>
@@ -104,7 +111,7 @@ export default function ContactPage() {
                 borderRadius: 8,
                 border: '1px solid var(--border)',
                 background: 'var(--bg)',
-                color: 'var(--white)',
+                color: 'var(--text-primary)',
                 fontSize: 13,
                 fontWeight: 600,
                 cursor: 'pointer',
@@ -143,8 +150,8 @@ export default function ContactPage() {
                       borderRadius: 20,
                       fontSize: 12,
                       fontWeight: 500,
-                      border: `1px solid ${topic === t.value ? 'var(--white)' : 'var(--border)'}`,
-                      background: topic === t.value ? 'var(--white)' : 'var(--bg)',
+                      border: `1px solid ${topic === t.value ? 'var(--text-primary)' : 'var(--border)'}`,
+                      background: topic === t.value ? 'var(--text-primary)' : 'var(--bg)',
                       color: topic === t.value ? 'var(--bg)' : 'var(--dim)',
                       cursor: 'pointer',
                       fontFamily: 'var(--font-sans)',
@@ -180,7 +187,7 @@ export default function ContactPage() {
                   border: '1px solid var(--border)',
                   background: 'var(--bg)',
                   fontSize: 14,
-                  color: 'var(--white)',
+                  color: 'var(--text-primary)',
                   outline: 'none',
                   boxSizing: 'border-box',
                   fontFamily: 'var(--font-sans)',
@@ -213,7 +220,7 @@ export default function ContactPage() {
                   border: '1px solid var(--border)',
                   background: 'var(--bg)',
                   fontSize: 14,
-                  color: 'var(--white)',
+                  color: 'var(--text-primary)',
                   outline: 'none',
                   boxSizing: 'border-box',
                   fontFamily: 'var(--font-sans)',

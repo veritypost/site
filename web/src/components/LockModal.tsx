@@ -102,7 +102,7 @@ export default function LockModal({ open, onClose, capability }: LockModalProps)
   };
   const panelStyle: CSSProperties = {
     background: 'var(--card)',
-    color: 'var(--white)',
+    color: 'var(--text-primary)',
     border: '1px solid var(--border)',
     borderRadius: 12,
     maxWidth: 420,
@@ -114,7 +114,7 @@ export default function LockModal({ open, onClose, capability }: LockModalProps)
     padding: '9px 16px',
     borderRadius: 8,
     background: 'transparent',
-    color: 'var(--white)',
+    color: 'var(--text-primary)',
     border: '1px solid var(--border)',
     fontSize: 13,
     fontWeight: 600,

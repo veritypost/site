@@ -125,12 +125,13 @@ export async function POST(request) {
 
     let newAchievements = [];
     if (completed) {
-      await incrementField(supabase, {
-        table: 'articles',
-        id: articleId,
-        field: 'view_count',
-        amount: 1,
-      });
+      // Y2 / #67: incrementField expects positional args
+      // (supabase, tableName, rowId, fieldName, amount) and the
+      // underlying `increment_field` RPC has EXECUTE revoked from
+      // `authenticated` (migration 056), so the call must run on the
+      // service client. Prior (object-form + user client) silently
+      // failed every increment for new reading_log rows.
+      await incrementField(service, 'articles', articleId, 'view_count', 1);
       scoring = await scoreReadingComplete(service, {
         userId: user.id,
         kidProfileId: kidProfileId || null,

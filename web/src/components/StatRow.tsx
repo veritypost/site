@@ -9,7 +9,12 @@ interface StatRowProps {
   color?: string;
 }
 
-export default function StatRow({ label, value, total, color = 'var(--white)' }: StatRowProps) {
+export default function StatRow({
+  label,
+  value,
+  total,
+  color = 'var(--text-primary)',
+}: StatRowProps) {
   const v = Number(value) || 0;
   const t = Number(total) || 0;
   const pct = t > 0 ? Math.min(100, (v / t) * 100) : 0;
@@ -25,7 +30,7 @@ export default function StatRow({ label, value, total, color = 'var(--white)' }:
         }}
       >
         <span>{label}</span>
-        <span style={{ color: v > 0 ? 'var(--white)' : 'var(--dim)', fontWeight: 500 }}>
+        <span style={{ color: v > 0 ? 'var(--text-primary)' : 'var(--dim)', fontWeight: 500 }}>
           {t > 0 ? `${v}/${t}` : v}
         </span>
       </div>

@@ -89,7 +89,12 @@ function daysSince(iso: string | null | undefined): number | null {
 //   Dark mode (hide everything):         TOP=false, NAV=false, FOOT=false
 // ============================================================
 const SHOW_TOP_BAR = true; // "verity post" wordmark + search icon
-const SHOW_BOTTOM_NAV = false; // Home / Notifications / Leaderboard / Profile
+// Y5-#3 — bottom nav re-enabled. Without it, signed-in users had no
+// persistent path between Home / Notifications / Leaderboard / Profile —
+// every navigation required a manual URL or a footer round-trip. The
+// per-route gate below still suppresses it on home, story, auth, admin,
+// and ideas pages so reading + auth + chrome-owning surfaces stay clean.
+const SHOW_BOTTOM_NAV = true; // Home / Notifications / Leaderboard / Profile
 const SHOW_FOOTER = true; // Help / Contact / Privacy / Terms / etc.
 
 // Auth / onboarding routes that run fullscreen without any global chrome.

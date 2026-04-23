@@ -7,7 +7,18 @@
 // generic client-facing copy while preserving the raw message in
 // server logs for debugging.
 
+// Sentinel: the mapping should pass `err.message` through to the client
+// rather than substituting a generic string. P0001 (RAISE EXCEPTION) is
+// the only Postgres error code where this is safe — trigger authors
+// write the message intentionally for end users (e.g. enforce_max_kids:
+// "Kid profile limit reached for this plan", enforce_bookmark_cap:
+// "Free accounts are capped at 10 bookmarks. Upgrade to Verity for
+// unlimited."). Constraint names, RLS names, column-level details never
+// surface through P0001.
+const PASSTHROUGH = Symbol('passthrough');
+
 const PG_ERROR_MAP = Object.freeze({
+  P0001: { status: 422, client: PASSTHROUGH },
   23505: { status: 409, client: 'Conflict: record already exists' },
   23503: { status: 400, client: 'Invalid reference' },
   23514: { status: 400, client: 'Constraint violation' },
@@ -40,7 +51,10 @@ export function safeErrorResponse(NextResponse, err, options = {}) {
   console.error('[api.error]', JSON.stringify(serverPayload));
 
   if (mapped) {
-    return NextResponse.json({ error: mapped.client, code }, { status: mapped.status });
+    const rawMessage = typeof err?.message === 'string' ? err.message.trim() : '';
+    const clientMessage =
+      mapped.client === PASSTHROUGH ? rawMessage || fallbackMessage : mapped.client;
+    return NextResponse.json({ error: clientMessage, code }, { status: mapped.status });
   }
   return NextResponse.json({ error: fallbackMessage }, { status: fallbackStatus });
 }

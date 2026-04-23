@@ -145,18 +145,19 @@ struct LoginView: View {
                         loading = false
                     }
                 } label: {
-                    HStack(spacing: 8) {
-                        Text("G")
-                            .font(.system(.body, design: .default, weight: .bold))
-                        Text("Sign in with Google")
-                            .font(.system(.subheadline, design: .default, weight: .semibold))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(minHeight: 48)
-                    .foregroundColor(VP.text)
-                    .background(VP.card)
-                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(VP.border))
-                    .cornerRadius(12)
+                    // No logo asset yet — Google brand requires the multicolor
+                    // mark or nothing. Until Assets.xcassets gets the official
+                    // Google G PNG, ship the text-only label which Google's
+                    // brand guide explicitly permits ("Continue with Google"
+                    // pattern).
+                    Text("Continue with Google")
+                        .font(.system(.subheadline, design: .default, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: 48)
+                        .foregroundColor(VP.text)
+                        .background(VP.card)
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(VP.border))
+                        .cornerRadius(12)
                 }
                 .disabled(loading)
                 .padding(.top, 8)

@@ -4,7 +4,10 @@ import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { verifyCronAuth } from '@/lib/cronAuth';
 import { withCronLog } from '@/lib/cronLog';
+import { logCronHeartbeat } from '@/lib/observability';
 import { safeErrorResponse } from '@/lib/apiErrors';
+
+const CRON_NAME = 'process-deletions';
 
 // Auth: CRON_SECRET via verifyCronAuth. Fail-closed 403.
 // Phase 19.2: daily sweep that anonymizes every account whose 30-day
@@ -32,13 +35,25 @@ async function run(request) {
   if (!verifyCronAuth(request).ok) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
+  await logCronHeartbeat(CRON_NAME, 'start');
+  try {
+    return await runInner();
+  } catch (err) {
+    await logCronHeartbeat(CRON_NAME, 'error', { error: err?.message || String(err) });
+    throw err;
+  }
+}
+
+async function runInner() {
   const service = createServiceClient();
   const { data: anonymizedCount, error } = await service.rpc('sweep_expired_deletions');
-  if (error)
+  if (error) {
+    await logCronHeartbeat(CRON_NAME, 'error', { error: error.message });
     return safeErrorResponse(NextResponse, error, {
       route: 'cron.process_deletions',
       fallbackStatus: 500,
     });
+  }
 
   // Find rows that just completed anonymization and still need their
   // auth.users credential dropped. The 25-hour window is generous
@@ -81,6 +96,11 @@ async function run(request) {
     }
   }
 
+  await logCronHeartbeat(CRON_NAME, 'end', {
+    anonymized_count: anonymizedCount,
+    auth_rows_deleted: authDeleted,
+    auth_rows_failed: authFailed,
+  });
   return NextResponse.json({
     anonymized_count: anonymizedCount,
     auth_rows_deleted: authDeleted,

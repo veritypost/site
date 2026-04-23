@@ -214,18 +214,17 @@ struct SignupView: View {
                             loading = false
                         }
                     } label: {
-                        HStack(spacing: 8) {
-                            Text("G")
-                                .font(.system(.body, design: .default, weight: .bold))
-                            Text("Sign up with Google")
-                                .font(.system(.subheadline, design: .default, weight: .semibold))
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(minHeight: 48)
-                        .foregroundColor(VP.text)
-                        .background(VP.card)
-                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(VP.border))
-                        .cornerRadius(12)
+                        // See LoginView for the rationale — text-only label
+                        // until the official Google G mark is added to
+                        // Assets.xcassets.
+                        Text("Continue with Google")
+                            .font(.system(.subheadline, design: .default, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .frame(minHeight: 48)
+                            .foregroundColor(VP.text)
+                            .background(VP.card)
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(VP.border))
+                            .cornerRadius(12)
                     }
                     .disabled(loading)
                     .padding(.top, 8)

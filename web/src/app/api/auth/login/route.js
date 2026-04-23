@@ -3,6 +3,7 @@
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { scoreDailyLogin } from '@/lib/scoring';
 
 // Bug 10: the client calls supabase.auth.signInWithPassword directly to get
 // a client session, then POSTs here so the server can run bookkeeping with
@@ -82,6 +83,18 @@ export async function POST(request) {
       try {
         await service.rpc('clear_failed_login', { p_user_id: userId });
       } catch {}
+
+      // Y2 / scoring: award `daily_login` (1 pt, max_per_day=1) and
+      // advance the streak. Both are idempotent per local-day. Scoring
+      // failure must NOT block login — wrap, log, swallow.
+      try {
+        const result = await scoreDailyLogin(service, { userId });
+        if (result?.error) {
+          console.error('[login] scoreDailyLogin', result.error);
+        }
+      } catch (e) {
+        console.error('[login] scoreDailyLogin threw', e);
+      }
     }
 
     return NextResponse.json({ user });

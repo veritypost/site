@@ -76,7 +76,7 @@ struct AlertsView: View {
             }
         }
         .background(VP.bg.ignoresSafeArea())
-        .navigationTitle("Alerts")
+        .navigationTitle("Notifications")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showLogin) { LoginView().environmentObject(auth) }
         .sheet(isPresented: $showSignup) { SignupView().environmentObject(auth) }

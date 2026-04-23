@@ -122,7 +122,7 @@ function SourcePills({ sources }: { sources: SourcePill[] }) {
               borderRadius: 16,
               border: expanded === i ? '1px solid var(--soft)' : '1px solid var(--border)',
               background: 'transparent',
-              color: expanded === i ? 'var(--white)' : 'var(--dim)',
+              color: expanded === i ? 'var(--text-primary)' : 'var(--dim)',
               fontSize: 11,
               fontWeight: 500,
               cursor: 'pointer',
@@ -144,7 +144,9 @@ function SourcePills({ sources }: { sources: SourcePill[] }) {
             animation: 'vpFadeIn 0.15s ease',
           }}
         >
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4, color: 'var(--white)' }}>
+          <div
+            style={{ fontSize: 13, fontWeight: 600, marginBottom: 4, color: 'var(--text-primary)' }}
+          >
             {sources[expanded].publisher || 'Source'}
           </div>
           {sources[expanded].title && (
@@ -153,7 +155,7 @@ function SourcePills({ sources }: { sources: SourcePill[] }) {
                 fontSize: 14,
                 fontWeight: 600,
                 fontFamily: 'var(--font-serif)',
-                color: 'var(--white)',
+                color: 'var(--text-primary)',
                 marginBottom: 4,
               }}
             >
@@ -229,7 +231,7 @@ function Timeline({ events }: { events: TimelineEvent[] }) {
                     width: 12,
                     height: 12,
                     borderRadius: '50%',
-                    background: 'var(--white)',
+                    background: 'var(--text-primary)',
                     border: '2px solid var(--accent)',
                     boxShadow: '0 0 0 4px var(--bg)',
                   }}
@@ -798,7 +800,9 @@ export default function StoryPage() {
             textAlign: 'center',
           }}
         >
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--white)', marginBottom: 6 }}>
+          <div
+            style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}
+          >
             Take the quiz to join the discussion
           </div>
           <div style={{ fontSize: 13, color: 'var(--dim)', lineHeight: 1.5, marginBottom: 14 }}>
@@ -867,7 +871,7 @@ export default function StoryPage() {
     // an informational panel instead of silence. D6 still holds — actual
     // comment content stays hidden; only the gating copy is shown.
     <div style={lockPanelStyle}>
-      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--white)', marginBottom: 6 }}>
+      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
         Discussion is locked until you pass the quiz above.
       </div>
       <div style={{ fontSize: 13, color: 'var(--dim)', lineHeight: 1.5 }}>
@@ -880,7 +884,7 @@ export default function StoryPage() {
     // the locked-panel shape so every tab state has visible content,
     // and surface the Create-free-account CTA inline.
     <div style={lockPanelStyle}>
-      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--white)', marginBottom: 6 }}>
+      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
         Discussion is for signed-in readers.
       </div>
       <div style={{ fontSize: 13, color: 'var(--dim)', lineHeight: 1.5, marginBottom: 12 }}>
@@ -957,7 +961,12 @@ export default function StoryPage() {
             </button>
             <div
               id="regwall-title"
-              style={{ fontSize: 22, fontWeight: 800, marginBottom: 10, color: 'var(--white)' }}
+              style={{
+                fontSize: 22,
+                fontWeight: 800,
+                marginBottom: 10,
+                color: 'var(--text-primary)',
+              }}
             >
               Sign up to keep reading
             </div>
@@ -1009,8 +1018,8 @@ export default function StoryPage() {
                 background: 'transparent',
                 border: 'none',
                 borderBottom:
-                  activeTab === tab ? '2px solid var(--white)' : '2px solid transparent',
-                color: activeTab === tab ? 'var(--white)' : 'var(--dim)',
+                  activeTab === tab ? '2px solid var(--text-primary)' : '2px solid transparent',
+                color: activeTab === tab ? 'var(--text-primary)' : 'var(--dim)',
                 fontWeight: activeTab === tab ? 600 : 400,
                 fontSize: 13,
                 cursor: 'pointer',
@@ -1125,7 +1134,7 @@ export default function StoryPage() {
                     lineHeight: 1.25,
                     letterSpacing: -0.4,
                     marginBottom: 12,
-                    color: 'var(--white)',
+                    color: 'var(--text-primary)',
                   }}
                 >
                   {story.title}
@@ -1244,7 +1253,7 @@ export default function StoryPage() {
                         style={{
                           fontSize: 18,
                           lineHeight: 1.55,
-                          color: 'var(--white)',
+                          color: 'var(--text-primary)',
                           marginBottom: 16,
                           fontFamily: 'var(--font-sans)',
                         }}
@@ -1267,7 +1276,7 @@ export default function StoryPage() {
                       style={{
                         fontSize: 14,
                         fontWeight: 700,
-                        color: 'var(--white)',
+                        color: 'var(--text-primary)',
                         marginBottom: 6,
                       }}
                     >
@@ -1451,7 +1460,7 @@ export default function StoryPage() {
                     borderRadius: 10,
                     border: '1px solid var(--border)',
                     background: 'transparent',
-                    color: 'var(--white)',
+                    color: 'var(--text-primary)',
                     fontSize: 13,
                     fontWeight: 600,
                     textDecoration: 'none',
@@ -1496,7 +1505,12 @@ export default function StoryPage() {
           >
             <div
               id="report-modal-title"
-              style={{ fontSize: 16, fontWeight: 700, color: 'var(--white)', marginBottom: 12 }}
+              style={{
+                fontSize: 16,
+                fontWeight: 700,
+                color: 'var(--text-primary)',
+                marginBottom: 12,
+              }}
             >
               Report this article
             </div>
@@ -1529,7 +1543,7 @@ export default function StoryPage() {
                         onChange={() => setReportCategory(c.value)}
                         style={{ accentColor: 'var(--accent)' }}
                       />
-                      <span style={{ fontSize: 13, color: 'var(--white)' }}>{c.label}</span>
+                      <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{c.label}</span>
                     </label>
                   ))}
                 </div>
@@ -1544,7 +1558,7 @@ export default function StoryPage() {
                     borderRadius: 6,
                     border: '1px solid var(--border)',
                     background: 'var(--bg)',
-                    color: 'var(--white)',
+                    color: 'var(--text-primary)',
                     fontSize: 13,
                     fontFamily: 'var(--font-sans)',
                     outline: 'none',

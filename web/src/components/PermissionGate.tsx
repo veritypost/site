@@ -83,7 +83,7 @@ function LockedCard({ capability, onClick }: LockedCardProps) {
         cursor: 'pointer',
       }}
     >
-      <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--white)', marginBottom: 6 }}>
+      <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
         {capability.label || 'Locked'}
       </div>
       <div style={{ fontSize: 13, color: 'var(--dim)', marginBottom: 16, lineHeight: 1.5 }}>

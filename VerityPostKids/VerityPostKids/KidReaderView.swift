@@ -31,10 +31,23 @@ struct KidReaderView: View {
                     if loading {
                         ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
                     } else {
-                        Text(body_)
-                            .font(.system(.body, design: .rounded, weight: .regular))
-                            .foregroundStyle(K.text)
-                            .lineSpacing(5)
+                        // Split on blank-line paragraph breaks so kids get
+                        // visible block spacing instead of one wall of text.
+                        // SwiftUI's default Text collapses `\n\n` to a single
+                        // newline of vertical gap, which reads as cramped.
+                        let paragraphs = body_
+                            .components(separatedBy: "\n\n")
+                            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                            .filter { !$0.isEmpty }
+                        VStack(alignment: .leading, spacing: 14) {
+                            ForEach(Array(paragraphs.enumerated()), id: \.offset) { _, p in
+                                Text(p)
+                                    .font(.system(.body, design: .rounded, weight: .regular))
+                                    .foregroundStyle(K.text)
+                                    .lineSpacing(5)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }
 
                         takeQuizButton
                     }

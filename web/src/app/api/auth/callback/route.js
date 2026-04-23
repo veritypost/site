@@ -4,6 +4,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { resolveNextForRedirect } from '@/lib/authRedirect';
 import { getSiteUrl } from '@/lib/siteUrl';
+import { scoreDailyLogin } from '@/lib/scoring';
 
 // F-038 — IdP-supplied `display_name` and `avatar_url` used to flow
 // straight into users/auth_providers. A hostile IdP (or a malicious
@@ -125,6 +126,17 @@ export async function GET(request) {
         metadata: { method: 'oauth', provider },
       });
 
+      // Y2 / scoring: first OAuth session counts as today's login event.
+      // Idempotent per local-day; failure must not block redirect.
+      try {
+        const result = await scoreDailyLogin(service, { userId: user.id });
+        if (result?.error) {
+          console.error('[callback] scoreDailyLogin', result.error);
+        }
+      } catch (e) {
+        console.error('[callback] scoreDailyLogin threw', e);
+      }
+
       return NextResponse.redirect(`${siteUrl}/signup/pick-username`);
     }
 
@@ -138,10 +150,22 @@ export async function GET(request) {
     // D40: silent welcome-back — if the account is still inside the 30-day
     // deletion grace window, clear the timer. RPC is idempotent. Best-effort;
     // failure does not block login.
+    const serviceForExisting = createServiceClient();
     try {
-      const service = createServiceClient();
-      await service.rpc('cancel_account_deletion', { p_user_id: user.id });
+      await serviceForExisting.rpc('cancel_account_deletion', { p_user_id: user.id });
     } catch {}
+
+    // Y2 / scoring: award `daily_login` (1 pt, max_per_day=1) and advance
+    // the streak. Both are idempotent per local-day; failure must not
+    // block the redirect.
+    try {
+      const result = await scoreDailyLogin(serviceForExisting, { userId: user.id });
+      if (result?.error) {
+        console.error('[callback] scoreDailyLogin', result.error);
+      }
+    } catch (e) {
+      console.error('[callback] scoreDailyLogin threw', e);
+    }
 
     if (!existing.username) {
       return NextResponse.redirect(`${siteUrl}/signup/pick-username`);

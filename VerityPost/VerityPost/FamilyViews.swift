@@ -37,6 +37,19 @@ struct FamilyDashboardView: View {
     @State private var canSetPin: Bool = false
     @State private var canResetPin: Bool = false
 
+    // Pre-submit cap check: read max_kids from the user's plan tier and
+    // disable Add Kid + show upgrade CTA when the plan limit is reached.
+    // Mirrors the server-side `trg_enforce_max_kids` trigger so the user
+    // never has to round-trip a 400 to discover they're at cap.
+    // Source of truth is plans.metadata->>'max_kids' in Supabase.
+    private func maxKids(for tier: String?) -> Int {
+        switch tier {
+        case "verity_family":    return 2
+        case "verity_family_xl": return 4
+        default:                 return 0
+        }
+    }
+
     // Sheet / dialog state
     @State private var showAddKid = false
     @State private var pairKid: KidProfile?
@@ -74,6 +87,50 @@ struct FamilyDashboardView: View {
                     }
 
                     if canAddKid {
+                        let limit = maxKids(for: auth.currentUser?.plan)
+                        let atCap = limit > 0 && kids.count >= limit
+                        let noFamilyPlan = limit == 0
+
+                        if atCap || noFamilyPlan {
+                            // Inline upgrade banner — appears above the Add
+                            // Kid button when the parent has hit their plan's
+                            // kid cap or doesn't have a family plan at all.
+                            // Tappable; lands on SubscriptionView so the
+                            // upgrade is one tap away.
+                            NavigationLink {
+                                SubscriptionView()
+                                    .environmentObject(auth)
+                            } label: {
+                                HStack(alignment: .top, spacing: 10) {
+                                    Image(systemName: "exclamationmark.circle.fill")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundColor(VP.accent)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(atCap
+                                             ? "You've reached your kid profile limit."
+                                             : "Add kids with a Verity Family plan.")
+                                            .font(.system(.footnote, design: .default, weight: .semibold))
+                                            .foregroundColor(VP.text)
+                                        Text("Upgrade to Verity Family")
+                                            .font(.caption)
+                                            .foregroundColor(VP.accent)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundColor(VP.dim)
+                                }
+                                .padding(12)
+                                .background(VP.card)
+                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border))
+                                .cornerRadius(10)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(atCap
+                                                ? "Kid profile limit reached. Upgrade to Verity Family."
+                                                : "Upgrade to Verity Family to add kids.")
+                        }
+
                         Button {
                             error = ""; flash = ""
                             showAddKid = true
@@ -88,10 +145,14 @@ struct FamilyDashboardView: View {
                             .padding(.horizontal, 14)
                             .padding(.vertical, 10)
                             .frame(minHeight: 44)
-                            .background(VP.accent)
+                            .background(atCap || noFamilyPlan ? VP.accent.opacity(0.4) : VP.accent)
                             .cornerRadius(10)
                         }
                         .buttonStyle(.plain)
+                        .disabled(atCap || noFamilyPlan)
+                        .accessibilityHint(atCap || noFamilyPlan
+                                           ? "Upgrade to Verity Family to add kids"
+                                           : "")
                     }
 
                     if kids.isEmpty {

@@ -41,6 +41,9 @@ import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { verifyCronAuth } from '@/lib/cronAuth';
 import { withCronLog } from '@/lib/cronLog';
+import { logCronHeartbeat } from '@/lib/observability';
+
+const CRON_NAME = 'pipeline-cleanup';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -50,6 +53,7 @@ async function run(request: Request) {
   if (!verifyCronAuth(request).ok) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
+  await logCronHeartbeat(CRON_NAME, 'start');
 
   const service = createServiceClient();
   const now = new Date();
@@ -217,6 +221,24 @@ async function run(request: Request) {
     clustersArchivedErrCode = 'cluster_expiry_failed';
   }
 
+  const errors = {
+    orphan_runs: orphanRunsErrCode,
+    orphan_items: orphanItemsErrCode,
+    orphan_locks: orphanLocksErrCode,
+    cluster_expiry: clustersArchivedErrCode,
+  };
+  const anyErr = Object.values(errors).some((e) => e !== null);
+  const heartbeatPayload = {
+    orphan_runs_cleaned: orphanRunsCount,
+    orphan_items_cleaned: orphanItemsCount,
+    orphan_locks_cleaned: orphanLocksCount,
+    clusters_archived: clustersArchivedCount,
+    errors,
+  };
+  // Per-sweep errors are logged but the route still returns 200 (Vercel would
+  // retry on 5xx). Emit an 'error' heartbeat when any sweep errored so the
+  // operator can see partial failures alongside the succeeded counters.
+  await logCronHeartbeat(CRON_NAME, anyErr ? 'error' : 'end', heartbeatPayload);
   return NextResponse.json({
     ok: true,
     ran_at: now.toISOString(),
@@ -224,12 +246,7 @@ async function run(request: Request) {
     orphan_items_cleaned: orphanItemsCount,
     orphan_locks_cleaned: orphanLocksCount,
     clusters_archived: clustersArchivedCount,
-    errors: {
-      orphan_runs: orphanRunsErrCode,
-      orphan_items: orphanItemsErrCode,
-      orphan_locks: orphanLocksErrCode,
-      cluster_expiry: clustersArchivedErrCode,
-    },
+    errors,
   });
 }
 

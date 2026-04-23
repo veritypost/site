@@ -46,7 +46,7 @@ struct PairCodeView: View {
                             .frame(width: 72, height: 72)
                             .shadow(color: K.teal.opacity(0.3), radius: 16, y: 6)
 
-                        Image(systemName: "qrcode.viewfinder")
+                        Image(systemName: "number.square")
                             .font(.system(.largeTitle, weight: .bold))
                             .foregroundStyle(.white)
                     }

@@ -21,9 +21,17 @@
 :root {
   --bg: #ffffff;
   --card: #f7f7f7;
-  --border: #222222;
+  /* Y5-#1 — was `#222222`; that read as a hard black outline on every
+     card, button, and pill. Aligned to `#e5e5e5` so it matches `--rule`
+     and the iOS `VP.border` token (1pt subtle gray). All 35 callers in
+     web/src use it as a 1px border line — none rely on a heavy variant. */
+  --border: #e5e5e5;
   --rule: #e5e5e5;
-  --white: #111111; /* primary text — named for parity with vp-views var names */
+  /* Y5-#2 — `--white` was a landmine: name said "white", value was
+     `#111111`. Renamed to `--text-primary` and every caller updated to
+     match. There is no separate "white" token; literal `#fff`/`#ffffff`
+     stays inline where actual white is meant. */
+  --text-primary: #111111;
   --text: #111111;
   --soft: #444444;
   /* DA-054 — `--dim` was `#666666`. Review recalculated contrast vs

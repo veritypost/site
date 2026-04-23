@@ -57,11 +57,28 @@ struct LeaderboardView: View {
                 }
 
                 if let loadError {
-                    Text(loadError)
-                        .font(.scaledSystem(size: 12, design: .rounded))
-                        .foregroundStyle(K.coralDark)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 20)
+                    VStack(spacing: 8) {
+                        Text(loadError)
+                            .font(.scaledSystem(size: 12, design: .rounded))
+                            .foregroundStyle(K.coralDark)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 20)
+                        Button {
+                            Task { await load() }
+                        } label: {
+                            Text("Retry")
+                                .font(.scaledSystem(size: 13, weight: .bold, design: .rounded))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 18)
+                                .padding(.vertical, 8)
+                                .frame(minHeight: 36)
+                                .background(K.teal)
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(loading)
+                    }
+                    .frame(maxWidth: .infinity)
                 }
             }
             .padding(.horizontal, 16)

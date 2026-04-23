@@ -5,7 +5,10 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { withApnsSession, resolveApnsEnv } from '@/lib/apns';
 import { verifyCronAuth } from '@/lib/cronAuth';
 import { withCronLog } from '@/lib/cronLog';
+import { logCronHeartbeat } from '@/lib/observability';
 import { getPlanLimitValue } from '@/lib/plans';
+
+const CRON_NAME = 'send-push';
 
 // Auth: CRON_SECRET via verifyCronAuth. Fail-closed 403.
 // Push delivery worker. Mirrors /api/cron/send-emails in shape: picks
@@ -27,7 +30,18 @@ const CONCURRENCY = 50;
 async function run(request) {
   if (!verifyCronAuth(request).ok)
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  await logCronHeartbeat(CRON_NAME, 'start');
+  try {
+    return await runInner();
+  } catch (err) {
+    await logCronHeartbeat(CRON_NAME, 'error', { error: err?.message || String(err) });
+    throw err;
+  }
+}
+
+async function runInner() {
   if (!process.env.APNS_AUTH_KEY) {
+    await logCronHeartbeat(CRON_NAME, 'error', { error: 'APNS_AUTH_KEY not configured' });
     return NextResponse.json({ error: 'APNS_AUTH_KEY not configured', sent: 0 }, { status: 503 });
   }
 
@@ -42,9 +56,13 @@ async function run(request) {
     .limit(BATCH_SIZE);
   if (loadErr) {
     console.error('[cron.send-push] load failed:', loadErr);
+    await logCronHeartbeat(CRON_NAME, 'error', { error: loadErr.message, stage: 'load' });
     return NextResponse.json({ error: 'Load failed' }, { status: 500 });
   }
-  if (!queued?.length) return NextResponse.json({ sent: 0 });
+  if (!queued?.length) {
+    await logCronHeartbeat(CRON_NAME, 'end', { sent: 0, batch: 0 });
+    return NextResponse.json({ sent: 0 });
+  }
 
   const userIds = [...new Set(queued.map((n) => n.user_id))];
   const [{ data: prefs }, { data: tokens }, { data: planRows }] = await Promise.all([
@@ -208,6 +226,13 @@ async function run(request) {
   }
 
   if (!needsDispatch.length) {
+    await logCronHeartbeat(CRON_NAME, 'end', {
+      sent,
+      skipped,
+      failed,
+      invalidated,
+      batch: queued.length,
+    });
     return NextResponse.json({ sent, skipped, failed, invalidated, batch: queued.length });
   }
 
@@ -284,6 +309,13 @@ async function run(request) {
     else failed += 1;
   }
 
+  await logCronHeartbeat(CRON_NAME, 'end', {
+    sent,
+    skipped,
+    failed,
+    invalidated,
+    batch: queued.length,
+  });
   return NextResponse.json({ sent, skipped, failed, invalidated, batch: queued.length });
 }
 
