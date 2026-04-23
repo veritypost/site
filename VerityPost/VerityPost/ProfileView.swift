@@ -1746,85 +1746,72 @@ struct AvatarQuickEditSheet: View {
     @EnvironmentObject var auth: AuthViewModel
     @Environment(\.dismiss) private var dismiss
 
-    private let colors: [String] = [
-        "#10b981", "#f59e0b", "#3b82f6", "#f43f5e",
-        "#ec4899", "#14b8a6", "#a855f7", "#818cf8",
+    // 12-color palette — neutrals + vivids. Enough variety, avoids paralysis.
+    private let palette: [String] = [
+        "#111827", "#6b7280", "#ffffff",
+        "#ef4444", "#f59e0b", "#eab308",
+        "#22c55e", "#14b8a6", "#3b82f6",
+        "#8b5cf6", "#ec4899", "#f43f5e",
     ]
 
-    @State private var selectedColor: String
-    @State private var displayName: String
+    @State private var outerColor: String
+    @State private var innerColor: String
+    @State private var textColor: String
+    @State private var initials: String
     @State private var saving = false
     @State private var errorMsg: String?
 
     init(user: VPUser) {
         self.user = user
-        _selectedColor = State(initialValue: user.avatarColor ?? "#818cf8")
-        _displayName = State(initialValue: user.displayName ?? user.username ?? "")
+        let av = user.avatar
+        let existingInitials = av?.initials
+            ?? user.displayName?.prefix(1).uppercased()
+            ?? user.username?.prefix(1).uppercased()
+            ?? ""
+        _outerColor = State(initialValue: av?.outer ?? user.avatarColor ?? "#3b82f6")
+        _innerColor = State(initialValue: av?.inner ?? "#ffffff")
+        _textColor  = State(initialValue: av?.textColor ?? "#111827")
+        _initials   = State(initialValue: String(existingInitials.prefix(3)))
     }
 
-    private var initial: String {
-        let base = displayName.trimmingCharacters(in: .whitespaces)
-        guard let first = base.first else { return "?" }
-        return String(first).uppercased()
+    private var displayedInitials: String {
+        // 1-3 chars, letters or numbers only, mixed case preserved.
+        let filtered = initials.filter { $0.isLetter || $0.isNumber }
+        return String(filtered.prefix(3))
     }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 24) {
-                    // Live preview
+                VStack(spacing: 22) {
+                    // Live preview — matches AvatarView rendering 1:1
                     ZStack {
-                        Circle()
-                            .fill(Color(hex: selectedColor))
-                        Text(initial)
-                            .font(.system(size: 40, weight: .heavy))
-                            .foregroundColor(.white)
+                        Circle().fill(Color(hex: innerColor))
+                        Circle().strokeBorder(Color(hex: outerColor), lineWidth: 4)
+                        Text(displayedInitials.isEmpty ? "?" : displayedInitials)
+                            .font(.system(size: displayedInitials.count > 1 ? 36 : 44, weight: .heavy))
+                            .foregroundColor(Color(hex: textColor))
+                            .tracking(displayedInitials.count > 1 ? -0.5 : 0)
                     }
-                    .frame(width: 96, height: 96)
+                    .frame(width: 112, height: 112)
                     .padding(.top, 8)
 
-                    // Color palette
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Color")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(VP.dim)
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 12) {
-                            ForEach(colors, id: \.self) { c in
-                                Button {
-                                    selectedColor = c
-                                    UISelectionFeedbackGenerator().selectionChanged()
-                                } label: {
-                                    ZStack {
-                                        Circle()
-                                            .fill(Color(hex: c))
-                                            .frame(width: 44, height: 44)
-                                        if c == selectedColor {
-                                            Circle()
-                                                .stroke(VP.text, lineWidth: 3)
-                                                .frame(width: 50, height: 50)
-                                        }
-                                    }
-                                    .frame(maxWidth: .infinity, minHeight: 56)
-                                    .contentShape(Rectangle())
-                                }
-                                .accessibilityLabel("Color \(c)")
+                    VStack(alignment: .leading, spacing: 6) {
+                        sectionLabel("Initials (1-3 characters)")
+                        TextField("Up to 3 letters or numbers", text: $initials)
+                            .textFieldStyle(.roundedBorder)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled(true)
+                            .onChange(of: initials) { _, newValue in
+                                let filtered = newValue.filter { $0.isLetter || $0.isNumber }
+                                let capped = String(filtered.prefix(3))
+                                if capped != newValue { initials = capped }
                             }
-                        }
                     }
 
-                    // Display name (drives the avatar initial)
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Display name")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(VP.dim)
-                        TextField("Your name", text: $displayName)
-                            .textFieldStyle(.roundedBorder)
-                            .textInputAutocapitalization(.words)
-                            .autocorrectionDisabled(true)
-                        Text("First letter shows on your avatar when no image is set.")
-                            .font(.system(size: 12))
-                            .foregroundColor(VP.dim)
-                    }
+                    colorPicker(label: "Ring color", selected: $outerColor)
+                    colorPicker(label: "Background color", selected: $innerColor)
+                    colorPicker(label: "Text color", selected: $textColor)
 
                     if let err = errorMsg {
                         Text(err)
@@ -1848,7 +1835,46 @@ struct AvatarQuickEditSheet: View {
                     } label: {
                         if saving { ProgressView() } else { Text("Save").bold() }
                     }
-                    .disabled(saving)
+                    .disabled(saving || displayedInitials.isEmpty)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func sectionLabel(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundColor(VP.dim)
+    }
+
+    @ViewBuilder
+    private func colorPicker(label: String, selected: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionLabel(label)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 6), spacing: 10) {
+                ForEach(palette, id: \.self) { c in
+                    Button {
+                        selected.wrappedValue = c
+                        UISelectionFeedbackGenerator().selectionChanged()
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(Color(hex: c))
+                                .overlay(
+                                    Circle().strokeBorder(VP.border, lineWidth: c == "#ffffff" ? 1 : 0)
+                                )
+                                .frame(width: 36, height: 36)
+                            if selected.wrappedValue == c {
+                                Circle()
+                                    .strokeBorder(VP.text, lineWidth: 3)
+                                    .frame(width: 44, height: 44)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .contentShape(Rectangle())
+                    }
+                    .accessibilityLabel("\(label) \(c)")
                 }
             }
         }
@@ -1857,26 +1883,40 @@ struct AvatarQuickEditSheet: View {
     private func save() async {
         saving = true
         errorMsg = nil
-        let trimmedName = displayName.trimmingCharacters(in: .whitespaces)
-        let nameToSend: String? = trimmedName.isEmpty ? nil : trimmedName
 
-        // Same RPC + same field names as SettingsView.AccountSettingsView.
-        // update_own_profile accepts a JSON object of profile fields plus a
-        // metadata merge object. We touch profile fields only.
-        struct ProfileFields: Encodable {
+        // update_own_profile takes `p_fields` — a jsonb object of column
+        // values. Avatar customisation writes both:
+        //   - avatar_color (legacy; mirrors ring color so pre-metadata
+        //     readers still render right)
+        //   - metadata.avatar = { outer, inner, initials, text_color }
+        //     (metadata merges server-side; other keys preserved)
+        struct AvatarJSON: Encodable {
+            let outer: String
+            let inner: String
+            let initials: String
+            let text_color: String
+        }
+        struct MetadataPatch: Encodable { let avatar: AvatarJSON }
+        struct Fields: Encodable {
             let avatar_color: String
-            let display_name: String?
+            let metadata: MetadataPatch
         }
-        struct Args: Encodable {
-            let p_profile: ProfileFields
-        }
-        let args = Args(p_profile: ProfileFields(avatar_color: selectedColor, display_name: nameToSend))
+        struct Args: Encodable { let p_fields: Fields }
+
+        let args = Args(p_fields: Fields(
+            avatar_color: outerColor,
+            metadata: MetadataPatch(avatar: AvatarJSON(
+                outer: outerColor,
+                inner: innerColor,
+                initials: displayedInitials,
+                text_color: textColor
+            ))
+        ))
 
         do {
             let client = SupabaseManager.shared.client
             try await client.rpc("update_own_profile", params: args).execute()
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            // Refresh local user so the hero updates immediately.
             if let id = auth.currentUser?.id {
                 await auth.loadUser(id: id)
             }

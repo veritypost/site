@@ -88,24 +88,40 @@ struct AvatarView: View {
     let outer: Color
     let inner: Color
     let initials: String
+    let textColor: Color?
     let size: CGFloat
 
-    init(outerHex: String? = nil, innerHex: String? = nil, initials: String, size: CGFloat = 32) {
+    init(outerHex: String? = nil, innerHex: String? = nil, initials: String, textHex: String? = nil, size: CGFloat = 32) {
         self.outer = Color(hex: outerHex ?? "777777")
         self.inner = innerHex.flatMap { Color(hex: $0) } ?? .clear
-        self.initials = String(initials.filter { $0.isLetter || $0.isNumber }.prefix(3)).uppercased()
+        self.initials = String(
+            initials.filter { $0.isLetter || $0.isNumber }.prefix(3)
+        )
+        self.textColor = textHex.flatMap { Color(hex: $0) }
         self.size = size
     }
 
-    // Convenience for a `VPUser`. Prefers users.avatar jsonb when present, else
-    // falls back to legacy avatar_color + first letter of username.
+    // Convenience for a `VPUser`. Reads metadata.avatar (outer/inner/initials/
+    // textColor) when set; falls back to legacy avatar_color + first letter of
+    // username so existing accounts render cleanly until they customise.
     init(user: VPUser?, size: CGFloat = 32) {
         let avatar = user?.avatar
         let outer = avatar?.outer ?? user?.avatarColor
         let inner = avatar?.inner
         let fallbackLetter = user?.username?.prefix(1).description ?? user?.email?.prefix(1).description ?? "?"
         let initials = avatar?.initials ?? fallbackLetter
-        self.init(outerHex: outer, innerHex: inner, initials: initials, size: size)
+        self.init(
+            outerHex: outer,
+            innerHex: inner,
+            initials: initials,
+            textHex: avatar?.textColor,
+            size: size
+        )
+    }
+
+    private var resolvedTextColor: Color {
+        if let t = textColor { return t }
+        return inner == .clear ? outer : VP.text
     }
 
     var body: some View {
@@ -117,7 +133,7 @@ struct AvatarView: View {
                 // Type) so the letter always fits inside the circle. Caller sizes
                 // the avatar; the letter follows.
                 .font(.system(size: max(9, size * 0.36), weight: .semibold))
-                .foregroundColor(inner == .clear ? outer : VP.text)
+                .foregroundColor(resolvedTextColor)
                 .tracking(initials.count > 1 ? -0.3 : 0)
         }
         .frame(width: size, height: size)

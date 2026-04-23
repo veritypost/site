@@ -22,7 +22,12 @@ struct VPUser: Codable, Identifiable {
     var displayName: String?
     var bio: String?
     var avatarColor: String?
-    var avatar: AvatarRef?
+    /// Avatar customisation lives inside `users.metadata.avatar` (the web
+    /// settings page writes there via `update_own_profile`). Swift decodes
+    /// the nested shape via `MetadataRef` and exposes it as a computed
+    /// property so call-sites still read `user.avatar` unchanged.
+    var metadata: MetadataRef?
+    var avatar: AvatarRef? { metadata?.avatar }
     var createdAt: Date?
     var onboardingCompletedAt: Date?
 
@@ -32,6 +37,16 @@ struct VPUser: Codable, Identifiable {
         var outer: String?
         var inner: String?
         var initials: String?
+        var textColor: String?
+
+        enum CodingKeys: String, CodingKey {
+            case outer, inner, initials
+            case textColor = "text_color"
+        }
+    }
+
+    struct MetadataRef: Codable {
+        var avatar: AvatarRef?
     }
 
     struct PlanRef: Codable {
@@ -39,7 +54,7 @@ struct VPUser: Codable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, username, email, plans, avatar, bio
+        case id, username, email, plans, bio, metadata
         case isExpert = "is_expert"
         case isVerifiedPublicFigure = "is_verified_public_figure"
         case verityScore = "verity_score"
