@@ -8,13 +8,30 @@ import UIKit
 // listing once the kids app is published.
 
 enum KidsAppLauncher {
-    // TODO: swap to real App Store URL once the kids app is published.
-    static let fallbackURL = URL(string: "https://veritypost.com/kids-app")!
+    // Pre-launch: web /kids-app marketing page is the fallback so a parent
+    // who taps "Open Kids App" before installing the kids app lands on a
+    // page explaining what it is. Apple-block: swap to the real App Store
+    // listing the same session the kids app is approved.
+    static let fallbackURL: URL = {
+        // Defensive: literal is well-formed, but the force-unwrap pattern
+        // mirrors test-only assumptions. A guard-let with a deliberately
+        // safe fallback keeps the call site total.
+        if let url = URL(string: "https://veritypost.com/kids-app") {
+            return url
+        }
+        return URL(string: "https://veritypost.com")!
+    }()
 
     static func open(kidId: String? = nil) {
-        var comps = URLComponents(string: "veritypostkids://open")!
+        guard var comps = URLComponents(string: "veritypostkids://open") else {
+            UIApplication.shared.open(fallbackURL, options: [:], completionHandler: nil)
+            return
+        }
         if let kidId { comps.queryItems = [URLQueryItem(name: "kid", value: kidId)] }
-        guard let url = comps.url else { return }
+        guard let url = comps.url else {
+            UIApplication.shared.open(fallbackURL, options: [:], completionHandler: nil)
+            return
+        }
         UIApplication.shared.open(url, options: [:]) { opened in
             if !opened {
                 UIApplication.shared.open(fallbackURL, options: [:], completionHandler: nil)

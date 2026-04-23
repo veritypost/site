@@ -15,6 +15,12 @@ struct MessagesView: View {
     @State private var accessChecked = false
     @State private var selectedConvo: DMConversation? = nil
 
+    // Apple Guideline 1.2 — DM thread Report / Block state.
+    @StateObject private var blocks = BlockService.shared
+    @State private var threadReportConvo: DMConversation? = nil
+    @State private var threadBlockTarget: (id: String, username: String?)? = nil
+    @State private var threadToast: String? = nil
+
     // Compose / search
     @State private var showSearch = false
     @State private var showSubscription = false
@@ -28,6 +34,9 @@ struct MessagesView: View {
         var title: String?
         var lastMessagePreview: String?
         var lastMessageAt: Date?
+        // Apple Guideline 1.2 — needed to block / report the other party
+        // from inside the thread without an extra round-trip.
+        var otherUserId: String?
         var otherUsername: String?
         var otherAvatarColor: String?
         var unread: Int = 0
@@ -115,7 +124,84 @@ struct MessagesView: View {
                     }
                 }
             }
+            // Apple Guideline 1.2 — Report / Block affordances on every DM
+            // thread. Visible only inside an open conversation; targets the
+            // other participant's user_id captured at conversation load.
+            if let convo = selectedConvo {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button {
+                            threadReportConvo = convo
+                        } label: {
+                            Label("Report this conversation", systemImage: "flag")
+                        }
+                        if let otherId = convo.otherUserId, otherId != auth.currentUser?.id {
+                            Button(role: .destructive) {
+                                threadBlockTarget = (id: otherId, username: convo.otherUsername)
+                            } label: {
+                                Label("Block @\(convo.otherUsername ?? "user")", systemImage: "hand.raised")
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .font(.subheadline)
+                            .foregroundColor(VP.accent)
+                    }
+                }
+            }
         }
+        .confirmationDialog(
+            "Report conversation",
+            isPresented: Binding(
+                get: { threadReportConvo != nil },
+                set: { if !$0 { threadReportConvo = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            ForEach(ReportReason.allCases) { reason in
+                Button(reason.label) {
+                    if let convo = threadReportConvo {
+                        Task { await submitConvoReport(convoId: convo.id, reason: reason) }
+                    }
+                    threadReportConvo = nil
+                }
+            }
+            Button("Cancel", role: .cancel) { threadReportConvo = nil }
+        } message: {
+            Text("Tell us why. A moderator will review it.")
+        }
+        .confirmationDialog(
+            threadBlockTarget.map { "Block @\($0.username ?? "user")?" } ?? "Block user?",
+            isPresented: Binding(
+                get: { threadBlockTarget != nil },
+                set: { if !$0 { threadBlockTarget = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Block", role: .destructive) {
+                if let t = threadBlockTarget {
+                    Task { await performThreadBlock(targetId: t.id, username: t.username) }
+                }
+                threadBlockTarget = nil
+            }
+            Button("Cancel", role: .cancel) { threadBlockTarget = nil }
+        } message: {
+            Text("You won\u{2019}t see their messages or comments.")
+        }
+        .overlay(alignment: .top) {
+            if let toast = threadToast {
+                Text(toast)
+                    .font(.system(.footnote, design: .default, weight: .semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(VP.accent))
+                    .shadow(radius: 4)
+                    .padding(.top, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.25), value: threadToast)
         .task(id: auth.currentUser?.id) { await checkAccessAndLoad() }
         .task(id: perms.changeToken) { await checkAccessAndLoad() }
         .task(id: auth.currentUser?.id) { await subscribeToConversationUpdates() }
@@ -355,6 +441,7 @@ struct MessagesView: View {
                     .neq("user_id", value: userId)
                     .execute().value) ?? []
                 let other = cps.first
+                convo.otherUserId = other?.user_id
                 convo.otherUsername = other?.users?.username
                 convo.otherAvatarColor = other?.users?.avatar_color
                 result.append(convo)
@@ -368,11 +455,51 @@ struct MessagesView: View {
                 result[i].unread = unreadMap[result[i].id] ?? 0
             }
 
-            conversations = result
+            // Apple Guideline 1.2 — drop conversations whose other party
+            // is on the viewer's block-set (in either direction). The
+            // server still returns them (RLS doesn't filter on the
+            // viewer's blocks today), so filter client-side here.
+            await BlockService.shared.refreshIfStale(currentUserId: userId)
+            conversations = result.filter { !BlockService.shared.isBlocked($0.otherUserId) }
         } catch {
             Log.d("Failed to load conversations: \(error)")
         }
         loading = false
+    }
+
+    // MARK: - Apple Guideline 1.2 — moderation actions
+
+    private func submitConvoReport(convoId: String, reason: ReportReason) async {
+        let ok = await ReportService.submit(targetType: .conversation, targetId: convoId, reason: reason)
+        await MainActor.run {
+            flashThreadToast(ok ? "Thanks for the report. We\u{2019}ll review it." : "Couldn\u{2019}t send report. Try again.")
+        }
+    }
+
+    private func performThreadBlock(targetId: String, username: String?) async {
+        let ok = await BlockService.shared.block(targetId: targetId)
+        await MainActor.run {
+            if ok {
+                let label = username.map { "@\($0)" } ?? "User"
+                flashThreadToast("\(label) blocked.")
+                // Drop the now-blocked thread from view + list.
+                if selectedConvo?.otherUserId == targetId { selectedConvo = nil }
+                conversations.removeAll { $0.otherUserId == targetId }
+            } else {
+                flashThreadToast("Couldn\u{2019}t block. Try again.")
+            }
+        }
+    }
+
+    @MainActor
+    private func flashThreadToast(_ text: String) {
+        threadToast = text
+        Task {
+            try? await Task.sleep(nanoseconds: 2_400_000_000)
+            await MainActor.run {
+                if threadToast == text { threadToast = nil }
+            }
+        }
     }
 
     // Mark a conversation read — writes last_read_at = now() on the caller's

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // Primary sign-in for the kids app. Parent enters the pair code on the
 // kid's device (or the kid types what the parent reads). On success:
@@ -16,6 +17,10 @@ struct PairCodeView: View {
     // don't spam-tap Pair during the server-side lockout.
     @State private var cooldownSeconds: Int = 0
     @State private var cooldownTimer: Timer? = nil
+    // Parental gate before mailto: opens — Apple Kids Category review
+    // requires every external action (mail, web, payments) to be gated
+    // behind a parental check.
+    @State private var showHelpGate: Bool = false
     @FocusState private var focused: Bool
 
     private let codeLength = 8
@@ -96,11 +101,16 @@ struct PairCodeView: View {
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 8)
 
-                    Link("Need help?", destination: URL(string: "mailto:support@veritypost.com?subject=Kids%20app%20pair%20code%20help")!)
-                        .font(.system(.caption, design: .rounded, weight: .semibold))
-                        .foregroundStyle(K.teal)
-                        .frame(minHeight: 44)
-                        .accessibilityLabel("Need help — email support")
+                    Button {
+                        showHelpGate = true
+                    } label: {
+                        Text("Need help?")
+                            .font(.system(.caption, design: .rounded, weight: .semibold))
+                            .foregroundStyle(K.teal)
+                            .frame(minHeight: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Need help — ask a grown-up to email support")
                 }
 
                 Spacer()
@@ -108,6 +118,12 @@ struct PairCodeView: View {
             .padding(.horizontal, 28)
         }
         .onAppear { focused = true }
+        .parentalGate(isPresented: $showHelpGate) {
+            // After grown-up passes the math check, open the mail composer.
+            if let url = URL(string: "mailto:support@veritypost.com?subject=Kids%20app%20pair%20code%20help") {
+                UIApplication.shared.open(url, options: [:], completionHandler: nil)
+            }
+        }
     }
 
     // MARK: Code field

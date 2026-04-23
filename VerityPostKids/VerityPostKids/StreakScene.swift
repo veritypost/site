@@ -37,6 +37,10 @@ struct StreakScene: View {
     @State private var sparkleCount = 0
     @State private var sparkleTimer: Timer? = nil
 
+    // Skip the choreography when reduce-motion is on. Kid sees the final
+    // streak number + flame + milestone card immediately.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         GeometryReader { geo in
             let cx = geo.size.width / 2
@@ -191,6 +195,18 @@ struct StreakScene: View {
     // MARK: Choreography
 
     private func runChoreography(at center: CGPoint) {
+        if reduceMotion {
+            // Static end-state — no flame animation, no rings, no particle
+            // burst, no continuous sparkles. Number jumps to current.
+            flameScale = 1.0
+            flameOpacity = 1.0
+            numberTrigger = true
+            glowOpacity = 1.0
+            milestoneOffset = 0
+            milestoneOpacity = 1.0
+            return
+        }
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             withAnimation(K.springOvershoot) {
                 flameScale = 1.0

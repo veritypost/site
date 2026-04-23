@@ -46,6 +46,10 @@ struct QuizPassScene: View {
 
     @StateObject private var particles = ParticleEmitter()
 
+    // Skip chip sweep + ring grow + confetti when reduce-motion is on.
+    // Result card appears in its final pose with the new score visible.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         GeometryReader { geo in
             ZStack {
@@ -257,6 +261,22 @@ struct QuizPassScene: View {
     // MARK: Choreography
 
     private func runChoreography(at center: CGPoint) {
+        if reduceMotion {
+            // Static end-state — correct chip already highlighted, result
+            // sheet up, score and ring at final values, no confetti.
+            if let idx = answers.firstIndex(where: { $0.correct }) {
+                chipHighlightIndex = idx
+                chipCheckVisible = true
+            }
+            chipSweepScale = 2.5
+            chipSweepOpacity = 0
+            questionOpacity = 0.1
+            resultOffset = 0
+            scoreTrigger = true
+            ringProgress = Double(newScore) / 100.0
+            return
+        }
+
         // 500ms: highlight correct chip + show checkmark
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             if let idx = answers.firstIndex(where: { $0.correct }) {

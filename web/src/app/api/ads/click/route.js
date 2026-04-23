@@ -33,7 +33,11 @@ export async function POST(request) {
     max: 120,
     windowSec: 60,
   });
-  if (rl.limited) return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+  if (rl.limited)
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': '60' } }
+    );
 
   const { error } = await service.rpc('log_ad_click', { p_impression_id: impressionId });
   if (error)

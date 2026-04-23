@@ -95,8 +95,72 @@ export async function POST(request) {
     );
   }
 
-  const { reason } = await request.json().catch(() => ({}));
+  const { reason, immediate } = await request.json().catch(() => ({}));
 
+  // Apple-accepted "delete now, no grace" path. The 30-day grace is an
+  // option not a requirement — surface it so users who explicitly
+  // confirm get instant removal. Behaviour: schedule, then run the
+  // anonymize RPC with the timer back-dated to now, then drop the
+  // GoTrue auth row. The cron will no-op for this user on its next
+  // pass (deletion_completed_at is set).
+  if (immediate === true) {
+    // 1. Schedule (idempotent — sets the data_requests row + grace
+    //    timestamp). We immediately back-date the timer so anonymize
+    //    can run.
+    const { error: schedErr } = await service.rpc('schedule_account_deletion', {
+      p_user_id: user.id,
+      p_reason: reason || 'immediate',
+    });
+    if (schedErr)
+      return safeErrorResponse(NextResponse, schedErr, {
+        route: 'account.delete.immediate.schedule',
+        fallbackStatus: 400,
+      });
+
+    // 2. Back-date the grace timer so the anonymize RPC accepts the
+    //    call (sweep_expired_deletions only picks up rows past their
+    //    timer; we're calling anonymize_user directly so this is
+    //    belt-and-suspenders for the audit row).
+    await service
+      .from('users')
+      .update({ deletion_scheduled_for: new Date(Date.now() - 1000).toISOString() })
+      .eq('id', user.id);
+
+    // 3. Run the PII scrub. The function's self-invoke guard checks
+    //    `auth.uid()` — service_role calls have no auth.uid(), so the
+    //    guard passes through.
+    const { error: anonErr } = await service.rpc('anonymize_user', { p_user_id: user.id });
+    if (anonErr) {
+      console.error('[account.delete.immediate] anonymize', anonErr);
+      return NextResponse.json(
+        { error: 'Could not complete immediate deletion. Try again or use the 30-day option.' },
+        { status: 500 }
+      );
+    }
+
+    // 4. Drop the GoTrue credential row. Match the cron's tolerance:
+    //    log on failure but tell the user the account is gone — the
+    //    cron will retry the auth-row delete on its next sweep.
+    try {
+      const { error: delErr } = await service.auth.admin.deleteUser(user.id);
+      if (delErr) {
+        const msg = (delErr.message || '').toLowerCase();
+        if (!msg.includes('user not found') && !msg.includes('not_found')) {
+          console.error('[account.delete.immediate] auth delete', delErr.message);
+        }
+      }
+    } catch (e) {
+      console.error('[account.delete.immediate] auth delete throw', e?.message);
+    }
+
+    return NextResponse.json({
+      deleted: true,
+      mode: 'immediate',
+      completed_at: new Date().toISOString(),
+    });
+  }
+
+  // Default: 30-day grace.
   const { data, error } = await service.rpc('schedule_account_deletion', {
     p_user_id: user.id,
     p_reason: reason || null,

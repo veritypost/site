@@ -29,7 +29,10 @@ export async function GET(request) {
       windowSec: 3600,
     });
     if (ipHit.limited) {
-      return NextResponse.json({ available: true, checked: false }, { status: 429 });
+      return NextResponse.json(
+        { available: true, checked: false },
+        { status: 429, headers: { 'Retry-After': '3600' } }
+      );
     }
     const emailHit = await checkRateLimit(supabase, {
       key: `check_email:addr:${email}`,
@@ -38,7 +41,10 @@ export async function GET(request) {
       windowSec: 86400,
     });
     if (emailHit.limited) {
-      return NextResponse.json({ available: true, checked: false }, { status: 429 });
+      return NextResponse.json(
+        { available: true, checked: false },
+        { status: 429, headers: { 'Retry-After': '86400' } }
+      );
     }
 
     const service = createServiceClient();

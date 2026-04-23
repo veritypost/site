@@ -1,5 +1,6 @@
 import SwiftUI
 import Supabase
+import UIKit
 
 // Kid profile: stats + earned badges + account control (unpair).
 // Port of adult KidProfileView, stripped of parent-surface links.
@@ -15,6 +16,10 @@ struct ProfileView: View {
     // "log out / forget device" action; COPPA/Kids Category review
     // requires parental verification before a kid can trigger it.
     @State private var showUnpairGate: Bool = false
+    // Apple Kids Category review — leaving the app to view Privacy or
+    // Terms must go through a parental gate first.
+    @State private var showLegalGate: Bool = false
+    @State private var pendingLegalURL: URL? = nil
 
     private var client: SupabaseClient { SupabaseKidsClient.shared.client }
 
@@ -24,6 +29,7 @@ struct ProfileView: View {
                 header
                 statsGrid
                 badgesSection
+                aboutSection
             }
             .padding(.horizontal, 20)
             .padding(.top, 24)
@@ -34,6 +40,61 @@ struct ProfileView: View {
         .parentalGate(isPresented: $showUnpairGate) {
             Task { await auth.signOut() }
         }
+        .parentalGate(isPresented: $showLegalGate) {
+            if let url = pendingLegalURL {
+                UIApplication.shared.open(url, options: [:], completionHandler: nil)
+            }
+            pendingLegalURL = nil
+        }
+    }
+
+    // MARK: About / Legal — parental-gated outbound links
+
+    private var aboutSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("About")
+                .font(.scaledSystem(size: 13, weight: .heavy, design: .rounded))
+                .kerning(1)
+                .textCase(.uppercase)
+                .foregroundStyle(K.dim)
+
+            VStack(spacing: 0) {
+                aboutRow(label: "Privacy Policy",
+                         url: URL(string: "https://veritypost.com/privacy")!)
+                Divider()
+                    .background(K.border)
+                aboutRow(label: "Terms of Service",
+                         url: URL(string: "https://veritypost.com/terms")!)
+            }
+            .background(K.card)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(K.border, lineWidth: 1)
+            )
+        }
+    }
+
+    private func aboutRow(label: String, url: URL) -> some View {
+        Button {
+            pendingLegalURL = url
+            showLegalGate = true
+        } label: {
+            HStack {
+                Text(label)
+                    .font(.scaledSystem(size: 14, weight: .semibold, design: .rounded))
+                    .foregroundStyle(K.text)
+                Spacer()
+                Image(systemName: "arrow.up.right.square")
+                    .font(.scaledSystem(size: 13, weight: .bold))
+                    .foregroundStyle(K.dim)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: Header

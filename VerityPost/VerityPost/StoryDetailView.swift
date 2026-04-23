@@ -91,6 +91,12 @@ struct StoryDetailView: View {
     @State private var showStreakCelebration = false
     @State private var streakCount = 0
 
+    // Apple Guideline 1.2 — Report Content + Block User on comments.
+    @StateObject private var blocks = BlockService.shared
+    @State private var reportTargetCommentId: String? = nil
+    @State private var blockTargetUser: (id: String, username: String?)? = nil
+    @State private var moderationToast: String? = nil
+
     // D17: TTS is now permission-gated (`article.tts.play`).
     @StateObject private var tts = TTSPlayer()
 
@@ -174,6 +180,59 @@ struct StoryDetailView: View {
             Text("Free accounts can save up to 10 bookmarks. Unlimited bookmarks and collections are available on paid plans.")
         }
         .sheet(isPresented: $showSubscription) { SubscriptionView().environmentObject(auth) }
+        // Apple Guideline 1.2 — Report Content / Block User affordances.
+        .confirmationDialog(
+            "Report comment",
+            isPresented: Binding(
+                get: { reportTargetCommentId != nil },
+                set: { if !$0 { reportTargetCommentId = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            ForEach(ReportReason.allCases) { reason in
+                Button(reason.label) {
+                    if let cid = reportTargetCommentId {
+                        Task { await submitCommentReport(commentId: cid, reason: reason) }
+                    }
+                    reportTargetCommentId = nil
+                }
+            }
+            Button("Cancel", role: .cancel) { reportTargetCommentId = nil }
+        } message: {
+            Text("Tell us why. A moderator will review it.")
+        }
+        .confirmationDialog(
+            blockTargetUser.map { "Block @\($0.username ?? "user")?" } ?? "Block user?",
+            isPresented: Binding(
+                get: { blockTargetUser != nil },
+                set: { if !$0 { blockTargetUser = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Block", role: .destructive) {
+                if let target = blockTargetUser {
+                    Task { await performBlock(targetId: target.id, username: target.username) }
+                }
+                blockTargetUser = nil
+            }
+            Button("Cancel", role: .cancel) { blockTargetUser = nil }
+        } message: {
+            Text("You won\u{2019}t see their comments or messages.")
+        }
+        .overlay(alignment: .top) {
+            if let toast = moderationToast {
+                Text(toast)
+                    .font(.system(.footnote, design: .default, weight: .semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(VP.accent))
+                    .shadow(radius: 4)
+                    .padding(.top, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.25), value: moderationToast)
         .task(id: story.id) { await loadData() }
         .task(id: story.id) { await subscribeToNewComments() }
         .task(id: perms.changeToken) {
@@ -807,7 +866,12 @@ struct StoryDetailView: View {
                     .padding(.horizontal, 20)
             } else {
                 VStack(spacing: 0) {
-                    ForEach(comments) { c in commentRow(c) }
+                    // Apple Guideline 1.2 — filter blocked users client-side
+                    // before render. The block-set is bidirectional (either
+                    // party's block hides the other) so this honours both
+                    // outgoing and incoming blocks even though the server
+                    // RLS policy doesn't yet filter on the user's behalf.
+                    ForEach(comments.filter { !blocks.isBlocked($0.userId) }) { c in commentRow(c) }
                 }
                 .padding(.top, 8)
             }
@@ -1070,6 +1134,23 @@ struct StoryDetailView: View {
         .padding(.horizontal, 20)
         .overlay(alignment: .bottom) {
             Rectangle().fill(VP.rule).frame(height: 1)
+        }
+        // Apple Guideline 1.2 — long-press affords Report + Block on every
+        // comment. Author-self check skips blocking yourself; the API also
+        // rejects it but we suppress the option entirely to avoid a dead-end.
+        .contextMenu {
+            Button {
+                reportTargetCommentId = comment.id
+            } label: {
+                Label("Report comment", systemImage: "flag")
+            }
+            if let authorId = comment.userId, authorId != auth.currentUser?.id {
+                Button(role: .destructive) {
+                    blockTargetUser = (id: authorId, username: comment.users?.username)
+                } label: {
+                    Label("Block @\(comment.users?.username ?? "user")", systemImage: "hand.raised")
+                }
+            }
         }
     }
 
@@ -1595,6 +1676,38 @@ struct StoryDetailView: View {
             }
         } catch {
             await MainActor.run { quizStage = .answering; quizError = "Network issue." }
+        }
+    }
+
+    // MARK: - Apple Guideline 1.2 — moderation actions
+
+    private func submitCommentReport(commentId: String, reason: ReportReason) async {
+        let ok = await ReportService.submit(targetType: .comment, targetId: commentId, reason: reason)
+        await MainActor.run {
+            flashModerationToast(ok ? "Thanks for the report. We\u{2019}ll review it." : "Couldn\u{2019}t send report. Try again.")
+        }
+    }
+
+    private func performBlock(targetId: String, username: String?) async {
+        let ok = await BlockService.shared.block(targetId: targetId)
+        await MainActor.run {
+            if ok {
+                let label = username.map { "@\($0)" } ?? "User"
+                flashModerationToast("\(label) blocked.")
+            } else {
+                flashModerationToast("Couldn\u{2019}t block. Try again.")
+            }
+        }
+    }
+
+    @MainActor
+    private func flashModerationToast(_ text: String) {
+        moderationToast = text
+        Task {
+            try? await Task.sleep(nanoseconds: 2_400_000_000)
+            await MainActor.run {
+                if moderationToast == text { moderationToast = nil }
+            }
         }
     }
 

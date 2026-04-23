@@ -57,6 +57,10 @@ struct SettingsView: View {
                     if canChangePassword {
                         NavigationLink("Password", destination: PasswordSettingsView())
                     }
+                    // Apple Guideline 1.2 — UGC-management surface. Always
+                    // present for signed-in users; the destination view
+                    // calls /api/users/blocked and exposes Unblock per row.
+                    NavigationLink("Blocked Accounts", destination: BlockedAccountsView())
                 }
             }
 
@@ -122,9 +126,30 @@ struct SettingsView: View {
                 }
             }
 
-            if canViewDataPrivacy {
+            // Apple Review 5.1.1(v) — Privacy Policy + Terms of Service
+            // must be reachable from inside the app, not only from a link
+            // shown during sign-up.
+            Section("Legal") {
+                Link("Privacy Policy",
+                     destination: URL(string: "https://veritypost.com/privacy")!)
+                    .foregroundColor(VP.text)
+                Link("Terms of Service",
+                     destination: URL(string: "https://veritypost.com/terms")!)
+                    .foregroundColor(VP.text)
+            }
+
+            // Apple Review 5.1.1(v) requires account deletion to be
+            // accessible to every authenticated user from inside the app
+            // — not gated on a permission. Permission-gated DataPrivacyView
+            // remains for the export flow + DM read-receipts toggle, but
+            // delete is always present for any signed-in account.
+            if auth.currentUser != nil {
                 Section("Data & Privacy") {
-                    NavigationLink("Export / Delete Data", destination: DataPrivacyView())
+                    if canViewDataPrivacy {
+                        NavigationLink("Export / Delete Data", destination: DataPrivacyView())
+                    } else {
+                        NavigationLink("Delete Account", destination: DataPrivacyView())
+                    }
                 }
             }
 
@@ -710,14 +735,48 @@ struct MFASettingsView: View {
 struct SubscriptionSettingsView: View {
     @EnvironmentObject var auth: AuthViewModel
     @StateObject private var perms = PermissionStore.shared
+    @StateObject private var store = StoreManager.shared
     @State private var showSubscription = false
     // Drives the Upgrade-vs-Manage affordance. `true` = active paid plan
     // (show manage), `false` = free/lapsed (show upgrade CTA). Populated
     // via PermissionService so admin toggles affect this immediately.
     @State private var hasActiveSubscription: Bool = false
+    @State private var restoreMessage: String? = nil
 
     var body: some View {
         Form {
+            // Apple Review 3.1.1 — Restore Purchases must be visible from
+            // the top-level subscription surface regardless of whether
+            // the user currently has an active sub. Always-on so a user
+            // who reinstalled / signed in on a new device can recover
+            // their previous purchase without having to find a hidden path.
+            Section {
+                Button {
+                    Task {
+                        restoreMessage = nil
+                        await store.restorePurchases()
+                        if let err = store.errorMessage {
+                            restoreMessage = err
+                        } else {
+                            restoreMessage = "Checked for purchases on your Apple ID."
+                        }
+                    }
+                } label: {
+                    HStack {
+                        Text("Restore Purchases")
+                        Spacer()
+                        if store.isLoading {
+                            ProgressView()
+                        }
+                    }
+                }
+                .foregroundColor(VP.accent)
+                .disabled(store.isLoading)
+                if let msg = restoreMessage {
+                    Text(msg).font(.caption).foregroundColor(VP.dim)
+                }
+            }
+
             Section("Current Plan") {
                 HStack {
                     Text("Plan")
@@ -1521,6 +1580,132 @@ indirect enum JSONValue: Codable {
             var out: [String: Any] = [:]
             for (k, v) in o { out[k] = v.anyValue }
             return out
+        }
+    }
+}
+
+// MARK: - Apple Guideline 1.2 — Blocked Accounts management
+
+/// Settings → Blocked Accounts. Lists every user the current viewer has
+/// blocked, with an Unblock action per row. Sourced from
+/// GET /api/users/blocked (server-side filter on `blocker_id = auth.uid()`)
+/// and mutated through DELETE /api/users/[id]/block.
+struct BlockedAccountsView: View {
+    @EnvironmentObject var auth: AuthViewModel
+    @StateObject private var blocks = BlockService.shared
+
+    struct BlockedRow: Decodable, Identifiable {
+        let id: String
+        let blocked_id: String?
+        let username: String?
+        let avatar_color: String?
+        let created_at: String?
+        let reason: String?
+    }
+
+    @State private var rows: [BlockedRow] = []
+    @State private var loading = true
+    @State private var loadError: String? = nil
+    @State private var busyId: String? = nil
+
+    var body: some View {
+        Group {
+            if loading {
+                ProgressView().padding(.top, 40)
+            } else if let err = loadError {
+                VStack(spacing: 8) {
+                    Text("Couldn\u{2019}t load blocks")
+                        .font(.system(.callout, design: .default, weight: .semibold))
+                        .foregroundColor(VP.text)
+                    Text(err).font(.caption).foregroundColor(VP.dim)
+                    Button("Try again") { Task { await load() } }
+                        .foregroundColor(VP.accent)
+                }
+                .padding(.top, 60)
+            } else if rows.isEmpty {
+                VStack(spacing: 6) {
+                    Text("No blocks")
+                        .font(.system(.callout, design: .default, weight: .semibold))
+                        .foregroundColor(VP.text)
+                    Text("People you block will appear here.")
+                        .font(.caption).foregroundColor(VP.dim)
+                }
+                .padding(.top, 60)
+            } else {
+                List {
+                    ForEach(rows) { row in
+                        HStack(spacing: 12) {
+                            Circle()
+                                .fill(Color(hex: row.avatar_color ?? "cccccc"))
+                                .frame(width: 36, height: 36)
+                                .overlay(
+                                    Text(String((row.username ?? "?").prefix(1)).uppercased())
+                                        .font(.system(.subheadline, design: .default, weight: .bold))
+                                        .foregroundColor(.white)
+                                )
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(row.username.map { "@\($0)" } ?? "Unknown user")
+                                    .font(.system(.subheadline, design: .default, weight: .semibold))
+                                    .foregroundColor(VP.text)
+                                if let r = row.reason, !r.isEmpty {
+                                    Text(r).font(.caption).foregroundColor(VP.dim)
+                                }
+                            }
+                            Spacer()
+                            Button {
+                                if let target = row.blocked_id {
+                                    Task { await unblock(rowId: row.id, targetId: target) }
+                                }
+                            } label: {
+                                Text(busyId == row.id ? "..." : "Unblock")
+                                    .font(.system(.footnote, design: .default, weight: .semibold))
+                                    .foregroundColor(VP.accent)
+                            }
+                            .disabled(busyId == row.id || row.blocked_id == nil)
+                        }
+                    }
+                }
+                .listStyle(.plain)
+            }
+        }
+        .navigationTitle("Blocked Accounts")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await load() }
+    }
+
+    private func load() async {
+        loading = true
+        loadError = nil
+        do {
+            guard let session = try? await SupabaseManager.shared.client.auth.session else {
+                loadError = "Sign in to view blocks."
+                loading = false
+                return
+            }
+            let url = SupabaseManager.shared.siteURL.appendingPathComponent("api/users/blocked")
+            var req = URLRequest(url: url)
+            req.httpMethod = "GET"
+            req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+            let (data, resp) = try await URLSession.shared.data(for: req)
+            guard let http = resp as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                loadError = "Couldn\u{2019}t load blocks."
+                loading = false
+                return
+            }
+            struct Resp: Decodable { let blocks: [BlockedRow] }
+            rows = (try? JSONDecoder().decode(Resp.self, from: data).blocks) ?? []
+        } catch {
+            loadError = "Couldn\u{2019}t load blocks."
+        }
+        loading = false
+    }
+
+    private func unblock(rowId: String, targetId: String) async {
+        busyId = rowId
+        let ok = await BlockService.shared.unblock(targetId: targetId)
+        await MainActor.run {
+            if ok { rows.removeAll { $0.id == rowId } }
+            busyId = nil
         }
     }
 }

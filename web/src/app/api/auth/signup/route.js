@@ -34,7 +34,10 @@ export async function POST(request) {
       windowSec: 3600,
     });
     if (hit.limited) {
-      return NextResponse.json({ error: 'Too many signup attempts' }, { status: 429 });
+      return NextResponse.json(
+        { error: 'Too many signup attempts' },
+        { status: 429, headers: { 'Retry-After': '3600' } }
+      );
     }
 
     const siteUrl = getSiteUrl();

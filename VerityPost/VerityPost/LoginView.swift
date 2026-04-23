@@ -1,3 +1,4 @@
+import AuthenticationServices
 import SwiftUI
 
 // @migrated-to-permissions 2026-04-18
@@ -113,25 +114,27 @@ struct LoginView: View {
                 .padding(.vertical, 18)
 
                 // Sign in with Apple (App Store Review Guideline 4.8).
-                Button {
-                    loading = true
-                    Task {
-                        await auth.signInWithApple()
-                        loading = false
+                // System-rendered button drives the native
+                // ASAuthorizationAppleIDProvider flow. AuthViewModel owns
+                // the nonce (set in onRequest) and the identity-token
+                // exchange with Supabase (handled in onCompletion).
+                SignInWithAppleButton(
+                    .signIn,
+                    onRequest: { request in
+                        auth.prepareAppleRequest(request)
+                    },
+                    onCompletion: { result in
+                        loading = true
+                        Task {
+                            await auth.completeAppleSignIn(result: result)
+                            loading = false
+                        }
                     }
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "apple.logo")
-                            .font(.system(.body, design: .default, weight: .medium))
-                        Text("Sign in with Apple")
-                            .font(.system(.subheadline, design: .default, weight: .semibold))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(minHeight: 48)
-                    .foregroundColor(.white)
-                    .background(Color.black)
-                    .cornerRadius(12)
-                }
+                )
+                .signInWithAppleButtonStyle(.black)
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
+                .cornerRadius(12)
                 .disabled(loading)
 
                 // Sign in with Google — matches web signup Google option.

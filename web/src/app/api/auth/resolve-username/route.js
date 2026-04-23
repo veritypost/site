@@ -42,7 +42,10 @@ export async function POST(request) {
     windowSec: 60,
   });
   if (hit.limited) {
-    return NextResponse.json({ error: 'Too many attempts' }, { status: 429 });
+    return NextResponse.json(
+      { error: 'Too many attempts' },
+      { status: 429, headers: { 'Retry-After': '60' } }
+    );
   }
 
   const { data: email, error } = await service.rpc('resolve_username_to_email', {

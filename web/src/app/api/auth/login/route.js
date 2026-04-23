@@ -21,7 +21,10 @@ export async function POST(request) {
       windowSec: 900,
     });
     if (hit.limited) {
-      return NextResponse.json({ error: 'Too many login attempts' }, { status: 429 });
+      return NextResponse.json(
+        { error: 'Too many login attempts' },
+        { status: 429, headers: { 'Retry-After': '900' } }
+      );
     }
 
     // Identify the signed-in user from the session cookie the client set

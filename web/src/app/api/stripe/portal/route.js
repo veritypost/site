@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { createBillingPortalSession } from '@/lib/stripe';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 export async function POST(request) {
   let user;
@@ -16,6 +17,23 @@ export async function POST(request) {
   }
 
   const service = createServiceClient();
+
+  // Mirror the rate-limit shape from /api/stripe/checkout: 20 portal
+  // sessions per hour per user. Stripe portal sessions are billable
+  // observability events; keep a sane cap.
+  const rate = await checkRateLimit(service, {
+    key: `stripe-portal:${user.id}`,
+    policyKey: 'stripe_portal',
+    max: 20,
+    windowSec: 3600,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many portal requests. Try again later.' },
+      { status: 429, headers: { 'Retry-After': '3600' } }
+    );
+  }
+
   const { data: me } = await service
     .from('users')
     .select('stripe_customer_id')

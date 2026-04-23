@@ -41,6 +41,10 @@ struct BadgeUnlockScene: View {
 
     @StateObject private var particles = ParticleEmitter()
 
+    // Skip the shimmer + pulse-rings + particle burst when reduce-motion
+    // is on. Badge appears in its final pose with text + buttons.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         GeometryReader { geo in
             ZStack {
@@ -203,6 +207,19 @@ struct BadgeUnlockScene: View {
     // MARK: Choreography
 
     private func runChoreography(at center: CGPoint) {
+        if reduceMotion {
+            // Static badge reveal: overlay, badge, text, buttons all in
+            // final position. No shimmer, no pulse rings, no confetti.
+            overlayOpacity = 1.0
+            badgeScale = 1.0
+            badgeOpacity = 1.0
+            textOpacity = 1.0
+            textOffset = 0
+            buttonsOpacity = 1.0
+            buttonsOffset = 0
+            return
+        }
+
         // 300ms: dim overlay
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             withAnimation(.easeOut(duration: 0.4)) {

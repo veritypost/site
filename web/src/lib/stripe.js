@@ -92,6 +92,49 @@ export async function retrieveSubscription(subscriptionId) {
   return stripeFetch(`/subscriptions/${subscriptionId}`);
 }
 
+// Look up the customer's currently-active subscription. We don't
+// persist `stripe_subscription_id` on `users` (the webhook only stores
+// the customer mapping), so reconciliation routes have to query Stripe
+// for the live subscription. Returns the most recent non-canceled
+// subscription, or null if none exists.
+export async function listCustomerSubscriptions(customerId, { status = 'all', limit = 10 } = {}) {
+  const qs = new URLSearchParams({ customer: customerId, status, limit: String(limit) });
+  return stripeFetch(`/subscriptions?${qs.toString()}`);
+}
+
+// Cancel at period end (Apple-friendly: user keeps access until paid
+// period expires; Stripe handles the actual cancellation event which
+// our webhook then reconciles into freeze_profile).
+export async function cancelSubscriptionAtPeriodEnd(subscriptionId) {
+  return stripeFetch(`/subscriptions/${subscriptionId}`, {
+    method: 'POST',
+    body: { cancel_at_period_end: 'true' },
+  });
+}
+
+// Remove the cancellation flag — the Stripe-side resume.
+export async function resumeSubscription(subscriptionId) {
+  return stripeFetch(`/subscriptions/${subscriptionId}`, {
+    method: 'POST',
+    body: { cancel_at_period_end: 'false' },
+  });
+}
+
+// Swap the subscription's price item to a new price (upgrade/downgrade).
+// Stripe needs the existing item id to update in-place; pass it in.
+// proration_behavior=create_prorations is the default and matches
+// what the user expects when changing tiers mid-cycle.
+export async function updateSubscriptionPrice(subscriptionId, itemId, newPriceId) {
+  return stripeFetch(`/subscriptions/${subscriptionId}`, {
+    method: 'POST',
+    body: {
+      items: [{ id: itemId, price: newPriceId }],
+      proration_behavior: 'create_prorations',
+      cancel_at_period_end: 'false',
+    },
+  });
+}
+
 // Verify webhook signature per Stripe spec. Returns the parsed event
 // or throws. Accepts the raw request body as a string.
 export function verifyWebhook(rawBody, signatureHeader) {

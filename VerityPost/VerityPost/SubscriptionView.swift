@@ -37,6 +37,7 @@ struct SubscriptionView: View {
                     promoSection
                     restoreSection
                     manageLink
+                    legalDisclosures
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 24)
@@ -44,6 +45,94 @@ struct SubscriptionView: View {
             .background(VP.bg)
             .navigationTitle("Subscription")
             .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+
+    // MARK: - Legal Disclosures (Apple Review 3.1.2)
+    //
+    // Auto-renewing subscriptions must surface: title, billing length,
+    // full price per period, renewal terms, cancellation steps, and direct
+    // links to Terms + Privacy. Apple rejects paywalls without these.
+
+    private var legalDisclosures: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Subscription Details")
+                .font(.system(.caption, design: .default, weight: .bold))
+                .tracking(1)
+                .foregroundColor(VP.dim)
+                .padding(.bottom, 2)
+
+            disclosureRow(
+                title: "Verity",
+                length: isAnnual ? "Annual" : "Monthly",
+                price: isAnnual ? "$39.99 per year" : "$3.99 per month"
+            )
+            disclosureRow(
+                title: "Verity Pro",
+                length: isAnnual ? "Annual" : "Monthly",
+                price: isAnnual ? "$99.99 per year" : "$9.99 per month"
+            )
+            disclosureRow(
+                title: "Verity Family",
+                length: isAnnual ? "Annual" : "Monthly",
+                price: isAnnual ? "$149.99 per year" : "$14.99 per month"
+            )
+            disclosureRow(
+                title: "Verity Family XL",
+                length: isAnnual ? "Annual" : "Monthly",
+                price: isAnnual ? "$199.99 per year" : "$19.99 per month"
+            )
+
+            Text("Subscriptions automatically renew unless auto-renew is turned off at least 24 hours before the end of the current period. Your account will be charged for renewal within 24 hours prior to the end of the current period at the price shown above. You can manage your subscription and turn off auto-renewal in your Apple ID account settings after purchase.")
+                .font(.caption)
+                .foregroundColor(VP.dim)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 6)
+
+            Text("Payment will be charged to your Apple ID account at confirmation of purchase. Any unused portion of a free trial period, if offered, will be forfeited when you purchase a subscription.")
+                .font(.caption)
+                .foregroundColor(VP.dim)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 16) {
+                Link("Terms of Service",
+                     destination: URL(string: "https://veritypost.com/terms")!)
+                    .font(.system(.caption, design: .default, weight: .semibold))
+                    .foregroundColor(VP.accent)
+                Link("Privacy Policy",
+                     destination: URL(string: "https://veritypost.com/privacy")!)
+                    .font(.system(.caption, design: .default, weight: .semibold))
+                    .foregroundColor(VP.accent)
+                Spacer()
+            }
+            .padding(.top, 8)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(18)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(VP.card)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(VP.border, lineWidth: 1)
+        )
+    }
+
+    private func disclosureRow(title: String, length: String, price: String) -> some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.system(.footnote, design: .default, weight: .semibold))
+                    .foregroundColor(VP.text)
+                Text(length)
+                    .font(.caption)
+                    .foregroundColor(VP.dim)
+            }
+            Spacer()
+            Text(price)
+                .font(.system(.footnote, design: .default, weight: .medium))
+                .foregroundColor(VP.text)
         }
     }
 

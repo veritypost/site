@@ -102,6 +102,10 @@ struct ContentView: View {
         }
         .onChange(of: auth.currentUser?.id) { _, newId in
             PushRegistration.shared.setCurrentUser(newId)
+            // Apple Guideline 1.2 — block-list cache follows the auth user.
+            // Loaded fresh on login/logout so comment + DM filters always
+            // resolve against the current viewer's perspective.
+            Task { await BlockService.shared.refresh(currentUserId: newId) }
         }
         .preferredColorScheme(.light)
     }

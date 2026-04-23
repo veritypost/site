@@ -6,6 +6,7 @@ import { assertKidOwnership } from '@/lib/kids';
 import { createServiceClient } from '@/lib/supabase/server';
 import { scoreQuizSubmit, checkAchievements } from '@/lib/scoring';
 import { v2LiveGuard } from '@/lib/featureFlags';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 export async function POST(request) {
   const blocked = await v2LiveGuard();
@@ -44,6 +45,23 @@ export async function POST(request) {
   }
 
   const service = createServiceClient();
+
+  // Rate-limit: 30 submits per minute per user. Generous enough for
+  // legitimate retries / multi-tab edge cases; tight enough to stop a
+  // scripted attempt to brute-force quiz answers.
+  const rate = await checkRateLimit(service, {
+    key: `quiz_submit:${user.id}`,
+    policyKey: 'quiz_submit',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many quiz submissions. Slow down.' },
+      { status: 429, headers: { 'Retry-After': '60' } }
+    );
+  }
+
   const { data, error } = await service.rpc('submit_quiz_attempt', {
     p_user_id: user.id,
     p_article_id: article_id,

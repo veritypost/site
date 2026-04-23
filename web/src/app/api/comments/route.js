@@ -5,6 +5,7 @@ import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { scoreCommentPost } from '@/lib/scoring';
 import { v2LiveGuard } from '@/lib/featureFlags';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 // POST /api/comments — create a top-level comment or threaded reply.
 // Body: { article_id, body, parent_id?, mentions? }
@@ -31,6 +32,23 @@ export async function POST(request) {
   }
 
   const service = createServiceClient();
+
+  // Rate-limit: 10 comments per minute per user. Even with the
+  // quiz-pass gate, an authenticated abuser could spam threads or
+  // mentions; cap their burst rate.
+  const rate = await checkRateLimit(service, {
+    key: `comments:${user.id}`,
+    policyKey: 'comments_post',
+    max: 10,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Posting too quickly. Wait a moment and try again.' },
+      { status: 429, headers: { 'Retry-After': '60' } }
+    );
+  }
+
   const { data, error } = await service.rpc('post_comment', {
     p_user_id: user.id,
     p_article_id: article_id,

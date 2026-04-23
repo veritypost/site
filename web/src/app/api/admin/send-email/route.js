@@ -71,7 +71,10 @@ export async function POST(request) {
     windowSec: 3600,
   });
   if (rl.limited) {
-    return NextResponse.json({ error: 'Too many sends, try again later' }, { status: 429 });
+    return NextResponse.json(
+      { error: 'Too many sends, try again later' },
+      { status: 429, headers: { 'Retry-After': '3600' } }
+    );
   }
 
   const body = await request.json().catch(() => ({}));

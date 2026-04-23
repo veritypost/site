@@ -24,6 +24,12 @@ struct PublicProfileView: View {
     @State private var canFollow: Bool = false
     @State private var canShareCard: Bool = false
 
+    // Apple Guideline 1.2 — Report / Block on user profiles.
+    @StateObject private var blocks = BlockService.shared
+    @State private var showReportDialog = false
+    @State private var showBlockDialog = false
+    @State private var profileToast: String? = nil
+
     var body: some View {
         ScrollView {
             if loading {
@@ -45,11 +51,95 @@ struct PublicProfileView: View {
         .background(VP.bg)
         .navigationTitle("@\(username)")
         .navigationBarTitleDisplayMode(.inline)
+        .confirmationDialog(
+            "Report user",
+            isPresented: $showReportDialog,
+            titleVisibility: .visible
+        ) {
+            ForEach(ReportReason.allCases) { reason in
+                Button(reason.label) {
+                    if let id = profile?.id {
+                        Task { await submitProfileReport(targetId: id, reason: reason) }
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Tell us why. A moderator will review it.")
+        }
+        .confirmationDialog(
+            blocks.isBlocked(profile?.id ?? "") ? "Unblock @\(profile?.username ?? username)?" : "Block @\(profile?.username ?? username)?",
+            isPresented: $showBlockDialog,
+            titleVisibility: .visible
+        ) {
+            if blocks.isBlocked(profile?.id ?? "") {
+                Button("Unblock") {
+                    if let id = profile?.id { Task { await performUnblock(id: id) } }
+                }
+            } else {
+                Button("Block", role: .destructive) {
+                    if let id = profile?.id { Task { await performBlock(id: id) } }
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text(blocks.isBlocked(profile?.id ?? "")
+                 ? "You\u{2019}ll start seeing this user\u{2019}s comments and messages again."
+                 : "You won\u{2019}t see their comments or messages.")
+        }
+        .overlay(alignment: .top) {
+            if let toast = profileToast {
+                Text(toast)
+                    .font(.system(.footnote, design: .default, weight: .semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(VP.accent))
+                    .shadow(radius: 4)
+                    .padding(.top, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.25), value: profileToast)
         .task { await load() }
         .task(id: perms.changeToken) {
             canViewOtherTotal = await PermissionService.shared.has("profile.score.view.other.total")
             canFollow = await PermissionService.shared.has("profile.follow")
             canShareCard = await PermissionService.shared.has("profile.card.share_link")
+        }
+    }
+
+    // MARK: - Apple Guideline 1.2 — moderation actions
+
+    private func submitProfileReport(targetId: String, reason: ReportReason) async {
+        let ok = await ReportService.submit(targetType: .user, targetId: targetId, reason: reason)
+        await MainActor.run {
+            flashProfileToast(ok ? "Thanks for the report. We\u{2019}ll review it." : "Couldn\u{2019}t send report. Try again.")
+        }
+    }
+
+    private func performBlock(id: String) async {
+        let ok = await BlockService.shared.block(targetId: id)
+        await MainActor.run {
+            flashProfileToast(ok ? "Blocked." : "Couldn\u{2019}t block. Try again.")
+        }
+    }
+
+    private func performUnblock(id: String) async {
+        let ok = await BlockService.shared.unblock(targetId: id)
+        await MainActor.run {
+            flashProfileToast(ok ? "Unblocked." : "Couldn\u{2019}t unblock. Try again.")
+        }
+    }
+
+    @MainActor
+    private func flashProfileToast(_ text: String) {
+        profileToast = text
+        Task {
+            try? await Task.sleep(nanoseconds: 2_400_000_000)
+            await MainActor.run {
+                if profileToast == text { profileToast = nil }
+            }
         }
     }
 
@@ -88,6 +178,36 @@ struct PublicProfileView: View {
                         .cornerRadius(8)
                 }
                 .disabled(followBusy)
+            }
+
+            // Apple Guideline 1.2 — Report user / Block user. Hidden on
+            // own profile. Block toggles via the cached BlockService set,
+            // so the label flips immediately after a successful POST/DELETE.
+            if auth.currentUser?.id != u.id {
+                HStack(spacing: 12) {
+                    Button {
+                        showReportDialog = true
+                    } label: {
+                        Text("Report user")
+                            .font(.system(.footnote, design: .default, weight: .semibold))
+                            .foregroundColor(VP.text)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .frame(minHeight: 44)
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(VP.border))
+                    }
+                    Button {
+                        showBlockDialog = true
+                    } label: {
+                        Text(blocks.isBlocked(u.id) ? "Unblock" : "Block user")
+                            .font(.system(.footnote, design: .default, weight: .semibold))
+                            .foregroundColor(blocks.isBlocked(u.id) ? VP.text : Color(hex: "B91C1C"))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .frame(minHeight: 44)
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(blocks.isBlocked(u.id) ? VP.border : Color(hex: "B91C1C")))
+                    }
+                }
             }
 
             Divider().background(VP.border)

@@ -43,6 +43,11 @@ targets:
           - CFBundleURLSchemes:
               - verity
             CFBundleURLName: com.veritypost.app
+        # Allows KidsAppLauncher.canOpenURL("veritypostkids://...") to return
+        # true when the kids app is installed. iOS 9+ requires every queried
+        # scheme to be declared here, otherwise canOpenURL always returns false.
+        LSApplicationQueriesSchemes:
+          - veritypostkids
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: false
         ITSAppUsesNonExemptEncryption: false
@@ -56,9 +61,15 @@ targets:
         SUPABASE_URL: "$(SUPABASE_URL)"
         SUPABASE_KEY: "$(SUPABASE_KEY)"
         VP_SITE_URL: "$(VP_SITE_URL)"
+    entitlements:
+      path: VerityPost/VerityPost.entitlements
+      properties:
+        com.apple.developer.applesignin:
+          - Default
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.veritypost.app
+        CODE_SIGN_ENTITLEMENTS: VerityPost/VerityPost.entitlements
         SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
         SUPPORTS_MACCATALYST: NO
         SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO

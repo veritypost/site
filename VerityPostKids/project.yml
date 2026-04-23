@@ -32,7 +32,7 @@ targets:
       properties:
         CFBundleDisplayName: "Verity Post Kids"
         UILaunchScreen:
-          UIColorName: ""
+          UIColorName: "kidsLaunchBackground"
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         UISupportedInterfaceOrientations:
@@ -42,13 +42,25 @@ targets:
             CFBundleURLSchemes:
               - veritypostkids
         ITSAppUsesNonExemptEncryption: false
-        # Supabase — same project as adult app.
-        # Anon key is public by design (ships in adult web too, prefix NEXT_PUBLIC_).
-        # Service role key NEVER goes here.
-        SUPABASE_URL: "https://fyiwulqphgmoqullmrfn.supabase.co"
-        SUPABASE_KEY: "sb_publishable_cghQhP7iWFHIPAWnhsH3tw_COmnxYJG"
-        VP_SITE_URL: "https://veritypost.com"
+        # Supabase credentials are read from Info.plist at runtime via
+        # SupabaseKidsClient. The values are populated from build settings
+        # (declared below) so the secrets aren't checked into the repo.
+        # Anon publishable key is public by design (it ships in the adult
+        # web bundle too, prefixed NEXT_PUBLIC_) — service-role key NEVER
+        # goes here. Set SUPABASE_KEY / SUPABASE_URL / VP_SITE_URL via an
+        # xcconfig or as Xcode build-setting overrides at build time.
+        SUPABASE_URL: "$(SUPABASE_URL)"
+        SUPABASE_KEY: "$(SUPABASE_KEY)"
+        VP_SITE_URL: "$(VP_SITE_URL)"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.veritypost.kids
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # Default values for local builds. CI / TestFlight / App Store
+        # submissions can override these via xcconfig or `xcodebuild
+        # SUPABASE_KEY=...` to keep the publishable key out of git history.
+        # Only the publishable (anon) key belongs here — service-role key
+        # is server-only and must never be set in either iOS target.
+        SUPABASE_URL: "https://fyiwulqphgmoqullmrfn.supabase.co"
+        SUPABASE_KEY: "sb_publishable_cghQhP7iWFHIPAWnhsH3tw_COmnxYJG"
+        VP_SITE_URL: "https://veritypost.com"

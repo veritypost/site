@@ -36,7 +36,7 @@ export async function POST(request) {
   if (hit.limited) {
     return NextResponse.json(
       { error: 'Too many email-change attempts. Try again later.' },
-      { status: 429 }
+      { status: 429, headers: { 'Retry-After': '3600' } }
     );
   }
 

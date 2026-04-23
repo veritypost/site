@@ -1,3 +1,5 @@
+import AuthenticationServices
+import CryptoKit
 import Foundation
 import Supabase
 
@@ -408,19 +410,92 @@ final class AuthViewModel: ObservableObject {
 
     // MARK: - Sign in with Apple
 
-    /// Sign in via Apple's OAuth provider. Launches `ASWebAuthenticationSession`
-    /// and hands the callback back to the Swift SDK, which resolves a session.
-    /// App Store Review Guideline 4.8 requires Sign in with Apple when any
-    /// third-party login is offered, so this is the minimum iOS OAuth surface.
-    func signInWithApple() async {
+    /// Native Sign in with Apple. The SwiftUI `SignInWithAppleButton`
+    /// owns the system sheet flow; this method
+    ///   1. configures the request (nonce, scopes) via `prepareAppleRequest`
+    ///   2. trades the resulting `ASAuthorizationCredential` for a Supabase
+    ///      session via `completeAppleSignIn(result:)`
+    /// Falls back to web OAuth on token-trade / transport failures so the
+    /// SIWA surface is never a dead end. App Store Review Guideline 4.8
+    /// requires native SIWA when any third-party login is offered.
+    ///
+    /// `currentNonce` is held on `self` because the SignInWithAppleButton's
+    /// onRequest and onCompletion fire in two separate calls — the
+    /// completion handler needs to read the same nonce that was hashed
+    /// into the request.
+    private var currentNonce: String?
+
+    /// Configure the Apple ID request with a fresh nonce. Call from
+    /// `SignInWithAppleButton(onRequest:)`.
+    func prepareAppleRequest(_ request: ASAuthorizationAppleIDRequest) {
+        let nonce = Self.randomNonceString()
+        currentNonce = nonce
+        request.requestedScopes = [.fullName, .email]
+        request.nonce = Self.sha256(nonce)
+    }
+
+    /// Trade the system-returned credential for a Supabase session.
+    /// Call from `SignInWithAppleButton(onCompletion:)`.
+    func completeAppleSignIn(result: Result<ASAuthorization, Error>) async {
         authError = nil
+        switch result {
+        case .failure(let error):
+            if (error as? ASAuthorizationError)?.code == .canceled {
+                // User dismissed the sheet — silent.
+                currentNonce = nil
+                return
+            }
+            Log.d("Native SIWA failed:", error)
+            await fallbackToWebSignInWithApple()
+            return
+
+        case .success(let authorization):
+            guard
+                let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                let identityTokenData = appleIDCredential.identityToken,
+                let identityToken = String(data: identityTokenData, encoding: .utf8),
+                let nonce = currentNonce
+            else {
+                Log.d("Native SIWA missing identity token or nonce")
+                await fallbackToWebSignInWithApple()
+                return
+            }
+
+            do {
+                _ = try await client.auth.signInWithIdToken(
+                    credentials: .init(
+                        provider: .apple,
+                        idToken: identityToken,
+                        nonce: nonce
+                    )
+                )
+                if let session = try? await client.auth.session {
+                    await loadUser(id: session.user.id.uuidString)
+                    isLoggedIn = true
+                    wasLoggedIn = true
+                }
+            } catch {
+                Log.d("Native SIWA token exchange failed:", error)
+                await fallbackToWebSignInWithApple()
+            }
+            currentNonce = nil
+        }
+    }
+
+    /// Legacy entry point retained for any caller that still wants the
+    /// async-throwing path. Internally drives the web OAuth flow as a
+    /// fallback only — the primary call site is the SignInWithAppleButton
+    /// in LoginView / SignupView.
+    func signInWithApple() async {
+        await fallbackToWebSignInWithApple()
+    }
+
+    private func fallbackToWebSignInWithApple() async {
         do {
             _ = try await client.auth.signInWithOAuth(
                 provider: .apple,
                 redirectTo: URL(string: "verity://login")
             )
-            // signInWithOAuth resolves a Session — let the auth state listener
-            // and loadUser path populate `currentUser` / `isLoggedIn`.
             if let session = try? await client.auth.session {
                 await loadUser(id: session.user.id.uuidString)
                 isLoggedIn = true
@@ -428,6 +503,26 @@ final class AuthViewModel: ObservableObject {
         } catch {
             authError = "Sign in with Apple failed. Try again."
         }
+    }
+
+    /// 32-byte cryptographically-random nonce, base64url-character-set
+    /// encoded. Apple requires the SHA256 of this in the request and the
+    /// raw value passed to Supabase so the identity token can be verified.
+    private static func randomNonceString(length: Int = 32) -> String {
+        precondition(length > 0)
+        var bytes = [UInt8](repeating: 0, count: length)
+        let status = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        precondition(status == errSecSuccess, "SecRandomCopyBytes failed: \(status)")
+        let charset: [Character] = Array(
+            "0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._"
+        )
+        return String(bytes.map { charset[Int($0) % charset.count] })
+    }
+
+    private static func sha256(_ input: String) -> String {
+        let data = Data(input.utf8)
+        let hashed = SHA256.hash(data: data)
+        return hashed.compactMap { String(format: "%02x", $0) }.joined()
     }
 
     /// Sign in via Google's OAuth provider. Same `ASWebAuthenticationSession`
@@ -486,3 +581,4 @@ final class AuthViewModel: ObservableObject {
         }
     }
 }
+

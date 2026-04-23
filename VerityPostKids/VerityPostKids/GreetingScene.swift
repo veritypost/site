@@ -46,6 +46,12 @@ struct GreetingScene: View {
 
     @StateObject private var particles = ParticleEmitter()
 
+    // Accessibility — when iOS reduce-motion is on we skip the typewriter
+    // sparkles + animation choreography and jump to the post-animation
+    // state. Required for Apple accessibility review and a meaningful
+    // win for kids who get nauseous from motion or use Switch Control.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     private var greetingText: String {
         let h = Calendar.current.component(.hour, from: Date())
         return h < 12 ? "Good morning" : (h < 17 ? "Good afternoon" : "Good evening")
@@ -367,6 +373,25 @@ struct GreetingScene: View {
     }
 
     private func runChoreography() {
+        if reduceMotion {
+            // Skip the entire intro and snap to the post-animation state.
+            // No particles, no shimmer, no typewriter — kid sees the
+            // greeting + name + streak + cards immediately.
+            bandOffset = 0
+            bandOpacity = 1.0
+            shimmerProgress = 1.0
+            orbScale = 1.0
+            orbRotation = 0
+            greetingOpacity = 1.0
+            greetingOffset = 0
+            typedCharCount = name.count
+            underlineTrigger = true
+            streakOpacity = 1.0
+            streakOffset = 0
+            cardsRevealed = Array(repeating: true, count: categories.count)
+            return
+        }
+
         try? await_delay(0.2)
         withAnimation(K.springOvershoot) {
             bandOffset = 0

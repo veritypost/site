@@ -72,6 +72,9 @@ export async function POST(request) {
       expires_at: data.expires_at,
     });
   } catch (err) {
-    return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 });
+    // Never leak err.message to the client — it can include Postgres
+    // detail strings, JWT internals, or third-party SDK error frames.
+    console.error('[kids-generate-pair-code] outer', err);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

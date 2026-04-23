@@ -23,6 +23,11 @@ struct KidQuizEngineView: View {
     @State private var loadError: String? = nil
     @State private var startedAt: Date = Date()
     @State private var showResult: Bool = false
+    // Apple Kids Category review — the quiz must refuse to load if the
+    // article isn't kids-safe, even though navigation through the rest of
+    // the kids app should never produce a non-safe article. Defense in
+    // depth in case the article state was stale on this device.
+    @State private var blockedNotKidsSafe: Bool = false
 
     private var client: SupabaseClient { SupabaseKidsClient.shared.client }
 
@@ -32,6 +37,8 @@ struct KidQuizEngineView: View {
 
             if loading {
                 ProgressView()
+            } else if blockedNotKidsSafe {
+                notKidsSafeState
             } else if questions.isEmpty {
                 emptyState
             } else if showResult {
@@ -62,6 +69,34 @@ struct KidQuizEngineView: View {
     private func loadQuestions() async {
         loading = true
         defer { loading = false }
+
+        // Defense-in-depth: pre-flight verify the article is kids-safe.
+        // The kids app's article lists already filter on is_kids_safe, but
+        // a stale deep-link or downstream feed change could leak a non-safe
+        // article in. RLS on `articles` for the kids JWT also enforces
+        // this, but a dedicated pre-check gives us an actionable empty
+        // state instead of a generic "couldn't load quiz" line.
+        struct ArticleSafety: Decodable { let is_kids_safe: Bool? }
+        do {
+            let safetyRows: [ArticleSafety] = try await client
+                .from("articles")
+                .select("is_kids_safe")
+                .eq("id", value: article.id)
+                .limit(1)
+                .execute()
+                .value
+            if safetyRows.first?.is_kids_safe != true {
+                blockedNotKidsSafe = true
+                questions = []
+                return
+            }
+        } catch {
+            // If we can't verify, fail closed — refuse to load the quiz.
+            blockedNotKidsSafe = true
+            questions = []
+            return
+        }
+
         do {
             let rows: [QuizQuestion] = try await client
                 .from("quizzes")
@@ -79,6 +114,30 @@ struct KidQuizEngineView: View {
             self.loadError = "Couldn't load quiz"
             self.questions = []
         }
+    }
+
+    private var notKidsSafeState: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.scaledSystem(size: 36, weight: .bold))
+                .foregroundStyle(K.dim)
+            Text("This story isn't available right now.")
+                .font(.scaledSystem(size: 15, weight: .semibold, design: .rounded))
+                .foregroundStyle(K.dim)
+                .multilineTextAlignment(.center)
+            Button { onDone() } label: {
+                Text("Back")
+                    .font(.scaledSystem(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 22)
+                    .padding(.vertical, 12)
+                    .background(K.teal)
+                    .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 8)
+        }
+        .padding(40)
     }
 
     // MARK: Question view

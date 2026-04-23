@@ -31,7 +31,7 @@ export async function POST(request) {
   if (rl.limited) {
     return NextResponse.json(
       { error: 'Too many submissions. Try again later.' },
-      { status: 429 },
+      { status: 429, headers: { 'Retry-After': '3600' } },
     );
   }
 
