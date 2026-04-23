@@ -443,6 +443,7 @@ struct ActivityItem: Identifiable {
         case read = "Read"
         case quiz = "Quiz"
         case comment = "Comment"
+        case bookmark = "Bookmark"
     }
 }
 

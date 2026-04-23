@@ -366,26 +366,3 @@ struct ProfileAchievementsView: View {
 
 // MARK: - Contact Us (stub that matches web copy)
 
-struct ProfileContactView: View {
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Contact Us")
-                    .font(.system(.title2, design: .default, weight: .bold))
-                    .foregroundColor(VP.text)
-
-                Text("We read every message. For feature requests, bug reports, or questions about your account, send us a note and we\u{2019}ll get back to you.")
-                    .font(.subheadline)
-                    .foregroundColor(VP.soft)
-
-                Link("support@veritypost.com", destination: URL(string: "mailto:support@veritypost.com")!)
-                    .font(.system(.subheadline, design: .default, weight: .semibold))
-                    .foregroundColor(VP.accent)
-            }
-            .padding(20)
-        }
-        .background(VP.bg)
-        .navigationTitle("Contact Us")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
