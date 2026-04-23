@@ -111,6 +111,7 @@ struct ProfileView: View {
 
     // Sheets
     @State private var showSubscription = false
+    @State private var showAvatarEdit = false
 
     // Anon state
     @State private var showLogin = false
@@ -198,6 +199,11 @@ struct ProfileView: View {
         .sheet(isPresented: $showSubscription) { SubscriptionView().environmentObject(auth) }
         .sheet(isPresented: $showLogin) { LoginView().environmentObject(auth) }
         .sheet(isPresented: $showSignup) { SignupView().environmentObject(auth) }
+        .sheet(isPresented: $showAvatarEdit) {
+            if let u = auth.currentUser {
+                AvatarQuickEditSheet(user: u).environmentObject(auth)
+            }
+        }
     }
 
     // MARK: - Top bar (brand + Kids + Settings)
@@ -293,17 +299,23 @@ struct ProfileView: View {
         let deltaToNext = max(0, (next?.minScore ?? score) - score)
 
         HStack(alignment: .center, spacing: 14) {
-            // Compact avatar with single-color tier ring (no gradient, no double rings)
-            ZStack {
-                Circle()
-                    .stroke(VP.border, lineWidth: 3)
-                Circle()
-                    .trim(from: 0, to: CGFloat(tierRingReveal ? progress : 0))
-                    .stroke(tierColor, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-                AvatarView(user: user, size: 56)
+            // Compact avatar with single-color tier ring (tap to edit color + name)
+            Button {
+                showAvatarEdit = true
+            } label: {
+                ZStack {
+                    Circle()
+                        .stroke(VP.border, lineWidth: 3)
+                    Circle()
+                        .trim(from: 0, to: CGFloat(tierRingReveal ? progress : 0))
+                        .stroke(tierColor, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                    AvatarView(user: user, size: 56)
+                }
+                .frame(width: 68, height: 68)
             }
-            .frame(width: 68, height: 68)
+            .buttonStyle(.plain)
+            .accessibilityLabel("Edit avatar color and display name")
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
@@ -1719,5 +1731,161 @@ struct BookmarkRow: Identifiable {
             detail: notes,
             time: time
         )
+    }
+}
+
+// MARK: - Avatar quick-edit sheet (color + display name)
+//
+// Owner: tap-to-edit on the hero avatar. Single source of truth — calls
+// the same `update_own_profile` RPC that SettingsView's AccountSettingsView
+// uses (with the same avatar_color + display_name shape), so changes flow
+// through the canonical write path. No parallel updaters.
+
+struct AvatarQuickEditSheet: View {
+    let user: VPUser
+    @EnvironmentObject var auth: AuthViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    private let colors: [String] = [
+        "#10b981", "#f59e0b", "#3b82f6", "#f43f5e",
+        "#ec4899", "#14b8a6", "#a855f7", "#818cf8",
+    ]
+
+    @State private var selectedColor: String
+    @State private var displayName: String
+    @State private var saving = false
+    @State private var errorMsg: String?
+
+    init(user: VPUser) {
+        self.user = user
+        _selectedColor = State(initialValue: user.avatarColor ?? "#818cf8")
+        _displayName = State(initialValue: user.displayName ?? user.username ?? "")
+    }
+
+    private var initial: String {
+        let base = displayName.trimmingCharacters(in: .whitespaces)
+        guard let first = base.first else { return "?" }
+        return String(first).uppercased()
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Live preview
+                    ZStack {
+                        Circle()
+                            .fill(Color(hex: selectedColor))
+                        Text(initial)
+                            .font(.system(size: 40, weight: .heavy))
+                            .foregroundColor(.white)
+                    }
+                    .frame(width: 96, height: 96)
+                    .padding(.top, 8)
+
+                    // Color palette
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Color")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(VP.dim)
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 12) {
+                            ForEach(colors, id: \.self) { c in
+                                Button {
+                                    selectedColor = c
+                                    UISelectionFeedbackGenerator().selectionChanged()
+                                } label: {
+                                    ZStack {
+                                        Circle()
+                                            .fill(Color(hex: c))
+                                            .frame(width: 44, height: 44)
+                                        if c == selectedColor {
+                                            Circle()
+                                                .stroke(VP.text, lineWidth: 3)
+                                                .frame(width: 50, height: 50)
+                                        }
+                                    }
+                                    .frame(maxWidth: .infinity, minHeight: 56)
+                                    .contentShape(Rectangle())
+                                }
+                                .accessibilityLabel("Color \(c)")
+                            }
+                        }
+                    }
+
+                    // Display name (drives the avatar initial)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Display name")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(VP.dim)
+                        TextField("Your name", text: $displayName)
+                            .textFieldStyle(.roundedBorder)
+                            .textInputAutocapitalization(.words)
+                            .autocorrectionDisabled(true)
+                        Text("First letter shows on your avatar when no image is set.")
+                            .font(.system(size: 12))
+                            .foregroundColor(VP.dim)
+                    }
+
+                    if let err = errorMsg {
+                        Text(err)
+                            .font(.system(size: 13))
+                            .foregroundColor(VP.danger)
+                            .multilineTextAlignment(.center)
+                    }
+                }
+                .padding(20)
+            }
+            .background(VP.bg)
+            .navigationTitle("Edit avatar")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        Task { await save() }
+                    } label: {
+                        if saving { ProgressView() } else { Text("Save").bold() }
+                    }
+                    .disabled(saving)
+                }
+            }
+        }
+    }
+
+    private func save() async {
+        saving = true
+        errorMsg = nil
+        let trimmedName = displayName.trimmingCharacters(in: .whitespaces)
+        let nameToSend: String? = trimmedName.isEmpty ? nil : trimmedName
+
+        // Same RPC + same field names as SettingsView.AccountSettingsView.
+        // update_own_profile accepts a JSON object of profile fields plus a
+        // metadata merge object. We touch profile fields only.
+        struct ProfileFields: Encodable {
+            let avatar_color: String
+            let display_name: String?
+        }
+        struct Args: Encodable {
+            let p_profile: ProfileFields
+        }
+        let args = Args(p_profile: ProfileFields(avatar_color: selectedColor, display_name: nameToSend))
+
+        do {
+            let client = SupabaseManager.shared.client
+            try await client.rpc("update_own_profile", params: args).execute()
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            // Refresh local user so the hero updates immediately.
+            if let id = auth.currentUser?.id {
+                await auth.loadUser(id: id)
+            }
+            await MainActor.run { dismiss() }
+        } catch {
+            await MainActor.run {
+                errorMsg = "Couldn't save. Try again."
+                saving = false
+            }
+        }
     }
 }
