@@ -465,6 +465,22 @@ All 10 Phase 3 tasks shipped. Per-task SHAs + diff summaries in `Sessions/04-22-
 - Task 18 — `POST /api/admin/pipeline/runs/:id/cancel`
 - Task 19 — `GET /api/cron/pipeline-cleanup` orphan-sweep cron
 
+### Phase 4 Decision 3.1 + 3.4 gap-fill — picker + cost preview + page-header freeform — SHIPPED 2026-04-22
+
+Owner flagged 2026-04-22: Tasks 20/21/22 missed three Decision 3 deliverables — sticky page-header provider/model picker, per-cluster est. cost preview, and Layer 2 freeform-instructions textarea on the page header (originally placed inside the modal in Task 22).
+
+Files:
+- NEW `web/src/components/admin/PipelineRunPicker.tsx` (~290 lines) — sticky page header (`position: sticky; top: 0; z-index: 10`). Provider dropdown sourced from distinct `ai_models.provider WHERE is_active=true` (loaded once on mount). Model dropdown empty until provider picked, filtered by provider, shows `display_name`. Collapsible "Add extra instructions" textarea (≤2000 chars). Imperative `reset()` ref method clears all three values + collapses textarea. Exports `estimateClusterCostUsd(input_price, output_price)` + `formatEstimatedCost(usd)` helpers. Per-step typical token counts hardcoded for the 9 LLM steps in the F7 chain (kid-path totals, conservative over-estimate per adversary review).
+- MODIFIED `web/src/components/admin/GenerationModal.tsx` — removed in-modal freeform Textarea + state. New props: `provider`, `model`, `freeformInstructions`, `onGenerateClick`. Audience radio STAYS in modal (per-cluster decision per Task 22 design + Decision 3.1). `startGeneration()` POSTs the picker's provider/model/freeform; calls `onGenerateClick()` BEFORE the POST so the picker resets atomically per Decision 3.1 "fresh pick every click." Defensive guard throws to `error` phase if picker is missing (host should already disable the trigger).
+- MODIFIED `web/src/app/admin/newsroom/page.tsx` — mounts `<PipelineRunPicker>` above the cluster grid. Per-card Generate button gated by `pickerReady` with tooltip "Pick a provider and model on the page header first." Cost preview rendered next to Generate as `est. $0.12` with tooltip explaining the rough-estimate caveat. Modal receives provider/model/freeform via props + resets picker on `onGenerateClick`.
+- MODIFIED `web/src/app/admin/newsroom/clusters/[id]/page.tsx` — same picker mount + same gating + same cost-preview pattern in the page header actions area.
+
+Verification:
+- `npx tsc --noEmit` clean (no new errors; 0 baseline diff).
+- `npx next lint` clean across all four touched files.
+
+Internal flow: Investigator (read all 4 reference files + queried live `ai_models` catalog via MCP) → Adversary (10-point pass: sticky positioning, fresh-pick reset semantics, cost-preview accuracy bias, audience location confirmation, modal prop vs context, retry path interaction, shared component vs inline) → Implementer (single commit).
+
 ### Phase 4 Task 20 — Newsroom home page `/admin/newsroom` — SHIPPED 2026-04-22
 
 `web/src/app/admin/newsroom/page.tsx` (474 lines). Per-task SHA + diff summary in `Sessions/04-22-2026/Session 1/COMPLETED_TASKS_2026-04-22.md`. Cluster card grid with Generate adult / Generate kid / Unlock / View buttons; Refresh feeds + Pipeline runs nav; offset paginated. Phase 4 continues with Tasks 21+ (cluster detail, run detail UI) next session.

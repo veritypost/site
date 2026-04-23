@@ -45,7 +45,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
@@ -58,6 +58,12 @@ import Badge from '@/components/admin/Badge';
 import EmptyState from '@/components/admin/EmptyState';
 import Spinner from '@/components/admin/Spinner';
 import GenerationModal from '@/components/admin/GenerationModal';
+import PipelineRunPicker, {
+  type PickerSelection,
+  type PipelineRunPickerHandle,
+  estimateClusterCostUsd,
+  formatEstimatedCost,
+} from '@/components/admin/PipelineRunPicker';
 import { ToastProvider, useToast } from '@/components/admin/Toast';
 import { ADMIN_C, F, S } from '@/lib/adminPalette';
 import type { Tables } from '@/types/database-helpers';
@@ -186,6 +192,26 @@ function ClusterDetailInner() {
   // as a boolean here (not an id) because the cluster is already known from
   // the route.
   const [generateOpen, setGenerateOpen] = useState(false);
+
+  // Page-header PipelineRunPicker (Decision 3.1). Same shape + reset
+  // semantics as /admin/newsroom; gates the header Generate button + drives
+  // the est. cost preview rendered next to it.
+  const pickerRef = useRef<PipelineRunPickerHandle | null>(null);
+  const [picker, setPicker] = useState<PickerSelection>({
+    provider: '',
+    model: '',
+    freeformInstructions: '',
+    inputPricePer1m: null,
+    outputPricePer1m: null,
+  });
+  const onPickerChange = useCallback((sel: PickerSelection) => {
+    setPicker(sel);
+  }, []);
+  const pickerReady = !!picker.provider && !!picker.model;
+  const estCost = estimateClusterCostUsd(
+    picker.inputPricePer1m,
+    picker.outputPricePer1m
+  );
 
   useEffect(() => {
     (async () => {
@@ -374,12 +400,30 @@ function ClusterDetailInner() {
       <Button
         variant="primary"
         size="md"
-        disabled={locked || busy !== ''}
+        disabled={locked || busy !== '' || !pickerReady}
         onClick={openGenerate}
-        title={locked ? 'Cluster is locked; another run is in progress.' : undefined}
+        title={
+          locked
+            ? 'Cluster is locked; another run is in progress.'
+            : !pickerReady
+              ? 'Pick a provider and model on the page header first.'
+              : undefined
+        }
       >
         Generate
       </Button>
+      {pickerReady && estCost !== null && (
+        <span
+          title="Rough estimate from typical token counts × the picked model's price. Real cost varies with article length and source size."
+          style={{
+            fontSize: F.xs,
+            color: ADMIN_C.dim,
+            alignSelf: 'center',
+          }}
+        >
+          {formatEstimatedCost(estCost)}
+        </span>
+      )}
       {locked && (
         <Button
           variant="danger"
@@ -413,6 +457,8 @@ function ClusterDetailInner() {
         backHref="/admin/newsroom"
         backLabel="Newsroom"
       />
+
+      <PipelineRunPicker ref={pickerRef} onChange={onPickerChange} />
 
       <PageSection>
         <div
@@ -688,7 +734,15 @@ function ClusterDetailInner() {
         open={generateOpen}
         clusterId={cluster.id}
         clusterTitle={title}
+        provider={picker.provider}
+        model={picker.model}
+        freeformInstructions={picker.freeformInstructions}
         onClose={closeGenerate}
+        onGenerateClick={() => {
+          // Decision 3.1 fresh-pick: clear provider, model, and freeform
+          // immediately after the modal POSTs.
+          pickerRef.current?.reset();
+        }}
         onRunSettled={() => {
           // Refresh cluster + runs so the new run appears in history and
           // lock badge updates. Completion navigates to article review so

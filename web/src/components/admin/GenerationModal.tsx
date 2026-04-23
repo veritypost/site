@@ -5,8 +5,10 @@
  * Task 20 + Task 21 with a single flow:
  *
  *   1. Caller renders one "Generate" button per cluster + opens this modal.
- *   2. Modal asks for audience (adult | kid) + optional freeform instructions
- *      (<= 2000 chars — matches the Zod schema at /api/admin/pipeline/generate).
+ *   2. Modal asks for audience (adult | kid) — the per-cluster decision.
+ *      Provider, model, and freeform instructions are picked on the page
+ *      header (see PipelineRunPicker) and passed in as props per
+ *      F7-DECISIONS-LOCKED §3.1 + §3.4.
  *   3. "Start" fires POST /api/admin/pipeline/generate (not awaited — the route
  *      is fully synchronous for the full pipeline, up to 300s). Immediately
  *      the modal begins polling pipeline_runs by cluster_id+audience to
@@ -50,7 +52,6 @@ import { ADMIN_C, F, S } from '@/lib/adminPalette';
 import Modal from '@/components/admin/Modal';
 import Button from '@/components/admin/Button';
 import Badge from '@/components/admin/Badge';
-import Textarea from '@/components/admin/Textarea';
 import Field from '@/components/admin/Field';
 import Spinner from '@/components/admin/Spinner';
 
@@ -111,6 +112,17 @@ export type GenerationModalProps = {
   open: boolean;
   clusterId: string;
   clusterTitle?: string | null;
+  /**
+   * Provider chosen on the page-level PipelineRunPicker. Empty string when
+   * no provider has been picked yet — the host page disables the Generate
+   * trigger in that state, so this value is always non-empty by the time
+   * the modal reaches startGeneration.
+   */
+  provider: string;
+  /** Model chosen on the page-level PipelineRunPicker. Same gating rule. */
+  model: string;
+  /** Optional Layer 2 freeform instructions from the page header. */
+  freeformInstructions?: string;
   onClose: () => void;
   /**
    * Called after a run completes or fails, so the host page can refresh
@@ -118,6 +130,13 @@ export type GenerationModalProps = {
    * the modal, not mid-run.
    */
   onRunSettled?: () => void;
+  /**
+   * Fired the moment the modal POSTs to /api/admin/pipeline/generate. Host
+   * page uses this to reset the page-level picker per F7-DECISIONS-LOCKED
+   * §3.1 "fresh pick every click." Safe to re-fire if the user retries —
+   * the host's reset is idempotent.
+   */
+  onGenerateClick?: () => void;
 };
 
 function formatCost(usd: number | string | null | undefined): string {
@@ -159,15 +178,19 @@ export default function GenerationModal({
   open,
   clusterId,
   clusterTitle,
+  provider,
+  model,
+  freeformInstructions,
   onClose,
   onRunSettled,
+  onGenerateClick,
 }: GenerationModalProps) {
   const router = useRouter();
   const supabase = useRef(createClient()).current;
 
-  // Form state
+  // Form state — audience is the only per-cluster decision; provider, model,
+  // and freeform are passed in from the page-header picker.
   const [audience, setAudience] = useState<Audience>('adult');
-  const [instructions, setInstructions] = useState('');
 
   // Run state
   const [phase, setPhase] = useState<Phase>('form');
@@ -185,8 +208,6 @@ export default function GenerationModal({
   const discoveryStartedAt = useRef<number>(0);
   const runStartedAtIso = useRef<string>('');
 
-  const instructionsOverLimit = instructions.length > 2000;
-
   function stopPolling() {
     if (pollTimer.current) {
       clearInterval(pollTimer.current);
@@ -197,7 +218,6 @@ export default function GenerationModal({
   function resetState() {
     stopPolling();
     setAudience('adult');
-    setInstructions('');
     setPhase('form');
     setRunId('');
     setRun(null);
@@ -251,7 +271,14 @@ export default function GenerationModal({
   }
 
   async function startGeneration() {
-    if (instructionsOverLimit) return;
+    // Picker-gated: host page disables the open-modal trigger when picker
+    // is empty, so by the time we POST the values are guaranteed set.
+    // Defensive fallback prevents an edge race if a caller forgets the gate.
+    if (!provider || !model) {
+      setErrorMessage('Pick a provider and model on the page header first.');
+      setPhase('error');
+      return;
+    }
     setPhase('starting');
     setErrorMessage('');
     setErrorType('');
@@ -259,6 +286,12 @@ export default function GenerationModal({
     const openedAt = new Date();
     runStartedAtIso.current = openedAt.toISOString();
     discoveryStartedAt.current = Date.now();
+
+    // Reset the page-level picker per Decision 3.1 "fresh pick every click."
+    // Fired before the POST so a quick second click can't reuse stale state.
+    onGenerateClick?.();
+
+    const trimmedFreeform = (freeformInstructions || '').trim();
 
     // Fire-and-forget: generate's POST is fully synchronous (up to 300s).
     // We can't await it without losing the live-progress UX. The promise
@@ -270,7 +303,9 @@ export default function GenerationModal({
       body: JSON.stringify({
         cluster_id: clusterId,
         audience,
-        ...(instructions.trim() ? { freeform_instructions: instructions.trim() } : {}),
+        provider,
+        model,
+        ...(trimmedFreeform ? { freeform_instructions: trimmedFreeform } : {}),
       }),
     });
 
@@ -431,6 +466,7 @@ export default function GenerationModal({
   // ---------- Render helpers ----------
 
   function renderForm() {
+    const trimmedFreeform = (freeformInstructions || '').trim();
     return (
       <>
         <Field label="Audience" hint="Which feed this cluster maps to.">
@@ -469,27 +505,26 @@ export default function GenerationModal({
           </div>
         </Field>
 
-        <Field
-          id="gen-instructions"
-          label="Freeform instructions"
-          hint={
-            instructionsOverLimit
-              ? `Too long: ${instructions.length} / 2000`
-              : `Optional. ${instructions.length} / 2000 characters.`
-          }
-          error={instructionsOverLimit ? 'Must be 2000 characters or fewer.' : undefined}
+        <div
+          style={{
+            fontSize: F.xs,
+            color: ADMIN_C.dim,
+            lineHeight: 1.5,
+            padding: S[2],
+            background: ADMIN_C.card,
+            borderRadius: 6,
+            border: `1px solid ${ADMIN_C.divider}`,
+          }}
         >
-          <Textarea
-            id="gen-instructions"
-            rows={5}
-            value={instructions}
-            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-              setInstructions(e.target.value)
-            }
-            placeholder="e.g. emphasize the legal angle; keep it under 600 words."
-            error={instructionsOverLimit}
-          />
-        </Field>
+          Using <strong>{provider || '—'}</strong> /{' '}
+          <strong style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
+            {model || '—'}
+          </strong>
+          {trimmedFreeform ? (
+            <> · with extra instructions ({trimmedFreeform.length} chars)</>
+          ) : null}
+          . Pick on the newsroom header.
+        </div>
       </>
     );
   }
@@ -735,6 +770,7 @@ export default function GenerationModal({
 
   function renderFooter() {
     if (phase === 'form') {
+      const pickerMissing = !provider || !model;
       return (
         <>
           <Button variant="ghost" onClick={handleClose}>
@@ -743,7 +779,10 @@ export default function GenerationModal({
           <Button
             variant="primary"
             onClick={() => void startGeneration()}
-            disabled={instructionsOverLimit}
+            disabled={pickerMissing}
+            title={
+              pickerMissing ? 'Pick a provider and model on the page header first.' : undefined
+            }
           >
             Start generation
           </Button>

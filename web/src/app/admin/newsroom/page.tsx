@@ -33,7 +33,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
@@ -46,6 +46,12 @@ import Badge from '@/components/admin/Badge';
 import EmptyState from '@/components/admin/EmptyState';
 import Spinner from '@/components/admin/Spinner';
 import GenerationModal from '@/components/admin/GenerationModal';
+import PipelineRunPicker, {
+  type PickerSelection,
+  type PipelineRunPickerHandle,
+  estimateClusterCostUsd,
+  formatEstimatedCost,
+} from '@/components/admin/PipelineRunPicker';
 import { ToastProvider, useToast } from '@/components/admin/Toast';
 import { ADMIN_C, F, S } from '@/lib/adminPalette';
 import type { Tables } from '@/types/database-helpers';
@@ -109,11 +115,34 @@ function NewsroomAdminInner() {
   const [busyRefresh, setBusyRefresh] = useState(false);
 
   // Task 22: single Generate button per card opens this modal, which handles
-  // audience choice + freeform instructions + live progress. We track the
-  // target cluster here instead of inside GenerationModal so closing + reopening
-  // against a different cluster is a clean remount (modal resets state on
-  // `open` or `clusterId` change).
+  // audience choice + live progress. Provider, model, and freeform live on
+  // the page-header picker per F7-DECISIONS-LOCKED §3.1 + §3.4 and are
+  // passed in as props on open. We track the target cluster here instead of
+  // inside GenerationModal so closing + reopening against a different
+  // cluster is a clean remount (modal resets state on `open` or `clusterId`
+  // change).
   const [genTarget, setGenTarget] = useState<{ id: string; title: string } | null>(null);
+
+  // Page-header PipelineRunPicker selection (Decision 3.1). Gates per-card
+  // Generate buttons + drives the est. cost preview + passed into the modal
+  // as props. Resets to blank after each Generate click via the picker's
+  // imperative handle.
+  const pickerRef = useRef<PipelineRunPickerHandle | null>(null);
+  const [picker, setPicker] = useState<PickerSelection>({
+    provider: '',
+    model: '',
+    freeformInstructions: '',
+    inputPricePer1m: null,
+    outputPricePer1m: null,
+  });
+  const onPickerChange = useCallback((sel: PickerSelection) => {
+    setPicker(sel);
+  }, []);
+  const pickerReady = !!picker.provider && !!picker.model;
+  const estCost = estimateClusterCostUsd(
+    picker.inputPricePer1m,
+    picker.outputPricePer1m
+  );
 
   useEffect(() => {
     (async () => {
@@ -281,9 +310,11 @@ function NewsroomAdminInner() {
     <Page>
       <PageHeader
         title="Newsroom"
-        subtitle="Active clusters from ingest. Open Generate to pick audience and kick off a run."
+        subtitle="Active clusters from ingest. Pick provider + model below, then open Generate to pick audience and kick off a run."
         actions={headerActions}
       />
+
+      <PipelineRunPicker ref={pickerRef} onChange={onPickerChange} />
 
       <PageSection>
         {loadError && clusters.length === 0 ? (
@@ -390,14 +421,30 @@ function NewsroomAdminInner() {
                       <Button
                         variant="primary"
                         size="sm"
-                        disabled={locked || busyId !== ''}
+                        disabled={locked || busyId !== '' || !pickerReady}
                         onClick={() => openGenerate(c.id, title)}
                         title={
-                          locked ? 'Cluster is locked; another run is in progress.' : undefined
+                          locked
+                            ? 'Cluster is locked; another run is in progress.'
+                            : !pickerReady
+                              ? 'Pick a provider and model on the page header first.'
+                              : undefined
                         }
                       >
                         Generate
                       </Button>
+                      {pickerReady && estCost !== null && (
+                        <span
+                          title="Rough estimate from typical token counts × the picked model's price. Real cost varies with article length and source size."
+                          style={{
+                            fontSize: F.xs,
+                            color: ADMIN_C.dim,
+                            alignSelf: 'center',
+                          }}
+                        >
+                          {formatEstimatedCost(estCost)}
+                        </span>
+                      )}
                       {locked && (
                         <Button
                           variant="danger"
@@ -450,7 +497,15 @@ function NewsroomAdminInner() {
         open={genTarget !== null}
         clusterId={genTarget?.id ?? ''}
         clusterTitle={genTarget?.title ?? null}
+        provider={picker.provider}
+        model={picker.model}
+        freeformInstructions={picker.freeformInstructions}
         onClose={closeGenerate}
+        onGenerateClick={() => {
+          // Decision 3.1: reset provider, model, and freeform after the
+          // POST fires. The picker's imperative reset handles all three.
+          pickerRef.current?.reset();
+        }}
         onRunSettled={() => {
           // Refresh to pick up lock + generation_state changes. Completion
           // navigates to the article review page so this mostly fires on
