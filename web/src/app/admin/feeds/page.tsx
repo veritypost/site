@@ -1,7 +1,7 @@
-// @admin-verified 2026-04-18
+// @admin-verified 2026-04-22
 'use client';
-import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { Tables } from '@/types/database-helpers';
 
@@ -30,6 +30,17 @@ import { ADMIN_C, F, S } from '@/lib/adminPalette';
 
 type FeedRow = Tables<'feeds'>;
 type FeedStatus = 'ok' | 'stale' | 'broken';
+type AudienceFilter = 'all' | 'adult' | 'kid';
+type AudienceValue = 'adult' | 'kid';
+
+const AUDIENCE_FILTERS: AudienceFilter[] = ['all', 'adult', 'kid'];
+const audienceLabel = (a: AudienceFilter) => (a === 'all' ? 'All' : a === 'adult' ? 'Adult' : 'Kid');
+const parseAudienceFilter = (raw: string | null): AudienceFilter => {
+  if (raw === 'adult' || raw === 'kid' || raw === 'all') return raw;
+  return 'all';
+};
+const normalizeAudience = (raw: string | null | undefined): AudienceValue =>
+  raw === 'kid' ? 'kid' : 'adult';
 
 type DisplayFeed = FeedRow & {
   outlet: string;
@@ -38,10 +49,13 @@ type DisplayFeed = FeedRow & {
   articles: number;
   active: boolean;
   failCount: number;
+  audienceValue: AudienceValue;
 };
 
 function FeedsAdminInner() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const supabase = createClient();
   const toast = useToast();
 
@@ -50,13 +64,42 @@ function FeedsAdminInner() {
   const [showAdd, setShowAdd] = useState(false);
   const [newOutlet, setNewOutlet] = useState('');
   const [newUrl, setNewUrl] = useState('');
+  const [newAudience, setNewAudience] = useState<AudienceValue>('adult');
   const [filter, setFilter] = useState<'all' | 'ok' | 'issues'>('all');
+  const [audienceTab, setAudienceTab] = useState<AudienceFilter>(() =>
+    parseAudienceFilter(searchParams?.get('audience') ?? null)
+  );
   const [search, setSearch] = useState('');
   const [staleHours, setStaleHours] = useState(6);
   const [brokenFailCount, setBrokenFailCount] = useState(10);
   const [pullIntervalMin, setPullIntervalMin] = useState(30);
   const [selected, setSelected] = useState<DisplayFeed | null>(null);
   const [adding, setAdding] = useState(false);
+
+  // Keep the in-state tab in sync with the URL when the user navigates back/forward.
+  useEffect(() => {
+    const next = parseAudienceFilter(searchParams?.get('audience') ?? null);
+    setAudienceTab((prev) => (prev === next ? prev : next));
+  }, [searchParams]);
+
+  // Seed the Add modal's audience to the active tab so kid-tab → "Add feed" defaults to kid.
+  // 'all' tab keeps the historical default (adult).
+  const openAddFeed = useCallback(() => {
+    setNewAudience(audienceTab === 'kid' ? 'kid' : 'adult');
+    setShowAdd(true);
+  }, [audienceTab]);
+
+  const setAudienceTabAndUrl = useCallback(
+    (next: AudienceFilter) => {
+      setAudienceTab(next);
+      const params = new URLSearchParams(searchParams?.toString() ?? '');
+      if (next === 'all') params.delete('audience');
+      else params.set('audience', next);
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [pathname, router, searchParams]
+  );
 
   useEffect(() => {
     const init = async () => {
@@ -114,12 +157,20 @@ function FeedsAdminInner() {
     articles: f.articles_imported_count ?? 0,
     active: f.is_active ?? true,
     failCount: f.error_count ?? 0,
+    audienceValue: normalizeAudience((f as { audience?: string | null }).audience),
   });
 
   const displayFeeds = useMemo(() => feeds.map(normFeed), [feeds, staleHours, brokenFailCount]);
 
+  // Audience tab filters the underlying list before search/status filters run, so the
+  // counts and empty-state copy reflect the active audience scope.
+  const audienceScoped = useMemo(() => {
+    if (audienceTab === 'all') return displayFeeds;
+    return displayFeeds.filter((f) => f.audienceValue === audienceTab);
+  }, [displayFeeds, audienceTab]);
+
   const filtered = useMemo(() => {
-    let list = displayFeeds;
+    let list = audienceScoped;
     if (filter === 'ok') list = list.filter((f) => f.status === 'ok');
     if (filter === 'issues') list = list.filter((f) => f.status !== 'ok');
     if (search.trim()) {
@@ -127,7 +178,13 @@ function FeedsAdminInner() {
       list = list.filter((f) => f.outlet.toLowerCase().includes(q) || (f.url || '').toLowerCase().includes(q));
     }
     return list;
-  }, [displayFeeds, filter, search]);
+  }, [audienceScoped, filter, search]);
+
+  const audienceCounts = useMemo(() => ({
+    all: displayFeeds.length,
+    adult: displayFeeds.filter((f) => f.audienceValue === 'adult').length,
+    kid: displayFeeds.filter((f) => f.audienceValue === 'kid').length,
+  }), [displayFeeds]);
 
   const toggleFeed = async (id: string, nextValue: boolean) => {
     // Optimistic
@@ -195,6 +252,7 @@ function FeedsAdminInner() {
         url: newUrl.trim(),
         feed_type: 'rss',
         is_active: true,
+        audience: newAudience,
       }),
     });
     const json = await res.json().catch(() => ({}));
@@ -204,13 +262,16 @@ function FeedsAdminInner() {
     toast.push({ message: 'Feed added', variant: 'success' });
     setNewOutlet('');
     setNewUrl('');
+    setNewAudience('adult');
     setShowAdd(false);
   };
 
-  const okCount = displayFeeds.filter((f) => f.status === 'ok').length;
-  const issueCount = displayFeeds.filter((f) => f.status !== 'ok').length;
-  const totalArticles = displayFeeds.reduce((a, f) => a + f.articles, 0);
-  const totalFails = displayFeeds.reduce((a, f) => a + f.failCount, 0);
+  // Stats are scoped to the active audience tab so the dashboard reflects what the
+  // operator is currently looking at (rather than the global mix).
+  const okCount = audienceScoped.filter((f) => f.status === 'ok').length;
+  const issueCount = audienceScoped.filter((f) => f.status !== 'ok').length;
+  const totalArticles = audienceScoped.reduce((a, f) => a + f.articles, 0);
+  const totalFails = audienceScoped.reduce((a, f) => a + f.failCount, 0);
 
   const statusVariant = (s: FeedStatus): 'success' | 'warn' | 'danger' => {
     if (s === 'ok') return 'success';
@@ -225,7 +286,22 @@ function FeedsAdminInner() {
       header: 'Source',
       render: (row: DisplayFeed) => (
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontWeight: 600, color: row.active ? ADMIN_C.white : ADMIN_C.muted }}>{row.outlet}</div>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: S[2],
+              fontWeight: 600,
+              color: row.active ? ADMIN_C.white : ADMIN_C.muted,
+            }}
+          >
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {row.outlet}
+            </span>
+            <Badge variant={row.audienceValue === 'kid' ? 'info' : 'neutral'} size="xs">
+              {row.audienceValue === 'kid' ? 'Kid' : 'Adult'}
+            </Badge>
+          </div>
           <div
             style={{
               fontSize: F.xs,
@@ -308,11 +384,48 @@ function FeedsAdminInner() {
         subtitle="News source feeds, health monitoring, and article volume."
         actions={
           <>
-            <Badge variant="neutral">{displayFeeds.length} feeds</Badge>
-            <Button variant="primary" onClick={() => setShowAdd(true)}>Add feed</Button>
+            <Badge variant="neutral">
+              {audienceScoped.length} {audienceTab === 'all' ? 'feeds' : `${audienceLabel(audienceTab).toLowerCase()} feeds`}
+            </Badge>
+            <Button variant="primary" onClick={openAddFeed}>Add feed</Button>
           </>
         }
       />
+
+      <PageSection title="Audience" description="Switch between adult and kid sources. The selected scope drives every panel below.">
+        <div role="tablist" aria-label="Feed audience" style={{ display: 'flex', gap: S[2], flexWrap: 'wrap' }}>
+          {AUDIENCE_FILTERS.map((tab) => {
+            const active = audienceTab === tab;
+            return (
+              <button
+                key={tab}
+                role="tab"
+                aria-selected={active}
+                type="button"
+                onClick={() => setAudienceTabAndUrl(tab)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: S[2],
+                  padding: `${S[2]}px ${S[3]}px`,
+                  borderRadius: 8,
+                  border: `1px solid ${active ? ADMIN_C.accent : ADMIN_C.divider}`,
+                  background: active ? ADMIN_C.accent : ADMIN_C.card,
+                  color: active ? ADMIN_C.white : ADMIN_C.soft,
+                  fontSize: F.sm,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                <span>{audienceLabel(tab)}</span>
+                <Badge variant={active ? 'ghost' : 'neutral'} size="xs">
+                  {audienceCounts[tab]}
+                </Badge>
+              </button>
+            );
+          })}
+        </div>
+      </PageSection>
 
       <PageSection title="Overview">
         <div
@@ -322,7 +435,7 @@ function FeedsAdminInner() {
             gap: S[3],
           }}
         >
-          <StatCard label="Total feeds" value={displayFeeds.length} />
+          <StatCard label={audienceTab === 'all' ? 'Total feeds' : `${audienceLabel(audienceTab)} feeds`} value={audienceScoped.length} />
           <StatCard label="Healthy" value={okCount} />
           <StatCard label="Issues" value={issueCount} />
           <StatCard label="Articles imported" value={totalArticles} />
@@ -381,9 +494,13 @@ function FeedsAdminInner() {
           }
           empty={
             <EmptyState
-              title="No feeds match"
-              description="Clear the filter or add a feed to start importing articles."
-              cta={<Button variant="primary" onClick={() => setShowAdd(true)}>Add feed</Button>}
+              title={audienceTab === 'all' ? 'No feeds match' : `No ${audienceLabel(audienceTab).toLowerCase()} feeds match`}
+              description={
+                audienceTab === 'all'
+                  ? 'Clear the filter or add a feed to start importing articles.'
+                  : `Switch tabs, clear the filter, or add a ${audienceLabel(audienceTab).toLowerCase()} feed to start importing articles.`
+              }
+              cta={<Button variant="primary" onClick={openAddFeed}>Add feed</Button>}
             />
           }
         />
@@ -409,6 +526,14 @@ function FeedsAdminInner() {
         {selected && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: S[3] }}>
             <KV label="Status" value={<Badge variant={statusVariant(selected.status)} dot>{statusLabel(selected.status)}</Badge>} />
+            <KV
+              label="Audience"
+              value={
+                <Badge variant={selected.audienceValue === 'kid' ? 'info' : 'neutral'} size="sm">
+                  {selected.audienceValue === 'kid' ? 'Kid' : 'Adult'}
+                </Badge>
+              }
+            />
             <KV label="Active" value={<Switch checked={selected.active} onChange={(next) => toggleFeed(selected.id, next)} />} />
             <KV label="Last polled" value={selected.lastPull} />
             <KV label="Error count" value={String(selected.failCount)} />
@@ -463,6 +588,17 @@ function FeedsAdminInner() {
           <div>
             <label style={labelStyle}>RSS URL</label>
             <TextInput type="url" value={newUrl} onChange={(e) => setNewUrl(e.target.value)} placeholder="https://example.com/rss" />
+          </div>
+          <div>
+            <label style={labelStyle}>Audience</label>
+            <Select
+              value={newAudience}
+              onChange={(e) => setNewAudience(e.target.value === 'kid' ? 'kid' : 'adult')}
+              options={[
+                { value: 'adult', label: 'Adult — routes into the adult article pool' },
+                { value: 'kid', label: 'Kid — routes into the kid-safe pool' },
+              ]}
+            />
           </div>
         </div>
       </Modal>

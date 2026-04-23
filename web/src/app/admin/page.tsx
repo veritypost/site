@@ -1,4 +1,4 @@
-// @admin-verified 2026-04-18
+// @admin-verified 2026-04-22
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -23,14 +23,15 @@ type HubGroup = { group: string; desc: string; items: HubPage[] };
 
 const PAGES: HubGroup[] = [
   { group: 'Content Pipeline', desc: 'How articles get made — from RSS ingestion through AI generation to publish', items: [
-    { href: '/admin/feeds', title: 'RSS Feeds', desc: 'Feed management, health monitoring, failure tracking, re-pull' },
-    { href: '/admin/newsroom', title: 'Newsroom', desc: 'F7: cluster grid home — Refresh feeds, Generate, Unlock, View per cluster' },
-    { href: '/admin/pipeline/runs', title: 'Pipeline Runs', desc: 'F7: observability — every generate/ingest run with filters, cost, duration' },
-    { href: '/admin/pipeline/costs', title: 'Pipeline Costs', desc: 'F7: today-vs-cap, per-model breakdown, 30-day chart, outliers' },
-    { href: '/admin/pipeline/settings', title: 'Pipeline Settings', desc: 'F7: kill switches, cost caps, cluster/story-match/plagiarism thresholds' },
-    { href: '/admin/stories', title: 'Articles', desc: 'Browse all articles with status filters, categories, and source counts' },
-    { href: '/admin/story-manager', title: 'Article Manager', desc: 'Full article editor — timeline, quizzes, sources, AI generation' },
-    { href: '/admin/kids-story-manager', title: 'Kids Article Manager', desc: 'Kids-mode article editor — simplified content for younger audiences' },
+    { href: '/admin/newsroom', title: 'Newsroom', desc: 'Operator workspace — adult/kid tab, filters, prompt picker, cluster grid, generate' },
+    { href: '/admin/pipeline/runs', title: 'Pipeline runs', desc: 'Observability — every generate/ingest run with filters, cost, duration' },
+    { href: '/admin/pipeline/costs', title: 'Pipeline costs', desc: 'Today-vs-cap, per-model breakdown, 30-day chart, outliers' },
+    { href: '/admin/pipeline/settings', title: 'Pipeline settings', desc: 'Kill switches, cost caps, cluster/story-match/plagiarism thresholds' },
+    { href: '/admin/pipeline/cleanup', title: 'Cleanup', desc: 'Daily cron sweep history — orphan runs/items/locks and 14-day cluster expiry; manual trigger' },
+    { href: '/admin/categories', title: 'Categories', desc: 'Taxonomy editor — top-level + subcategories, kids-safe gate, slug, status' },
+    { href: '/admin/prompt-presets', title: 'Prompt presets', desc: 'Reusable generation instructions — adult, kid, or both' },
+    { href: '/admin/feeds', title: 'Feeds', desc: 'RSS sources — outlets, audience routing, health, last poll' },
+    { href: '/admin/stories', title: 'Articles', desc: 'Browse all articles; click into a row to review/edit/publish via the F7-native editor' },
   ]},
   { group: 'Community & Moderation', desc: 'User-generated content, discussion rules, and content moderation', items: [
     { href: '/admin/comments', title: 'Discussion Settings', desc: 'Quiz gate, AI tagging, role badges, threading depth, health scoring' },

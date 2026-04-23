@@ -106,7 +106,7 @@ function fetchWithTimeout(url: string, ms = 6000): Promise<Parser.Output<unknown
 // POST handler
 // ----------------------------------------------------------------------------
 
-export async function POST() {
+export async function POST(req: Request) {
   // 1. Permission gate
   let actor;
   try {
@@ -116,6 +116,25 @@ export async function POST() {
     return permissionError(err);
   }
   const actorId = actor.id as string;
+
+  // Optional `{ audience: 'adult' | 'kid' }` body — when present, the feed
+  // fetch is filtered to that audience so the per-tab "Refresh feeds" button
+  // in the Newsroom workspace only re-polls the relevant sources. Empty body
+  // (or no body) keeps the legacy behavior: refresh both audiences.
+  let audienceFilter: 'adult' | 'kid' | null = null;
+  try {
+    const text = await req.text();
+    if (text.trim().length > 0) {
+      const parsed = JSON.parse(text) as { audience?: unknown };
+      if (parsed.audience === 'adult' || parsed.audience === 'kid') {
+        audienceFilter = parsed.audience;
+      } else if (parsed.audience !== undefined && parsed.audience !== null) {
+        return NextResponse.json({ error: 'audience must be "adult" or "kid"' }, { status: 422 });
+      }
+    }
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 422 });
+  }
 
   const service = createServiceClient();
 
@@ -157,7 +176,9 @@ export async function POST() {
       items_processed: 0,
       items_created: 0,
       items_failed: 0,
-      input_params: {} as Json,
+      input_params: audienceFilter
+        ? ({ audience: audienceFilter } as unknown as Json)
+        : ({} as Json),
       output_summary: {} as Json,
       step_timings_ms: {} as Json,
     })
@@ -172,12 +193,19 @@ export async function POST() {
 
   // 5. Main body — on any throw, mark run failed and return 500
   try {
-    // 6. Fetch active feeds (rss/feed types only)
-    const { data: feedsData, error: feedsErr } = await service
+    // 6. Fetch active feeds (rss/feed types only). When the request body
+    // pins an audience, scope the SELECT to only that audience's feeds so
+    // the cross-audience tab in the Newsroom workspace doesn't drag the
+    // other audience along for the ride.
+    const feedsQuery = service
       .from('feeds')
       .select('id,url,source_name,audience,feed_type,name')
       .eq('is_active', true)
       .in('feed_type', ['feed', 'rss']);
+    if (audienceFilter) {
+      feedsQuery.eq('audience', audienceFilter);
+    }
+    const { data: feedsData, error: feedsErr } = await feedsQuery;
     if (feedsErr) {
       throw new Error(`feeds lookup failed: ${feedsErr.message}`);
     }
@@ -343,6 +371,7 @@ export async function POST() {
 
     async function clusterAudience(
       table: 'discovery_items' | 'kid_discovery_items',
+      audience: 'adult' | 'kid',
       loadCandidates: () => Promise<StoryCandidate[]>
     ): Promise<{ summary: ClusteringSummary; durationMs: number; storyMatchMs: number }> {
       const audienceStart = Date.now();
@@ -432,19 +461,25 @@ export async function POST() {
           }
 
           // Net-new story: insert feed_clusters row, then link items.
+          // Audience is derived from the source feed.audience (adult vs kid)
+          // and threaded down through clusterAudience -> here so the row
+          // lands on the correct audience surface (migration 126 added the
+          // NOT NULL audience column with CHECK ('adult','kid')).
+          const insertPayload = {
+            title: cluster.title,
+            summary: '',
+            keywords: cluster.keywords,
+            is_active: true,
+            is_breaking: false,
+            generation_state: 'clustered',
+            primary_article_id: null,
+            category_id: null,
+            similarity_threshold: clusterThresholdPct,
+            audience,
+          };
           const { data: clusterRow, error: clusterErr } = await service
             .from('feed_clusters')
-            .insert({
-              title: cluster.title,
-              summary: '',
-              keywords: cluster.keywords,
-              is_active: true,
-              is_breaking: false,
-              generation_state: 'clustered',
-              primary_article_id: null,
-              category_id: null,
-              similarity_threshold: clusterThresholdPct,
-            })
+            .insert(insertPayload)
             .select('id')
             .single();
           if (clusterErr || !clusterRow) {
@@ -490,12 +525,34 @@ export async function POST() {
       return { summary, durationMs: Date.now() - audienceStart, storyMatchMs };
     }
 
-    const adultClusterRun = await clusterAudience('discovery_items', () =>
-      loadStoryMatchCandidates(service)
-    );
-    const kidClusterRun = await clusterAudience('kid_discovery_items', () =>
-      loadKidStoryMatchCandidates(service)
-    );
+    // Honor the audience filter for the clustering pass too — no point
+    // re-clustering an audience whose feeds we didn't poll. The filtered-out
+    // side returns a zero-filled summary so the response shape stays stable.
+    const emptyClusterRun = {
+      summary: {
+        itemsConsidered: 0,
+        clustersCreated: 0,
+        singletons: 0,
+        matchedExisting: 0,
+        itemsIgnored: 0,
+        clusterErrors: [],
+      },
+      durationMs: 0,
+      storyMatchMs: 0,
+    } satisfies { summary: ClusteringSummary; durationMs: number; storyMatchMs: number };
+
+    const adultClusterRun =
+      audienceFilter === 'kid'
+        ? emptyClusterRun
+        : await clusterAudience('discovery_items', 'adult', () =>
+            loadStoryMatchCandidates(service)
+          );
+    const kidClusterRun =
+      audienceFilter === 'adult'
+        ? emptyClusterRun
+        : await clusterAudience('kid_discovery_items', 'kid', () =>
+            loadKidStoryMatchCandidates(service)
+          );
 
     // 11. Mark run completed
     const completedAt = new Date();

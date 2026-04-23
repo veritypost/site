@@ -5,8 +5,11 @@
  * Task 20 + Task 21 with a single flow:
  *
  *   1. Caller renders one "Generate" button per cluster + opens this modal.
- *   2. Modal asks for audience (adult | kid) — the per-cluster decision.
- *      Provider, model, and freeform instructions are picked on the page
+ *      Audience is owned by the host page (Newsroom workspace tab) and passed
+ *      in as a prop — adult-tab cards offer a secondary "Generate kids
+ *      version" hatch that opens the modal with audience='kid' + the adult
+ *      cluster's source URLs forwarded so the kid run reuses the source set.
+ *   2. Provider, model, and freeform instructions are picked on the page
  *      header (see PipelineRunPicker) and passed in as props per
  *      F7-DECISIONS-LOCKED §3.1 + §3.4.
  *   3. "Start" fires POST /api/admin/pipeline/generate (not awaited — the route
@@ -52,7 +55,6 @@ import { ADMIN_C, F, S } from '@/lib/adminPalette';
 import Modal from '@/components/admin/Modal';
 import Button from '@/components/admin/Button';
 import Badge from '@/components/admin/Badge';
-import Field from '@/components/admin/Field';
 import Spinner from '@/components/admin/Spinner';
 
 // Discovery + polling cadence. 2s chosen for live feel; stable under Task 12's
@@ -112,6 +114,21 @@ export type GenerationModalProps = {
   open: boolean;
   clusterId: string;
   clusterTitle?: string | null;
+  /**
+   * Audience the run targets. Owned by the host page (the Newsroom workspace
+   * tab), passed in per click. The modal no longer renders an audience
+   * radio — adult-tab cards offer a secondary "Generate kids version"
+   * trigger that opens the same modal with audience='kid'.
+   */
+  audience: Audience;
+  /**
+   * Optional source URL list the kid run should reuse from an adult cluster.
+   * Forwarded straight through to /api/admin/pipeline/generate. Backend
+   * accepts arbitrary additional input under input_params; if the route
+   * doesn't recognize the key it ignores it without erroring (see Stream 4
+   * follow-up to plumb `source_urls` end-to-end).
+   */
+  sourceUrls?: string[];
   /**
    * Provider chosen on the page-level PipelineRunPicker. Empty string when
    * no provider has been picked yet — the host page disables the Generate
@@ -178,6 +195,8 @@ export default function GenerationModal({
   open,
   clusterId,
   clusterTitle,
+  audience,
+  sourceUrls,
   provider,
   model,
   freeformInstructions,
@@ -187,10 +206,6 @@ export default function GenerationModal({
 }: GenerationModalProps) {
   const router = useRouter();
   const supabase = useRef(createClient()).current;
-
-  // Form state — audience is the only per-cluster decision; provider, model,
-  // and freeform are passed in from the page-header picker.
-  const [audience, setAudience] = useState<Audience>('adult');
 
   // Run state
   const [phase, setPhase] = useState<Phase>('form');
@@ -217,7 +232,6 @@ export default function GenerationModal({
 
   function resetState() {
     stopPolling();
-    setAudience('adult');
     setPhase('form');
     setRunId('');
     setRun(null);
@@ -297,6 +311,10 @@ export default function GenerationModal({
     // We can't await it without losing the live-progress UX. The promise
     // is still caught to surface early-exit errors (kill switch, cost cap,
     // rate limit) where the run row is never created.
+    const trimmedSourceUrls = (sourceUrls || []).filter(
+      (u) => typeof u === 'string' && u.trim().length > 0
+    );
+
     const generatePromise = fetch('/api/admin/pipeline/generate', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -306,6 +324,7 @@ export default function GenerationModal({
         provider,
         model,
         ...(trimmedFreeform ? { freeform_instructions: trimmedFreeform } : {}),
+        ...(trimmedSourceUrls.length > 0 ? { source_urls: trimmedSourceUrls } : {}),
       }),
     });
 
@@ -467,43 +486,29 @@ export default function GenerationModal({
 
   function renderForm() {
     const trimmedFreeform = (freeformInstructions || '').trim();
+    const sourceUrlCount = (sourceUrls || []).filter(
+      (u) => typeof u === 'string' && u.trim().length > 0
+    ).length;
     return (
       <>
-        <Field label="Audience" hint="Which feed this cluster maps to.">
-          <div style={{ display: 'flex', gap: S[3] }}>
-            {(['adult', 'kid'] as const).map((opt) => {
-              const active = audience === opt;
-              return (
-                <label
-                  key={opt}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: S[2],
-                    padding: `${S[2]}px ${S[3]}px`,
-                    border: `1px solid ${active ? ADMIN_C.accent : ADMIN_C.border}`,
-                    borderRadius: 6,
-                    background: active ? ADMIN_C.card : ADMIN_C.bg,
-                    cursor: 'pointer',
-                    fontSize: F.sm,
-                    color: ADMIN_C.white,
-                    userSelect: 'none',
-                  }}
-                >
-                  <input
-                    type="radio"
-                    name="audience"
-                    value={opt}
-                    checked={active}
-                    onChange={() => setAudience(opt)}
-                    style={{ margin: 0 }}
-                  />
-                  {opt === 'adult' ? 'Adult' : 'Kid'}
-                </label>
-              );
-            })}
-          </div>
-        </Field>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: S[2],
+            flexWrap: 'wrap',
+          }}
+        >
+          <span style={{ fontSize: F.sm, color: ADMIN_C.dim }}>Audience</span>
+          <Badge variant={audience === 'kid' ? 'info' : 'neutral'} size="sm">
+            {audience === 'kid' ? 'Kid' : 'Adult'}
+          </Badge>
+          {sourceUrlCount > 0 && (
+            <Badge variant="warn" size="sm">
+              Reusing {sourceUrlCount} adult source{sourceUrlCount === 1 ? '' : 's'}
+            </Badge>
+          )}
+        </div>
 
         <div
           style={{

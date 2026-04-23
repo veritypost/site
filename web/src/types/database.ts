@@ -952,6 +952,56 @@ export type Database = {
           },
         ]
       }
+      ai_prompt_presets: {
+        Row: {
+          audience: string
+          body: string
+          category_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          audience?: string
+          body: string
+          category_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          audience?: string
+          body?: string
+          category_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_prompt_presets_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       alert_preferences: {
         Row: {
           alert_type: string
@@ -3888,6 +3938,117 @@ export type Database = {
         }
         Relationships: []
       }
+      events_20260424: {
+        Row: {
+          article_id: string | null
+          article_slug: string | null
+          author_id: string | null
+          category_slug: string | null
+          consent_ads: boolean | null
+          consent_analytics: boolean | null
+          content_type: string | null
+          country_iso2: string | null
+          created_at: string
+          device_id: string | null
+          device_type: string | null
+          event_category: string
+          event_id: string
+          event_name: string
+          experiment_bucket: string | null
+          ip_hash: string | null
+          is_bot: boolean
+          occurred_at: string
+          page: string | null
+          payload: Json
+          received_at: string
+          referrer_domain: string | null
+          region: string | null
+          session_id: string
+          subcategory_slug: string | null
+          user_agent_hash: string | null
+          user_id: string | null
+          user_tenure_days: number | null
+          user_tier: string | null
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          viewport_h: number | null
+          viewport_w: number | null
+        }
+        Insert: {
+          article_id?: string | null
+          article_slug?: string | null
+          author_id?: string | null
+          category_slug?: string | null
+          consent_ads?: boolean | null
+          consent_analytics?: boolean | null
+          content_type?: string | null
+          country_iso2?: string | null
+          created_at?: string
+          device_id?: string | null
+          device_type?: string | null
+          event_category: string
+          event_id: string
+          event_name: string
+          experiment_bucket?: string | null
+          ip_hash?: string | null
+          is_bot?: boolean
+          occurred_at: string
+          page?: string | null
+          payload?: Json
+          received_at?: string
+          referrer_domain?: string | null
+          region?: string | null
+          session_id: string
+          subcategory_slug?: string | null
+          user_agent_hash?: string | null
+          user_id?: string | null
+          user_tenure_days?: number | null
+          user_tier?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          viewport_h?: number | null
+          viewport_w?: number | null
+        }
+        Update: {
+          article_id?: string | null
+          article_slug?: string | null
+          author_id?: string | null
+          category_slug?: string | null
+          consent_ads?: boolean | null
+          consent_analytics?: boolean | null
+          content_type?: string | null
+          country_iso2?: string | null
+          created_at?: string
+          device_id?: string | null
+          device_type?: string | null
+          event_category?: string
+          event_id?: string
+          event_name?: string
+          experiment_bucket?: string | null
+          ip_hash?: string | null
+          is_bot?: boolean
+          occurred_at?: string
+          page?: string | null
+          payload?: Json
+          received_at?: string
+          referrer_domain?: string | null
+          region?: string | null
+          session_id?: string
+          subcategory_slug?: string | null
+          user_agent_hash?: string | null
+          user_id?: string | null
+          user_tenure_days?: number | null
+          user_tier?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          viewport_h?: number | null
+          viewport_w?: number | null
+        }
+        Relationships: []
+      }
       events_default: {
         Row: {
           article_id: string | null
@@ -4697,8 +4858,14 @@ export type Database = {
       }
       feed_clusters: {
         Row: {
+          archived_at: string | null
+          archived_reason: string | null
+          audience: string
           category_id: string | null
           created_at: string
+          dismiss_reason: string | null
+          dismissed_at: string | null
+          dismissed_by: string | null
           expires_at: string | null
           generation_state: string | null
           id: string
@@ -4715,8 +4882,14 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
+          archived_reason?: string | null
+          audience?: string
           category_id?: string | null
           created_at?: string
+          dismiss_reason?: string | null
+          dismissed_at?: string | null
+          dismissed_by?: string | null
           expires_at?: string | null
           generation_state?: string | null
           id?: string
@@ -4733,8 +4906,14 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
+          archived_reason?: string | null
+          audience?: string
           category_id?: string | null
           created_at?: string
+          dismiss_reason?: string | null
+          dismissed_at?: string | null
+          dismissed_by?: string | null
           expires_at?: string | null
           generation_state?: string | null
           id?: string
@@ -10200,6 +10379,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      archive_cluster: {
+        Args: { p_cluster_id: string; p_reason?: string }
+        Returns: Json
+      }
       article_quiz_pool_size: {
         Args: { p_article_id: string }
         Returns: number
@@ -10384,6 +10567,10 @@ export type Database = {
       delete_bookmark_collection: {
         Args: { p_collection_id: string; p_user_id: string }
         Returns: undefined
+      }
+      dismiss_cluster: {
+        Args: { p_cluster_id: string; p_reason?: string }
+        Returns: Json
       }
       drop_old_events_partitions: {
         Args: { retention_days?: number }
@@ -10573,6 +10760,10 @@ export type Database = {
         Args: { p_admin_id: string; p_application_id: string }
         Returns: undefined
       }
+      merge_clusters: {
+        Args: { p_source_id: string; p_target_id: string }
+        Returns: Json
+      }
       my_permission_keys: {
         Args: { p_as_kid?: string; p_kid_token?: string }
         Returns: {
@@ -10635,6 +10826,14 @@ export type Database = {
       purge_rate_limit_events: {
         Args: { older_than?: string }
         Returns: number
+      }
+      reassign_cluster_items: {
+        Args: {
+          p_audience: string
+          p_item_id: string
+          p_target_cluster_id: string
+        }
+        Returns: Json
       }
       recompute_family_achievements: { Args: never; Returns: Json }
       recompute_verity_score: {
@@ -10802,6 +11001,15 @@ export type Database = {
         Args: { p_comment_id: string; p_user_id: string }
         Returns: undefined
       }
+      split_cluster: {
+        Args: {
+          p_item_ids: string[]
+          p_new_summary?: string
+          p_new_title?: string
+          p_source_id: string
+        }
+        Returns: Json
+      }
       start_conversation: {
         Args: { p_other_user_id: string; p_user_id: string }
         Returns: Json
@@ -10892,6 +11100,7 @@ export type Database = {
         Args: { p_comment_id: string; p_user_id: string; p_vote_type: string }
         Returns: Json
       }
+      undismiss_cluster: { Args: { p_cluster_id: string }; Returns: Json }
       unhide_comment: {
         Args: { p_comment_id: string; p_mod_id: string }
         Returns: undefined

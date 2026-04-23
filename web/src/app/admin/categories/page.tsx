@@ -1,464 +1,1019 @@
-// @admin-verified 2026-04-18
+/**
+ * Newsroom redesign Stream 2 — /admin/categories tree editor.
+ *
+ * Replaces the prior adult/kids-tabs + Drawer page with a single tree
+ * view. Both adult and kids categories live in one taxonomy now; the
+ * `is_kids_safe` flag is just a column. UI:
+ *
+ *   - Top-level rows in `sort_order` order
+ *   - Subcategories indented under their parent, also `sort_order`
+ *   - Per row: name, slug, badges (Active/Inactive, Kids-safe, Premium),
+ *     article_count, buttons (Edit, Add child only on top-level, Move,
+ *     Archive)
+ *   - "Add top-level category" inline at the bottom
+ *   - "Show archived" toggle in the header — flips the deleted_at filter
+ *   - Edit modal: name, slug, description, color_hex, icon_name, sort_order,
+ *     is_active, is_kids_safe, is_premium
+ *   - Move modal: dropdown to set parent_id (null = top-level). Self,
+ *     descendants, and second-level rows are filtered out client-side
+ *     (server enforces too).
+ *   - Archive: soft-delete via DELETE; restore button on archived rows
+ *     issues a PATCH that sets deleted_at = null + is_active = true.
+ *
+ * Page-level access: client gates on ADMIN_ROLES (consistent with the
+ * other Newsroom pages). Per-mutation gate is `admin.pipeline.categories.manage`
+ * server-side.
+ */
+
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+
 import { createClient } from '@/lib/supabase/client';
-import { EDITOR_ROLES } from '@/lib/roles';
+import { ADMIN_ROLES } from '@/lib/roles';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 import type { Tables } from '@/types/database-helpers';
+
 import Page, { PageHeader } from '@/components/admin/Page';
 import PageSection from '@/components/admin/PageSection';
-import DataTable from '@/components/admin/DataTable';
-import Toolbar from '@/components/admin/Toolbar';
 import Button from '@/components/admin/Button';
+import Badge from '@/components/admin/Badge';
+import EmptyState from '@/components/admin/EmptyState';
+import Spinner from '@/components/admin/Spinner';
+import Modal from '@/components/admin/Modal';
+import ConfirmDialog from '@/components/admin/ConfirmDialog';
+import Field from '@/components/admin/Field';
 import TextInput from '@/components/admin/TextInput';
+import Textarea from '@/components/admin/Textarea';
 import NumberInput from '@/components/admin/NumberInput';
 import Switch from '@/components/admin/Switch';
-import StatCard from '@/components/admin/StatCard';
-import EmptyState from '@/components/admin/EmptyState';
-import Drawer from '@/components/admin/Drawer';
-import ConfirmDialog from '@/components/admin/ConfirmDialog';
-import Badge from '@/components/admin/Badge';
-import { useToast } from '@/components/admin/Toast';
+import Select from '@/components/admin/Select';
+import { ToastProvider, useToast } from '@/components/admin/Toast';
 
 type CategoryRow = Tables<'categories'>;
 
-type CategoryWithSubs = CategoryRow & {
-  subs: CategoryRow[];
+type FormState = {
+  name: string;
+  slug: string;
+  description: string;
+  color_hex: string;
+  icon_name: string;
+  sort_order: number;
+  is_active: boolean;
+  is_kids_safe: boolean;
+  is_premium: boolean;
 };
 
-type Tab = 'adult' | 'kids';
+const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
-function slugify(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 120);
 }
 
-export default function CategoriesAdmin() {
+function emptyForm(seed?: Partial<FormState>): FormState {
+  return {
+    name: '',
+    slug: '',
+    description: '',
+    color_hex: '',
+    icon_name: '',
+    sort_order: 0,
+    is_active: true,
+    is_kids_safe: false,
+    is_premium: false,
+    ...seed,
+  };
+}
+
+function rowToForm(row: CategoryRow): FormState {
+  return {
+    name: row.name ?? '',
+    slug: row.slug ?? '',
+    description: row.description ?? '',
+    color_hex: row.color_hex ?? '',
+    icon_name: row.icon_name ?? '',
+    sort_order: row.sort_order ?? 0,
+    is_active: row.is_active !== false,
+    is_kids_safe: row.is_kids_safe === true,
+    is_premium: row.is_premium === true,
+  };
+}
+
+export default function CategoriesAdminPage() {
+  return (
+    <ToastProvider>
+      <CategoriesAdminInner />
+    </ToastProvider>
+  );
+}
+
+function CategoriesAdminInner() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
-  const { push } = useToast();
+  const toast = useToast();
 
-  const [tab, setTab] = useState<Tab>('adult');
-  const [adultCats, setAdultCats] = useState<CategoryWithSubs[]>([]);
-  const [kidsCats, setKidsCats] = useState<CategoryWithSubs[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [newCat, setNewCat] = useState<string>('');
-  const [drawerRow, setDrawerRow] = useState<CategoryWithSubs | null>(null);
-  const [newSub, setNewSub] = useState<string>('');
-  const [confirm, setConfirmState] = useState<{
-    kind: 'delete-category' | 'delete-sub';
-    catId: string;
-    subId?: string;
-    label: string;
-  } | null>(null);
+  const [authorized, setAuthorized] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [rows, setRows] = useState<CategoryRow[]>([]);
+  const [showArchived, setShowArchived] = useState(false);
+  const [busyId, setBusyId] = useState<string>('');
 
-  const fetchCategories = useCallback(async () => {
+  // Modal state.
+  const [editing, setEditing] = useState<{ row: CategoryRow | null; form: FormState } | null>(
+    null
+  );
+  const [editError, setEditError] = useState<string>('');
+  const [editSaving, setEditSaving] = useState(false);
+  const [slugTouched, setSlugTouched] = useState(false);
+
+  const [creating, setCreating] = useState<{ parentId: string | null; form: FormState } | null>(
+    null
+  );
+  const [createError, setCreateError] = useState<string>('');
+  const [createSaving, setCreateSaving] = useState(false);
+  const [createSlugTouched, setCreateSlugTouched] = useState(false);
+
+  const [moving, setMoving] = useState<{ row: CategoryRow; nextParentId: string | null } | null>(
+    null
+  );
+  const [moveError, setMoveError] = useState<string>('');
+  const [moveSaving, setMoveSaving] = useState(false);
+
+  const [archiveConfirm, setArchiveConfirm] = useState<CategoryRow | null>(null);
+
+  // ---- load ---------------------------------------------------------------
+
+  const fetchAll = useCallback(async () => {
+    // Load all rows (visible + archived) in one shot. Filtering is client-side
+    // so the "Show archived" toggle is instant and the same row references
+    // survive across toggles.
     const { data, error } = await supabase
       .from('categories')
       .select('*')
-      .order('sort_order', { ascending: true, nullsFirst: false });
-
-    if (error || !data) return;
-
-    const parents = data.filter((c) => !c.parent_id);
-    const subs = data.filter((c) => !!c.parent_id);
-
-    const withSubs: CategoryWithSubs[] = parents.map((p) => ({
-      ...p,
-      subs: subs.filter((s) => s.parent_id === p.id),
-    }));
-
-    setAdultCats(withSubs.filter((c) => !c.is_kids_safe));
-    setKidsCats(withSubs.filter((c) => c.is_kids_safe));
-  }, [supabase]);
+      .order('sort_order', { ascending: true })
+      .order('name', { ascending: true });
+    if (error || !data) {
+      toast.push({ message: 'Could not load categories.', variant: 'danger' });
+      return;
+    }
+    setRows(data as CategoryRow[]);
+  }, [supabase, toast]);
 
   useEffect(() => {
-    const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/'); return; }
-
-      const { data: userRoles } = await supabase
-        .from('user_roles')
-        .select('roles(name)')
-        .eq('user_id', user.id);
-      const roleNames = (userRoles || [])
-        .map((r) => {
-          const rel = (r as { roles: { name: string } | { name: string }[] | null }).roles;
-          if (Array.isArray(rel)) return rel[0]?.name;
-          return rel?.name;
-        })
-        .filter(Boolean) as string[];
-      if (!roleNames.some((r) => EDITOR_ROLES.has(r))) {
+    let cancelled = false;
+    (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (cancelled) return;
+      if (!user) {
         router.push('/');
         return;
       }
-
-      await fetchCategories();
-      setLoading(false);
+      const { data: roleRows } = await supabase
+        .from('user_roles')
+        .select('roles(name)')
+        .eq('user_id', user.id);
+      if (cancelled) return;
+      const names = ((roleRows || []) as Array<{ roles: { name: string } | null }>)
+        .map((r) => r.roles?.name)
+        .filter(Boolean) as string[];
+      if (!names.some((n) => ADMIN_ROLES.has(n))) {
+        router.push('/');
+        return;
+      }
+      setAuthorized(true);
+      await fetchAll();
+      if (!cancelled) setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
     };
-    init();
-  }, [supabase, router, fetchCategories]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const cats = tab === 'adult' ? adultCats : kidsCats;
-  const setCats = tab === 'adult' ? setAdultCats : setKidsCats;
+  // ---- derived tree -------------------------------------------------------
 
-  const toggleVisibility = async (id: string, next: boolean) => {
-    // Optimistic local update; rollback on failure.
-    setCats((prev) => prev.map((c) => (c.id === id ? { ...c, is_active: next } : c)));
-    const res = await fetch(`/api/admin/categories/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_active: next }),
-    });
-    if (!res.ok) {
-      setCats((prev) => prev.map((c) => (c.id === id ? { ...c, is_active: !next } : c)));
-      const body = await res.json().catch(() => ({ error: 'Update failed' }));
-      push({ message: `Could not update: ${body.error || 'unknown error'}`, variant: 'danger' });
-    } else {
-      push({ message: next ? 'Category enabled' : 'Category hidden', variant: 'success' });
+  const tree = useMemo(() => {
+    const visibleRows = showArchived ? rows : rows.filter((r) => !r.deleted_at);
+    const byParent = new Map<string | null, CategoryRow[]>();
+    for (const r of visibleRows) {
+      const p = r.parent_id ?? null;
+      if (!byParent.has(p)) byParent.set(p, []);
+      byParent.get(p)!.push(r);
     }
-  };
+    const sortFn = (a: CategoryRow, b: CategoryRow) =>
+      (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name);
+    for (const arr of byParent.values()) arr.sort(sortFn);
+    return byParent;
+  }, [rows, showArchived]);
 
-  const updateSortOrder = async (id: string, next: number) => {
-    setCats((prev) => prev.map((c) => (c.id === id ? { ...c, sort_order: next } : c)));
-    const res = await fetch(`/api/admin/categories/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sort_order: next }),
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({ error: 'save failed' }));
-      push({ message: `Sort-order save failed: ${body.error || 'unknown error'}`, variant: 'danger' });
+  const topLevel = tree.get(null) ?? [];
+
+  // Pre-compute id → row + descendants map (for move target filter). Uses
+  // the full row set so descendants of an archived row are still excluded.
+  const allRowsById = useMemo(() => {
+    const m = new Map<string, CategoryRow>();
+    for (const r of rows) m.set(r.id, r);
+    return m;
+  }, [rows]);
+
+  function descendantIds(id: string): Set<string> {
+    const out = new Set<string>();
+    const stack: string[] = [id];
+    while (stack.length) {
+      const cur = stack.pop()!;
+      for (const r of rows) {
+        if (r.parent_id === cur && !out.has(r.id)) {
+          out.add(r.id);
+          stack.push(r.id);
+        }
+      }
     }
-  };
+    return out;
+  }
 
-  const addCategory = async () => {
-    if (!newCat.trim()) return;
-    const name = newCat.trim();
-    const slug = slugify(name);
-    const isKids = tab === 'kids';
-    const sort_order = cats.length;
+  // ---- mutations ----------------------------------------------------------
 
-    const res = await fetch('/api/admin/categories', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, slug, is_active: true, is_kids_safe: isKids, sort_order }),
-    });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok || !json.row) {
-      push({ message: `Could not add category: ${json.error || 'unknown error'}`, variant: 'danger' });
+  async function handleEditSave() {
+    if (!editing || !editing.row) return;
+    setEditError('');
+    const f = editing.form;
+
+    if (!f.name.trim()) {
+      setEditError('Name is required.');
       return;
     }
-    setCats((prev) => [...prev, { ...json.row, subs: [] }]);
-    setNewCat('');
-    push({ message: `Added "${name}"`, variant: 'success' });
-  };
-
-  const addSub = async (catId: string, name: string) => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    const slug = slugify(trimmed);
-    const res = await fetch('/api/admin/categories', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: trimmed,
-        slug,
-        parent_id: catId,
-        is_active: true,
-        is_kids_safe: tab === 'kids',
-      }),
-    });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok || !json.row) {
-      push({ message: `Could not add subcategory: ${json.error || 'unknown error'}`, variant: 'danger' });
+    if (!SLUG_RE.test(f.slug)) {
+      setEditError('Slug must be lowercase letters, numbers, and hyphens.');
       return;
     }
-    setCats((prev) => prev.map((c) => (c.id === catId ? { ...c, subs: [...c.subs, json.row] } : c)));
-    setDrawerRow((prev) => (prev && prev.id === catId ? { ...prev, subs: [...prev.subs, json.row] } : prev));
-    setNewSub('');
-    push({ message: `Added "${trimmed}"`, variant: 'success' });
-  };
-
-  const removeSub = async (catId: string, subId: string) => {
-    const res = await fetch(`/api/admin/categories/${subId}`, { method: 'DELETE' });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({ error: 'delete failed' }));
-      push({ message: `Could not delete: ${body.error || 'unknown error'}`, variant: 'danger' });
+    if (f.color_hex && !HEX_RE.test(f.color_hex)) {
+      setEditError('Color must be a #RRGGBB hex value.');
       return;
     }
-    setCats((prev) =>
-      prev.map((c) => (c.id === catId ? { ...c, subs: c.subs.filter((s) => s.id !== subId) } : c)),
-    );
-    setDrawerRow((prev) =>
-      prev && prev.id === catId ? { ...prev, subs: prev.subs.filter((s) => s.id !== subId) } : prev,
-    );
-    push({ message: 'Subcategory removed', variant: 'success' });
-  };
 
-  const visibleCount = cats.filter((c) => c.is_active !== false).length;
-  const totalSubs = cats.reduce((a, c) => a + c.subs.length, 0);
+    const payload = {
+      name: f.name.trim(),
+      slug: f.slug.trim(),
+      description: f.description.trim() || null,
+      color_hex: f.color_hex.trim() || null,
+      icon_name: f.icon_name.trim() || null,
+      sort_order: Math.max(0, Math.floor(f.sort_order || 0)),
+      is_active: f.is_active,
+      is_kids_safe: f.is_kids_safe,
+      is_premium: f.is_premium,
+    };
 
-  const columns = [
-    {
-      key: 'name' as const,
-      header: 'Name',
-      render: (row: CategoryWithSubs) => (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <span style={{ fontWeight: 600, color: row.is_active === false ? C.muted : C.white }}>
-            {row.name}
-          </span>
-          <span style={{ fontSize: F.xs, color: C.muted }}>/{row.slug}</span>
-        </div>
-      ),
-    },
-    {
-      key: 'subs' as const,
-      header: 'Subs',
-      align: 'right' as const,
-      width: 80,
-      sortable: false,
-      render: (row: CategoryWithSubs) => (
-        <span style={{ color: row.subs.length > 0 ? C.white : C.muted }}>{row.subs.length}</span>
-      ),
-    },
-    {
-      key: 'sort_order' as const,
-      header: 'Sort',
-      align: 'right' as const,
-      width: 110,
-      render: (row: CategoryWithSubs) => (
-        <div onClick={(e) => e.stopPropagation()}>
-          <NumberInput
-            size="sm"
-            block={false}
-            min={0}
-            value={row.sort_order ?? 0}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-              const v = Math.max(0, parseInt(e.target.value, 10) || 0);
-              setCats((prev) => prev.map((c) => (c.id === row.id ? { ...c, sort_order: v } : c)));
-            }}
-            onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
-              updateSortOrder(row.id, Math.max(0, parseInt(e.target.value, 10) || 0));
-            }}
-            style={{ width: 76, textAlign: 'right' }}
-          />
-        </div>
-      ),
-    },
-    {
-      key: 'is_active' as const,
-      header: 'Visible',
-      align: 'right' as const,
-      width: 90,
-      render: (row: CategoryWithSubs) => (
-        <div onClick={(e) => e.stopPropagation()} style={{ display: 'inline-flex' }}>
-          <Switch
-            checked={row.is_active !== false}
-            onChange={(next: boolean) => toggleVisibility(row.id, next)}
-          />
-        </div>
-      ),
-    },
-  ];
+    setEditSaving(true);
+    try {
+      const res = await fetch(`/api/admin/categories/${editing.row.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = (await res.json().catch(() => ({}))) as { error?: string };
+      if (res.status === 429) {
+        setEditError('Too many requests. Try again in a moment.');
+        return;
+      }
+      if (!res.ok) {
+        setEditError(json.error || 'Could not save changes.');
+        return;
+      }
+      toast.push({ message: 'Category saved.', variant: 'success' });
+      setEditing(null);
+      setSlugTouched(false);
+      await fetchAll();
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  async function handleCreateSave() {
+    if (!creating) return;
+    setCreateError('');
+    const f = creating.form;
+
+    if (!f.name.trim()) {
+      setCreateError('Name is required.');
+      return;
+    }
+    if (!SLUG_RE.test(f.slug)) {
+      setCreateError('Slug must be lowercase letters, numbers, and hyphens.');
+      return;
+    }
+    if (f.color_hex && !HEX_RE.test(f.color_hex)) {
+      setCreateError('Color must be a #RRGGBB hex value.');
+      return;
+    }
+
+    const payload = {
+      name: f.name.trim(),
+      slug: f.slug.trim(),
+      description: f.description.trim() || null,
+      parent_id: creating.parentId,
+      color_hex: f.color_hex.trim() || null,
+      icon_name: f.icon_name.trim() || null,
+      sort_order: Math.max(0, Math.floor(f.sort_order || 0)),
+      is_active: f.is_active,
+      is_kids_safe: f.is_kids_safe,
+      is_premium: f.is_premium,
+    };
+
+    setCreateSaving(true);
+    try {
+      const res = await fetch('/api/admin/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = (await res.json().catch(() => ({}))) as { error?: string; row?: CategoryRow };
+      if (res.status === 429) {
+        setCreateError('Too many requests. Try again in a moment.');
+        return;
+      }
+      if (!res.ok || !json.row) {
+        setCreateError(json.error || 'Could not create category.');
+        return;
+      }
+      toast.push({ message: 'Category added.', variant: 'success' });
+      setCreating(null);
+      setCreateSlugTouched(false);
+      await fetchAll();
+    } finally {
+      setCreateSaving(false);
+    }
+  }
+
+  async function handleMoveSave() {
+    if (!moving) return;
+    setMoveError('');
+    setMoveSaving(true);
+    try {
+      const res = await fetch(`/api/admin/categories/${moving.row.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parent_id: moving.nextParentId }),
+      });
+      const json = (await res.json().catch(() => ({}))) as { error?: string };
+      if (res.status === 429) {
+        setMoveError('Too many requests. Try again in a moment.');
+        return;
+      }
+      if (!res.ok) {
+        setMoveError(json.error || 'Could not move category.');
+        return;
+      }
+      toast.push({ message: 'Category moved.', variant: 'success' });
+      setMoving(null);
+      await fetchAll();
+    } finally {
+      setMoveSaving(false);
+    }
+  }
+
+  async function handleArchive(row: CategoryRow) {
+    setBusyId(row.id);
+    try {
+      const res = await fetch(`/api/admin/categories/${row.id}`, { method: 'DELETE' });
+      const json = (await res.json().catch(() => ({}))) as { error?: string };
+      if (res.status === 429) {
+        toast.push({
+          message: 'Too many requests. Try again in a moment.',
+          variant: 'warn',
+        });
+        return;
+      }
+      if (!res.ok) {
+        toast.push({ message: json.error || 'Could not archive.', variant: 'danger' });
+        return;
+      }
+      toast.push({ message: 'Category archived.', variant: 'success' });
+      await fetchAll();
+    } finally {
+      setBusyId('');
+      setArchiveConfirm(null);
+    }
+  }
+
+  async function handleRestore(row: CategoryRow) {
+    // Restore = PATCH with deleted_at: null. The route whitelists this
+    // single legal value as a soft-delete reversal; everything else
+    // routes to a 400 to keep the API surface tight.
+    setBusyId(row.id);
+    try {
+      const res = await fetch(`/api/admin/categories/${row.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deleted_at: null, is_active: true }),
+      });
+      const json = (await res.json().catch(() => ({}))) as { error?: string };
+      if (res.status === 429) {
+        toast.push({
+          message: 'Too many requests. Try again in a moment.',
+          variant: 'warn',
+        });
+        return;
+      }
+      if (!res.ok) {
+        toast.push({ message: json.error || 'Could not restore.', variant: 'danger' });
+        return;
+      }
+      toast.push({ message: 'Category restored.', variant: 'success' });
+      await fetchAll();
+    } finally {
+      setBusyId('');
+    }
+  }
+
+  // ---- render -------------------------------------------------------------
 
   if (loading) {
     return (
-      <Page maxWidth={880}>
-        <PageHeader title="Categories" subtitle="Loading…" />
+      <Page>
+        <div style={{ padding: S[12], textAlign: 'center', color: C.dim }}>
+          <Spinner /> Loading categories
+        </div>
       </Page>
     );
   }
+  if (!authorized) return null;
+
+  const totalActive = rows.filter((r) => !r.deleted_at && r.is_active).length;
+  const totalArchived = rows.filter((r) => !!r.deleted_at).length;
+
+  const headerActions = (
+    <>
+      <Button
+        variant={showArchived ? 'primary' : 'secondary'}
+        size="md"
+        onClick={() => setShowArchived((v) => !v)}
+      >
+        {showArchived ? 'Hide archived' : `Show archived (${totalArchived})`}
+      </Button>
+      <Link href="/admin/newsroom" style={{ textDecoration: 'none' }}>
+        <Button variant="ghost" size="md">
+          Newsroom
+        </Button>
+      </Link>
+    </>
+  );
 
   return (
-    <Page maxWidth={880}>
+    <Page>
       <PageHeader
         title="Categories"
-        subtitle="News categories and subcategories for adult and kids content"
+        subtitle={`${totalActive} active categories. Two-level taxonomy: parent → subcategory.`}
+        actions={headerActions}
       />
 
-      {/* Tab switch — adult / kids */}
-      <Toolbar
-        left={(
-          <div style={{ display: 'inline-flex', border: `1px solid ${C.divider}`, borderRadius: 6, overflow: 'hidden' }}>
-            {(['adult', 'kids'] as Tab[]).map((t) => {
-              const active = tab === t;
+      <PageSection>
+        {topLevel.length === 0 ? (
+          <EmptyState
+            title="No categories yet"
+            description="Add a top-level category below to start the taxonomy."
+          />
+        ) : (
+          <div
+            style={{
+              border: `1px solid ${C.divider}`,
+              borderRadius: 8,
+              background: C.bg,
+              overflow: 'hidden',
+            }}
+          >
+            {topLevel.map((parent, idx) => {
+              const children = tree.get(parent.id) ?? [];
               return (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setTab(t)}
-                  style={{
-                    border: 'none',
-                    padding: `${S[1] + 2}px ${S[3]}px`,
-                    fontSize: F.sm,
-                    fontWeight: active ? 600 : 500,
-                    background: active ? C.accent : C.bg,
-                    color: active ? '#ffffff' : C.soft,
-                    cursor: 'pointer',
-                  }}
-                >
-                  {t === 'adult' ? 'Adult' : 'Kids'}{' '}
-                  <span style={{ opacity: 0.7 }}>
-                    ({(t === 'adult' ? adultCats : kidsCats).length})
-                  </span>
-                </button>
+                <div key={parent.id}>
+                  {idx > 0 && (
+                    <div role="presentation" style={{ height: 1, background: C.divider }} />
+                  )}
+                  <CategoryRowView
+                    row={parent}
+                    depth={0}
+                    busy={busyId === parent.id}
+                    onEdit={() => {
+                      setEditError('');
+                      setSlugTouched(true);
+                      setEditing({ row: parent, form: rowToForm(parent) });
+                    }}
+                    onAddChild={() => {
+                      setCreateError('');
+                      setCreateSlugTouched(false);
+                      setCreating({
+                        parentId: parent.id,
+                        form: emptyForm({ is_kids_safe: parent.is_kids_safe }),
+                      });
+                    }}
+                    onMove={() => {
+                      setMoveError('');
+                      setMoving({ row: parent, nextParentId: parent.parent_id ?? null });
+                    }}
+                    onArchive={() => setArchiveConfirm(parent)}
+                    onRestore={() => handleRestore(parent)}
+                  />
+                  {children.map((child) => (
+                    <div
+                      key={child.id}
+                      style={{ borderTop: `1px solid ${C.divider}`, background: C.card }}
+                    >
+                      <CategoryRowView
+                        row={child}
+                        depth={1}
+                        busy={busyId === child.id}
+                        onEdit={() => {
+                          setEditError('');
+                          setSlugTouched(true);
+                          setEditing({ row: child, form: rowToForm(child) });
+                        }}
+                        // No add-child for second-level rows (depth cap).
+                        onAddChild={null}
+                        onMove={() => {
+                          setMoveError('');
+                          setMoving({ row: child, nextParentId: child.parent_id ?? null });
+                        }}
+                        onArchive={() => setArchiveConfirm(child)}
+                        onRestore={() => handleRestore(child)}
+                      />
+                    </div>
+                  ))}
+                </div>
               );
             })}
           </div>
         )}
-      />
 
-      {/* Stats */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))',
-          gap: S[3],
-          marginBottom: S[6],
-        }}
-      >
-        <StatCard label="Categories" value={cats.length} />
-        <StatCard label="Visible" value={visibleCount} />
-        <StatCard label="Subcategories" value={totalSubs} />
-      </div>
-
-      <PageSection
-        title={tab === 'adult' ? 'Adult categories' : 'Kids categories'}
-        description="Click a row to manage its subcategories"
-      >
-        <DataTable
-          columns={columns}
-          rows={cats}
-          rowKey={(r) => (r as CategoryWithSubs).id}
-          onRowClick={(r) => setDrawerRow(r as CategoryWithSubs)}
-          paginate={false}
-          empty={(
-            <EmptyState
-              title={`No ${tab} categories yet`}
-              description="Add one below to get started."
-            />
-          )}
-        />
-
-        {/* Add new — one input, one button */}
-        <div style={{ display: 'flex', gap: S[2], marginTop: S[3], flexWrap: 'wrap' }}>
-          <div style={{ flex: '1 1 220px', minWidth: 0 }}>
-            <TextInput
-              value={newCat}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewCat(e.target.value)}
-              onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter') addCategory(); }}
-              placeholder={`New ${tab} category name`}
-            />
-          </div>
-          <Button variant="primary" onClick={addCategory} disabled={!newCat.trim()}>
-            Add category
+        <div style={{ marginTop: S[4] }}>
+          <Button
+            variant="primary"
+            onClick={() => {
+              setCreateError('');
+              setCreateSlugTouched(false);
+              setCreating({ parentId: null, form: emptyForm() });
+            }}
+          >
+            Add top-level category
           </Button>
         </div>
       </PageSection>
 
-      {/* Drawer — subcategory management */}
-      <Drawer
-        open={!!drawerRow}
-        onClose={() => { setDrawerRow(null); setNewSub(''); }}
-        title={drawerRow ? drawerRow.name : ''}
-        description={drawerRow ? `Slug /${drawerRow.slug} · sort ${drawerRow.sort_order ?? 0}` : ''}
+      {/* Edit modal */}
+      <Modal
+        open={!!editing}
+        onClose={() => {
+          setEditing(null);
+          setSlugTouched(false);
+          setEditError('');
+        }}
+        title={editing?.row ? `Edit "${editing.row.name}"` : 'Edit category'}
         width="md"
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setEditing(null);
+                setSlugTouched(false);
+                setEditError('');
+              }}
+              disabled={editSaving}
+            >
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleEditSave} loading={editSaving}>
+              Save changes
+            </Button>
+          </>
+        }
       >
-        {drawerRow && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: S[4] }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: S[3] }}>
-              <div>
-                <div style={{ fontSize: F.base, fontWeight: 600, color: C.white }}>Visibility</div>
-                <div style={{ fontSize: F.xs, color: C.dim }}>Toggle whether readers see this category</div>
-              </div>
-              <Switch
-                checked={drawerRow.is_active !== false}
-                onChange={(next: boolean) => {
-                  setDrawerRow({ ...drawerRow, is_active: next });
-                  toggleVisibility(drawerRow.id, next);
+        {editing && (
+          <CategoryForm
+            form={editing.form}
+            error={editError}
+            onChange={(next) =>
+              setEditing(editing ? { ...editing, form: { ...editing.form, ...next } } : null)
+            }
+            slugTouched={slugTouched}
+            setSlugTouched={setSlugTouched}
+          />
+        )}
+      </Modal>
+
+      {/* Create modal */}
+      <Modal
+        open={!!creating}
+        onClose={() => {
+          setCreating(null);
+          setCreateSlugTouched(false);
+          setCreateError('');
+        }}
+        title={
+          creating?.parentId
+            ? `Add subcategory under "${allRowsById.get(creating.parentId)?.name ?? '…'}"`
+            : 'Add top-level category'
+        }
+        width="md"
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setCreating(null);
+                setCreateSlugTouched(false);
+                setCreateError('');
+              }}
+              disabled={createSaving}
+            >
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleCreateSave} loading={createSaving}>
+              Create
+            </Button>
+          </>
+        }
+      >
+        {creating && (
+          <CategoryForm
+            form={creating.form}
+            error={createError}
+            onChange={(next) =>
+              setCreating(
+                creating ? { ...creating, form: { ...creating.form, ...next } } : null
+              )
+            }
+            slugTouched={createSlugTouched}
+            setSlugTouched={setCreateSlugTouched}
+          />
+        )}
+      </Modal>
+
+      {/* Move modal */}
+      <Modal
+        open={!!moving}
+        onClose={() => {
+          setMoving(null);
+          setMoveError('');
+        }}
+        title={moving ? `Move "${moving.row.name}"` : 'Move category'}
+        width="sm"
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setMoving(null);
+                setMoveError('');
+              }}
+              disabled={moveSaving}
+            >
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleMoveSave} loading={moveSaving}>
+              Move
+            </Button>
+          </>
+        }
+      >
+        {moving && (
+          <div>
+            <Field id="move-parent" label="New parent" hint="Pick a top-level row, or “(none)” to make this a top-level category.">
+              <Select
+                id="move-parent"
+                value={moving.nextParentId ?? ''}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                  const v = e.target.value || null;
+                  setMoving(moving ? { ...moving, nextParentId: v } : null);
                 }}
-              />
-            </div>
-
-            <div>
-              <div style={{ fontSize: F.base, fontWeight: 600, color: C.white, marginBottom: S[2] }}>
-                Subcategories
+              >
+                <option value="">(none — make top-level)</option>
+                {(() => {
+                  // Eligible parents = top-level rows, not self, not a descendant
+                  // of self, not the current parent (no-op move).
+                  const desc = descendantIds(moving.row.id);
+                  return topLevel
+                    .filter((p) => p.id !== moving.row.id && !desc.has(p.id) && !p.deleted_at)
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ));
+                })()}
+              </Select>
+            </Field>
+            {moveError && (
+              <div
+                role="alert"
+                style={{
+                  marginTop: S[2],
+                  padding: `${S[2]}px ${S[3]}px`,
+                  background: 'rgba(239,68,68,0.08)',
+                  border: '1px solid rgba(239,68,68,0.35)',
+                  borderRadius: 6,
+                  color: C.danger,
+                  fontSize: F.sm,
+                }}
+              >
+                {moveError}
               </div>
-              {drawerRow.subs.length === 0 ? (
-                <div style={{ fontSize: F.sm, color: C.dim }}>No subcategories yet.</div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: S[1] }}>
-                  {drawerRow.subs.map((sub) => (
-                    <div
-                      key={sub.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: S[2],
-                        padding: `${S[2]}px ${S[3]}px`,
-                        border: `1px solid ${C.divider}`,
-                        borderRadius: 6,
-                        background: C.bg,
-                      }}
-                    >
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: F.base, color: C.white, fontWeight: 500 }}>{sub.name}</div>
-                        <div style={{ fontSize: F.xs, color: C.muted }}>/{sub.slug}</div>
-                      </div>
-                      {sub.is_active === false && <Badge variant="warn" size="xs">Hidden</Badge>}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setConfirmState({ kind: 'delete-sub', catId: drawerRow.id, subId: sub.id, label: sub.name })}
-                      >
-                        Remove
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div style={{ display: 'flex', gap: S[2], marginTop: S[3], flexWrap: 'wrap' }}>
-                <div style={{ flex: '1 1 160px', minWidth: 0 }}>
-                  <TextInput
-                    value={newSub}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewSub(e.target.value)}
-                    onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
-                      if (e.key === 'Enter') addSub(drawerRow.id, newSub);
-                    }}
-                    placeholder="New subcategory name"
-                  />
-                </div>
-                <Button
-                  variant="primary"
-                  onClick={() => addSub(drawerRow.id, newSub)}
-                  disabled={!newSub.trim()}
-                >
-                  Add
-                </Button>
-              </div>
-            </div>
+            )}
           </div>
         )}
-      </Drawer>
+      </Modal>
 
-      {/* Destructive-action confirm — only used for subcategory removal */}
+      {/* Archive confirm */}
       <ConfirmDialog
-        open={confirm?.kind === 'delete-sub'}
-        title="Remove subcategory?"
-        message={confirm ? `"${confirm.label}" will be deleted. This cannot be undone.` : ''}
-        confirmLabel="Remove"
+        open={!!archiveConfirm}
+        title="Archive category?"
+        message={
+          archiveConfirm
+            ? `"${archiveConfirm.name}" will be hidden from readers and the editor. Existing articles keep their reference. You can restore it from "Show archived".`
+            : ''
+        }
+        confirmLabel="Archive"
         variant="danger"
-        onCancel={() => setConfirmState(null)}
+        onCancel={() => setArchiveConfirm(null)}
         onConfirm={async () => {
-          if (confirm?.kind === 'delete-sub' && confirm.subId) {
-            await removeSub(confirm.catId, confirm.subId);
-          }
-          setConfirmState(null);
+          if (archiveConfirm) await handleArchive(archiveConfirm);
         }}
       />
     </Page>
+  );
+}
+
+// ----- row view -----------------------------------------------------------
+
+function CategoryRowView({
+  row,
+  depth,
+  busy,
+  onEdit,
+  onAddChild,
+  onMove,
+  onArchive,
+  onRestore,
+}: {
+  row: CategoryRow;
+  depth: 0 | 1;
+  busy: boolean;
+  onEdit: () => void;
+  onAddChild: (() => void) | null;
+  onMove: () => void;
+  onArchive: () => void;
+  onRestore: () => void;
+}) {
+  const archived = !!row.deleted_at;
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: S[3],
+        padding: `${S[3]}px ${S[4]}px`,
+        paddingLeft: S[4] + (depth === 1 ? S[6] : 0),
+        opacity: archived ? 0.65 : 1,
+      }}
+    >
+      {/* Color swatch — small visual cue, falls back to a transparent box */}
+      <div
+        aria-hidden="true"
+        style={{
+          width: 10,
+          height: 10,
+          borderRadius: 2,
+          background: row.color_hex || 'transparent',
+          border: row.color_hex ? `1px solid ${C.divider}` : `1px dashed ${C.divider}`,
+          flexShrink: 0,
+        }}
+      />
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            display: 'flex',
+            gap: S[2],
+            alignItems: 'center',
+            flexWrap: 'wrap',
+          }}
+        >
+          <span
+            style={{
+              fontSize: F.md,
+              fontWeight: depth === 0 ? 600 : 500,
+              color: C.white,
+              textDecoration: archived ? 'line-through' : 'none',
+            }}
+          >
+            {row.name}
+          </span>
+          <span style={{ fontSize: F.xs, color: C.muted }}>/{row.slug}</span>
+
+          {!row.is_active && (
+            <Badge variant="warn" size="xs">
+              Hidden
+            </Badge>
+          )}
+          {row.is_active && (
+            <Badge variant="success" size="xs">
+              Active
+            </Badge>
+          )}
+          {row.is_kids_safe && (
+            <Badge variant="info" size="xs">
+              Kids-safe
+            </Badge>
+          )}
+          {row.is_premium && (
+            <Badge variant="neutral" size="xs">
+              Premium
+            </Badge>
+          )}
+          {archived && (
+            <Badge variant="danger" size="xs">
+              Archived
+            </Badge>
+          )}
+        </div>
+        <div
+          style={{
+            marginTop: 2,
+            display: 'flex',
+            gap: S[3],
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            fontSize: F.xs,
+            color: C.dim,
+          }}
+        >
+          <span>{row.article_count ?? 0} articles</span>
+          <span>sort {row.sort_order ?? 0}</span>
+          {row.icon_name && <span>icon: {row.icon_name}</span>}
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: S[1], flexShrink: 0 }}>
+        {!archived && (
+          <>
+            <Button variant="ghost" size="sm" onClick={onEdit} disabled={busy}>
+              Edit
+            </Button>
+            {onAddChild && (
+              <Button variant="ghost" size="sm" onClick={onAddChild} disabled={busy}>
+                Add child
+              </Button>
+            )}
+            <Button variant="ghost" size="sm" onClick={onMove} disabled={busy}>
+              Move
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onArchive} disabled={busy}>
+              Archive
+            </Button>
+          </>
+        )}
+        {archived && (
+          <Button variant="secondary" size="sm" onClick={onRestore} loading={busy}>
+            Restore
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ----- shared form -------------------------------------------------------
+
+function CategoryForm({
+  form,
+  error,
+  onChange,
+  slugTouched,
+  setSlugTouched,
+}: {
+  form: FormState;
+  error: string;
+  onChange: (next: Partial<FormState>) => void;
+  slugTouched: boolean;
+  setSlugTouched: (b: boolean) => void;
+}) {
+  return (
+    <div>
+      {error && (
+        <div
+          role="alert"
+          style={{
+            marginBottom: S[3],
+            padding: `${S[2]}px ${S[3]}px`,
+            background: 'rgba(239,68,68,0.08)',
+            border: '1px solid rgba(239,68,68,0.35)',
+            borderRadius: 6,
+            color: C.danger,
+            fontSize: F.sm,
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+      <Field id="cat-name" label="Name" required>
+        <TextInput
+          id="cat-name"
+          value={form.name}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+            const next = e.target.value;
+            const patch: Partial<FormState> = { name: next };
+            if (!slugTouched) patch.slug = slugify(next);
+            onChange(patch);
+          }}
+          placeholder="Politics"
+        />
+      </Field>
+
+      <Field id="cat-slug" label="Slug" required hint="Lowercase letters, numbers, and hyphens.">
+        <TextInput
+          id="cat-slug"
+          value={form.slug}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+            setSlugTouched(true);
+            onChange({ slug: e.target.value });
+          }}
+          placeholder="politics"
+        />
+      </Field>
+
+      <Field id="cat-desc" label="Description">
+        <Textarea
+          id="cat-desc"
+          rows={3}
+          value={form.description}
+          onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+            onChange({ description: e.target.value })
+          }
+          placeholder="One-line summary (optional)."
+        />
+      </Field>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: S[3] }}>
+        <Field id="cat-color" label="Color (hex)" hint="#1f2937">
+          <TextInput
+            id="cat-color"
+            value={form.color_hex}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+              onChange({ color_hex: e.target.value })
+            }
+            placeholder="#1f2937"
+          />
+        </Field>
+        <Field id="cat-icon" label="Icon name" hint="Matches the icon set in code.">
+          <TextInput
+            id="cat-icon"
+            value={form.icon_name}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+              onChange({ icon_name: e.target.value })
+            }
+            placeholder="building-columns"
+          />
+        </Field>
+      </div>
+
+      <Field id="cat-sort" label="Sort order" hint="Lower numbers appear first.">
+        <NumberInput
+          id="cat-sort"
+          min={0}
+          value={form.sort_order}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+            onChange({ sort_order: Math.max(0, parseInt(e.target.value, 10) || 0) })
+          }
+        />
+      </Field>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: S[2], marginTop: S[2] }}>
+        <Switch
+          checked={form.is_active}
+          onChange={(next: boolean) => onChange({ is_active: next })}
+          label="Active"
+          hint="Visible to readers when on."
+        />
+        <Switch
+          checked={form.is_kids_safe}
+          onChange={(next: boolean) => onChange({ is_kids_safe: next })}
+          label="Kids-safe"
+          hint="Available to the kids surface."
+        />
+        <Switch
+          checked={form.is_premium}
+          onChange={(next: boolean) => onChange({ is_premium: next })}
+          label="Premium"
+          hint="Reserved for paid tiers."
+        />
+      </div>
+    </div>
   );
 }

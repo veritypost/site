@@ -1,7 +1,7 @@
 /**
  * F7 Phase 3 Task 19 — GET /api/cron/pipeline-cleanup
  *
- * Every-5-min safety net with three idempotent best-effort sweeps:
+ * Daily (Hobby tier) safety net with four idempotent best-effort sweeps:
  *
  *   1. Orphan runs: pipeline_runs rows in status='running' older than 10 min
  *      are marked 'failed' with error_type='abort'. Threshold > generate's
@@ -19,12 +19,21 @@
  *      cleared (locked_by/locked_at/generation_state → NULL). Double-
  *      insurance against release_cluster_lock failures.
  *
+ *   4. Cluster expiry (Stage 3 / Stream 7): feed_clusters older than
+ *      14 days that have NO articles or kid_articles referencing them
+ *      (in any status — draft, review, published, archived) are soft-
+ *      archived via the archive_cluster RPC with reason='auto_expired_14d'.
+ *      Capped at 500/run to bound runtime. The "any status" filter is
+ *      load-bearing: a draft article queued against a cluster keeps the
+ *      cluster alive even before publish.
+ *
  * Auth: verifyCronAuth (x-vercel-cron header OR CRON_SECRET bearer).
  * Response always 200 — per-sweep errors surface via console.error + cron
  * wrapper's Sentry capture, not via HTTP status (Vercel would retry on 5xx).
  *
- * Depends on migrations 116 + 120 (locked_* cols + error_type). Until applied,
- * updates fail silently and the cron no-ops — acceptable while the pipeline
+ * Depends on migrations 116 + 120 + 126 (locked_* cols + error_type +
+ * archive_cluster RPC / archived_at column). Until applied, updates fail
+ * silently and the affected sweep no-ops — acceptable while the pipeline
  * is itself STAGED.
  */
 
@@ -121,16 +130,105 @@ async function run(request: Request) {
     orphanLocksErrCode = 'orphan_locks_failed';
   }
 
+  // 4. Cluster expiry (Stream 7 / Stage 3). Soft-archive feed_clusters
+  //    that are >14d old AND have no referencing articles or kid_articles
+  //    (in any status). Capped at 500/run to bound the per-sweep blast
+  //    radius — a healthy queue should never approach this; the cap is
+  //    a safety bound, not a steady-state expectation.
+  //
+  //    The "any status" filter is critical. We check `cluster_id IS NOT
+  //    NULL` only — we deliberately do NOT filter on articles.status,
+  //    so a draft, review, or archived article queued against a cluster
+  //    keeps it alive. Operators get the full 14-day window plus
+  //    indefinite extension for any draft work-in-progress.
+  const CLUSTER_EXPIRY_CAP = 500;
+  const expiryThresholdIso = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString();
+  let clustersArchivedCount = 0;
+  let clustersArchivedErrCode: string | null = null;
+  try {
+    // Two scans (articles + kid_articles) → union of in-use cluster_ids,
+    // then filter feed_clusters by NOT IN that set. Doing this client-side
+    // avoids a NOT IN subquery against PostgREST, which doesn't support
+    // it cleanly across two source tables.
+    const [adultRefs, kidRefs] = await Promise.all([
+      service.from('articles').select('cluster_id').not('cluster_id', 'is', null),
+      service.from('kid_articles').select('cluster_id').not('cluster_id', 'is', null),
+    ]);
+    if (adultRefs.error) throw adultRefs.error;
+    if (kidRefs.error) throw kidRefs.error;
+
+    const inUseIds = new Set<string>();
+    for (const r of adultRefs.data ?? []) {
+      if (r.cluster_id) inUseIds.add(r.cluster_id);
+    }
+    for (const r of kidRefs.data ?? []) {
+      if (r.cluster_id) inUseIds.add(r.cluster_id);
+    }
+
+    // Pull candidate clusters (>14d old, not yet archived, not actively
+    // generating, not currently locked). Cap the read at CLUSTER_EXPIRY_CAP * 2
+    // to leave headroom after the in-use filter.
+    //
+    // locked_at + generation_state guards: a cluster could be 14d+ old AND
+    // have no articles yet AND be mid-generate (long pipeline run, retry
+    // after failure, etc.). Without these guards the sweep races the
+    // generator and archives a cluster whose run is about to write articles.
+    const { data: candidates, error: candErr } = await service
+      .from('feed_clusters')
+      .select('id, locked_at, generation_state')
+      .is('archived_at', null)
+      .is('locked_at', null)
+      .lt('created_at', expiryThresholdIso)
+      .limit(CLUSTER_EXPIRY_CAP * 2);
+    if (candErr) throw candErr;
+
+    const toArchive: string[] = [];
+    for (const c of candidates ?? []) {
+      if (toArchive.length >= CLUSTER_EXPIRY_CAP) break;
+      if (inUseIds.has(c.id)) continue;
+      if ((c as { generation_state?: string | null }).generation_state === 'generating') continue;
+      toArchive.push(c.id);
+    }
+
+    // archive_cluster is defined in migration 126; types/database.ts
+    // hasn't been regenerated against it yet, so cast through `unknown`
+    // — same pattern as adminMutation.requireAdminOutranks for
+    // post-generation RPCs.
+    type RpcFn = (
+      fn: string,
+      args: Record<string, unknown>
+    ) => Promise<{ data: unknown; error: { message: string } | null }>;
+    const rpcCall = service.rpc as unknown as RpcFn;
+    for (const id of toArchive) {
+      const { error: rpcErr } = await rpcCall('archive_cluster', {
+        p_cluster_id: id,
+        p_reason: 'auto_expired_14d',
+      });
+      if (rpcErr) {
+        console.error('[cron.pipeline-cleanup.cluster_expiry.rpc]', id, rpcErr.message);
+        clustersArchivedErrCode = 'cluster_expiry_partial';
+        continue;
+      }
+      clustersArchivedCount += 1;
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[cron.pipeline-cleanup.cluster_expiry]', msg);
+    clustersArchivedErrCode = 'cluster_expiry_failed';
+  }
+
   return NextResponse.json({
     ok: true,
     ran_at: now.toISOString(),
     orphan_runs_cleaned: orphanRunsCount,
     orphan_items_cleaned: orphanItemsCount,
     orphan_locks_cleaned: orphanLocksCount,
+    clusters_archived: clustersArchivedCount,
     errors: {
       orphan_runs: orphanRunsErrCode,
       orphan_items: orphanItemsErrCode,
       orphan_locks: orphanLocksErrCode,
+      cluster_expiry: clustersArchivedErrCode,
     },
   });
 }
