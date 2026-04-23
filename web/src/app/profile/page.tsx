@@ -164,6 +164,7 @@ function ProfilePageInner() {
     cardShare: false,
     messagesInbox: false,
     bookmarksList: false,
+    family: false,
   });
 
   // Tab-specific state
@@ -250,6 +251,7 @@ function ProfilePageInner() {
         cardShare: hasPermission('profile.card_share'),
         messagesInbox: hasPermission('messages.inbox.view'),
         bookmarksList: hasPermission('bookmarks.list.view'),
+        family: hasPermission('settings.family.view'),
       });
 
       setAuthResolved(true);
@@ -520,9 +522,16 @@ function ProfilePageInner() {
         title={user.display_name || user.username || 'Profile'}
         subtitle={user.username ? `@${user.username}` : 'Your reading, activity, and achievements'}
         actions={
-          <Button variant="secondary" size="sm" onClick={() => router.push('/profile/settings')}>
-            Settings
-          </Button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {perms.family && (
+              <Button variant="secondary" size="sm" onClick={() => router.push('/profile/kids')}>
+                Kids
+              </Button>
+            )}
+            <Button variant="secondary" size="sm" onClick={() => router.push('/profile/settings')}>
+              Settings
+            </Button>
+          </div>
         }
       />
 
