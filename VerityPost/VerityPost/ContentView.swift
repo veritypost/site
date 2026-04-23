@@ -86,7 +86,10 @@ struct ContentView: View {
                 VerifyEmailView()
                     .environmentObject(auth)
             } else if auth.currentUser?.needsOnboarding == true {
-                WelcomeView(onFinish: {})
+                // WelcomeView handles the onboarding stamp + user reload
+                // itself. When the reload flips `needsOnboarding` false
+                // this branch is replaced by MainTabView automatically.
+                WelcomeView()
                     .environmentObject(auth)
             } else {
                 MainTabView()

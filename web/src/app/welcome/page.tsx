@@ -1,7 +1,7 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified system_auth 2026-04-18
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '../../lib/supabase/client';
 import { useTrack } from '@/lib/useTrack';
@@ -10,7 +10,7 @@ import { useTrack } from '@/lib/useTrack';
 //   - When NEXT_PUBLIC_SITE_MODE=coming_soon → renders the holding card
 //     (no auth, no carousel, no nav). The middleware redirects every
 //     non-exempt public path here while holding mode is on.
-//   - Otherwise → first-login onboarding carousel that redirects on
+//   - Otherwise → first-login onboarding 3-screen tour that redirects on
 //     `onboarding_completed_at` (a UX state flag, not a permission).
 
 const IS_COMING_SOON = process.env.NEXT_PUBLIC_SITE_MODE === 'coming_soon';
@@ -53,27 +53,18 @@ const C = {
   text: '#111111',
   dim: '#666666',
   accent: '#111111',
+  quiz: '#8b5cf6',
+  quizBg: '#f5f3ff',
+  quizBorder: '#ddd6fe',
+  success: '#22c55e',
 } as const;
 
-interface Screen {
+type FeedStory = {
+  id: string;
+  slug: string;
   title: string;
-  body: string;
-}
-
-const SCREENS: Screen[] = [
-  {
-    title: 'Discussions are earned',
-    body: 'Every article has a short comprehension quiz. Score 3 out of 5 and the discussion unlocks. No quiz pass, no comments — which is how we keep trolls out and the conversation grounded in what was actually written.',
-  },
-  {
-    title: 'Your Verity Score is a knowledge map',
-    body: 'Quizzes and reading grow your score across categories. It\u2019s a personal picture of what you know, not a rank. Paid readers can see each other\u2019s category breakdowns so discussion context is richer.',
-  },
-  {
-    title: 'Streaks reward showing up',
-    body: 'Read something every day and your streak climbs. Milestones at 7, 30, 90, and 365 days earn bonus points. Miss a day without a freeze and you start over — so make the habit stick.',
-  },
-];
+  category?: { name: string | null } | null;
+};
 
 export default function WelcomePage() {
   if (IS_COMING_SOON) return <HoldingCard />;
@@ -92,6 +83,8 @@ export default function WelcomePage() {
   const [busy, setBusy] = useState<boolean>(false);
   // eslint-disable-next-line react-hooks/rules-of-hooks -- launch-hide pattern; remove when feature unhides (FIX_SESSION_1 launch-hides)
   const [finishError, setFinishError] = useState<string | null>(null);
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- launch-hide pattern; remove when feature unhides (FIX_SESSION_1 launch-hides)
+  const [stories, setStories] = useState<FeedStory[]>([]);
 
   // page_view fires once loading resolves so we don't count the bounce-out
   // branches (unverified, already-onboarded) as carousel views.
@@ -113,17 +106,37 @@ export default function WelcomePage() {
       }
       const { data: me } = await supabase
         .from('users')
-        .select('onboarding_completed_at, email_verified')
+        .select('onboarding_completed_at, email_verified, username')
         .eq('id', user.id)
         .maybeSingle();
       if (!me?.email_verified) {
         router.replace('/verify-email');
         return;
       }
+      if (!me?.username) {
+        router.replace('/signup/pick-username');
+        return;
+      }
       if (me?.onboarding_completed_at) {
         router.replace('/');
         return;
       }
+
+      // Best-effort: fetch 1-3 top stories for the last screen's preview.
+      // If the query fails we fall through with an empty list — the screen
+      // degrades to a single CTA and still works.
+      try {
+        const { data: rows } = await supabase
+          .from('articles')
+          .select('id, slug, title, category:categories(name)')
+          .eq('status', 'published')
+          .order('published_at', { ascending: false })
+          .limit(3);
+        if (rows) setStories(rows as unknown as FeedStory[]);
+      } catch (err) {
+        console.error('welcome preview fetch failed', err);
+      }
+
       setLoading(false);
     })();
   }, []);
@@ -153,22 +166,41 @@ export default function WelcomePage() {
 
   if (loading) return null;
 
-  const screen = SCREENS[index];
-  const isLast = index === SCREENS.length - 1;
+  const isLast = index === 2;
+
+  const shell: CSSProperties = {
+    minHeight: '100vh',
+    background: C.bg,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '32px 16px',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    boxSizing: 'border-box',
+  };
+
+  const wordmark: CSSProperties = {
+    fontFamily: 'var(--font-source-serif), Georgia, "Times New Roman", serif',
+    fontSize: '22px',
+    fontWeight: 800,
+    color: C.accent,
+    letterSpacing: '-0.02em',
+    userSelect: 'none',
+  };
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: C.bg,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '24px 16px',
-      }}
-    >
+    <div style={shell}>
       <div style={{ width: '100%', maxWidth: 480 }}>
-        <div style={{ textAlign: 'right', marginBottom: 16 }}>
+        {/* Header: wordmark + skip */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 24,
+          }}
+        >
+          <div style={wordmark}>Verity Post</div>
           <button
             onClick={finish}
             disabled={busy}
@@ -178,52 +210,56 @@ export default function WelcomePage() {
               color: C.dim,
               fontSize: 13,
               fontWeight: 600,
-              cursor: 'pointer',
-              padding: 4,
+              cursor: busy ? 'not-allowed' : 'pointer',
+              padding: '10px 8px',
+              fontFamily: 'inherit',
+              minHeight: 44,
             }}
           >
             Skip
           </button>
         </div>
 
+        {/* Card */}
         <div
           style={{
             background: C.card,
             border: `1px solid ${C.border}`,
-            borderRadius: 14,
-            padding: '32px 24px',
-            minHeight: 320,
+            borderRadius: 18,
+            padding: '36px 28px 32px',
+            minHeight: 420,
             display: 'flex',
             flexDirection: 'column',
           }}
         >
+          {index === 0 && <ScreenOne />}
+          {index === 1 && <ScreenTwo />}
+          {index === 2 && <ScreenThree stories={stories} />}
+
+          {/* Pagination dots */}
           <div
             style={{
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: 2,
-              color: C.dim,
-              textTransform: 'uppercase',
+              display: 'flex',
+              gap: 8,
+              marginTop: 32,
+              justifyContent: 'center',
             }}
           >
-            {`Welcome to Verity Post | ${index + 1} of ${SCREENS.length}`}
-          </div>
-          <div style={{ fontSize: 24, fontWeight: 800, marginTop: 20, lineHeight: 1.2 }}>
-            {screen.title}
-          </div>
-          <div style={{ fontSize: 15, lineHeight: 1.55, color: C.text, marginTop: 16, flex: 1 }}>
-            {screen.body}
-          </div>
-
-          <div style={{ display: 'flex', gap: 6, marginTop: 24 }}>
-            {SCREENS.map((_, i) => (
-              <div
+            {[0, 1, 2].map((i) => (
+              <button
                 key={i}
+                type="button"
+                onClick={() => setIndex(i)}
+                aria-label={`Go to screen ${i + 1}`}
                 style={{
-                  flex: 1,
-                  height: 4,
-                  borderRadius: 2,
-                  background: i <= index ? C.accent : C.border,
+                  width: i === index ? 24 : 8,
+                  height: 8,
+                  borderRadius: 4,
+                  border: 'none',
+                  background: i === index ? C.accent : C.border,
+                  cursor: 'pointer',
+                  padding: 0,
+                  transition: 'all 0.2s',
                 }}
               />
             ))}
@@ -247,6 +283,7 @@ export default function WelcomePage() {
           )}
         </div>
 
+        {/* Bottom action bar */}
         <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
           {index > 0 && (
             <button
@@ -260,6 +297,8 @@ export default function WelcomePage() {
                 fontSize: 14,
                 fontWeight: 600,
                 cursor: 'pointer',
+                fontFamily: 'inherit',
+                minHeight: 48,
               }}
             >
               Back
@@ -270,20 +309,245 @@ export default function WelcomePage() {
             disabled={busy}
             style={{
               flex: 1,
-              padding: '12px 18px',
+              padding: '14px 18px',
               borderRadius: 10,
               border: 'none',
               background: C.accent,
               color: '#fff',
-              fontSize: 14,
+              fontSize: 15,
               fontWeight: 700,
               cursor: busy ? 'default' : 'pointer',
+              fontFamily: 'inherit',
+              minHeight: 48,
             }}
           >
-            {isLast ? (busy ? 'Finishing\u2026' : 'Start reading') : 'Next'}
+            {isLast ? (busy ? 'Finishing…' : 'Get started') : 'Next'}
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ---------- Screens ----------
+
+function ScreenOne() {
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+      <div
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: 2,
+          color: C.dim,
+          textTransform: 'uppercase',
+        }}
+      >
+        Welcome
+      </div>
+      <h2
+        style={{
+          fontSize: 30,
+          fontWeight: 800,
+          margin: '14px 0 16px 0',
+          lineHeight: 1.1,
+          letterSpacing: '-0.02em',
+          color: C.text,
+          fontFamily: 'var(--font-source-serif), Georgia, "Times New Roman", serif',
+        }}
+      >
+        Welcome to Verity Post.
+      </h2>
+      <p
+        style={{
+          fontSize: 17,
+          lineHeight: 1.55,
+          color: C.text,
+          margin: 0,
+        }}
+      >
+        Where every commenter passed the quiz.
+      </p>
+      <p
+        style={{
+          fontSize: 14,
+          lineHeight: 1.6,
+          color: C.dim,
+          margin: '18px 0 0 0',
+        }}
+      >
+        News that respects your attention, and a discussion floor earned by reading the article —
+        not shouting about it.
+      </p>
+    </div>
+  );
+}
+
+function ScreenTwo() {
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <div
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: 2,
+          color: C.dim,
+          textTransform: 'uppercase',
+        }}
+      >
+        How it works
+      </div>
+      <h2
+        style={{
+          fontSize: 28,
+          fontWeight: 800,
+          margin: '14px 0 18px 0',
+          lineHeight: 1.15,
+          letterSpacing: '-0.02em',
+          color: C.text,
+          fontFamily: 'var(--font-source-serif), Georgia, "Times New Roman", serif',
+        }}
+      >
+        Read. Quiz. Discuss.
+      </h2>
+
+      {/* Tiny visual of the unlock chain */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          marginBottom: 20,
+        }}
+      >
+        <Step label="Read" tone="read" />
+        <Arrow />
+        <Step label="Quiz" tone="quiz" />
+        <Arrow />
+        <Step label="Comment" tone="comment" />
+      </div>
+
+      <p style={{ fontSize: 14, lineHeight: 1.6, color: C.text, margin: 0 }}>
+        Every article has a 5-question comprehension quiz. Score <strong>3 out of 5</strong> and the
+        discussion unlocks.
+      </p>
+      <p
+        style={{
+          fontSize: 13,
+          lineHeight: 1.6,
+          color: C.dim,
+          margin: '10px 0 0 0',
+        }}
+      >
+        That&rsquo;s how we keep trolls out and the conversation grounded in what was actually
+        written.
+      </p>
+    </div>
+  );
+}
+
+function ScreenThree({ stories }: { stories: FeedStory[] }) {
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <div
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: 2,
+          color: C.dim,
+          textTransform: 'uppercase',
+        }}
+      >
+        Ready?
+      </div>
+      <h2
+        style={{
+          fontSize: 28,
+          fontWeight: 800,
+          margin: '14px 0 18px 0',
+          lineHeight: 1.15,
+          letterSpacing: '-0.02em',
+          color: C.text,
+          fontFamily: 'var(--font-source-serif), Georgia, "Times New Roman", serif',
+        }}
+      >
+        Your first read is waiting.
+      </h2>
+
+      {stories.length > 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {stories.map((s) => (
+            <a
+              key={s.id}
+              href={`/story/${s.slug}`}
+              style={{
+                display: 'block',
+                padding: '14px 16px',
+                borderRadius: 12,
+                background: C.bg,
+                border: `1px solid ${C.border}`,
+                textDecoration: 'none',
+                color: C.text,
+                transition: 'border-color 0.15s, transform 0.15s',
+              }}
+            >
+              {s.category?.name && (
+                <div
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: 1.4,
+                    color: C.dim,
+                    textTransform: 'uppercase',
+                    marginBottom: 6,
+                  }}
+                >
+                  {s.category.name}
+                </div>
+              )}
+              <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.35 }}>{s.title}</div>
+            </a>
+          ))}
+        </div>
+      ) : (
+        <p style={{ fontSize: 14, lineHeight: 1.6, color: C.dim, margin: 0 }}>
+          Head to the home feed — pick any article, read it, and the quiz will be right below.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function Step({ label, tone }: { label: string; tone: 'read' | 'quiz' | 'comment' }) {
+  const palette = {
+    read: { bg: '#eff6ff', color: '#3b82f6', border: '#bfdbfe' },
+    quiz: { bg: C.quizBg, color: C.quiz, border: C.quizBorder },
+    comment: { bg: '#f0fdf4', color: C.success, border: '#bbf7d0' },
+  }[tone];
+  return (
+    <div
+      style={{
+        flex: 1,
+        textAlign: 'center',
+        padding: '10px 8px',
+        borderRadius: 10,
+        background: palette.bg,
+        border: `1px solid ${palette.border}`,
+        color: palette.color,
+        fontSize: 12,
+        fontWeight: 700,
+        letterSpacing: 0.3,
+      }}
+    >
+      {label}
+    </div>
+  );
+}
+
+function Arrow() {
+  return (
+    <div style={{ color: C.dim, fontSize: 14, fontWeight: 600 }} aria-hidden="true">
+      →
     </div>
   );
 }
