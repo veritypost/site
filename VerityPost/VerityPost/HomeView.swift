@@ -270,6 +270,8 @@ struct HomeView: View {
                     .font(.system(size: 15, weight: .heavy))
                     .tracking(-0.15) // -0.01em at 15pt ≈ -0.15pt
                     .foregroundColor(VP.text)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
             }
             ToolbarItem(placement: .topBarTrailing) {
                 if canSearch {
