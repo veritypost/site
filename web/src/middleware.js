@@ -166,6 +166,21 @@ export async function middleware(request) {
     applyCors(request, response);
   }
 
+  // F7 Decision 1 — legacy admin shells deleted. Exact-match 301 redirects
+  // so external deep links (emails, Slack, bookmarks) keep working without
+  // catching the F7 sub-routes /admin/pipeline/{runs,costs,settings} that
+  // share the prefix. Both legacy pages carried @admin-verified markers;
+  // Decision 1 + the F7-pipeline-restructure plan are the deferred approval.
+  if (pathname === '/admin/pipeline' || pathname === '/admin/ingest') {
+    const dest = request.nextUrl.clone();
+    dest.pathname = '/admin/newsroom';
+    dest.search = '';
+    const redirect = NextResponse.redirect(dest, { status: 301 });
+    redirect.headers.set('x-request-id', requestId);
+    redirect.headers.set('Content-Security-Policy-Report-Only', csp);
+    return redirect;
+  }
+
   // T-046 — pre-launch holding mode. When NEXT_PUBLIC_SITE_MODE=coming_soon,
   // redirect every public request to /welcome (which renders a minimal brand
   // card). Owner bypass: hit /preview?token=PREVIEW_BYPASS_TOKEN once and a

@@ -12,7 +12,7 @@
  *
  * Header:
  *   - Refresh feeds -> POST /api/newsroom/ingest/run
- *   - Pipeline runs -> navigate to /admin/pipeline
+ *   - Pipeline runs -> navigate to /admin/pipeline/runs
  *
  * Dependency status:
  *   - Migration 116 (feed_clusters.locked_* columns) — LIVE.
@@ -269,7 +269,7 @@ function NewsroomAdminInner() {
       >
         Refresh feeds
       </Button>
-      <Link href="/admin/pipeline" style={{ textDecoration: 'none' }}>
+      <Link href="/admin/pipeline/runs" style={{ textDecoration: 'none' }}>
         <Button variant="ghost" size="md">
           Pipeline runs
         </Button>

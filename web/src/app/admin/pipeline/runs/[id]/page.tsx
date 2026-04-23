@@ -334,17 +334,17 @@ function RunDetailInner() {
         <PageHeader
           title="Run not found"
           subtitle="This run may have been removed, or the id is invalid."
-          backHref="/admin/pipeline"
-          backLabel="Pipeline"
+          backHref="/admin/pipeline/runs"
+          backLabel="Pipeline runs"
         />
         <PageSection>
           <EmptyState
             title="No run at this id"
-            description="Return to the pipeline dashboard to pick another run."
+            description="Return to the runs list to pick another run."
             cta={
-              <Link href="/admin/pipeline" style={{ textDecoration: 'none' }}>
+              <Link href="/admin/pipeline/runs" style={{ textDecoration: 'none' }}>
                 <Button variant="primary" size="md">
-                  Back to pipeline
+                  Back to runs
                 </Button>
               </Link>
             }
@@ -360,13 +360,13 @@ function RunDetailInner() {
         <PageHeader
           title="Could not load run"
           subtitle={loadError || 'Unknown error'}
-          backHref="/admin/pipeline"
-          backLabel="Pipeline"
+          backHref="/admin/pipeline/runs"
+          backLabel="Pipeline runs"
         />
         <PageSection>
           <EmptyState
             title="Load failed"
-            description="Try again in a moment, or return to the pipeline dashboard."
+            description="Try again in a moment, or return to the runs list."
             cta={
               <Button variant="primary" size="md" onClick={() => load()}>
                 Retry load
@@ -427,9 +427,9 @@ function RunDetailInner() {
           </Button>
         </Link>
       )}
-      <Link href="/admin/pipeline" style={{ textDecoration: 'none' }}>
+      <Link href="/admin/pipeline/runs" style={{ textDecoration: 'none' }}>
         <Button variant="ghost" size="md">
-          Back to pipeline
+          Back to runs
         </Button>
       </Link>
     </>

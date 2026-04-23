@@ -275,8 +275,8 @@ export default function PipelineCostsPage() {
         <PageHeader
           title="Pipeline costs"
           subtitle="Live LLM spend vs caps. Read-only."
-          backHref="/admin/pipeline"
-          backLabel="Pipeline"
+          backHref="/admin/pipeline/runs"
+          backLabel="Pipeline runs"
         />
         <div style={{ display: 'flex', justifyContent: 'center', padding: S[12] }}>
           <Spinner />

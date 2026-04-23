@@ -28,8 +28,6 @@ const PAGES: HubGroup[] = [
     { href: '/admin/pipeline/runs', title: 'Pipeline Runs', desc: 'F7: observability — every generate/ingest run with filters, cost, duration' },
     { href: '/admin/pipeline/costs', title: 'Pipeline Costs', desc: 'F7: today-vs-cap, per-model breakdown, 30-day chart, outliers' },
     { href: '/admin/pipeline/settings', title: 'Pipeline Settings', desc: 'F7: kill switches, cost caps, cluster/story-match/plagiarism thresholds' },
-    { href: '/admin/ingest', title: 'Source Ingest (legacy)', desc: 'Older ingest shell — superseded by Newsroom for F7 runs' },
-    { href: '/admin/pipeline', title: 'AI Pipeline (legacy)', desc: 'Older pipeline shell — superseded by Pipeline Runs + Costs + Settings' },
     { href: '/admin/stories', title: 'Articles', desc: 'Browse all articles with status filters, categories, and source counts' },
     { href: '/admin/story-manager', title: 'Article Manager', desc: 'Full article editor — timeline, quizzes, sources, AI generation' },
     { href: '/admin/kids-story-manager', title: 'Kids Article Manager', desc: 'Kids-mode article editor — simplified content for younger audiences' },
