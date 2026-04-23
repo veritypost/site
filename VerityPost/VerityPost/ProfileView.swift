@@ -1784,16 +1784,16 @@ struct AvatarQuickEditSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 22) {
-                    // Live preview — matches AvatarView rendering 1:1
-                    ZStack {
-                        Circle().fill(Color(hex: innerColor))
-                        Circle().strokeBorder(Color(hex: outerColor), lineWidth: 4)
-                        Text(displayedInitials.isEmpty ? "?" : displayedInitials)
-                            .font(.system(size: displayedInitials.count > 1 ? 36 : 44, weight: .heavy))
-                            .foregroundColor(Color(hex: textColor))
-                            .tracking(displayedInitials.count > 1 ? -0.5 : 0)
-                    }
-                    .frame(width: 112, height: 112)
+                    // Live preview — actually renders AvatarView so what you
+                    // see here matches what shows on Profile / comments / DMs.
+                    // Same stroke width, same font ratio, same tracking rules.
+                    AvatarView(
+                        outerHex: outerColor,
+                        innerHex: innerColor,
+                        initials: displayedInitials.isEmpty ? "?" : displayedInitials,
+                        textHex: textColor,
+                        size: 112
+                    )
                     .padding(.top, 8)
 
                     VStack(alignment: .leading, spacing: 6) {
