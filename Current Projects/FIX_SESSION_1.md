@@ -223,6 +223,8 @@ Based on `.env.example` rewrite from 2026-04-20. Each is optional; document-by-d
 
 **Effort:** 15 min to start; multi-day wait for approval.
 
+**SHIPPED 2026-04-23 (owner-side):** Apple Developer account approved. Bundle ID registration + capabilities + IAP product setup walk-through scheduled for a later session at owner's signal (memory: `project_apple_console_walkthrough_pending.md`).
+
 ---
 
 ### 00-J — Remove ex-dev from Vercel team
@@ -267,6 +269,8 @@ Based on `.env.example` rewrite from 2026-04-20. Each is optional; document-by-d
 
 **Effort:** depends on how quizzes are authored (manual vs. AI-assisted pipeline).
 
+**N/A 2026-04-23:** Owner is wiping all existing articles before launch. Every post-wipe article comes through the F7 pipeline, which generates quizzes inline. Backfill gap closes itself; this entry is no longer launch-blocking.
+
 ---
 
 ### 00-M — Apply `schema/106_kid_trial_freeze_notification.sql`
@@ -281,6 +285,8 @@ Based on `.env.example` rewrite from 2026-04-20. Each is optional; document-by-d
 **Verdict: REAL and OPEN** (launch-blocking for kid-product conversion funnel).
 
 **Effort:** 2 min.
+
+**SHIPPED (verified 2026-04-23):** MCP `pg_get_functiondef('freeze_kid_trial')` returns the live function body matching `schema/106` 1:1 (notification block present). The migration was applied in a prior session that didn't update `supabase_migrations.schema_migrations`. Tracker entry was stale; actual code has been live for some time. Mark closed.
 
 ---
 
