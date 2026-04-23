@@ -43,6 +43,13 @@ enum VP {
     static let commentColor = Color(hex: "22c55e")
     static let commentBorder = Color(hex: "bbf7d0")
 
+    // Streak heatmap cells. Track = empty day; Muted = missed read day; Active = read day.
+    // Added with the ProfileView rebuild (2026-04-22) so the 30-day grid reads as
+    // a first-class visual rather than reusing the form-border color.
+    static let streakTrack = Color(hex: "f0f0f0")
+    static let streakMissed = Color(hex: "e5e5e5")
+    static let streakActive = Color(hex: "22c55e")
+
     // Kids color options
     static let kidColors: [String] = [
         "#10b981", "#f59e0b", "#3b82f6", "#f43f5e",

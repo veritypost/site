@@ -19,22 +19,58 @@ import UIKit
 
 // MARK: - Shared card chrome
 
-/// Standard section header above a card. Matches the tracking/weight of
-/// web's SectionWrapper title.
+/// Section header above a card.
+///
+/// Two looks:
+///   - Subpages use the legacy compact all-caps header (kept for density
+///     inside focused flows like Password / Email / MFA).
+///   - The hub opts in to the premium header with an optional tinted-icon
+///     tile on the left (set via `icon`).
 private struct SettingsSectionHeader: View {
     let title: String
     let tone: Tone
+    var icon: String? = nil
+    var iconTint: Color? = nil
     enum Tone { case normal, danger }
 
     var body: some View {
-        Text(title.uppercased())
-            .font(.system(size: 11, weight: .heavy))
-            .tracking(0.8)
-            .foregroundColor(tone == .danger ? VP.danger : VP.dim)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 16)
-            .padding(.top, 18)
-            .padding(.bottom, 8)
+        HStack(spacing: 10) {
+            if let icon {
+                let tint = iconTint ?? (tone == .danger ? VP.danger : VP.text)
+                IconTile(system: icon, tint: tint, size: 26, symbolSize: 13)
+            }
+            Text(icon == nil ? title.uppercased() : title)
+                .font(icon == nil
+                      ? .system(size: 11, weight: .heavy)
+                      : .system(.callout, design: .default, weight: .bold))
+                .tracking(icon == nil ? 0.8 : -0.3)
+                .foregroundColor(tone == .danger ? VP.danger : (icon == nil ? VP.dim : VP.text))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.top, icon == nil ? 18 : 22)
+        .padding(.bottom, icon == nil ? 8 : 10)
+    }
+}
+
+/// Tinted-circle SF Symbol tile used beside section headers and inside
+/// hub rows. Tint controls both the circle fill (at 12% opacity) and the
+/// symbol color (full opacity). Keeps the visual rhythm consistent whether
+/// a row is neutral, accent, or destructive.
+private struct IconTile: View {
+    let system: String
+    let tint: Color
+    var size: CGFloat = 30
+    var symbolSize: CGFloat = 14
+
+    var body: some View {
+        ZStack {
+            Circle().fill(tint.opacity(0.12))
+            Image(systemName: system)
+                .font(.system(size: symbolSize, weight: .semibold))
+                .foregroundColor(tint)
+        }
+        .frame(width: size, height: size)
     }
 }
 
@@ -54,7 +90,7 @@ private struct SettingsCard<Content: View>: View {
 }
 
 /// Chevron row inside a card — destination NavigationLink. 44pt min height,
-/// entire row tappable, 1px VP.border separator baked in when `showDivider`.
+/// entire row tappable, hairline separator baked in when `showDivider`.
 private struct SettingsRowLink<Destination: View>: View {
     let title: String
     let subtitle: String?
@@ -95,7 +131,7 @@ private struct SettingsRowLink<Destination: View>: View {
             .contentShape(Rectangle())
             .overlay(alignment: .bottom) {
                 if showDivider {
-                    Rectangle().fill(VP.border).frame(height: 1).padding(.leading, 16)
+                    Rectangle().fill(VP.border.opacity(0.6)).frame(height: 1).padding(.leading, 16)
                 }
             }
         }
@@ -128,7 +164,7 @@ private struct SettingsRowExternal: View {
             .contentShape(Rectangle())
             .overlay(alignment: .bottom) {
                 if showDivider {
-                    Rectangle().fill(VP.border).frame(height: 1).padding(.leading, 16)
+                    Rectangle().fill(VP.border.opacity(0.6)).frame(height: 1).padding(.leading, 16)
                 }
             }
         }
@@ -170,7 +206,7 @@ private struct SettingsRowButton: View {
             .contentShape(Rectangle())
             .overlay(alignment: .bottom) {
                 if showDivider {
-                    Rectangle().fill(VP.border).frame(height: 1).padding(.leading, 16)
+                    Rectangle().fill(VP.border.opacity(0.6)).frame(height: 1).padding(.leading, 16)
                 }
             }
         }
@@ -200,7 +236,7 @@ private struct SettingsRowValue: View {
         .frame(minHeight: 44)
         .overlay(alignment: .bottom) {
             if showDivider {
-                Rectangle().fill(VP.border).frame(height: 1).padding(.leading, 16)
+                Rectangle().fill(VP.border.opacity(0.6)).frame(height: 1).padding(.leading, 16)
             }
         }
     }
@@ -371,20 +407,199 @@ private struct SettingsToggleRow: View {
         .frame(minHeight: 44)
         .overlay(alignment: .bottom) {
             if showDivider {
-                Rectangle().fill(VP.border).frame(height: 1).padding(.leading, 16)
+                Rectangle().fill(VP.border.opacity(0.6)).frame(height: 1).padding(.leading, 16)
             }
         }
     }
 }
 
 // MARK: - Settings hub
+//
+// World-class hub: search-as-you-type, section icons, per-row icons,
+// live value previews, one inline-toggled privacy pref (DM read receipts),
+// pull-to-refresh, and a clearly-separated Danger zone at the bottom.
+//
+// Every row is declared once in a single `rows` model and rendered from
+// that model — search, permission gates, and section grouping all compose
+// through the same pipeline, so adding a new row is a one-line tuple.
+//
+// Existing subpage destinations are preserved verbatim; the hub's job is
+// discovery + one-tap state, not re-implementing the flows.
+
+/// Row-level icon tile used inside hub rows. Smaller cousin of `IconTile`
+/// so the row stays on a 44pt baseline but still scans well.
+private struct RowIconTile: View {
+    let system: String
+    var tint: Color = VP.text
+    var body: some View {
+        IconTile(system: system, tint: tint, size: 30, symbolSize: 14)
+    }
+}
+
+/// Hub row — unified NavigationLink / Button / Link surface with an icon,
+/// a value preview, and a trailing chevron or arrow. Keeps every hub row
+/// on a shared visual rhythm (44pt minimum, 14pt vertical pad, 16pt label,
+/// 14pt dim value preview) so the list reads like one continuous scan.
+///
+/// `kind` captures the destination semantics without leaking a generic
+/// parameter onto the row model — lets us store heterogeneous rows in one
+/// array for search/filter.
+private enum HubRowKind {
+    case push(AnyView)
+    case external(URL)
+    case action(() -> Void)
+    case toggle(Binding<Bool>, isDisabled: Bool)
+    case staticValue
+}
+
+private struct HubRow: View {
+    let icon: String
+    var iconTint: Color = VP.text
+    let title: String
+    var subtitle: String? = nil
+    var valuePreview: String? = nil
+    var valueTone: Color = VP.dim
+    var tone: Tone = .normal
+    var showDivider: Bool = true
+    let kind: HubRowKind
+    var onTap: (() -> Void)? = nil
+
+    enum Tone { case normal, accent, destructive }
+
+    private var labelColor: Color {
+        switch tone {
+        case .normal: return VP.text
+        case .accent: return VP.accent
+        case .destructive: return VP.danger
+        }
+    }
+
+    @ViewBuilder
+    private var contentRow: some View {
+        HStack(spacing: 12) {
+            RowIconTile(system: icon, tint: iconTint)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(labelColor)
+                    .lineLimit(1)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.system(size: 13, weight: .regular))
+                        .foregroundColor(VP.dim)
+                        .lineLimit(1)
+                }
+            }
+            Spacer(minLength: 8)
+            trailing
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .frame(minHeight: 56)
+        .contentShape(Rectangle())
+        .overlay(alignment: .bottom) {
+            if showDivider {
+                Rectangle()
+                    .fill(VP.border.opacity(0.6))
+                    .frame(height: 1)
+                    .padding(.leading, 58)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var trailing: some View {
+        switch kind {
+        case .push:
+            if let valuePreview, !valuePreview.isEmpty {
+                Text(valuePreview)
+                    .font(.system(size: 14, weight: .regular))
+                    .foregroundColor(valueTone)
+                    .lineLimit(1)
+            }
+            Image(systemName: "chevron.right")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(VP.muted)
+        case .external:
+            if let valuePreview, !valuePreview.isEmpty {
+                Text(valuePreview)
+                    .font(.system(size: 14, weight: .regular))
+                    .foregroundColor(valueTone)
+                    .lineLimit(1)
+            }
+            Image(systemName: "arrow.up.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(VP.muted)
+        case .action:
+            if let valuePreview, !valuePreview.isEmpty {
+                Text(valuePreview)
+                    .font(.system(size: 14, weight: .regular))
+                    .foregroundColor(valueTone)
+                    .lineLimit(1)
+            }
+        case .toggle(let binding, let isDisabled):
+            Toggle("", isOn: binding)
+                .labelsHidden()
+                .tint(VP.accent)
+                .disabled(isDisabled)
+        case .staticValue:
+            if let valuePreview {
+                Text(valuePreview)
+                    .font(.system(size: 14, weight: .regular))
+                    .foregroundColor(valueTone)
+                    .lineLimit(1)
+            }
+        }
+    }
+
+    var body: some View {
+        switch kind {
+        case .push(let destination):
+            NavigationLink(destination: destination) { contentRow }
+                .buttonStyle(.plain)
+                .simultaneousGesture(TapGesture().onEnded { onTap?() })
+        case .external(let url):
+            Link(destination: url) { contentRow }
+                .simultaneousGesture(TapGesture().onEnded { onTap?() })
+        case .action(let handler):
+            Button(action: { onTap?(); handler() }) { contentRow }
+                .buttonStyle(.plain)
+        case .toggle, .staticValue:
+            contentRow
+        }
+    }
+}
+
+/// Rendered section — a single SettingsCard wrapping a block of HubRows.
+/// Matches divider collapse on the last row automatically.
+private struct HubSection<Content: View>: View {
+    let title: String
+    var tone: SettingsSectionHeader.Tone = .normal
+    let icon: String
+    var iconTint: Color? = nil
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(spacing: 0) {
+            SettingsSectionHeader(title: title, tone: tone, icon: icon, iconTint: iconTint)
+            SettingsCard { content }
+        }
+        .padding(.bottom, 2)
+    }
+}
 
 struct SettingsView: View {
     @EnvironmentObject var auth: AuthViewModel
     @StateObject private var perms = PermissionStore.shared
+    @StateObject private var push = PushPermission.shared
+    @StateObject private var blocks = BlockService.shared
     @Environment(\.dismiss) private var dismiss
 
     @State private var showFeedback = false
+    @State private var searchText = ""
+    @State private var searchQuery = ""
+    @State private var searchDebouncer: Task<Void, Never>? = nil
+    @State private var tapTick = 0
 
     // Permission gates — mirrored from web SECTIONS tree. Resolved by
     // PermissionService on mount and refreshed when perms.changeToken
@@ -401,9 +616,18 @@ struct SettingsView: View {
     @State private var canViewAlerts: Bool = false
     @State private var canViewDataPrivacy: Bool = false
 
+    // Live value-preview state, fetched on appear and re-fetched by
+    // pull-to-refresh. Zero preview-only writes — these mirror server state.
+    @State private var hasActiveSubscription: Bool = false
+    @State private var mfaEnabled: Bool = false
+    @State private var dmReceiptsEnabled: Bool = true
+    @State private var dmReceiptsLoading: Bool = true
+
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
     }
+
+    // MARK: Body
 
     var body: some View {
         ScrollView {
@@ -414,13 +638,9 @@ struct SettingsView: View {
                     identityHeader(user)
                 }
 
-                accountSection
-                preferencesSection
-                privacySection
-                if canViewBilling { billingSection }
-                expertSection
-                aboutSection
-                dangerSection
+                searchField
+
+                sections
 
                 Color.clear.frame(height: 32)
             }
@@ -428,8 +648,23 @@ struct SettingsView: View {
         .background(VP.bg.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarTitleDisplayMode(.inline)
+        .scrollDismissesKeyboard(.interactively)
+        .refreshable { await refreshAll() }
+        .sensoryFeedback(.selection, trigger: tapTick)
         .sheet(isPresented: $showFeedback) { FeedbackSheet().environmentObject(auth) }
         .task(id: perms.changeToken) { await loadPerms() }
+        .task { await loadPreviews() }
+        .onChange(of: searchText) { _, new in
+            // 100ms debounce — keeps search smooth without re-filtering on
+            // every keystroke when the user is typing fast.
+            searchDebouncer?.cancel()
+            searchDebouncer = Task {
+                try? await Task.sleep(nanoseconds: 100_000_000)
+                if !Task.isCancelled {
+                    await MainActor.run { searchQuery = new }
+                }
+            }
+        }
     }
 
     // MARK: Identity
@@ -462,150 +697,408 @@ struct SettingsView: View {
         .padding(.vertical, 18)
     }
 
-    // MARK: Sections
+    // MARK: Search field
 
-    private var accountSection: some View {
-        VStack(spacing: 0) {
-            SettingsSectionHeader(title: "Account", tone: .normal)
-            SettingsCard {
-                if canEditProfile {
-                    SettingsRowLink("Profile") { AccountSettingsView() }
+    private var searchField: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(VP.muted)
+            TextField("Search settings", text: $searchText)
+                .font(.system(size: 15))
+                .foregroundColor(VP.text)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled(true)
+                .submitLabel(.search)
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                    searchQuery = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 15))
+                        .foregroundColor(VP.muted)
                 }
-                if canEditEmail {
-                    SettingsRowLink("Email") { EmailSettingsView() }
-                }
-                if canChangePassword {
-                    SettingsRowLink("Password") { PasswordSettingsView() }
-                }
-                if canViewLoginActivity {
-                    SettingsRowLink("Sign-in activity") { LoginActivityView() }
-                }
-                if canViewMFA {
-                    SettingsRowLink("Two-factor authentication",
-                                    showDivider: false) { MFASettingsView() }
-                } else {
-                    // Collapse last divider on the preceding row when MFA is hidden.
-                    Color.clear.frame(height: 0)
-                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
             }
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(VP.card)
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .padding(.horizontal, 16)
+        .padding(.top, 2)
+        .padding(.bottom, 10)
     }
 
-    private var preferencesSection: some View {
-        VStack(spacing: 0) {
-            SettingsSectionHeader(title: "Preferences", tone: .normal)
-            SettingsCard {
-                if canViewAlerts {
-                    SettingsRowLink("Alerts",
-                                    subtitle: "Push, email, and in-app")
-                        { NotificationsSettingsView() }
-                }
-                if canViewFeedPrefs {
-                    SettingsRowLink("Feed",
-                                    subtitle: "What surfaces, what's filtered",
-                                    showDivider: false)
-                        { FeedPreferencesSettingsView() }
+    // MARK: Sections — assembled from a row model so search can filter them
+
+    @ViewBuilder
+    private var sections: some View {
+        let visibleAccount = filter(accountRows)
+        let visiblePrefs = filter(preferencesRows)
+        let visiblePrivacy = filter(privacyRows)
+        let visibleBilling = canViewBilling ? filter(billingRows) : []
+        let visibleExpert = filter(expertRows)
+        let visibleAbout = filter(aboutRows)
+        let visibleDanger = filter(dangerRows)
+
+        let anyVisible = !visibleAccount.isEmpty
+                      || !visiblePrefs.isEmpty
+                      || !visiblePrivacy.isEmpty
+                      || !visibleBilling.isEmpty
+                      || !visibleExpert.isEmpty
+                      || !visibleAbout.isEmpty
+                      || !visibleDanger.isEmpty
+
+        VStack(spacing: 18) {
+            if !visibleAccount.isEmpty {
+                HubSection(title: "Account", icon: "person.crop.circle.fill", iconTint: VP.text) {
+                    renderRows(visibleAccount)
                 }
             }
-            if !canViewAlerts && !canViewFeedPrefs {
+            if !visiblePrefs.isEmpty {
+                HubSection(title: "Preferences", icon: "slider.horizontal.3", iconTint: VP.text) {
+                    renderRows(visiblePrefs)
+                }
+            } else if !canViewAlerts && !canViewFeedPrefs && searchQuery.isEmpty {
                 SettingsNote(text: "Preferences aren\u{2019}t available for your account.")
             }
-        }
-    }
-
-    private var privacySection: some View {
-        VStack(spacing: 0) {
-            SettingsSectionHeader(title: "Privacy & Safety", tone: .normal)
-            SettingsCard {
-                // Apple Guideline 1.2 — UGC blocking management must be
-                // reachable from Settings. Always-on for signed-in users.
-                SettingsRowLink("Blocked accounts") { BlockedAccountsView() }
-                if canViewDataPrivacy {
-                    SettingsRowLink("Data & privacy",
-                                    subtitle: "Export, receipts, deletion",
-                                    showDivider: false)
-                        { DataPrivacyView() }
-                } else {
-                    // Apple Review 5.1.1(v) — delete must be reachable for every
-                    // signed-in user even when export/receipts perm is missing.
-                    SettingsRowLink("Delete account",
-                                    showDivider: false)
-                        { DataPrivacyView() }
+            if !visiblePrivacy.isEmpty {
+                HubSection(title: "Privacy", icon: "lock.fill", iconTint: VP.text) {
+                    renderRows(visiblePrivacy)
                 }
             }
-        }
-    }
-
-    private var billingSection: some View {
-        VStack(spacing: 0) {
-            SettingsSectionHeader(title: "Billing", tone: .normal)
-            SettingsCard {
-                SettingsRowLink("Subscription",
-                                subtitle: "Plan, upgrade, restore",
-                                showDivider: false)
-                    { SubscriptionSettingsView() }
-            }
-        }
-    }
-
-    private var expertSection: some View {
-        VStack(spacing: 0) {
-            SettingsSectionHeader(title: "Expert", tone: .normal)
-            SettingsCard {
-                SettingsRowLink("Verification application") { VerificationRequestView() }
-                if canViewExpertSettings {
-                    SettingsRowLink("Expert settings",
-                                    showDivider: false)
-                        { ExpertSettingsView() }
-                } else if canApplyExpert,
-                          let url = URL(string: SupabaseManager.shared.siteURL
-                                        .appendingPathComponent("signup/expert").absoluteString) {
-                    SettingsRowExternal(title: "Apply to be an expert",
-                                        url: url,
-                                        tone: .accent,
-                                        showDivider: false)
+            if !visibleBilling.isEmpty {
+                HubSection(title: "Billing", icon: "creditcard.fill", iconTint: VP.text) {
+                    renderRows(visibleBilling)
                 }
             }
-        }
-    }
-
-    private var aboutSection: some View {
-        VStack(spacing: 0) {
-            SettingsSectionHeader(title: "About", tone: .normal)
-            SettingsCard {
-                SettingsRowButton(title: "Send feedback",
-                                  tone: .normal,
-                                  trailing: nil) { showFeedback = true }
-                // Apple Review 5.1.1(v) — Privacy + Terms reachable from
-                // inside the app.
-                if let privacy = URL(string: "https://veritypost.com/privacy") {
-                    SettingsRowExternal(title: "Privacy policy", url: privacy)
-                }
-                if let terms = URL(string: "https://veritypost.com/terms") {
-                    SettingsRowExternal(title: "Terms of service", url: terms)
-                }
-                SettingsRowValue(title: "Version", value: appVersion, showDivider: false)
-            }
-        }
-    }
-
-    private var dangerSection: some View {
-        VStack(spacing: 0) {
-            SettingsSectionHeader(title: "Danger zone", tone: .danger)
-            SettingsCard {
-                SettingsRowButton(title: "Sign out",
-                                  tone: .destructive,
-                                  trailing: nil,
-                                  showDivider: false) {
-                    // Haptic cue for destructive session end.
-                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
-                    Task { await auth.logout() }
+            if !visibleExpert.isEmpty {
+                HubSection(title: "Expert", icon: "checkmark.seal.fill", iconTint: VP.text) {
+                    renderRows(visibleExpert)
                 }
             }
+            if !visibleAbout.isEmpty {
+                HubSection(title: "About", icon: "info.circle.fill", iconTint: VP.text) {
+                    renderRows(visibleAbout)
+                }
+            }
+            if !visibleDanger.isEmpty {
+                HubSection(title: "Danger zone",
+                           tone: .danger,
+                           icon: "exclamationmark.triangle.fill",
+                           iconTint: VP.danger) {
+                    renderRows(visibleDanger)
+                }
+            }
+
+            if !anyVisible {
+                emptySearchState
+            }
+        }
+        .padding(.top, 4)
+    }
+
+    /// Renders a filtered row list, suppressing the divider on the last row
+    /// so the card doesn't end with a rule-under-last pattern.
+    @ViewBuilder
+    private func renderRows(_ rows: [HubRowSpec]) -> some View {
+        ForEach(Array(rows.enumerated()), id: \.element.id) { idx, spec in
+            spec.make(isLast: idx == rows.count - 1, onTap: { tapTick &+= 1 })
         }
     }
 
-    // MARK: Perm loader
+    private var emptySearchState: some View {
+        VStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 22, weight: .regular))
+                .foregroundColor(VP.muted)
+            Text("No matches for \u{201C}\(searchText)\u{201D}")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(VP.text)
+            Text("Try a different word.")
+                .font(.caption)
+                .foregroundColor(VP.dim)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
+    }
+
+    // MARK: Row model
+    //
+    // Every hub row is declared as a `HubRowSpec` with a keyword set used
+    // for filtering. `make(isLast:onTap:)` materializes the view with the
+    // right divider behavior and sensory-feedback trigger.
+
+    private struct HubRowSpec: Identifiable {
+        let id: String
+        let keywords: [String]
+        let builder: (_ isLast: Bool, _ onTap: @escaping () -> Void) -> AnyView
+
+        func make(isLast: Bool, onTap: @escaping () -> Void) -> AnyView {
+            builder(isLast, onTap)
+        }
+    }
+
+    private func filter(_ rows: [HubRowSpec]) -> [HubRowSpec] {
+        let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !q.isEmpty else { return rows }
+        return rows.filter { spec in
+            spec.keywords.contains { $0.lowercased().contains(q) }
+        }
+    }
+
+    // MARK: Row definitions (one tuple per row — add new rows here)
+
+    private var accountRows: [HubRowSpec] {
+        var out: [HubRowSpec] = []
+        if canEditProfile {
+            out.append(HubRowSpec(id: "profile",
+                                  keywords: ["profile", "account", "username", "bio", "avatar", "location", "website"]) { isLast, onTap in
+                AnyView(HubRow(icon: "person.fill", title: "Profile",
+                               subtitle: "Username, bio, avatar",
+                               showDivider: !isLast,
+                               kind: .push(AnyView(AccountSettingsView())),
+                               onTap: onTap))
+            })
+        }
+        if canEditEmail {
+            out.append(HubRowSpec(id: "email",
+                                  keywords: ["email", "address", "change email", "account"]) { isLast, onTap in
+                AnyView(HubRow(icon: "envelope.fill", title: "Email",
+                               valuePreview: self.auth.currentUser?.email,
+                               showDivider: !isLast,
+                               kind: .push(AnyView(EmailSettingsView())),
+                               onTap: onTap))
+            })
+        }
+        if canChangePassword {
+            out.append(HubRowSpec(id: "password",
+                                  keywords: ["password", "change password", "security", "account"]) { isLast, onTap in
+                AnyView(HubRow(icon: "key.fill", title: "Password",
+                               showDivider: !isLast,
+                               kind: .push(AnyView(PasswordSettingsView())),
+                               onTap: onTap))
+            })
+        }
+        if canViewLoginActivity {
+            out.append(HubRowSpec(id: "login-activity",
+                                  keywords: ["sign-in", "sign in", "login", "activity", "sessions", "devices", "security"]) { isLast, onTap in
+                AnyView(HubRow(icon: "clock.arrow.circlepath", title: "Sign-in activity",
+                               subtitle: "Recent sessions and devices",
+                               showDivider: !isLast,
+                               kind: .push(AnyView(LoginActivityView())),
+                               onTap: onTap))
+            })
+        }
+        if canViewMFA {
+            out.append(HubRowSpec(id: "mfa",
+                                  keywords: ["two factor", "two-factor", "2fa", "mfa", "totp", "authenticator", "security"]) { isLast, onTap in
+                AnyView(HubRow(icon: "shield.lefthalf.filled", title: "Two-factor authentication",
+                               valuePreview: self.mfaEnabled ? "On" : "Off",
+                               valueTone: self.mfaEnabled ? VP.right : VP.dim,
+                               showDivider: !isLast,
+                               kind: .push(AnyView(MFASettingsView())),
+                               onTap: onTap))
+            })
+        }
+        return out
+    }
+
+    private var preferencesRows: [HubRowSpec] {
+        var out: [HubRowSpec] = []
+        if canViewAlerts {
+            out.append(HubRowSpec(id: "alerts",
+                                  keywords: ["alerts", "notifications", "push", "email", "digest", "breaking", "recap"]) { isLast, onTap in
+                AnyView(HubRow(icon: "bell.fill", title: "Alerts",
+                               subtitle: "Push, email, and in-app",
+                               valuePreview: self.push.summary,
+                               valueTone: self.push.isOn ? VP.right : VP.dim,
+                               showDivider: !isLast,
+                               kind: .push(AnyView(NotificationsSettingsView())),
+                               onTap: onTap))
+            })
+        }
+        if canViewFeedPrefs {
+            out.append(HubRowSpec(id: "feed",
+                                  keywords: ["feed", "home", "trending", "breaking", "recommended", "compact", "preferences"]) { isLast, onTap in
+                AnyView(HubRow(icon: "list.bullet.rectangle.fill", title: "Feed",
+                               subtitle: "What surfaces, what\u{2019}s filtered",
+                               showDivider: !isLast,
+                               kind: .push(AnyView(FeedPreferencesSettingsView())),
+                               onTap: onTap))
+            })
+        }
+        return out
+    }
+
+    private var privacyRows: [HubRowSpec] {
+        var out: [HubRowSpec] = []
+
+        // DM read receipts — genuine inline toggle. Writes to the
+        // dm_read_receipts_enabled column via update_own_profile RPC,
+        // round-tripped through the same path DataPrivacyView uses so
+        // both surfaces stay coherent.
+        out.append(HubRowSpec(id: "dm-receipts",
+                              keywords: ["read receipts", "dm", "messages", "privacy", "receipts"]) { isLast, onTap in
+            let binding = Binding<Bool>(
+                get: { self.dmReceiptsEnabled },
+                set: { newValue in
+                    self.dmReceiptsEnabled = newValue
+                    onTap()
+                    Task { await self.saveDmReceiptsPref(newValue) }
+                }
+            )
+            return AnyView(HubRow(icon: "checkmark.message.fill",
+                                  title: "DM read receipts",
+                                  subtitle: "Let senders see when you\u{2019}ve read",
+                                  showDivider: !isLast,
+                                  kind: .toggle(binding, isDisabled: self.dmReceiptsLoading)))
+        })
+
+        out.append(HubRowSpec(id: "blocked",
+                              keywords: ["blocked", "block", "mute", "privacy", "safety"]) { isLast, onTap in
+            let count = self.blocks.blockedIds.count
+            return AnyView(HubRow(icon: "hand.raised.fill", title: "Blocked accounts",
+                                  valuePreview: count > 0 ? "\(count)" : nil,
+                                  showDivider: !isLast,
+                                  kind: .push(AnyView(BlockedAccountsView())),
+                                  onTap: onTap))
+        })
+
+        if canViewDataPrivacy {
+            out.append(HubRowSpec(id: "data-privacy",
+                                  keywords: ["data", "privacy", "export", "gdpr", "ccpa", "delete", "deletion", "receipts"]) { isLast, onTap in
+                AnyView(HubRow(icon: "arrow.up.doc.fill", title: "Data & privacy",
+                               subtitle: "Export, receipts, deletion",
+                               showDivider: !isLast,
+                               kind: .push(AnyView(DataPrivacyView())),
+                               onTap: onTap))
+            })
+        } else {
+            // Apple Review 5.1.1(v) — delete must be reachable for every
+            // signed-in user even when the export permission is missing.
+            out.append(HubRowSpec(id: "delete-account",
+                                  keywords: ["delete", "account", "remove", "deletion", "close"]) { isLast, onTap in
+                AnyView(HubRow(icon: "xmark.bin.fill",
+                               iconTint: VP.danger,
+                               title: "Delete account",
+                               tone: .destructive,
+                               showDivider: !isLast,
+                               kind: .push(AnyView(DataPrivacyView())),
+                               onTap: onTap))
+            })
+        }
+        return out
+    }
+
+    private var billingRows: [HubRowSpec] {
+        [
+            HubRowSpec(id: "subscription",
+                       keywords: ["billing", "subscription", "plan", "upgrade", "pro", "family", "verity", "restore", "purchase"]) { isLast, onTap in
+                AnyView(HubRow(icon: "creditcard.fill", title: "Subscription",
+                               subtitle: "Plan, upgrade, restore",
+                               valuePreview: self.auth.currentUser?.planDisplay,
+                               valueTone: self.hasActiveSubscription ? VP.right : VP.dim,
+                               showDivider: !isLast,
+                               kind: .push(AnyView(SubscriptionSettingsView())),
+                               onTap: onTap))
+            },
+        ]
+    }
+
+    private var expertRows: [HubRowSpec] {
+        var out: [HubRowSpec] = []
+        out.append(HubRowSpec(id: "verification",
+                              keywords: ["verification", "verify", "application", "expert", "journalist", "public figure"]) { isLast, onTap in
+            AnyView(HubRow(icon: "checkmark.seal.fill", title: "Verification application",
+                           showDivider: !isLast,
+                           kind: .push(AnyView(VerificationRequestView())),
+                           onTap: onTap))
+        })
+        if canViewExpertSettings {
+            out.append(HubRowSpec(id: "expert-settings",
+                                  keywords: ["expert", "settings", "tag limit", "notifications"]) { isLast, onTap in
+                AnyView(HubRow(icon: "person.crop.circle.badge.checkmark", title: "Expert settings",
+                               showDivider: !isLast,
+                               kind: .push(AnyView(ExpertSettingsView())),
+                               onTap: onTap))
+            })
+        } else if canApplyExpert,
+                  let url = URL(string: SupabaseManager.shared.siteURL
+                                .appendingPathComponent("signup/expert").absoluteString) {
+            out.append(HubRowSpec(id: "apply-expert",
+                                  keywords: ["apply", "expert", "application", "become"]) { isLast, onTap in
+                AnyView(HubRow(icon: "arrow.up.forward.app.fill",
+                               title: "Apply to be an expert",
+                               tone: .accent,
+                               showDivider: !isLast,
+                               kind: .external(url),
+                               onTap: onTap))
+            })
+        }
+        return out
+    }
+
+    private var aboutRows: [HubRowSpec] {
+        var out: [HubRowSpec] = []
+        out.append(HubRowSpec(id: "feedback",
+                              keywords: ["feedback", "send feedback", "bug", "feature", "support", "help"]) { isLast, onTap in
+            AnyView(HubRow(icon: "paperplane.fill", title: "Send feedback",
+                           showDivider: !isLast,
+                           kind: .action({ self.showFeedback = true }),
+                           onTap: onTap))
+        })
+        if let privacy = URL(string: "https://veritypost.com/privacy") {
+            out.append(HubRowSpec(id: "privacy-policy",
+                                  keywords: ["privacy", "policy", "legal"]) { isLast, onTap in
+                AnyView(HubRow(icon: "doc.text.fill", title: "Privacy policy",
+                               showDivider: !isLast,
+                               kind: .external(privacy),
+                               onTap: onTap))
+            })
+        }
+        if let terms = URL(string: "https://veritypost.com/terms") {
+            out.append(HubRowSpec(id: "terms",
+                                  keywords: ["terms", "service", "legal", "agreement"]) { isLast, onTap in
+                AnyView(HubRow(icon: "doc.plaintext.fill", title: "Terms of service",
+                               showDivider: !isLast,
+                               kind: .external(terms),
+                               onTap: onTap))
+            })
+        }
+        out.append(HubRowSpec(id: "version",
+                              keywords: ["version", "about", "build"]) { isLast, _ in
+            AnyView(HubRow(icon: "info.circle.fill", title: "Version",
+                           valuePreview: self.appVersion,
+                           showDivider: !isLast,
+                           kind: .staticValue))
+        })
+        return out
+    }
+
+    private var dangerRows: [HubRowSpec] {
+        [
+            HubRowSpec(id: "sign-out",
+                       keywords: ["sign out", "log out", "logout", "exit"]) { isLast, _ in
+                AnyView(HubRow(icon: "rectangle.portrait.and.arrow.right",
+                               iconTint: VP.danger,
+                               title: "Sign out",
+                               tone: .destructive,
+                               showDivider: !isLast,
+                               kind: .action({
+                                    // Destructive end-of-session haptic.
+                                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                                    Task { await self.auth.logout() }
+                               })))
+            },
+        ]
+    }
+
+    // MARK: Loaders
 
     private func loadPerms() async {
         canViewExpertSettings = await PermissionService.shared.has("settings.expert.view")
@@ -619,6 +1112,65 @@ struct SettingsView: View {
         canViewFeedPrefs = await PermissionService.shared.has("settings.feed.view")
         canViewAlerts = await PermissionService.shared.has("notifications.prefs.view")
         canViewDataPrivacy = await PermissionService.shared.has("settings.data.request_export")
+        hasActiveSubscription = await PermissionService.shared.has("billing.subscription.view_own")
+    }
+
+    /// Hydrates every preview the hub shows. Called on mount and again by
+    /// pull-to-refresh. Each branch is best-effort — errors leave the old
+    /// value intact so the UI doesn't blank on a transient failure.
+    private func loadPreviews() async {
+        await push.refresh()
+        await loadMFAState()
+        await loadDmReceiptsPref()
+        await blocks.refreshIfStale(currentUserId: auth.currentUser?.id)
+    }
+
+    private func loadMFAState() async {
+        do {
+            let factors = try await SupabaseManager.shared.client.auth.mfa.listFactors()
+            mfaEnabled = factors.totp.contains(where: { $0.status == .verified })
+        } catch { Log.d("Hub MFA preview load error:", error) }
+    }
+
+    private func loadDmReceiptsPref() async {
+        guard let userId = auth.currentUser?.id else {
+            dmReceiptsLoading = false
+            return
+        }
+        struct Row: Decodable { let dm_read_receipts_enabled: Bool? }
+        let r: [Row] = (try? await SupabaseManager.shared.client.from("users")
+            .select("dm_read_receipts_enabled")
+            .eq("id", value: userId)
+            .execute().value) ?? []
+        dmReceiptsEnabled = r.first?.dm_read_receipts_enabled ?? true
+        dmReceiptsLoading = false
+    }
+
+    private func saveDmReceiptsPref(_ newValue: Bool) async {
+        guard auth.currentUser?.id != nil else { return }
+        struct Args: Encodable { let p_fields: Patch }
+        struct Patch: Encodable { let dm_read_receipts_enabled: Bool }
+        do {
+            try await SupabaseManager.shared.client.rpc(
+                "update_own_profile",
+                params: Args(p_fields: Patch(dm_read_receipts_enabled: newValue))
+            ).execute()
+        } catch {
+            Log.d("Hub saveDmReceiptsPref error:", error)
+            // Revert on failure so UI stays coherent with server.
+            await MainActor.run { self.dmReceiptsEnabled = !newValue }
+        }
+    }
+
+    /// Pull-to-refresh entry point. Re-fetches permissions, user data,
+    /// and every preview. Matches ProfileView's refresh contract.
+    private func refreshAll() async {
+        await PermissionService.shared.refreshIfStale()
+        if let userId = auth.currentUser?.id {
+            await auth.loadUser(id: userId)
+        }
+        await loadPerms()
+        await loadPreviews()
     }
 }
 
@@ -1015,7 +1567,7 @@ struct LoginActivityView: View {
                         .padding(.vertical, 12)
                         .overlay(alignment: .bottom) {
                             if idx < rows.count - 1 {
-                                Rectangle().fill(VP.border).frame(height: 1).padding(.leading, 16)
+                                Rectangle().fill(VP.border.opacity(0.6)).frame(height: 1).padding(.leading, 16)
                             }
                         }
                     }
@@ -1816,7 +2368,7 @@ struct ExpertSettingsView: View {
                             .contentShape(Rectangle())
                             .overlay(alignment: .bottom) {
                                 if idx < notifOptions.count - 1 {
-                                    Rectangle().fill(VP.border).frame(height: 1).padding(.leading, 16)
+                                    Rectangle().fill(VP.border.opacity(0.6)).frame(height: 1).padding(.leading, 16)
                                 }
                             }
                         }
@@ -2266,7 +2818,7 @@ struct BlockedAccountsView: View {
                         .frame(minHeight: 44)
                         .overlay(alignment: .bottom) {
                             if idx < rows.count - 1 {
-                                Rectangle().fill(VP.border).frame(height: 1).padding(.leading, 16)
+                                Rectangle().fill(VP.border.opacity(0.6)).frame(height: 1).padding(.leading, 16)
                             }
                         }
                     }

@@ -2,32 +2,40 @@ import SwiftUI
 import Supabase
 
 // @migrated-to-permissions 2026-04-18
-// @feature-verified profile_settings 2026-04-18
+// @feature-verified profile_settings 2026-04-22
 //
-// Layout parity with web/src/app/profile/page.tsx (mobile breakpoint):
-//   - Flat top bar (brand + Settings) — nav bar hidden like HomeView.
-//   - 4-tab strip: Overview / Activity / Categories / Milestones. Underline
-//     style with active = VP.text + 600, inactive = VP.dim + 500.
-//   - Overview: identity card w/ tier ring + progress-to-next-tier; Quick
-//     Links (Messages / Bookmarks / Kids); Profile card preview; Quick
-//     stats grid (Articles read / Quizzes completed / Comments).
-//   - Activity: filter row (All/Articles/Comments/Bookmarks) + rows. iOS
-//     preserves the quiz-attempt rollup from the existing loader — richer
-//     than web; intentional iOS-native superset.
-//   - Categories: preserved per-category drilldown with subcategory stats
-//     + upvotes — richer than web's flat list; iOS-native superset.
-//   - Milestones: tier-progress card on top, then achievement grid grouped
-//     by category with earned/locked badges.
+// World-class profile rebuild (2026-04-22). The screen is a live, dense
+// "home for you" — hero stats are always visible; tabs drill into the
+// full lists. Layout:
 //
-// iOS idioms intentionally preserved (do not match web 1:1):
-//   - pull-to-refresh on the outer ScrollView
-//   - 44pt tap targets on header buttons
-//   - system font stack
+//   topBar (flat, shared with HomeView/SettingsView)
+//   [ hero card: tier ring + score + tier pill + progress bar + delta-to-next ]
+//   [ 30-day streak grid + streak summary row ]
+//   [ stat row: Articles read / Quizzes passed / Comments ]
+//   [ social row: Followers / Following — gated by profile.followers.view.own ]
+//   [ quick action row: Bookmarks / Messages / Share / Kids ]
+//   [ recent activity preview — 3 rows + "See all" ]
+//   [ achievement preview — 3 tiles + "See all" ]
+//   [ tab bar: Overview / Activity / Categories / Milestones ]
+//   [ tab content ]
 //
-// Launch-hide gates from the web profile (the `{false && ...}` and
-// kill-switch Quick Link gates) are NOT propagated here. iOS shows
-// permission-granted features live — the adult app treats perm-gated
-// surfaces as product features, not launch-hidden drift.
+// iOS idioms preserved:
+//   - pull-to-refresh on the outer ScrollView drives every loader
+//   - 44pt tap targets on header/action buttons
+//   - light haptic on tab switch + quick-action tap
+//   - spring reveal on tier ring / streak grid on first appear
+//   - Dynamic Type compatible (relative font styles used everywhere that
+//     isn't fixed-size by design like the avatar glyph)
+//
+// Data sources (real, not mocked):
+//   - users.verity_score / streak_current / streak_best / articles_read_count
+//     / quizzes_completed_count / comment_count / followers_count /
+//     following_count / display_name / bio — loaded by AuthViewModel.loadUser
+//   - score_tiers — live query, cached per screen
+//   - reading_log (30-day window) — built into a day-set to drive the grid
+//   - reading_log / quiz_attempts / comments / bookmarks — activity feed
+//   - user_achievements + achievements — badge showcase
+//   - comment_votes — per-category upvote tally (milestones tab)
 
 struct ProfileView: View {
     @EnvironmentObject var auth: AuthViewModel
@@ -44,11 +52,13 @@ struct ProfileView: View {
     @State private var canViewMessages: Bool = false
     @State private var canViewExpertQueue: Bool = false
     @State private var canViewFamily: Bool = false
+    @State private var canViewFollowers: Bool = false
+    @State private var canViewFollowing: Bool = false
     @State private var permsLoaded: Bool = false
 
-    // Tabs — 4-item set mirroring web. Quizzes + Achievements folded into
-    // Activity and Milestones respectively (web has no standalone tab for
-    // either). Kids surfaces as a Quick Link in Overview.
+    // Tabs — 4-item set. Overview is the "profile card + my stuff" deeper
+    // view; the hero/stats/streak/quick-actions all sit above the tab bar
+    // and stay visible regardless of tab.
     enum ProfileTab: String, CaseIterable, Identifiable {
         case overview   = "Overview"
         case activity   = "Activity"
@@ -58,9 +68,7 @@ struct ProfileView: View {
     }
     @State private var tab: ProfileTab = .overview
 
-    // Activity filter — mirrors web's All / Articles / Comments / Bookmarks
-    // toggle. iOS also surfaces quiz rows under "Articles" since reads and
-    // quiz attempts both map to article-interaction rows.
+    // Activity filter — All / Articles / Comments / Bookmarks
     enum ActivityFilter: String, CaseIterable, Identifiable {
         case all = "All"
         case articles = "Articles"
@@ -85,6 +93,14 @@ struct ProfileView: View {
     @State private var achievementsLoaded = false
     @State private var scoreTiers: [ScoreTierRow] = []
 
+    // 30-day streak heatmap — midnight-aligned dates with a reading_log row.
+    @State private var streakDays: Set<Date> = []
+    @State private var streakLoaded = false
+
+    // Reveal animation flags (first-load spring on hero + streak)
+    @State private var tierRingReveal: Bool = false
+    @State private var streakGridReveal: Bool = false
+
     // Expansion state (milestones / categories drilldown)
     @State private var expandedCat: String? = nil
     @State private var expandedSub: String? = nil
@@ -103,8 +119,8 @@ struct ProfileView: View {
     // Per-subcategory thresholds for progress bars (match site)
     private let subThresholds: (reads: Int, quizzes: Int, comments: Int, upvotes: Int) = (20, 20, 10, 10)
 
-    // D32: profile card share is now gated by `profile.card.share_link`
-    // (server-side plan→permission mapping in `compute_effective_perms`).
+    // D32: profile card share is gated by `profile.card.share_link`
+    // (server-side plan→permission mapping in compute_effective_perms).
     private func profileCardURL(for username: String) -> URL? {
         let encoded = username.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? username
         return URL(string: "https://veritypost.com/card/\(encoded)")
@@ -113,13 +129,16 @@ struct ProfileView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                // Flat top bar — matches HomeView's fix for iOS 26's floating
-                // glass-bubble nav. Rendered inside ScrollView, not as a
-                // NavigationStack toolbar, so there's no shadow strip.
                 topBar
 
                 if let user = auth.currentUser {
-                    identityCard(user)
+                    heroCard(user)
+                    streakStrip(user)
+                    statRow(user)
+                    socialRow(user)
+                    quickActionsRow(user)
+                    recentActivityPreview
+                    achievementsPreview
                     tabBar
                     tabContent(user)
                     logoutButton
@@ -134,6 +153,25 @@ struct ProfileView: View {
         .refreshable { await refreshAll() }
         .task { await SettingsService.shared.loadIfNeeded() }
         .task { await loadScoreTiers() }
+        .task {
+            if let uid = auth.currentUser?.id {
+                async let a: Void = loadActivity(userId: uid)
+                async let s: Void = loadStreak(userId: uid)
+                async let ach: Void = loadAchievements(userId: uid)
+                _ = await (a, s, ach)
+            }
+            // Stagger the reveal animations so the hero and streak don't
+            // pop in simultaneously — feels like a sequence rather than a
+            // flash. Keep total duration under 600ms so pull-to-refresh
+            // still feels instant on repeat.
+            withAnimation(.spring(response: 0.55, dampingFraction: 0.8)) {
+                tierRingReveal = true
+            }
+            try? await Task.sleep(nanoseconds: 120_000_000)
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
+                streakGridReveal = true
+            }
+        }
         .task(id: tab) { loadTabData() }
         .task(id: perms.changeToken) {
             canShareProfileCard = await PermissionService.shared.has("profile.card.share_link")
@@ -145,6 +183,8 @@ struct ProfileView: View {
             canViewMessages = await PermissionService.shared.has("messages.inbox.view")
             canViewExpertQueue = await PermissionService.shared.has("expert.queue.view")
             canViewFamily = await PermissionService.shared.has("settings.family.view")
+            canViewFollowers = await PermissionService.shared.has("profile.followers.view.own")
+            canViewFollowing = await PermissionService.shared.has("profile.following.view.own")
             permsLoaded = true
         }
         .navigationDestination(item: $navigatedStory) { story in
@@ -160,7 +200,7 @@ struct ProfileView: View {
         .sheet(isPresented: $showSignup) { SignupView().environmentObject(auth) }
     }
 
-    // MARK: - Top bar (brand + Settings)
+    // MARK: - Top bar (brand + Kids + Settings)
     private var topBar: some View {
         HStack(spacing: 0) {
             Text("verity post")
@@ -170,9 +210,6 @@ struct ProfileView: View {
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
             Spacer()
-            // Mirrors web's PageHeader actions — Kids (if family perm) +
-            // Settings. Kids button is hidden until perms resolve to avoid
-            // a late-appearing button after mount.
             if permsLoaded && canViewFamily {
                 NavigationLink {
                     FamilyDashboardView().environmentObject(auth)
@@ -236,144 +273,556 @@ struct ProfileView: View {
         }
     }
 
-    // MARK: - Identity card (tier ring + score blocks + progress-to-next)
-    //
-    // Mirrors web profile's OverviewTab header card:
-    //   - avatar wrapped in a conic-gradient ring colored by current tier,
-    //     with progress rotation = fraction-to-next-tier
-    //   - display name (falls back to username; VPUser has no display_name
-    //     column) + tier pill
-    //   - "@username · Member since <Month YYYY>"
-    //   - 3 score blocks: Verity score / Current streak / Best streak
-    //   - progress bar toward the next tier
+    // MARK: - Hero card (large tier ring + centered score + tier pill + progress)
     @ViewBuilder
-    private func identityCard(_ user: VPUser) -> some View {
+    private func heroCard(_ user: VPUser) -> some View {
         let score = user.verityScore ?? 0
         let current = tierFor(score: score)
         let next = nextTier(after: current)
         let minScore = current?.minScore ?? 0
         let range = (next?.minScore ?? 0) - minScore
         let progress: Double = {
-            guard let next = next, range > 0 else { return 1.0 }
-            _ = next
+            guard next != nil, range > 0 else { return 1.0 }
             return min(1.0, max(0.0, Double(score - minScore) / Double(range)))
         }()
         let tierColor = Color(hex: current?.colorHex ?? "999999")
         let tierLabel = current?.displayName ?? "Newcomer"
-        let title = user.username ?? "Reader"
+        let displayTitle = (user.displayName?.trimmingCharacters(in: .whitespaces).isEmpty == false
+                            ? user.displayName
+                            : user.username) ?? "Reader"
+        let deltaToNext = max(0, (next?.minScore ?? score) - score)
 
         VStack(spacing: 16) {
-            HStack(alignment: .top, spacing: 14) {
-                // Tier ring around avatar — conic gradient replicates the
-                // web's progress-ring look. SwiftUI has no direct conic
-                // conic-gradient rotation API, so we draw a ring trim on
-                // top of a full-color circle.
-                ZStack {
-                    Circle()
-                        .trim(from: 0, to: 1)
-                        .stroke(VP.border, lineWidth: 3)
-                    Circle()
-                        .trim(from: 0, to: CGFloat(progress))
-                        .stroke(tierColor, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                    AvatarView(user: user, size: 64)
+            // Centered tier ring with avatar — large, gradient-tinted
+            ZStack {
+                Circle()
+                    .stroke(VP.border, lineWidth: 6)
+                Circle()
+                    .trim(from: 0, to: CGFloat(tierRingReveal ? progress : 0))
+                    .stroke(
+                        AngularGradient(
+                            gradient: Gradient(colors: [
+                                tierColor.opacity(0.55),
+                                tierColor,
+                                tierColor.opacity(0.85)
+                            ]),
+                            center: .center,
+                            startAngle: .degrees(-90),
+                            endAngle: .degrees(270)
+                        ),
+                        style: StrokeStyle(lineWidth: 6, lineCap: .round)
+                    )
+                    .rotationEffect(.degrees(-90))
+                AvatarView(user: user, size: 96)
+            }
+            .frame(width: 120, height: 120)
+
+            // Name + verified + tier pill
+            VStack(spacing: 6) {
+                HStack(spacing: 6) {
+                    Text(displayTitle)
+                        .font(.system(.title2, design: .default, weight: .bold))
+                        .foregroundColor(VP.text)
+                        .lineLimit(1)
+                    VerifiedBadgeView(user: user, size: 11)
                 }
-                .frame(width: 72, height: 72)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Text(title)
-                            .font(.system(.title3, design: .default, weight: .bold))
-                            .foregroundColor(VP.text)
-                            .lineLimit(1)
-                        VerifiedBadgeView(user: user, size: 10)
-                    }
-
-                    // Tier pill — bordered, colored by tier hex.
-                    Text(tierLabel)
-                        .font(.system(.caption, design: .default, weight: .semibold))
-                        .foregroundColor(tierColor)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 99)
-                                .stroke(tierColor, lineWidth: 1)
-                        )
-
-                    Text(memberSinceLine(user))
+                if let uname = user.username, !uname.isEmpty,
+                   user.displayName?.trimmingCharacters(in: .whitespaces).isEmpty == false {
+                    Text("@\(uname)")
                         .font(.caption)
                         .foregroundColor(VP.dim)
-                        .lineLimit(1)
                 }
-                Spacer(minLength: 0)
+                Text(tierLabel.uppercased())
+                    .font(.system(.caption2, design: .default, weight: .bold))
+                    .tracking(1.2)
+                    .foregroundColor(tierColor)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 99)
+                            .stroke(tierColor, lineWidth: 1)
+                    )
             }
 
-            // 3 score blocks, matching web's ScoreBlock label copy.
-            HStack(alignment: .top, spacing: 0) {
-                scoreBlock(label: "Verity score", value: score.formatted())
-                Spacer(minLength: 8)
-                scoreBlock(label: "Current streak", value: "\(user.streakCurrent ?? 0)d")
-                Spacer(minLength: 8)
-                scoreBlock(label: "Best streak", value: "\(user.streakBest ?? 0)d")
-                Spacer(minLength: 0)
+            // Big score number
+            VStack(spacing: 2) {
+                Text(score.formatted())
+                    .font(.system(size: 44, weight: .heavy, design: .default))
+                    .tracking(-1)
+                    .foregroundColor(VP.text)
+                    .contentTransition(.numericText())
+                Text("Verity score")
+                    .font(.system(.caption2, design: .default, weight: .semibold))
+                    .tracking(0.8)
+                    .foregroundColor(VP.dim)
             }
 
-            // Progress-to-next-tier bar — hidden at top tier.
+            // Progress bar + next tier delta
             if let next = next {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text("Progress to \(next.displayName)")
-                            .font(.caption2)
-                            .foregroundColor(VP.dim)
-                        Spacer()
-                        Text("\(score.formatted()) / \(next.minScore.formatted())")
-                            .font(.caption2)
-                            .foregroundColor(VP.dim)
-                    }
+                VStack(spacing: 6) {
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
-                            RoundedRectangle(cornerRadius: 3)
+                            RoundedRectangle(cornerRadius: 4)
                                 .fill(VP.border)
-                                .frame(height: 6)
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(tierColor)
-                                .frame(width: geo.size.width * CGFloat(progress), height: 6)
+                                .frame(height: 8)
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [tierColor.opacity(0.7), tierColor],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .frame(width: geo.size.width * CGFloat(tierRingReveal ? progress : 0), height: 8)
                         }
                     }
-                    .frame(height: 6)
+                    .frame(height: 8)
+                    HStack {
+                        Text("\(deltaToNext.formatted()) to \(next.displayName)")
+                            .font(.caption)
+                            .foregroundColor(VP.dim)
+                        Spacer()
+                        Text("\(Int(progress * 100))%")
+                            .font(.system(.caption, design: .default, weight: .semibold))
+                            .foregroundColor(tierColor)
+                    }
                 }
+            } else {
+                Text("Top tier reached")
+                    .font(.system(.caption, design: .default, weight: .semibold))
+                    .foregroundColor(tierColor)
             }
         }
+        .frame(maxWidth: .infinity)
         .padding(20)
         .background(VP.card)
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(VP.border))
+        .cornerRadius(16)
+        .padding(.horizontal, 16)
+        .padding(.top, 16)
+        .padding(.bottom, 12)
+    }
+
+    // MARK: - Streak strip (30-day heatmap grid)
+    @ViewBuilder
+    private func streakStrip(_ user: VPUser) -> some View {
+        let current = user.streakCurrent ?? 0
+        let best = user.streakBest ?? 0
+        let readDaysIn30 = readDaysInLast30()
+
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Last 30 days")
+                    .font(.system(.subheadline, design: .default, weight: .semibold))
+                    .foregroundColor(VP.text)
+                Spacer()
+                Text("\(readDaysIn30) read · \(current)-day streak")
+                    .font(.caption)
+                    .foregroundColor(VP.dim)
+            }
+
+            // 30-day grid — 10 cols × 3 rows, oldest → newest.
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 10),
+                spacing: 6
+            ) {
+                ForEach(lastNDays(30), id: \.self) { day in
+                    let isRead = streakDays.contains(day)
+                    let isFuture = day > todayMidnight()
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(
+                            isFuture ? VP.streakTrack
+                            : isRead ? VP.streakActive
+                            : VP.streakMissed
+                        )
+                        .frame(height: 18)
+                        .opacity(streakGridReveal ? 1 : 0)
+                        .scaleEffect(streakGridReveal ? 1 : 0.6)
+                        .animation(
+                            .spring(response: 0.45, dampingFraction: 0.75)
+                                .delay(Double(dayIndex(day)) * 0.012),
+                            value: streakGridReveal
+                        )
+                        .accessibilityLabel(dayAccessibilityLabel(day: day, isRead: isRead))
+                }
+            }
+
+            HStack(spacing: 12) {
+                legendDot(color: VP.streakActive, label: "Read")
+                legendDot(color: VP.streakMissed, label: "Missed")
+                Spacer()
+                Text("Best: \(best)d")
+                    .font(.system(.caption2, design: .default, weight: .semibold))
+                    .foregroundColor(VP.dim)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(VP.card)
+                    .overlay(RoundedRectangle(cornerRadius: 99).stroke(VP.border))
+                    .cornerRadius(99)
+            }
+        }
+        .padding(14)
+        .background(VP.bg)
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(VP.border))
         .cornerRadius(12)
         .padding(.horizontal, 16)
-        .padding(.top, 16)
-        .padding(.bottom, 16)
+        .padding(.bottom, 12)
     }
 
-    private func scoreBlock(label: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(value)
-                .font(.system(.title2, design: .default, weight: .bold))
-                .foregroundColor(VP.text)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-            Text(label.uppercased())
-                .font(.system(.caption2, design: .default, weight: .semibold))
-                .tracking(0.4)
-                .foregroundColor(VP.dim)
+    private func legendDot(color: Color, label: String) -> some View {
+        HStack(spacing: 4) {
+            RoundedRectangle(cornerRadius: 2).fill(color).frame(width: 8, height: 8)
+            Text(label).font(.caption2).foregroundColor(VP.dim)
         }
     }
 
-    private func memberSinceLine(_ user: VPUser) -> String {
-        let uname = user.username.map { "@\($0)" } ?? ""
-        let since = user.memberSince
-        if uname.isEmpty && since.isEmpty { return "" }
-        if uname.isEmpty { return "Member since \(since)" }
-        if since.isEmpty { return uname }
-        return "\(uname) · Member since \(since)"
+    // MARK: - Stat row (3 tiles)
+    @ViewBuilder
+    private func statRow(_ user: VPUser) -> some View {
+        HStack(spacing: 8) {
+            statTile(
+                label: "Articles read",
+                value: "\((user.articlesReadCount ?? 0).formatted())",
+                icon: "book.fill"
+            )
+            statTile(
+                label: "Quizzes passed",
+                value: "\((user.quizzesCompletedCount ?? 0).formatted())",
+                icon: "checkmark.seal.fill"
+            )
+            statTile(
+                label: "Comments",
+                value: "\((user.commentCount ?? 0).formatted())",
+                icon: "bubble.left.fill"
+            )
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 12)
+    }
+
+    private func statTile(label: String, value: String, icon: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(VP.dim)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(value)
+                    .font(.system(.title3, design: .default, weight: .bold))
+                    .foregroundColor(VP.text)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                Text(label)
+                    .font(.caption2)
+                    .foregroundColor(VP.dim)
+                    .lineLimit(1)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(VP.card)
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(VP.border))
+        .cornerRadius(12)
+    }
+
+    // MARK: - Social row (Followers / Following)
+    @ViewBuilder
+    private func socialRow(_ user: VPUser) -> some View {
+        if permsLoaded && (canViewFollowers || canViewFollowing) {
+            HStack(spacing: 8) {
+                if canViewFollowers {
+                    statTile(
+                        label: "Followers",
+                        value: "\((user.followersCount ?? 0).formatted())",
+                        icon: "person.2.fill"
+                    )
+                }
+                if canViewFollowing {
+                    statTile(
+                        label: "Following",
+                        value: "\((user.followingCount ?? 0).formatted())",
+                        icon: "person.crop.circle.badge.plus"
+                    )
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 12)
+        }
+    }
+
+    // MARK: - Quick actions row (icon buttons)
+    @ViewBuilder
+    private func quickActionsRow(_ user: VPUser) -> some View {
+        let showShare = canShareProfileCard && (user.username?.isEmpty == false)
+
+        HStack(spacing: 8) {
+            if canViewBookmarks {
+                NavigationLink {
+                    BookmarksView().environmentObject(auth)
+                } label: {
+                    quickActionChip(icon: "bookmark.fill", label: "Saved")
+                }
+                .buttonStyle(.plain)
+                .simultaneousGesture(TapGesture().onEnded {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                })
+            }
+            if canViewMessages {
+                NavigationLink {
+                    MessagesView().environmentObject(auth)
+                } label: {
+                    quickActionChip(icon: "envelope.fill", label: "Inbox")
+                }
+                .buttonStyle(.plain)
+                .simultaneousGesture(TapGesture().onEnded {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                })
+            }
+            if showShare, let uname = user.username, let url = profileCardURL(for: uname) {
+                ShareLink(item: url) {
+                    quickActionChip(icon: "square.and.arrow.up", label: "Share")
+                }
+            }
+            if canViewFamily {
+                NavigationLink {
+                    FamilyDashboardView().environmentObject(auth)
+                } label: {
+                    quickActionChip(icon: "figure.2.and.child.holdinghands", label: "Kids")
+                }
+                .buttonStyle(.plain)
+            } else if canViewExpertQueue {
+                NavigationLink {
+                    ExpertQueueView().environmentObject(auth)
+                } label: {
+                    quickActionChip(icon: "checkmark.bubble.fill", label: "Expert")
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 12)
+    }
+
+    private func quickActionChip(icon: String, label: String) -> some View {
+        VStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundColor(VP.text)
+                .frame(height: 22)
+            Text(label)
+                .font(.system(.caption2, design: .default, weight: .semibold))
+                .foregroundColor(VP.text)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(minHeight: 64)
+        .padding(.vertical, 10)
+        .background(VP.card)
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(VP.border))
+        .cornerRadius(12)
+    }
+
+    // MARK: - Recent activity preview (top 3 + see all)
+    @ViewBuilder
+    private var recentActivityPreview: some View {
+        let top3 = Array(combinedActivityAllTypes().prefix(3))
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                sectionTitle("Recent activity")
+                Spacer()
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    withAnimation(.easeOut(duration: 0.2)) { tab = .activity }
+                } label: {
+                    HStack(spacing: 2) {
+                        Text("See all")
+                            .font(.system(.caption, design: .default, weight: .semibold))
+                        Image(systemName: "chevron.right").font(.caption2)
+                    }
+                    .foregroundColor(VP.dim)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+
+            if !activityLoaded {
+                compactSkeletonRow()
+                compactSkeletonRow()
+                compactSkeletonRow()
+            } else if top3.isEmpty {
+                Text("No activity yet. Read an article or leave a comment.")
+                    .font(.caption)
+                    .foregroundColor(VP.dim)
+                    .padding(.vertical, 8)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(top3) { item in
+                        compactActivityRow(item)
+                    }
+                }
+                .background(VP.card)
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(VP.border))
+                .cornerRadius(12)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 12)
+    }
+
+    private func compactActivityRow(_ item: ActivityItem) -> some View {
+        Button {
+            if let slug = item.slug { navigateToSlug = slug }
+        } label: {
+            HStack(alignment: .top, spacing: 10) {
+                Text(activityBadgeLabel(item.type))
+                    .font(.system(.caption2, design: .default, weight: .bold))
+                    .foregroundColor(activityColor(item.type))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 4)
+                            .stroke(activityColor(item.type), lineWidth: 1)
+                    )
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(item.label)
+                        .font(.system(.footnote, design: .default, weight: .medium))
+                        .foregroundColor(VP.text)
+                        .lineLimit(1)
+                    if !item.detail.isEmpty {
+                        Text(item.detail)
+                            .font(.caption2)
+                            .foregroundColor(VP.dim)
+                            .lineLimit(1)
+                    }
+                }
+                Spacer()
+                Text(timeAgo(item.time))
+                    .font(.caption2)
+                    .foregroundColor(VP.dim)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(VP.rule).frame(height: 1)
+                    .padding(.leading, 12)
+                    .opacity(item.id == compactLastRowId() ? 0 : 1)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func compactSkeletonRow() -> some View {
+        HStack(spacing: 10) {
+            RoundedRectangle(cornerRadius: 4).fill(VP.streakTrack)
+                .frame(width: 40, height: 14)
+            RoundedRectangle(cornerRadius: 4).fill(VP.streakTrack)
+                .frame(height: 14)
+            Spacer()
+            RoundedRectangle(cornerRadius: 4).fill(VP.streakTrack)
+                .frame(width: 36, height: 10)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(VP.card)
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(VP.border))
+        .cornerRadius(12)
+    }
+
+    private func compactLastRowId() -> String {
+        combinedActivityAllTypes().prefix(3).last?.id ?? ""
+    }
+
+    // MARK: - Achievements preview (top 3 + see all)
+    @ViewBuilder
+    private var achievementsPreview: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                sectionTitle("Achievements")
+                Spacer()
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    withAnimation(.easeOut(duration: 0.2)) { tab = .milestones }
+                } label: {
+                    HStack(spacing: 2) {
+                        Text("See all")
+                            .font(.system(.caption, design: .default, weight: .semibold))
+                        Image(systemName: "chevron.right").font(.caption2)
+                    }
+                    .foregroundColor(VP.dim)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+
+            if !achievementsLoaded {
+                HStack(spacing: 10) {
+                    ForEach(0..<3, id: \.self) { _ in
+                        RoundedRectangle(cornerRadius: 12).fill(VP.streakTrack)
+                            .frame(height: 68)
+                    }
+                }
+            } else if userAchievements.isEmpty {
+                Text("Complete a quiz or hit your first streak to earn badges.")
+                    .font(.caption)
+                    .foregroundColor(VP.dim)
+                    .padding(.vertical, 8)
+            } else {
+                HStack(spacing: 10) {
+                    ForEach(Array(userAchievements.prefix(3))) { ua in
+                        achievementChip(ua)
+                    }
+                    // If the user has fewer than 3 achievements, pad with
+                    // an aspirational "next up" slot so the strip always
+                    // renders three cards.
+                    if userAchievements.count < 3 {
+                        ForEach(0..<(3 - userAchievements.count), id: \.self) { _ in
+                            nextAchievementPlaceholder()
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 12)
+    }
+
+    private func achievementChip(_ ua: UserAchievement) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Image(systemName: "rosette")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(VP.success)
+            Text(ua.achievements?.name ?? "Badge")
+                .font(.system(.caption, design: .default, weight: .semibold))
+                .foregroundColor(VP.text)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(VP.card)
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(VP.success.opacity(0.4)))
+        .cornerRadius(12)
+    }
+
+    private func nextAchievementPlaceholder() -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Image(systemName: "lock.fill")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(VP.muted)
+            Text("Keep reading")
+                .font(.system(.caption, design: .default, weight: .semibold))
+                .foregroundColor(VP.dim)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(Color.clear)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                .foregroundColor(VP.border)
+        )
     }
 
     // MARK: - Tab bar (4 items, underline style)
@@ -381,7 +830,10 @@ struct ProfileView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 0) {
                 ForEach(ProfileTab.allCases) { t in
-                    Button { tab = t } label: {
+                    Button {
+                        UISelectionFeedbackGenerator().selectionChanged()
+                        withAnimation(.easeOut(duration: 0.2)) { tab = t }
+                    } label: {
                         Text(t.rawValue)
                             .font(.system(.subheadline, design: .default, weight: tab == t ? .semibold : .medium))
                             .foregroundColor(tab == t ? VP.text : VP.dim)
@@ -417,37 +869,17 @@ struct ProfileView: View {
         }
     }
 
-    // MARK: - Overview tab
+    // MARK: - Overview tab (bio + profile card + my-stuff list)
     @ViewBuilder
     private func overviewTab(_ user: VPUser) -> some View {
         VStack(alignment: .leading, spacing: 20) {
-            // Quick Links — the discovery row web calls "My stuff".
-            // Rendered only after perms resolve to avoid flicker.
-            if permsLoaded && (canViewMessages || canViewBookmarks || canViewFamily || canViewExpertQueue) {
-                VStack(alignment: .leading, spacing: 10) {
-                    sectionTitle("My stuff")
-                    VStack(spacing: 8) {
-                        if canViewMessages {
-                            quickLink(label: "Messages",
-                                      description: "Your direct conversations",
-                                      destination: AnyView(MessagesView().environmentObject(auth)))
-                        }
-                        if canViewBookmarks {
-                            quickLink(label: "Bookmarks",
-                                      description: "Articles you've saved",
-                                      destination: AnyView(BookmarksView().environmentObject(auth)))
-                        }
-                        if canViewFamily {
-                            quickLink(label: "Kids",
-                                      description: "Manage your family plan and kid profiles",
-                                      destination: AnyView(FamilyDashboardView().environmentObject(auth)))
-                        }
-                        if canViewExpertQueue {
-                            quickLink(label: "Expert Queue",
-                                      description: "Questions from readers",
-                                      destination: AnyView(ExpertQueueView().environmentObject(auth)))
-                        }
-                    }
+            if let bio = user.bio?.trimmingCharacters(in: .whitespaces), !bio.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    sectionTitle("About")
+                    Text(bio)
+                        .font(.system(.subheadline, design: .default))
+                        .foregroundColor(VP.soft)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
@@ -489,22 +921,36 @@ struct ProfileView: View {
                 }
             }
 
-            // Quick stats — web shows 5 (incl Followers/Following). VPUser
-            // doesn't carry follower counts, so iOS shows the 3 stats the
-            // adult app has populated. Adding follower counts is a separate
-            // data-layer change; tracked as an iOS-native delta.
-            VStack(alignment: .leading, spacing: 10) {
-                sectionTitle("Quick stats")
-                LazyVGrid(columns: [
-                    GridItem(.flexible(), spacing: 8),
-                    GridItem(.flexible(), spacing: 8),
-                    GridItem(.flexible(), spacing: 8),
-                ], spacing: 8) {
-                    statCardTile(label: "Articles read", value: "\((user.articlesReadCount ?? 0).formatted())")
-                    statCardTile(label: "Quizzes completed", value: "\((user.quizzesCompletedCount ?? 0).formatted())")
-                    statCardTile(label: "Comments", value: "\((user.commentCount ?? 0).formatted())")
+            // My stuff — quick-link list
+            if permsLoaded && (canViewMessages || canViewBookmarks || canViewFamily || canViewExpertQueue) {
+                VStack(alignment: .leading, spacing: 10) {
+                    sectionTitle("My stuff")
+                    VStack(spacing: 8) {
+                        if canViewMessages {
+                            quickLink(label: "Messages",
+                                      description: "Your direct conversations",
+                                      destination: AnyView(MessagesView().environmentObject(auth)))
+                        }
+                        if canViewBookmarks {
+                            quickLink(label: "Bookmarks",
+                                      description: "Articles you've saved",
+                                      destination: AnyView(BookmarksView().environmentObject(auth)))
+                        }
+                        if canViewFamily {
+                            quickLink(label: "Kids",
+                                      description: "Manage your family plan and kid profiles",
+                                      destination: AnyView(FamilyDashboardView().environmentObject(auth)))
+                        }
+                        if canViewExpertQueue {
+                            quickLink(label: "Expert Queue",
+                                      description: "Questions from readers",
+                                      destination: AnyView(ExpertQueueView().environmentObject(auth)))
+                        }
+                    }
                 }
             }
+
+            memberSinceFooter(user)
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 8)
@@ -528,8 +974,8 @@ struct ProfileView: View {
                         .foregroundColor(VP.dim)
                 }
                 Spacer()
-                Text("\u{203A}")
-                    .font(.title3)
+                Image(systemName: "chevron.right")
+                    .font(.caption)
                     .foregroundColor(VP.dim)
             }
             .padding(.horizontal, 14)
@@ -546,7 +992,7 @@ struct ProfileView: View {
         HStack(spacing: 12) {
             AvatarView(user: user, size: 44)
             VStack(alignment: .leading, spacing: 2) {
-                Text(user.username ?? "Reader")
+                Text(profileCardTitle(user))
                     .font(.system(.subheadline, design: .default, weight: .semibold))
                     .foregroundColor(VP.text)
                 HStack(spacing: 4) {
@@ -578,32 +1024,32 @@ struct ProfileView: View {
         }
     }
 
-    private func statCardTile(label: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(value)
-                .font(.system(.headline, design: .default, weight: .bold))
-                .foregroundColor(VP.text)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-            Text(label)
-                .font(.caption2)
-                .foregroundColor(VP.dim)
-                .lineLimit(2)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(VP.card)
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border))
-        .cornerRadius(10)
+    private func profileCardTitle(_ user: VPUser) -> String {
+        if let dn = user.displayName?.trimmingCharacters(in: .whitespaces), !dn.isEmpty { return dn }
+        return user.username ?? "Reader"
     }
 
-    // MARK: - Activity tab
+    @ViewBuilder
+    private func memberSinceFooter(_ user: VPUser) -> some View {
+        let since = user.memberSince
+        if !since.isEmpty {
+            Text("Member since \(since)")
+                .font(.caption2)
+                .foregroundColor(VP.dim)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.top, 4)
+        }
+    }
+
+    // MARK: - Activity tab (full list + filters)
     private var activityTab: some View {
         VStack(spacing: 0) {
-            // Filter row — mirrors web's secondary-button row.
             HStack(spacing: 8) {
                 ForEach(ActivityFilter.allCases) { f in
-                    Button { activityFilter = f } label: {
+                    Button {
+                        UISelectionFeedbackGenerator().selectionChanged()
+                        activityFilter = f
+                    } label: {
                         Text(f.rawValue)
                             .font(.system(.footnote, design: .default, weight: .semibold))
                             .foregroundColor(activityFilter == f ? .white : VP.dim)
@@ -642,9 +1088,14 @@ struct ProfileView: View {
         }
     }
 
+    private func combinedActivityAllTypes() -> [ActivityItem] {
+        (activity + bookmarkItems.map { $0.asActivityItem })
+            .sorted { $0.time > $1.time }
+    }
+
     private func filteredActivityItems() -> [ActivityItem] {
         switch activityFilter {
-        case .all:       return activity + bookmarkItems.map { $0.asActivityItem }
+        case .all:       return combinedActivityAllTypes()
         case .articles:  return activity.filter { $0.type == .read || $0.type == .quiz }
         case .comments:  return activity.filter { $0.type == .comment }
         case .bookmarks: return bookmarkItems.map { $0.asActivityItem }
@@ -854,11 +1305,10 @@ struct ProfileView: View {
         .opacity(unlocked ? 1 : 0.5)
     }
 
-    // MARK: - Milestones tab (tier-progress + achievements grouped)
+    // MARK: - Milestones tab (tier-progress + achievement grid)
     @ViewBuilder
     private func milestonesTab(_ user: VPUser) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Tier progress card — mirrors web's Milestones tier block.
             let score = user.verityScore ?? 0
             let current = tierFor(score: score)
             let next = nextTier(after: current)
@@ -876,8 +1326,7 @@ struct ProfileView: View {
                             Text(tierLabel)
                                 .font(.system(.subheadline, design: .default, weight: .bold))
                                 .foregroundColor(VP.text)
-                            Text(next == nil ? "Top tier reached"
-                                 : "\(((next?.minScore ?? 0) - score).formatted()) points to \(next!.displayName)")
+                            Text(tierProgressSubtitle(score: score, next: next))
                                 .font(.caption2)
                                 .foregroundColor(VP.dim)
                         }
@@ -907,7 +1356,6 @@ struct ProfileView: View {
                 .cornerRadius(10)
             }
 
-            // Achievements grid — mirrors web's grouped-by-category layout.
             VStack(alignment: .leading, spacing: 10) {
                 sectionTitle("Achievements")
                 if !achievementsLoaded {
@@ -966,6 +1414,12 @@ struct ProfileView: View {
         .cornerRadius(10)
     }
 
+    private func tierProgressSubtitle(score: Int, next: ScoreTierRow?) -> String {
+        guard let next = next else { return "Top tier reached" }
+        let delta = max(0, next.minScore - score)
+        return "\(delta.formatted()) points to \(next.displayName)"
+    }
+
     private static let achFormatter: DateFormatter = {
         let f = DateFormatter(); f.dateFormat = "MMM d, yyyy"; return f
     }()
@@ -1019,8 +1473,6 @@ struct ProfileView: View {
     }
 
     private func tierFor(score: Int) -> ScoreTierRow? {
-        // Tiers are sorted ascending by min_score; pick highest whose
-        // min_score is <= score.
         var best: ScoreTierRow? = nil
         for t in scoreTiers where t.minScore <= score {
             if best == nil || t.minScore > (best?.minScore ?? Int.min) { best = t }
@@ -1049,29 +1501,80 @@ struct ProfileView: View {
         } catch { Log.d("Load score_tiers error: \(error)") }
     }
 
+    // MARK: - Streak grid helpers
+    private func todayMidnight() -> Date {
+        Calendar.current.startOfDay(for: Date())
+    }
+
+    private func lastNDays(_ n: Int) -> [Date] {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        return (0..<n).compactMap { cal.date(byAdding: .day, value: -((n - 1) - $0), to: today) }
+    }
+
+    private func dayIndex(_ day: Date) -> Int {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        let comps = cal.dateComponents([.day], from: day, to: today)
+        return 29 - max(0, min(29, comps.day ?? 0))
+    }
+
+    private func readDaysInLast30() -> Int {
+        let window = lastNDays(30)
+        return window.filter { streakDays.contains($0) }.count
+    }
+
+    private func dayAccessibilityLabel(day: Date, isRead: Bool) -> String {
+        let f = DateFormatter(); f.dateFormat = "MMM d"
+        return "\(f.string(from: day)): \(isRead ? "read" : "no read")"
+    }
+
+    private func loadStreak(userId: String) async {
+        struct Row: Decodable { let created_at: Date? }
+        do {
+            let cal = Calendar.current
+            guard let since = cal.date(byAdding: .day, value: -30, to: cal.startOfDay(for: Date())) else { return }
+            let iso = ISO8601DateFormatter().string(from: since)
+            let rows: [Row] = try await client.from("reading_log")
+                .select("created_at")
+                .eq("user_id", value: userId)
+                .gte("created_at", value: iso)
+                .execute().value
+            var days: Set<Date> = []
+            for r in rows {
+                if let d = r.created_at {
+                    days.insert(cal.startOfDay(for: d))
+                }
+            }
+            streakDays = days
+        } catch { Log.d("Load streak error: \(error)") }
+        streakLoaded = true
+    }
+
     // MARK: - Refresh (pull-to-refresh)
     private func refreshAll() async {
         guard let uid = auth.currentUser?.id else { return }
+        // Pull every data source the hero + tabs depend on. loadUser
+        // re-fetches the users row so follower/score/streak counts update
+        // inline without waiting for the next auth tick.
         async let a: Void = loadActivity(userId: uid)
         async let m: Void = loadMilestones(userId: uid)
         async let ach: Void = loadAchievements(userId: uid)
         async let t: Void = loadScoreTiers()
-        _ = await (a, m, ach, t)
+        async let s: Void = loadStreak(userId: uid)
+        async let u: Void = auth.loadUser(id: uid)
+        _ = await (a, m, ach, t, s, u)
     }
 
-    // MARK: - Data loading
+    // MARK: - Tab-triggered data loading
     private func loadTabData() {
         guard let userId = auth.currentUser?.id else { return }
         switch tab {
         case .activity where !activityLoaded: Task { await loadActivity(userId: userId) }
         case .categories where !milestonesLoaded: Task { await loadMilestones(userId: userId) }
         case .milestones where !milestonesLoaded: Task { await loadMilestones(userId: userId) }
-        case .milestones where !achievementsLoaded: Task { await loadAchievements(userId: userId) }
         default: break
         }
-        // Load achievements the first time Milestones opens even if
-        // milestones was already loaded (the case statement above bails
-        // after the first match).
         if tab == .milestones && !achievementsLoaded {
             Task { await loadAchievements(userId: userId) }
         }

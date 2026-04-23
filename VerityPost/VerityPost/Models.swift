@@ -17,6 +17,10 @@ struct VPUser: Codable, Identifiable {
     var streakCurrent: Int?
     var streakBest: Int?
     var commentCount: Int?
+    var followersCount: Int?
+    var followingCount: Int?
+    var displayName: String?
+    var bio: String?
     var avatarColor: String?
     var avatar: AvatarRef?
     var createdAt: Date?
@@ -35,7 +39,7 @@ struct VPUser: Codable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, username, email, plans, avatar
+        case id, username, email, plans, avatar, bio
         case isExpert = "is_expert"
         case isVerifiedPublicFigure = "is_verified_public_figure"
         case verityScore = "verity_score"
@@ -44,6 +48,9 @@ struct VPUser: Codable, Identifiable {
         case streakCurrent = "streak_current"
         case streakBest = "streak_best"
         case commentCount = "comment_count"
+        case followersCount = "followers_count"
+        case followingCount = "following_count"
+        case displayName = "display_name"
         case avatarColor = "avatar_color"
         case createdAt = "created_at"
         case onboardingCompletedAt = "onboarding_completed_at"
