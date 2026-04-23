@@ -72,13 +72,27 @@ struct HomeView: View {
     var body: some View {
         ZStack {
             // Main feed — mirrors web mobile (web/src/app/page.tsx): a single
-            // scroll of breaking banner, streak line, story cards, load-more.
-            // Category + subcategory pill rows are intentionally hidden to
-            // match the launch gate on web (page.tsx wraps both pill rows in
-            // `{false && ...}`); filter state is preserved so flipping the
-            // gate back on is a one-line change.
+            // scroll of category pills, breaking banner, streak line, story
+            // cards, load-more. iOS intentionally shows everything open —
+            // we do not propagate web's launch-hide `{false && ...}` gates
+            // to iOS; the pill rows render live here.
             ScrollView {
                 VStack(spacing: 0) {
+                    // Category pill row — horizontal scroll, "All" first then
+                    // one pill per loaded category. Selecting a pill filters
+                    // the feed and clears any previously selected subcategory.
+                    if !categories.isEmpty {
+                        categoryPillRow
+                    }
+
+                    // Subcategory pill row — only when a category is active
+                    // and it has subcategories. Matches web's conditional
+                    // render (page.tsx: activeCategory !== 'All' && subs > 0).
+                    if let catId = selectedCategory,
+                       !subcategories.filter({ $0.categoryId == catId }).isEmpty {
+                        subcategoryPillRow(categoryId: catId)
+                    }
+
                     if loading {
                         // Matches web mobile: centered text, 48pt vertical
                         // padding, dim color, 15pt size.
@@ -298,6 +312,91 @@ struct HomeView: View {
             canSearchFilterDate = await PermissionService.shared.has("search.advanced.date_range")
             canSearchFilterSource = await PermissionService.shared.has("search.advanced.source")
         }
+    }
+
+    // MARK: - Category + subcategory pill rows
+
+    /// Category pill row — "All" + one pill per loaded category. Matches the
+    /// web styling spec: 14x8 padding, 13pt weight 600, capsule, active uses
+    /// VP.text bg + VP.bg text, inactive uses VP.bg + VP.text text with a 1pt
+    /// VP.border outline. Horizontal scroll, 6pt spacing, 8pt container inset.
+    private var categoryPillRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                homePill(
+                    label: "All",
+                    isActive: selectedCategory == nil,
+                    action: {
+                        selectedCategory = nil
+                        selectedSubcategory = nil
+                    }
+                )
+                ForEach(categories) { cat in
+                    homePill(
+                        label: cat.displayName,
+                        isActive: selectedCategory == cat.id,
+                        action: {
+                            selectedCategory = cat.id
+                            selectedSubcategory = nil
+                        }
+                    )
+                }
+            }
+            .padding(.horizontal, 8)
+        }
+        .padding(.top, 6)
+        .padding(.bottom, 6)
+    }
+
+    /// Subcategory pill row — "All <cat>" + one pill per subcategory of the
+    /// selected category. Same styling as the category row for parity with
+    /// web's second pill strip.
+    @ViewBuilder
+    private func subcategoryPillRow(categoryId: String) -> some View {
+        let subs = subcategories.filter { $0.categoryId == categoryId }
+        let catName = categories.first(where: { $0.id == categoryId })?.displayName ?? ""
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                homePill(
+                    label: catName.isEmpty ? "All" : "All \(catName)",
+                    isActive: selectedSubcategory == nil,
+                    action: { selectedSubcategory = nil }
+                )
+                ForEach(subs) { sub in
+                    homePill(
+                        label: sub.name,
+                        isActive: selectedSubcategory == sub.id,
+                        action: {
+                            selectedSubcategory = selectedSubcategory == sub.id ? nil : sub.id
+                        }
+                    )
+                }
+            }
+            .padding(.horizontal, 8)
+        }
+        .padding(.bottom, 8)
+    }
+
+    /// Shared pill styling for home category/subcategory rows. 13pt / 600 /
+    /// capsule / 14x8 padding. Active inverts (VP.text bg + VP.bg text),
+    /// inactive is VP.bg bg + VP.text text + 1pt VP.border outline.
+    @ViewBuilder
+    private func homePill(label: String, isActive: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(isActive ? VP.bg : VP.text)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule().fill(isActive ? VP.text : VP.bg)
+                )
+                .overlay(
+                    Capsule().stroke(isActive ? VP.text : VP.border, lineWidth: 1)
+                )
+                .fixedSize(horizontal: true, vertical: false)
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Filtered stories
