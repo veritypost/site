@@ -4,15 +4,391 @@ import UIKit
 
 // @migrated-to-permissions 2026-04-18
 // @feature-verified profile_settings 2026-04-18
+//
+// iOS Settings surface. Mirrors web/src/app/profile/settings/page.tsx
+// section tree (Account / Preferences / Privacy & Safety / Billing /
+// Expert / About / Danger zone) with iOS-native idioms: flat custom
+// top bar (no iOS 26 glass bubble), card-shaped sections, plain VStacks
+// — no Form/List/grouped-inset styling. Every subpage follows the same
+// card shell + dividers + 44pt tap targets.
+//
+// All write paths stay on the existing server contracts: update_own_profile
+// RPC (profile / metadata merges / dm_read_receipts), /api/expert/apply,
+// /api/support, /api/account/delete, /api/users/blocked, Supabase GoTrue
+// (email / password / MFA), get_own_login_activity RPC, StoreKit restore.
+
+// MARK: - Shared card chrome
+
+/// Standard section header above a card. Matches the tracking/weight of
+/// web's SectionWrapper title.
+private struct SettingsSectionHeader: View {
+    let title: String
+    let tone: Tone
+    enum Tone { case normal, danger }
+
+    var body: some View {
+        Text(title.uppercased())
+            .font(.system(size: 11, weight: .heavy))
+            .tracking(0.8)
+            .foregroundColor(tone == .danger ? VP.danger : VP.dim)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .padding(.top, 18)
+            .padding(.bottom, 8)
+    }
+}
+
+/// Card container — 1px VP.border, 12pt corner radius, VP.bg interior.
+/// Rows inside are responsible for their own internal dividers.
+private struct SettingsCard<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(spacing: 0) { content }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(VP.bg)
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(VP.border, lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding(.horizontal, 16)
+    }
+}
+
+/// Chevron row inside a card — destination NavigationLink. 44pt min height,
+/// entire row tappable, 1px VP.border separator baked in when `showDivider`.
+private struct SettingsRowLink<Destination: View>: View {
+    let title: String
+    let subtitle: String?
+    var showDivider: Bool = true
+    @ViewBuilder let destination: () -> Destination
+
+    init(_ title: String,
+         subtitle: String? = nil,
+         showDivider: Bool = true,
+         @ViewBuilder destination: @escaping () -> Destination) {
+        self.title = title
+        self.subtitle = subtitle
+        self.showDivider = showDivider
+        self.destination = destination
+    }
+
+    var body: some View {
+        NavigationLink(destination: destination()) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 15, weight: .regular))
+                        .foregroundColor(VP.text)
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.caption)
+                            .foregroundColor(VP.dim)
+                    }
+                }
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(VP.muted)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+            .overlay(alignment: .bottom) {
+                if showDivider {
+                    Rectangle().fill(VP.border).frame(height: 1).padding(.leading, 16)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// External link row (same chrome as SettingsRowLink but opens a URL).
+private struct SettingsRowExternal: View {
+    let title: String
+    let url: URL
+    var tone: Tone = .normal
+    var showDivider: Bool = true
+    enum Tone { case normal, accent }
+
+    var body: some View {
+        Link(destination: url) {
+            HStack(spacing: 12) {
+                Text(title)
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundColor(tone == .accent ? VP.accent : VP.text)
+                Spacer(minLength: 8)
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(VP.muted)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+            .overlay(alignment: .bottom) {
+                if showDivider {
+                    Rectangle().fill(VP.border).frame(height: 1).padding(.leading, 16)
+                }
+            }
+        }
+    }
+}
+
+/// Action row (tap to run a closure). Used for Send Feedback + Restore
+/// Purchases + Sign out / Delete account.
+private struct SettingsRowButton: View {
+    let title: String
+    let tone: Tone
+    let trailing: String?
+    var showDivider: Bool = true
+    let action: () -> Void
+    enum Tone { case normal, accent, destructive }
+
+    private var textColor: Color {
+        switch tone {
+        case .normal: return VP.text
+        case .accent: return VP.accent
+        case .destructive: return VP.danger
+        }
+    }
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Text(title)
+                    .font(.system(size: 15, weight: tone == .accent ? .semibold : .regular))
+                    .foregroundColor(textColor)
+                Spacer(minLength: 8)
+                if let trailing {
+                    Text(trailing).font(.caption).foregroundColor(VP.dim)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+            .overlay(alignment: .bottom) {
+                if showDivider {
+                    Rectangle().fill(VP.border).frame(height: 1).padding(.leading, 16)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// Static value row — label left, value right, no chevron.
+private struct SettingsRowValue: View {
+    let title: String
+    let value: String
+    var valueColor: Color = VP.dim
+    var showDivider: Bool = true
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(title)
+                .font(.system(size: 15, weight: .regular))
+                .foregroundColor(VP.text)
+            Spacer(minLength: 8)
+            Text(value)
+                .font(.system(size: 14, weight: .regular))
+                .foregroundColor(valueColor)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .frame(minHeight: 44)
+        .overlay(alignment: .bottom) {
+            if showDivider {
+                Rectangle().fill(VP.border).frame(height: 1).padding(.leading, 16)
+            }
+        }
+    }
+}
+
+/// Flat top bar — pairs with `.toolbar(.hidden, for: .navigationBar)`.
+/// Replaces iOS 26's floating glass nav bubble with the same flat bar
+/// HomeView + ProfileView use. Back chevron dismisses; title is centered
+/// by flex.
+private struct SettingsTopBar: View {
+    let title: String
+    let onBack: () -> Void
+
+    var body: some View {
+        ZStack {
+            Text(title)
+                .font(.system(size: 15, weight: .heavy))
+                .tracking(-0.15)
+                .foregroundColor(VP.text)
+            HStack(spacing: 0) {
+                Button(action: onBack) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(VP.text)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel("Back")
+                Spacer()
+            }
+        }
+        .frame(height: 44)
+        .padding(.horizontal, 6)
+        .background(VP.bg)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(VP.border).frame(height: 1)
+        }
+    }
+}
+
+/// Standard page shell for every subpage in this file. Wraps content in
+/// a ScrollView + flat top bar + hides the native nav bar.
+private struct SettingsPageShell<Content: View>: View {
+    let title: String
+    @ViewBuilder var content: Content
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                SettingsTopBar(title: title, onBack: { dismiss() })
+                content
+                Color.clear.frame(height: 24)
+            }
+        }
+        .background(VP.bg.ignoresSafeArea())
+        .toolbar(.hidden, for: .navigationBar)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+/// Banner for informational / warning notes at the top or bottom of a
+/// card — mirrors web's subtle inline note copy.
+private struct SettingsNote: View {
+    let text: String
+    var body: some View {
+        Text(text)
+            .font(.caption)
+            .foregroundColor(VP.dim)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .padding(.top, 6)
+    }
+}
+
+/// Standard filled primary button (VP.text bg + VP.bg text). Used inline
+/// in forms for Save / Submit / Update actions.
+private struct SettingsPrimaryButton: View {
+    let title: String
+    let isLoading: Bool
+    let isDisabled: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack {
+                if isLoading { ProgressView().tint(VP.bg) }
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(VP.bg)
+            }
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background(isDisabled ? VP.muted : VP.text)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+        .disabled(isDisabled || isLoading)
+    }
+}
+
+/// Styled text field + optional secure entry, framed to match web inputs.
+private struct SettingsTextField: View {
+    let label: String?
+    let placeholder: String
+    @Binding var text: String
+    var isSecure: Bool = false
+    var keyboard: UIKeyboardType = .default
+    var autocap: TextInputAutocapitalization = .sentences
+    var autocorrect: Bool = true
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let label {
+                Text(label)
+                    .font(.caption)
+                    .foregroundColor(VP.dim)
+            }
+            Group {
+                if isSecure {
+                    SecureField(placeholder, text: $text)
+                } else {
+                    TextField(placeholder, text: $text)
+                        .keyboardType(keyboard)
+                        .textInputAutocapitalization(autocap)
+                        .autocorrectionDisabled(!autocorrect)
+                }
+            }
+            .font(.system(size: 15))
+            .foregroundColor(VP.text)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 11)
+            .background(VP.bg)
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(VP.border, lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+    }
+}
+
+/// Toggle row matching the row chrome — label left, switch right.
+private struct SettingsToggleRow: View {
+    let title: String
+    let subtitle: String?
+    @Binding var isOn: Bool
+    var isDisabled: Bool = false
+    var showDivider: Bool = true
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundColor(VP.text)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundColor(VP.dim)
+                }
+            }
+            Spacer(minLength: 8)
+            Toggle("", isOn: $isOn)
+                .labelsHidden()
+                .tint(VP.accent)
+                .disabled(isDisabled)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .frame(minHeight: 44)
+        .overlay(alignment: .bottom) {
+            if showDivider {
+                Rectangle().fill(VP.border).frame(height: 1).padding(.leading, 16)
+            }
+        }
+    }
+}
 
 // MARK: - Settings hub
 
 struct SettingsView: View {
     @EnvironmentObject var auth: AuthViewModel
     @StateObject private var perms = PermissionStore.shared
-    private let client = SupabaseManager.shared.client
+    @Environment(\.dismiss) private var dismiss
 
     @State private var showFeedback = false
+
+    // Permission gates — mirrored from web SECTIONS tree. Resolved by
+    // PermissionService on mount and refreshed when perms.changeToken
+    // bumps (admin-driven grants land without a relaunch).
     @State private var canViewExpertSettings: Bool = false
     @State private var canApplyExpert: Bool = false
     @State private var canEditProfile: Bool = false
@@ -22,158 +398,227 @@ struct SettingsView: View {
     @State private var canViewLoginActivity: Bool = false
     @State private var canViewBilling: Bool = false
     @State private var canViewFeedPrefs: Bool = false
+    @State private var canViewAlerts: Bool = false
     @State private var canViewDataPrivacy: Bool = false
 
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
+    }
+
     var body: some View {
-        Form {
-            if let u = auth.currentUser {
-                Section {
-                    HStack(spacing: 12) {
-                        AvatarView(user: u, size: 44)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(u.username ?? "").font(.system(.callout, design: .default, weight: .bold))
-                            Text(u.email ?? "").font(.caption).foregroundColor(VP.dim)
-                        }
-                        Spacer()
-                        Text(u.planDisplay)
-                            .font(.system(.caption, design: .default, weight: .semibold))
-                            .foregroundColor(VP.accent)
-                            .padding(.horizontal, 10).padding(.vertical, 4)
-                            .background(VP.accent.opacity(0.1))
-                            .cornerRadius(10)
-                    }
-                    .padding(.vertical, 4)
-                }
-            }
+        ScrollView {
+            VStack(spacing: 0) {
+                SettingsTopBar(title: "Settings", onBack: { dismiss() })
 
-            if canEditProfile || canEditEmail || canChangePassword {
-                Section("Account") {
-                    if canEditProfile {
-                        NavigationLink("Profile", destination: AccountSettingsView())
-                    }
-                    if canEditEmail {
-                        NavigationLink("Email", destination: EmailSettingsView())
-                    }
-                    if canChangePassword {
-                        NavigationLink("Password", destination: PasswordSettingsView())
-                    }
-                    // Apple Guideline 1.2 — UGC-management surface. Always
-                    // present for signed-in users; the destination view
-                    // calls /api/users/blocked and exposes Unblock per row.
-                    NavigationLink("Blocked Accounts", destination: BlockedAccountsView())
+                if let user = auth.currentUser {
+                    identityHeader(user)
                 }
-            }
 
-            if canViewMFA || canViewLoginActivity {
-                Section("Security") {
-                    if canViewMFA {
-                        NavigationLink("Two-Factor Authentication", destination: MFASettingsView())
-                    }
-                    if canViewLoginActivity {
-                        NavigationLink("Sign-in Activity", destination: LoginActivityView())
-                    }
+                accountSection
+                preferencesSection
+                privacySection
+                if canViewBilling { billingSection }
+                expertSection
+                aboutSection
+                dangerSection
+
+                Color.clear.frame(height: 32)
+            }
+        }
+        .background(VP.bg.ignoresSafeArea())
+        .toolbar(.hidden, for: .navigationBar)
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showFeedback) { FeedbackSheet().environmentObject(auth) }
+        .task(id: perms.changeToken) { await loadPerms() }
+    }
+
+    // MARK: Identity
+
+    private func identityHeader(_ user: VPUser) -> some View {
+        HStack(spacing: 14) {
+            AvatarView(user: user, size: 56)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(user.username ?? "Reader")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundColor(VP.text)
+                        .lineLimit(1)
+                    VerifiedBadgeView(user: user, size: 10)
                 }
-            }
-
-            Section("Messages") {
-                NavigationLink("Inbox", destination: MessagesView().environmentObject(auth))
-            }
-
-            if canViewBilling {
-                Section("Subscription") {
-                    NavigationLink("Manage Plan", destination: SubscriptionSettingsView())
-                }
-            }
-
-            if canViewFeedPrefs {
-                Section("Preferences") {
-                    NavigationLink("Notifications", destination: NotificationsSettingsView())
-                    NavigationLink("Feed Preferences", destination: FeedPreferencesSettingsView())
-                }
-            } else {
-                Section("Preferences") {
-                    NavigationLink("Notifications", destination: NotificationsSettingsView())
-                }
-            }
-
-            Section("Family") {
-                Text("Manage kid profiles from the Kids tab on your profile.")
+                Text(user.email ?? "")
                     .font(.caption)
                     .foregroundColor(VP.dim)
+                    .lineLimit(1)
             }
+            Spacer(minLength: 8)
+            Text(user.planDisplay)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(VP.text)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .overlay(RoundedRectangle(cornerRadius: 99).stroke(VP.border, lineWidth: 1))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 18)
+    }
 
-            Section("Application") {
-                NavigationLink("Verification", destination: VerificationRequestView())
+    // MARK: Sections
+
+    private var accountSection: some View {
+        VStack(spacing: 0) {
+            SettingsSectionHeader(title: "Account", tone: .normal)
+            SettingsCard {
+                if canEditProfile {
+                    SettingsRowLink("Profile") { AccountSettingsView() }
+                }
+                if canEditEmail {
+                    SettingsRowLink("Email") { EmailSettingsView() }
+                }
+                if canChangePassword {
+                    SettingsRowLink("Password") { PasswordSettingsView() }
+                }
+                if canViewLoginActivity {
+                    SettingsRowLink("Sign-in activity") { LoginActivityView() }
+                }
+                if canViewMFA {
+                    SettingsRowLink("Two-factor authentication",
+                                    showDivider: false) { MFASettingsView() }
+                } else {
+                    // Collapse last divider on the preceding row when MFA is hidden.
+                    Color.clear.frame(height: 0)
+                }
+            }
+        }
+    }
+
+    private var preferencesSection: some View {
+        VStack(spacing: 0) {
+            SettingsSectionHeader(title: "Preferences", tone: .normal)
+            SettingsCard {
+                if canViewAlerts {
+                    SettingsRowLink("Alerts",
+                                    subtitle: "Push, email, and in-app")
+                        { NotificationsSettingsView() }
+                }
+                if canViewFeedPrefs {
+                    SettingsRowLink("Feed",
+                                    subtitle: "What surfaces, what's filtered",
+                                    showDivider: false)
+                        { FeedPreferencesSettingsView() }
+                }
+            }
+            if !canViewAlerts && !canViewFeedPrefs {
+                SettingsNote(text: "Preferences aren\u{2019}t available for your account.")
+            }
+        }
+    }
+
+    private var privacySection: some View {
+        VStack(spacing: 0) {
+            SettingsSectionHeader(title: "Privacy & Safety", tone: .normal)
+            SettingsCard {
+                // Apple Guideline 1.2 — UGC blocking management must be
+                // reachable from Settings. Always-on for signed-in users.
+                SettingsRowLink("Blocked accounts") { BlockedAccountsView() }
+                if canViewDataPrivacy {
+                    SettingsRowLink("Data & privacy",
+                                    subtitle: "Export, receipts, deletion",
+                                    showDivider: false)
+                        { DataPrivacyView() }
+                } else {
+                    // Apple Review 5.1.1(v) — delete must be reachable for every
+                    // signed-in user even when export/receipts perm is missing.
+                    SettingsRowLink("Delete account",
+                                    showDivider: false)
+                        { DataPrivacyView() }
+                }
+            }
+        }
+    }
+
+    private var billingSection: some View {
+        VStack(spacing: 0) {
+            SettingsSectionHeader(title: "Billing", tone: .normal)
+            SettingsCard {
+                SettingsRowLink("Subscription",
+                                subtitle: "Plan, upgrade, restore",
+                                showDivider: false)
+                    { SubscriptionSettingsView() }
+            }
+        }
+    }
+
+    private var expertSection: some View {
+        VStack(spacing: 0) {
+            SettingsSectionHeader(title: "Expert", tone: .normal)
+            SettingsCard {
+                SettingsRowLink("Verification application") { VerificationRequestView() }
                 if canViewExpertSettings {
-                    NavigationLink("Expert Settings", destination: ExpertSettingsView())
-                } else if canApplyExpert {
-                    Link(
-                        "Apply to be an Expert",
-                        destination: SupabaseManager.shared.siteURL.appendingPathComponent("signup/expert")
-                    )
-                    .foregroundColor(VP.accent)
+                    SettingsRowLink("Expert settings",
+                                    showDivider: false)
+                        { ExpertSettingsView() }
+                } else if canApplyExpert,
+                          let url = URL(string: SupabaseManager.shared.siteURL
+                                        .appendingPathComponent("signup/expert").absoluteString) {
+                    SettingsRowExternal(title: "Apply to be an expert",
+                                        url: url,
+                                        tone: .accent,
+                                        showDivider: false)
                 }
             }
+        }
+    }
 
-            Section("Help & Info") {
-                Button("Send Feedback") { showFeedback = true }
-                    .foregroundColor(VP.text)
-                HStack {
-                    Text("Version")
-                    Spacer()
-                    Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—")
-                        .foregroundColor(VP.dim)
+    private var aboutSection: some View {
+        VStack(spacing: 0) {
+            SettingsSectionHeader(title: "About", tone: .normal)
+            SettingsCard {
+                SettingsRowButton(title: "Send feedback",
+                                  tone: .normal,
+                                  trailing: nil) { showFeedback = true }
+                // Apple Review 5.1.1(v) — Privacy + Terms reachable from
+                // inside the app.
+                if let privacy = URL(string: "https://veritypost.com/privacy") {
+                    SettingsRowExternal(title: "Privacy policy", url: privacy)
                 }
-            }
-
-            // Apple Review 5.1.1(v) — Privacy Policy + Terms of Service
-            // must be reachable from inside the app, not only from a link
-            // shown during sign-up.
-            Section("Legal") {
-                Link("Privacy Policy",
-                     destination: URL(string: "https://veritypost.com/privacy")!)
-                    .foregroundColor(VP.text)
-                Link("Terms of Service",
-                     destination: URL(string: "https://veritypost.com/terms")!)
-                    .foregroundColor(VP.text)
-            }
-
-            // Apple Review 5.1.1(v) requires account deletion to be
-            // accessible to every authenticated user from inside the app
-            // — not gated on a permission. Permission-gated DataPrivacyView
-            // remains for the export flow + DM read-receipts toggle, but
-            // delete is always present for any signed-in account.
-            if auth.currentUser != nil {
-                Section("Data & Privacy") {
-                    if canViewDataPrivacy {
-                        NavigationLink("Export / Delete Data", destination: DataPrivacyView())
-                    } else {
-                        NavigationLink("Delete Account", destination: DataPrivacyView())
-                    }
+                if let terms = URL(string: "https://veritypost.com/terms") {
+                    SettingsRowExternal(title: "Terms of service", url: terms)
                 }
+                SettingsRowValue(title: "Version", value: appVersion, showDivider: false)
             }
+        }
+    }
 
-            Section {
-                Button("Sign out", role: .destructive) {
+    private var dangerSection: some View {
+        VStack(spacing: 0) {
+            SettingsSectionHeader(title: "Danger zone", tone: .danger)
+            SettingsCard {
+                SettingsRowButton(title: "Sign out",
+                                  tone: .destructive,
+                                  trailing: nil,
+                                  showDivider: false) {
+                    // Haptic cue for destructive session end.
+                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
                     Task { await auth.logout() }
                 }
             }
         }
-        .navigationTitle("Settings")
-        .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showFeedback) { FeedbackSheet() }
-        .task(id: perms.changeToken) {
-            canViewExpertSettings = await PermissionService.shared.has("settings.expert.view")
-            canApplyExpert = await PermissionService.shared.has("expert.application.apply")
-            canEditProfile = await PermissionService.shared.has("settings.view")
-            canEditEmail = await PermissionService.shared.has("settings.account.edit_email")
-            canChangePassword = await PermissionService.shared.has("settings.account.change_password")
-            canViewMFA = await PermissionService.shared.has("settings.account.2fa.enable")
-            canViewLoginActivity = await PermissionService.shared.has("settings.login_activity.view")
-            canViewBilling = await PermissionService.shared.has("billing.view.plan")
-            canViewFeedPrefs = await PermissionService.shared.has("settings.feed.view")
-            canViewDataPrivacy = await PermissionService.shared.has("settings.data.request_export")
-        }
+    }
+
+    // MARK: Perm loader
+
+    private func loadPerms() async {
+        canViewExpertSettings = await PermissionService.shared.has("settings.expert.view")
+        canApplyExpert = await PermissionService.shared.has("expert.application.apply")
+        canEditProfile = await PermissionService.shared.has("settings.view")
+        canEditEmail = await PermissionService.shared.has("settings.account.edit_email")
+        canChangePassword = await PermissionService.shared.has("settings.account.change_password")
+        canViewMFA = await PermissionService.shared.has("settings.account.2fa.enable")
+        canViewLoginActivity = await PermissionService.shared.has("settings.login_activity.view")
+        canViewBilling = await PermissionService.shared.has("billing.view.plan")
+        canViewFeedPrefs = await PermissionService.shared.has("settings.feed.view")
+        canViewAlerts = await PermissionService.shared.has("notifications.prefs.view")
+        canViewDataPrivacy = await PermissionService.shared.has("settings.data.request_export")
     }
 }
 
@@ -182,7 +627,7 @@ struct SettingsView: View {
 struct AccountSettingsView: View {
     @EnvironmentObject var auth: AuthViewModel
     private let client = SupabaseManager.shared.client
-    @Environment(\.dismiss) var dismiss
+    @Environment(\.dismiss) private var dismiss
 
     @State private var username = ""
     @State private var bio = ""
@@ -191,12 +636,12 @@ struct AccountSettingsView: View {
 
     // Two-tone avatar
     @State private var avatarOuter = "#818cf8"
-    @State private var avatarInner: String? = nil  // nil = transparent
+    @State private var avatarInner: String? = nil
     @State private var avatarInitials = ""
     @State private var initialsError: String? = nil
 
     @State private var saving = false
-    @State private var saved = false
+    @State private var savedBanner: String? = nil
 
     private let colorOptions = [
         "#818cf8", "#22c55e", "#ef4444", "#f59e0b", "#3b82f6",
@@ -211,99 +656,127 @@ struct AccountSettingsView: View {
     }
 
     var body: some View {
-        Form {
-            Section("Avatar") {
-                HStack(alignment: .top, spacing: 16) {
-                    AvatarView(outerHex: avatarOuter, innerHex: avatarInner, initials: previewInitials, size: 72)
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Up to 3 characters, letters and numbers only.")
-                            .font(.caption)
-                            .foregroundColor(VP.dim)
-                        TextField("ABC", text: $avatarInitials)
-                            .textInputAutocapitalization(.characters)
-                            .autocorrectionDisabled(true)
-                            .onChange(of: avatarInitials) { _, new in
-                                let clean = new.uppercased()
-                                    .filter { $0.isLetter || $0.isNumber }
-                                    .prefix(3)
-                                let cleanStr = String(clean)
-                                if cleanStr != new { avatarInitials = cleanStr }
-                                initialsError = (new.count > 0 && cleanStr.isEmpty) ? "Only letters and numbers." : nil
+        SettingsPageShell(title: "Profile") {
+            // Avatar card — preview + initials + ring + inner fill pickers.
+            SettingsSectionHeader(title: "Avatar", tone: .normal)
+            SettingsCard {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(alignment: .top, spacing: 14) {
+                        AvatarView(outerHex: avatarOuter,
+                                   innerHex: avatarInner,
+                                   initials: previewInitials,
+                                   size: 72)
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Up to 3 characters, letters and numbers only.")
+                                .font(.caption).foregroundColor(VP.dim)
+                            SettingsTextField(label: nil,
+                                              placeholder: "ABC",
+                                              text: $avatarInitials,
+                                              autocap: .characters,
+                                              autocorrect: false)
+                                .onChange(of: avatarInitials) { _, new in
+                                    let clean = new.uppercased()
+                                        .filter { $0.isLetter || $0.isNumber }
+                                        .prefix(3)
+                                    let cleanStr = String(clean)
+                                    if cleanStr != new { avatarInitials = cleanStr }
+                                    initialsError = (new.count > 0 && cleanStr.isEmpty)
+                                        ? "Only letters and numbers."
+                                        : nil
+                                }
+                            if let err = initialsError {
+                                Text(err).font(.caption).foregroundColor(VP.wrong)
                             }
-                        if let err = initialsError {
-                            Text(err).font(.caption).foregroundColor(VP.wrong)
+                        }
+                    }
+
+                    Text("Ring color").font(.caption).foregroundColor(VP.dim)
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 6),
+                              spacing: 10) {
+                        ForEach(colorOptions, id: \.self) { color in
+                            Circle().fill(Color(hex: color)).frame(width: 32, height: 32)
+                                .overlay(Circle().stroke(VP.text,
+                                                          lineWidth: avatarOuter == color ? 3 : 0))
+                                .onTapGesture { avatarOuter = color }
+                        }
+                    }
+
+                    Text("Inner fill").font(.caption).foregroundColor(VP.dim)
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 6),
+                              spacing: 10) {
+                        ZStack {
+                            Circle().fill(Color.white)
+                            Circle().strokeBorder(VP.border,
+                                                   style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
+                        }
+                        .frame(width: 32, height: 32)
+                        .overlay(Circle().stroke(VP.text, lineWidth: avatarInner == nil ? 3 : 0))
+                        .onTapGesture { avatarInner = nil }
+
+                        ForEach(colorOptions, id: \.self) { color in
+                            Circle().fill(Color(hex: color)).frame(width: 32, height: 32)
+                                .overlay(Circle().stroke(VP.text,
+                                                          lineWidth: avatarInner == color ? 3 : 0))
+                                .onTapGesture { avatarInner = color }
                         }
                     }
                 }
-                .padding(.vertical, 4)
-
-                Text("Ring color").font(.caption).foregroundColor(VP.dim)
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 6), spacing: 8) {
-                    ForEach(colorOptions, id: \.self) { color in
-                        Circle().fill(Color(hex: color)).frame(width: 32, height: 32)
-                            .overlay(Circle().stroke(VP.text, lineWidth: avatarOuter == color ? 3 : 0))
-                            .onTapGesture { avatarOuter = color }
-                    }
-                }
-                .padding(.bottom, 8)
-
-                Text("Inner fill").font(.caption).foregroundColor(VP.dim)
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 6), spacing: 8) {
-                    // Transparent option
-                    ZStack {
-                        Circle().fill(Color.white)
-                        Circle().strokeBorder(VP.border, style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
-                    }
-                    .frame(width: 32, height: 32)
-                    .overlay(Circle().stroke(VP.text, lineWidth: avatarInner == nil ? 3 : 0))
-                    .onTapGesture { avatarInner = nil }
-
-                    ForEach(colorOptions, id: \.self) { color in
-                        Circle().fill(Color(hex: color)).frame(width: 32, height: 32)
-                            .overlay(Circle().stroke(VP.text, lineWidth: avatarInner == color ? 3 : 0))
-                            .onTapGesture { avatarInner = color }
-                    }
-                }
-                .padding(.vertical, 4)
+                .padding(16)
             }
 
-            Section("Identity") {
-                HStack {
-                    Text("Username").foregroundColor(VP.dim); Spacer()
-                    TextField("username", text: $username).multilineTextAlignment(.trailing)
-                        .textInputAutocapitalization(.never)
+            // Identity card
+            SettingsSectionHeader(title: "Identity", tone: .normal)
+            SettingsCard {
+                VStack(spacing: 14) {
+                    SettingsTextField(label: "Username",
+                                      placeholder: "username",
+                                      text: $username,
+                                      autocap: .never,
+                                      autocorrect: false)
+                    SettingsTextField(label: "Location",
+                                      placeholder: "City, Country",
+                                      text: $location)
+                    SettingsTextField(label: "Website",
+                                      placeholder: "https://",
+                                      text: $website,
+                                      keyboard: .URL,
+                                      autocap: .never,
+                                      autocorrect: false)
                 }
-                HStack {
-                    Text("Location").foregroundColor(VP.dim); Spacer()
-                    TextField("City, Country", text: $location).multilineTextAlignment(.trailing)
-                }
-                HStack {
-                    Text("Website").foregroundColor(VP.dim); Spacer()
-                    TextField("https://", text: $website).multilineTextAlignment(.trailing)
-                        .keyboardType(.URL).textInputAutocapitalization(.never)
-                }
+                .padding(16)
             }
 
-            Section("Bio") {
-                TextField("Tell us about yourself...", text: $bio, axis: .vertical).lineLimit(3...8)
+            // Bio card
+            SettingsSectionHeader(title: "Bio", tone: .normal)
+            SettingsCard {
+                VStack(alignment: .leading, spacing: 6) {
+                    TextField("Tell us about yourself...", text: $bio, axis: .vertical)
+                        .font(.system(size: 15))
+                        .foregroundColor(VP.text)
+                        .lineLimit(3...8)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 11)
+                        .background(VP.bg)
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(VP.border, lineWidth: 1))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                .padding(16)
             }
 
-            Section {
-                Button { Task { await save() } } label: {
-                    HStack {
-                        Spacer()
-                        Text(saving ? "Saving..." : (saved ? "Saved" : "Save Changes"))
-                            .fontWeight(.bold).foregroundColor(.white)
-                        Spacer()
-                    }
-                    .padding(.vertical, 4)
+            // Save
+            VStack(spacing: 8) {
+                SettingsPrimaryButton(title: saving ? "Saving..." : "Save changes",
+                                      isLoading: saving,
+                                      isDisabled: username.trimmingCharacters(in: .whitespaces).isEmpty) {
+                    Task { await save() }
                 }
-                .listRowBackground(saving ? VP.dim : VP.accent)
-                .disabled(saving || username.trimmingCharacters(in: .whitespaces).isEmpty)
+                if let banner = savedBanner {
+                    Text(banner).font(.caption).foregroundColor(VP.right)
+                }
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
         }
-        .navigationTitle("Profile")
-        .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             username = auth.currentUser?.username ?? ""
             avatarOuter = auth.currentUser?.avatarColor ?? "#818cf8"
@@ -315,26 +788,14 @@ struct AccountSettingsView: View {
         saving = true
         defer { saving = false }
 
-        // Round 5 Item 2: single server-side write contract via
-        // update_own_profile RPC (SECDEF, 20-column allowlist, server-side
-        // metadata deep-merge). Routes location/website/avatar into
-        // metadata because public.users has no first-class columns for
-        // those — mirrors what the web profile settings card does and
-        // closes the latent phantom-column typo that silently no-op'd the
-        // previous FullUpdate / LegacyUpdate catch-fallback pattern.
+        // Round 5 Item 2: server-side metadata merge via update_own_profile
+        // (SECDEF, allowlist). Routes location/website/avatar into metadata.
         struct AvatarJSON: Encodable { let outer: String; let inner: String?; let initials: String }
         struct MetadataPatch: Encodable {
             let avatar: AvatarJSON
             let location: String
             let website: String
         }
-        // Round 11 P1: `avatar_url` is the canonical column the web app
-        // writes and the rest of the app reads (leaderboard, comments, etc).
-        // No uploader UI exists on iOS yet (color + initials only) — when
-        // one lands, wire the uploaded URL into `avatarUrl` below. Sending
-        // nil is safe because `update_own_profile` uses COALESCE and
-        // preserves the existing column value when a key is null (Round 5
-        // Item 2). `avatar_url` is in the RPC allowlist.
         struct ProfilePatch: Encodable {
             let username: String
             let bio: String
@@ -346,16 +807,13 @@ struct AccountSettingsView: View {
         let initials = avatarInitials.isEmpty
             ? String((username.first.map { String($0) } ?? "?")).uppercased()
             : avatarInitials
-        // No upload UI yet — forward nil so the COALESCE in the RPC keeps
-        // whatever value is already stored server-side.
-        let avatarUrl: String? = nil
 
         do {
             let args = Args(p_fields: ProfilePatch(
                 username: username,
                 bio: bio,
                 avatar_color: avatarOuter,
-                avatar_url: avatarUrl,
+                avatar_url: nil,
                 metadata: MetadataPatch(
                     avatar: AvatarJSON(outer: avatarOuter, inner: avatarInner, initials: initials),
                     location: location,
@@ -365,12 +823,13 @@ struct AccountSettingsView: View {
             try await client.rpc("update_own_profile", params: args).execute()
         } catch {
             Log.d("Save profile error:", error)
+            savedBanner = "Couldn\u{2019}t save. Try again."
             return
         }
 
         await auth.loadUser(id: userId)
-        saved = true
-        try? await Task.sleep(nanoseconds: 1_200_000_000)
+        savedBanner = "Saved."
+        try? await Task.sleep(nanoseconds: 900_000_000)
         dismiss()
     }
 }
@@ -387,34 +846,43 @@ struct EmailSettingsView: View {
     @State private var submitting = false
 
     var body: some View {
-        Form {
-            Section("Current Email") {
-                HStack {
-                    Text(auth.currentUser?.email ?? "—").foregroundColor(VP.text)
-                    Spacer()
-                }
+        SettingsPageShell(title: "Email") {
+            SettingsSectionHeader(title: "Current email", tone: .normal)
+            SettingsCard {
+                SettingsRowValue(title: "Signed in as",
+                                 value: auth.currentUser?.email ?? "—",
+                                 showDivider: false)
             }
-            Section("Change Email") {
-                TextField("New email address", text: $newEmail)
-                    .keyboardType(.emailAddress)
-                    .textInputAutocapitalization(.never)
-                Button(submitting ? "Sending..." : "Send verification link") {
-                    Task { await requestChange() }
+
+            SettingsSectionHeader(title: "Change email", tone: .normal)
+            SettingsCard {
+                VStack(spacing: 14) {
+                    SettingsTextField(label: "New email address",
+                                      placeholder: "you@example.com",
+                                      text: $newEmail,
+                                      keyboard: .emailAddress,
+                                      autocap: .never,
+                                      autocorrect: false)
+                    SettingsPrimaryButton(title: submitting ? "Sending..." : "Send verification link",
+                                          isLoading: submitting,
+                                          isDisabled: !newEmail.contains("@")) {
+                        Task { await requestChange() }
+                    }
                 }
-                .disabled(submitting || !newEmail.contains("@"))
+                .padding(16)
             }
+
             if let s = status {
-                Section {
-                    Text(s).font(.caption).foregroundColor(isError ? VP.wrong : VP.right)
-                }
+                Text(s)
+                    .font(.caption)
+                    .foregroundColor(isError ? VP.wrong : VP.right)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
             }
-            Section {
-                Text("Supabase will send a verification link to your new address. Your email won't change until you click the link.")
-                    .font(.caption).foregroundColor(VP.dim)
-            }
+
+            SettingsNote(text: "Supabase will send a verification link to your new address. Your email won\u{2019}t change until you click the link.")
+                .padding(.bottom, 8)
         }
-        .navigationTitle("Email")
-        .navigationBarTitleDisplayMode(.inline)
     }
 
     private func requestChange() async {
@@ -444,29 +912,38 @@ struct PasswordSettingsView: View {
     @State private var isError = false
 
     var body: some View {
-        Form {
-            Section("New Password") {
-                SecureField("New password (min 8 chars)", text: $newPassword)
-                SecureField("Confirm new password", text: $confirmPassword)
-            }
-            Section {
-                Button(submitting ? "Updating..." : "Update password") {
-                    Task { await submit() }
+        SettingsPageShell(title: "Password") {
+            SettingsSectionHeader(title: "New password", tone: .normal)
+            SettingsCard {
+                VStack(spacing: 14) {
+                    SettingsTextField(label: nil,
+                                      placeholder: "New password (min 8 chars)",
+                                      text: $newPassword,
+                                      isSecure: true)
+                    SettingsTextField(label: nil,
+                                      placeholder: "Confirm new password",
+                                      text: $confirmPassword,
+                                      isSecure: true)
+                    SettingsPrimaryButton(title: submitting ? "Updating..." : "Update password",
+                                          isLoading: submitting,
+                                          isDisabled: newPassword.count < 8
+                                                      || newPassword != confirmPassword) {
+                        Task { await submit() }
+                    }
                 }
-                .disabled(submitting || newPassword.count < 8 || newPassword != confirmPassword)
+                .padding(16)
             }
+
             if let s = status {
-                Section {
-                    Text(s).font(.caption).foregroundColor(isError ? VP.wrong : VP.right)
-                }
+                Text(s)
+                    .font(.caption)
+                    .foregroundColor(isError ? VP.wrong : VP.right)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
             }
-            Section {
-                Text("Password must be at least 8 characters. Use a passphrase or a password manager — good security starts here.")
-                    .font(.caption).foregroundColor(VP.dim)
-            }
+
+            SettingsNote(text: "Password must be at least 8 characters. Use a passphrase or a password manager \u{2014} good security starts here.")
         }
-        .navigationTitle("Password")
-        .navigationBarTitleDisplayMode(.inline)
     }
 
     private func submit() async {
@@ -507,41 +984,50 @@ struct LoginActivityView: View {
     @State private var loaded = false
 
     var body: some View {
-        List {
+        SettingsPageShell(title: "Sign-in activity") {
             if !loaded {
-                ProgressView().frame(maxWidth: .infinity).listRowBackground(Color.clear)
+                ProgressView().padding(.top, 40)
             } else if rows.isEmpty {
                 Text("No recent sign-in activity.")
                     .font(.footnote).foregroundColor(VP.dim)
+                    .padding(.top, 40)
             } else {
-                ForEach(rows) { r in
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text(r.action.replacingOccurrences(of: "_", with: " ").capitalized)
-                                .font(.system(.subheadline, design: .default, weight: .semibold))
-                            Spacer()
-                            Text(Self.formatDate(r.created_at))
-                                .font(.caption)
-                                .foregroundColor(VP.dim)
+                SettingsSectionHeader(title: "Recent", tone: .normal)
+                SettingsCard {
+                    ForEach(Array(rows.enumerated()), id: \.element.id) { idx, r in
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text(r.action.replacingOccurrences(of: "_", with: " ").capitalized)
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(VP.text)
+                                Spacer()
+                                Text(Self.formatDate(r.created_at))
+                                    .font(.caption).foregroundColor(VP.dim)
+                            }
+                            if let m = r.metadata {
+                                Text([m.device, m.browser, m.ip].compactMap { $0 }.joined(separator: " \u{00B7} "))
+                                    .font(.caption)
+                                    .foregroundColor(VP.dim)
+                            }
                         }
-                        if let m = r.metadata {
-                            Text([m.device, m.browser, m.ip].compactMap { $0 }.joined(separator: " · "))
-                                .font(.caption)
-                                .foregroundColor(VP.dim)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .overlay(alignment: .bottom) {
+                            if idx < rows.count - 1 {
+                                Rectangle().fill(VP.border).frame(height: 1).padding(.leading, 16)
+                            }
                         }
                     }
-                    .padding(.vertical, 2)
                 }
             }
         }
-        .navigationTitle("Sign-in Activity")
-        .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
     }
 
     private static func formatDate(_ iso: String?) -> String {
         guard let s = iso, let date = ISO8601DateFormatter().date(from: s) else { return "" }
-        let f = DateFormatter(); f.dateFormat = "MMM d · h:mm a"
+        let f = DateFormatter(); f.dateFormat = "MMM d \u{00B7} h:mm a"
         return f.string(from: date)
     }
 
@@ -574,77 +1060,100 @@ struct MFASettingsView: View {
     @State private var isError = false
 
     var body: some View {
-        Form {
+        SettingsPageShell(title: "Two-factor") {
             if !loaded {
-                Section { ProgressView().frame(maxWidth: .infinity) }
+                ProgressView().padding(.top, 40)
             } else if let fid = verifiedFactorId {
-                Section("Enabled") {
-                    Text("Two-factor authentication is on. You'll be asked for a code each time you sign in.")
-                        .font(.caption).foregroundColor(VP.soft)
-                    Text("Factor ID: \(String(fid.prefix(8)))…")
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundColor(VP.dim)
-                    Button(busy ? "Disabling..." : "Disable Two-Factor", role: .destructive) {
-                        Task { await disable(factorId: fid) }
+                SettingsSectionHeader(title: "Enabled", tone: .normal)
+                SettingsCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Two-factor authentication is on. You\u{2019}ll be asked for a code each time you sign in.")
+                            .font(.caption).foregroundColor(VP.soft)
+                        Text("Factor ID: \(String(fid.prefix(8)))\u{2026}")
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundColor(VP.dim)
+                        SettingsPrimaryButton(title: busy ? "Disabling..." : "Disable two-factor",
+                                              isLoading: busy,
+                                              isDisabled: false) {
+                            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                            Task { await disable(factorId: fid) }
+                        }
                     }
-                    .disabled(busy)
-                }
-                if let s = status {
-                    Section { Text(s).font(.caption).foregroundColor(isError ? VP.wrong : VP.right) }
+                    .padding(16)
                 }
             } else {
-                Section("Set Up") {
-                    if let uri = totpUri {
-                        Text("Scan this in your authenticator app, or paste the manual key.")
-                            .font(.caption).foregroundColor(VP.soft)
-                        if let secret = totpSecret {
+                SettingsSectionHeader(title: "Set up", tone: .normal)
+                SettingsCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        if let uri = totpUri {
+                            Text("Scan this in your authenticator app, or paste the manual key.")
+                                .font(.caption).foregroundColor(VP.soft)
+                            if let secret = totpSecret {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Manual key").font(.caption).foregroundColor(VP.dim)
+                                    Text(secret)
+                                        .font(.system(.footnote, design: .monospaced))
+                                        .foregroundColor(VP.text)
+                                        .textSelection(.enabled)
+                                }
+                            }
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("Manual key").font(.caption).foregroundColor(VP.dim)
-                                Text(secret)
-                                    .font(.system(.footnote, design: .monospaced))
-                                    .foregroundColor(VP.text)
-                                    .textSelection(.enabled)
+                                Text("Or tap to open in an authenticator app:")
+                                    .font(.caption).foregroundColor(VP.dim)
+                                if let url = URL(string: uri) {
+                                    Link(uri, destination: url)
+                                        .font(.system(.caption, design: .monospaced))
+                                        .lineLimit(3)
+                                }
+                            }
+                        } else {
+                            SettingsPrimaryButton(title: busy ? "Generating..." : "Generate setup code",
+                                                  isLoading: busy,
+                                                  isDisabled: false) {
+                                Task { await startEnroll() }
                             }
                         }
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Or tap to open in an authenticator app:")
-                                .font(.caption).foregroundColor(VP.dim)
-                            if let url = URL(string: uri) {
-                                Link(uri, destination: url)
-                                    .font(.system(.caption, design: .monospaced))
-                                    .lineLimit(3)
-                            }
-                        }
-                    } else {
-                        Button(busy ? "Generating..." : "Generate setup code") {
-                            Task { await startEnroll() }
-                        }
-                        .disabled(busy)
                     }
+                    .padding(16)
                 }
+
                 if pendingFactorId != nil {
-                    Section("Verify") {
-                        TextField("6-digit code", text: $code)
-                            .keyboardType(.numberPad)
-                            .font(.system(.headline, design: .monospaced))
-                            .onChange(of: code) { _, new in
-                                let digits = new.filter { $0.isNumber }
-                                if digits != new { code = String(digits.prefix(6)) }
-                                else if digits.count > 6 { code = String(digits.prefix(6)) }
+                    SettingsSectionHeader(title: "Verify", tone: .normal)
+                    SettingsCard {
+                        VStack(spacing: 10) {
+                            TextField("6-digit code", text: $code)
+                                .keyboardType(.numberPad)
+                                .font(.system(.title3, design: .monospaced, weight: .semibold))
+                                .foregroundColor(VP.text)
+                                .multilineTextAlignment(.center)
+                                .padding(.vertical, 12)
+                                .background(VP.bg)
+                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(VP.border, lineWidth: 1))
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .onChange(of: code) { _, new in
+                                    let digits = new.filter { $0.isNumber }
+                                    if digits != new { code = String(digits.prefix(6)) }
+                                    else if digits.count > 6 { code = String(digits.prefix(6)) }
+                                }
+                            SettingsPrimaryButton(title: busy ? "Verifying..." : "Verify & enable",
+                                                  isLoading: busy,
+                                                  isDisabled: code.count != 6) {
+                                Task { await verify() }
                             }
-                        Button(busy ? "Verifying..." : "Verify & Enable") {
-                            Task { await verify() }
                         }
-                        .disabled(busy || code.count != 6)
+                        .padding(16)
                     }
-                }
-                if let s = status {
-                    Section { Text(s).font(.caption).foregroundColor(isError ? VP.wrong : VP.right) }
                 }
             }
+
+            if let s = status {
+                Text(s)
+                    .font(.caption)
+                    .foregroundColor(isError ? VP.wrong : VP.right)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+            }
         }
-        .navigationTitle("Two-Factor")
-        .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
     }
 
@@ -655,8 +1164,6 @@ struct MFASettingsView: View {
                 verifiedFactorId = "\(v.id)"
             } else if let p = factors.totp.first(where: { $0.status == .unverified }) {
                 pendingFactorId = "\(p.id)"
-                // listFactors does not return the TOTP URI or secret — user
-                // has to tap "Generate" to start a fresh enrollment if needed.
             }
         } catch {
             status = error.localizedDescription
@@ -737,21 +1244,50 @@ struct SubscriptionSettingsView: View {
     @StateObject private var perms = PermissionStore.shared
     @StateObject private var store = StoreManager.shared
     @State private var showSubscription = false
-    // Drives the Upgrade-vs-Manage affordance. `true` = active paid plan
-    // (show manage), `false` = free/lapsed (show upgrade CTA). Populated
-    // via PermissionService so admin toggles affect this immediately.
     @State private var hasActiveSubscription: Bool = false
     @State private var restoreMessage: String? = nil
 
     var body: some View {
-        Form {
-            // Apple Review 3.1.1 — Restore Purchases must be visible from
-            // the top-level subscription surface regardless of whether
-            // the user currently has an active sub. Always-on so a user
-            // who reinstalled / signed in on a new device can recover
-            // their previous purchase without having to find a hidden path.
-            Section {
-                Button {
+        SettingsPageShell(title: "Subscription") {
+            SettingsSectionHeader(title: "Current plan", tone: .normal)
+            SettingsCard {
+                SettingsRowValue(title: "Plan",
+                                 value: auth.currentUser?.planDisplay ?? "Free",
+                                 valueColor: VP.accent)
+                SettingsRowValue(title: "Status",
+                                 value: hasActiveSubscription ? "Active" : "No active subscription",
+                                 showDivider: false)
+            }
+
+            SettingsSectionHeader(title: "Billing", tone: .normal)
+            SettingsCard {
+                if !hasActiveSubscription {
+                    SettingsRowButton(title: "Upgrade",
+                                      tone: .accent,
+                                      trailing: nil,
+                                      showDivider: false) {
+                        showSubscription = true
+                    }
+                } else if let url = URL(string: "https://apps.apple.com/account/subscriptions") {
+                    SettingsRowExternal(title: "Manage subscription",
+                                        url: url,
+                                        tone: .accent,
+                                        showDivider: false)
+                }
+            }
+
+            if hasActiveSubscription {
+                SettingsNote(text: "Subscriptions purchased in the app are managed by Apple.")
+            }
+
+            // Apple Review 3.1.1 — Restore Purchases always-on so reinstall /
+            // new-device flows can recover a previous purchase.
+            SettingsSectionHeader(title: "Restore", tone: .normal)
+            SettingsCard {
+                SettingsRowButton(title: store.isLoading ? "Checking..." : "Restore purchases",
+                                  tone: .accent,
+                                  trailing: nil,
+                                  showDivider: false) {
                     Task {
                         restoreMessage = nil
                         await store.restorePurchases()
@@ -761,84 +1297,31 @@ struct SubscriptionSettingsView: View {
                             restoreMessage = "Checked for purchases on your Apple ID."
                         }
                     }
-                } label: {
-                    HStack {
-                        Text("Restore Purchases")
-                        Spacer()
-                        if store.isLoading {
-                            ProgressView()
-                        }
-                    }
                 }
-                .foregroundColor(VP.accent)
-                .disabled(store.isLoading)
-                if let msg = restoreMessage {
-                    Text(msg).font(.caption).foregroundColor(VP.dim)
-                }
+            }
+            if let msg = restoreMessage {
+                SettingsNote(text: msg)
             }
 
-            Section("Current Plan") {
-                HStack {
-                    Text("Plan")
-                    Spacer()
-                    Text(auth.currentUser?.planDisplay ?? "Free")
-                        .foregroundColor(VP.accent).fontWeight(.semibold)
-                }
-                HStack {
-                    Text("Status")
-                    Spacer()
-                    Text(hasActiveSubscription ? "Active" : "No active subscription")
-                        .foregroundColor(VP.dim)
+            SettingsSectionHeader(title: "Web billing", tone: .normal)
+            SettingsCard {
+                if let url = URL(string: "https://veritypost.com/profile/settings/billing") {
+                    SettingsRowExternal(title: "Open web billing",
+                                        url: url,
+                                        tone: .accent,
+                                        showDivider: false)
                 }
             }
-
-            Section("Billing") {
-                if !hasActiveSubscription {
-                    Button("Upgrade") { showSubscription = true }
-                        .foregroundColor(VP.accent)
-                        .fontWeight(.semibold)
-                } else {
-                    Button("Manage Subscription") {
-                        if let url = URL(string: "https://apps.apple.com/account/subscriptions") {
-                            UIApplication.shared.open(url)
-                        }
-                    }
-                    .foregroundColor(VP.accent)
-                    Text("Subscriptions purchased in the app are managed by Apple.")
-                        .font(.caption)
-                        .foregroundColor(VP.dim)
-                }
-            }
-
-            Section {
-                Text("If you purchased your plan on the web, manage it at veritypost.com/profile/settings/billing.")
-                    .font(.caption)
-                    .foregroundColor(VP.dim)
-                Button("Open web billing") {
-                    if let url = URL(string: "https://veritypost.com/profile/settings/billing") {
-                        UIApplication.shared.open(url)
-                    }
-                }
-                .foregroundColor(VP.accent)
-            }
+            SettingsNote(text: "If you purchased your plan on the web, manage it at veritypost.com/profile/settings/billing.")
         }
-        .navigationTitle("Subscription")
-        .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showSubscription) { SubscriptionView().environmentObject(auth) }
         .task(id: perms.changeToken) {
-            // `billing.subscription.view_own` is granted for active paid
-            // plans in `compute_effective_perms`; free/lapsed users don't
-            // get it, which is exactly the Upgrade-CTA condition.
             hasActiveSubscription = await PermissionService.shared.has("billing.subscription.view_own")
         }
     }
 }
 
-// MARK: - Notifications
-// @feature-verified notifications 2026-04-18
-// Push row self-gates on notifications.prefs.toggle_push; in-app toggles
-// on notifications.prefs.toggle_in_app. Section disappears entirely for
-// users without notifications.prefs.view.
+// MARK: - Notifications (Alerts)
 
 struct NotificationsSettingsView: View {
     @EnvironmentObject var auth: AuthViewModel
@@ -860,61 +1343,70 @@ struct NotificationsSettingsView: View {
     @State private var canToggleInApp = false
 
     var body: some View {
-        Form {
+        SettingsPageShell(title: "Alerts") {
             if !canViewPrefs {
-                Section {
-                    Text("Notifications preferences aren\u{2019}t available for your account.")
-                        .font(.caption)
-                        .foregroundColor(VP.dim)
-                }
+                SettingsNote(text: "Notifications preferences aren\u{2019}t available for your account.")
             } else {
                 if canTogglePush {
-                    Section("Push") {
-                        HStack {
-                            Text("System permission")
-                            Spacer()
-                            Text(push.summary)
-                                .foregroundColor(push.isOn ? VP.right : VP.dim)
-                                .font(.caption)
-                        }
+                    SettingsSectionHeader(title: "Push", tone: .normal)
+                    SettingsCard {
+                        SettingsRowValue(title: "System permission",
+                                         value: push.summary,
+                                         valueColor: push.isOn ? VP.right : VP.dim,
+                                         showDivider: push.status == .notDetermined || push.isDenied)
                         if push.status == .notDetermined {
-                            Button("Turn on notifications") { showPushPrompt = true }
-                                .foregroundColor(VP.accent)
+                            SettingsRowButton(title: "Turn on notifications",
+                                              tone: .accent,
+                                              trailing: nil,
+                                              showDivider: false) { showPushPrompt = true }
                         } else if push.isDenied {
-                            // Once denied, iOS won't show the dialog again — only
-                            // Settings.app can flip it back on.
-                            Button("Open iOS Settings") { push.openSystemSettings() }
-                                .foregroundColor(VP.accent)
-                            Text("Notifications are off for Verity Post. Open iOS Settings to turn them back on.")
-                                .font(.caption)
-                                .foregroundColor(VP.dim)
+                            // Once denied, iOS won't re-prompt — deep link to Settings.
+                            SettingsRowButton(title: "Open iOS Settings",
+                                              tone: .accent,
+                                              trailing: nil,
+                                              showDivider: false) { push.openSystemSettings() }
                         }
+                    }
+                    if push.isDenied {
+                        SettingsNote(text: "Notifications are off for Verity Post. Open iOS Settings to turn them back on.")
                     }
                 }
 
                 if canToggleInApp {
-                    Section("What to send") {
-                        Toggle("Breaking news alerts", isOn: $breakingAlerts)
-                        Toggle("Morning digest", isOn: $morningDigest)
-                        Toggle("Expert answered my question", isOn: $expertReplies)
-                        Toggle("Replies to my comments", isOn: $commentReplies)
-                        Toggle("Weekly recap", isOn: $weeklyRecap)
+                    SettingsSectionHeader(title: "What to send", tone: .normal)
+                    SettingsCard {
+                        SettingsToggleRow(title: "Breaking news alerts",
+                                          subtitle: "Fast-moving stories",
+                                          isOn: $breakingAlerts)
+                        SettingsToggleRow(title: "Morning digest",
+                                          subtitle: "One email per day",
+                                          isOn: $morningDigest)
+                        SettingsToggleRow(title: "Expert replies",
+                                          subtitle: "When an expert answers your ask",
+                                          isOn: $expertReplies)
+                        SettingsToggleRow(title: "Replies to my comments",
+                                          subtitle: nil,
+                                          isOn: $commentReplies)
+                        SettingsToggleRow(title: "Weekly recap",
+                                          subtitle: "Your week in review",
+                                          isOn: $weeklyRecap,
+                                          showDivider: false)
                     }
 
-                    Section {
-                        Button(saving ? "Saving..." : "Save preferences") { Task { await save() } }
-                            .disabled(saving || !loaded)
+                    VStack {
+                        SettingsPrimaryButton(title: saving ? "Saving..." : "Save preferences",
+                                              isLoading: saving,
+                                              isDisabled: !loaded) {
+                            Task { await save() }
+                        }
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
                 }
 
-                Section {
-                    Text("These preferences control email digests and in-app alerts. Actual push delivery also requires system permission.")
-                        .font(.caption).foregroundColor(VP.dim)
-                }
+                SettingsNote(text: "These preferences control email digests and in-app alerts. Actual push delivery also requires system permission.")
             }
         }
-        .navigationTitle("Notifications")
-        .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
         .task(id: perms.changeToken) {
             canViewPrefs = await PermissionService.shared.has("notifications.prefs.view")
@@ -924,7 +1416,7 @@ struct NotificationsSettingsView: View {
         .sheet(isPresented: $showPushPrompt) {
             PushPromptSheet(
                 title: "Turn on notifications",
-                detail: "We'll only notify you about things you've subscribed to \u{2014} breaking news, expert replies, comment replies. You can change any of these below.",
+                detail: "We\u{2019}ll only notify you about things you\u{2019}ve subscribed to \u{2014} breaking news, expert replies, comment replies. You can change any of these below.",
                 onEnable: {
                     await push.requestIfNeeded()
                     if push.isOn, let uid = auth.currentUser?.id {
@@ -938,12 +1430,8 @@ struct NotificationsSettingsView: View {
 
     private func load() async {
         guard let userId = auth.currentUser?.id else { loaded = true; return }
-        // Load existing preferences
-        // Round 6 iOS-DATA: `preferences` is a phantom column on `users`; the
-        // real jsonb holder is `metadata` (Round 5 Item 2 already routed writes
-        // through `update_own_profile` storing at `metadata.notifications`).
-        // Reads now mirror by selecting `metadata` and drilling into the
-        // same sub-key namespace.
+        // Round 6 iOS-DATA: `preferences` is a phantom column; real jsonb
+        // lives at `users.metadata` (writes go through update_own_profile).
         struct Row: Decodable { let metadata: JSONValue? }
         if let row: Row = try? await client.from("users")
             .select("metadata")
@@ -964,15 +1452,10 @@ struct NotificationsSettingsView: View {
         guard let userId = auth.currentUser?.id else { return }
         saving = true
         defer { saving = false }
-        // Round 6 iOS-DATA: read-back merges the current metadata blob
-        // (not the phantom `preferences` column) so sibling keys survive.
         struct Row: Decodable { let metadata: JSONValue? }
         let existing: Row? = try? await client.from("users")
             .select("metadata").eq("id", value: userId).single().execute().value
-        var merged: [String: Any] = [:]
-        if let prefs = existing?.metadata?.dictionary {
-            merged = prefs
-        }
+        var merged: [String: Any] = existing?.metadata?.dictionary ?? [:]
         merged["notifications"] = [
             "breaking": breakingAlerts,
             "digest": morningDigest,
@@ -981,10 +1464,6 @@ struct NotificationsSettingsView: View {
             "weekly_recap": weeklyRecap,
         ]
         do {
-            // Round 5 Item 2: fixes the latent `preferences` -> `metadata`
-            // column typo AND gates through the SECDEF RPC. The RPC
-            // server-side-merges metadata at the top level so the re-read
-            // at line ~890 stays defensive but no longer races.
             let data = try JSONSerialization.data(withJSONObject: merged)
             let metadataValue = try JSONDecoder().decode(JSONValue.self, from: data)
             struct Args: Encodable { let p_fields: Patch }
@@ -1012,31 +1491,52 @@ struct FeedPreferencesSettingsView: View {
     @State private var saving = false
 
     var body: some View {
-        Form {
-            Section("Feed") {
-                Toggle("Show breaking stories at top", isOn: $showBreaking)
-                Toggle("Show trending stories", isOn: $showTrending)
-                Toggle("Show recommended stories", isOn: $showRecommended)
+        SettingsPageShell(title: "Feed") {
+            SettingsSectionHeader(title: "What surfaces", tone: .normal)
+            SettingsCard {
+                SettingsToggleRow(title: "Show breaking at top",
+                                  subtitle: nil,
+                                  isOn: $showBreaking)
+                SettingsToggleRow(title: "Show trending",
+                                  subtitle: nil,
+                                  isOn: $showTrending)
+                SettingsToggleRow(title: "Show recommended",
+                                  subtitle: nil,
+                                  isOn: $showRecommended,
+                                  showDivider: false)
             }
-            Section("Filters") {
-                Toggle("Hide low-credibility stories", isOn: $hideLowCred)
+
+            SettingsSectionHeader(title: "Filters", tone: .normal)
+            SettingsCard {
+                SettingsToggleRow(title: "Hide low-credibility stories",
+                                  subtitle: nil,
+                                  isOn: $hideLowCred,
+                                  showDivider: false)
             }
-            Section("Display") {
-                Toggle("Compact layout", isOn: $compactDisplay)
+
+            SettingsSectionHeader(title: "Display", tone: .normal)
+            SettingsCard {
+                SettingsToggleRow(title: "Compact layout",
+                                  subtitle: "Tighter rows, smaller hero images",
+                                  isOn: $compactDisplay,
+                                  showDivider: false)
             }
-            Section {
-                Button(saving ? "Saving..." : "Save") { Task { await save() } }
-                    .disabled(saving || !loaded)
+
+            VStack {
+                SettingsPrimaryButton(title: saving ? "Saving..." : "Save",
+                                      isLoading: saving,
+                                      isDisabled: !loaded) {
+                    Task { await save() }
+                }
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
         }
-        .navigationTitle("Feed Preferences")
-        .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
     }
 
     private func load() async {
         guard let userId = auth.currentUser?.id else { loaded = true; return }
-        // Round 6 iOS-DATA: see NotificationsSettingsView.load for rationale.
         struct Row: Decodable { let metadata: JSONValue? }
         if let row: Row = try? await client.from("users")
             .select("metadata").eq("id", value: userId).single().execute().value,
@@ -1054,8 +1554,6 @@ struct FeedPreferencesSettingsView: View {
         guard let userId = auth.currentUser?.id else { return }
         saving = true
         defer { saving = false }
-        // Round 6 iOS-DATA: merge into `metadata` (real column), not
-        // `preferences` (phantom).
         struct Row: Decodable { let metadata: JSONValue? }
         let existing: Row? = try? await client.from("users")
             .select("metadata").eq("id", value: userId).single().execute().value
@@ -1068,9 +1566,6 @@ struct FeedPreferencesSettingsView: View {
             "display": compactDisplay ? "compact" : "comfortable",
         ]
         do {
-            // Round 5 Item 2: goes through update_own_profile RPC
-            // (SECDEF, server-side metadata merge). Also closes the
-            // `preferences` -> `metadata` column typo.
             let data = try JSONSerialization.data(withJSONObject: merged)
             let metadataValue = try JSONDecoder().decode(JSONValue.self, from: data)
             struct Args: Encodable { let p_fields: Patch }
@@ -1103,59 +1598,103 @@ struct VerificationRequestView: View {
     @State private var submittedMessage: String? = nil
 
     var body: some View {
-        Form {
+        SettingsPageShell(title: "Verification") {
             if let s = existingStatus {
-                Section("Status") {
-                    Text(s.capitalized)
-                        .font(.system(.subheadline, design: .default, weight: .semibold))
-                        .foregroundColor(s == "approved" ? VP.right : (s == "rejected" ? VP.wrong : VP.accent))
+                SettingsSectionHeader(title: "Status", tone: .normal)
+                SettingsCard {
+                    SettingsRowValue(title: "Current status",
+                                     value: s.capitalized,
+                                     valueColor: s == "approved"
+                                        ? VP.right
+                                        : (s == "rejected" ? VP.wrong : VP.accent),
+                                     showDivider: false)
                 }
             }
-            Section("Type") {
-                Picker("Applying as", selection: $type) {
+
+            SettingsSectionHeader(title: "Type", tone: .normal)
+            SettingsCard {
+                Picker("", selection: $type) {
                     Text("Expert").tag("expert")
                     Text("Journalist").tag("journalist")
-                    Text("Public Figure").tag("public_figure")
+                    Text("Public figure").tag("public_figure")
                 }
                 .pickerStyle(.segmented)
+                .padding(16)
             }
-            Section("About You") {
-                // Round 6 iOS-DATA: `full_name` is NOT NULL on
-                // `expert_applications`; /api/expert/apply rejects requests
-                // without it. Added as a required TextField.
-                TextField("Full name", text: $fullName)
-                    .textInputAutocapitalization(.words)
-                TextField("Field / area (e.g. AI policy)", text: $field)
-                TextField("Role / title (e.g. Research Lead)", text: $role)
-                TextField("Organization (optional)", text: $org)
-                TextField("Short bio", text: $bio, axis: .vertical).lineLimit(3...8)
+
+            SettingsSectionHeader(title: "About you", tone: .normal)
+            SettingsCard {
+                VStack(spacing: 14) {
+                    // Round 6 iOS-DATA: `full_name` is NOT NULL in expert_applications.
+                    SettingsTextField(label: "Full name",
+                                      placeholder: "Jane Doe",
+                                      text: $fullName,
+                                      autocap: .words)
+                    SettingsTextField(label: "Field / area",
+                                      placeholder: "AI policy",
+                                      text: $field)
+                    SettingsTextField(label: "Role / title",
+                                      placeholder: "Research Lead",
+                                      text: $role)
+                    SettingsTextField(label: "Organization (optional)",
+                                      placeholder: "—",
+                                      text: $org)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Short bio").font(.caption).foregroundColor(VP.dim)
+                        TextField("Tell us about your work...", text: $bio, axis: .vertical)
+                            .font(.system(size: 15))
+                            .foregroundColor(VP.text)
+                            .lineLimit(3...8)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 11)
+                            .background(VP.bg)
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(VP.border, lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                }
+                .padding(16)
             }
-            Section("Links") {
-                TextField("Portfolio URL", text: $portfolioURL)
-                    .keyboardType(.URL).textInputAutocapitalization(.never)
-                TextField("LinkedIn", text: $linkedin)
-                    .keyboardType(.URL).textInputAutocapitalization(.never)
+
+            SettingsSectionHeader(title: "Links", tone: .normal)
+            SettingsCard {
+                VStack(spacing: 14) {
+                    SettingsTextField(label: "Portfolio URL",
+                                      placeholder: "https://",
+                                      text: $portfolioURL,
+                                      keyboard: .URL,
+                                      autocap: .never,
+                                      autocorrect: false)
+                    SettingsTextField(label: "LinkedIn",
+                                      placeholder: "https://linkedin.com/in/...",
+                                      text: $linkedin,
+                                      keyboard: .URL,
+                                      autocap: .never,
+                                      autocorrect: false)
+                }
+                .padding(16)
             }
-            Section {
-                Button(submitting ? "Submitting..." : "Submit application") {
+
+            VStack(spacing: 10) {
+                SettingsPrimaryButton(title: submitting ? "Submitting..." : "Submit application",
+                                      isLoading: submitting,
+                                      isDisabled: fullName.trimmingCharacters(in: .whitespaces).isEmpty
+                                                  || field.isEmpty
+                                                  || bio.isEmpty) {
                     Task { await submit() }
                 }
-                .disabled(submitting || fullName.trimmingCharacters(in: .whitespaces).isEmpty
-                          || field.isEmpty || bio.isEmpty)
+                if let msg = submittedMessage {
+                    Text(msg).font(.caption).foregroundColor(VP.right)
+                }
             }
-            if let msg = submittedMessage {
-                Section { Text(msg).font(.caption).foregroundColor(VP.right) }
-            }
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
         }
-        .navigationTitle("Verification")
-        .navigationBarTitleDisplayMode(.inline)
         .task { await loadExisting() }
     }
 
     private func loadExisting() async {
         guard let userId = auth.currentUser?.id else { loaded = true; return }
-        // Round 6 iOS-DATA: `submitted_at` is a phantom column on
-        // `expert_applications`; the real ordering column is `created_at`.
+        // Round 6 iOS-DATA: `submitted_at` is phantom; real ordering column is `created_at`.
         struct Row: Decodable { let status: String }
         let rows: [Row] = (try? await client.from("expert_applications")
             .select("status")
@@ -1171,11 +1710,8 @@ struct VerificationRequestView: View {
         guard auth.currentUser?.id != nil else { return }
         submitting = true
         defer { submitting = false }
-        // Round 6 iOS-DATA: route through /api/expert/apply (gated on
-        // `expert.application.apply` permission, dispatches to the
-        // `submit_expert_application` RPC). Direct inserts previously
-        // wrote phantom columns (`type`, `field`, `role`, `org`, `links`)
-        // and would be rejected by the NOT NULL constraint on `full_name`.
+        // Route through /api/expert/apply — gated on expert.application.apply,
+        // dispatches to submit_expert_application RPC.
         struct ExpertApplyBody: Encodable {
             let application_type: String
             let full_name: String
@@ -1215,7 +1751,7 @@ struct VerificationRequestView: View {
             req.httpBody = try JSONEncoder().encode(body)
             let (_, resp) = try await URLSession.shared.data(for: req)
             if let http = resp as? HTTPURLResponse, http.statusCode == 200 {
-                submittedMessage = "Application received. We'll review within 5 business days."
+                submittedMessage = "Application received. We\u{2019}ll review within 5 business days."
                 existingStatus = "pending"
             } else {
                 Log.d("Verification submit non-200:", (resp as? HTTPURLResponse)?.statusCode as Any)
@@ -1224,7 +1760,7 @@ struct VerificationRequestView: View {
     }
 }
 
-// MARK: - Expert settings (only shown to role=expert)
+// MARK: - Expert settings (role=expert)
 
 struct ExpertSettingsView: View {
     @EnvironmentObject var auth: AuthViewModel
@@ -1243,29 +1779,67 @@ struct ExpertSettingsView: View {
     ]
 
     var body: some View {
-        Form {
-            Section("Daily Tag Limit") {
-                Stepper("\(tagLimit) / day", value: $tagLimit, in: 1...20)
-            }
-            Section("Question Notifications") {
-                Picker("", selection: $notifPref) {
-                    ForEach(notifOptions, id: \.0) { k, label in Text(label).tag(k) }
+        SettingsPageShell(title: "Expert") {
+            SettingsSectionHeader(title: "Daily tag limit", tone: .normal)
+            SettingsCard {
+                HStack {
+                    Text("\(tagLimit) / day")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(VP.text)
+                    Spacer()
+                    Stepper("", value: $tagLimit, in: 1...20).labelsHidden()
                 }
-                .pickerStyle(.inline)
-                .labelsHidden()
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .frame(minHeight: 44)
             }
-            Section {
-                Button(saving ? "Saving..." : "Save") { Task { await save() } }.disabled(saving || !loaded)
+
+            SettingsSectionHeader(title: "Question notifications", tone: .normal)
+            SettingsCard {
+                VStack(spacing: 0) {
+                    ForEach(Array(notifOptions.enumerated()), id: \.element.0) { idx, pair in
+                        Button { notifPref = pair.0 } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: notifPref == pair.0
+                                      ? "largecircle.fill.circle"
+                                      : "circle")
+                                    .font(.system(size: 18, weight: .regular))
+                                    .foregroundColor(notifPref == pair.0 ? VP.accent : VP.muted)
+                                Text(pair.1)
+                                    .font(.system(size: 15, weight: .regular))
+                                    .foregroundColor(VP.text)
+                                Spacer()
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                            .overlay(alignment: .bottom) {
+                                if idx < notifOptions.count - 1 {
+                                    Rectangle().fill(VP.border).frame(height: 1).padding(.leading, 16)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
             }
+
+            VStack {
+                SettingsPrimaryButton(title: saving ? "Saving..." : "Save",
+                                      isLoading: saving,
+                                      isDisabled: !loaded) {
+                    Task { await save() }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
         }
-        .navigationTitle("Expert Settings")
-        .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
     }
 
     private func load() async {
         guard let userId = auth.currentUser?.id else { loaded = true; return }
-        // Round 6 iOS-DATA: see NotificationsSettingsView.load for rationale.
         struct Row: Decodable { let metadata: JSONValue? }
         if let row: Row = try? await client.from("users")
             .select("metadata").eq("id", value: userId).single().execute().value,
@@ -1280,16 +1854,12 @@ struct ExpertSettingsView: View {
         guard let userId = auth.currentUser?.id else { return }
         saving = true
         defer { saving = false }
-        // Round 6 iOS-DATA: merge into `metadata`, not phantom `preferences`.
         struct Row: Decodable { let metadata: JSONValue? }
         let existing: Row? = try? await client.from("users")
             .select("metadata").eq("id", value: userId).single().execute().value
         var merged: [String: Any] = existing?.metadata?.dictionary ?? [:]
         merged["expert"] = ["tagLimit": tagLimit, "notifPref": notifPref]
         do {
-            // Round 5 Item 2: goes through update_own_profile RPC
-            // (SECDEF, server-side metadata merge). Also closes the
-            // `preferences` -> `metadata` column typo.
             let data = try JSONSerialization.data(withJSONObject: merged)
             let metadataValue = try JSONDecoder().decode(JSONValue.self, from: data)
             struct Args: Encodable { let p_fields: Patch }
@@ -1311,53 +1881,62 @@ struct DataPrivacyView: View {
     @State private var exportRequested = false
     @State private var showDeleteConfirm = false
     @State private var deleteSubmitted = false
-    // Task 62 — DM read receipts opt-out (migration 044). Default true
-    // preserves always-on behavior; toggling writes users.dm_read_receipts_enabled.
+    // Task 62 — DM read receipts opt-out (migration 044).
     @State private var dmReceiptsEnabled = true
     @State private var dmReceiptsLoading = true
+    @StateObject private var perms = PermissionStore.shared
+    @State private var canExport = false
 
     var body: some View {
-        Form {
-            Section("Messages") {
-                Toggle("DM read receipts", isOn: $dmReceiptsEnabled)
-                    .disabled(dmReceiptsLoading)
-                    .onChange(of: dmReceiptsEnabled) { newValue in
+        SettingsPageShell(title: "Data & Privacy") {
+            SettingsSectionHeader(title: "Messages", tone: .normal)
+            SettingsCard {
+                SettingsToggleRow(title: "DM read receipts",
+                                  subtitle: "Let senders see when you\u{2019}ve read their messages",
+                                  isOn: $dmReceiptsEnabled,
+                                  isDisabled: dmReceiptsLoading,
+                                  showDivider: false)
+                    .onChange(of: dmReceiptsEnabled) { _, newValue in
                         Task { await saveDmReceiptsPref(newValue) }
                     }
-                Text("Let senders see when you\u{2019}ve read their direct messages. Turn off to read without confirming.")
-                    .font(.caption).foregroundColor(VP.dim)
             }
 
-            Section("Your Data") {
-                Button("Request data export") {
-                    Task { await requestExport() }
+            if canExport {
+                SettingsSectionHeader(title: "Your data", tone: .normal)
+                SettingsCard {
+                    SettingsRowButton(title: exportRequested ? "Export requested"
+                                                             : "Request data export",
+                                      tone: exportRequested ? .normal : .accent,
+                                      trailing: nil,
+                                      showDivider: false) {
+                        Task { await requestExport() }
+                    }
                 }
-                .disabled(exportRequested)
-                .foregroundColor(VP.accent)
                 if exportRequested {
-                    Text("We'll email you a downloadable archive within 30 days, per GDPR.")
-                        .font(.caption).foregroundColor(VP.dim)
+                    SettingsNote(text: "We\u{2019}ll email you a downloadable archive within 30 days, per GDPR.")
                 }
             }
 
-            Section("Delete Account") {
-                Button("Delete my account", role: .destructive) {
+            SettingsSectionHeader(title: "Delete account", tone: .danger)
+            SettingsCard {
+                SettingsRowButton(title: "Delete my account",
+                                  tone: .destructive,
+                                  trailing: nil,
+                                  showDivider: false) {
+                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
                     showDeleteConfirm = true
                 }
-                if deleteSubmitted {
-                    Text("Request submitted. Your account will be deleted within 30 days; log back in to cancel.")
-                        .font(.caption).foregroundColor(VP.dim)
-                }
+            }
+            if deleteSubmitted {
+                SettingsNote(text: "Request submitted. Your account will be deleted within 30 days; log back in to cancel.")
             }
 
-            Section {
-                Text("Data requests and deletions are processed via the data_requests queue. This complies with GDPR and CCPA obligations.")
-                    .font(.caption).foregroundColor(VP.dim)
-            }
+            SettingsNote(text: "Data requests and deletions are processed via the data_requests queue. This complies with GDPR and CCPA obligations.")
         }
-        .navigationTitle("Data & Privacy")
-        .navigationBarTitleDisplayMode(.inline)
         .task { await loadDmReceiptsPref() }
+        .task(id: perms.changeToken) {
+            canExport = await PermissionService.shared.has("settings.data.request_export")
+        }
         .alert("Delete account?", isPresented: $showDeleteConfirm) {
             Button("Delete", role: .destructive) { Task { await requestDeletion() } }
             Button("Cancel", role: .cancel) { }
@@ -1379,9 +1958,6 @@ struct DataPrivacyView: View {
 
     private func saveDmReceiptsPref(_ newValue: Bool) async {
         guard auth.currentUser?.id != nil else { return }
-        // Round 5 Item 2: routes through the update_own_profile SECDEF RPC
-        // rather than direct users.update (which the Round 4 trigger would
-        // not reject for this column, but we keep the write path uniform).
         struct Args: Encodable { let p_fields: Patch }
         struct Patch: Encodable { let dm_read_receipts_enabled: Bool }
         do {
@@ -1429,7 +2005,7 @@ struct DataPrivacyView: View {
 struct FeedbackSheet: View {
     @EnvironmentObject var auth: AuthViewModel
     private let client = SupabaseManager.shared.client
-    @Environment(\.dismiss) var dismiss
+    @Environment(\.dismiss) private var dismiss
 
     @State private var category = "bug"
     @State private var message: String = ""
@@ -1437,32 +2013,52 @@ struct FeedbackSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Category") {
-                    Picker("", selection: $category) {
-                        Text("Bug").tag("bug")
-                        Text("Feature").tag("feature_request")
-                        Text("Other").tag("other")
+            ScrollView {
+                VStack(spacing: 0) {
+                    SettingsSectionHeader(title: "Category", tone: .normal)
+                    SettingsCard {
+                        Picker("", selection: $category) {
+                            Text("Bug").tag("bug")
+                            Text("Feature").tag("feature_request")
+                            Text("Other").tag("other")
+                        }
+                        .pickerStyle(.segmented)
+                        .padding(16)
                     }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                }
-                Section("Your feedback") {
-                    TextField("Tell us what's up...", text: $message, axis: .vertical)
-                        .lineLimit(4...10)
-                }
-                Section {
-                    Button(submitting ? "Sending..." : "Send") {
-                        Task { await submit() }
+
+                    SettingsSectionHeader(title: "Your feedback", tone: .normal)
+                    SettingsCard {
+                        TextField("Tell us what\u{2019}s up...", text: $message, axis: .vertical)
+                            .font(.system(size: 15))
+                            .foregroundColor(VP.text)
+                            .lineLimit(4...10)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 11)
+                            .background(VP.bg)
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(VP.border, lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .padding(16)
                     }
-                    .disabled(submitting || message.trimmingCharacters(in: .whitespaces).isEmpty)
+
+                    VStack {
+                        SettingsPrimaryButton(title: submitting ? "Sending..." : "Send",
+                                              isLoading: submitting,
+                                              isDisabled: message.trimmingCharacters(in: .whitespaces).isEmpty) {
+                            Task { await submit() }
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
+
+                    Color.clear.frame(height: 24)
                 }
             }
-            .navigationTitle("Send Feedback")
+            .background(VP.bg.ignoresSafeArea())
+            .navigationTitle("Send feedback")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") { dismiss() }.foregroundColor(VP.text)
                 }
             }
         }
@@ -1472,10 +2068,8 @@ struct FeedbackSheet: View {
         guard auth.currentUser?.id != nil else { return }
         submitting = true
         defer { submitting = false }
-        // Round 6 iOS-DATA: route through /api/support. Direct inserts
-        // previously wrote a phantom `body` column on `support_tickets`;
-        // the real message body lives in `ticket_messages`, and the
-        // server route handles the two-table insert.
+        // Round 6 iOS-DATA: /api/support handles the two-table insert
+        // (support_tickets + ticket_messages).
         struct SupportBody: Encodable {
             let category: String
             let subject: String
@@ -1504,16 +2098,12 @@ struct FeedbackSheet: View {
     }
 }
 
-// MARK: - Minimal JSONValue (decodes jsonb from Supabase without ties to a specific schema)
+// MARK: - Minimal JSONValue (decodes jsonb from Supabase without a fixed schema)
 
 indirect enum JSONValue: Codable {
     case string(String), int(Int), double(Double), bool(Bool), null
     case array([JSONValue]), object([String: JSONValue])
 
-    // Round 5 Item 2: Encodable conformance added so iOS save paths can
-    // wrap a dynamic [String: Any] merged metadata blob into the
-    // update_own_profile RPC `p_fields` jsonb without hand-writing an
-    // Encodable for every shape.
     func encode(to encoder: Encoder) throws {
         var c = encoder.singleValueContainer()
         switch self {
@@ -1586,7 +2176,7 @@ indirect enum JSONValue: Codable {
 
 // MARK: - Apple Guideline 1.2 — Blocked Accounts management
 
-/// Settings → Blocked Accounts. Lists every user the current viewer has
+/// Settings → Blocked accounts. Lists every user the current viewer has
 /// blocked, with an Unblock action per row. Sourced from
 /// GET /api/users/blocked (server-side filter on `blocker_id = auth.uid()`)
 /// and mutated through DELETE /api/users/[id]/block.
@@ -1609,43 +2199,46 @@ struct BlockedAccountsView: View {
     @State private var busyId: String? = nil
 
     var body: some View {
-        Group {
+        SettingsPageShell(title: "Blocked accounts") {
             if loading {
                 ProgressView().padding(.top, 40)
             } else if let err = loadError {
                 VStack(spacing: 8) {
                     Text("Couldn\u{2019}t load blocks")
-                        .font(.system(.callout, design: .default, weight: .semibold))
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(VP.text)
                     Text(err).font(.caption).foregroundColor(VP.dim)
                     Button("Try again") { Task { await load() } }
                         .foregroundColor(VP.accent)
                 }
                 .padding(.top, 60)
+                .frame(maxWidth: .infinity)
             } else if rows.isEmpty {
                 VStack(spacing: 6) {
                     Text("No blocks")
-                        .font(.system(.callout, design: .default, weight: .semibold))
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(VP.text)
                     Text("People you block will appear here.")
                         .font(.caption).foregroundColor(VP.dim)
                 }
                 .padding(.top, 60)
+                .frame(maxWidth: .infinity)
             } else {
-                List {
-                    ForEach(rows) { row in
+                SettingsSectionHeader(title: "Blocked", tone: .normal)
+                SettingsCard {
+                    ForEach(Array(rows.enumerated()), id: \.element.id) { idx, row in
                         HStack(spacing: 12) {
                             Circle()
                                 .fill(Color(hex: row.avatar_color ?? "cccccc"))
                                 .frame(width: 36, height: 36)
                                 .overlay(
                                     Text(String((row.username ?? "?").prefix(1)).uppercased())
-                                        .font(.system(.subheadline, design: .default, weight: .bold))
+                                        .font(.system(size: 13, weight: .bold))
                                         .foregroundColor(.white)
                                 )
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(row.username.map { "@\($0)" } ?? "Unknown user")
-                                    .font(.system(.subheadline, design: .default, weight: .semibold))
+                                    .font(.system(size: 14, weight: .semibold))
                                     .foregroundColor(VP.text)
                                 if let r = row.reason, !r.isEmpty {
                                     Text(r).font(.caption).foregroundColor(VP.dim)
@@ -1657,19 +2250,29 @@ struct BlockedAccountsView: View {
                                     Task { await unblock(rowId: row.id, targetId: target) }
                                 }
                             } label: {
-                                Text(busyId == row.id ? "..." : "Unblock")
-                                    .font(.system(.footnote, design: .default, weight: .semibold))
+                                Text(busyId == row.id ? "\u{2026}" : "Unblock")
+                                    .font(.system(size: 13, weight: .semibold))
                                     .foregroundColor(VP.accent)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .overlay(RoundedRectangle(cornerRadius: 99)
+                                        .stroke(VP.border, lineWidth: 1))
                             }
+                            .buttonStyle(.plain)
                             .disabled(busyId == row.id || row.blocked_id == nil)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .frame(minHeight: 44)
+                        .overlay(alignment: .bottom) {
+                            if idx < rows.count - 1 {
+                                Rectangle().fill(VP.border).frame(height: 1).padding(.leading, 16)
+                            }
                         }
                     }
                 }
-                .listStyle(.plain)
             }
         }
-        .navigationTitle("Blocked Accounts")
-        .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
     }
 
