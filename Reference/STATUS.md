@@ -19,7 +19,7 @@ Verity Post is a permission-driven news platform (web + iOS) whose admin console
 | Admin console | `web/src/app/admin/*` + `web/src/app/api/admin/*` | 39 pages + 27 DS components, `@admin-verified` LOCKED |
 | Database | Supabase project `fyiwulqphgmoqullmrfn` | 100+ tables (use MCP for live count) |
 | Hosting | Vercel | Deploys on push to `main` (verified 2026-04-21) |
-| AI pipeline | `web/src/lib/pipeline/` + `web/src/app/api/admin/pipeline/*` + `web/src/app/api/newsroom/*` | F7 — 13 helper files, 12-step orchestrator, end-to-end live as of 2026-04-22 |
+| AI pipeline | `web/src/lib/pipeline/` + `web/src/app/api/admin/pipeline/*` + `web/src/app/api/newsroom/*` | F7 — 13 helper files, 12-step orchestrator, end-to-end live; Newsroom redesign 2026-04-22 (`b269e17`): single-page workspace with adult/kid tabs, dynamic taxonomy + prompt-preset library, inline cluster mutations (move/merge/split/dismiss), 14-day auto-archive |
 
 ## Permission system (product DNA)
 
@@ -59,7 +59,7 @@ Three apps, one DB, shared Supabase.
 | `web/src/lib/pipeline/*` | F7 AI pipeline — 12-step orchestrator helpers (cluster, story-match, scrape, clean-text, editorial-guide, call-model, cost-tracker, persist-article, plagiarism-check, prompt-overrides, render-body, errors, logger) |
 | `web/src/app/api/newsroom/ingest/run/route.ts` | F7 ingest — RSS poll → discovery_items → preCluster → story-match → feed_clusters (audience-routed; manual-trigger from /admin/newsroom) |
 | `web/src/app/api/admin/pipeline/generate/route.ts` | F7 12-step generate orchestrator — cluster lock → audience_safety_check → headline+summary+categorization → body → grounding → plagiarism → timeline → quiz → quiz_verification → persist |
-| `web/src/app/api/cron/pipeline-cleanup/route.ts` | F7 every-5-min orphan sweep (runs > 10 min stale, items in `generating` > 10 min, locks > 15 min) |
+| `web/src/app/api/cron/pipeline-cleanup/route.ts` | F7 daily cron (Hobby tier) — 4 sweeps: orphan runs > 10 min, items in `generating` > 10 min, expired cluster locks > 15 min, 14-day cluster expiry (skips locked_at + `generation_state='generating'`) |
 | `schema/reset_and_rebuild_v2.sql` | canonical DR replay (see `Current Projects/FIX_SESSION_1.md` — drift known) |
 
 ## Dev tooling

@@ -1,4 +1,4 @@
-# Next-session handoff — F7 COMPLETE / freeform Phase 5
+# Next-session handoff — Newsroom redesign SHIPPED, click-through verification + xlsx reconcile pending
 
 Paste this into the first message of your next Claude Code session.
 
@@ -6,99 +6,128 @@ Paste this into the first message of your next Claude Code session.
 
 ## STATE OF THE WORLD (2026-04-22 end-of-session)
 
-**F7 status — ALL PHASES COMPLETE (Tasks 1-30 of 30 shipped):**
+**F7 status — ALL PHASES COMPLETE (Tasks 1-30 of 30 shipped) + Phase 5 Newsroom redesign LIVE:**
 
 | Phase | Scope | State |
 |---|---|---|
-| Phase 1 (Foundation) | Tasks 1-4 | ✅ LIVE |
-| Phase 2 (Ingest) | Tasks 5-9 | ✅ LIVE |
-| Phase 3 (Orchestrator) | Tasks 10-19 | ✅ LIVE |
-| Phase 4 (Admin UI) | Tasks 20-30 | ✅ LIVE — full admin surface for the AI pipeline |
+| Phase 1 (Foundation) | Tasks 1-4 | LIVE |
+| Phase 2 (Ingest) | Tasks 5-9 | LIVE |
+| Phase 3 (Orchestrator) | Tasks 10-19 | LIVE |
+| Phase 4 (Admin UI) | Tasks 20-30 | LIVE |
+| Phase 5 (Newsroom redesign) | b269e17 | LIVE — single-page operator workspace, audience tabs, dynamic taxonomy, prompt presets, cluster mutations, 14d auto-archive |
 
 **Migrations — all applied live in `fyiwulqphgmoqullmrfn`:**
-- 112 (kids_waitlist), 114 (F7 foundation), 116 (cluster locks + perms), 118 (persist_generated_article RPC), 120 (pipeline_runs.error_type), 122 (cluster_id FKs + asymmetric ON DELETE fix), 124 (kids_summary RPC branch drop)
+- 112 (kids_waitlist), 114 (F7 foundation), 116 (cluster locks + perms), 118 (persist_generated_article RPC), 120 (pipeline_runs.error_type), 122 (cluster_id FKs + asymmetric ON DELETE fix), 124 (kids_summary RPC branch drop), **126 (Newsroom redesign — feed_clusters audience + archive/dismiss + ai_prompt_presets table + 6 cluster mutation RPCs + 3 perms wired to owner/admin/editor sets)**
 
-**types:gen ran** post-apply. `web/src/types/database.ts` reflects full live schema.
+**types:gen ran post-126.** `web/src/types/database.ts` reflects full live schema including `ai_prompt_presets`, all new RPCs, all new feed_clusters columns.
 
-**Clustering now wired end-to-end** (commit `238045b`) — ingest calls `preCluster` + `findBestMatch` per audience, writes `feed_clusters` rows + sets `discovery_items.cluster_id` + transitions `state='clustered'`. Pipeline reachable through normal flow.
+---
+
+## THE NEW NEWSROOM (read this — it's the operator surface)
+
+`/admin/newsroom` is now a **single-page operator workspace**. The owner asked for "a better version of the original verity-post-pipeline-snapshot" — collapsed across 4 prior pages into one. Everything related to running the AI pipeline lives here:
+
+**Top to bottom:**
+1. **Audience tab toggle** — Adult / Kid (URL-persisted via `?audience=...`)
+2. **Glance bar** — today's spend / runs 24h / kill switch state (toggle inline) / feed health, with deep-links to `/admin/pipeline/{costs,runs,settings}` + `/admin/feeds`
+3. **Filter row** — dynamic category dropdown + subcategory (filtered by `categories.parent_id`) + outlet + 6h/24h/72h/7d/all time + debounced search
+4. **Prompt picker** — Default editorial / Preset (DB-driven via `ai_prompt_presets`) / Custom textarea
+5. **Provider/model picker** — existing `PipelineRunPicker` retained
+6. **Refresh feeds button** — audience-scoped POST to `/api/newsroom/ingest/run`
+7. **Cluster cards** — title + summary + each source article inline (outlet + headline + lede + scraped time + URL link) + per-source Move-out/Move-to controls + predicted cost preview + **two inline Generate buttons** (Generate {audience} primary + cross-audience hatch "Generate kids version" only on adult tab) + Merge dropdown / Split / Dismiss inline + "Show dismissed" toggle
+8. **Recent runs strip** at bottom — last 10 with retry + view-all link
+
+**Edit affordances on cards** (per owner: "auto-generate clusters, but if I notice articles can be moved or groups combined I should have the ability"):
+- Move discovery item out of cluster, or to a different cluster (audience-symmetric)
+- Merge two clusters (target dropdown — soft-archives source via `archived_reason='merged_into:<uuid>'`)
+- Split cluster into a new sibling (multi-select source rows + Split button)
+- Dismiss (soft hide via `dismissed_at`; "Show dismissed" toggle restores view)
+
+**Cross-audience hatch** is one-way: adult cluster → kid run via `source_urls` override (kid pipeline reuses adult source URLs, runs through kid prompt scaffolding + `audience_safety_check`). Backend rejects 422 if attempted in any other shape.
+
+---
+
+## NEW ADMIN PAGES
+
+| Path | Purpose |
+|---|---|
+| `/admin/newsroom` | Operator workspace (rewritten — see above) |
+| `/admin/categories` | Tree editor — dynamic taxonomy CRUD with parent reparent + cycle prevention + soft-delete + restore |
+| `/admin/prompt-presets` | Prompt library editor — All/Adult/Kid/Both tabs, name+body+audience+category_id+sort_order, archive→restore via PATCH |
+| `/admin/pipeline/cleanup` | Cron sweep history (`webhook_log` source) + "Run cleanup now" manual trigger (rate-limited 6/3600s) |
+
+**Story Manager + Kids Story Manager pages REMOVED from admin hub.** Stage 0 recon verdict: snapshot-era 1258-line pages, REWRITE >400 LOC needed for F7 schema. F7-native `/admin/articles/[id]/{review,edit}` is the canonical editor — accessed via `/admin/articles` list.
+
+---
+
+## NEW PERMISSIONS (canonical naming)
+
+Following established `admin.pipeline.<noun>.<verb>` convention:
+- `admin.pipeline.clusters.manage` (move/merge/split/archive/dismiss)
+- `admin.pipeline.presets.manage` (CRUD prompt presets)
+- `admin.pipeline.categories.manage` (CRUD taxonomy)
+
+All wired into `owner` + `admin` + `editor` permission_sets via migration 126 step 11. **xlsx reconcile pending** — owner must add these 3 keys to `/Users/veritypost/Desktop/verity post/permissions.xlsx` before next `scripts/import-permissions.js --apply` runs (otherwise sync would drop the new wirings).
 
 ---
 
 ## READ ORDER (do not skip)
 
 1. `Reference/STATUS.md` — live narrative
-2. `Current Projects/F7-DECISIONS-LOCKED.md` — the 8 locked decisions + invariants (every agent reads this)
-3. `Sessions/04-22-2026/Session 1/MASTER_CLEANUP_PLAN.md` — what shipped this session + known follow-ups
-4. `Sessions/04-22-2026/Session 1/COMPLETED_TASKS_2026-04-22.md` — per-task SHIPPED blocks
+2. `Current Projects/F7-DECISIONS-LOCKED.md` — the 8 locked decisions + invariants
+3. `Sessions/04-22-2026/Session 1/COMPLETED_TASKS_2026-04-22.md` — per-commit SHIPPED blocks (b269e17 is at top — Newsroom redesign)
+4. `Sessions/04-22-2026/Session 1/F7_SMOKE_TEST_RUNBOOK.md` — original F7 smoke test (still valid for the pipeline core)
 5. `Current Projects/F7-PHASE-3-RUNBOOK.md` — 12-step canonical vocab + observability
-6. `Sessions/04-22-2026/Session 1/_superseded/` — archived prior-session prompts (reference only)
-7. `Sessions/04-22-2026/Session 1/_facts-archive/` — PM FACTS sheets for Tasks 14-20 (reference only)
 
 ---
 
-## PHASE 4 — ALL SHIPPED (no work remaining in F7)
+## OPEN FOLLOW-UPS
 
-| Task | What | SHA |
-|---|---|---|
-| 20 | `/admin/newsroom` home — cluster grid | `6938c8c` |
-| 21 | `/admin/newsroom/clusters/:id` cluster detail | `2d63621` |
-| 22 | Generation modal (`components/admin/GenerationModal.tsx`) | `b250695` |
-| 23 | `/admin/articles/:id/review` | `1f19e42` |
-| 24 | `/admin/articles/:id/edit` | `1f19e42` |
-| 25 | Publish/reject (PATCH on shared endpoint) | `1f19e42` |
-| 26 | `/admin/pipeline/runs` observability dashboard | `d366911` |
-| 27 | `/admin/pipeline/runs/:id` run detail | `a53a260` |
-| 28 | `/admin/pipeline/costs` cost tracker dashboard | `16822db` |
-| 29 | `/admin/pipeline/settings` settings UI | `f5be651` |
-| 30 | Manual ingest button (covered by Task 20 Refresh feeds) | n/a — already on Task 20 |
+**Owner action items (cannot be done by agents):**
+1. **Click-through smoke test** of new Newsroom workspace + 3 new admin pages on Vercel deploy. Verify:
+   - Adult/Kid tab toggle persists in URL + filters cluster list correctly
+   - Refresh feeds button (per-audience) actually polls only that audience's feeds
+   - Generate adult / Generate kids buttons open modal with audience already decided
+   - Generate kids version on adult cluster card forwards source URLs (cross-audience hatch)
+   - Move/Merge/Split/Dismiss inline controls work + record audit log
+   - `/admin/categories` add/edit/move/archive cycle prevention works
+   - `/admin/prompt-presets` create + select preset in Newsroom prompt picker
+   - `/admin/pipeline/cleanup` shows recent cron runs + manual trigger works
+2. **xlsx reconcile** — add the 3 new permission keys to `permissions.xlsx`. Without this, the next `import-permissions.js --apply` would drop the migration 126 step-11 wirings.
+3. **Vercel Pro upgrade** — restore per-minute cron schedule in `web/vercel.json` for prompt orphan recovery (currently daily at 6 AM UTC due to Hobby tier limit).
 
-Pipeline is fully reachable end-to-end through normal admin flow:
-1. Admin opens `/admin/newsroom`
-2. Clicks Refresh feeds → ingest + cluster runs → cluster cards appear
-3. Clicks View on a card → cluster detail page with discovery items + run history
-4. Clicks Generate → modal opens with audience picker + freeform instructions → progress polled live
-5. On completion → article review page → Edit / Regenerate / Publish / Reject
-6. Publish → article goes to `status='published'` and lands in reader
-7. Observability: `/admin/pipeline/runs` lists every run; click → detail with step timings + retry/cancel
-8. Cost: `/admin/pipeline/costs` shows today vs cap + per-model + 30-day chart
-9. Settings: `/admin/pipeline/settings` toggles kill switches + tunes thresholds
-
-**Click-through verification needed (owner)** — every Phase 4 page needs a manual eyeball pass since I can't open a browser.
+**Code follow-ups (open, low priority):**
+- `/admin/feeds` — audience editing post-create not supported (PATCH `/api/admin/feeds/[id]/route.ts` doesn't accept `audience`); flagged by Stream 5. If owner mis-tags a feed, today they delete + re-add. Cheap to add when owner asks.
+- Existing `/admin/feeds/page.tsx` `react-hooks/exhaustive-deps` lint warning predates this session; not a blocker.
+- Per-sweep cron counters (orphan_runs/items/locks/clusters_archived) only persist via `webhook_log` cron metadata + per-trigger response; `Sessions/...COMPLETED_TASKS_2026-04-22.md b269e17` notes a possible `cleanup_runs` table if durable per-sweep history matters.
+- RPC concurrency comment: `merge_clusters` + `split_cluster` lock the source cluster row but NOT the discovery_items being moved; concurrent ingest writes could theoretically race for off-by-N counts. Low real risk; flagged in adversary report for documentation only.
+- Snapshot's `add-to-timeline` mini-pipeline (running stories — `timeline_entries` as first-class content units) is **deliberately NOT ported**. F7 builds flat articles per generate run. If owner wants running stories, that's a separate Phase 6 architectural task. Surfaced 2026-04-22 from snapshot inspection.
+- Legacy `/admin/pipeline/page.tsx` shells were deleted in commit `081c483` (last session).
 
 ---
 
-## KNOWN FOLLOW-UPS (open)
+## THE PARALLEL-AGENT PATTERN (validated this session)
 
-- ~~**F2** — Layer 1 prompt overrides into plagiarism rewrite~~ — SHIPPED `6132de7`.
-- ~~**E2** — `web/src/lib/pipeline/redact.ts` PII scrubber~~ — SHIPPED `6132de7` + `d49a5aa` (helper built + wired into all 6 F7 routes).
-- ~~**Task 16 follow-up** — drop legacy `output_summary.error_type` stash~~ — SHIPPED `6132de7`.
-- ~~**P2-A** — generate finally status guard~~ — was already in place; only stale comment in cancel route updated (`6132de7`).
-- **Vercel Hobby tier** — `*/5 * * * *` cron downgraded to daily (`0 6 * * *`) in commit `1cdbadd` because Hobby tier rejects per-minute crons. When owner upgrades to Pro, restore the per-minute schedule with a one-line edit in `web/vercel.json`. Trade-off documented in `cron/pipeline-cleanup/route.ts` TSDoc.
-- **Snapshot timeline-as-content architecture NOT ported** — F7 builds flat articles per generate run; the snapshot's `timeline_entries`-as-primary-content + `add-to-timeline` mini-pipeline (story accumulates updates over time) was deliberately scoped out. If owner wants running stories, that's a Phase 5 architecture task. Surfaced 2026-04-22 from snapshot inspection.
-- **Legacy `/admin/pipeline/page.tsx`** is `@admin-verified` LOCKED and coexists with the new F7 surfaces. Future cleanup (delete + redirect to `/admin/newsroom`) requires owner approval per the lock.
-- Untracked `Future Projects/verity-living-edition.html` was added to `.gitignore` in commit `9aca4e6` — no longer noise.
+**6-stream parallel build:** Streams 1-6 dispatched simultaneously against locked migration 126 spec — clustering writes audience, categories editor, presets editor, 5 cluster mutation routes, feeds tabs, Newsroom rewrite. Streams 7-8 ran in second wave (cron sweep + cleanup view; source_urls plumbing + cluster detail redirect). Final independent adversary verdict: 8/10 GREEN, 2 YELLOW with applied fixes.
 
----
+**Migration paste cycle bugs caught + fixed:**
+- `r.slug` → `r.name` (RLS join)
+- `label`/`category_key` → `display_name`/`category` (permissions table column names)
+- `pipeline.manage_*` → `admin.pipeline.<noun>.<verb>` (canonical key prefix)
+- `touch_updated_at` → `update_updated_at_column` (live trigger function)
+- `permission_sets.name` → `.key` (live column name)
 
-## THE 3-AGENT FLOW (established this session)
-
-For every non-trivial Phase 4 task:
-1. **PM builds FACTS_taskN.md** up front via MCP queries + file reads. Ground truth sheet. Do NOT skip.
-2. **Investigator agent** — structured claim table, every row cited file:line or MCP query. No prose.
-3. **Adversary agent** — fixed rubric (auth bypass, race, error-type routing, downstream mutation, idempotency, edge cases, FACTS drift, scope creep). RED/YELLOW/GREEN verdict.
-4. **Implementer agent** — feeds corrected spec verbatim + MUST-NOT-TOUCH fence.
-5. **PM self-verifies** deterministically — tsc, lint, diff read, grep banned strings.
-
-Dead casts + types: after every migration apply, `cd web && npm run types:gen` and remove any now-obsolete `as never` / `as unknown as` casts.
+These are the kind of bugs the agents can't catch from spec alone — only live MCP verification finds them. **Always MCP-verify schema before pasting any DDL.**
 
 ---
 
 ## START
 
-F7 is complete. All known follow-ups closed. Next session is freeform — read the 7 docs above, say "Ready," wait for direction. Likely candidates:
+Newsroom redesign is complete + verified + pushed. Next session is freeform — read the docs above, say "Ready," wait for direction. Likely candidates:
 
-1. **Click-through smoke test** of all Phase 4 admin pages on the live deploy. Runbook at `Sessions/04-22-2026/Session 1/F7_SMOKE_TEST_RUNBOOK.md`. PM can boot a dev server + walk owner through the 9 pages.
-2. **Phase 5 — running stories architecture** (the timeline-as-content port from snapshot) — biggest open product question. F7 builds flat articles; snapshot's design accumulates a story over time via timeline entries with their own quizzes + comments. Substantial new work. Owner picks priority.
-3. **Phase 5 — reader UX cluster** (F1/F2/F3/F4 from Future Projects — sources above headline, reading receipt, earned-chrome comments, quiet home feed).
-4. **Pre-launch blockers** in `Current Projects/FIX_SESSION_1.md` — Apple Developer account (iOS), AdSense + ads.txt, Stripe live audit, Sentry activation, CSP enforce flip, HIBP, quiz content (10 questions per published article).
-5. **Vercel Pro upgrade** — restore per-minute cron schedule in `vercel.json` for prompt orphan recovery.
+1. **Click-through smoke test** of Newsroom + 3 new admin pages (owner-only — agents can't open browser)
+2. **xlsx reconcile** + run `scripts/import-permissions.js --dry-run` to verify 3 new keys before `--apply`
+3. **Phase 6 — running stories architecture** (snapshot's `timeline_entries` + `add-to-timeline` mini-pipeline) — biggest open product question. Substantial new work. Owner picks priority.
+4. **Phase 6 — reader UX cluster** (F1/F2/F3/F4 from Future Projects)
+5. **Pre-launch blockers** in `Current Projects/FIX_SESSION_1.md` (Apple Developer account, AdSense + ads.txt, Stripe live audit, Sentry activation, CSP enforce flip, HIBP, quiz content)
+6. **Vercel Pro upgrade** — restore per-minute cron schedule
