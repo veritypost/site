@@ -17,7 +17,7 @@
 // polish. ADMIN_C (the light-bordered, dark-on-white default) is the
 // right fit — matches other admin pages and renders fine in public chrome.
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 
@@ -53,15 +53,6 @@ function parseTab(raw: string | null): TabId {
   if (!raw) return 'overview';
   return (TAB_IDS as readonly string[]).includes(raw) ? (raw as TabId) : 'overview';
 }
-
-// ---------------------------------------------------------------
-// Tier data is DB-backed via `@/lib/scoreTiers`. Prior code carried
-// six hardcoded tiers (newcomer/reader/contributor/trusted/distinguished/
-// luminary at 0/100/500/2000/5000/10000) — the live `score_tiers` table
-// uses newcomer/reader/informed/analyst/scholar/luminary at
-// 0/100/300/600/1000/1500. A user at score=300 was "contributor" in
-// this page and "informed" in the DB. See T-001 in TASKS.md.
-// ---------------------------------------------------------------
 
 // ---------------------------------------------------------------
 // Types for joined rows — Supabase typed relationships return
@@ -188,12 +179,6 @@ function ProfilePageInner() {
   // cache in the helper means most navs don't hit the DB here.
   const [scoreTiers, setScoreTiers] = useState<ScoreTier[]>([]);
 
-  // Keyboard nav buffer for chord shortcuts (g + letter)
-  const chordRef = useRef<{ awaitG: boolean; timer: ReturnType<typeof setTimeout> | null }>({
-    awaitG: false,
-    timer: null,
-  });
-
   // -------------------------------------------------------------
   // Sync tab state to URL
   // -------------------------------------------------------------
@@ -209,28 +194,25 @@ function ProfilePageInner() {
 
   // -------------------------------------------------------------
   // Auth + user fetch + permission refresh
+  //
+  // The `onAuthStateChange` listener catches the two cases the initial
+  // `getUser()` can't:
+  //   - SIGNED_OUT (another tab logs out, or the refresh token is revoked
+  //     server-side) — bounce to /login so the user isn't stuck on a stale
+  //     authed screen reading [object Promise].
+  //   - TOKEN_REFRESHED — re-pull the user row + permission cache because
+  //     a refreshed token can carry a different role/plan claim (admin
+  //     mutation, plan upgrade, role grant). Without this the page shows
+  //     pre-refresh capabilities until the next full nav.
   // -------------------------------------------------------------
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      const {
-        data: { user: authUser },
-      } = await supabase.auth.getUser();
-      if (cancelled) return;
 
-      if (!authUser) {
-        setAuthResolved(true);
-        setLoading(false);
-        router.replace('/login?next=/profile');
-        return;
-      }
-
-      setAuthUserId(authUser.id);
-
+    async function load(authUserId: string) {
       const { data: row } = await supabase
         .from('users')
         .select('*')
-        .eq('id', authUser.id)
+        .eq('id', authUserId)
         .maybeSingle();
       if (cancelled) return;
       if (row) setUser(row);
@@ -253,12 +235,45 @@ function ProfilePageInner() {
         bookmarksList: hasPermission('bookmarks.list.view'),
         family: hasPermission('settings.family.view'),
       });
+    }
+
+    (async () => {
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser();
+      if (cancelled) return;
+
+      if (!authUser) {
+        setAuthResolved(true);
+        setLoading(false);
+        router.replace('/login?next=/profile');
+        return;
+      }
+
+      setAuthUserId(authUser.id);
+      await load(authUser.id);
+      if (cancelled) return;
 
       setAuthResolved(true);
       setLoading(false);
     })();
+
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (cancelled) return;
+      if (event === 'SIGNED_OUT') {
+        router.replace('/login?next=/profile');
+        return;
+      }
+      if (event === 'TOKEN_REFRESHED' && session?.user) {
+        load(session.user.id).catch((err) => {
+          console.error('[profile] reload after token refresh failed', err);
+        });
+      }
+    });
+
     return () => {
       cancelled = true;
+      sub.subscription.unsubscribe();
     };
   }, [router, supabase]);
 
@@ -369,81 +384,6 @@ function ProfilePageInner() {
     loadCategories,
     loadMilestones,
   ]);
-
-  // -------------------------------------------------------------
-  // Keyboard shortcuts: 1/2/3/4 switch tabs; g+a, g+c, g+m chords
-  // -------------------------------------------------------------
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      const target = e.target as HTMLElement | null;
-      if (
-        target &&
-        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
-      )
-        return;
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-
-      if (chordRef.current.awaitG) {
-        chordRef.current.awaitG = false;
-        if (chordRef.current.timer) {
-          clearTimeout(chordRef.current.timer);
-          chordRef.current.timer = null;
-        }
-        if (e.key === 'a') {
-          e.preventDefault();
-          switchTab('activity');
-          return;
-        }
-        if (e.key === 'c') {
-          e.preventDefault();
-          switchTab('categories');
-          return;
-        }
-        if (e.key === 'm') {
-          e.preventDefault();
-          switchTab('milestones');
-          return;
-        }
-        if (e.key === 'o') {
-          e.preventDefault();
-          switchTab('overview');
-          return;
-        }
-      }
-
-      if (e.key === '1') {
-        e.preventDefault();
-        switchTab('overview');
-        return;
-      }
-      if (e.key === '2') {
-        e.preventDefault();
-        switchTab('activity');
-        return;
-      }
-      if (e.key === '3') {
-        e.preventDefault();
-        switchTab('categories');
-        return;
-      }
-      if (e.key === '4') {
-        e.preventDefault();
-        switchTab('milestones');
-        return;
-      }
-      if (e.key === 'g') {
-        chordRef.current.awaitG = true;
-        chordRef.current.timer = setTimeout(() => {
-          chordRef.current.awaitG = false;
-        }, 900);
-      }
-    }
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      if (chordRef.current.timer) clearTimeout(chordRef.current.timer);
-    };
-  }, [switchTab]);
 
   // -------------------------------------------------------------
   // Render guards
@@ -592,8 +532,8 @@ function ProfilePageInner() {
 }
 
 // ===============================================================
-// Tab bar — flat underline style, horizontal scroll on narrow
-// viewports, keyboard shortcut hints in title.
+// Tab bar — flat underline style, horizontal scroll on narrow viewports.
+// Click-driven only; no keyboard shortcuts (owner preference).
 // ===============================================================
 function Tabs({ tab, onChange }: { tab: TabId; onChange: (t: TabId) => void }) {
   return (
@@ -609,7 +549,7 @@ function Tabs({ tab, onChange }: { tab: TabId; onChange: (t: TabId) => void }) {
         WebkitOverflowScrolling: 'touch',
       }}
     >
-      {TAB_IDS.map((id, i) => {
+      {TAB_IDS.map((id) => {
         const active = tab === id;
         return (
           <button
@@ -617,7 +557,7 @@ function Tabs({ tab, onChange }: { tab: TabId; onChange: (t: TabId) => void }) {
             role="tab"
             aria-selected={active}
             onClick={() => onChange(id)}
-            title={`${TAB_LABELS[id]} (press ${i + 1})`}
+            title={TAB_LABELS[id]}
             style={{
               background: 'transparent',
               border: 'none',
@@ -681,7 +621,7 @@ function OverviewTab({
 
   const stats: Array<{ label: string; value: string | number }> = [
     { label: 'Articles read', value: (user.articles_read_count ?? 0).toLocaleString() },
-    { label: 'Quizzes completed', value: (user.quizzes_completed_count ?? 0).toLocaleString() },
+    { label: 'Quizzes passed', value: (user.quizzes_completed_count ?? 0).toLocaleString() },
     { label: 'Comments', value: (user.comment_count ?? 0).toLocaleString() },
     { label: 'Followers', value: (user.followers_count ?? 0).toLocaleString() },
     { label: 'Following', value: (user.following_count ?? 0).toLocaleString() },

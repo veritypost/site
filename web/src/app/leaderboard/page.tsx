@@ -2,12 +2,14 @@
 // @feature-verified home_feed 2026-04-18
 'use client';
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { createClient } from '../../lib/supabase/client';
 import Avatar from '../../components/Avatar';
 import StatRow from '../../components/StatRow';
 import VerifiedBadge from '../../components/VerifiedBadge';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import { usePageViewTrack } from '@/lib/useTrack';
+import { PERIOD_LABELS, periodSince, type Period } from '@/lib/leaderboardPeriod';
 import type { Tables } from '@/types/database-helpers';
 
 // Leaderboard — D5/D31. Public top-3, verified readers see the full list,
@@ -24,8 +26,10 @@ import type { Tables } from '@/types/database-helpers';
 const TABS = ['Top Verifiers', 'Top Readers', 'Rising Stars', 'Weekly'] as const;
 type TabKey = (typeof TABS)[number];
 
-const PERIODS = ['All Time', 'This Month', 'This Week'] as const;
-type PeriodKey = (typeof PERIODS)[number];
+// Period model lives in `@/lib/leaderboardPeriod` so web + iOS share
+// the same labels + rolling-cutoff semantics.
+const PERIODS = PERIOD_LABELS;
+type PeriodKey = Period;
 
 // Strip "(kids)" / "Kids " markers so kid-version categories render with
 // the same name as their adult parent inside any view that already filters
@@ -182,16 +186,18 @@ export default function LeaderboardPage() {
       }
 
       // Time-filtered tabs: rank by reading_history count over window.
+      // Weekly tab is always a 7-day rolling window regardless of `period`
+      // (the picker is hidden on Weekly; only Top Verifiers exposes it).
       let periodCutoff: string | null = null;
-      if (activeTab === 'Weekly' || (activeTab === 'Top Verifiers' && period !== 'All Time')) {
-        const d = new Date();
-        d.setDate(d.getDate() - (period === 'This Month' ? 30 : 7));
-        periodCutoff = d.toISOString();
+      if (activeTab === 'Weekly') {
+        periodCutoff = periodSince('This Week')!.toISOString();
+      } else if (activeTab === 'Top Verifiers' && period !== 'All Time') {
+        const cutoff = periodSince(period);
+        periodCutoff = cutoff ? cutoff.toISOString() : null;
       }
 
       if (activeTab === 'Rising Stars') {
-        const thirty = new Date();
-        thirty.setDate(thirty.getDate() - 30);
+        const thirty = periodSince('This Month')!;
         const { data } = await supabase
           .from('users')
           .select(
@@ -211,36 +217,52 @@ export default function LeaderboardPage() {
       }
 
       if (periodCutoff) {
-        const { data: hist } = await supabase
-          .from('reading_log')
-          .select('user_id')
-          .gte('created_at', periodCutoff)
-          .not('user_id', 'is', null);
-        const histRows = (hist as Array<{ user_id: string | null }> | null) || [];
+        // Migration 142: `leaderboard_period_counts` is a SECURITY DEFINER
+        // RPC that aggregates `reading_log` cross-user under a service-side
+        // privacy filter (email_verified + not banned + show_on_leaderboard
+        // + not frozen + not deleted + kid_profile_id IS NULL). Replaces a
+        // client-side direct query against `reading_log` that returned at
+        // most ~1000 rows under RLS — under-counting for anyone past the
+        // first page and silently degrading the rank for active readers.
+        //
+        // Type cast: migration 142 lands in this same Wave 1 ship; the
+        // generated `Database` type in src/types/database.ts is regenerated
+        // post-migration in the dedicated types-regen commit. Until then
+        // the RPC name + return shape aren't in the union — cast through
+        // `as never` for the name and `as unknown as ...` for the return.
+        // Drop both casts after `npm run types:gen`.
+        const { data: rpcRows, error: rpcErr } = await supabase.rpc(
+          'leaderboard_period_counts' as never,
+          { p_since: periodCutoff, p_limit: 50 } as never
+        );
+        if (rpcErr) {
+          console.error('[leaderboard] leaderboard_period_counts failed', rpcErr);
+          setUsers([]);
+          setLoading(false);
+          return;
+        }
         const counts: Record<string, number> = {};
-        histRows.forEach((h) => {
-          if (!h.user_id) return;
-          counts[h.user_id] = (counts[h.user_id] || 0) + 1;
-        });
-        const ids = Object.entries(counts)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 50)
-          .map((x) => x[0]);
+        const ids: string[] = [];
+        const rpcList =
+          (rpcRows as unknown as Array<{ user_id: string; reads_count: number }> | null) || [];
+        for (const row of rpcList) {
+          counts[row.user_id] = Number(row.reads_count) || 0;
+          ids.push(row.user_id);
+        }
         if (ids.length === 0) {
           setUsers([]);
           setLoading(false);
           return;
         }
+        // The RPC already applied the privacy filters; we still re-select
+        // user rows here because the RPC returns only (user_id, reads_count)
+        // and the UI needs avatars, badges, and the broader stat columns.
         const { data } = await supabase
           .from('users')
           .select(
             'id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert, verity_score, streak_current, quizzes_completed_count, articles_read_count, comment_count'
           )
-          .in('id', ids)
-          .eq('email_verified', true)
-          .eq('is_banned', false)
-          .eq('show_on_leaderboard', true)
-          .is('frozen_at', null);
+          .in('id', ids);
         const rows = (data as LeaderUser[] | null) || [];
         const sorted = rows.slice().sort((a, b) => (counts[b.id] || 0) - (counts[a.id] || 0));
         setUsers(sorted.map((u) => ({ ...u, displayScore: counts[u.id] || 0 })));
@@ -526,242 +548,166 @@ export default function LeaderboardPage() {
               )}
             </div>
           )}
-          {/* Anon view: blur ALL (top 3 + 4-8) with lock overlay */}
+          {/* Anon view: top-3 visible (matches the iOS pattern + the
+              comment at line 252 — "anon viewers see only top 3 per D31").
+              Rows 4+ render blurred behind a sign-up CTA so anon visitors
+              know there's more to see. Previously every row rendered
+              blurred, which contradicted the comment and the spec. */}
           {!me && users.length > 0 && (
-            <div style={{ position: 'relative', overflow: 'hidden' }}>
-              <div style={{ filter: 'blur(6px)', pointerEvents: 'none', userSelect: 'none' }}>
-                {users.slice(0, 8).map((u, i) => (
+            <>
+              {users.slice(0, 3).map((u, i) => (
+                <LeaderRow
+                  key={u.id}
+                  user={u}
+                  rank={i + 1}
+                  rankColor="var(--accent)"
+                  onToggle={() => setExpanded(expanded === u.id ? null : u.id)}
+                  expanded={expanded === u.id}
+                  topScore={topScore}
+                  topReads={topReads}
+                  topQuizzes={topQuizzes}
+                  topComments={topComments}
+                  topStreak={topStreak}
+                  isLast={i === Math.min(2, users.length - 1) && users.length <= 3}
+                />
+              ))}
+              {users.length > 3 && (
+                <div style={{ position: 'relative', overflow: 'hidden' }}>
+                  <div style={{ filter: 'blur(6px)', pointerEvents: 'none', userSelect: 'none' }}>
+                    {users.slice(3, 8).map((u, i) => (
+                      <div
+                        key={u.id}
+                        style={{
+                          padding: '12px 20px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 12,
+                          borderBottom: '1px solid var(--rule)',
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 14,
+                            fontWeight: 700,
+                            color: 'var(--dim)',
+                            width: 28,
+                            textAlign: 'right',
+                          }}
+                        >
+                          {i + 4}
+                        </span>
+                        <div
+                          style={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: '50%',
+                            background: 'var(--rule)',
+                          }}
+                        />
+                        <div style={{ flex: 1 }}>
+                          <div
+                            style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}
+                          >
+                            {u.username}
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--dim)' }}>
+                            {(u.verity_score || 0).toLocaleString()} verity
+                          </div>
+                        </div>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent)' }}>
+                          {(u.displayScore || 0).toLocaleString()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                   <div
-                    key={u.id}
                     style={{
-                      padding: '12px 20px',
+                      position: 'absolute',
+                      inset: 0,
+                      zIndex: 3,
                       display: 'flex',
+                      flexDirection: 'column',
                       alignItems: 'center',
-                      gap: 12,
-                      borderBottom: '1px solid var(--rule)',
+                      justifyContent: 'center',
+                      background:
+                        'linear-gradient(to bottom, rgba(255,255,255,0.3), rgba(255,255,255,0.95) 70%)',
                     }}
                   >
-                    <span
+                    <p
                       style={{
-                        fontSize: 14,
+                        margin: '0 0 4px',
+                        fontSize: 16,
                         fontWeight: 700,
-                        color: i < 3 ? 'var(--accent)' : 'var(--dim)',
-                        width: 28,
-                        textAlign: 'right',
+                        color: 'var(--text)',
                       }}
                     >
-                      {i + 1}
-                    </span>
-                    <div
+                      Sign up to see the full leaderboard
+                    </p>
+                    <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--dim)' }}>
+                      Free account unlocks ranks beyond top 3.
+                    </p>
+                    <a
+                      href="/signup"
                       style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: '50%',
-                        background: 'var(--rule)',
+                        display: 'inline-block',
+                        padding: '10px 28px',
+                        background: 'var(--accent)',
+                        color: '#fff',
+                        borderRadius: 10,
+                        fontSize: 14,
+                        fontWeight: 600,
+                        textDecoration: 'none',
                       }}
-                    />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
-                        {u.username}
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--dim)' }}>
-                        {(u.verity_score || 0).toLocaleString()} verity
-                      </div>
-                    </div>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent)' }}>
-                      {(u.displayScore || 0).toLocaleString()}
-                    </div>
+                    >
+                      Create free account
+                    </a>
                   </div>
-                ))}
-              </div>
-              <div
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  zIndex: 3,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background:
-                    'linear-gradient(to bottom, rgba(255,255,255,0.3), rgba(255,255,255,0.95) 70%)',
-                }}
-              >
-                <p
-                  style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700, color: 'var(--text)' }}
-                >
-                  Full leaderboard locked
-                </p>
-                <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--dim)' }}>
-                  Sign up to see where everyone ranks
-                </p>
-                <a
-                  href="/signup"
-                  style={{
-                    display: 'inline-block',
-                    padding: '10px 28px',
-                    background: 'var(--accent)',
-                    color: '#fff',
-                    borderRadius: 10,
-                    fontSize: 14,
-                    fontWeight: 600,
-                    textDecoration: 'none',
-                  }}
-                >
-                  Create free account
-                </a>
-              </div>
-            </div>
+                </div>
+              )}
+            </>
           )}
 
           {/* Top 3 — visible to anyone signed in */}
           {me &&
-            users.slice(0, 3).map((u, i) => (
-              <div key={u.id}>
-                <div
-                  onClick={() => setExpanded(expanded === u.id ? null : u.id)}
-                  style={{
-                    padding: '12px 20px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                    borderBottom: '1px solid var(--rule)',
-                    cursor: 'pointer',
-                    background: expanded === u.id ? 'var(--card)' : 'transparent',
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: 14,
-                      fontWeight: 700,
-                      color: 'var(--accent)',
-                      width: 28,
-                      textAlign: 'right',
-                    }}
-                  >
-                    {i + 1}
-                  </span>
-                  <Avatar user={u} size={40} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontSize: 14,
-                        fontWeight: 600,
-                        color: 'var(--text-primary)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 6,
-                      }}
-                    >
-                      {u.username}
-                      <VerifiedBadge user={u} />
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent)' }}>
-                    {(u.displayScore || 0).toLocaleString()}
-                  </div>
-                </div>
-                {expanded === u.id && (
-                  <div
-                    style={{
-                      padding: '8px 16px 16px 16px',
-                      background: 'var(--card)',
-                      borderBottom: '1px solid var(--rule)',
-                    }}
-                  >
-                    <StatRow label="Score" value={u.displayScore || 0} total={topScore} />
-                    <StatRow
-                      label="Articles Read"
-                      value={u.articles_read_count || 0}
-                      total={topReads}
-                    />
-                    <StatRow
-                      label="Quizzes Passed"
-                      value={u.quizzes_completed_count || 0}
-                      total={topQuizzes}
-                    />
-                    <StatRow label="Comments" value={u.comment_count || 0} total={topComments} />
-                    <StatRow label="Streak" value={u.streak_current || 0} total={topStreak} />
-                  </div>
-                )}
-              </div>
-            ))}
+            users
+              .slice(0, 3)
+              .map((u, i) => (
+                <LeaderRow
+                  key={u.id}
+                  user={u}
+                  rank={i + 1}
+                  rankColor="var(--accent)"
+                  onToggle={() => setExpanded(expanded === u.id ? null : u.id)}
+                  expanded={expanded === u.id}
+                  topScore={topScore}
+                  topReads={topReads}
+                  topQuizzes={topQuizzes}
+                  topComments={topComments}
+                  topStreak={topStreak}
+                />
+              ))}
 
           {/* Positions 4+ — verified only */}
           {fullAccess
-            ? users.slice(3).map((u, i) => (
-                <div key={u.id}>
-                  <div
-                    onClick={() => setExpanded(expanded === u.id ? null : u.id)}
-                    style={{
-                      padding: '12px 20px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 12,
-                      borderBottom: i < users.length - 4 ? '1px solid var(--rule)' : 'none',
-                      cursor: 'pointer',
-                      background: expanded === u.id ? 'var(--card)' : 'transparent',
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: 14,
-                        fontWeight: 700,
-                        color: 'var(--dim)',
-                        width: 28,
-                        textAlign: 'right',
-                      }}
-                    >
-                      {i + 4}
-                    </span>
-                    <Avatar user={u} size={40} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div
-                        style={{
-                          fontSize: 14,
-                          fontWeight: 600,
-                          color: 'var(--text-primary)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 6,
-                        }}
-                      >
-                        {u.username}
-                        <VerifiedBadge user={u} />
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--dim)' }}>
-                        {(u.verity_score || 0).toLocaleString()} verity
-                      </div>
-                    </div>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent)' }}>
-                      {(u.displayScore || 0).toLocaleString()}
-                    </div>
-                  </div>
-                  {expanded === u.id && (
-                    <div
-                      style={{
-                        padding: '8px 16px 16px 16px',
-                        background: 'var(--card)',
-                        borderBottom: '1px solid var(--rule)',
-                      }}
-                    >
-                      <StatRow label="Score" value={u.displayScore || 0} total={topScore} />
-                      <StatRow
-                        label="Articles Read"
-                        value={u.articles_read_count || 0}
-                        total={topReads}
-                      />
-                      <StatRow
-                        label="Quizzes Passed"
-                        value={u.quizzes_completed_count || 0}
-                        total={topQuizzes}
-                      />
-                      <StatRow label="Comments" value={u.comment_count || 0} total={topComments} />
-                      <StatRow label="Streak" value={u.streak_current || 0} total={topStreak} />
-                    </div>
-                  )}
-                </div>
-              ))
+            ? users
+                .slice(3)
+                .map((u, i) => (
+                  <LeaderRow
+                    key={u.id}
+                    user={u}
+                    rank={i + 4}
+                    rankColor="var(--dim)"
+                    onToggle={() => setExpanded(expanded === u.id ? null : u.id)}
+                    expanded={expanded === u.id}
+                    topScore={topScore}
+                    topReads={topReads}
+                    topQuizzes={topQuizzes}
+                    topComments={topComments}
+                    topStreak={topStreak}
+                    isLast={i === users.length - 4 - 1}
+                    showVerityScore
+                  />
+                ))
             : me &&
               users.length > 3 && (
                 /* Unverified: blur 4+ with upgrade lock */
@@ -857,6 +803,155 @@ export default function LeaderboardPage() {
               )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ===============================================================
+// Row primitive — replaces three near-identical inline blocks.
+// `onToggle` flips the expanded drawer; the username sits inside a
+// real <Link> with stopPropagation so a tap on the name navigates to
+// /u/<username> (matches the iOS pattern: tap username = go to profile)
+// while a tap anywhere else on the row still toggles stats.
+// ===============================================================
+interface LeaderRowProps {
+  user: LeaderUser;
+  rank: number;
+  rankColor: string;
+  onToggle: () => void;
+  expanded: boolean;
+  topScore: number;
+  topReads: number;
+  topQuizzes: number;
+  topComments: number;
+  topStreak: number;
+  isLast?: boolean;
+  showVerityScore?: boolean;
+}
+
+function LeaderRow({
+  user: u,
+  rank,
+  rankColor,
+  onToggle,
+  expanded,
+  topScore,
+  topReads,
+  topQuizzes,
+  topComments,
+  topStreak,
+  isLast = false,
+  showVerityScore = false,
+}: LeaderRowProps) {
+  const profileHref = u.username ? `/u/${u.username}` : null;
+  return (
+    <div>
+      <div
+        onClick={onToggle}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onToggle();
+          }
+        }}
+        aria-expanded={expanded}
+        style={{
+          padding: '12px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          borderBottom: isLast ? 'none' : '1px solid var(--rule)',
+          cursor: 'pointer',
+          background: expanded ? 'var(--card)' : 'transparent',
+        }}
+      >
+        <span
+          style={{
+            fontSize: 14,
+            fontWeight: 700,
+            color: rankColor,
+            width: 28,
+            textAlign: 'right',
+          }}
+        >
+          {rank}
+        </span>
+        <Avatar user={u} size={40} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontSize: 14,
+              fontWeight: 600,
+              color: 'var(--text-primary)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            {profileHref ? (
+              <Link
+                href={profileHref}
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  color: 'var(--text-primary)',
+                  textDecoration: 'none',
+                  fontWeight: 600,
+                }}
+              >
+                {u.username}
+              </Link>
+            ) : (
+              u.username
+            )}
+            <VerifiedBadge user={u} />
+          </div>
+          {showVerityScore && (
+            <div style={{ fontSize: 11, color: 'var(--dim)' }}>
+              {(u.verity_score || 0).toLocaleString()} verity
+            </div>
+          )}
+        </div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent)' }}>
+          {(u.displayScore || 0).toLocaleString()}
+        </div>
+      </div>
+      {expanded && (
+        <div
+          style={{
+            padding: '8px 16px 16px 16px',
+            background: 'var(--card)',
+            borderBottom: '1px solid var(--rule)',
+          }}
+        >
+          <StatRow label="Score" value={u.displayScore || 0} total={topScore} />
+          <StatRow label="Articles Read" value={u.articles_read_count || 0} total={topReads} />
+          <StatRow
+            label="Quizzes Passed"
+            value={u.quizzes_completed_count || 0}
+            total={topQuizzes}
+          />
+          <StatRow label="Comments" value={u.comment_count || 0} total={topComments} />
+          <StatRow label="Streak" value={u.streak_current || 0} total={topStreak} />
+          {profileHref && (
+            <div style={{ marginTop: 10, textAlign: 'right' }}>
+              <Link
+                href={profileHref}
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: 'var(--accent)',
+                  textDecoration: 'none',
+                }}
+              >
+                View profile →
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

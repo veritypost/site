@@ -57,7 +57,13 @@ export async function fetchVersion() {
 }
 
 // If the global or user version has bumped since last check, invalidate the
-// cached sections AND the full-perms cache so the next read re-hits the DB.
+// cached sections and AWAIT a full-perms refresh so any caller that resumes
+// after this returns reads coherent permissions. Previously we cleared the
+// cache and fired the refresh fire-and-forget; a synchronous `hasPermission`
+// call between cache-null and refresh-completion saw `allPermsCache === null`,
+// fell through to the empty section cache, and returned `false` for every key.
+// That window manifested as random "you don't have permission" toasts on first
+// nav after any role/plan change. Awaiting the in-flight refresh closes it.
 export async function refreshIfStale() {
   const v = await fetchVersion();
   if (!v) return;
@@ -67,14 +73,13 @@ export async function refreshIfStale() {
   if (bumped) {
     versionState = { ...v, checkedAt: Date.now() };
     sectionCache.clear();
-    // Full cache must be repopulated to reflect the new state. Fire-and-forget
-    // the refresh so callers awaiting refreshIfStale don't block on a network
-    // round-trip they didn't ask for; hasPermission readers will see the fresh
-    // data once the fetch lands.
-    allPermsCache = null;
+    // Drop only the inflight handle + timestamp — keep `allPermsCache` populated
+    // until the new fetch lands so concurrent `hasPermission` reads return the
+    // last-known-good answer (slightly stale > all-deny). `refreshAllPermissions`
+    // overwrites the cache atomically once the RPC resolves.
     _allPermsFetchedAt = 0;
     allPermsInflight = null;
-    refreshAllPermissions().catch(() => {});
+    await refreshAllPermissions();
   } else {
     versionState.checkedAt = Date.now();
   }

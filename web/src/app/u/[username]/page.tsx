@@ -1,12 +1,16 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified follow 2026-04-18
 'use client';
-import { useState, useEffect, CSSProperties } from 'react';
+import { useState, useEffect, useMemo, CSSProperties } from 'react';
 import { useParams, notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import Avatar from '@/components/Avatar';
+import ConfirmDialog from '@/components/ConfirmDialog';
 import FollowButton from '@/components/FollowButton';
+import VerifiedBadge from '@/components/VerifiedBadge';
 import { useToast } from '@/components/Toast';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
+import { getScoreTiers, tierFor, type ScoreTier } from '@/lib/scoreTiers';
 import type { Tables } from '@/types/database-helpers';
 
 // D28 + D32 / Pass 17 — public profile by username.
@@ -16,6 +20,18 @@ import type { Tables } from '@/types/database-helpers';
 //   - Verity Score readout    -> profile.score.view.other.total
 //   - Expert badge            -> profile.expert.badge.view
 //   - Profile card share link -> profile.card_share
+//
+// Wave 1 / C4 additions:
+//   - Avatar via canonical <Avatar/> (no parallel letter-glyph div).
+//   - Block + Report actions for non-self viewers (POST /api/users/[id]/block,
+//     POST /api/reports). Confirm dialog on Block; Report opens a tiny inline
+//     reason picker.
+//   - Tier pill from `score_tiers` (DB-backed via lib/scoreTiers).
+//   - banner_url validated as http/https before CSS injection (prevents
+//     `javascript:`/`data:` sneaks via the user-controlled column).
+//   - profile_visibility: only 'private' returns notFound (post-migration 142
+//     'followers' is dropped). Activity tab hides when target.show_activity
+//     is explicitly false.
 
 type TargetRow = Pick<
   Tables<'users'>,
@@ -29,10 +45,15 @@ type TargetRow = Pick<
   | 'verity_score'
   | 'followers_count'
   | 'following_count'
+  | 'articles_read_count'
+  | 'quizzes_completed_count'
+  | 'comment_count'
   | 'profile_visibility'
+  | 'show_activity'
   | 'is_expert'
   | 'expert_title'
   | 'expert_organization'
+  | 'is_verified_public_figure'
 >;
 
 type MeRow = Pick<Tables<'users'>, 'id'>;
@@ -42,6 +63,10 @@ interface UserListItem {
   username: string | null;
   avatar_color: string | null;
   avatar_url: string | null;
+  // Index signature matches `AvatarUser` so this row can pass straight
+  // into <Avatar user={u} /> without a wrapper. The Avatar component
+  // only reads avatar_color, username, and the optional `avatar` shape.
+  [k: string]: unknown;
 }
 
 type FollowsTab = 'followers' | 'following';
@@ -68,7 +93,7 @@ const C = {
 export default function ProfilePage() {
   const params = useParams<{ username: string }>();
   const username = params?.username;
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const toast = useToast();
   const [me, setMe] = useState<MeRow | null>(null);
   const [target, setTarget] = useState<TargetRow | null>(null);
@@ -77,6 +102,7 @@ export default function ProfilePage() {
   const [canSeeVerityScore, setCanSeeVerityScore] = useState<boolean>(false);
   const [canShareCard, setCanShareCard] = useState<boolean>(false);
   const [canSeeExpert, setCanSeeExpert] = useState<boolean>(false);
+  const [scoreTiers, setScoreTiers] = useState<ScoreTier[]>([]);
   const [tab, setTab] = useState<FollowsTab>('followers');
   const [following, setFollowing] = useState<boolean>(false);
   const [followers, setFollowers] = useState<UserListItem[]>([]);
@@ -88,6 +114,17 @@ export default function ProfilePage() {
   // to take (avoids a flash of loading into the wrong UI).
   const [isAnon, setIsAnon] = useState<boolean>(false);
   const [checkedAuth, setCheckedAuth] = useState<boolean>(false);
+
+  // Block / Report state — both surfaces sit next to Follow + DM. Block
+  // gates behind a confirm dialog (irreversible-feeling action even though
+  // unblock exists in /profile/settings); Report uses an inline reason
+  // picker that posts to /api/reports.
+  const [blocked, setBlocked] = useState<boolean>(false);
+  const [blockBusy, setBlockBusy] = useState<boolean>(false);
+  const [confirmBlockOpen, setConfirmBlockOpen] = useState<boolean>(false);
+  const [reportOpen, setReportOpen] = useState<boolean>(false);
+  const [reportReason, setReportReason] = useState<string>('spam');
+  const [reportBusy, setReportBusy] = useState<boolean>(false);
 
   useEffect(() => {
     if (!username) return;
@@ -111,6 +148,8 @@ export default function ProfilePage() {
         setCanSeeVerityScore(hasPermission('profile.score.view.other.total'));
         setCanShareCard(hasPermission('profile.card_share'));
         setCanSeeExpert(hasPermission('profile.expert.badge.view'));
+        const tiers = await getScoreTiers(supabase);
+        setScoreTiers(tiers);
       } else {
         // Q1 — anon visitors short-circuit BEFORE the target fetch. We
         // deliberately don't hit the `users` table with an anon RLS read
@@ -124,7 +163,7 @@ export default function ProfilePage() {
       const { data: targetRow } = await supabase
         .from('users')
         .select(
-          'id, username, display_name, bio, avatar_url, avatar_color, banner_url, verity_score, followers_count, following_count, profile_visibility, is_expert, expert_title, expert_organization'
+          'id, username, display_name, bio, avatar_url, avatar_color, banner_url, verity_score, followers_count, following_count, articles_read_count, quizzes_completed_count, comment_count, profile_visibility, show_activity, is_expert, expert_title, expert_organization, is_verified_public_figure'
         )
         .eq('username', username as string)
         .maybeSingle<TargetRow>();
@@ -133,26 +172,37 @@ export default function ProfilePage() {
         setLoading(false);
         return;
       }
-      if (targetRow.profile_visibility === 'private' && (!user || user.id !== targetRow.id)) {
+      // post-migration 142: profile_visibility is locked to ('public','private').
+      // Only 'private' is opt-in and hides the profile from non-self viewers.
+      if (targetRow.profile_visibility === 'private' && user.id !== targetRow.id) {
         setNotFoundFlag(true);
         setLoading(false);
         return;
       }
       setTarget(targetRow);
 
-      if (user && user.id !== targetRow.id) {
-        const { data: f } = await supabase
-          .from('follows')
-          .select('id')
-          .eq('follower_id', user.id)
-          .eq('following_id', targetRow.id)
-          .maybeSingle();
+      if (user.id !== targetRow.id) {
+        const [{ data: f }, { data: b }] = await Promise.all([
+          supabase
+            .from('follows')
+            .select('id')
+            .eq('follower_id', user.id)
+            .eq('following_id', targetRow.id)
+            .maybeSingle(),
+          supabase
+            .from('blocked_users')
+            .select('id')
+            .eq('blocker_id', user.id)
+            .eq('blocked_id', targetRow.id)
+            .maybeSingle(),
+        ]);
         setFollowing(!!f);
+        setBlocked(!!b);
       }
 
       setLoading(false);
     })();
-  }, [username]);
+  }, [username, supabase]);
 
   useEffect(() => {
     (async () => {
@@ -254,14 +304,80 @@ export default function ProfilePage() {
   if (!target) return notFound();
 
   const showFollowControls = !!(me && me.id !== target.id);
+  // Strip user-controlled URLs that aren't http/https before injection into a
+  // CSS `url()` template. The column is owner-edited but RLS doesn't enforce
+  // scheme; without this gate `javascript:` or `data:` URIs survive into the
+  // rendered style attribute. `new URL()` would also normalize relative
+  // refs we don't want — keep the regex narrow and explicit.
+  const bannerHref =
+    target.banner_url && /^https?:\/\//i.test(target.banner_url) ? target.banner_url : null;
+  const tierInfo = tierFor(target.verity_score, scoreTiers);
+
+  async function handleConfirmBlock() {
+    if (!target) return;
+    setBlockBusy(true);
+    try {
+      const res = await fetch(`/api/users/${target.id}/block`, { method: 'POST' });
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      setBlocked(true);
+      setConfirmBlockOpen(false);
+      toast.success(`Blocked @${target.username}.`);
+    } catch (err) {
+      console.error('[u/profile] block failed', err);
+      toast.error('Could not block this user. Try again.');
+    } finally {
+      setBlockBusy(false);
+    }
+  }
+
+  async function handleUnblock() {
+    if (!target) return;
+    setBlockBusy(true);
+    try {
+      const res = await fetch(`/api/users/${target.id}/block`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      setBlocked(false);
+      toast.success(`Unblocked @${target.username}.`);
+    } catch (err) {
+      console.error('[u/profile] unblock failed', err);
+      toast.error('Could not unblock this user. Try again.');
+    } finally {
+      setBlockBusy(false);
+    }
+  }
+
+  async function handleSubmitReport() {
+    if (!target) return;
+    setReportBusy(true);
+    try {
+      const res = await fetch('/api/reports', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          targetType: 'user',
+          targetId: target.id,
+          reason: reportReason,
+        }),
+      });
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      setReportOpen(false);
+      setReportReason('spam');
+      toast.success('Report filed. Thanks — moderators will review.');
+    } catch (err) {
+      console.error('[u/profile] report failed', err);
+      toast.error('Could not file the report. Try again.');
+    } finally {
+      setReportBusy(false);
+    }
+  }
 
   return (
     <div style={{ maxWidth: 760, margin: '0 auto', padding: '0 0 80px' }}>
       <div
         style={{
           height: 180,
-          background: target.banner_url
-            ? `center/cover url('${target.banner_url}')`
+          background: bannerHref
+            ? `center/cover url('${bannerHref}')`
             : 'linear-gradient(135deg, #111, #333)',
         }}
       />
@@ -271,17 +387,12 @@ export default function ProfilePage() {
             width: 80,
             height: 80,
             borderRadius: '50%',
-            background: target.avatar_color || '#e5e5e5',
             border: '4px solid #fff',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 32,
-            fontWeight: 800,
-            color: '#fff',
+            background: '#fff',
+            display: 'inline-block',
           }}
         >
-          {(target.username || '?').charAt(0).toUpperCase()}
+          <Avatar user={target} size={80} />
         </div>
 
         <div
@@ -295,8 +406,35 @@ export default function ProfilePage() {
           }}
         >
           <div>
-            <div style={{ fontSize: 22, fontWeight: 800 }}>
-              {target.display_name || target.username}
+            <div
+              style={{
+                fontSize: 22,
+                fontWeight: 800,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              {target.display_name || target.username || 'Anonymous'}
+              <VerifiedBadge user={target} />
+              {tierInfo && (
+                <span
+                  title={`Tier: ${tierInfo.display_name}`}
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    padding: '2px 8px',
+                    borderRadius: 999,
+                    border: `1px solid ${tierInfo.color_hex}`,
+                    color: tierInfo.color_hex,
+                    background: 'transparent',
+                    letterSpacing: '0.02em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  {tierInfo.display_name}
+                </span>
+              )}
             </div>
             <div style={{ fontSize: 13, color: '#666' }}>@{target.username}</div>
             {target.is_expert && canSeeExpert && (
@@ -322,27 +460,139 @@ export default function ProfilePage() {
                   Send message
                 </a>
               )}
+              {/* Block / Unblock — uses /api/users/[id]/block (POST/DELETE).
+                  No permission gate at the UI; the API enforces
+                  settings.privacy.blocked_users.manage and email verification. */}
+              <button
+                type="button"
+                onClick={() => (blocked ? handleUnblock() : setConfirmBlockOpen(true))}
+                disabled={blockBusy}
+                style={secondaryActionStyle(blockBusy)}
+              >
+                {blockBusy ? 'Working…' : blocked ? 'Unblock' : 'Block'}
+              </button>
+              {/* Report — opens an inline reason picker. The /api/reports
+                  route requires `article.report` permission; if the viewer
+                  lacks it the request 403s and the toast surfaces a generic
+                  error (real reason logged server-side). */}
+              <button
+                type="button"
+                onClick={() => setReportOpen((v) => !v)}
+                style={secondaryActionStyle(false)}
+              >
+                Report
+              </button>
             </div>
           )}
         </div>
+
+        {/* Inline report reason picker — small + click-driven. Closes on
+            submit / cancel. Reasons mirror the comment-report set so admin
+            triage stays consistent. */}
+        {showFollowControls && reportOpen && (
+          <div
+            style={{
+              marginTop: 10,
+              padding: 12,
+              border: '1px solid #e5e5e5',
+              borderRadius: 10,
+              background: '#fafafa',
+            }}
+          >
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#111', marginBottom: 8 }}>
+              Report @{target.username}
+            </div>
+            <select
+              value={reportReason}
+              onChange={(e) => setReportReason(e.target.value)}
+              disabled={reportBusy}
+              style={{
+                width: '100%',
+                padding: '8px 10px',
+                fontSize: 13,
+                border: '1px solid #e5e5e5',
+                borderRadius: 8,
+                background: '#fff',
+                color: '#111',
+                marginBottom: 10,
+                fontFamily: 'inherit',
+              }}
+            >
+              <option value="spam">Spam</option>
+              <option value="harassment">Harassment</option>
+              <option value="impersonation">Impersonation</option>
+              <option value="hate">Hate speech</option>
+              <option value="other">Other</option>
+            </select>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => setReportOpen(false)}
+                disabled={reportBusy}
+                style={secondaryActionStyle(reportBusy)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmitReport}
+                disabled={reportBusy}
+                style={{
+                  padding: '7px 12px',
+                  borderRadius: 7,
+                  border: 'none',
+                  background: '#111',
+                  color: '#fff',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: reportBusy ? 'not-allowed' : 'pointer',
+                  opacity: reportBusy ? 0.6 : 1,
+                }}
+              >
+                {reportBusy ? 'Filing…' : 'Submit report'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {target.bio && (
           <div style={{ fontSize: 14, color: '#333', marginTop: 10 }}>{target.bio}</div>
         )}
 
-        <div style={{ display: 'flex', gap: 18, marginTop: 14, fontSize: 13, flexWrap: 'wrap' }}>
-          <div>
-            <b>{target.followers_count || 0}</b> <span style={{ color: '#666' }}>followers</span>
-          </div>
-          <div>
-            <b>{target.following_count || 0}</b> <span style={{ color: '#666' }}>following</span>
-          </div>
-          {canSeeVerityScore && (
+        {/* Canonical public-profile stat set — matches own profile, iOS
+         *  own profile, and iOS public profile. Hidden when the target
+         *  has flipped `show_activity` off. Verity Score sits below as a
+         *  separate optional readout gated on `profile.score.view.other.total`. */}
+        {target.show_activity !== false && (
+          <div style={{ display: 'flex', gap: 18, marginTop: 14, fontSize: 13, flexWrap: 'wrap' }}>
             <div>
-              <b>{target.verity_score || 0}</b> <span style={{ color: '#666' }}>Verity Score</span>
+              <b>{(target.articles_read_count ?? 0).toLocaleString()}</b>{' '}
+              <span style={{ color: '#666' }}>Articles read</span>
             </div>
-          )}
-        </div>
+            <div>
+              <b>{(target.quizzes_completed_count ?? 0).toLocaleString()}</b>{' '}
+              <span style={{ color: '#666' }}>Quizzes passed</span>
+            </div>
+            <div>
+              <b>{(target.comment_count ?? 0).toLocaleString()}</b>{' '}
+              <span style={{ color: '#666' }}>Comments</span>
+            </div>
+            <div>
+              <b>{(target.followers_count ?? 0).toLocaleString()}</b>{' '}
+              <span style={{ color: '#666' }}>Followers</span>
+            </div>
+            <div>
+              <b>{(target.following_count ?? 0).toLocaleString()}</b>{' '}
+              <span style={{ color: '#666' }}>Following</span>
+            </div>
+          </div>
+        )}
+        {canSeeVerityScore && (
+          <div style={{ marginTop: 8, fontSize: 13 }}>
+            <b>{(target.verity_score ?? 0).toLocaleString()}</b>{' '}
+            <span style={{ color: '#666' }}>Verity Score</span>
+          </div>
+        )}
 
         {/* Shareable profile card link — D32; shows on own profile when
          *  viewer has profile.card_share permission. */}
@@ -390,6 +640,18 @@ export default function ProfilePage() {
         {tab === 'followers' && <UserList users={followers} />}
         {tab === 'following' && <UserList users={followingList} />}
       </div>
+
+      <ConfirmDialog
+        open={confirmBlockOpen}
+        title={`Block @${target.username}?`}
+        message="They won't see your profile, comments, or messages. You can unblock from this page or your privacy settings."
+        confirmLabel="Block"
+        cancelLabel="Cancel"
+        danger
+        busy={blockBusy}
+        onConfirm={handleConfirmBlock}
+        onClose={() => (blockBusy ? null : setConfirmBlockOpen(false))}
+      />
     </div>
   );
 }
@@ -420,21 +682,7 @@ function UserList({ users }: { users: UserListItem[] }) {
             color: '#111',
           }}
         >
-          <div
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: '50%',
-              background: u.avatar_color || '#ccc',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#fff',
-              fontWeight: 700,
-            }}
-          >
-            {(u.username || '?').charAt(0).toUpperCase()}
-          </div>
+          <Avatar user={u} size={32} />
           <div style={{ fontSize: 13, fontWeight: 600 }}>@{u.username || ''}</div>
         </a>
       ))}
@@ -453,3 +701,18 @@ const dmLinkStyle: CSSProperties = {
   textDecoration: 'none',
   display: 'inline-block',
 };
+
+function secondaryActionStyle(busy: boolean): CSSProperties {
+  return {
+    padding: '7px 12px',
+    borderRadius: 7,
+    border: '1px solid #e5e5e5',
+    background: 'transparent',
+    color: '#111',
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: busy ? 'not-allowed' : 'pointer',
+    fontFamily: 'inherit',
+    opacity: busy ? 0.6 : 1,
+  };
+}
