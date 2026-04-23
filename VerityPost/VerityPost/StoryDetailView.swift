@@ -1,10 +1,29 @@
 import SwiftUI
 import Supabase
+import UIKit
 
 // @migrated-to-permissions 2026-04-18
 // @feature-verified tts 2026-04-18
 // @feature-verified quiz 2026-04-18
 // @feature-verified article_reading 2026-04-18
+
+// MARK: - Scroll offset preference (article reading-progress ribbon)
+// Tracks the article body's scroll offset relative to the enclosing
+// ScrollView via a transparent GeometryReader background. Used to fill the
+// reading-progress ribbon and to fire the half-scroll quiz pre-teaser.
+private struct ArticleScrollOffsetKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+private struct ArticleContentHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
 
 struct StoryDetailView: View {
     let story: Story
@@ -110,52 +129,105 @@ struct StoryDetailView: View {
         return min(3, max(1, total))
     }
 
+    // MARK: - Engagement polish state
+    // Reading-progress ribbon, half-scroll quiz teaser, quiz-pass moment,
+    // composer focus, and Up Next sheet. Each piece has a reduce-motion guard
+    // (see `reduceMotion` env value) so the animations vanish when the OS
+    // accessibility preference is set.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @FocusState private var composerFocused: Bool
+    @State private var scrollOffset: CGFloat = 0
+    @State private var contentHeight: CGFloat = 1
+    @State private var viewportHeight: CGFloat = 1
+    @State private var showQuizTeaser = false
+    @State private var quizTeaserDismissed = false
+    @State private var showPassBurst = false
+    @State private var pointsDelta: Int? = nil
+    @State private var pointsDeltaVisible = false
+    @State private var showUpNext = false
+    @State private var upNextStories: [Story] = []
+    @State private var upNextRequested = false
+    @State private var endOfArticleHit = false
+
     // MARK: - Body
     var body: some View {
         VStack(spacing: 0) {
             tabBar
-            ScrollView {
-                if let loadError = loadError {
-                    VStack(spacing: 10) {
-                        Text("Couldn't load this story")
-                            .font(.system(.callout, design: .default, weight: .semibold))
-                            .foregroundColor(VP.text)
-                        Text(loadError)
-                            .font(.footnote)
-                            .foregroundColor(VP.dim)
-                            .multilineTextAlignment(.center)
-                        Button {
-                            Task { await loadData() }
-                        } label: {
-                            Text("Try again")
-                                .font(.system(.subheadline, design: .default, weight: .semibold))
-                                .foregroundColor(VP.accent)
+            readingProgressRibbon
+            ScrollViewReader { proxy in
+                ScrollView {
+                    if let loadError = loadError {
+                        VStack(spacing: 10) {
+                            Text("Couldn't load this story")
+                                .font(.system(.callout, design: .default, weight: .semibold))
+                                .foregroundColor(VP.text)
+                            Text(loadError)
+                                .font(.footnote)
+                                .foregroundColor(VP.dim)
+                                .multilineTextAlignment(.center)
+                            Button {
+                                Task { await loadData() }
+                            } label: {
+                                Text("Try again")
+                                    .font(.system(.subheadline, design: .default, weight: .semibold))
+                                    .foregroundColor(VP.accent)
+                            }
+                            .padding(.top, 4)
                         }
-                        .padding(.top, 4)
-                    }
-                    .padding(.horizontal, 40)
-                    .padding(.top, 60)
-                } else {
-                    switch activeTab {
-                    case .story: storyContent
-                    case .timeline:
-                        if canViewTimeline { timelineContent } else { EmptyView() }
-                    case .discussion:
-                        // D6 / Bug 46: discussion is invisible to anonymous
-                        // users. If they somehow land here (e.g., state
-                        // carried over from a previous signed-in session),
-                        // render nothing instead of teasing the quiz player.
-                        if auth.isLoggedIn {
-                            discussionContent
-                        } else {
-                            EmptyView()
+                        .padding(.horizontal, 40)
+                        .padding(.top, 60)
+                    } else {
+                        switch activeTab {
+                        case .story:
+                            storyContent
+                                .background(
+                                    GeometryReader { inner in
+                                        Color.clear
+                                            .preference(
+                                                key: ArticleContentHeightKey.self,
+                                                value: inner.size.height
+                                            )
+                                    }
+                                )
+                        case .timeline:
+                            if canViewTimeline { timelineContent } else { EmptyView() }
+                        case .discussion:
+                            // D6 / Bug 46: discussion is invisible to anonymous
+                            // users. If they somehow land here (e.g., state
+                            // carried over from a previous signed-in session),
+                            // render nothing instead of teasing the quiz player.
+                            if auth.isLoggedIn {
+                                discussionContent
+                            } else {
+                                EmptyView()
+                            }
                         }
                     }
                 }
+                .background(
+                    GeometryReader { outer in
+                        Color.clear
+                            .preference(
+                                key: ArticleScrollOffsetKey.self,
+                                value: -outer.frame(in: .named("storyScroll")).minY
+                            )
+                            .onAppear { viewportHeight = outer.size.height }
+                            .onChange(of: outer.size.height) { _, h in viewportHeight = h }
+                    }
+                )
+                .coordinateSpace(name: "storyScroll")
+                .onPreferenceChange(ArticleScrollOffsetKey.self) { handleScrollOffset($0) }
+                .onPreferenceChange(ArticleContentHeightKey.self) { contentHeight = max($0, 1) }
+                .onChange(of: userPassedQuiz) { wasPassed, isPassed in
+                    if !wasPassed && isPassed {
+                        triggerQuizPassMoment(scrollProxy: proxy)
+                    }
+                }
+                .background(VP.bg)
             }
-            .background(VP.bg)
         }
         .background(VP.bg)
+        .sheet(isPresented: $showUpNext) { upNextSheet }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
@@ -265,7 +337,9 @@ struct StoryDetailView: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: moderationToast)
+        .overlay(alignment: .center) { quizPassBurst }
         .task(id: story.id) { await loadData() }
+        .task(id: story.id) { await loadUpNextStories() }
         .task(id: story.id) { await subscribeToNewComments() }
         .task(id: perms.changeToken) {
             canPlayTTS = await PermissionService.shared.has("article.tts.play")
@@ -356,11 +430,18 @@ struct StoryDetailView: View {
                     .padding(.top, 12)
             }
 
-            // Meta line
+            // Meta line — date · source count · estimated read time
             HStack(spacing: 8) {
                 let dateStr = story.publishedAt.map(formatDate) ?? ""
                 let srcCount = sources.count
-                Text("\(dateStr)\(srcCount > 0 ? " · \(srcCount) source\(srcCount == 1 ? "" : "s")" : "")")
+                let metaLine: String = {
+                    var parts: [String] = []
+                    if !dateStr.isEmpty { parts.append(dateStr) }
+                    if srcCount > 0 { parts.append("\(srcCount) source\(srcCount == 1 ? "" : "s")") }
+                    parts.append("\(estimatedReadMinutes) min read")
+                    return parts.joined(separator: " · ")
+                }()
+                Text(metaLine)
                     .font(.caption)
                     .foregroundColor(VP.dim)
                 Spacer()
@@ -373,15 +454,23 @@ struct StoryDetailView: View {
             if canViewBody {
                 if let content = story.content, !content.isEmpty {
                     let paras = content.split(whereSeparator: \.isNewline).map(String.init).filter { !$0.isEmpty }
+                    let mid = paras.count / 2
                     VStack(alignment: .leading, spacing: 16) {
-                        ForEach(Array(paras.enumerated()), id: \.offset) { _, p in
+                        ForEach(Array(paras.enumerated()), id: \.offset) { idx, p in
                             Text(p)
                                 .font(.headline)
                                 .foregroundColor(VP.text)
                                 .lineSpacing(5)
+                                .padding(.horizontal, 20)
+                            // Inject the quiz pre-teaser inline at the midpoint
+                            // of the article body. Visibility is gated by the
+                            // half-scroll trigger inside the teaser view itself
+                            // so it never appears above the fold.
+                            if idx == mid && idx > 0 {
+                                quizTeaserCard
+                            }
                         }
                     }
-                    .padding(.horizontal, 20)
                 }
             } else {
                 VStack(alignment: .leading, spacing: 10) {
@@ -463,37 +552,70 @@ struct StoryDetailView: View {
         }
     }
 
-    // MARK: - Source pills
+    // MARK: - Source list (expandable cards w/ outlet glyph)
+    // Replaces the old single-row pill scroller with a vertical stack of
+    // tap-to-expand cards. Each card shows an SF-Symbol-backed favicon
+    // placeholder seeded from the outlet name's first letter, the outlet
+    // label, and (when expanded) the cited headline + a Link that opens the
+    // source URL in Safari via the system handler (matches the project's
+    // existing UIApplication.shared.open pattern — no new dependency).
     private var sourcePillsSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(Array(sources.enumerated()), id: \.element.id) { i, src in
-                        Button {
-                            expandedSource = expandedSource == i ? nil : i
-                        } label: {
-                            Text(src.outletName ?? "Source")
-                                .font(.system(.caption, design: .default, weight: .medium))
-                                .foregroundColor(expandedSource == i ? VP.text : VP.dim)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 5)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 99)
-                                        .stroke(expandedSource == i ? VP.soft : VP.border, lineWidth: 1)
-                                )
-                        }
-                        .buttonStyle(.plain)
+        VStack(alignment: .leading, spacing: 8) {
+            Text("SOURCES")
+                .font(.system(.caption2, design: .default, weight: .bold))
+                .tracking(1)
+                .foregroundColor(VP.dim)
+                .padding(.horizontal, 20)
+            VStack(spacing: 8) {
+                ForEach(Array(sources.enumerated()), id: \.element.id) { i, src in
+                    sourceCard(index: i, src: src)
+                }
+            }
+            .padding(.horizontal, 20)
+        }
+    }
+
+    private func sourceCard(index i: Int, src: SourceLink) -> some View {
+        let isOpen = expandedSource == i
+        let outlet = src.outletName ?? "Source"
+        let glyph = String(outlet.first.map { String($0) } ?? "S").uppercased()
+        return VStack(alignment: .leading, spacing: 0) {
+            Button {
+                if reduceMotion {
+                    expandedSource = isOpen ? nil : i
+                } else {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        expandedSource = isOpen ? nil : i
                     }
                 }
-                .padding(.horizontal, 20)
-            }
-
-            if let i = expandedSource, i < sources.count {
-                let src = sources[i]
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(src.outletName ?? "Source")
-                        .font(.system(.caption, design: .default, weight: .semibold))
+            } label: {
+                HStack(spacing: 10) {
+                    ZStack {
+                        Circle()
+                            .fill(VP.accent.opacity(0.08))
+                        Text(glyph)
+                            .font(.system(.caption, design: .default, weight: .bold))
+                            .foregroundColor(VP.accent)
+                    }
+                    .frame(width: 24, height: 24)
+                    .accessibilityHidden(true)
+                    Text(outlet)
+                        .font(.system(.footnote, design: .default, weight: .semibold))
                         .foregroundColor(VP.text)
+                    Spacer()
+                    Image(systemName: isOpen ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(VP.dim)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(outlet) source. \(isOpen ? "Collapse" : "Expand")")
+
+            if isOpen {
+                VStack(alignment: .leading, spacing: 6) {
                     if let h = src.headline, !h.isEmpty {
                         Text(h)
                             .font(.system(.subheadline, design: .serif, weight: .semibold))
@@ -501,22 +623,25 @@ struct StoryDetailView: View {
                     }
                     if let u = src.url, let url = URL(string: u) {
                         Link(destination: url) {
-                            Text("Read on \(src.outletName ?? "source") →")
-                                .font(.system(.caption, design: .default, weight: .semibold))
-                                .foregroundColor(VP.accent)
+                            HStack(spacing: 4) {
+                                Text("Read on \(outlet)")
+                                Image(systemName: "arrow.up.right")
+                                    .font(.system(size: 10, weight: .semibold))
+                            }
+                            .font(.system(.caption, design: .default, weight: .semibold))
+                            .foregroundColor(VP.accent)
                         }
                     }
                 }
-                .padding(12)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(VP.card)
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(VP.border, lineWidth: 1))
-                .cornerRadius(8)
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
-                .transition(.opacity)
+                .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
             }
         }
+        .background(VP.card)
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border, lineWidth: 1))
+        .cornerRadius(10)
     }
 
     // MARK: - Timeline content
@@ -820,6 +945,10 @@ struct StoryDetailView: View {
         let border = selected ? VP.accent : VP.border
         return Button {
             guard !answered, quizStage == .answering else { return }
+            // Subtle selection haptic on every answer tap. Apple recommends
+            // .selectionChanged for "value-picker"-style discrete choices,
+            // which matches how the quiz reads (one of N options per card).
+            UISelectionFeedbackGenerator().selectionChanged()
             quizAnswers[quizId] = oi
             let isLast = quizCurrent >= quizQuestions.count - 1
             // Match web ArticleQuiz: 350ms settle, then auto-advance or submit.
@@ -873,7 +1002,10 @@ struct StoryDetailView: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 12)
             } else {
-                composer.padding(.horizontal, 20).padding(.top, 12)
+                composer
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+                    .id("composer")
             }
 
             // Expert insights (permission-gated via `article.expert_responses.read`).
@@ -962,6 +1094,16 @@ struct StoryDetailView: View {
 
     private var activeComposer: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // Post-quiz composer headline. Pre-quiz, the discussion section is
+            // rendered as the locked quiz player so this branch never runs;
+            // once the user has passed, the headline confirms they unlocked it.
+            if userPassedQuiz {
+                Text("What did you think?")
+                    .font(.system(.subheadline, design: .default, weight: .bold))
+                    .foregroundColor(VP.text)
+                    .padding(.bottom, 8)
+            }
+
             // D21: paid-only @mention autocomplete dropdown.
             if canMentionAutocomplete && !mentionSuggestions.isEmpty {
                 VStack(alignment: .leading, spacing: 0) {
@@ -1001,6 +1143,22 @@ struct StoryDetailView: View {
                         .font(.footnote)
                         .foregroundColor(VP.text)
                         .lineLimit(1...4)
+                        .focused($composerFocused)
+                        .submitLabel(.send)
+                        .onSubmit {
+                            // Return-key submit. Multi-line entries can still
+                            // grow because TextField is axis: .vertical — the
+                            // submit binding fires only on a literal Return on
+                            // the keyboard, not on Shift+Return-style breaks.
+                            Task { await postComment() }
+                        }
+                        .toolbar {
+                            ToolbarItemGroup(placement: .keyboard) {
+                                Spacer()
+                                Button("Done") { composerFocused = false }
+                                    .foregroundColor(VP.accent)
+                            }
+                        }
                         .onChange(of: commentText) { _, new in
                             handleMentionChange(new)
                         }
@@ -1274,7 +1432,284 @@ struct StoryDetailView: View {
         }
     }
 
+    // MARK: - Reading progress ribbon
+    // Thin VP.accent bar under the tab bar that fills as the reader scrolls
+    // through the article. Uses the ArticleScrollOffsetKey/ContentHeightKey
+    // preference values populated from the ScrollView background. Hidden when
+    // the active tab is not the article (no progress to report there).
+    @ViewBuilder private var readingProgressRibbon: some View {
+        if activeTab == .story {
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Rectangle().fill(VP.rule)
+                    Rectangle()
+                        .fill(VP.accent)
+                        .frame(width: geo.size.width * readingProgress)
+                }
+            }
+            .frame(height: 2)
+            .accessibilityHidden(true)
+        }
+    }
+
+    // Clamped 0...1. Uses the visible viewport against total content so the
+    // ribbon hits 1.0 when the last paragraph clears the bottom edge rather
+    // than waiting for the user to scroll past empty space.
+    private var readingProgress: CGFloat {
+        let scrollable = max(contentHeight - viewportHeight, 1)
+        let raw = scrollOffset / scrollable
+        return min(max(raw, 0), 1)
+    }
+
+    // MARK: - Quiz pass burst (subtle particle moment + +X points delta)
+    @ViewBuilder private var quizPassBurst: some View {
+        if showPassBurst {
+            VStack(spacing: 8) {
+                Image(systemName: "star.fill")
+                    .font(.system(size: 44, weight: .bold))
+                    .foregroundColor(VP.accent)
+                    .symbolEffect(.bounce, value: showPassBurst)
+                if let delta = pointsDelta, pointsDeltaVisible {
+                    Text("+\(delta) points")
+                        .font(.system(.subheadline, design: .default, weight: .bold))
+                        .foregroundColor(VP.accent)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 6)
+                        .background(RoundedRectangle(cornerRadius: 99).fill(VP.accent.opacity(0.1)))
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .transition(.opacity)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+    }
+
+    // MARK: - Quiz pre-teaser (inline at ~50% scroll)
+    // Subtle inline card injected partway through the article body that hints
+    // at the quiz at the end. Hidden once the reader passes, dismisses, or
+    // when the discussion tab is already open.
+    @ViewBuilder private var quizTeaserCard: some View {
+        if showQuizTeaser, !userPassedQuiz, !quizTeaserDismissed, canTakeQuiz {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "checklist")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(VP.accent)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("5 questions waiting at the end")
+                        .font(.system(.footnote, design: .default, weight: .bold))
+                        .foregroundColor(VP.text)
+                    Text("Pass 3 to join the discussion.")
+                        .font(.caption)
+                        .foregroundColor(VP.soft)
+                }
+                Spacer()
+                Button {
+                    quizTeaserDismissed = true
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(VP.dim)
+                        .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Dismiss quiz reminder")
+            }
+            .padding(12)
+            .background(VP.card)
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border, lineWidth: 1))
+            .cornerRadius(10)
+            .padding(.horizontal, 20)
+            .padding(.top, 18)
+            .transition(reduceMotion ? .opacity : .move(edge: .leading).combined(with: .opacity))
+        }
+    }
+
+    // MARK: - Up Next sheet
+    // Slide-in (system .sheet) recommendation list. Loaded once on mount; tap
+    // a card to push the next StoryDetailView via the existing
+    // navigationDestination(for: Story.self) wired in HomeView.
+    @ViewBuilder private var upNextSheet: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("UP NEXT")
+                        .font(.system(.caption2, design: .default, weight: .bold))
+                        .tracking(1)
+                        .foregroundColor(VP.dim)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 12)
+                    if upNextStories.isEmpty {
+                        Text("Nothing else queued in this category yet.")
+                            .font(.footnote)
+                            .foregroundColor(VP.dim)
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 24)
+                    } else {
+                        VStack(spacing: 10) {
+                            ForEach(upNextStories) { s in
+                                NavigationLink(value: s) {
+                                    upNextCard(s)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 32)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .background(VP.bg)
+            .navigationTitle("Up next")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Close") { showUpNext = false }
+                        .foregroundColor(VP.accent)
+                }
+            }
+            .navigationDestination(for: Story.self) { next in
+                StoryDetailView(story: next).environmentObject(auth)
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+
+    private func upNextCard(_ s: Story) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let cat = categoryName, !cat.isEmpty {
+                Text(cat.uppercased())
+                    .font(.system(.caption2, design: .default, weight: .semibold))
+                    .tracking(1)
+                    .foregroundColor(VP.accent)
+            }
+            Text(s.title ?? "Untitled")
+                .font(.system(.callout, design: .serif, weight: .semibold))
+                .foregroundColor(VP.text)
+                .multilineTextAlignment(.leading)
+                .lineLimit(3)
+            if let summary = s.summary, !summary.isEmpty {
+                Text(summary)
+                    .font(.caption)
+                    .foregroundColor(VP.soft)
+                    .lineSpacing(2)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(VP.card)
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(VP.border, lineWidth: 1))
+        .cornerRadius(12)
+    }
+
+    // MARK: - Scroll + engagement triggers
+    private func handleScrollOffset(_ value: CGFloat) {
+        scrollOffset = value
+        // Half-scroll quiz teaser: arms once when the reader crosses 50% of
+        // the scrollable range. Stays armed even if they scroll back so the
+        // card doesn't flicker on every scroll oscillation.
+        let scrollable = max(contentHeight - viewportHeight, 1)
+        if !showQuizTeaser, !quizTeaserDismissed, value / scrollable >= 0.5 {
+            if reduceMotion {
+                showQuizTeaser = true
+            } else {
+                withAnimation(.easeOut(duration: 0.3)) { showQuizTeaser = true }
+            }
+        }
+        // End-of-article Up Next trigger fires once when the reader reaches
+        // ~95% of the body. Skipped until recommendations have loaded so we
+        // don't pop an empty sheet.
+        if !endOfArticleHit, !upNextStories.isEmpty, value / scrollable >= 0.95 {
+            endOfArticleHit = true
+            // Don't auto-pop while the keyboard is up or the user is in the
+            // middle of an interaction (composer focus = active session).
+            if !composerFocused && !showUpNext {
+                if reduceMotion {
+                    showUpNext = true
+                } else {
+                    withAnimation(.easeOut(duration: 0.35)) { showUpNext = true }
+                }
+            }
+        }
+    }
+
+    // Triggered when userPassedQuiz flips false→true. Combines a subtle
+    // burst overlay, points-delta animation, focus on the composer, and a
+    // success haptic. Reduce-motion strips the animation but keeps the
+    // scroll + focus + haptic so the functional behaviour is preserved.
+    // Also pins activeTab to .discussion so the composer is in the tree
+    // before the scrollProxy tries to reach it.
+    private func triggerQuizPassMoment(scrollProxy: ScrollViewProxy) {
+        let success = UINotificationFeedbackGenerator()
+        success.notificationOccurred(.success)
+        let delta = quizResult?.correct ?? 0
+        pointsDelta = delta > 0 ? delta : nil
+        // Quiz lives inside discussionContent already, but pinning the tab
+        // explicitly keeps the composer in the tree even if the user taps
+        // Article during the burst.
+        activeTab = .discussion
+        if reduceMotion {
+            scrollProxy.scrollTo("composer", anchor: .top)
+            composerFocused = true
+            return
+        }
+        withAnimation(.easeOut(duration: 0.25)) { showPassBurst = true }
+        withAnimation(.easeOut(duration: 0.5).delay(0.1)) { pointsDeltaVisible = true }
+        withAnimation(.easeInOut(duration: 0.45).delay(0.55)) {
+            scrollProxy.scrollTo("composer", anchor: .top)
+        }
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_400_000_000)
+            withAnimation(.easeIn(duration: 0.35)) {
+                showPassBurst = false
+                pointsDeltaVisible = false
+            }
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            composerFocused = true
+        }
+    }
+
+    // MARK: - Up Next loader
+    // Same category, recently published, excluding this article. Limit 3.
+    private func loadUpNextStories() async {
+        guard !upNextRequested else { return }
+        upNextRequested = true
+        guard let catId = story.categoryId else { return }
+        do {
+            let next: [Story] = try await client.from("articles")
+                .select("id, title, slug, excerpt, body, cover_image_url, category_id, status, is_breaking, is_developing, published_at, created_at")
+                .eq("category_id", value: catId)
+                .eq("status", value: "published")
+                .neq("id", value: story.id)
+                .order("published_at", ascending: false)
+                .limit(3)
+                .execute().value
+            await MainActor.run { upNextStories = next }
+        } catch {
+            Log.d("[StoryDetail] up-next load error:", error)
+        }
+    }
+
     // MARK: - Helpers
+
+    // Word-count-based read time. 200 wpm matches the web /story page
+    // (added in the same engagement-polish ship). Always shows at least
+    // "1 min read" so the meta line is consistent on stub articles.
+    private var estimatedReadMinutes: Int {
+        let body = story.content ?? ""
+        if body.isEmpty { return 1 }
+        let words = body
+            .split { $0.isWhitespace || $0.isNewline }
+            .filter { !$0.isEmpty }
+            .count
+        return max(1, words / 200)
+    }
+
     private func badge(_ text: String, color: Color) -> some View {
         // Canonical solid-bg + white-text style, matches web story-page
         // Breaking/Developing badges (commit 46c27d2) + iOS HomeView card
@@ -1784,6 +2219,20 @@ struct StoryDetailView: View {
                 await MainActor.run {
                     comments.insert(decoded.comment, at: 0)
                     commentText = ""
+                    composerFocused = false
+                    // Light selection haptic to confirm the send. Matches the
+                    // quiz-answer tap pattern — discrete, single-action.
+                    UISelectionFeedbackGenerator().selectionChanged()
+                    // Post-send Up Next: show once, only if we have
+                    // recommendations queued and the user hasn't already seen
+                    // the sheet via the end-of-article trigger.
+                    if !upNextStories.isEmpty && !showUpNext {
+                        if reduceMotion {
+                            showUpNext = true
+                        } else {
+                            withAnimation(.easeOut(duration: 0.35)) { showUpNext = true }
+                        }
+                    }
                 }
                 let ss = SettingsService.shared
                 if ss.commentBool("rate_limit_comments") {

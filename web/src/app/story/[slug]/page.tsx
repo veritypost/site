@@ -107,78 +107,107 @@ function timeAgo(iso: string | null | undefined): string {
   return `${d}d`;
 }
 
+// Compact source list — one card per cited outlet. Each card opens the
+// canonical URL in a new tab (rel=noopener,noreferrer); the card itself is
+// the full click target so the favicon-stand-in initial doesn't need to be
+// a separate hit area. Replaces the old single-row pill scroller; pairs
+// with the iOS sourceCard layout shipped in the same engagement-polish
+// pass so both surfaces present sources the same way.
 function SourcePills({ sources }: { sources: SourcePill[] }) {
-  const [expanded, setExpanded] = useState<number | null>(null);
   if (!sources || sources.length === 0) return null;
   return (
-    <div style={{ marginTop: 12 }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-        {sources.map((src, i) => (
-          <button
+    <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {sources.map((src, i) => {
+        const publisher = src.publisher || 'Source';
+        const glyph = (publisher.trim().charAt(0) || 'S').toUpperCase();
+        const url = src.url || '';
+        const Tag: 'a' | 'div' = url ? 'a' : 'div';
+        const tagProps = url
+          ? {
+              href: url,
+              target: '_blank',
+              rel: 'noopener noreferrer',
+            }
+          : {};
+        return (
+          <Tag
             key={src.id || i}
-            onClick={() => setExpanded(expanded === i ? null : i)}
+            {...tagProps}
             style={{
-              padding: '4px 10px',
-              borderRadius: 16,
-              border: expanded === i ? '1px solid var(--soft)' : '1px solid var(--border)',
-              background: 'transparent',
-              color: expanded === i ? 'var(--text-primary)' : 'var(--dim)',
-              fontSize: 11,
-              fontWeight: 500,
-              cursor: 'pointer',
-              fontFamily: 'var(--font-sans)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '8px 12px',
+              borderRadius: 10,
+              border: '1px solid var(--border)',
+              background: 'var(--card)',
+              textDecoration: 'none',
+              color: 'inherit',
+              cursor: url ? 'pointer' : 'default',
             }}
           >
-            {src.publisher || 'Source'}
-          </button>
-        ))}
-      </div>
-      {expanded !== null && sources[expanded] && (
-        <div
-          style={{
-            marginTop: 8,
-            padding: '10px 12px',
-            borderRadius: 8,
-            background: 'var(--srcCard)',
-            border: '1px solid var(--border)',
-            animation: 'vpFadeIn 0.15s ease',
-          }}
-        >
-          <div
-            style={{ fontSize: 13, fontWeight: 600, marginBottom: 4, color: 'var(--text-primary)' }}
-          >
-            {sources[expanded].publisher || 'Source'}
-          </div>
-          {sources[expanded].title && (
-            <div
+            <span
+              aria-hidden="true"
               style={{
-                fontSize: 14,
-                fontWeight: 600,
-                fontFamily: 'var(--font-serif)',
-                color: 'var(--text-primary)',
-                marginBottom: 4,
+                width: 24,
+                height: 24,
+                flexShrink: 0,
+                borderRadius: '50%',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(17,17,17,0.08)',
+                color: 'var(--accent)',
+                fontSize: 11,
+                fontWeight: 700,
+                fontFamily: 'var(--font-sans)',
               }}
             >
-              {sources[expanded].title}
-            </div>
-          )}
-          {sources[expanded].quote && (
-            <div style={{ fontSize: 12, color: 'var(--dim)', marginBottom: 6 }}>
-              {sources[expanded].quote}
-            </div>
-          )}
-          {sources[expanded].url && (
-            <a
-              href={sources[expanded].url || '#'}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)' }}
-            >
-              Read on {sources[expanded].publisher} →
-            </a>
-          )}
-        </div>
-      )}
+              {glyph}
+            </span>
+            <span style={{ minWidth: 0, flex: 1 }}>
+              <span
+                style={{
+                  display: 'block',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: 'var(--text-primary)',
+                  fontFamily: 'var(--font-sans)',
+                }}
+              >
+                {publisher}
+              </span>
+              {src.title && (
+                <span
+                  style={{
+                    display: 'block',
+                    fontSize: 12,
+                    color: 'var(--dim)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {src.title}
+                </span>
+              )}
+            </span>
+            {url && (
+              <span
+                aria-hidden="true"
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: 'var(--accent)',
+                  flexShrink: 0,
+                }}
+              >
+                Read →
+              </span>
+            )}
+          </Tag>
+        );
+      })}
     </div>
   );
 }
@@ -323,6 +352,12 @@ export default function StoryPage() {
   const [activeTab, setActiveTab] = useState<'Article' | 'Timeline' | 'Discussion'>('Article');
   const [isDesktop, setIsDesktop] = useState<boolean>(true);
   const [bookmarkError, setBookmarkError] = useState<string>('');
+
+  // Reading-progress ribbon. Drives a `transform: scaleX(value)` bar fixed at
+  // the top of the document. Updated on scroll via a passive listener; clamped
+  // 0..1 so the bar never overshoots when the page is shorter than the
+  // viewport. Companion to the iOS reading-progress polish in the same ship.
+  const [readingProgress, setReadingProgress] = useState<number>(0);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return;
@@ -644,6 +679,37 @@ export default function StoryPage() {
     };
   }, [story, currentUser]);
 
+  // Reading-progress ribbon scroll listener. Independent of the read-complete
+  // signal above so the ribbon updates regardless of auth state and continues
+  // to fill after the 80% mark. Idle when the article hasn't loaded.
+  useEffect(() => {
+    if (!story) return;
+    const update = () => {
+      if (typeof window === 'undefined' || typeof document === 'undefined') return;
+      const doc = document.documentElement;
+      const scrollable = Math.max(doc.scrollHeight - window.innerHeight, 1);
+      const ratio = window.scrollY / scrollable;
+      setReadingProgress(Math.min(Math.max(ratio, 0), 1));
+    };
+    update();
+    window.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, [story]);
+
+  // Word-count-based read time. 200 wpm matches the iOS estimatedReadMinutes
+  // helper so both surfaces agree on the displayed minute count for the same
+  // article body. Clamps to 1 so empty/sparse stubs still show a value.
+  const readMinutes = (() => {
+    const body = story?.body ?? '';
+    if (!body) return 1;
+    const words = body.split(/\s+/).filter(Boolean).length;
+    return Math.max(1, Math.floor(words / 200));
+  })();
+
   const handleShare = async () => {
     const url = window.location.href;
     // Pass 17 / UJ-606: prefer navigator.clipboard, fall back to the
@@ -902,6 +968,44 @@ export default function StoryPage() {
 
   return (
     <div className="vp-dark">
+      {/* Reading-progress ribbon. Fixed at the very top of the viewport, 2px
+          tall, fills with scroll. `transform: scaleX` keeps the paint cheap
+          (compositor-only update). The motion-media query collapses the
+          transition for users with reduced-motion enabled. */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 2,
+          zIndex: 100,
+          background: 'transparent',
+          pointerEvents: 'none',
+        }}
+      >
+        <div
+          style={{
+            height: '100%',
+            width: '100%',
+            background: 'var(--accent)',
+            transformOrigin: 'left center',
+            transform: `scaleX(${readingProgress})`,
+            transition: 'transform 80ms linear',
+            willChange: 'transform',
+          }}
+          className="vp-reading-progress-bar"
+        />
+      </div>
+      <style jsx>{`
+        @media (prefers-reduced-motion: reduce) {
+          .vp-reading-progress-bar {
+            transition: none !important;
+          }
+        }
+      `}</style>
+
       {/* D23: anonymous 2nd-article interstitial (sign-up CTA variant) */}
       <Interstitial
         open={showAnonInterstitial && !LAUNCH_HIDE_ANON_INTERSTITIAL}
@@ -1169,6 +1273,7 @@ export default function StoryPage() {
                     {formatDate(story.published_at || story.created_at)}
                     {sources.length > 0 &&
                       ` · ${sources.length} source${sources.length === 1 ? '' : 's'}`}
+                    {` · ${readMinutes} min read`}
                   </span>
                   <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                     {canListenTts && <TTSButton text={`${story.title}. ${story.body || ''}`} />}
