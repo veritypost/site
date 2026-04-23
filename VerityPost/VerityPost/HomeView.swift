@@ -78,6 +78,42 @@ struct HomeView: View {
             // to iOS; the pill rows render live here.
             ScrollView {
                 VStack(spacing: 0) {
+                    // Flat top bar — matches web's rgba(255,255,255,0.97) fixed
+                    // top bar. Rendered inside ScrollView (not as NavigationStack
+                    // toolbar) because iOS 26's default toolbar wraps items in
+                    // a floating glass bubble + adds a scroll-edge gray shadow
+                    // that .toolbarBackground can't fully override.
+                    HStack(spacing: 0) {
+                        Text("verity post")
+                            .font(.system(size: 15, weight: .heavy))
+                            .tracking(-0.15)
+                            .foregroundColor(VP.text)
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
+                        Spacer()
+                        if canSearch {
+                            Button {
+                                showSearch.toggle()
+                            } label: {
+                                Image(systemName: showSearch ? "xmark" : "magnifyingglass")
+                                    .font(.system(size: 20, weight: .regular))
+                                    .foregroundColor(VP.dim)
+                                    .frame(width: 44, height: 44)
+                                    .contentShape(Rectangle())
+                            }
+                            .accessibilityLabel(showSearch ? "Close search" : "Search stories")
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(VP.bg)
+                    .overlay(
+                        Rectangle()
+                            .fill(VP.border)
+                            .frame(height: 1),
+                        alignment: .bottom
+                    )
+
                     // Category pill row — horizontal scroll, "All" first then
                     // one pill per loaded category. Selecting a pill filters
                     // the feed and clears any previously selected subcategory.
@@ -259,43 +295,10 @@ struct HomeView: View {
                 }
             }
         }
-        .toolbar {
-            // Top-bar wordmark — matches web/src/app/NavWrapper.tsx exactly:
-            // lowercase "verity post" at 15pt weight 800, -0.01em tracking,
-            // left-aligned. The VP tile + heavy "Verity Post" title was iOS
-            // drift that never shipped on web. `.topBarLeading` gives us the
-            // same left-aligned position web uses.
-            ToolbarItem(placement: .topBarLeading) {
-                Text("verity post")
-                    .font(.system(size: 15, weight: .heavy))
-                    .tracking(-0.15) // -0.01em at 15pt ≈ -0.15pt
-                    .foregroundColor(VP.text)
-                    .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                if canSearch {
-                    Button {
-                        showSearch.toggle()
-                    } label: {
-                        Image(systemName: showSearch ? "xmark" : "magnifyingglass")
-                            .font(.system(size: 20, weight: .regular))
-                            .foregroundColor(VP.dim)
-                            .frame(minWidth: 44, minHeight: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .accessibilityLabel(showSearch ? "Close search" : "Search stories")
-                }
-            }
-        }
-        // Fix the "gray bar below the nav menu": SwiftUI's default nav-bar
-        // background is the system translucent material, which renders as
-        // a faint gray strip under the wordmark. Pinning the nav-bar
-        // background to VP.bg (white) — both scroll-edge and in-flight —
-        // removes the artifact and matches web's fixed white top bar
-        // (rgba(255,255,255,0.97) in NavWrapper.tsx).
-        .toolbarBackground(VP.bg, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
+        // Hide native nav bar entirely — custom flat top bar renders inside
+        // ScrollView. iOS 26 toolbar defaults to liquid-glass bubble +
+        // scroll-edge shadow which .toolbarBackground can't fully override.
+        .toolbar(.hidden, for: .navigationBar)
         .navigationBarTitleDisplayMode(.inline)
         .task { await loadData() }
         .task(id: perms.changeToken) {
