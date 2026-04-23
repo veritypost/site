@@ -178,20 +178,11 @@ struct HomeView: View {
                                 .buttonStyle(.plain)
                             }
 
-                            // Day-streak line — plain text above the first
-                            // card. Web shows this inline (page.tsx: "Day N")
-                            // at 13pt weight 600, 12pt bottom margin.
-                            if let streak = auth.currentUser?.streak, streak > 1 {
-                                HStack {
-                                    Text("Day \(streak)")
-                                        .font(.system(size: 13, weight: .semibold))
-                                        .foregroundColor(VP.text)
-                                    Spacer()
-                                }
-                                .padding(.horizontal, 16)
-                                .padding(.top, 12)
-                                .padding(.bottom, 12)
-                            }
+                            // Streak count intentionally NOT rendered on
+                            // adult home. Server still advances the streak
+                            // via the reading_log trigger (migration 134);
+                            // count shows on profile / achievements /
+                            // leaderboard. Home stays clean.
 
                             // Recap card (users with recap permission; self-hides if no recap).
                             if canSeeRecap {

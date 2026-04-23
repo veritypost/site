@@ -1236,14 +1236,11 @@ export default function HomePage() {
               No articles found.
             </div>
           )}
-          {!loading &&
-            feedVisible.length > 0 &&
-            loggedIn &&
-            (authUser?.streak_current || 0) > 1 && (
-              <div style={{ fontSize: 13, fontWeight: 600, color: C.text, margin: '0 0 12px' }}>
-                Day {authUser?.streak_current}
-              </div>
-            )}
+          {/* Streak count intentionally NOT rendered on adult home.
+              Server still advances users.streak_current via
+              score_on_reading_complete / advance_streak — the count is
+              tracked, just not displayed here. Streak surfaces on
+              profile / achievements / leaderboard remain. */}
           {/* LAUNCH: RecapCard hidden pre-launch — the anon variant pushes
               paid sign-ups ("See what you missed this week"), and we're not
               ready to convert traffic yet. Flip back to
