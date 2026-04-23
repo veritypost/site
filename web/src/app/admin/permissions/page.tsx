@@ -1,4 +1,4 @@
-// @admin-verified 2026-04-18
+// @admin-verified 2026-04-23
 'use client';
 
 // /admin/permissions — canonical v2 RBAC admin surface.

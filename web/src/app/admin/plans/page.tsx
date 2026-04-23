@@ -1,4 +1,4 @@
-// @admin-verified 2026-04-18
+// @admin-verified 2026-04-23
 'use client';
 
 // Plan + plan-features admin. Plan selection lives in the left pane;

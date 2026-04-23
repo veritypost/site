@@ -1,4 +1,4 @@
-// @admin-verified 2026-04-18
+// @admin-verified 2026-04-23
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { createClient } from '@/lib/supabase/server';
