@@ -181,7 +181,7 @@ struct HomeView: View {
                             // Day-streak line — plain text above the first
                             // card. Web shows this inline (page.tsx: "Day N")
                             // at 13pt weight 600, 12pt bottom margin.
-                            if let streak = auth.currentUser?.streak, streak > 0 {
+                            if let streak = auth.currentUser?.streak, streak > 1 {
                                 HStack {
                                     Text("Day \(streak)")
                                         .font(.system(size: 13, weight: .semibold))

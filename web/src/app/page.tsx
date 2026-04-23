@@ -1239,7 +1239,7 @@ export default function HomePage() {
           {!loading &&
             feedVisible.length > 0 &&
             loggedIn &&
-            (authUser?.streak_current || 0) > 0 && (
+            (authUser?.streak_current || 0) > 1 && (
               <div style={{ fontSize: 13, fontWeight: 600, color: C.text, margin: '0 0 12px' }}>
                 Day {authUser?.streak_current}
               </div>
