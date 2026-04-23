@@ -71,63 +71,22 @@ struct HomeView: View {
 
     var body: some View {
         ZStack {
-            // Main feed
+            // Main feed — mirrors web mobile (web/src/app/page.tsx): a single
+            // scroll of breaking banner, streak line, story cards, load-more.
+            // Category + subcategory pill rows are intentionally hidden to
+            // match the launch gate on web (page.tsx wraps both pill rows in
+            // `{false && ...}`); filter state is preserved so flipping the
+            // gate back on is a one-line change.
             ScrollView {
                 VStack(spacing: 0) {
-                    // Streak header — plain text per design rules (no flame icon).
-                    if let streak = auth.currentUser?.streak, streak > 0 {
-                        HStack {
-                            Text("Day \(streak)")
-                                .font(.system(.footnote, design: .default, weight: .semibold))
-                                .foregroundColor(VP.text)
-                            Spacer()
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 12)
-                    }
-
-                    // Category pills
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            PillButton(label: "All", isActive: selectedCategory == nil) {
-                                selectedCategory = nil
-                                selectedSubcategory = nil
-                            }
-                            ForEach(categories) { cat in
-                                PillButton(label: cat.displayName, isActive: selectedCategory == cat.id) {
-                                    selectedCategory = cat.id
-                                    selectedSubcategory = nil
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 16)
-                    }
-
-                    // Subcategory pills (when a category is selected, logged-in only)
-                    if auth.currentUser != nil, let catId = selectedCategory {
-                        let subs = subcategories.filter { $0.categoryId == catId }
-                        if !subs.isEmpty {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 8) {
-                                    PillButton(label: "All", isActive: selectedSubcategory == nil) {
-                                        selectedSubcategory = nil
-                                    }
-                                    ForEach(subs) { sub in
-                                        PillButton(label: sub.name, isActive: selectedSubcategory == sub.id) {
-                                            selectedSubcategory = sub.id
-                                        }
-                                    }
-                                }
-                                .padding(.horizontal, 20)
-                                .padding(.bottom, 12)
-                            }
-                        }
-                    }
-
                     if loading {
-                        ProgressView()
-                            .padding(.top, 60)
+                        // Matches web mobile: centered text, 48pt vertical
+                        // padding, dim color, 15pt size.
+                        Text("Loading articles...")
+                            .font(.system(size: 15))
+                            .foregroundColor(VP.dim)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 48)
                     } else if let loadError = loadError {
                         VStack(spacing: 10) {
                             Text("Couldn't load stories")
@@ -148,19 +107,15 @@ struct HomeView: View {
                             .padding(.top, 4)
                         }
                         .padding(.horizontal, 40)
-                        .padding(.top, 60)
+                        .padding(.vertical, 48)
                     } else if filteredStories.isEmpty {
-                        VStack(spacing: 8) {
-                            Text("No stories yet")
-                                .font(.system(.callout, design: .default, weight: .semibold))
-                                .foregroundColor(VP.text)
-                            Text("No stories in this category yet. Try another or check back soon.")
-                                .font(.footnote)
-                                .foregroundColor(VP.dim)
-                                .multilineTextAlignment(.center)
-                        }
-                        .padding(.horizontal, 40)
-                        .padding(.top, 60)
+                        // Match web mobile's exact empty copy ("No articles
+                        // found.") and layout — centered, 48pt padding, dim.
+                        Text("No articles found.")
+                            .font(.system(size: 15))
+                            .foregroundColor(VP.dim)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 48)
                     } else {
                         LazyVStack(spacing: 0) {
                             // Breaking-news banner — top of feed when an
@@ -171,6 +126,21 @@ struct HomeView: View {
                                     breakingBanner(for: breaking)
                                 }
                                 .buttonStyle(.plain)
+                            }
+
+                            // Day-streak line — plain text above the first
+                            // card. Web shows this inline (page.tsx: "Day N")
+                            // at 13pt weight 600, 12pt bottom margin.
+                            if let streak = auth.currentUser?.streak, streak > 0 {
+                                HStack {
+                                    Text("Day \(streak)")
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundColor(VP.text)
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.top, 12)
+                                .padding(.bottom, 12)
                             }
 
                             // Recap card (users with recap permission; self-hides if no recap).
@@ -194,18 +164,31 @@ struct HomeView: View {
                                 }
                             }
 
-                            // Load More button
+                            // Load more — mirrors web's card-style full-width
+                            // button (page.tsx "Load more articles"): #f7f7f7
+                            // background, 1.5px border, 12pt radius, 14pt
+                            // padding, 14pt text weight 600 accent color.
                             if hasMoreStories {
                                 Button {
                                     Task { await loadMore() }
                                 } label: {
-                                    Text("Load More")
-                                        .font(.system(.subheadline, design: .default, weight: .semibold))
+                                    Text("Load more articles")
+                                        .font(.system(size: 14, weight: .semibold))
                                         .foregroundColor(VP.accent)
                                         .frame(maxWidth: .infinity)
                                         .padding(.vertical, 14)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .fill(VP.card)
+                                        )
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .stroke(VP.border, lineWidth: 1.5)
+                                        )
                                 }
                                 .buttonStyle(.plain)
+                                .padding(.horizontal, 16)
+                                .padding(.top, 8)
                             }
                         }
                         .navigationDestination(for: Story.self) { story in
@@ -263,22 +246,16 @@ struct HomeView: View {
             }
         }
         .toolbar {
-            // Matches site's sticky nav: VP logo square + "Verity Post" title.
-            ToolbarItem(placement: .principal) {
-                HStack(spacing: 8) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(VP.text)
-                            .frame(width: 28, height: 28)
-                        Text("VP")
-                            .font(.system(.caption, design: .default, weight: .black))
-                            .foregroundColor(.white)
-                    }
-                    Text("Verity Post")
-                        .font(.system(.headline, design: .default, weight: .heavy))
-                        .tracking(-0.48)
-                        .foregroundColor(VP.text)
-                }
+            // Top-bar wordmark — matches web/src/app/NavWrapper.tsx exactly:
+            // lowercase "verity post" at 15pt weight 800, -0.01em tracking,
+            // left-aligned. The VP tile + heavy "Verity Post" title was iOS
+            // drift that never shipped on web. `.topBarLeading` gives us the
+            // same left-aligned position web uses.
+            ToolbarItem(placement: .topBarLeading) {
+                Text("verity post")
+                    .font(.system(size: 15, weight: .heavy))
+                    .tracking(-0.15) // -0.01em at 15pt ≈ -0.15pt
+                    .foregroundColor(VP.text)
             }
             ToolbarItem(placement: .topBarTrailing) {
                 if canSearch {
@@ -286,7 +263,7 @@ struct HomeView: View {
                         showSearch.toggle()
                     } label: {
                         Image(systemName: showSearch ? "xmark" : "magnifyingglass")
-                            .font(.headline)
+                            .font(.system(size: 20, weight: .regular))
                             .foregroundColor(VP.dim)
                             .frame(minWidth: 44, minHeight: 44)
                             .contentShape(Rectangle())
@@ -295,6 +272,15 @@ struct HomeView: View {
                 }
             }
         }
+        // Fix the "gray bar below the nav menu": SwiftUI's default nav-bar
+        // background is the system translucent material, which renders as
+        // a faint gray strip under the wordmark. Pinning the nav-bar
+        // background to VP.bg (white) — both scroll-edge and in-flight —
+        // removes the artifact and matches web's fixed white top bar
+        // (rgba(255,255,255,0.97) in NavWrapper.tsx).
+        .toolbarBackground(VP.bg, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .navigationBarTitleDisplayMode(.inline)
         .task { await loadData() }
         .task(id: perms.changeToken) {
             canSeeRecap = await PermissionService.shared.has("recap.list.view")
@@ -767,62 +753,85 @@ struct HomeView: View {
 
 // MARK: - Story Card
 
-/// Article card — mirrors site/src/app/page.js feed card exactly.
-/// Card background #f7f7f7, 1pt #e5e5e5 border, 12pt radius, 14x16 padding.
-/// Category badge (uppercase 11pt 600, accent color) + optional BREAKING pill.
-/// Title 15pt weight 700, line-height 1.4. Excerpt 13pt dim. Absolute date 11pt dim.
+/// Article card — mirrors web/src/app/page.tsx feed card exactly.
+/// 16:9 cover image on top (or category-tinted fallback), then body padding
+/// 14×16: category badge (11pt 600 uppercase #111) + optional BREAKING chip,
+/// title 15pt 700, excerpt 13pt #666, date 11pt #666. Card background #f7f7f7,
+/// 1pt #e5e5e5 border, 12pt radius, 12pt vertical gap between cards.
 struct StoryCard: View {
     let story: Story
     var categoryName: String? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
-                if let cat = categoryName, !cat.isEmpty {
-                    Text(cat.uppercased())
-                        .font(.system(.caption, design: .default, weight: .semibold))
-                        .tracking(0.33)
-                        .foregroundColor(VP.accent)
-                }
-                if story.isBreaking == true {
-                    Text("BREAKING")
-                        .font(.system(.caption2, design: .default, weight: .heavy))
-                        .tracking(0.5)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(RoundedRectangle(cornerRadius: 4).fill(Color(hex: "ef4444")))
-                }
-            }
+        VStack(alignment: .leading, spacing: 0) {
+            // 16:9 cover image — matches web's CardThumbnail. AsyncImage with
+            // a tinted fallback so missing-image cards still feel intentional.
+            CardThumbnail(
+                url: story.imageUrl,
+                seed: categoryName ?? story.title ?? story.id,
+                label: (categoryName ?? "").uppercased()
+            )
 
-            Text(story.title ?? "Untitled")
-                .font(.system(.callout, design: .default, weight: .bold))
-                .foregroundColor(VP.text)
-                .lineSpacing(2)
-                .multilineTextAlignment(.leading)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    if let cat = categoryName, !cat.isEmpty {
+                        // Web: 11pt weight 600, 0.03em tracking, #111 accent.
+                        Text(cat.uppercased())
+                            .font(.system(size: 11, weight: .semibold))
+                            .tracking(0.33)
+                            .foregroundColor(VP.accent)
+                    }
+                    if story.isBreaking == true {
+                        // Web: 10pt weight 800, 0.05em tracking, white on
+                        // #ef4444, 6×2 padding, 4pt radius.
+                        Text("BREAKING")
+                            .font(.system(size: 10, weight: .heavy))
+                            .tracking(0.5)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(RoundedRectangle(cornerRadius: 4).fill(Color(hex: "ef4444")))
+                    }
+                }
+                .padding(.top, 4)
 
-            if let summary = story.summary, !summary.isEmpty {
-                Text(summary)
-                    .font(.footnote)
-                    .foregroundColor(VP.dim)
-                    .lineSpacing(2)
+                // Web title: 15pt weight 700, line-height 1.4, #111.
+                Text(story.title ?? "Untitled")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(VP.text)
+                    .lineSpacing(15 * 0.4) // 1.4 line-height
                     .multilineTextAlignment(.leading)
-            }
+                    .padding(.top, 4)
 
-            if let date = story.publishedAt {
-                Text(absoluteDate(date))
-                    .font(.caption)
-                    .foregroundColor(VP.dim)
-                    .padding(.top, 2)
+                if let summary = story.summary, !summary.isEmpty {
+                    // Web excerpt: 13pt, line-height 1.5, #666.
+                    Text(summary)
+                        .font(.system(size: 13))
+                        .foregroundColor(VP.dim)
+                        .lineSpacing(13 * 0.5) // 1.5 line-height
+                        .multilineTextAlignment(.leading)
+                        .padding(.top, 4)
+                }
+
+                if let date = story.publishedAt {
+                    // Web date: 11pt #666, 6pt top margin.
+                    Text(absoluteDate(date))
+                        .font(.system(size: 11))
+                        .foregroundColor(VP.dim)
+                        .padding(.top, 6)
+                }
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(VP.card)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(VP.border, lineWidth: 1))
-        .cornerRadius(12)
         .padding(.horizontal, 16)
+        // Web uses `marginBottom: 12` on each card; mirror as a 6/6 split so
+        // the first card hugs the streak line above and adjacent cards keep
+        // a 12pt gap between them.
         .padding(.vertical, 6)
     }
 
@@ -830,5 +839,78 @@ struct StoryCard: View {
         let f = DateFormatter()
         f.dateFormat = "MMM d, yyyy"
         return f.string(from: d)
+    }
+}
+
+// MARK: - Card thumbnail
+
+/// 16:9 image block with a category-tinted fallback. Mirrors web's
+/// `CardThumbnail` (page.tsx): tries the cover_image_url; on missing/failed
+/// load, renders a deterministic tinted background derived from the seed
+/// string with the label as a soft watermark. Top corners are rounded so
+/// the card's 12pt radius reads as one continuous shape.
+struct CardThumbnail: View {
+    let url: String?
+    let seed: String
+    let label: String
+
+    var body: some View {
+        let tint = Self.tint(for: seed)
+        ZStack {
+            tint
+            if let raw = url, !raw.isEmpty, let imageURL = URL(string: raw) {
+                AsyncImage(url: imageURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    case .failure, .empty:
+                        // Watermark label inside the tinted block.
+                        fallbackLabel
+                    @unknown default:
+                        fallbackLabel
+                    }
+                }
+            } else {
+                fallbackLabel
+            }
+        }
+        .aspectRatio(16.0 / 9.0, contentMode: .fit)
+        .frame(maxWidth: .infinity)
+        .clipped()
+        // Round only the top corners so the bottom edge meets the body
+        // padding cleanly inside the parent card's outer rounded rectangle.
+        .clipShape(
+            UnevenRoundedRectangle(
+                cornerRadii: .init(topLeading: 12, bottomLeading: 0, bottomTrailing: 0, topTrailing: 12),
+                style: .continuous
+            )
+        )
+    }
+
+    @ViewBuilder
+    private var fallbackLabel: some View {
+        if !label.isEmpty {
+            Text(label)
+                .font(.system(size: 13, weight: .bold))
+                .tracking(1.04) // ~0.08em at 13pt
+                .foregroundColor(Color(white: 17.0 / 255.0).opacity(0.45))
+                .multilineTextAlignment(.center)
+                .padding(16)
+        } else {
+            Color.clear
+        }
+    }
+
+    /// Stable hue per seed string — same hash semantics as web's
+    /// `tintFromString`, rendered as `hsl(hue, 28%, 88%)`.
+    private static func tint(for seed: String) -> Color {
+        var h: Int32 = 0
+        for scalar in seed.unicodeScalars {
+            h = (h &* 31) &+ Int32(scalar.value)
+        }
+        let hue = Double(abs(Int(h)) % 360) / 360.0
+        return Color(hue: hue, saturation: 0.28, brightness: 0.88)
     }
 }
