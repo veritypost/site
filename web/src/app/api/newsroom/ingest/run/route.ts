@@ -2,14 +2,17 @@
  * F7 Phase 2 Task 9 — /api/newsroom/ingest/run
  *
  * POST handler for the admin "Refresh feeds" button. Fetches all active
- * RSS feeds, deduplicates against discovery_items/kid_discovery_items by
- * raw_url, and inserts new pending rows for the pipeline orchestrator
- * (Task 10) to pick up.
+ * RSS feeds, deduplicates against discovery_items by raw_url, and inserts
+ * new pending rows for the pipeline orchestrator (Task 10) to pick up.
  *
  * Ported from snapshot: verity-post-pipeline-snapshot/src/app/api/ingest/route.js
  * Differences from snapshot:
- *   - Writes to discovery_items / kid_discovery_items (not scanned_articles)
- *   - Splits by feeds.audience at ingest time (kid vs adult discovery)
+ *   - Writes to discovery_items (no audience-split anymore — the unified-feed
+ *     pivot collapses adult and kid sources into one pool; the operator
+ *     picks audience at generation time)
+ *   - The legacy `feeds.audience` column stays in DB for back-compat with
+ *     mutation RPCs but is no longer a UI primary; ingest writes every
+ *     active feed regardless of its audience tag
  *   - No scraping here (snapshot also deferred scraping per line 287)
  *   - Writes pipeline_runs row for observability
  *   - Admin-gated via admin.pipeline.run_ingest (not open)
@@ -29,9 +32,7 @@ import { preCluster, getClusterOverlapPct, type ClusterInputArticle } from '@/li
 import {
   findBestMatch,
   loadStoryMatchCandidates,
-  loadKidStoryMatchCandidates,
   getStoryMatchOverlapPct,
-  type StoryCandidate,
 } from '@/lib/pipeline/story-match';
 
 export const runtime = 'nodejs';
@@ -43,15 +44,13 @@ export const maxDuration = 300;
 // ----------------------------------------------------------------------------
 
 type DiscoveryInsert = Database['public']['Tables']['discovery_items']['Insert'];
-type KidDiscoveryInsert = Database['public']['Tables']['kid_discovery_items']['Insert'];
 type FeedRow = Pick<
   Database['public']['Tables']['feeds']['Row'],
-  'id' | 'url' | 'source_name' | 'audience' | 'feed_type'
+  'id' | 'url' | 'source_name' | 'feed_type'
 > & { name?: string | null };
 
 interface FlatItem {
   feed_id: string;
-  audience: string;
   raw_url: string;
   raw_title: string | null;
   excerpt: string;
@@ -117,20 +116,14 @@ export async function POST(req: Request) {
   }
   const actorId = actor.id as string;
 
-  // Optional `{ audience: 'adult' | 'kid' }` body — when present, the feed
-  // fetch is filtered to that audience so the per-tab "Refresh feeds" button
-  // in the Newsroom workspace only re-polls the relevant sources. Empty body
-  // (or no body) keeps the legacy behavior: refresh both audiences.
-  let audienceFilter: 'adult' | 'kid' | null = null;
+  // Body parse — the legacy shape included an `audience` field; we still
+  // accept it for back-compat but ignore it. The unified-feed pivot polls
+  // every active feed in one pass.
   try {
     const text = await req.text();
     if (text.trim().length > 0) {
-      const parsed = JSON.parse(text) as { audience?: unknown };
-      if (parsed.audience === 'adult' || parsed.audience === 'kid') {
-        audienceFilter = parsed.audience;
-      } else if (parsed.audience !== undefined && parsed.audience !== null) {
-        return NextResponse.json({ error: 'audience must be "adult" or "kid"' }, { status: 422 });
-      }
+      // Validate JSON only — ignore the parsed body.
+      JSON.parse(text);
     }
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 422 });
@@ -176,9 +169,7 @@ export async function POST(req: Request) {
       items_processed: 0,
       items_created: 0,
       items_failed: 0,
-      input_params: audienceFilter
-        ? ({ audience: audienceFilter } as unknown as Json)
-        : ({} as Json),
+      input_params: {} as Json,
       output_summary: {} as Json,
       step_timings_ms: {} as Json,
     })
@@ -193,19 +184,16 @@ export async function POST(req: Request) {
 
   // 5. Main body — on any throw, mark run failed and return 500
   try {
-    // 6. Fetch active feeds (rss/feed types only). When the request body
-    // pins an audience, scope the SELECT to only that audience's feeds so
-    // the cross-audience tab in the Newsroom workspace doesn't drag the
-    // other audience along for the ride.
-    const feedsQuery = service
+    // 6. Fetch active feeds (rss/feed types only). The unified-feed pivot
+    // dropped audience filtering — every active feed contributes to the same
+    // discovery pool. The audience column stays in DB (defaulted to 'adult')
+    // for back-compat with the cluster-mutation RPCs that still take it as
+    // a defensive parameter.
+    const { data: feedsData, error: feedsErr } = await service
       .from('feeds')
-      .select('id,url,source_name,audience,feed_type,name')
+      .select('id,url,source_name,feed_type,name')
       .eq('is_active', true)
       .in('feed_type', ['feed', 'rss']);
-    if (audienceFilter) {
-      feedsQuery.eq('audience', audienceFilter);
-    }
-    const { data: feedsData, error: feedsErr } = await feedsQuery;
     if (feedsErr) {
       throw new Error(`feeds lookup failed: ${feedsErr.message}`);
     }
@@ -231,7 +219,6 @@ export async function POST(req: Request) {
           const outlet = feed.source_name || feed.name || 'Unknown';
           allItems.push({
             feed_id: feed.id,
-            audience: feed.audience,
             raw_url: item.link,
             raw_title: item.title?.trim() || null,
             excerpt: (item.contentSnippet || '').slice(0, 500),
@@ -244,17 +231,10 @@ export async function POST(req: Request) {
       }
     }
 
-    // 9. Split by audience
-    const adultItems = allItems.filter((i) => i.audience === 'adult');
-    const kidItems = allItems.filter((i) => i.audience === 'kid');
-
-    // 10. Dedup + insert per target table
+    // 9. Dedup + insert into the single discovery_items pool.
     const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
 
-    async function processAudience<TInsert extends DiscoveryInsert | KidDiscoveryInsert>(
-      items: FlatItem[],
-      table: 'discovery_items' | 'kid_discovery_items'
-    ): Promise<{ inserted: number; skipped: number }> {
+    async function processItems(items: FlatItem[]): Promise<{ inserted: number; skipped: number }> {
       if (items.length === 0) return { inserted: 0, skipped: 0 };
 
       // Dedup query in batches of 100
@@ -263,11 +243,11 @@ export async function POST(req: Request) {
       for (let i = 0; i < urls.length; i += 100) {
         const batch = urls.slice(i, i + 100);
         const { data: existing, error: existErr } = await service
-          .from(table)
+          .from('discovery_items')
           .select('raw_url')
           .in('raw_url', batch);
         if (existErr) {
-          throw new Error(`${table} dedup lookup failed: ${existErr.message}`);
+          throw new Error(`discovery_items dedup lookup failed: ${existErr.message}`);
         }
         for (const row of existing ?? []) {
           if (row.raw_url) existingUrls.add(row.raw_url);
@@ -295,42 +275,29 @@ export async function POST(req: Request) {
       if (fresh.length === 0) return { inserted: 0, skipped };
 
       // Map to insert rows
-      const rows: TInsert[] = fresh.map((it) => {
-        const row: DiscoveryInsert = {
-          feed_id: it.feed_id,
-          raw_url: it.raw_url,
-          raw_title: it.raw_title,
-          raw_body: null,
-          raw_published_at: it.pubDate ? new Date(it.pubDate).toISOString() : null,
-          state: 'pending',
-          metadata: { outlet: it.outlet, excerpt: it.excerpt } as Json,
-        };
-        return row as TInsert;
-      });
+      const rows: DiscoveryInsert[] = fresh.map((it) => ({
+        feed_id: it.feed_id,
+        raw_url: it.raw_url,
+        raw_title: it.raw_title,
+        raw_body: null,
+        raw_published_at: it.pubDate ? new Date(it.pubDate).toISOString() : null,
+        state: 'pending',
+        metadata: { outlet: it.outlet, excerpt: it.excerpt } as Json,
+      }));
 
       // Upsert in batches of 500
       let inserted = 0;
       for (let i = 0; i < rows.length; i += 500) {
         const batch = rows.slice(i, i + 500);
-        const query =
-          table === 'discovery_items'
-            ? service
-                .from('discovery_items')
-                .upsert(batch as DiscoveryInsert[], {
-                  onConflict: 'raw_url',
-                  ignoreDuplicates: true,
-                })
-                .select('id')
-            : service
-                .from('kid_discovery_items')
-                .upsert(batch as KidDiscoveryInsert[], {
-                  onConflict: 'raw_url',
-                  ignoreDuplicates: true,
-                })
-                .select('id');
-        const { data: insData, error: insErr } = await query;
+        const { data: insData, error: insErr } = await service
+          .from('discovery_items')
+          .upsert(batch, {
+            onConflict: 'raw_url',
+            ignoreDuplicates: true,
+          })
+          .select('id');
         if (insErr) {
-          throw new Error(`${table} upsert failed: ${insErr.message}`);
+          throw new Error(`discovery_items upsert failed: ${insErr.message}`);
         }
         inserted += (insData ?? []).length;
       }
@@ -338,22 +305,19 @@ export async function POST(req: Request) {
       return { inserted, skipped };
     }
 
-    const { inserted: adultInserted, skipped: adultSkipped } =
-      await processAudience<DiscoveryInsert>(adultItems, 'discovery_items');
-    const { inserted: kidInserted, skipped: kidSkipped } =
-      await processAudience<KidDiscoveryInsert>(kidItems, 'kid_discovery_items');
+    const { inserted: itemsInserted, skipped: itemsSkipped } = await processItems(allItems);
 
     // ----------------------------------------------------------------------
-    // 10b. Clustering orchestration (F7 Phase 2 wire-up — closes F1).
+    // 10. Clustering orchestration (F7 Phase 2 wire-up — closes F1).
     //
-    // Runs preCluster + story-match dedupe per audience over the last 6 hours
-    // of pending discovery items. Match-against-existing-article -> mark items
-    // 'ignored' (no cluster row). No match -> insert feed_clusters row +
-    // mark items 'clustered' with cluster_id. Singletons stay 'pending'.
+    // Runs preCluster + story-match dedupe over the last 6 hours of pending
+    // discovery items. The unified pivot collapsed both audiences into one
+    // pool, so we run a single pass — clusters land with audience='adult'
+    // by default (the column stays in DB for back-compat with mutation RPCs
+    // that still take it as a defensive parameter).
     //
     // Per-cluster failures are caught and recorded into clusterErrors; one
-    // bad cluster never aborts the batch. Adult and kid candidate pools are
-    // isolated (kid clusters never see adult articles and vice versa).
+    // bad cluster never aborts the batch.
     // ----------------------------------------------------------------------
 
     interface ClusteringSummary {
@@ -369,11 +333,11 @@ export async function POST(req: Request) {
     const clusterThresholdPct = await getClusterOverlapPct();
     const storyMatchThresholdPct = await getStoryMatchOverlapPct();
 
-    async function clusterAudience(
-      table: 'discovery_items' | 'kid_discovery_items',
-      audience: 'adult' | 'kid',
-      loadCandidates: () => Promise<StoryCandidate[]>
-    ): Promise<{ summary: ClusteringSummary; durationMs: number; storyMatchMs: number }> {
+    async function clusterPool(): Promise<{
+      summary: ClusteringSummary;
+      durationMs: number;
+      storyMatchMs: number;
+    }> {
       const audienceStart = Date.now();
       const summary: ClusteringSummary = {
         itemsConsidered: 0,
@@ -384,32 +348,27 @@ export async function POST(req: Request) {
         clusterErrors: [],
       };
 
-      // Load candidates ONCE per audience (kid candidates only for kid clusters).
+      // Load story-match candidates ONCE — the adult article pool. Kid
+      // articles aren't matched against here because the unified feed
+      // produces both adult and kid from the same cluster, so a kid-side
+      // story match would create a false dedupe against an adult article
+      // that happens to share keywords.
       const storyMatchStart = Date.now();
-      const candidates = await loadCandidates();
+      const candidates = await loadStoryMatchCandidates(service);
       const storyMatchMs = Date.now() - storyMatchStart;
 
-      // Pull recently-fetched pending items for this audience.
+      // Pull recently-fetched pending items.
       const cutoffIso = new Date(Date.now() - SIX_HOURS_MS).toISOString();
-      const query =
-        table === 'discovery_items'
-          ? service
-              .from('discovery_items')
-              .select('id, raw_title, metadata')
-              .eq('state', 'pending')
-              .gte('fetched_at', cutoffIso)
-              .order('fetched_at', { ascending: false })
-          : service
-              .from('kid_discovery_items')
-              .select('id, raw_title, metadata')
-              .eq('state', 'pending')
-              .gte('fetched_at', cutoffIso)
-              .order('fetched_at', { ascending: false });
-      const { data: pendingRows, error: pendingErr } = await query;
+      const { data: pendingRows, error: pendingErr } = await service
+        .from('discovery_items')
+        .select('id, raw_title, metadata')
+        .eq('state', 'pending')
+        .gte('fetched_at', cutoffIso)
+        .order('fetched_at', { ascending: false });
       if (pendingErr) {
         summary.clusterErrors.push({
           title: '[load-pending]',
-          error: `${table} pending lookup failed: ${pendingErr.message}`,
+          error: `discovery_items pending lookup failed: ${pendingErr.message}`,
         });
         return { summary, durationMs: Date.now() - audienceStart, storyMatchMs };
       }
@@ -442,16 +401,10 @@ export async function POST(req: Request) {
 
           if (match.matchedArticleId) {
             // Existing-story duplicate: mark items 'ignored', no cluster row.
-            const updateRes =
-              table === 'discovery_items'
-                ? await service
-                    .from('discovery_items')
-                    .update({ state: 'ignored', updated_at: new Date().toISOString() })
-                    .in('id', itemIds)
-                : await service
-                    .from('kid_discovery_items')
-                    .update({ state: 'ignored', updated_at: new Date().toISOString() })
-                    .in('id', itemIds);
+            const updateRes = await service
+              .from('discovery_items')
+              .update({ state: 'ignored', updated_at: new Date().toISOString() })
+              .in('id', itemIds);
             if (updateRes.error) {
               throw new Error(`mark-ignored failed: ${updateRes.error.message}`);
             }
@@ -461,10 +414,10 @@ export async function POST(req: Request) {
           }
 
           // Net-new story: insert feed_clusters row, then link items.
-          // Audience is derived from the source feed.audience (adult vs kid)
-          // and threaded down through clusterAudience -> here so the row
-          // lands on the correct audience surface (migration 126 added the
-          // NOT NULL audience column with CHECK ('adult','kid')).
+          // audience defaults to 'adult' for back-compat with the cluster
+          // mutation RPCs (require_audience checks on move/merge/split).
+          // The UI no longer surfaces this column — operators pick adult vs
+          // kid at generation time.
           const insertPayload = {
             title: cluster.title,
             summary: '',
@@ -475,7 +428,7 @@ export async function POST(req: Request) {
             primary_article_id: null,
             category_id: null,
             similarity_threshold: clusterThresholdPct,
-            audience,
+            audience: 'adult' as const,
           };
           const { data: clusterRow, error: clusterErr } = await service
             .from('feed_clusters')
@@ -488,24 +441,14 @@ export async function POST(req: Request) {
             );
           }
 
-          const linkRes =
-            table === 'discovery_items'
-              ? await service
-                  .from('discovery_items')
-                  .update({
-                    cluster_id: clusterRow.id,
-                    state: 'clustered',
-                    updated_at: new Date().toISOString(),
-                  })
-                  .in('id', itemIds)
-              : await service
-                  .from('kid_discovery_items')
-                  .update({
-                    cluster_id: clusterRow.id,
-                    state: 'clustered',
-                    updated_at: new Date().toISOString(),
-                  })
-                  .in('id', itemIds);
+          const linkRes = await service
+            .from('discovery_items')
+            .update({
+              cluster_id: clusterRow.id,
+              state: 'clustered',
+              updated_at: new Date().toISOString(),
+            })
+            .in('id', itemIds);
           if (linkRes.error) {
             throw new Error(`link-cluster failed: ${linkRes.error.message}`);
           }
@@ -525,57 +468,25 @@ export async function POST(req: Request) {
       return { summary, durationMs: Date.now() - audienceStart, storyMatchMs };
     }
 
-    // Honor the audience filter for the clustering pass too — no point
-    // re-clustering an audience whose feeds we didn't poll. The filtered-out
-    // side returns a zero-filled summary so the response shape stays stable.
-    const emptyClusterRun = {
-      summary: {
-        itemsConsidered: 0,
-        clustersCreated: 0,
-        singletons: 0,
-        matchedExisting: 0,
-        itemsIgnored: 0,
-        clusterErrors: [],
-      },
-      durationMs: 0,
-      storyMatchMs: 0,
-    } satisfies { summary: ClusteringSummary; durationMs: number; storyMatchMs: number };
-
-    const adultClusterRun =
-      audienceFilter === 'kid'
-        ? emptyClusterRun
-        : await clusterAudience('discovery_items', 'adult', () =>
-            loadStoryMatchCandidates(service)
-          );
-    const kidClusterRun =
-      audienceFilter === 'adult'
-        ? emptyClusterRun
-        : await clusterAudience('kid_discovery_items', 'kid', () =>
-            loadKidStoryMatchCandidates(service)
-          );
+    const clusterRun = await clusterPool();
 
     // 11. Mark run completed
     const completedAt = new Date();
     const durationMs = completedAt.getTime() - startedAtMs;
-    const itemsCreated = adultInserted + kidInserted;
+    const itemsCreated = itemsInserted;
     const itemsProcessed = allItems.length;
-    const skippedDuplicates = adultSkipped + kidSkipped;
+    const skippedDuplicates = itemsSkipped;
     const output: Json = {
       feedsSucceeded,
       feedsFailed,
-      adultInserted,
-      kidInserted,
-      adultSkipped,
-      kidSkipped,
-      clusteringAdult: adultClusterRun.summary,
-      clusteringKid: kidClusterRun.summary,
+      itemsInserted,
+      itemsSkipped,
+      clustering: clusterRun.summary,
     } as unknown as Json;
 
     const stepTimings: Json = {
-      cluster_adult_ms: adultClusterRun.durationMs,
-      cluster_kid_ms: kidClusterRun.durationMs,
-      story_match_adult_ms: adultClusterRun.storyMatchMs,
-      story_match_kid_ms: kidClusterRun.storyMatchMs,
+      cluster_ms: clusterRun.durationMs,
+      story_match_ms: clusterRun.storyMatchMs,
     } as unknown as Json;
 
     const { error: updateErr } = await service
@@ -604,10 +515,8 @@ export async function POST(req: Request) {
       newValue: {
         itemsCreated,
         durationMs,
-        adultClustersCreated: adultClusterRun.summary.clustersCreated,
-        adultMatchedExisting: adultClusterRun.summary.matchedExisting,
-        kidClustersCreated: kidClusterRun.summary.clustersCreated,
-        kidMatchedExisting: kidClusterRun.summary.matchedExisting,
+        clustersCreated: clusterRun.summary.clustersCreated,
+        matchedExisting: clusterRun.summary.matchedExisting,
       },
     });
 
@@ -618,12 +527,10 @@ export async function POST(req: Request) {
       feedsSucceeded,
       feedsFailed,
       totalScanned: itemsProcessed,
-      adultInserted,
-      kidInserted,
+      itemsInserted,
       skippedDuplicates,
       durationMs,
-      clusteringAdult: adultClusterRun.summary,
-      clusteringKid: kidClusterRun.summary,
+      clustering: clusterRun.summary,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'unknown error';

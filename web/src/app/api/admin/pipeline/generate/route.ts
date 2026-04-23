@@ -82,13 +82,18 @@ export const maxDuration = 300;
 // Request schema
 // ----------------------------------------------------------------------------
 
-// source_urls override — kid cross-audience hatch. When the caller forwards
-// the adult cluster's source URLs alongside cluster_id, we skip the normal
+// source_urls override — explicit list passthrough. When the caller forwards
+// a list of source URLs alongside cluster_id, we skip the normal
 // discovery_items-derived source set and ingest these URLs directly. Each
 // must be a valid http(s) URL, capped at 500 chars per entry, max 10 entries.
-// Validated at the schema layer so the route body stays narrow. See
-// GenerationModal.tsx — adult-tab cards expose a "Generate kids version"
-// trigger that opens the modal with audience='kid' + this list populated.
+// Validated at the schema layer so the route body stays narrow.
+//
+// For audience='kid' runs, the client may omit source_urls entirely — the
+// route falls back to deriving them from the cluster's own discovery_items
+// rows (every cluster lives in `discovery_items` now; the legacy
+// `kid_discovery_items` is no longer the kid source-of-truth). This keeps
+// the client-side responsibility to one prop (cluster_id + audience) and
+// the kid-pipeline-needs-explicit-urls plumbing internal to the server.
 const SourceUrlSchema = z
   .string()
   .trim()
@@ -471,10 +476,14 @@ export async function POST(req: Request) {
 
   const { cluster_id, audience, freeform_instructions, provider, model, source_urls } = input;
   // De-dupe + drop empties; the schema already trimmed + validated each entry.
-  const sourceUrlOverride: string[] = Array.from(
+  // `sourceUrlsExplicit` tracks whether the client passed URLs in the body —
+  // distinct from `sourceUrlsOverridden` (which may also be true after the
+  // server auto-derives URLs for a kid run from the cluster's discovery_items).
+  let sourceUrlOverride: string[] = Array.from(
     new Set((source_urls ?? []).filter((u) => u.length > 0))
   );
-  const sourceUrlsOverridden = sourceUrlOverride.length > 0;
+  const sourceUrlsExplicit = sourceUrlOverride.length > 0;
+  let sourceUrlsOverridden = sourceUrlsExplicit;
   const service = createServiceClient();
 
   // 3. Kill switch
@@ -605,27 +614,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Cluster not found' }, { status: 404 });
   }
 
-  // Cross-audience hatch is intentionally one-way: adult cluster -> kid run via
-  // source_urls override. Reject any other shape (kid cluster + override, or
-  // adult cluster + override + audience='adult' which is a no-op surface for
-  // operator confusion). Without this, a kid cluster + override could skip the
-  // discovery-item audience peek defense-in-depth.
-  if (sourceUrlsOverridden) {
-    if (clusterRow.audience !== 'adult' || audience !== 'kid') {
-      await failRun(
-        service,
-        runId,
-        startedAtMs,
-        'schema_validation',
-        `source_urls override only supported for adult cluster -> kid run (got cluster.audience=${clusterRow.audience}, audience=${audience})`,
-        0
-      );
-      return NextResponse.json(
-        { error: 'source_urls override only supported for adult cluster -> kid run' },
-        { status: 422 }
-      );
-    }
-  }
+  // The unified-feed pivot removed the adult-only-cluster guard: the operator
+  // picks audience at generation time, and a single cluster row can produce
+  // both an adult and a kid article. The cluster.audience column is no longer
+  // a UI primary (it stays in DB defaulted to 'adult' for back-compat with
+  // the legacy cluster mutation RPCs). The remaining defense-in-depth is the
+  // kid pipeline's `audience_safety_check` step (9a) which classifies the
+  // cluster content with the cheap-tier LLM and aborts on adult-grade
+  // material.
 
   type DiscoveryItem = {
     id: string;
@@ -636,17 +632,56 @@ export async function POST(req: Request) {
     feed_id: string | null;
     state: string;
   };
-  const discoveryTable = audience === 'adult' ? 'discovery_items' : 'kid_discovery_items';
+
+  // For kid runs without an explicit URL list, auto-derive from the cluster's
+  // discovery_items. The adult pipeline still walks discovery_items rows
+  // directly so it can update their state across the lifecycle. The kid
+  // pipeline takes the URL list and synthesizes virtual items so the same
+  // discovery rows can power both pipelines without state collisions.
+  if (audience === 'kid' && !sourceUrlsExplicit) {
+    const { data: clusterRows, error: clusterRowsErr } = await service
+      .from('discovery_items')
+      .select('raw_url')
+      .eq('cluster_id', cluster_id)
+      .in('state', ['pending', 'clustered']);
+    if (clusterRowsErr) {
+      await failRun(service, runId, startedAtMs, 'unknown', clusterRowsErr.message, 0);
+      return NextResponse.json({ error: 'Discovery lookup failed' }, { status: 500 });
+    }
+    const derived = Array.from(
+      new Set((clusterRows ?? []).map((r) => r.raw_url).filter((u): u is string => !!u))
+    );
+    if (derived.length === 0) {
+      await failRun(
+        service,
+        runId,
+        startedAtMs,
+        'schema_validation',
+        'No discovery items available in cluster for kid generation',
+        0
+      );
+      return NextResponse.json(
+        { error: 'No discovery items available in cluster' },
+        { status: 400 }
+      );
+    }
+    sourceUrlOverride = derived.slice(0, 10);
+    sourceUrlsOverridden = true;
+  }
+
+  // Adult runs still walk discovery_items directly (so the rows transition
+  // pending -> clustered -> generating -> published as the pipeline runs).
+  // Kid runs use the override path even when the URLs were derived from the
+  // same discovery rows server-side — this leaves the adult lifecycle
+  // untouched when both audiences are generated from one cluster.
+  const discoveryTable = 'discovery_items' as const;
   let items: DiscoveryItem[];
 
   if (sourceUrlsOverridden) {
-    // Source-URL override path (kid cross-audience hatch). Caller forwarded
-    // adult cluster URLs to a kid run. We synthesize virtual discovery items
-    // — no DB row exists in kid_discovery_items for these URLs — so we skip
-    // the audience-feed peek, the state='generating' update, and the finally
-    // state reset. The kid audience_safety_check step still runs (9a) and
-    // gates publication. Cluster lock + cluster header still apply because
-    // cluster_id is a real adult cluster the operator chose to fork from.
+    // Source-URL override path. We synthesize virtual discovery items — no
+    // DB row update happens for these — so we skip the state='generating'
+    // update and the finally state reset. The kid audience_safety_check
+    // step still runs (9a) and gates publication.
     items = sourceUrlOverride.map((url) => ({
       id: `override:${url}`,
       raw_url: url,
@@ -680,44 +715,6 @@ export async function POST(req: Request) {
         { error: 'No discovery items available in cluster' },
         { status: 400 }
       );
-    }
-
-    // Audience peek: join feeds.audience to confirm all items match request audience.
-    // Fail-closed: if no item resolves a feed_id, the audience cannot be verified —
-    // refuse rather than risk an adult-tagged cluster passing as audience='kid'.
-    const feedIds = Array.from(
-      new Set(items.map((i) => i.feed_id).filter((v): v is string => !!v))
-    );
-    if (feedIds.length === 0) {
-      await failRun(
-        service,
-        runId,
-        startedAtMs,
-        'schema_validation',
-        'Cluster items have no resolvable feed_id — audience cannot be verified',
-        0
-      );
-      return NextResponse.json({ error: 'audience_unverifiable' }, { status: 422 });
-    }
-    const { data: feedsData, error: feedsErr } = await service
-      .from('feeds')
-      .select('id, audience')
-      .in('id', feedIds);
-    if (feedsErr) {
-      await failRun(service, runId, startedAtMs, 'unknown', feedsErr.message, 0);
-      return NextResponse.json({ error: 'Feeds lookup failed' }, { status: 500 });
-    }
-    const mismatched = (feedsData ?? []).filter((f) => f.audience !== audience);
-    if (mismatched.length > 0) {
-      await failRun(
-        service,
-        runId,
-        startedAtMs,
-        'schema_validation',
-        'Cluster contains items from feeds with a different audience',
-        0
-      );
-      return NextResponse.json({ error: 'mixed_audience' }, { status: 422 });
     }
   }
 

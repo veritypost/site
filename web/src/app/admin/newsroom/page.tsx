@@ -1,36 +1,40 @@
 /**
- * F7 Newsroom Redesign — single-page operator workspace.
+ * F7 Newsroom Redesign — single-page operator workspace, unified feed.
  *
- * Replaces the Phase-4 Task-20 cluster grid + the Task-21 cluster-detail
- * splash with one screen that owns end-to-end newsroom operations:
+ * One feed pool, one cluster list. Adult and kid sources are no longer
+ * separated upstream — every active feed contributes to a single discovery
+ * pool, clusters form across the whole pool, and the operator picks
+ * audience at GENERATION TIME via a 3-button picker (Adult / Kid / Both).
  *
- *   1. Audience tab — Adult / Kid. URL-persisted via ?audience=. Switches
- *      every downstream query: cluster list, glance bar, filter dropdowns,
- *      preset list, refresh-feeds payload.
- *   2. Glance bar — today's spend, today's run count, kill-switch state,
- *      feed health. Each tile deep-links to the relevant pipeline / feeds
- *      surface. Numbers are scoped to the active audience.
- *   3. Filter row — category, subcategory, outlet, time window, search.
- *      Filters are taxonomy-driven (Stream 2 + Stream 5 supply the editor
- *      surfaces; the data lives in `categories` + `feeds`).
- *   4. Prompt picker — Default / Preset / Custom. Preset list comes from
- *      ai_prompt_presets (Stream 3 ships the editor + API). Custom is
- *      forwarded as freeform_instructions on the generate POST.
- *   5. Provider/model picker — kept as PipelineRunPicker, but the freeform
- *      surface is hidden because the prompt picker above owns instructions.
- *   6. Refresh feeds — POSTs /api/newsroom/ingest/run with the active
- *      audience so only that side's RSS is re-polled.
- *   7. Cluster grid — adult OR kid clusters (never mixed). Source rows are
- *      expanded inline. Per-row controls: Move out, Move to. Per-cluster:
- *      Generate, Generate kids version (adult tab only), Merge with,
- *      Split, Dismiss. Toggle for Show dismissed.
- *   8. Recent runs strip — last 10 pipeline_runs for the active audience.
+ *   1. GlanceBar — combined numbers across both pipelines: today's spend,
+ *      today's runs, kill switches (adult + kid side-by-side), feed health.
+ *   2. Filter row — category, subcategory, outlet, time window, search,
+ *      Show dismissed. (No audience filter — there is no audience tab now.)
+ *   3. Prompt picker — Default / Preset / Custom (preset list pulled from
+ *      ai_prompt_presets, scoped to "both" since both audiences may render).
+ *   4. Provider/model picker (PipelineRunPicker, freeform hidden).
+ *   5. "Refresh feeds" — single button (POST to /api/newsroom/ingest/run
+ *      with no audience body — the route polls every active feed).
+ *   6. Cluster list — ONE flat sorted list (updated_at desc), 50 per page,
+ *      single "Load more". Per row: title + dim metadata, generated-state
+ *      badges (`Adult: View` / `Kid: View` if articles exist), Generate
+ *      picker button, Move/Merge/Split/Dismiss controls, source-row
+ *      disclosure toggle.
+ *   7. Recent runs strip — last 10 across both audiences interleaved.
  *
- * Schema notes — migration 126 adds:
- *   - feed_clusters.audience (NOT NULL, CHECK ('adult','kid'))
- *   - feed_clusters.archived_at, archived_reason
- *   - feed_clusters.dismissed_at, dismissed_by, dismiss_reason
- *   - ai_prompt_presets table
+ * Source-row reads route through /api/admin/newsroom/clusters/sources
+ * (service-role; bypasses the `admin.system.view` SELECT RLS on
+ * discovery_items). Article-existence reads route through
+ * /api/admin/newsroom/clusters/articles (also service-role; needed for
+ * kid_articles which has only kid-JWT SELECT access).
+ *
+ * URL persistence:
+ *   ?cat=<uuid>           top-level category
+ *   ?sub=<uuid>           subcategory (only meaningful with cat)
+ *   ?outlet=<uuid>        feed id
+ *   ?window=6h|24h|72h|7d|all
+ *   ?q=<text>             search (post-debounce)
+ *   ?dismissed=1          show dismissed (otherwise hidden)
  *
  * Auth: client-side ADMIN_ROLES gate matching the rest of /admin/*.
  */
@@ -89,8 +93,10 @@ type DiscoveryRow = {
   cluster_id: string | null;
   raw_url: string;
   raw_title: string | null;
+  raw_body: string | null;
   fetched_at: string;
   metadata: { outlet?: string | null; excerpt?: string | null } | null;
+  state: string | null;
 };
 
 type FeedLite = {
@@ -98,7 +104,6 @@ type FeedLite = {
   name: string;
   source_name: string | null;
   url: string;
-  audience: Audience;
   is_active: boolean;
   last_polled_at: string | null;
   error_count: number;
@@ -137,13 +142,31 @@ type RecentRun = {
 type GlanceData = {
   todaySpendUsd: number;
   runs: { completed: number; failed: number; running: number };
-  killSwitchEnabled: boolean | null;
+  killSwitches: { adultEnabled: boolean | null; kidEnabled: boolean | null };
   unhealthyFeedCount: number;
 };
 
-const PAGE_SIZE = 24;
+type ArticleHit = {
+  cluster_id: string;
+  audience: Audience;
+  article_id: string;
+  status: string;
+};
+
+type ArticleMap = Record<
+  string,
+  {
+    adultId?: string;
+    kidId?: string;
+    adultStatus?: string;
+    kidStatus?: string;
+  }
+>;
+
+const PAGE_SIZE = 50;
 const SEARCH_DEBOUNCE_MS = 300;
 const STALE_FEED_HOURS = 6;
+const RECENT_RUNS_LIMIT = 10;
 const TIME_WINDOWS: { value: string; label: string; hours: number | null }[] = [
   { value: '6h', label: 'Last 6 hours', hours: 6 },
   { value: '24h', label: 'Last 24 hours', hours: 24 },
@@ -195,33 +218,34 @@ function NewsroomWorkspace() {
   const supabase = useMemo(() => createClient(), []);
   const toast = useToast();
 
-  // -- Audience tab (URL-persisted) -------------------------------------
-  const audienceParam = searchParams.get('audience');
-  const audience: Audience = audienceParam === 'kid' ? 'kid' : 'adult';
-
-  // -- Auth gate --------------------------------------------------------
+  // -- Auth gate ------------------------------------------------------------
   const [authorized, setAuthorized] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
 
-  // -- Filter state -----------------------------------------------------
+  // -- Reference data (categories + feeds + presets) ----------------------
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [feeds, setFeeds] = useState<FeedLite[]>([]);
   const [presets, setPresets] = useState<PromptPreset[]>([]);
 
-  const [filterCategoryId, setFilterCategoryId] = useState<string>('');
-  const [filterSubcategoryId, setFilterSubcategoryId] = useState<string>('');
-  const [filterFeedId, setFilterFeedId] = useState<string>('');
-  const [filterWindow, setFilterWindow] = useState<string>('72h');
-  const [searchInput, setSearchInput] = useState<string>('');
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [showDismissed, setShowDismissed] = useState(false);
+  // -- Filter state ---------------------------------------------------------
+  const [filterCategoryId, setFilterCategoryId] = useState<string>(
+    searchParams.get('cat') || ''
+  );
+  const [filterSubcategoryId, setFilterSubcategoryId] = useState<string>(
+    searchParams.get('sub') || ''
+  );
+  const [filterFeedId, setFilterFeedId] = useState<string>(searchParams.get('outlet') || '');
+  const [filterWindow, setFilterWindow] = useState<string>(searchParams.get('window') || '72h');
+  const [searchInput, setSearchInput] = useState<string>(searchParams.get('q') || '');
+  const [searchQuery, setSearchQuery] = useState<string>(searchParams.get('q') || '');
+  const [showDismissed, setShowDismissed] = useState(searchParams.get('dismissed') === '1');
 
-  // -- Prompt picker ----------------------------------------------------
+  // -- Prompt picker --------------------------------------------------------
   const [promptMode, setPromptMode] = useState<PromptMode>('default');
   const [promptPresetId, setPromptPresetId] = useState<string>('');
   const [customPrompt, setCustomPrompt] = useState<string>('');
 
-  // -- Provider/model picker -------------------------------------------
+  // -- Provider/model picker ----------------------------------------------
   const pickerRef = useRef<PipelineRunPickerHandle | null>(null);
   const [picker, setPicker] = useState<PickerSelection>({
     provider: '',
@@ -234,57 +258,93 @@ function NewsroomWorkspace() {
     setPicker(sel);
   }, []);
   const pickerReady = !!picker.provider && !!picker.model;
-  const estCost = estimateClusterCostUsd(
-    picker.inputPricePer1m,
-    picker.outputPricePer1m
-  );
+  const estCost = estimateClusterCostUsd(picker.inputPricePer1m, picker.outputPricePer1m);
 
-  // -- Cluster list -----------------------------------------------------
+  // -- Cluster list (single flat list) ------------------------------------
   const [clusters, setClusters] = useState<ClusterRow[]>([]);
-  const [clusterLoading, setClusterLoading] = useState(true);
-  const [clusterLoadError, setClusterLoadError] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  // -- Source items per cluster ----------------------------------------
+  // -- Source items per cluster -------------------------------------------
   const [sourceMap, setSourceMap] = useState<Record<string, DiscoveryRow[]>>({});
 
-  // -- Glance + recent runs --------------------------------------------
+  // -- Per-cluster article-existence map ----------------------------------
+  const [articleMap, setArticleMap] = useState<ArticleMap>({});
+
+  // -- Glance + recent runs -----------------------------------------------
   const [glance, setGlance] = useState<GlanceData | null>(null);
   const [recentRuns, setRecentRuns] = useState<RecentRun[]>([]);
 
-  // -- In-flight controls ----------------------------------------------
+  // -- In-flight controls -------------------------------------------------
   const [busyId, setBusyId] = useState<string>('');
   const [busyRefresh, setBusyRefresh] = useState(false);
   const [retryRunId, setRetryRunId] = useState<string>('');
   const [splitMode, setSplitMode] = useState<{ clusterId: string; itemIds: Set<string> } | null>(
     null
   );
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  // -- Generate modal target -------------------------------------------
-  // sourceUrls is non-empty only for the "Generate kids version" hatch on
-  // adult cards — that flow forwards the adult cluster's discovery URLs
-  // so the kid run reuses the source set. Plain adult + plain kid runs
-  // pass an empty array.
+  // -- Generate modal target ----------------------------------------------
   const [genTarget, setGenTarget] = useState<
     | {
         id: string;
         title: string;
-        audience: Audience;
-        sourceUrls: string[];
       }
     | null
   >(null);
 
-  // -- URL helpers ------------------------------------------------------
-  const setAudienceTab = useCallback(
-    (next: Audience) => {
+  // -- URL writer ---------------------------------------------------------
+  const writeUrl = useCallback(
+    (
+      overrides: Partial<{
+        cat: string;
+        sub: string;
+        outlet: string;
+        window: string;
+        q: string;
+        dismissed: boolean;
+      }>
+    ) => {
       const params = new URLSearchParams(searchParams.toString());
-      params.set('audience', next);
-      router.replace(`/admin/newsroom?${params.toString()}`);
+      const next = {
+        cat: overrides.cat ?? filterCategoryId,
+        sub: overrides.sub ?? filterSubcategoryId,
+        outlet: overrides.outlet ?? filterFeedId,
+        window: overrides.window ?? filterWindow,
+        q: overrides.q ?? searchQuery,
+        dismissed: overrides.dismissed ?? showDismissed,
+      };
+      // Strip legacy filters that no longer apply.
+      params.delete('audience');
+      params.delete('show');
+      if (next.cat) params.set('cat', next.cat);
+      else params.delete('cat');
+      if (next.sub) params.set('sub', next.sub);
+      else params.delete('sub');
+      if (next.outlet) params.set('outlet', next.outlet);
+      else params.delete('outlet');
+      if (next.window && next.window !== '72h') params.set('window', next.window);
+      else params.delete('window');
+      if (next.q) params.set('q', next.q);
+      else params.delete('q');
+      if (next.dismissed) params.set('dismissed', '1');
+      else params.delete('dismissed');
+      const qs = params.toString();
+      router.replace(qs ? `/admin/newsroom?${qs}` : '/admin/newsroom');
     },
-    [router, searchParams]
+    [
+      searchParams,
+      router,
+      filterCategoryId,
+      filterSubcategoryId,
+      filterFeedId,
+      filterWindow,
+      searchQuery,
+      showDismissed,
+    ]
   );
 
   // ----------------------------------------------------------------------
@@ -322,24 +382,18 @@ function NewsroomWorkspace() {
   }, [router, supabase]);
 
   // ----------------------------------------------------------------------
-  // Reference data — categories, feeds, presets. Re-fetched per audience
-  // so the kid tab gets the kids-safe filter applied at the source.
+  // Reference data — categories, feeds (no audience split), presets.
   // ----------------------------------------------------------------------
   useEffect(() => {
     if (!authorized) return;
     let cancelled = false;
     (async () => {
-      // Categories: top-level + sub. Filter by is_kids_safe on the kid tab.
-      const catQuery = supabase
+      const { data: cats, error: catErr } = await supabase
         .from('categories')
         .select('id, name, slug, parent_id, is_active, is_kids_safe, deleted_at')
         .is('deleted_at', null)
         .eq('is_active', true)
         .order('name', { ascending: true });
-      if (audience === 'kid') {
-        catQuery.eq('is_kids_safe', true);
-      }
-      const { data: cats, error: catErr } = await catQuery;
       if (cancelled) return;
       if (catErr) {
         console.error('[newsroom] categories load failed:', catErr.message);
@@ -348,28 +402,23 @@ function NewsroomWorkspace() {
         setCategories((cats || []) as CategoryRow[]);
       }
 
-      const { data: feedRows, error: feedErr } = await supabase
+      const { data: feedRows, error: feedsErr } = await supabase
         .from('feeds')
-        .select('id, name, source_name, url, audience, is_active, last_polled_at, error_count')
-        .eq('audience', audience)
+        .select('id, name, source_name, url, is_active, last_polled_at, error_count')
         .eq('is_active', true)
         .order('name', { ascending: true });
       if (cancelled) return;
-      if (feedErr) {
-        console.error('[newsroom] feeds load failed:', feedErr.message);
+      if (feedsErr) {
+        console.error('[newsroom] feeds load failed:', feedsErr.message);
       } else {
         setFeeds((feedRows || []) as FeedLite[]);
       }
 
-      // Prompt presets — Stream 3's table. Audience is 'adult' | 'kid' | 'both'.
-      // Wrapped in try/catch so any transient failure soft-degrades to an
-      // empty preset list (the rest of the workspace still works).
       try {
         const presetRes = await supabase
           .from('ai_prompt_presets')
           .select('id, name, body, audience, is_active, sort_order')
           .eq('is_active', true)
-          .in('audience', [audience, 'both'])
           .order('sort_order', { ascending: true })
           .order('name', { ascending: true });
         if (cancelled) return;
@@ -388,192 +437,246 @@ function NewsroomWorkspace() {
     return () => {
       cancelled = true;
     };
-  }, [audience, authorized, supabase, toast]);
+  }, [authorized, supabase, toast]);
 
-  // Reset cascading filters when audience switches — old category may not
-  // be kids-safe, old feed may belong to the other audience, etc.
-  useEffect(() => {
-    setFilterCategoryId('');
-    setFilterSubcategoryId('');
-    setFilterFeedId('');
-    setSplitMode(null);
-    setPromptMode('default');
-    setPromptPresetId('');
-    setCustomPrompt('');
-  }, [audience]);
-
+  // Reset subcategory when top-level category clears or changes.
   useEffect(() => {
     setFilterSubcategoryId('');
   }, [filterCategoryId]);
 
   // ----------------------------------------------------------------------
-  // Search debounce
+  // Search debounce (writes through to URL on commit).
   // ----------------------------------------------------------------------
   useEffect(() => {
-    const handle = setTimeout(() => setSearchQuery(searchInput.trim()), SEARCH_DEBOUNCE_MS);
+    const handle = setTimeout(() => {
+      const trimmed = searchInput.trim();
+      setSearchQuery(trimmed);
+    }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(handle);
   }, [searchInput]);
 
   // ----------------------------------------------------------------------
-  // Cluster list — refetched whenever any filter or audience changes.
+  // Source-row fetch via the service-role API. One call per page load.
+  // ----------------------------------------------------------------------
+  const fetchSourcesFor = useCallback(
+    async (clusterIds: string[]): Promise<DiscoveryRow[]> => {
+      if (clusterIds.length === 0) return [];
+      try {
+        const res = await fetch('/api/admin/newsroom/clusters/sources', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ cluster_ids: clusterIds }),
+        });
+        if (!res.ok) {
+          if (res.status !== 429) {
+            console.error('[newsroom] source fetch failed status', res.status);
+          }
+          return [];
+        }
+        const body = (await res.json().catch(() => ({}))) as { rows?: DiscoveryRow[] };
+        return Array.isArray(body.rows) ? body.rows : [];
+      } catch (err) {
+        console.error('[newsroom] source fetch threw:', err);
+        return [];
+      }
+    },
+    []
+  );
+
+  // ----------------------------------------------------------------------
+  // Article-existence fetch via the service-role API. One call per load.
+  // ----------------------------------------------------------------------
+  const fetchArticlesFor = useCallback(
+    async (clusterIds: string[]): Promise<ArticleHit[]> => {
+      if (clusterIds.length === 0) return [];
+      try {
+        const res = await fetch('/api/admin/newsroom/clusters/articles', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ cluster_ids: clusterIds }),
+        });
+        if (!res.ok) {
+          if (res.status !== 429) {
+            console.error('[newsroom] article fetch failed status', res.status);
+          }
+          return [];
+        }
+        const body = (await res.json().catch(() => ({}))) as { rows?: ArticleHit[] };
+        return Array.isArray(body.rows) ? body.rows : [];
+      } catch (err) {
+        console.error('[newsroom] article fetch threw:', err);
+        return [];
+      }
+    },
+    []
+  );
+
+  // ----------------------------------------------------------------------
+  // Cluster query builder — single flat list, no audience filter.
+  // ----------------------------------------------------------------------
+  const buildClusterQuery = useCallback(
+    (fromOffset: number) => {
+      let query = supabase
+        .from('feed_clusters')
+        .select(
+          'id, title, summary, is_breaking, is_active, created_at, updated_at, category_id, locked_by, locked_at, audience, archived_at, dismissed_at, dismiss_reason'
+        )
+        .eq('is_active', true)
+        .is('archived_at', null);
+
+      if (!showDismissed) {
+        query = query.is('dismissed_at', null);
+      }
+
+      if (filterCategoryId) {
+        query = query.eq('category_id', filterCategoryId);
+      }
+      if (filterSubcategoryId) {
+        query = query.eq('category_id', filterSubcategoryId);
+      }
+
+      const win = TIME_WINDOWS.find((w) => w.value === filterWindow);
+      if (win?.hours) {
+        const cutoff = new Date(Date.now() - win.hours * 60 * 60 * 1000).toISOString();
+        query = query.gte('updated_at', cutoff);
+      }
+
+      if (searchQuery) {
+        const escaped = searchQuery.replace(/[%_]/g, (m) => `\\${m}`);
+        query = query.or(`title.ilike.%${escaped}%,summary.ilike.%${escaped}%`);
+      }
+
+      return query
+        .order('updated_at', { ascending: false })
+        .range(fromOffset, fromOffset + PAGE_SIZE - 1);
+    },
+    [supabase, showDismissed, filterCategoryId, filterSubcategoryId, filterWindow, searchQuery]
+  );
+
+  // ----------------------------------------------------------------------
+  // Load clusters (used by both initial + load-more).
   // ----------------------------------------------------------------------
   const loadClusters = useCallback(
     async (reset: boolean) => {
       if (!authorized) return;
-      if (reset) {
-        setClusterLoading(true);
-        setOffset(0);
-      } else {
-        setLoadingMore(true);
-      }
-      const nextOffset = reset ? 0 : offset;
+      const currentOffset = reset ? 0 : offset;
+
+      if (reset) setLoading(true);
+      else setLoadingMore(true);
 
       try {
-        let query = supabase
-          .from('feed_clusters')
-          .select(
-            'id, title, summary, is_breaking, is_active, created_at, updated_at, category_id, locked_by, locked_at, audience, archived_at, dismissed_at, dismiss_reason'
-          )
-          .eq('is_active', true)
-          .eq('audience', audience)
-          .is('archived_at', null);
-
-        if (!showDismissed) {
-          query = query.is('dismissed_at', null);
-        }
-
-        if (filterCategoryId) {
-          query = query.eq('category_id', filterCategoryId);
-        }
-        if (filterSubcategoryId) {
-          query = query.eq('category_id', filterSubcategoryId);
-        }
-
-        const win = TIME_WINDOWS.find((w) => w.value === filterWindow);
-        if (win?.hours) {
-          const cutoff = new Date(Date.now() - win.hours * 60 * 60 * 1000).toISOString();
-          query = query.gte('updated_at', cutoff);
-        }
-
-        if (searchQuery) {
-          const escaped = searchQuery.replace(/[%_]/g, (m) => `\\${m}`);
-          query = query.or(`title.ilike.%${escaped}%,summary.ilike.%${escaped}%`);
-        }
-
-        const { data: rows, error } = await query
-          .order('updated_at', { ascending: false })
-          .range(nextOffset, nextOffset + PAGE_SIZE - 1);
-
+        const { data: rows, error } = await buildClusterQuery(currentOffset);
         if (error) {
           console.error('[newsroom] cluster load failed:', error.message);
-          setClusterLoadError(true);
+          setLoadError(true);
           if (reset) setClusters([]);
           toast.push({ message: 'Could not load clusters.', variant: 'danger' });
           setHasMore(false);
           return;
         }
-
         const baseRows = (rows || []) as unknown as ClusterRow[];
         setClusters((prev) => (reset ? baseRows : [...prev, ...baseRows]));
         setHasMore(baseRows.length === PAGE_SIZE);
-        setOffset(nextOffset + PAGE_SIZE);
-        setClusterLoadError(false);
+        setOffset(currentOffset + PAGE_SIZE);
+        setLoadError(false);
 
-        // Outlet filter is post-query: applies to the visible cluster set
-        // by intersecting with the discovery rows we fetch next. We do
-        // the intersection in render, not here, so the offset+pagination
-        // stays predictable.
-
-        // Fetch source rows for the just-loaded clusters. The discovery
-        // table forks by audience (discovery_items vs kid_discovery_items)
-        // but the column shape is identical, so the result type collapses
-        // cleanly to DiscoveryRow[].
+        // Source-row + article-existence batch fetches in parallel.
         if (baseRows.length > 0) {
           const ids = baseRows.map((r) => r.id);
-          const sourceRes =
-            audience === 'kid'
-              ? await supabase
-                  .from('kid_discovery_items')
-                  .select('id, feed_id, cluster_id, raw_url, raw_title, fetched_at, metadata')
-                  .in('cluster_id', ids)
-                  .order('fetched_at', { ascending: false })
-              : await supabase
-                  .from('discovery_items')
-                  .select('id, feed_id, cluster_id, raw_url, raw_title, fetched_at, metadata')
-                  .in('cluster_id', ids)
-                  .order('fetched_at', { ascending: false });
-          if (sourceRes.error) {
-            console.error('[newsroom] source load failed:', sourceRes.error.message);
-          } else {
-            const grouped: Record<string, DiscoveryRow[]> = {};
-            for (const row of (sourceRes.data || []) as unknown as DiscoveryRow[]) {
-              if (!row.cluster_id) continue;
-              if (!grouped[row.cluster_id]) grouped[row.cluster_id] = [];
-              grouped[row.cluster_id].push(row);
-            }
-            setSourceMap((prev) => (reset ? grouped : { ...prev, ...grouped }));
+          const [sourceRows, articleRows] = await Promise.all([
+            fetchSourcesFor(ids),
+            fetchArticlesFor(ids),
+          ]);
+
+          const grouped: Record<string, DiscoveryRow[]> = {};
+          for (const r of sourceRows) {
+            if (!r.cluster_id) continue;
+            if (!grouped[r.cluster_id]) grouped[r.cluster_id] = [];
+            grouped[r.cluster_id].push(r);
           }
+
+          const articles: ArticleMap = {};
+          for (const hit of articleRows) {
+            if (!hit.cluster_id) continue;
+            if (!articles[hit.cluster_id]) articles[hit.cluster_id] = {};
+            if (hit.audience === 'adult') {
+              articles[hit.cluster_id].adultId = hit.article_id;
+              articles[hit.cluster_id].adultStatus = hit.status;
+            } else {
+              articles[hit.cluster_id].kidId = hit.article_id;
+              articles[hit.cluster_id].kidStatus = hit.status;
+            }
+          }
+
+          setSourceMap((prev) => {
+            const next = reset
+              ? Object.fromEntries(Object.entries(prev).filter(([k]) => !ids.includes(k)))
+              : { ...prev };
+            for (const id of ids) next[id] = grouped[id] || [];
+            return next;
+          });
+          setArticleMap((prev) => {
+            const next = reset
+              ? Object.fromEntries(Object.entries(prev).filter(([k]) => !ids.includes(k)))
+              : { ...prev };
+            for (const id of ids) next[id] = articles[id] || {};
+            return next;
+          });
         } else if (reset) {
           setSourceMap({});
+          setArticleMap({});
         }
       } finally {
-        if (reset) setClusterLoading(false);
+        if (reset) setLoading(false);
         else setLoadingMore(false);
       }
     },
-    [
-      audience,
-      authorized,
-      filterCategoryId,
-      filterSubcategoryId,
-      filterWindow,
-      offset,
-      searchQuery,
-      showDismissed,
-      supabase,
-      toast,
-    ]
+    [authorized, buildClusterQuery, offset, fetchSourcesFor, fetchArticlesFor, toast]
   );
 
+  // Reset whenever any filter changes. We deliberately omit `loadClusters`
+  // from the deps array — it transitively depends on `offset`, and
+  // refetching when an offset bumps would loop. The exhaustive-deps disable
+  // is intentional and scoped tight.
   useEffect(() => {
     if (!authorized) return;
     void loadClusters(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    audience,
-    authorized,
-    filterCategoryId,
-    filterSubcategoryId,
-    filterWindow,
-    searchQuery,
-    showDismissed,
-  ]);
+  }, [authorized, filterCategoryId, filterSubcategoryId, filterWindow, searchQuery, showDismissed]);
 
   // ----------------------------------------------------------------------
-  // Glance bar — today's runs + spend + kill switch + feed health.
+  // Glance bar — combined across both pipelines.
   // ----------------------------------------------------------------------
-  const loadGlance = useCallback(async () => {
-    if (!authorized) return;
+  const computeGlance = useCallback(async (): Promise<GlanceData> => {
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
     const sinceIso = startOfDay.toISOString();
 
     const { data: runRows, error: runErr } = await supabase
       .from('pipeline_runs')
-      .select('status, total_cost_usd')
-      .eq('audience', audience)
+      .select('status, total_cost_usd, audience')
+      .in('audience', ['adult', 'kid'])
       .eq('pipeline_type', 'generate')
       .gte('started_at', sinceIso);
 
     let spend = 0;
     const counts = { completed: 0, failed: 0, running: 0 };
     if (!runErr && runRows) {
-      for (const r of runRows as Array<{ status: string | null; total_cost_usd: number | string | null }>) {
-        const cost = typeof r.total_cost_usd === 'string' ? parseFloat(r.total_cost_usd) : r.total_cost_usd;
+      for (const r of runRows as Array<{
+        status: string | null;
+        total_cost_usd: number | string | null;
+      }>) {
+        const cost =
+          typeof r.total_cost_usd === 'string' ? parseFloat(r.total_cost_usd) : r.total_cost_usd;
         if (Number.isFinite(cost)) spend += cost as number;
         const status = (r.status || '').toLowerCase();
         if (status === 'completed' || status === 'success') counts.completed += 1;
-        else if (status === 'failed' || status === 'error' || status === 'cancelled' || status === 'canceled')
+        else if (
+          status === 'failed' ||
+          status === 'error' ||
+          status === 'cancelled' ||
+          status === 'canceled'
+        )
           counts.failed += 1;
         else if (status === 'running' || status === 'pending') counts.running += 1;
       }
@@ -581,17 +684,21 @@ function NewsroomWorkspace() {
       console.error('[newsroom] glance runs load failed:', runErr.message);
     }
 
-    const settingsKey = audience === 'kid' ? 'ai.kid_generation_enabled' : 'ai.adult_generation_enabled';
-    let killSwitchEnabled: boolean | null = null;
-    const { data: settingsRow, error: settingsErr } = await supabase
+    // Two kill switches — both surfaced side-by-side.
+    let adultEnabled: boolean | null = null;
+    let kidEnabled: boolean | null = null;
+    const { data: settingsRows, error: settingsErr } = await supabase
       .from('settings')
-      .select('value')
-      .eq('key', settingsKey)
-      .maybeSingle();
+      .select('key, value')
+      .in('key', ['ai.adult_generation_enabled', 'ai.kid_generation_enabled']);
     if (settingsErr) {
       console.error('[newsroom] kill switch lookup failed:', settingsErr.message);
-    } else if (settingsRow) {
-      killSwitchEnabled = String(settingsRow.value) === 'true';
+    } else if (settingsRows) {
+      for (const r of settingsRows as Array<{ key: string; value: string | null }>) {
+        const enabled = String(r.value) === 'true';
+        if (r.key === 'ai.adult_generation_enabled') adultEnabled = enabled;
+        if (r.key === 'ai.kid_generation_enabled') kidEnabled = enabled;
+      }
     }
 
     const staleCutoff = new Date(Date.now() - STALE_FEED_HOURS * 60 * 60 * 1000).toISOString();
@@ -599,10 +706,12 @@ function NewsroomWorkspace() {
     const { data: healthRows, error: healthErr } = await supabase
       .from('feeds')
       .select('id, error_count, last_polled_at')
-      .eq('audience', audience)
       .eq('is_active', true);
     if (!healthErr && healthRows) {
-      for (const f of healthRows as Array<{ error_count: number; last_polled_at: string | null }>) {
+      for (const f of healthRows as Array<{
+        error_count: number;
+        last_polled_at: string | null;
+      }>) {
         if (f.error_count > 0) {
           unhealthy += 1;
           continue;
@@ -615,32 +724,38 @@ function NewsroomWorkspace() {
       console.error('[newsroom] feed health lookup failed:', healthErr.message);
     }
 
-    setGlance({
+    return {
       todaySpendUsd: spend,
       runs: counts,
-      killSwitchEnabled,
+      killSwitches: { adultEnabled, kidEnabled },
       unhealthyFeedCount: unhealthy,
-    });
-  }, [audience, authorized, supabase]);
+    };
+  }, [supabase]);
+
+  const loadGlance = useCallback(async () => {
+    if (!authorized) return;
+    const g = await computeGlance();
+    setGlance(g);
+  }, [authorized, computeGlance]);
 
   // ----------------------------------------------------------------------
-  // Recent runs strip — last 10 generate runs for the active audience.
+  // Recent runs — interleaved across both audiences.
   // ----------------------------------------------------------------------
   const loadRecentRuns = useCallback(async () => {
     if (!authorized) return;
     const { data, error } = await supabase
       .from('pipeline_runs')
       .select('id, status, started_at, completed_at, total_cost_usd, model, cluster_id, audience')
-      .eq('audience', audience)
+      .in('audience', ['adult', 'kid'])
       .eq('pipeline_type', 'generate')
       .order('started_at', { ascending: false })
-      .limit(10);
+      .limit(RECENT_RUNS_LIMIT);
     if (error) {
       console.error('[newsroom] recent runs load failed:', error.message);
       return;
     }
     setRecentRuns((data || []) as unknown as RecentRun[]);
-  }, [audience, authorized, supabase]);
+  }, [authorized, supabase]);
 
   useEffect(() => {
     if (!authorized) return;
@@ -649,7 +764,7 @@ function NewsroomWorkspace() {
   }, [authorized, loadGlance, loadRecentRuns]);
 
   // ----------------------------------------------------------------------
-  // Subcategory list (re-derived from `categories` whenever filterCategoryId changes)
+  // Derived data
   // ----------------------------------------------------------------------
   const topLevelCategories = useMemo(
     () => categories.filter((c) => c.parent_id === null),
@@ -660,29 +775,30 @@ function NewsroomWorkspace() {
     return categories.filter((c) => c.parent_id === filterCategoryId);
   }, [categories, filterCategoryId]);
 
-  // ----------------------------------------------------------------------
-  // Outlet filter (client-side intersection)
-  // ----------------------------------------------------------------------
+  // Outlet filter intersection (post-query, against the discovery rows we
+  // already fetched).
   const visibleClusters = useMemo(() => {
     if (!filterFeedId) return clusters;
-    return clusters.filter((c) => {
-      const sources = sourceMap[c.id] || [];
-      return sources.some((s) => s.feed_id === filterFeedId);
-    });
+    return clusters.filter((c) =>
+      (sourceMap[c.id] || []).some((s) => s.feed_id === filterFeedId)
+    );
   }, [clusters, sourceMap, filterFeedId]);
 
-  // ----------------------------------------------------------------------
-  // Feed name lookup
-  // ----------------------------------------------------------------------
+  // Feed lookup index for the source-row outlet display.
   const feedById = useMemo(() => {
     const m: Record<string, FeedLite> = {};
     for (const f of feeds) m[f.id] = f;
     return m;
   }, [feeds]);
 
-  // ----------------------------------------------------------------------
-  // Active prompt instructions (computed for GenerationModal freeform)
-  // ----------------------------------------------------------------------
+  // Category lookup for the row metadata line.
+  const catById = useMemo(() => {
+    const m: Record<string, CategoryRow> = {};
+    for (const c of categories) m[c.id] = c;
+    return m;
+  }, [categories]);
+
+  // Active prompt body (forwarded into GenerationModal as freeform).
   const activePromptBody = useMemo(() => {
     if (promptMode === 'preset' && promptPresetId) {
       const p = presets.find((x) => x.id === promptPresetId);
@@ -695,7 +811,7 @@ function NewsroomWorkspace() {
   }, [promptMode, promptPresetId, customPrompt, presets]);
 
   // ----------------------------------------------------------------------
-  // Refresh feeds
+  // Refresh feeds — single button.
   // ----------------------------------------------------------------------
   async function refreshFeeds() {
     setBusyRefresh(true);
@@ -703,7 +819,7 @@ function NewsroomWorkspace() {
       const res = await fetch('/api/newsroom/ingest/run', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ audience }),
+        body: JSON.stringify({}),
       });
       if (res.status === 429) {
         toast.push({
@@ -718,17 +834,22 @@ function NewsroomWorkspace() {
         return;
       }
       toast.push({ message: 'Feeds refreshed.', variant: 'success' });
-      await loadClusters(true);
-      await loadGlance();
+      await Promise.all([loadClusters(true), loadGlance()]);
     } finally {
       setBusyRefresh(false);
     }
   }
 
   // ----------------------------------------------------------------------
-  // Cluster mutation handlers (Stream 4 routes)
+  // Cluster mutation handlers
   // ----------------------------------------------------------------------
+  function audienceOf(clusterId: string): Audience {
+    const c = clusters.find((x) => x.id === clusterId);
+    return c?.audience ?? 'adult';
+  }
+
   async function moveItem(clusterId: string, itemId: string, targetClusterId: string | null) {
+    const aud = audienceOf(clusterId);
     const key = `${clusterId}:move:${itemId}`;
     setBusyId(key);
     try {
@@ -738,7 +859,7 @@ function NewsroomWorkspace() {
         body: JSON.stringify({
           item_id: itemId,
           target_cluster_id: targetClusterId,
-          audience,
+          audience: aud,
         }),
       });
       if (!res.ok) {
@@ -798,8 +919,9 @@ function NewsroomWorkspace() {
   }
 
   async function dismissCluster(clusterId: string) {
-    const reason = typeof window !== 'undefined' ? window.prompt('Dismiss reason (optional)') : '';
-    if (reason === null) return; // user cancelled the prompt
+    const reason =
+      typeof window !== 'undefined' ? window.prompt('Dismiss reason (optional)') : '';
+    if (reason === null) return;
     const key = `${clusterId}:dismiss`;
     setBusyId(key);
     try {
@@ -877,24 +999,29 @@ function NewsroomWorkspace() {
   }
 
   // ----------------------------------------------------------------------
-  // Generate handlers (host page owns audience; modal is dumb pass-through)
+  // Generate handlers — open the modal in audience-picker mode.
   // ----------------------------------------------------------------------
-  function openGenerate(cluster: ClusterRow, options?: { kidVersion?: boolean }) {
-    const targetAudience: Audience = options?.kidVersion ? 'kid' : audience;
-    const sourceUrls =
-      options?.kidVersion && audience === 'adult'
-        ? (sourceMap[cluster.id] || []).map((s) => s.raw_url).filter(Boolean)
-        : [];
+  function openGenerate(cluster: ClusterRow) {
     setGenTarget({
       id: cluster.id,
       title: (cluster.title && cluster.title.trim()) || 'Untitled cluster',
-      audience: targetAudience,
-      sourceUrls,
     });
   }
 
   function closeGenerate() {
     setGenTarget(null);
+  }
+
+  // ----------------------------------------------------------------------
+  // Expand toggle
+  // ----------------------------------------------------------------------
+  function toggleExpanded(clusterId: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(clusterId)) next.delete(clusterId);
+      else next.add(clusterId);
+      return next;
+    });
   }
 
   // ----------------------------------------------------------------------
@@ -911,12 +1038,26 @@ function NewsroomWorkspace() {
   }
   if (!authorized) return null;
 
+  // Source URLs forwarded to the modal so picker-mode kid runs can reuse the
+  // cluster's discovery items. The server also auto-derives, so this is a
+  // belt-and-braces handoff that lets the modal show the "Reusing N
+  // sources" badge accurately.
+  const targetSourceUrls: string[] = genTarget
+    ? (sourceMap[genTarget.id] || []).map((s) => s.raw_url).filter(Boolean)
+    : [];
+
   const headerActions = (
     <>
-      <Button variant="secondary" size="md" loading={busyRefresh} onClick={refreshFeeds}>
+      <Button
+        variant="secondary"
+        size="md"
+        loading={busyRefresh}
+        disabled={busyRefresh}
+        onClick={() => void refreshFeeds()}
+      >
         Refresh feeds
       </Button>
-      <Link href={`/admin/pipeline/runs?audience=${audience}`} style={{ textDecoration: 'none' }}>
+      <Link href="/admin/pipeline/runs" style={{ textDecoration: 'none' }}>
         <Button variant="ghost" size="md">
           All runs
         </Button>
@@ -928,13 +1069,11 @@ function NewsroomWorkspace() {
     <Page>
       <PageHeader
         title="Newsroom"
-        subtitle="Operator workspace for clustering and generation. Audience-scoped end to end."
+        subtitle="Operator workspace — one feed pool, one cluster list. Pick adult, kid, or both at generation time."
         actions={headerActions}
       />
 
-      <AudienceTabs audience={audience} onSwitch={setAudienceTab} />
-
-      <GlanceBar audience={audience} glance={glance} />
+      <GlanceBar glance={glance} />
 
       <FilterRow
         topCategories={topLevelCategories}
@@ -946,13 +1085,32 @@ function NewsroomWorkspace() {
         filterWindow={filterWindow}
         searchInput={searchInput}
         showDismissed={showDismissed}
-        onCategoryChange={setFilterCategoryId}
-        onSubcategoryChange={setFilterSubcategoryId}
-        onFeedChange={setFilterFeedId}
-        onWindowChange={setFilterWindow}
-        onSearchChange={setSearchInput}
-        onShowDismissedChange={setShowDismissed}
+        onCategoryChange={(id) => {
+          setFilterCategoryId(id);
+          writeUrl({ cat: id, sub: '' });
+        }}
+        onSubcategoryChange={(id) => {
+          setFilterSubcategoryId(id);
+          writeUrl({ sub: id });
+        }}
+        onFeedChange={(id) => {
+          setFilterFeedId(id);
+          writeUrl({ outlet: id });
+        }}
+        onWindowChange={(val) => {
+          setFilterWindow(val);
+          writeUrl({ window: val });
+        }}
+        onSearchChange={(val) => {
+          setSearchInput(val);
+        }}
+        onShowDismissedChange={(next) => {
+          setShowDismissed(next);
+          writeUrl({ dismissed: next });
+        }}
       />
+
+      <SearchUrlSync searchQuery={searchQuery} writeUrl={writeUrl} />
 
       <PromptPicker
         mode={promptMode}
@@ -966,83 +1124,45 @@ function NewsroomWorkspace() {
 
       <PipelineRunPicker ref={pickerRef} onChange={onPickerChange} />
 
-      <PageSection
-        title="Clusters"
-        description={`${visibleClusters.length} visible · audience: ${audience}`}
-      >
-        {clusterLoading ? (
-          <div style={{ padding: S[8], textAlign: 'center', color: ADMIN_C.dim }}>
-            <Spinner /> Loading clusters
-          </div>
-        ) : clusterLoadError && visibleClusters.length === 0 ? (
-          <EmptyState
-            title="Could not load clusters"
-            description="Something went wrong fetching the cluster list. Try refreshing feeds or reload the page."
-          />
-        ) : visibleClusters.length === 0 ? (
-          <EmptyState
-            title="No clusters match"
-            description="Adjust the filters or click Refresh feeds to ingest. New clusters appear here as they form."
-          />
-        ) : (
-          <ClusterGrid
-            clusters={visibleClusters}
-            sourceMap={sourceMap}
-            feedById={feedById}
-            audience={audience}
-            pickerReady={pickerReady}
-            estCost={estCost}
-            busyId={busyId}
-            splitMode={splitMode}
-            onSplitModeChange={setSplitMode}
-            onGenerate={(c) => openGenerate(c)}
-            onGenerateKidsVersion={(c) => openGenerate(c, { kidVersion: true })}
-            onMoveItem={moveItem}
-            onMerge={mergeCluster}
-            onSplitCommit={splitCluster}
-            onDismiss={dismissCluster}
-            onUndismiss={undismissCluster}
-            onUnlock={unlockCluster}
-          />
-        )}
-
-        {hasMore && !clusterLoading && (
-          <div style={{ display: 'flex', justifyContent: 'center', marginTop: S[6] }}>
-            <Button
-              variant="secondary"
-              size="md"
-              loading={loadingMore}
-              disabled={loadingMore}
-              onClick={() => loadClusters(false)}
-            >
-              Load more
-            </Button>
-          </div>
-        )}
-      </PageSection>
-
-      <RecentRunsStrip
-        audience={audience}
-        runs={recentRuns}
-        retryRunId={retryRunId}
-        onRetry={retryRun}
+      <ClusterListSection
+        loading={loading}
+        loadError={loadError}
+        rows={visibleClusters}
+        totalCount={visibleClusters.length}
+        hasMore={hasMore}
+        loadingMore={loadingMore}
+        onLoadMore={() => loadClusters(false)}
+        sourceMap={sourceMap}
+        articleMap={articleMap}
+        feedById={feedById}
+        catById={catById}
+        expanded={expanded}
+        onToggleExpand={toggleExpanded}
+        pickerReady={pickerReady}
+        estCost={estCost}
+        busyId={busyId}
+        splitMode={splitMode}
+        onSplitModeChange={setSplitMode}
+        onGenerate={openGenerate}
+        onMoveItem={moveItem}
+        onMerge={mergeCluster}
+        onSplitCommit={splitCluster}
+        onDismiss={dismissCluster}
+        onUndismiss={undismissCluster}
+        onUnlock={unlockCluster}
       />
+
+      <RecentRunsStrip runs={recentRuns} retryRunId={retryRunId} onRetry={retryRun} />
 
       <GenerationModal
         open={genTarget !== null}
         clusterId={genTarget?.id ?? ''}
         clusterTitle={genTarget?.title ?? null}
-        audience={genTarget?.audience ?? audience}
-        sourceUrls={genTarget?.sourceUrls ?? []}
+        audienceMode="picker"
+        sourceUrls={targetSourceUrls}
         provider={picker.provider}
         model={picker.model}
-        freeformInstructions={
-          // Prompt picker overrides the header's freeform when active, so the
-          // operator can pick a preset on the page and it flows into the run
-          // without re-typing. Picker freeform stays as a final-layer add-on
-          // when no preset/custom is picked.
-          activePromptBody || picker.freeformInstructions
-        }
+        freeformInstructions={activePromptBody || picker.freeformInstructions}
         onClose={closeGenerate}
         onGenerateClick={() => {
           pickerRef.current?.reset();
@@ -1058,65 +1178,30 @@ function NewsroomWorkspace() {
 }
 
 // =====================================================================
-// Sub-components — kept inside the same file because they read tightly
-// from the workspace's local state and are not reused elsewhere.
+// Sub-components
 // =====================================================================
 
-function AudienceTabs({
-  audience,
-  onSwitch,
+function SearchUrlSync({
+  searchQuery,
+  writeUrl,
 }: {
-  audience: Audience;
-  onSwitch: (next: Audience) => void;
+  searchQuery: string;
+  writeUrl: (overrides: Partial<{ q: string }>) => void;
 }) {
-  return (
-    <div
-      role="tablist"
-      aria-label="Audience"
-      style={{
-        display: 'flex',
-        gap: S[2],
-        padding: `${S[2]}px 0`,
-        marginBottom: S[3],
-        borderBottom: `1px solid ${ADMIN_C.divider}`,
-      }}
-    >
-      {(['adult', 'kid'] as const).map((opt) => {
-        const active = audience === opt;
-        return (
-          <button
-            key={opt}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            onClick={() => onSwitch(opt)}
-            style={{
-              padding: `${S[2]}px ${S[4]}px`,
-              border: 'none',
-              borderBottom: `2px solid ${active ? ADMIN_C.accent : 'transparent'}`,
-              background: 'transparent',
-              color: active ? ADMIN_C.white : ADMIN_C.dim,
-              fontWeight: active ? 600 : 500,
-              fontSize: F.md,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-            }}
-          >
-            {opt === 'adult' ? 'Adult' : 'Kid'}
-          </button>
-        );
-      })}
-    </div>
-  );
+  useEffect(() => {
+    writeUrl({ q: searchQuery });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery]);
+  return null;
 }
 
-function GlanceBar({ audience, glance }: { audience: Audience; glance: GlanceData | null }) {
+function GlanceBar({ glance }: { glance: GlanceData | null }) {
   const cards = [
     {
       label: "Today's spend",
       value: glance ? formatCostUsd(glance.todaySpendUsd) : '—',
-      hint: 'Generate runs since 00:00 local',
-      href: `/admin/pipeline/costs?audience=${audience}`,
+      hint: 'Generate runs since 00:00 local (adult + kid)',
+      href: `/admin/pipeline/costs`,
     },
     {
       label: "Today's runs",
@@ -1126,25 +1211,13 @@ function GlanceBar({ audience, glance }: { audience: Audience; glance: GlanceDat
       hint: glance
         ? `${glance.runs.completed} done · ${glance.runs.failed} failed · ${glance.runs.running} running`
         : 'Generate pipeline only',
-      href: `/admin/pipeline/runs?audience=${audience}`,
-    },
-    {
-      label: 'Kill switch',
-      value:
-        glance?.killSwitchEnabled === null
-          ? '—'
-          : glance?.killSwitchEnabled
-            ? 'Enabled'
-            : 'Disabled',
-      hint: 'Click to manage',
-      href: '/admin/pipeline/settings',
-      danger: glance?.killSwitchEnabled === false,
+      href: `/admin/pipeline/runs`,
     },
     {
       label: 'Feed health',
       value: glance ? `${glance.unhealthyFeedCount} need attention` : '—',
       hint: 'Errors or stale > 6h',
-      href: `/admin/feeds?audience=${audience}`,
+      href: `/admin/feeds`,
       danger: (glance?.unhealthyFeedCount ?? 0) > 0,
     },
   ];
@@ -1152,53 +1225,116 @@ function GlanceBar({ audience, glance }: { audience: Audience; glance: GlanceDat
   return (
     <div
       style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+        display: 'flex',
+        flexDirection: 'column',
         gap: S[3],
         marginBottom: S[4],
       }}
     >
-      {cards.map((c) => (
-        <Link
-          key={c.label}
-          href={c.href}
-          style={{ textDecoration: 'none' }}
-          // The settings page is a separate concern surface; opening it in
-          // a new tab keeps the operator's filter context here intact.
-          target={c.label === 'Kill switch' ? '_blank' : undefined}
-          rel={c.label === 'Kill switch' ? 'noopener noreferrer' : undefined}
-        >
-          <div
-            style={{
-              padding: S[3],
-              border: `1px solid ${c.danger ? ADMIN_C.danger : ADMIN_C.divider}`,
-              borderRadius: 8,
-              background: ADMIN_C.bg,
-              transition: 'background 120ms ease, border-color 120ms ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = ADMIN_C.hover;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = ADMIN_C.bg;
-            }}
-          >
-            <div style={{ fontSize: F.xs, color: ADMIN_C.muted, marginBottom: 2 }}>{c.label}</div>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          gap: S[3],
+        }}
+      >
+        {cards.map((c) => (
+          <Link key={c.label} href={c.href} style={{ textDecoration: 'none' }}>
             <div
               style={{
-                fontSize: F.lg,
-                fontWeight: 600,
-                color: c.danger ? ADMIN_C.danger : ADMIN_C.white,
-                lineHeight: 1.2,
+                padding: S[3],
+                border: `1px solid ${c.danger ? ADMIN_C.danger : ADMIN_C.divider}`,
+                borderRadius: 8,
+                background: ADMIN_C.card,
+                transition: 'background 120ms ease, border-color 120ms ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = ADMIN_C.hover;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = ADMIN_C.card;
               }}
             >
-              {c.value}
+              <div style={{ fontSize: F.xs, color: ADMIN_C.muted, marginBottom: 2 }}>
+                {c.label}
+              </div>
+              <div
+                style={{
+                  fontSize: F.lg,
+                  fontWeight: 600,
+                  color: c.danger ? ADMIN_C.danger : ADMIN_C.white,
+                  lineHeight: 1.2,
+                }}
+              >
+                {c.value}
+              </div>
+              <div style={{ fontSize: F.xs, color: ADMIN_C.dim, marginTop: 2 }}>{c.hint}</div>
             </div>
-            <div style={{ fontSize: F.xs, color: ADMIN_C.dim, marginTop: 2 }}>{c.hint}</div>
-          </div>
-        </Link>
-      ))}
+          </Link>
+        ))}
+      </div>
+
+      {/* Two kill switches side-by-side. */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+          gap: S[3],
+        }}
+      >
+        <KillSwitchCard
+          label="Adult generation"
+          enabled={glance?.killSwitches.adultEnabled ?? null}
+        />
+        <KillSwitchCard
+          label="Kid generation"
+          enabled={glance?.killSwitches.kidEnabled ?? null}
+        />
+      </div>
     </div>
+  );
+}
+
+function KillSwitchCard({
+  label,
+  enabled,
+}: {
+  label: string;
+  enabled: boolean | null;
+}) {
+  const danger = enabled === false;
+  const value = enabled === null ? '—' : enabled ? 'Enabled' : 'Disabled';
+  return (
+    <Link href="/admin/pipeline/settings" style={{ textDecoration: 'none' }}>
+      <div
+        style={{
+          padding: S[3],
+          border: `1px solid ${danger ? ADMIN_C.danger : ADMIN_C.divider}`,
+          borderRadius: 8,
+          background: ADMIN_C.card,
+          transition: 'background 120ms ease, border-color 120ms ease',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = ADMIN_C.hover;
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = ADMIN_C.card;
+        }}
+      >
+        <div style={{ fontSize: F.xs, color: ADMIN_C.muted, marginBottom: 2 }}>{label}</div>
+        <div
+          style={{
+            fontSize: F.lg,
+            fontWeight: 600,
+            color: danger ? ADMIN_C.danger : ADMIN_C.white,
+            lineHeight: 1.2,
+          }}
+        >
+          {value}
+        </div>
+        <div style={{ fontSize: F.xs, color: ADMIN_C.dim, marginTop: 2 }}>Click to manage</div>
+      </div>
+    </Link>
   );
 }
 
@@ -1439,7 +1575,9 @@ function PromptPicker({
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onPresetChange(e.target.value)}
               options={presets.map((p) => ({
                 value: p.id,
-                label: `${p.name}${p.audience === 'both' ? ' (both)' : p.audience === 'kid' ? ' (kid)' : ''}`,
+                label: `${p.name}${
+                  p.audience === 'both' ? ' (both)' : p.audience === 'kid' ? ' (kid)' : ' (adult)'
+                }`,
               }))}
             />
           </Field>
@@ -1485,18 +1623,26 @@ function PromptPicker({
   );
 }
 
-function ClusterGrid({
-  clusters,
+function ClusterListSection({
+  loading,
+  loadError,
+  rows,
+  totalCount,
+  hasMore,
+  loadingMore,
+  onLoadMore,
   sourceMap,
+  articleMap,
   feedById,
-  audience,
+  catById,
+  expanded,
+  onToggleExpand,
   pickerReady,
   estCost,
   busyId,
   splitMode,
   onSplitModeChange,
   onGenerate,
-  onGenerateKidsVersion,
   onMoveItem,
   onMerge,
   onSplitCommit,
@@ -1504,17 +1650,25 @@ function ClusterGrid({
   onUndismiss,
   onUnlock,
 }: {
-  clusters: ClusterRow[];
+  loading: boolean;
+  loadError: boolean;
+  rows: ClusterRow[];
+  totalCount: number;
+  hasMore: boolean;
+  loadingMore: boolean;
+  onLoadMore: () => void;
   sourceMap: Record<string, DiscoveryRow[]>;
+  articleMap: ArticleMap;
   feedById: Record<string, FeedLite>;
-  audience: Audience;
+  catById: Record<string, CategoryRow>;
+  expanded: Set<string>;
+  onToggleExpand: (clusterId: string) => void;
   pickerReady: boolean;
   estCost: number | null;
   busyId: string;
   splitMode: { clusterId: string; itemIds: Set<string> } | null;
   onSplitModeChange: (next: { clusterId: string; itemIds: Set<string> } | null) => void;
   onGenerate: (c: ClusterRow) => void;
-  onGenerateKidsVersion: (c: ClusterRow) => void;
   onMoveItem: (clusterId: string, itemId: string, targetClusterId: string | null) => void;
   onMerge: (sourceId: string, targetId: string) => void;
   onSplitCommit: (sourceId: string, itemIds: string[]) => void;
@@ -1523,385 +1677,563 @@ function ClusterGrid({
   onUnlock: (clusterId: string) => void;
 }) {
   return (
+    <PageSection
+      title="Clusters"
+      description={loading ? 'Loading…' : `${totalCount} cluster${totalCount === 1 ? '' : 's'}`}
+    >
+      {loading ? (
+        <div style={{ padding: S[6], textAlign: 'center', color: ADMIN_C.dim }}>
+          <Spinner /> Loading clusters
+        </div>
+      ) : loadError && rows.length === 0 ? (
+        <EmptyState
+          title="Could not load clusters"
+          description="Something went wrong fetching the cluster list. Try refreshing feeds or reload the page."
+        />
+      ) : rows.length === 0 ? (
+        <EmptyState
+          title="No clusters match"
+          description="Adjust filters above or refresh feeds. New clusters appear here as they form."
+        />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: S[2] }}>
+          {rows.map((c) => (
+            <ClusterRowItem
+              key={c.id}
+              cluster={c}
+              sources={sourceMap[c.id] || []}
+              articles={articleMap[c.id] || {}}
+              feedById={feedById}
+              catById={catById}
+              expanded={expanded.has(c.id)}
+              onToggleExpand={() => onToggleExpand(c.id)}
+              otherClusters={rows.filter((r) => r.id !== c.id)}
+              pickerReady={pickerReady}
+              estCost={estCost}
+              busyId={busyId}
+              splitMode={splitMode}
+              onSplitModeChange={onSplitModeChange}
+              onGenerate={onGenerate}
+              onMoveItem={onMoveItem}
+              onMerge={onMerge}
+              onSplitCommit={onSplitCommit}
+              onDismiss={onDismiss}
+              onUndismiss={onUndismiss}
+              onUnlock={onUnlock}
+            />
+          ))}
+        </div>
+      )}
+
+      {hasMore && !loading && (
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: S[4] }}>
+          <Button
+            variant="secondary"
+            size="md"
+            loading={loadingMore}
+            disabled={loadingMore}
+            onClick={onLoadMore}
+          >
+            Load more
+          </Button>
+        </div>
+      )}
+    </PageSection>
+  );
+}
+
+function ClusterRowItem({
+  cluster,
+  sources,
+  articles,
+  feedById,
+  catById,
+  expanded,
+  onToggleExpand,
+  otherClusters,
+  pickerReady,
+  estCost,
+  busyId,
+  splitMode,
+  onSplitModeChange,
+  onGenerate,
+  onMoveItem,
+  onMerge,
+  onSplitCommit,
+  onDismiss,
+  onUndismiss,
+  onUnlock,
+}: {
+  cluster: ClusterRow;
+  sources: DiscoveryRow[];
+  articles: ArticleMap[string];
+  feedById: Record<string, FeedLite>;
+  catById: Record<string, CategoryRow>;
+  expanded: boolean;
+  onToggleExpand: () => void;
+  otherClusters: ClusterRow[];
+  pickerReady: boolean;
+  estCost: number | null;
+  busyId: string;
+  splitMode: { clusterId: string; itemIds: Set<string> } | null;
+  onSplitModeChange: (next: { clusterId: string; itemIds: Set<string> } | null) => void;
+  onGenerate: (c: ClusterRow) => void;
+  onMoveItem: (clusterId: string, itemId: string, targetClusterId: string | null) => void;
+  onMerge: (sourceId: string, targetId: string) => void;
+  onSplitCommit: (sourceId: string, itemIds: string[]) => void;
+  onDismiss: (clusterId: string) => void;
+  onUndismiss: (clusterId: string) => void;
+  onUnlock: (clusterId: string) => void;
+}) {
+  const c = cluster;
+  const locked = !!c.locked_by;
+  const dismissed = !!c.dismissed_at;
+  const title = (c.title && c.title.trim()) || 'Untitled cluster';
+  const inSplit = splitMode?.clusterId === c.id;
+  const splitSelected = inSplit ? splitMode.itemIds : new Set<string>();
+
+  const cat = c.category_id ? catById[c.category_id] : null;
+  const parent = cat?.parent_id ? catById[cat.parent_id] : null;
+  const catLine = cat ? (parent ? `${parent.name} > ${cat.name}` : cat.name) : '—';
+
+  const sourceCount = sources.length;
+  const adultArticleId = articles?.adultId || null;
+  const kidArticleId = articles?.kidId || null;
+
+  return (
     <div
       style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))',
-        gap: S[4],
+        border: `1px solid ${dismissed ? ADMIN_C.warn : ADMIN_C.divider}`,
+        borderRadius: 8,
+        background: ADMIN_C.bg,
+        opacity: dismissed ? 0.75 : 1,
       }}
     >
-      {clusters.map((c) => {
-        const sources = sourceMap[c.id] || [];
-        const locked = !!c.locked_by;
-        const dismissed = !!c.dismissed_at;
-        const title = (c.title && c.title.trim()) || 'Untitled cluster';
-        const otherClusters = clusters.filter((x) => x.id !== c.id);
-        const inSplit = splitMode?.clusterId === c.id;
-        const splitSelected = inSplit ? splitMode.itemIds : new Set<string>();
+      <div
+        style={{
+          padding: `${S[3]}px ${S[3]}px`,
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: S[3],
+          flexWrap: 'wrap',
+        }}
+      >
+        <button
+          type="button"
+          onClick={onToggleExpand}
+          aria-label={expanded ? 'Collapse sources' : 'Expand sources'}
+          aria-expanded={expanded}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: ADMIN_C.soft,
+            cursor: 'pointer',
+            fontSize: F.md,
+            padding: 4,
+            lineHeight: 1,
+            flexShrink: 0,
+          }}
+        >
+          {expanded ? '▾' : '▸'}
+        </button>
 
-        return (
+        <div style={{ flex: '1 1 320px', minWidth: 0 }}>
           <div
-            key={c.id}
             style={{
-              border: `1px solid ${dismissed ? ADMIN_C.warn : ADMIN_C.divider}`,
-              borderRadius: 8,
-              background: ADMIN_C.bg,
-              padding: S[4],
               display: 'flex',
-              flexDirection: 'column',
-              gap: S[3],
-              opacity: dismissed ? 0.7 : 1,
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              gap: S[2],
+              marginBottom: 2,
             }}
           >
-            <div style={{ display: 'flex', gap: S[2], flexWrap: 'wrap', alignItems: 'center' }}>
-              {c.is_breaking && (
-                <Badge variant="danger" size="xs">
-                  Breaking
-                </Badge>
-              )}
-              {locked && (
-                <span
-                  title={
-                    c.locked_at
-                      ? `Locked ${relativeTime(c.locked_at)} (auto-expires after 10 min via RPC TTL)`
-                      : 'Cluster is locked; another run is in progress.'
-                  }
-                >
-                  <Badge variant="warn" size="xs">
-                    Locked
-                  </Badge>
-                </span>
-              )}
-              {dismissed && (
+            {c.is_breaking && (
+              <Badge variant="danger" size="xs">
+                Breaking
+              </Badge>
+            )}
+            {locked && (
+              <span
+                title={
+                  c.locked_at
+                    ? `Locked ${relativeTime(c.locked_at)} (auto-expires after 10 min via RPC TTL)`
+                    : 'Cluster is locked; another run is in progress.'
+                }
+              >
                 <Badge variant="warn" size="xs">
-                  Dismissed{c.dismiss_reason ? `: ${truncate(c.dismiss_reason, 60)}` : ''}
+                  Locked
                 </Badge>
-              )}
-              <span style={{ marginLeft: 'auto', fontSize: F.xs, color: ADMIN_C.muted }}>
-                {relativeTime(c.updated_at)}
               </span>
-            </div>
-
-            <div
+            )}
+            {dismissed && (
+              <Badge variant="warn" size="xs">
+                Dismissed{c.dismiss_reason ? `: ${truncate(c.dismiss_reason, 60)}` : ''}
+              </Badge>
+            )}
+            <button
+              type="button"
+              onClick={onToggleExpand}
               style={{
+                background: 'transparent',
+                border: 'none',
+                padding: 0,
+                margin: 0,
+                color: ADMIN_C.white,
                 fontSize: F.md,
                 fontWeight: 600,
-                color: ADMIN_C.white,
                 lineHeight: 1.3,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                textAlign: 'left',
               }}
             >
-              {title}
-            </div>
+              {truncate(title, 80)}
+            </button>
+          </div>
+          <div
+            style={{
+              fontSize: F.xs,
+              color: ADMIN_C.muted,
+              lineHeight: 1.4,
+            }}
+          >
+            {catLine} · {relativeTime(c.updated_at)} ·{' '}
+            <span title="Source articles linked to this cluster">
+              {sourceCount} source{sourceCount === 1 ? '' : 's'}
+            </span>
+          </div>
+        </div>
 
-            {c.summary && (
-              <div
-                style={{
-                  fontSize: F.sm,
-                  color: ADMIN_C.dim,
-                  lineHeight: 1.5,
-                }}
+        {/* Right-side action buttons */}
+        <div
+          style={{
+            display: 'flex',
+            gap: S[2],
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            flex: '0 1 auto',
+          }}
+        >
+          {/* Generated badges + View links */}
+          {adultArticleId && (
+            <Link
+              href={`/admin/articles/${adultArticleId}/review`}
+              style={{ textDecoration: 'none' }}
+            >
+              <Badge variant="success" size="sm">
+                Adult ✓ View
+              </Badge>
+            </Link>
+          )}
+          {kidArticleId && (
+            <Link
+              href={`/admin/articles/${kidArticleId}/review`}
+              style={{ textDecoration: 'none' }}
+            >
+              <Badge variant="info" size="sm">
+                Kid ✓ View
+              </Badge>
+            </Link>
+          )}
+
+          {inSplit ? (
+            <>
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={splitSelected.size === 0 || busyId !== ''}
+                loading={busyId === `${c.id}:split`}
+                onClick={() => onSplitCommit(c.id, Array.from(splitSelected))}
               >
-                {truncate(c.summary, 240)}
-              </div>
-            )}
-
-            {/* Source rows */}
-            <div
-              style={{
-                borderTop: `1px solid ${ADMIN_C.divider}`,
-                paddingTop: S[3],
-                display: 'flex',
-                flexDirection: 'column',
-                gap: S[2],
-              }}
-            >
-              <div
-                style={{
-                  fontSize: F.xs,
-                  color: ADMIN_C.muted,
-                  textTransform: 'uppercase',
-                  letterSpacing: 0.4,
-                }}
+                Split into new cluster ({splitSelected.size})
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => onSplitModeChange(null)}>
+                Cancel
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={locked || busyId !== '' || !pickerReady || dismissed}
+                onClick={() => onGenerate(c)}
+                title={
+                  locked
+                    ? 'Cluster is locked; another run is in progress.'
+                    : !pickerReady
+                      ? 'Pick a provider and model first.'
+                      : dismissed
+                        ? 'Restore the cluster before generating.'
+                        : 'Pick adult, kid, or both at the next step.'
+                }
               >
-                {sources.length} source{sources.length === 1 ? '' : 's'}
-              </div>
-              {sources.length === 0 && (
-                <div style={{ fontSize: F.xs, color: ADMIN_C.muted, fontStyle: 'italic' }}>
-                  No source rows linked. The cluster may be matched to an existing article.
-                </div>
-              )}
-              {sources.map((s) => {
-                const feed = s.feed_id ? feedById[s.feed_id] : null;
-                const outlet =
-                  feed?.source_name || feed?.name || s.metadata?.outlet || 'Unknown outlet';
-                const headline =
-                  (s.raw_title && s.raw_title.trim()) ||
-                  (s.raw_url ? new URL(s.raw_url).pathname.split('/').filter(Boolean).slice(-1)[0] : '') ||
-                  '(untitled)';
-                const lede = s.metadata?.excerpt || '';
-                const moveKey = `${c.id}:move:${s.id}`;
-                const checked = splitSelected.has(s.id);
-                return (
-                  <div
-                    key={s.id}
-                    style={{
-                      padding: S[2],
-                      border: `1px solid ${ADMIN_C.divider}`,
-                      borderRadius: 6,
-                      background: ADMIN_C.card,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: S[1],
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: S[2],
-                        flexWrap: 'wrap',
-                      }}
-                    >
-                      {inSplit && (
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => {
-                            const next = new Set(splitSelected);
-                            if (next.has(s.id)) next.delete(s.id);
-                            else next.add(s.id);
-                            onSplitModeChange({ clusterId: c.id, itemIds: next });
-                          }}
-                        />
-                      )}
-                      <span style={{ fontSize: F.xs, color: ADMIN_C.dim, fontWeight: 600 }}>
-                        {outlet}
-                      </span>
-                      <span style={{ fontSize: F.xs, color: ADMIN_C.muted }}>
-                        · {relativeTime(s.fetched_at)}
-                      </span>
-                    </div>
-                    <a
-                      href={s.raw_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        fontSize: F.sm,
-                        color: ADMIN_C.white,
-                        textDecoration: 'none',
-                        fontWeight: 500,
-                        lineHeight: 1.4,
-                      }}
-                    >
-                      {truncate(headline, 140)}
-                    </a>
-                    {lede && (
-                      <div style={{ fontSize: F.xs, color: ADMIN_C.dim, lineHeight: 1.5 }}>
-                        {truncate(lede, 200)}
-                      </div>
-                    )}
-                    {!inSplit && (
-                      <div
-                        style={{
-                          display: 'flex',
-                          gap: S[2],
-                          flexWrap: 'wrap',
-                          marginTop: S[1],
-                        }}
-                      >
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={busyId !== ''}
-                          loading={busyId === moveKey}
-                          onClick={() => onMoveItem(c.id, s.id, null)}
-                          title="Detach this source from the cluster (creates a singleton)"
-                        >
-                          Move out
-                        </Button>
-                        {otherClusters.length > 0 && (
-                          <Select
-                            size="sm"
-                            value=""
-                            placeholder="Move to..."
-                            disabled={busyId !== ''}
-                            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
-                              const target = e.target.value;
-                              if (target) onMoveItem(c.id, s.id, target);
-                            }}
-                            options={otherClusters.map((oc) => ({
-                              value: oc.id,
-                              label: truncate((oc.title || 'Untitled cluster').trim(), 50),
-                            }))}
-                            block={false}
-                            style={{ width: 200 }}
-                          />
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                Generate
+              </Button>
 
-            {/* Cost line */}
-            {pickerReady && estCost !== null && (
-              <div style={{ fontSize: F.xs, color: ADMIN_C.muted }}>
-                Predicted: {formatEstimatedCost(estCost)}
-              </div>
-            )}
-
-            {/* Action row */}
-            <div
-              style={{
-                display: 'flex',
-                gap: S[2],
-                flexWrap: 'wrap',
-                alignItems: 'center',
-                marginTop: S[1],
-              }}
-            >
-              {inSplit ? (
-                <>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    disabled={splitSelected.size === 0 || busyId !== ''}
-                    loading={busyId === `${c.id}:split`}
-                    onClick={() => onSplitCommit(c.id, Array.from(splitSelected))}
-                  >
-                    Split into new cluster ({splitSelected.size})
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => onSplitModeChange(null)}>
-                    Cancel split
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    disabled={locked || busyId !== '' || !pickerReady || dismissed}
-                    onClick={() => onGenerate(c)}
-                    title={
-                      locked
-                        ? 'Cluster is locked; another run is in progress.'
-                        : !pickerReady
-                          ? 'Pick a provider and model below first.'
-                          : dismissed
-                            ? 'Restore the cluster before generating.'
-                            : undefined
+              {otherClusters.length > 0 && (
+                <Select
+                  size="sm"
+                  value=""
+                  placeholder="Move…"
+                  disabled={busyId !== '' || dismissed}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                    const target = e.target.value;
+                    if (target) {
+                      onToggleExpand();
                     }
-                  >
-                    Generate {audience === 'kid' ? 'kid' : 'adult'} article
-                  </Button>
+                  }}
+                  options={otherClusters.map((oc) => ({
+                    value: oc.id,
+                    label: truncate((oc.title || 'Untitled cluster').trim(), 50),
+                  }))}
+                  block={false}
+                  style={{ width: 140 }}
+                />
+              )}
 
-                  {audience === 'adult' && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      disabled={locked || busyId !== '' || !pickerReady || dismissed}
-                      onClick={() => onGenerateKidsVersion(c)}
-                      title="Run the kid pipeline against this cluster's adult sources."
-                    >
-                      Generate kids version
-                    </Button>
-                  )}
+              {otherClusters.length > 0 && (
+                <Select
+                  size="sm"
+                  value=""
+                  placeholder="Merge with…"
+                  disabled={busyId !== '' || dismissed}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                    const target = e.target.value;
+                    if (target) onMerge(c.id, target);
+                  }}
+                  options={otherClusters.map((oc) => ({
+                    value: oc.id,
+                    label: truncate((oc.title || 'Untitled cluster').trim(), 50),
+                  }))}
+                  block={false}
+                  style={{ width: 170 }}
+                />
+              )}
 
-                  {otherClusters.length > 0 && (
-                    <Select
-                      size="sm"
-                      value=""
-                      placeholder="Merge with..."
-                      disabled={busyId !== '' || dismissed}
-                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
-                        const target = e.target.value;
-                        if (target) onMerge(c.id, target);
+              {sourceCount > 1 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={busyId !== '' || dismissed}
+                  onClick={() => {
+                    onSplitModeChange({ clusterId: c.id, itemIds: new Set() });
+                    if (!expanded) onToggleExpand();
+                  }}
+                >
+                  Split…
+                </Button>
+              )}
+
+              {dismissed ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={busyId !== ''}
+                  loading={busyId === `${c.id}:undismiss`}
+                  onClick={() => onUndismiss(c.id)}
+                >
+                  Restore
+                </Button>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={busyId !== ''}
+                  loading={busyId === `${c.id}:dismiss`}
+                  onClick={() => onDismiss(c.id)}
+                >
+                  Dismiss
+                </Button>
+              )}
+
+              {locked && (
+                <Button
+                  variant="danger"
+                  size="sm"
+                  loading={busyId === `${c.id}:unlock`}
+                  disabled={busyId !== ''}
+                  onClick={() => onUnlock(c.id)}
+                >
+                  Unlock
+                </Button>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {expanded && (
+        <div
+          style={{
+            borderTop: `1px solid ${ADMIN_C.divider}`,
+            padding: S[3],
+            display: 'flex',
+            flexDirection: 'column',
+            gap: S[2],
+            background: ADMIN_C.card,
+          }}
+        >
+          {pickerReady && estCost !== null && (
+            <div style={{ fontSize: F.xs, color: ADMIN_C.muted }}>
+              Predicted cost (per audience): {formatEstimatedCost(estCost)}
+            </div>
+          )}
+          {c.summary && (
+            <div
+              style={{
+                fontSize: F.sm,
+                color: ADMIN_C.dim,
+                lineHeight: 1.5,
+              }}
+            >
+              {truncate(c.summary, 320)}
+            </div>
+          )}
+          {sourceCount === 0 && (
+            <div style={{ fontSize: F.xs, color: ADMIN_C.muted, fontStyle: 'italic' }}>
+              No source rows linked. The cluster may be matched to an existing article.
+            </div>
+          )}
+          {sources.map((s) => {
+            const feed = s.feed_id ? feedById[s.feed_id] : null;
+            const outlet =
+              feed?.source_name || feed?.name || s.metadata?.outlet || 'Unknown outlet';
+            const headline =
+              (s.raw_title && s.raw_title.trim()) ||
+              (s.raw_url
+                ? new URL(s.raw_url).pathname.split('/').filter(Boolean).slice(-1)[0]
+                : '') ||
+              '(untitled)';
+            const lede = s.metadata?.excerpt || (s.raw_body || '').trim();
+            const moveKey = `${c.id}:move:${s.id}`;
+            const checked = splitSelected.has(s.id);
+            return (
+              <div
+                key={s.id}
+                style={{
+                  padding: S[2],
+                  border: `1px solid ${ADMIN_C.divider}`,
+                  borderRadius: 6,
+                  background: ADMIN_C.bg,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: S[1],
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: S[2],
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  {inSplit && (
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => {
+                        const next = new Set(splitSelected);
+                        if (next.has(s.id)) next.delete(s.id);
+                        else next.add(s.id);
+                        onSplitModeChange({ clusterId: c.id, itemIds: next });
                       }}
-                      options={otherClusters.map((oc) => ({
-                        value: oc.id,
-                        label: truncate((oc.title || 'Untitled cluster').trim(), 50),
-                      }))}
-                      block={false}
-                      style={{ width: 220 }}
                     />
                   )}
-
-                  {sources.length > 1 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={busyId !== '' || dismissed}
-                      onClick={() =>
-                        onSplitModeChange({ clusterId: c.id, itemIds: new Set() })
-                      }
-                    >
-                      Split…
-                    </Button>
-                  )}
-
-                  {dismissed ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={busyId !== ''}
-                      loading={busyId === `${c.id}:undismiss`}
-                      onClick={() => onUndismiss(c.id)}
-                    >
-                      Restore
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={busyId !== ''}
-                      loading={busyId === `${c.id}:dismiss`}
-                      onClick={() => onDismiss(c.id)}
-                    >
-                      Dismiss
-                    </Button>
-                  )}
-
-                  {locked && (
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      loading={busyId === `${c.id}:unlock`}
-                      disabled={busyId !== ''}
-                      onClick={() => onUnlock(c.id)}
-                    >
-                      Unlock
-                    </Button>
-                  )}
-
-                  {/* TODO Stream 6.1 — delete /admin/newsroom/clusters/[id]
-                       once the workspace has full parity. View link kept
-                       active so PM's cleanup pass can sweep it cleanly. */}
-                  <Link
-                    href={`/admin/newsroom/clusters/${c.id}`}
-                    style={{ textDecoration: 'none', marginLeft: 'auto' }}
+                  <span style={{ fontSize: F.xs, color: ADMIN_C.dim, fontWeight: 600 }}>
+                    {outlet}
+                  </span>
+                  <span style={{ fontSize: F.xs, color: ADMIN_C.muted }}>
+                    · {relativeTime(s.fetched_at)}
+                  </span>
+                  <a
+                    href={s.raw_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      fontSize: F.xs,
+                      color: ADMIN_C.muted,
+                      marginLeft: 'auto',
+                      textDecoration: 'underline',
+                    }}
                   >
-                    <Button variant="ghost" size="sm">
-                      View
+                    Open
+                  </a>
+                </div>
+                <a
+                  href={s.raw_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    fontSize: F.sm,
+                    color: ADMIN_C.white,
+                    textDecoration: 'none',
+                    fontWeight: 500,
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {truncate(headline, 140)}
+                </a>
+                {lede && (
+                  <div style={{ fontSize: F.xs, color: ADMIN_C.dim, lineHeight: 1.5 }}>
+                    {truncate(lede, 200)}
+                  </div>
+                )}
+                {!inSplit && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: S[2],
+                      flexWrap: 'wrap',
+                      marginTop: S[1],
+                    }}
+                  >
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={busyId !== ''}
+                      loading={busyId === moveKey}
+                      onClick={() => onMoveItem(c.id, s.id, null)}
+                      title="Detach this source from the cluster (creates a singleton)"
+                    >
+                      Move out
                     </Button>
-                  </Link>
-                </>
-              )}
-            </div>
-          </div>
-        );
-      })}
+                    {otherClusters.length > 0 && (
+                      <Select
+                        size="sm"
+                        value=""
+                        placeholder="Move to…"
+                        disabled={busyId !== ''}
+                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                          const target = e.target.value;
+                          if (target) onMoveItem(c.id, s.id, target);
+                        }}
+                        options={otherClusters.map((oc) => ({
+                          value: oc.id,
+                          label: truncate((oc.title || 'Untitled cluster').trim(), 50),
+                        }))}
+                        block={false}
+                        style={{ width: 200 }}
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
 
 function RecentRunsStrip({
-  audience,
   runs,
   retryRunId,
   onRetry,
 }: {
-  audience: Audience;
   runs: RecentRun[];
   retryRunId: string;
   onRetry: (id: string) => void;
@@ -1909,9 +2241,9 @@ function RecentRunsStrip({
   return (
     <PageSection
       title="Recent runs"
-      description={`Last ${runs.length} generate runs for the ${audience} audience.`}
+      description={`Last ${runs.length} generate runs across both audiences.`}
       aside={
-        <Link href={`/admin/pipeline/runs?audience=${audience}`} style={{ textDecoration: 'none' }}>
+        <Link href="/admin/pipeline/runs" style={{ textDecoration: 'none' }}>
           <Button variant="ghost" size="sm">
             View all
           </Button>
@@ -1920,7 +2252,7 @@ function RecentRunsStrip({
     >
       {runs.length === 0 ? (
         <div style={{ fontSize: F.sm, color: ADMIN_C.dim, padding: S[3] }}>
-          No generate runs yet for this audience.
+          No generate runs yet.
         </div>
       ) : (
         <div
@@ -1932,7 +2264,11 @@ function RecentRunsStrip({
         >
           {runs.map((r) => {
             const status = (r.status || '').toLowerCase();
-            const failed = status === 'failed' || status === 'error' || status === 'cancelled' || status === 'canceled';
+            const failed =
+              status === 'failed' ||
+              status === 'error' ||
+              status === 'cancelled' ||
+              status === 'canceled';
             return (
               <div
                 key={r.id}
@@ -1945,11 +2281,15 @@ function RecentRunsStrip({
                   borderRadius: 6,
                   background: ADMIN_C.bg,
                   fontSize: F.sm,
+                  flexWrap: 'wrap',
                 }}
               >
-                <span style={{ color: ADMIN_C.muted, fontSize: F.xs, minWidth: 110 }}>
+                <span style={{ color: ADMIN_C.muted, fontSize: F.xs, minWidth: 90 }}>
                   {relativeTime(r.started_at)}
                 </span>
+                <Badge size="xs" variant={r.audience === 'kid' ? 'info' : 'neutral'}>
+                  {r.audience === 'kid' ? 'Kid' : r.audience === 'adult' ? 'Adult' : '—'}
+                </Badge>
                 <Badge
                   size="xs"
                   variant={
