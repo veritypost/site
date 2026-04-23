@@ -30,10 +30,23 @@ struct PublicProfileView: View {
     @State private var showBlockDialog = false
     @State private var profileToast: String? = nil
 
+    // Anon sign-up CTA sheets — mirror ProfileView's anon flow.
+    @State private var showLogin = false
+    @State private var showSignup = false
+
     var body: some View {
         ScrollView {
             if loading {
                 ProgressView().padding(.top, 60)
+            } else if auth.currentUser == nil {
+                // Web parity (`web/src/app/u/[username]/page.tsx`): anon
+                // visitors get an in-page sign-up CTA instead of the
+                // profile body. We deliberately don't hit the users
+                // table on the anon branch — display_name / bio /
+                // avatar / follower counts never cross the wire for a
+                // random visitor. The /card/<username> path remains the
+                // public share surface.
+                anonSignUpGate
             } else if notFound {
                 VStack(spacing: 6) {
                     Text("Profile not found")
@@ -101,12 +114,58 @@ struct PublicProfileView: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: profileToast)
+        .sheet(isPresented: $showLogin) { LoginView().environmentObject(auth) }
+        .sheet(isPresented: $showSignup) { SignupView().environmentObject(auth) }
         .task { await load() }
         .task(id: perms.changeToken) {
             canViewOtherTotal = await PermissionService.shared.has("profile.score.view.other.total")
             canFollow = await PermissionService.shared.has("profile.follow")
             canShareCard = await PermissionService.shared.has("profile.card.share_link")
         }
+    }
+
+    // MARK: - Anon sign-up gate (web parity)
+    //
+    // Mirrors `web/src/app/u/[username]/page.tsx` Q1 anon hero. Renders
+    // an in-page CTA prompting the visitor to sign up; tapping the
+    // primary or secondary action opens the LoginView / SignupView
+    // sheet rather than redirecting (no URL-bar to bounce out of in
+    // a native nav stack).
+    private var anonSignUpGate: some View {
+        VStack(spacing: 14) {
+            Spacer().frame(height: 60)
+            ZStack {
+                Circle()
+                    .fill(VP.card)
+                    .overlay(Circle().stroke(VP.border))
+                    .frame(width: 64, height: 64)
+                Text("@")
+                    .font(.system(size: 24, weight: .bold, design: .monospaced))
+                    .foregroundColor(VP.accent)
+            }
+            Text("Sign up to see @\(username)\u{2019}s profile")
+                .font(.system(.title3, design: .default, weight: .bold))
+                .foregroundColor(VP.text)
+                .multilineTextAlignment(.center)
+            Text("Profiles show reading history, Verity Score, streak, comments, and more. Join free to view this profile and build your own.")
+                .font(.footnote)
+                .foregroundColor(VP.dim)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+            Button("Sign up") { showSignup = true }
+                .font(.system(.subheadline, design: .default, weight: .semibold))
+                .foregroundColor(.white)
+                .padding(.horizontal, 28)
+                .padding(.vertical, 12)
+                .frame(minHeight: 44)
+                .background(VP.accent)
+                .cornerRadius(10)
+            Button("Already have an account? Sign in") { showLogin = true }
+                .font(.system(.footnote, design: .default, weight: .medium))
+                .foregroundColor(VP.accent)
+            Spacer().frame(height: 80)
+        }
+        .padding(.horizontal, 16)
     }
 
     // MARK: - Apple Guideline 1.2 — moderation actions
@@ -212,10 +271,17 @@ struct PublicProfileView: View {
 
             Divider().background(VP.border)
 
-            HStack(spacing: 16) {
-                stat(label: "Articles", value: u.articlesReadCount ?? 0)
-                stat(label: "Quizzes", value: u.quizzesCompletedCount ?? 0)
-                stat(label: "Comments", value: u.commentCount ?? 0)
+            // Canonical public-profile stat set — matches own profile,
+            // web own profile, and web public profile. Hidden when the
+            // target has flipped `show_activity` off.
+            if u.showActivity != false {
+                HStack(spacing: 16) {
+                    stat(label: "Articles read", value: u.articlesReadCount ?? 0)
+                    stat(label: "Quizzes passed", value: u.quizzesCompletedCount ?? 0)
+                    stat(label: "Comments", value: u.commentCount ?? 0)
+                    stat(label: "Followers", value: u.followersCount ?? 0)
+                    stat(label: "Following", value: u.followingCount ?? 0)
+                }
             }
 
             if !canViewOtherTotal {
@@ -247,7 +313,7 @@ struct PublicProfileView: View {
 
     private func stat(label: String, value: Int) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text("\(value)")
+            Text(value.formatted())
                 .font(.system(.title3, design: .default, weight: .bold))
                 .foregroundColor(VP.text)
             Text(label)
@@ -277,6 +343,13 @@ struct PublicProfileView: View {
 
     private func load() async {
         loading = true
+        // Web parity: anon visitors short-circuit BEFORE the target
+        // fetch so we never read another user's profile row anonymously.
+        // The body branch renders `anonSignUpGate` instead.
+        if auth.currentUser == nil {
+            loading = false
+            return
+        }
         do {
             // Round A (092b_rls_lockdown_followup): narrow `.select()` (was
             // SELECT *) to the safe, anon-readable column list. Authenticated
@@ -284,7 +357,7 @@ struct PublicProfileView: View {
             // sweeps would break SELECT * silently. Matches the anon GRANT
             // list from migration 092b + public_user_profiles view shape.
             let row: VPUser? = try await client.from("users")
-                .select("id, username, display_name, bio, avatar_url, avatar_color, banner_url, verity_score, streak_current, is_expert, expert_title, expert_organization, is_verified_public_figure, articles_read_count, quizzes_completed_count, comment_count, followers_count, following_count, profile_visibility, is_banned, email_verified, show_on_leaderboard, created_at")
+                .select("id, username, display_name, bio, avatar_url, avatar_color, banner_url, verity_score, streak_current, is_expert, expert_title, expert_organization, is_verified_public_figure, articles_read_count, quizzes_completed_count, comment_count, followers_count, following_count, show_activity, profile_visibility, is_banned, email_verified, show_on_leaderboard, created_at")
                 .eq("username", value: username)
                 .limit(1)
                 .single()

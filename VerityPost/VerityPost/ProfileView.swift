@@ -88,10 +88,18 @@ struct ProfileView: View {
     @State private var subStats: [String: CategoryStats] = [:]
     @State private var catUpvotes: [String: Int] = [:]
     @State private var subUpvotes: [String: Int] = [:]
-    @State private var milestonesLoaded = false
+    @State private var categoriesLoaded = false
     @State private var userAchievements: [UserAchievement] = []
+    /// All achievement definitions (earned + locked). The milestones grid
+    /// renders both states — earned first, locked after — mirroring web's
+    /// `loadMilestones` / earnedMap pattern at `web/src/app/profile/page.tsx`.
+    @State private var allAchievements: [Achievement] = []
+    /// Map of achievement_id → earned_at (ISO string), populated from the
+    /// user_achievements rows. Empty value means locked.
+    @State private var earnedMap: [String: Date] = [:]
     @State private var achievementsLoaded = false
     @State private var scoreTiers: [ScoreTierRow] = []
+    @State private var scoreTiersLoaded = false
 
     // 30-day streak heatmap — midnight-aligned dates with a reading_log row.
     @State private var streakDays: Set<Date> = []
@@ -133,16 +141,28 @@ struct ProfileView: View {
                 topBar
 
                 if let user = auth.currentUser {
-                    heroCard(user)
-                    streakStrip(user)
-                    statRow(user)
-                    socialRow(user)
-                    quickActionsRow(user)
-                    recentActivityPreview
-                    achievementsPreview
-                    tabBar
-                    tabContent(user)
-                    logoutButton
+                    if user.emailVerified == false {
+                        // Web parity: the full hero/stats/streak/activity grid
+                        // is hidden until the email is verified. Same copy
+                        // and CTA as `web/src/app/profile/page.tsx` around
+                        // the `!perms.viewOwn && !user.email_verified` branch.
+                        verifyEmailGate
+                        logoutButton
+                    } else {
+                        if user.frozenAt != nil {
+                            frozenAccountBanner
+                        }
+                        heroCard(user)
+                        streakStrip(user)
+                        statRow(user)
+                        socialRow(user)
+                        quickActionsRow(user)
+                        recentActivityPreview
+                        achievementsPreview
+                        tabBar
+                        tabContent(user)
+                        logoutButton
+                    }
                 } else {
                     anonProfileHero
                 }
@@ -279,6 +299,83 @@ struct ProfileView: View {
         }
     }
 
+    // MARK: - Verify-email gate (web parity)
+    //
+    // Mirrors the `!perms.viewOwn && !user.email_verified` branch on
+    // `web/src/app/profile/page.tsx`. Hides the full profile until the
+    // signup verification email is confirmed; resend lives on
+    // SettingsView so we keep this surface as a clean dead-end with one
+    // CTA back to the verify flow handled at app level.
+    private var verifyEmailGate: some View {
+        VStack(spacing: 12) {
+            Spacer().frame(height: 32)
+            Image(systemName: "envelope.badge.shield.half.filled")
+                .font(.system(size: 40, weight: .regular))
+                .foregroundColor(VP.dim)
+            Text("Verify your email")
+                .font(.system(.title3, design: .default, weight: .bold))
+                .foregroundColor(VP.text)
+            Text("Confirm your email to see your reading history, categories, and achievements.")
+                .font(.footnote)
+                .foregroundColor(VP.dim)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+            Button {
+                Task { _ = await auth.resendVerificationEmail() }
+            } label: {
+                Text("Resend verification email")
+                    .font(.system(.subheadline, design: .default, weight: .semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 22)
+                    .padding(.vertical, 12)
+                    .frame(minHeight: 44)
+                    .background(VP.accent)
+                    .cornerRadius(10)
+            }
+            Spacer().frame(height: 20)
+        }
+        .padding(.horizontal, 16)
+    }
+
+    // MARK: - Frozen account banner (web parity)
+    //
+    // Mirrors the inline red notice on `web/src/app/profile/page.tsx`
+    // shown when `user.frozen_at` is non-null. Tapping the banner opens
+    // the SubscriptionView sheet so the resubscribe path is one tap.
+    private var frozenAccountBanner: some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            showSubscription = true
+        } label: {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "snowflake")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(VP.danger)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Your Verity Score is frozen")
+                        .font(.system(.footnote, design: .default, weight: .semibold))
+                        .foregroundColor(VP.danger)
+                    Text("Resubscribe to resume tracking progress.")
+                        .font(.caption)
+                        .foregroundColor(VP.danger.opacity(0.85))
+                }
+                Spacer(minLength: 4)
+                Image(systemName: "chevron.right")
+                    .font(.caption2)
+                    .foregroundColor(VP.danger)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(VP.danger.opacity(0.08))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.danger.opacity(0.32)))
+            .cornerRadius(10)
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Verity Score frozen. Resubscribe to resume tracking.")
+    }
+
     // MARK: - Hero card (compact horizontal: avatar + ring left, name/score/progress right)
     @ViewBuilder
     private func heroCard(_ user: VPUser) -> some View {
@@ -291,8 +388,12 @@ struct ProfileView: View {
             guard next != nil, range > 0 else { return 1.0 }
             return min(1.0, max(0.0, Double(score - minScore) / Double(range)))
         }()
-        let tierColor = Color(hex: current?.colorHex ?? "999999")
-        let tierLabel = current?.displayName ?? "Newcomer"
+        // Until score_tiers loads, render a neutral skeleton ring so the
+        // first paint doesn't flash "Newcomer" grey before the real tier
+        // resolves. Once loaded, switch to the real tier color/label.
+        let tiersReady = scoreTiersLoaded && !scoreTiers.isEmpty
+        let tierColor = tiersReady ? Color(hex: current?.colorHex ?? "999999") : VP.border
+        let tierLabel = tiersReady ? (current?.displayName ?? "Newcomer") : ""
         let displayTitle = (user.displayName?.trimmingCharacters(in: .whitespaces).isEmpty == false
                             ? user.displayName
                             : user.username) ?? "Reader"
@@ -306,10 +407,12 @@ struct ProfileView: View {
                 ZStack {
                     Circle()
                         .stroke(VP.border, lineWidth: 3)
-                    Circle()
-                        .trim(from: 0, to: CGFloat(tierRingReveal ? progress : 0))
-                        .stroke(tierColor, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
+                    if tiersReady {
+                        Circle()
+                            .trim(from: 0, to: CGFloat(tierRingReveal ? progress : 0))
+                            .stroke(tierColor, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                            .rotationEffect(.degrees(-90))
+                    }
                     AvatarView(user: user, size: 56)
                 }
                 .frame(width: 68, height: 68)
@@ -324,14 +427,33 @@ struct ProfileView: View {
                         .foregroundColor(VP.text)
                         .lineLimit(1)
                     VerifiedBadgeView(user: user, size: 11)
-                    Text(tierLabel)
-                        .font(.system(size: 10, weight: .semibold))
-                        .tracking(0.3)
-                        .foregroundColor(tierColor)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(tierColor.opacity(0.1))
-                        .cornerRadius(4)
+                    // expert_title chip — surfaces alongside the existing
+                    // VerifiedBadgeView "Expert" pill when the user has a
+                    // declared title (e.g., "Cardiologist"). Mirrors the
+                    // web `roleBadges` row at `web/src/app/profile/page.tsx`.
+                    if user.isExpert == true,
+                       let title = user.expertTitle?.trimmingCharacters(in: .whitespaces),
+                       !title.isEmpty {
+                        Text(title)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(VP.text)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(VP.card)
+                            .overlay(RoundedRectangle(cornerRadius: 4).stroke(VP.border))
+                            .cornerRadius(4)
+                            .lineLimit(1)
+                    }
+                    if tiersReady {
+                        Text(tierLabel)
+                            .font(.system(size: 10, weight: .semibold))
+                            .tracking(0.3)
+                            .foregroundColor(tierColor)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(tierColor.opacity(0.1))
+                            .cornerRadius(4)
+                    }
                 }
 
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -1138,7 +1260,7 @@ struct ProfileView: View {
     // MARK: - Categories tab (preserves subcategory drilldown)
     private var categoriesTab: some View {
         VStack(spacing: 10) {
-            if !milestonesLoaded {
+            if !categoriesLoaded {
                 ProgressView().padding(.top, 40)
             } else if categories.isEmpty {
                 emptyState(
@@ -1331,18 +1453,36 @@ struct ProfileView: View {
             }
 
             VStack(alignment: .leading, spacing: 10) {
-                sectionTitle("Achievements")
+                HStack(alignment: .firstTextBaseline) {
+                    sectionTitle("Achievements")
+                    Spacer()
+                    if achievementsLoaded && !allAchievements.isEmpty {
+                        Text("\(earnedMap.count) of \(allAchievements.count) earned")
+                            .font(.caption)
+                            .foregroundColor(VP.dim)
+                    }
+                }
                 if !achievementsLoaded {
                     ProgressView().padding(.top, 8)
-                } else if userAchievements.isEmpty {
+                } else if allAchievements.isEmpty {
                     emptyState(
                         title: "No achievements yet",
                         description: "Complete a quiz or hit your first streak to start collecting badges."
                     )
                 } else {
+                    // Render earned first, then locked — same ordering
+                    // convention as the web milestones grid. Each tile
+                    // reflects its state: earned (filled, accent badge,
+                    // date) vs locked (dimmed silhouette, Locked badge).
+                    let earnedFirst = allAchievements.sorted { lhs, rhs in
+                        let l = earnedMap[lhs.id] != nil
+                        let r = earnedMap[rhs.id] != nil
+                        if l != r { return l && !r }
+                        return (lhs.name ?? "") < (rhs.name ?? "")
+                    }
                     LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
-                        ForEach(userAchievements) { ua in
-                            achievementCard(ua)
+                        ForEach(earnedFirst) { a in
+                            achievementCard(a, earnedAt: earnedMap[a.id])
                         }
                     }
                 }
@@ -1352,29 +1492,42 @@ struct ProfileView: View {
         .padding(.bottom, 8)
     }
 
-    private func achievementCard(_ ua: UserAchievement) -> some View {
-        let a = ua.achievements
+    /// Single card used for both earned and locked achievements. The
+    /// state is driven by `earnedAt == nil`: locked tiles dim to 0.55
+    /// opacity, use a `lock.fill` glyph and a neutral "Locked" badge;
+    /// earned tiles are at full opacity with the success "Earned" badge
+    /// and the unlocked-on date.
+    private func achievementCard(_ a: Achievement, earnedAt: Date?) -> some View {
+        let isEarned = earnedAt != nil
         return VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .top) {
-                Text(a?.name ?? "Achievement")
-                    .font(.system(.subheadline, design: .default, weight: .semibold))
-                    .foregroundColor(VP.text)
-                    .lineLimit(2)
+                HStack(spacing: 6) {
+                    Image(systemName: isEarned ? "rosette" : "lock.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(isEarned ? VP.success : VP.muted)
+                    Text(a.name ?? "Achievement")
+                        .font(.system(.subheadline, design: .default, weight: .semibold))
+                        .foregroundColor(VP.text)
+                        .lineLimit(2)
+                }
                 Spacer(minLength: 4)
-                Text("Earned")
+                Text(isEarned ? "Earned" : "Locked")
                     .font(.system(.caption2, design: .default, weight: .semibold))
-                    .foregroundColor(VP.success)
+                    .foregroundColor(isEarned ? VP.success : VP.dim)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .overlay(RoundedRectangle(cornerRadius: 4).stroke(VP.success, lineWidth: 1))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 4)
+                            .stroke(isEarned ? VP.success : VP.border, lineWidth: 1)
+                    )
             }
-            if let d = a?.description, !d.isEmpty {
+            if let d = a.description, !d.isEmpty {
                 Text(d)
                     .font(.caption)
                     .foregroundColor(VP.soft)
                     .lineLimit(3)
             }
-            if let u = ua.earnedAt {
+            if let u = earnedAt {
                 Text("Unlocked \(Self.achFormatter.string(from: u))")
                     .font(.caption2)
                     .foregroundColor(VP.dim)
@@ -1386,6 +1539,7 @@ struct ProfileView: View {
         .background(VP.card)
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border))
         .cornerRadius(10)
+        .opacity(isEarned ? 1 : 0.55)
     }
 
     private func tierProgressSubtitle(score: Int, next: ScoreTierRow?) -> String {
@@ -1473,6 +1627,10 @@ struct ProfileView: View {
                 .execute().value
             scoreTiers = rows
         } catch { Log.d("Load score_tiers error: \(error)") }
+        // Always set the loaded flag — even on failure we want the hero to
+        // exit the skeleton state and render a "Newcomer" fallback rather
+        // than spin forever if score_tiers ever 404s.
+        scoreTiersLoaded = true
     }
 
     // MARK: - Streak grid helpers
@@ -1509,9 +1667,15 @@ struct ProfileView: View {
             let cal = Calendar.current
             guard let since = cal.date(byAdding: .day, value: -30, to: cal.startOfDay(for: Date())) else { return }
             let iso = ISO8601DateFormatter().string(from: since)
+            // `.is("kid_profile_id", value: nil)` — every kids-app
+            // reading_log row carries the kid_profile_id, so without
+            // this filter the parent's own streak grid would also count
+            // their kid's reads. Same guard added on every query that
+            // joins user_id + a kids-eligible table.
             let rows: [Row] = try await client.from("reading_log")
                 .select("created_at")
                 .eq("user_id", value: userId)
+                .is("kid_profile_id", value: nil)
                 .gte("created_at", value: iso)
                 .execute().value
             var days: Set<Date> = []
@@ -1532,12 +1696,12 @@ struct ProfileView: View {
         // re-fetches the users row so follower/score/streak counts update
         // inline without waiting for the next auth tick.
         async let a: Void = loadActivity(userId: uid)
-        async let m: Void = loadMilestones(userId: uid)
+        async let c: Void = loadCategories(userId: uid)
         async let ach: Void = loadAchievements(userId: uid)
         async let t: Void = loadScoreTiers()
         async let s: Void = loadStreak(userId: uid)
         async let u: Void = auth.loadUser(id: uid)
-        _ = await (a, m, ach, t, s, u)
+        _ = await (a, c, ach, t, s, u)
     }
 
     // MARK: - Tab-triggered data loading
@@ -1545,8 +1709,7 @@ struct ProfileView: View {
         guard let userId = auth.currentUser?.id else { return }
         switch tab {
         case .activity where !activityLoaded: Task { await loadActivity(userId: userId) }
-        case .categories where !milestonesLoaded: Task { await loadMilestones(userId: userId) }
-        case .milestones where !milestonesLoaded: Task { await loadMilestones(userId: userId) }
+        case .categories where !categoriesLoaded: Task { await loadCategories(userId: userId) }
         default: break
         }
         if tab == .milestones && !achievementsLoaded {
@@ -1556,13 +1719,20 @@ struct ProfileView: View {
 
     private func loadActivity(userId: String) async {
         do {
+            // reading_log + quiz_attempts carry kid_profile_id when the
+            // row originated in the kids app — filter out so the parent's
+            // adult Activity feed never surfaces their kid's reads or
+            // quizzes. (comments + bookmarks have no kid_profile_id
+            // column; kids don't comment or bookmark.)
             async let r: [ReadingLogItem] = client.from("reading_log")
                 .select("id, read_at, completed, articles(title, slug)")
                 .eq("user_id", value: userId)
+                .is("kid_profile_id", value: nil)
                 .order("created_at", ascending: false).limit(50).execute().value
             async let q: [QuizAttempt] = client.from("quiz_attempts")
                 .select("id, article_id, attempt_number, is_correct, points_earned, created_at, articles(title, slug)")
                 .eq("user_id", value: userId)
+                .is("kid_profile_id", value: nil)
                 .order("created_at", ascending: false).limit(200).execute().value
             async let c: [VPComment] = client.from("comments")
                 .select("id, body, created_at, articles(title, slug)")
@@ -1622,24 +1792,43 @@ struct ProfileView: View {
         activityLoaded = true
     }
 
-    private func loadMilestones(userId: String) async {
+    /// Loads the Categories tab data — top-level categories, their
+    /// subcategories (`parent_id IS NOT NULL` rows from the same self-
+    /// referential `categories` table), and the per-category/per-sub
+    /// tally of reads/quizzes/comments/upvotes that drives the progress
+    /// bars and lock states. Renamed from `loadMilestones` (the
+    /// achievements grid is loaded separately by `loadAchievements`).
+    private func loadCategories(userId: String) async {
         do {
-            async let cats: [VPCategory] = client.from("categories")
+            // Pull every active non-kids category in one round trip,
+            // then split locally into top-level (parent_id == nil) and
+            // sub (parent_id != nil) instead of issuing two queries.
+            async let allCats: [VPCategory] = client.from("categories")
                 .select()
                 .eq("is_kids_safe", value: false).eq("is_active", value: true)
                 .order("sort_order").execute().value
             async let reads: [ReadingLogItem] = client.from("reading_log")
                 .select("article_id, articles(category_id, subcategory_id)")
-                .eq("user_id", value: userId).execute().value
+                .eq("user_id", value: userId)
+                .is("kid_profile_id", value: nil)
+                .execute().value
             async let qs: [QuizAttempt] = client.from("quiz_attempts")
                 .select("article_id, articles(category_id, subcategory_id)")
-                .eq("user_id", value: userId).execute().value
+                .eq("user_id", value: userId)
+                .is("kid_profile_id", value: nil)
+                .execute().value
             async let cs: [VPComment] = client.from("comments")
                 .select("article_id, articles(category_id, subcategory_id)")
                 .eq("user_id", value: userId).execute().value
 
-            categories = try await cats
-            subcategories = []
+            let combined = try await allCats
+            categories = combined.filter { $0.categoryId == nil }
+            // Subcategories share the same VPCategory shape; cast into
+            // VPSubcategory so the existing render path (which expects
+            // VPSubcategory) keeps working unchanged.
+            subcategories = combined
+                .filter { $0.categoryId != nil }
+                .map { VPSubcategory(id: $0.id, categoryId: $0.categoryId, name: $0.name, slug: $0.slug) }
 
             var cat: [String: CategoryStats] = [:]
             var sub: [String: CategoryStats] = [:]
@@ -1674,17 +1863,46 @@ struct ProfileView: View {
             }
             catUpvotes = catU
             subUpvotes = subU
-        } catch { Log.d("Load milestones error: \(error)") }
-        milestonesLoaded = true
+        } catch { Log.d("Load categories error: \(error)") }
+        categoriesLoaded = true
     }
 
     private func loadAchievements(userId: String) async {
         do {
-            let data: [UserAchievement] = try await client.from("user_achievements")
+            // Web parity (`web/src/app/profile/page.tsx` loadMilestones):
+            // pull every public achievement definition AND the user's
+            // earned rows in parallel, then render earned + locked in
+            // the same grid. Without the locked half the user has no
+            // sense of what's even possible to earn.
+            //
+            // `.is("kid_profile_id", value: nil)` keeps the parent's
+            // adult achievement list separate from any kid-earned rows
+            // tied to the same user_id (legacy data).
+            async let mineRows: [UserAchievement] = client.from("user_achievements")
                 .select("id, user_id, achievement_id, earned_at, achievements(id, name, category, description)")
                 .eq("user_id", value: userId)
+                .is("kid_profile_id", value: nil)
                 .order("earned_at", ascending: false).execute().value
-            userAchievements = data
+            async let allRows: [Achievement] = client.from("achievements")
+                .select("id, name, category, description")
+                .eq("is_active", value: true)
+                .eq("is_secret", value: false)
+                .order("category")
+                .order("sort_order")
+                .execute().value
+
+            let mine = try await mineRows
+            let all = try await allRows
+            userAchievements = mine
+            allAchievements = all
+
+            var map: [String: Date] = [:]
+            for ua in mine {
+                if let aid = ua.achievementId, let ts = ua.earnedAt {
+                    map[aid] = ts
+                }
+            }
+            earnedMap = map
         } catch { Log.d("Load achievements error: \(error)") }
         achievementsLoaded = true
     }

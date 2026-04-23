@@ -10,7 +10,15 @@ struct VPUser: Codable, Identifiable {
     /// AuthViewModel.loadUser populates this via `select("*, plans(tier)")`.
     var plans: PlanRef?
     var isExpert: Bool?
+    var expertTitle: String?
     var isVerifiedPublicFigure: Bool?
+    /// Mirrors `users.email_verified` — gates the full Profile hero on iOS
+    /// the same way the web does at `web/src/app/profile/page.tsx`.
+    var emailVerified: Bool?
+    /// Mirrors `users.frozen_at` — when set, the Verity Score has stopped
+    /// tracking (cancelled paid plan, grace expired). Profile shows a red
+    /// banner with a Resubscribe CTA, mirroring the web inline notice.
+    var frozenAt: Date?
     var verityScore: Int?
     var articlesReadCount: Int?
     var quizzesCompletedCount: Int?
@@ -19,6 +27,11 @@ struct VPUser: Codable, Identifiable {
     var commentCount: Int?
     var followersCount: Int?
     var followingCount: Int?
+    /// Mirrors `users.show_activity`. When the target has flipped this off,
+    /// the canonical 5-stat row (Articles read / Quizzes passed / Comments /
+    /// Followers / Following) is hidden on every public surface. Defaults
+    /// to `true` per the DB column default.
+    var showActivity: Bool?
     var displayName: String?
     var bio: String?
     var avatarColor: String?
@@ -56,7 +69,10 @@ struct VPUser: Codable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case id, username, email, plans, bio, metadata
         case isExpert = "is_expert"
+        case expertTitle = "expert_title"
         case isVerifiedPublicFigure = "is_verified_public_figure"
+        case emailVerified = "email_verified"
+        case frozenAt = "frozen_at"
         case verityScore = "verity_score"
         case articlesReadCount = "articles_read_count"
         case quizzesCompletedCount = "quizzes_completed_count"
@@ -65,6 +81,7 @@ struct VPUser: Codable, Identifiable {
         case commentCount = "comment_count"
         case followersCount = "followers_count"
         case followingCount = "following_count"
+        case showActivity = "show_activity"
         case displayName = "display_name"
         case avatarColor = "avatar_color"
         case createdAt = "created_at"

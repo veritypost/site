@@ -51,6 +51,13 @@ final class AuthViewModel: ObservableObject {
             Task { [weak self] in
                 guard let self, let uid = self.currentUser?.id else { return }
                 await self.loadUser(id: uid)
+                // Permissions are derived from plan_id server-side — without
+                // dropping the cached set after a tier change, the UI keeps
+                // showing free-tier gates even though the user just paid.
+                // Mirrors the web `refreshAllPermissions()` call from
+                // SubscriptionContext post-purchase.
+                await PermissionService.shared.invalidate()
+                await PermissionService.shared.loadAll()
             }
         }
     }
