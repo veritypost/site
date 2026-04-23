@@ -273,7 +273,7 @@ struct ProfileView: View {
         }
     }
 
-    // MARK: - Hero card (large tier ring + centered score + tier pill + progress)
+    // MARK: - Hero card (compact horizontal: avatar + ring left, name/score/progress right)
     @ViewBuilder
     private func heroCard(_ user: VPUser) -> some View {
         let score = user.verityScore ?? 0
@@ -292,115 +292,77 @@ struct ProfileView: View {
                             : user.username) ?? "Reader"
         let deltaToNext = max(0, (next?.minScore ?? score) - score)
 
-        VStack(spacing: 16) {
-            // Centered tier ring with avatar — large, gradient-tinted
+        HStack(alignment: .center, spacing: 14) {
+            // Compact avatar with single-color tier ring (no gradient, no double rings)
             ZStack {
                 Circle()
-                    .stroke(VP.border, lineWidth: 6)
+                    .stroke(VP.border, lineWidth: 3)
                 Circle()
                     .trim(from: 0, to: CGFloat(tierRingReveal ? progress : 0))
-                    .stroke(
-                        AngularGradient(
-                            gradient: Gradient(colors: [
-                                tierColor.opacity(0.55),
-                                tierColor,
-                                tierColor.opacity(0.85)
-                            ]),
-                            center: .center,
-                            startAngle: .degrees(-90),
-                            endAngle: .degrees(270)
-                        ),
-                        style: StrokeStyle(lineWidth: 6, lineCap: .round)
-                    )
+                    .stroke(tierColor, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                     .rotationEffect(.degrees(-90))
-                AvatarView(user: user, size: 96)
+                AvatarView(user: user, size: 56)
             }
-            .frame(width: 120, height: 120)
+            .frame(width: 68, height: 68)
 
-            // Name + verified + tier pill
-            VStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Text(displayTitle)
-                        .font(.system(.title2, design: .default, weight: .bold))
+                        .font(.system(size: 17, weight: .semibold))
                         .foregroundColor(VP.text)
                         .lineLimit(1)
                     VerifiedBadgeView(user: user, size: 11)
+                    Text(tierLabel)
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(0.3)
+                        .foregroundColor(tierColor)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(tierColor.opacity(0.1))
+                        .cornerRadius(4)
                 }
-                if let uname = user.username, !uname.isEmpty,
-                   user.displayName?.trimmingCharacters(in: .whitespaces).isEmpty == false {
-                    Text("@\(uname)")
-                        .font(.caption)
+
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(score.formatted())
+                        .font(.system(size: 22, weight: .heavy))
+                        .tracking(-0.5)
+                        .foregroundColor(VP.text)
+                        .contentTransition(.numericText())
+                    Text("Verity score")
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(VP.dim)
+                    Spacer()
+                    if next != nil {
+                        Text("\(deltaToNext.formatted()) to \(next!.displayName)")
+                            .font(.system(size: 11))
+                            .foregroundColor(VP.dim)
+                            .lineLimit(1)
+                    }
                 }
-                Text(tierLabel.uppercased())
-                    .font(.system(.caption2, design: .default, weight: .bold))
-                    .tracking(1.2)
-                    .foregroundColor(tierColor)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 99)
-                            .stroke(tierColor, lineWidth: 1)
-                    )
-            }
 
-            // Big score number
-            VStack(spacing: 2) {
-                Text(score.formatted())
-                    .font(.system(size: 44, weight: .heavy, design: .default))
-                    .tracking(-1)
-                    .foregroundColor(VP.text)
-                    .contentTransition(.numericText())
-                Text("Verity score")
-                    .font(.system(.caption2, design: .default, weight: .semibold))
-                    .tracking(0.8)
-                    .foregroundColor(VP.dim)
-            }
-
-            // Progress bar + next tier delta
-            if let next = next {
-                VStack(spacing: 6) {
+                if next != nil {
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
-                            RoundedRectangle(cornerRadius: 4)
+                            RoundedRectangle(cornerRadius: 3)
                                 .fill(VP.border)
-                                .frame(height: 8)
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(
-                                    LinearGradient(
-                                        colors: [tierColor.opacity(0.7), tierColor],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                                .frame(width: geo.size.width * CGFloat(tierRingReveal ? progress : 0), height: 8)
+                                .frame(height: 4)
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(tierColor)
+                                .frame(width: geo.size.width * CGFloat(tierRingReveal ? progress : 0), height: 4)
                         }
                     }
-                    .frame(height: 8)
-                    HStack {
-                        Text("\(deltaToNext.formatted()) to \(next.displayName)")
-                            .font(.caption)
-                            .foregroundColor(VP.dim)
-                        Spacer()
-                        Text("\(Int(progress * 100))%")
-                            .font(.system(.caption, design: .default, weight: .semibold))
-                            .foregroundColor(tierColor)
-                    }
+                    .frame(height: 4)
                 }
-            } else {
-                Text("Top tier reached")
-                    .font(.system(.caption, design: .default, weight: .semibold))
-                    .foregroundColor(tierColor)
             }
         }
+        .padding(14)
         .frame(maxWidth: .infinity)
-        .padding(20)
         .background(VP.card)
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(VP.border))
-        .cornerRadius(16)
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(VP.border))
+        .cornerRadius(12)
         .padding(.horizontal, 16)
-        .padding(.top, 16)
-        .padding(.bottom, 12)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
     }
 
     // MARK: - Streak strip (30-day heatmap grid)
