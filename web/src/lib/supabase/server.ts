@@ -48,7 +48,19 @@ export function createClient(): SupabaseClient<Database> {
   );
 }
 
+// L7: a JWT is three base64url segments separated by dots. Reject any bearer
+// that doesn't match the shape before handing it to PostgREST — a malformed
+// string passes the function today and first explodes at the first query,
+// which surfaces as an opaque "invalid JWT" error deep in a handler. This
+// guard is shape-only (no signature verification — that still happens in
+// PostgREST against the SUPABASE_JWT_SECRET); the win is turning a silent
+// mid-call failure into an early, localizable throw.
+const JWT_SHAPE_RX = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
+
 export function createClientFromToken(token: string): SupabaseClient<Database> {
+  if (typeof token !== 'string' || !JWT_SHAPE_RX.test(token)) {
+    throw new Error('createClientFromToken: bearer is not a well-formed JWT');
+  }
   return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL as string,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string,
