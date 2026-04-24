@@ -1,7 +1,7 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified kids 2026-04-18
 import { NextResponse } from 'next/server';
-import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { createClient, createEphemeralClient, createServiceClient } from '@/lib/supabase/server';
 import { requirePermission } from '@/lib/auth';
 import { assertKidOwnership } from '@/lib/kids';
 import { checkRateLimit } from '@/lib/rateLimit';
@@ -46,13 +46,32 @@ export async function POST(request) {
       return NextResponse.json({ error: 'password is required' }, { status: 400 });
     }
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({
+    // Verify parent password via the ephemeral client so the parent's
+    // session cookie is not rotated on every probe (DA-092 / Option A
+    // item 6 sibling pattern). Also feed the 5-strike account-lockout
+    // counter on failure via record_failed_login_by_email — failed
+    // PIN-reset password probes count against login lockout the same
+    // way /api/auth/login-failed does.
+    const ephemeral = createEphemeralClient();
+    const { data: probe, error: signInError } = await ephemeral.auth.signInWithPassword({
       email: user.email,
       password,
     });
-
-    if (signInError) {
+    if (signInError || !probe?.user) {
+      try {
+        await svc.rpc('record_failed_login_by_email', { p_email: user.email });
+      } catch (rpcErr) {
+        console.error(
+          '[kids.reset-pin] record_failed_login_by_email failed:',
+          rpcErr?.message || rpcErr
+        );
+      }
       return NextResponse.json({ error: 'Incorrect password' }, { status: 401 });
+    }
+    try {
+      await ephemeral.auth.signOut();
+    } catch {
+      /* best-effort */
     }
 
     await assertKidOwnership(kid_profile_id, { client: supabase, userId: user.id });

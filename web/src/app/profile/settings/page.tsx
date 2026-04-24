@@ -2220,13 +2220,24 @@ function PasswordCard({
   const handleSubmit = async () => {
     if (!canSubmit) return;
     setBusy(true);
-    const { error: signErr } = await supabase.auth.signInWithPassword({
-      email: authEmail,
-      password: current,
+    // Verify current password via server endpoint that uses an ephemeral
+    // Supabase client. Replaces a direct supabase.auth.signInWithPassword
+    // call here, which (a) bypassed the per-user/per-email rate-limit gate
+    // login uses, (b) rotated the caller's session cookie on every probe,
+    // (c) triggered onAuthStateChange('SIGNED_IN') on every other listener.
+    // See /api/auth/verify-password for the new defense layers.
+    const verifyRes = await fetch('/api/auth/verify-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: current }),
     });
-    if (signErr) {
+    if (!verifyRes.ok) {
       setBusy(false);
-      pushToast({ message: 'Current password is incorrect.', variant: 'danger' });
+      if (verifyRes.status === 429) {
+        pushToast({ message: 'Too many attempts. Try again later.', variant: 'danger' });
+      } else {
+        pushToast({ message: 'Current password is incorrect.', variant: 'danger' });
+      }
       return;
     }
     const { error: upErr } = await supabase.auth.updateUser({ password: next });
