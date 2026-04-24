@@ -22,6 +22,16 @@ struct KidQuizResult {
     let writeFailures: Int
 }
 
+// C14 — server-authoritative verdict from public.get_kid_quiz_verdict.
+// Kept as a flat struct separate from the decoded payload so the RPC's
+// snake_case keys don't leak into the rest of the app.
+private struct KidQuizServerVerdict {
+    let isPassed: Bool
+    let correct: Int
+    let total: Int
+    let thresholdPct: Int
+}
+
 struct KidQuizEngineView: View {
     let article: KidArticle
     let categoryColor: Color
@@ -47,6 +57,16 @@ struct KidQuizEngineView: View {
     // primary + retry. Surfaced via KidQuizResult so celebration scenes can
     // avoid celebrating a streak bump that didn't persist.
     @State private var writeFailures: Int = 0
+    // C14 — handles for in-flight per-question writes. We await all of
+    // them before fetching the server verdict so the RPC doesn't count
+    // a quiz with pending writes still unlanded.
+    @State private var pendingWrites: [Task<Void, Never>] = []
+    // C14 — server-computed verdict from get_kid_quiz_verdict RPC.
+    // Replaces local `correctCount >= ceil(total * 0.6)`. `nil` while
+    // the verdict is being fetched or if the fetch failed; local
+    // computation is used as a safety fallback only.
+    @State private var serverVerdict: KidQuizServerVerdict? = nil
+    @State private var verdictPending: Bool = false
     // Apple Kids Category review — the quiz must refuse to load if the
     // article isn't kids-safe, even though navigation through the rest of
     // the kids app should never produce a non-safe article. Defense in
@@ -281,7 +301,10 @@ struct KidQuizEngineView: View {
     private func revealAnswer(q: QuizQuestion, chosen: QuizOption) {
         withAnimation(K.springSnap) { revealed = true }
         if chosen.isCorrect { correctCount += 1 }
-        Task { await writeAttempt(q: q, chosen: chosen) }
+        // C14 — retain the task handle so we can await pending writes
+        // before asking the server for a verdict.
+        let t = Task { await writeAttempt(q: q, chosen: chosen) }
+        pendingWrites.append(t)
     }
 
     private func next() {
@@ -291,6 +314,58 @@ struct KidQuizEngineView: View {
             index += 1
         } else {
             withAnimation { showResult = true }
+            // C14 — fetch the server-authoritative verdict once results
+            // view is on screen. Fire-and-forget; loading state is
+            // driven off verdictPending.
+            Task { await fetchServerVerdict() }
+        }
+    }
+
+    private func fetchServerVerdict() async {
+        guard let kidId = auth.kid?.id else { return }
+        // Let every pending write settle so the RPC counts every
+        // attempt the kid just made.
+        for t in pendingWrites {
+            _ = await t.value
+        }
+        await MainActor.run { pendingWrites.removeAll() }
+        await MainActor.run { verdictPending = true }
+        do {
+            struct VerdictPayload: Decodable {
+                let is_passed: Bool
+                let correct: Int
+                let total: Int
+                let threshold_pct: Int
+            }
+            struct Params: Encodable {
+                let p_kid_profile_id: String
+                let p_article_id: String
+            }
+            let verdict: VerdictPayload = try await client
+                .rpc("get_kid_quiz_verdict", params: Params(
+                    p_kid_profile_id: kidId.uuidString,
+                    p_article_id: article.id.uuidString
+                ))
+                .execute()
+                .value
+            await MainActor.run {
+                self.serverVerdict = KidQuizServerVerdict(
+                    isPassed: verdict.is_passed,
+                    correct: verdict.correct,
+                    total: verdict.total,
+                    thresholdPct: verdict.threshold_pct
+                )
+                self.verdictPending = false
+            }
+        } catch {
+            print("[KidQuizEngineView] get_kid_quiz_verdict failed:", error)
+            // Fall through to local computation if the RPC fails —
+            // don't block the kid on a transient network issue, but
+            // bump writeFailures so scenes soften celebration copy.
+            await MainActor.run {
+                self.writeFailures += 1
+                self.verdictPending = false
+            }
         }
     }
 
@@ -333,13 +408,27 @@ struct KidQuizEngineView: View {
     // MARK: Result
 
     private var currentResult: KidQuizResult {
+        // C14 — prefer server verdict when we have it. Falls back to
+        // local computation only if the RPC hasn't returned (e.g.
+        // offline) so the kid never sees an indefinite spinner.
         let total = questions.count
-        let passed = correctCount >= max(1, Int(ceil(Double(total) * 0.6)))
+        let passed: Bool
+        let shownCorrect: Int
+        if let v = serverVerdict {
+            passed = v.isPassed
+            shownCorrect = v.correct
+        } else {
+            // Fallback matches the pre-C14 local computation (60%
+            // threshold, ceiling). Only used if the server verdict
+            // failed to load.
+            passed = correctCount >= max(1, Int(ceil(Double(total) * 0.6)))
+            shownCorrect = correctCount
+        }
         // Reader-side reading_log double-fail counts as one extra write failure.
         let totalFailures = writeFailures + (readingLogFailed ? 1 : 0)
         return KidQuizResult(
             passed: passed,
-            correctCount: correctCount,
+            correctCount: shownCorrect,
             total: total,
             writeFailures: totalFailures
         )
