@@ -14,7 +14,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { ADMIN_ROLES } from '@/lib/roles';
+import { hasPermission, refreshAllPermissions } from '@/lib/permissions';
 import DestructiveActionConfirm from '@/components/admin/DestructiveActionConfirm';
 
 import Page, { PageHeader } from '@/components/admin/Page';
@@ -130,13 +130,12 @@ export default function AdminPermissionsPage() {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/'); return; }
-      const { data: userRoles } = await supabase
-        .from('user_roles')
-        .select('roles(name)')
-        .eq('user_id', user.id);
-      const names = ((userRoles || []) as Array<{ roles: { name: string } | null }>)
-        .map((r) => r.roles?.name).filter(Boolean) as string[];
-      if (!names.some((n) => ADMIN_ROLES.has(n))) {
+      // AD4: gate on the page's API-backing perm, not ADMIN_ROLES. Admins
+      // without `admin.permissions.catalog.view` previously rendered the full
+      // tab shell then 403'd on every write. Align page entry with the
+      // catalog-view permission so denial is a redirect, not a dead surface.
+      await refreshAllPermissions();
+      if (!hasPermission('admin.permissions.catalog.view')) {
         router.push('/');
         return;
       }

@@ -15,7 +15,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { ADMIN_ROLES } from '@/lib/roles';
+import { hasPermission, refreshAllPermissions } from '@/lib/permissions';
 import DestructiveActionConfirm from '@/components/admin/DestructiveActionConfirm';
 
 import Page, { PageHeader } from '@/components/admin/Page';
@@ -131,16 +131,21 @@ export default function UsersAdmin() {
       if (authError || !user) { router.push('/login'); return; }
 
       const { data: profile } = await supabase.from('users').select('id').eq('id', user.id).single();
+      // AD4: gate on the page's API-backing perm, not ADMIN_ROLES. Admins without
+      // `admin.users.list.view` previously rendered the page then 403'd on first
+      // row click. Align page entry with the list-view permission so denial is
+      // surfaced immediately via redirect.
+      await refreshAllPermissions();
+      if (!profile || !hasPermission('admin.users.list.view')) {
+        router.push('/');
+        return;
+      }
       const { data: userRoles } = await supabase
         .from('user_roles')
         .select('roles(name)')
         .eq('user_id', user.id);
       const roleNames = ((userRoles || []) as Array<{ roles: { name: string } | null }>)
         .map((r) => r.roles?.name).filter(Boolean) as string[];
-      if (!profile || !roleNames.some((r) => ADMIN_ROLES.has(r))) {
-        router.push('/');
-        return;
-      }
       setCurrentUserId(user.id);
       // T-103: hierarchy comes from DB. Load it before computing `highest`
       // so the reverse-scan finds the actor's top role against the live
