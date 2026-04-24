@@ -3427,19 +3427,29 @@ function DataExportCard({
 
   const requestExport = async () => {
     setBusy('export');
-    const payload: TableInsert<'data_requests'> = {
-      user_id: userId,
-      type: 'export',
-      status: 'pending',
-    };
-    const { error } = await supabase.from('data_requests').insert(payload);
-    setBusy('');
-    if (error) {
-      pushToast({ message: error.message, variant: 'danger' });
-      return;
+    // C4 — route through the API so the request is gated by
+    // settings.data.request_export, rate-limited (1/day), and
+    // deduped against any existing pending/processing export. The
+    // old direct `.insert()` relied solely on RLS + stale client
+    // perm cache.
+    try {
+      const res = await fetch('/api/account/data-export', { method: 'POST' });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        deduped?: boolean;
+      };
+      if (!res.ok) {
+        pushToast({ message: data?.error || 'Could not queue export.', variant: 'danger' });
+        return;
+      }
+      pushToast({
+        message: data?.deduped ? 'Export already in progress.' : 'Data export requested.',
+        variant: 'success',
+      });
+      await load();
+    } finally {
+      setBusy('');
     }
-    pushToast({ message: 'Data export requested.', variant: 'success' });
-    await load();
   };
 
   // M8: the second deletion entry point (inline here) conflicted with the
