@@ -64,7 +64,36 @@ export async function POST(request) {
       // Route all three writes through service-role.
       const service = createServiceClient();
 
-      await service.from('users').upsert(
+      // C12 — atomic rollback helper. Any post-auth.signUp failure must
+      // clean up BOTH public.users (if it landed) AND auth.users. The
+      // schema comment in 105_remove_superadmin_role.sql documents the
+      // required deletion order: user_roles → public.users → auth.users.
+      // Wrapped in try/catch per step so a partial rollback still logs
+      // every piece and returns a consistent user-facing error. Without
+      // this, the old code only deleted auth.users on role failure and
+      // left the public.users row orphaned; a retry with the same email
+      // then collided on users.email UNIQUE and the user was effectively
+      // locked out.
+      const rollback = async (reason) => {
+        console.error('[auth.signup] rolling back', { userId, reason });
+        try {
+          await service.from('user_roles').delete().eq('user_id', userId);
+        } catch (e) {
+          console.error('[auth.signup] rollback user_roles delete failed', e);
+        }
+        try {
+          await service.from('users').delete().eq('id', userId);
+        } catch (e) {
+          console.error('[auth.signup] rollback public.users delete failed', e);
+        }
+        try {
+          await service.auth.admin.deleteUser(userId);
+        } catch (e) {
+          console.error('[auth.signup] rollback deleteUser failed', e);
+        }
+      };
+
+      const { error: usersUpsertErr } = await service.from('users').upsert(
         {
           id: userId,
           email,
@@ -79,6 +108,10 @@ export async function POST(request) {
         },
         { onConflict: 'id' }
       );
+      if (usersUpsertErr) {
+        await rollback(`users upsert failed: ${usersUpsertErr.message || usersUpsertErr}`);
+        return NextResponse.json({ error: 'Signup failed. Please try again.' }, { status: 500 });
+      }
 
       // The `handle_new_auth_user` trigger on auth.users INSERT already
       // upserts the 'user' role idempotently (ON CONFLICT DO NOTHING) —
@@ -114,15 +147,11 @@ export async function POST(request) {
         .select('*', { count: 'exact', head: true })
         .eq('user_id', userId);
       if (!roleCount) {
-        console.error('[auth.signup] user has no role after signup', { userId });
-        // Roll back the auth row so the user can retry cleanly. The
-        // users-table upsert above stays (its data is harmless without
-        // an auth row) and the cron reconciler will eventually sweep it.
-        try {
-          await service.auth.admin.deleteUser(userId);
-        } catch (rollbackErr) {
-          console.error('[auth.signup] rollback deleteUser failed', rollbackErr);
-        }
+        // C12 — roll back ALL three rows (user_roles, public.users,
+        // auth.users) instead of just auth.users. Prior code left an
+        // orphaned public.users row with a UNIQUE(email) constraint
+        // that blocked the user's retry.
+        await rollback('no role assigned after signup');
         return NextResponse.json({ error: 'Signup failed. Please try again.' }, { status: 500 });
       }
 
