@@ -36,15 +36,23 @@ export async function POST(request) {
   });
   if (error) {
     const msg = error.message || '';
-    const status = msg.includes('paid plan')
-      ? 403
-      : msg.includes('muted') || msg.includes('banned')
-        ? 403
-        : msg.includes('rate limit')
-          ? 429
-          : msg.includes('participant')
-            ? 403
-            : 400;
+    // Stable `[CODE]` prefix from schema/150 post_message RPC. Substring
+    // fallback stays for the pre-migration window — delete it once 150
+    // is applied everywhere. The prefix is server-internal; it never
+    // ships to the user (we send `userMsg` from the lookup).
+    const codeMatch = msg.match(/^\[([A-Z_]+)\]/);
+    const code = codeMatch?.[1] || null;
+    let status;
+    if (code === 'DM_PAID_PLAN') status = 403;
+    else if (code === 'DM_MUTED') status = 403;
+    else if (code === 'NOT_PARTICIPANT') status = 403;
+    else if (code === 'DM_RATE_LIMIT') status = 429;
+    else if (code === 'DM_EMPTY' || code === 'DM_TOO_LONG') status = 400;
+    else if (msg.includes('paid plan')) status = 403;
+    else if (msg.includes('muted') || msg.includes('banned')) status = 403;
+    else if (msg.includes('rate limit')) status = 429;
+    else if (msg.includes('participant')) status = 403;
+    else status = 400;
     const userMsg =
       status === 429
         ? 'Too many messages. Please slow down.'

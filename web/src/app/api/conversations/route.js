@@ -38,21 +38,29 @@ export async function POST(request) {
   });
   if (error) {
     const msg = error.message || '';
-    const status = msg.includes('paid plan')
-      ? 403
-      : msg.includes('muted') || msg.includes('banned')
-        ? 403
-        : msg.includes('not found')
-          ? 404
-          : msg.includes('yourself')
-            ? 400
-            : 400;
+    // Stable `[CODE]` prefix from schema/150 start_conversation RPC.
+    // Substring fallback stays for the pre-migration window — delete
+    // once 150 is applied. Prefix is server-internal (never shipped).
+    const codeMatch = msg.match(/^\[([A-Z_]+)\]/);
+    const code = codeMatch?.[1] || null;
+    let status;
+    if (code === 'DM_PAID_PLAN') status = 403;
+    else if (code === 'DM_MUTED') status = 403;
+    else if (code === 'USER_NOT_FOUND') status = 404;
+    else if (code === 'SELF_CONV') status = 400;
+    else if (code === 'DM_MISSING_IDS') status = 400;
+    else if (msg.includes('paid plan')) status = 403;
+    else if (msg.includes('muted') || msg.includes('banned')) status = 403;
+    else if (msg.includes('not found')) status = 404;
+    else if (msg.includes('yourself')) status = 400;
+    else status = 400;
+    const isSelf = code === 'SELF_CONV' || msg.includes('yourself');
     const userMsg =
       status === 404
         ? 'Recipient not found.'
         : status === 403
           ? 'You cannot start a conversation with this user.'
-          : msg.includes('yourself')
+          : isSelf
             ? 'You cannot message yourself.'
             : 'Could not start conversation';
     console.error('[conversations.post]', error);
