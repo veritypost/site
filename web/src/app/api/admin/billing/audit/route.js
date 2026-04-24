@@ -1,7 +1,7 @@
 // @migrated-to-permissions 2026-04-19
 // @feature-verified admin_api 2026-04-19
 import { NextResponse } from 'next/server';
-import { requirePermission } from '@/lib/auth';
+import { requireAuth, hasPermissionServer } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { recordAdminAction } from '@/lib/adminMutation';
@@ -14,19 +14,33 @@ import { recordAdminAction } from '@/lib/adminMutation';
 // forget pattern used by the billing admin UI.
 //
 // Body: { action: string, target_type: string, target_id: string, metadata?: object }
-// Auth: caller must hold admin.billing.audit (falls back to admin.billing.view).
+// Auth: caller must hold at least one billing-write permission
+// (override_plan / cancel / freeze / refund). The prior gate was
+// admin.billing.view (READ perm), which let anyone who could look at
+// billing plant arbitrary audit rows for arbitrary targets.
 export async function POST(request) {
   let actor;
   try {
-    actor = await requirePermission('admin.billing.view');
+    actor = await requireAuth();
   } catch (err) {
     if (err.status) {
-      console.error('[admin.billing.audit.permission]', err?.message || err);
+      console.error('[admin.billing.audit.auth]', err?.message || err);
       return NextResponse.json(
         { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
         { status: err.status }
       );
     }
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const WRITE_PERMS = [
+    'admin.billing.override_plan',
+    'admin.billing.cancel',
+    'admin.billing.freeze',
+    'admin.billing.refund',
+  ];
+  const perms = await Promise.all(WRITE_PERMS.map((k) => hasPermissionServer(k)));
+  if (!perms.some(Boolean)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
