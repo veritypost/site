@@ -57,9 +57,11 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Lookup failed' }, { status: 500 });
   }
 
-  if (!email) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
-
-  return NextResponse.json({ email });
+  // Always 200 with a uniform shape — the rate limit alone didn't
+  // close enumeration, since a 404 vs 200 status tells the caller
+  // whether a username exists (14.4k probes/day at 10/min/IP is
+  // plenty of daylight). Callers combine this response with the
+  // subsequent signIn's generic "Invalid credentials" to avoid
+  // differential signals at either layer.
+  return NextResponse.json({ email: email || null });
 }
