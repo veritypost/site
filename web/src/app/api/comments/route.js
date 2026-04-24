@@ -43,9 +43,14 @@ export async function POST(request) {
     windowSec: 60,
   });
   if (rate.limited) {
+    // H22 — dynamic Retry-After based on the actual remaining window
+    // from checkRateLimit instead of always "60". If a user posts 9
+    // comments then waits 45s, the 10th shouldn't be told to wait a
+    // full minute more.
+    const retryAfter = String(rate.windowSec ?? 60);
     return NextResponse.json(
       { error: 'Posting too quickly. Wait a moment and try again.' },
-      { status: 429, headers: { 'Retry-After': '60' } }
+      { status: 429, headers: { 'Retry-After': retryAfter } }
     );
   }
 
