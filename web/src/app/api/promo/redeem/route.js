@@ -146,6 +146,16 @@ export async function POST(request) {
       .update({ plan_id: plan.id, plan_status: 'active' })
       .eq('id', user.id);
 
+    // B1 — perms cache invalidation. The four billing_* RPCs now bump
+    // internally (migration 148), but this route writes users.plan_id
+    // directly without going through them. Single route-level bump
+    // covers the only direct-write callsite. Best-effort; the plan
+    // change is already committed.
+    const { error: bumpErr } = await supabase.rpc('bump_user_perms_version', {
+      p_user_id: user.id,
+    });
+    if (bumpErr) console.error('[promo.redeem] perms_version bump failed:', bumpErr.message);
+
     // F-013 — audit every promo-driven plan upgrade for abuse review.
     await supabase.from('audit_log').insert({
       actor_id: user.id,
