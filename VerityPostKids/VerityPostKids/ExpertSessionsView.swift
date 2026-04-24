@@ -9,6 +9,13 @@ struct ExpertSessionsView: View {
     @State private var sessions: [KidExpertSession] = []
     @State private var loading: Bool = true
     @State private var loadError: String? = nil
+    // C16 — expert sessions surface adult-contact discovery (live + scheduled
+    // conversations with experts). Apple's Kids Category review requires a
+    // parental gate before any such discovery. Session-sticky: pass the gate
+    // once per app launch, then the tab works normally until next cold start.
+    // Matches the ProfileView Unpair gate behavior.
+    @State private var parentGatePassed: Bool = false
+    @State private var showParentGate: Bool = false
 
     private var client: SupabaseClient { SupabaseKidsClient.shared.client }
 
@@ -16,7 +23,9 @@ struct ExpertSessionsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 header
-                if loading && sessions.isEmpty {
+                if !parentGatePassed {
+                    parentGatePlaceholder
+                } else if loading && sessions.isEmpty {
                     ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
                 } else if sessions.isEmpty {
                     emptyState
@@ -27,7 +36,7 @@ struct ExpertSessionsView: View {
                         }
                     }
                 }
-                if let loadError {
+                if parentGatePassed, let loadError {
                     VStack(spacing: 8) {
                         Text(loadError)
                             .font(.scaledSystem(size: 12, design: .rounded))
@@ -57,7 +66,48 @@ struct ExpertSessionsView: View {
             .padding(.bottom, 40)
         }
         .background(K.bg.ignoresSafeArea())
-        .task { await load() }
+        // C16 — gate sessions fetch behind the parental check so a kid
+        // browsing the tab doesn't see any adult-contact content until a
+        // parent verifies. Gate also suppresses the data egress (network
+        // call) until gate passes.
+        .parentalGate(isPresented: $showParentGate) {
+            parentGatePassed = true
+            Task { await load() }
+        }
+    }
+
+    private var parentGatePlaceholder: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "person.2.badge.key")
+                .font(.scaledSystem(size: 40, weight: .bold))
+                .foregroundStyle(K.teal)
+            Text("Parent check needed")
+                .font(.scaledSystem(size: 18, weight: .black, design: .rounded))
+                .foregroundStyle(K.text)
+            Text("Expert sessions let you see and join live chats with grown-ups. A parent needs to unlock this.")
+                .font(.scaledSystem(size: 13, weight: .medium, design: .rounded))
+                .foregroundStyle(K.dim)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 12)
+            Button {
+                showParentGate = true
+            } label: {
+                Text("Ask a grown-up")
+                    .font(.scaledSystem(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .frame(minHeight: 44)
+                    .background(K.teal)
+                    .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 32)
+        .padding(.horizontal, 20)
+        .background(K.card)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private var header: some View {
