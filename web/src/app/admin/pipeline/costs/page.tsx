@@ -21,6 +21,7 @@ import PageSection from '@/components/admin/PageSection';
 import StatCard from '@/components/admin/StatCard';
 import Spinner from '@/components/admin/Spinner';
 import EmptyState from '@/components/admin/EmptyState';
+import { ToastProvider, useToast } from '@/components/admin/Toast';
 import { ADMIN_C, F, S } from '@/lib/adminPalette';
 
 // ---------------------------------------------------------------------------
@@ -115,6 +116,15 @@ function thirtyDayKeys(): string[] {
 // ---------------------------------------------------------------------------
 
 export default function PipelineCostsPage() {
+  return (
+    <ToastProvider>
+      <PipelineCostsPageInner />
+    </ToastProvider>
+  );
+}
+
+function PipelineCostsPageInner() {
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [todayUsd, setTodayUsd] = useState<number>(0);
@@ -162,17 +172,24 @@ export default function PipelineCostsPage() {
 
       if (cancelled) return;
 
+      // AD6: keep the inline banner for context + toast on state change
+      // (handled via useEffect below). DA-119 — don't leak raw error.message
+      // into user-visible copy; log server-side keys + drop the payload.
       if (todayRes.error) {
-        setErr(`today RPC: ${todayRes.error.message}`);
+        console.error('[pipeline-costs] today RPC', todayRes.error);
+        setErr('Could not load today’s spend.');
       }
       if (capsRes.error) {
-        setErr(`settings: ${capsRes.error.message}`);
+        console.error('[pipeline-costs] settings', capsRes.error);
+        setErr('Could not load cap settings.');
       }
       if (costsRes.error) {
-        setErr(`pipeline_costs: ${costsRes.error.message}`);
+        console.error('[pipeline-costs] pipeline_costs', costsRes.error);
+        setErr('Could not load cost history.');
       }
       if (runsRes.error) {
-        setErr(`pipeline_runs: ${runsRes.error.message}`);
+        console.error('[pipeline-costs] pipeline_runs', runsRes.error);
+        setErr('Could not load top runs.');
       }
 
       const todayNum = Number(todayRes.data);
@@ -196,7 +213,7 @@ export default function PipelineCostsPage() {
     load().catch((e) => {
       if (cancelled) return;
       console.error('[pipeline-costs] load failed', e);
-      setErr(e instanceof Error ? e.message : String(e));
+      setErr('Could not load pipeline cost data.');
       setLoading(false);
     });
 
@@ -204,6 +221,12 @@ export default function PipelineCostsPage() {
       cancelled = true;
     };
   }, []);
+
+  // AD6: surface load failures as a toast so an operator who scrolled past
+  // the inline banner still sees that the page is showing stale/empty data.
+  useEffect(() => {
+    if (err) toast.push({ message: err, variant: 'danger' });
+  }, [err, toast]);
 
   // Spend indicator color — spec thresholds (not soft_alert_pct).
   const capUsd = caps?.daily_usd ?? 0;
@@ -306,7 +329,7 @@ export default function PipelineCostsPage() {
             fontSize: F.sm,
           }}
         >
-          Data load error: {err}
+          {err}
         </div>
       )}
 
