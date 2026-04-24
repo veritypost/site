@@ -273,7 +273,13 @@ function CommentsAdminInner() {
                         block={false}
                         size="sm"
                         value={nums[item.num]}
-                        onChange={(e) => setNums((prev) => ({ ...prev, [item.num as string]: parseInt(e.target.value, 10) || 0 }))}
+                        // C7 — prior code only persisted on blur. If the
+                        // user typed a value and navigated away without
+                        // blurring (tab close, router navigation), the
+                        // edit was silently lost. updateNum now runs on
+                        // every change; persistSettings already debounces
+                        // via saveTimeout so the DB isn't spammed.
+                        onChange={(e) => updateNum(item.num as string, e.target.value)}
                         onBlur={(e) => updateNum(item.num as string, (e.target as HTMLInputElement).value)}
                         style={{ width: 60, textAlign: 'center' }}
                       />
@@ -283,7 +289,9 @@ function CommentsAdminInner() {
                           block={false}
                           size="sm"
                           value={nums[item.num2]}
-                          onChange={(e) => setNums((prev) => ({ ...prev, [item.num2 as string]: parseInt(e.target.value, 10) || 0 }))}
+                          // C7 — same on-change persist as the num field
+                          // above. persistSettings debounces writes.
+                          onChange={(e) => updateNum(item.num2 as string, e.target.value)}
                           onBlur={(e) => updateNum(item.num2 as string, (e.target as HTMLInputElement).value)}
                           style={{ width: 60, textAlign: 'center' }}
                         />
