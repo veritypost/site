@@ -1558,15 +1558,28 @@ function ProfileCard({
   };
 
   const handleAvatarUpload = async (file: File) => {
-    // Stores under avatars/<userId>/<timestamp>-<filename>.
-    const path = `${userId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-    const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
-    if (error) {
-      pushToast({ message: error.message, variant: 'danger' });
-      return;
+    // NOTE(owner): the `avatars` storage bucket is not created via code —
+    // it must exist in the Supabase dashboard. If it's missing the
+    // upload fails with "Bucket not found"; match the banners handler
+    // and surface a clean message instead of leaking the raw error.
+    try {
+      const path = `${userId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
+      if (error) {
+        const msg = /bucket.*not.*found/i.test(error.message)
+          ? 'Avatar upload is not configured yet — contact admin.'
+          : error.message;
+        pushToast({ message: msg, variant: 'danger' });
+        return;
+      }
+      const { data } = supabase.storage.from('avatars').getPublicUrl(path);
+      if (data?.publicUrl) setAvatarUrl(data.publicUrl);
+    } catch {
+      pushToast({
+        message: 'Avatar upload is not configured yet — contact admin.',
+        variant: 'danger',
+      });
     }
-    const { data } = supabase.storage.from('avatars').getPublicUrl(path);
-    if (data?.publicUrl) setAvatarUrl(data.publicUrl);
   };
 
   const handleBannerUpload = async (file: File) => {
