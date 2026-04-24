@@ -8,10 +8,32 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // PATCH /api/bookmarks/[id] — update notes / move between collections.
 // Notes + collections are paid-only (D13) — we refuse on the server
 // for free users trying to sneak these fields in.
+//
+// C10 — the PATCH previously hard-required `bookmarks.note.edit` for
+// every call, including pure collection moves. UI gates the
+// "move to collection" action on `bookmarks.collection.create`, so a
+// user with collection permission but without note-edit permission
+// hit a cryptic 403 after clicking the move UI that the client said
+// they could use. Fix: parse the body first, then require the
+// appropriate permission for the field actually being modified.
 export async function PATCH(request, { params }) {
+  const { notes, collection_id } = await request.json().catch(() => ({}));
+
+  const editingNotes = notes !== undefined;
+  const movingCollection = collection_id !== undefined;
+
+  // If the caller is moving a collection but not editing notes, gate on
+  // the collection permission (matching the UI check). Otherwise fall
+  // back to note-edit permission. If both fields are present, note-edit
+  // is the broader ask and implies collection-edit on every paid tier
+  // in the current matrix; punt the "collection-only perm but also
+  // editing notes" edge case — UI doesn't surface it.
+  const requiredPerm =
+    movingCollection && !editingNotes ? 'bookmarks.collection.create' : 'bookmarks.note.edit';
+
   let user;
   try {
-    user = await requirePermission('bookmarks.note.edit');
+    user = await requirePermission(requiredPerm);
   } catch (err) {
     if (err.status) {
       console.error('[bookmarks.[id].permission]', err?.message || err);
@@ -23,7 +45,6 @@ export async function PATCH(request, { params }) {
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
 
-  const { notes, collection_id } = await request.json().catch(() => ({}));
   const service = createServiceClient();
 
   // Verify ownership before the paid-feature check so we can return the
