@@ -25,7 +25,13 @@ import type { Tables } from '@/types/database-helpers';
 
 const ROLES = ['moderator', 'editor', 'admin', 'expert', 'educator', 'journalist'] as const;
 const PENALTY_LABELS: Record<number, string> = { 1: 'Warn', 2: '24h comment mute', 3: '7-day mute', 4: 'Ban' };
-const HIERARCHY: Record<string, number> = {
+
+// C22 / R-7-AGR-01 — HIERARCHY kept ONLY as a last-resort fallback for
+// when the live `roles` fetch fails. Canonical levels come from the DB
+// via `roleLevels` state (populated in the initial useEffect). If the
+// DB hierarchy_level ever diverges from this map, DB wins. Do NOT add
+// new roles here — extend the roles table.
+const HIERARCHY_FALLBACK: Record<string, number> = {
   owner: 100,
   admin: 80,
   editor: 70,
@@ -79,6 +85,15 @@ function ModerationConsoleInner() {
   const [loading, setLoading] = useState(true);
   const [isMod, setIsMod] = useState(false);
   const [actorMaxLevel, setActorMaxLevel] = useState(0);
+  // C22 — canonical name→hierarchy_level map loaded from DB. Replaces
+  // the hardcoded HIERARCHY lookup. Updated from the `roles` table in
+  // the initial useEffect. If load fails, falls through to
+  // HIERARCHY_FALLBACK at the call site.
+  const [roleLevels, setRoleLevels] = useState<Record<string, number>>({});
+  // C23 — target's max hierarchy level, computed when a target is
+  // loaded. Drives penalty-button enable/disable so the operator can't
+  // submit a penalty the server will reject for rank reasons.
+  const [targetMaxLevel, setTargetMaxLevel] = useState(0);
   const [query, setQuery] = useState('');
   const [target, setTarget] = useState<TargetUser | null>(null);
   const [roles, setRoles] = useState<string[]>([]);
@@ -107,19 +122,35 @@ function ModerationConsoleInner() {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/'); return; }
-      const { data: userRoles } = await supabase
-        .from('user_roles')
-        .select('roles!fk_user_roles_role_id(name, hierarchy_level)')
-        .eq('user_id', user.id);
-      const roleRows = (userRoles || [])
+      const [actorRolesRes, allRolesRes] = await Promise.all([
+        supabase
+          .from('user_roles')
+          .select('roles!fk_user_roles_role_id(name, hierarchy_level)')
+          .eq('user_id', user.id),
+        // C22 — load the full roles table once so UI gating uses live DB
+        // hierarchy_level, not a hardcoded map that can drift.
+        supabase.from('roles').select('name, hierarchy_level'),
+      ]);
+      const roleRows = (actorRolesRes.data || [])
         .map((r) => (r as { roles: { name: string | null; hierarchy_level: number | null } | null }).roles)
         .filter((r): r is { name: string | null; hierarchy_level: number | null } => Boolean(r));
       const names = roleRows.map((r) => r.name).filter((n): n is string => Boolean(n));
       const admin = names.some((n) => ADMIN_ROLES.has(n));
       const mod = admin || names.some((n) => ['moderator', 'editor'].includes(n));
+      // Build the live name→level map. If the fetch failed, leave it
+      // empty and fall through to HIERARCHY_FALLBACK at call sites.
+      const levelsMap: Record<string, number> = {};
+      for (const r of (allRolesRes.data || []) as Array<{ name: string | null; hierarchy_level: number | null }>) {
+        if (r.name && typeof r.hierarchy_level === 'number') {
+          levelsMap[r.name] = r.hierarchy_level;
+        }
+      }
+      setRoleLevels(levelsMap);
+      const levelFor = (n: string | null) =>
+        (n && levelsMap[n]) ?? (n ? HIERARCHY_FALLBACK[n] : 0) ?? 0;
       const maxLevel = Math.max(
         0,
-        ...roleRows.map((r) => r.hierarchy_level ?? (r.name ? HIERARCHY[r.name] : 0) ?? 0),
+        ...roleRows.map((r) => r.hierarchy_level ?? levelFor(r.name)),
       );
       setIsMod(mod);
       setActorMaxLevel(maxLevel);
@@ -155,7 +186,7 @@ function ModerationConsoleInner() {
     const [rolesRes, warningsRes] = await Promise.all([
       supabase
         .from('user_roles')
-        .select('roles!fk_user_roles_role_id(name)')
+        .select('roles!fk_user_roles_role_id(name, hierarchy_level)')
         .eq('user_id', data.id),
       supabase
         .from('user_warnings')
@@ -165,11 +196,27 @@ function ModerationConsoleInner() {
         .limit(20),
     ]);
 
-    setRoles(
-      (rolesRes.data || [])
-        .map((x) => (x as { roles?: { name?: string | null } | null }).roles?.name)
-        .filter((n): n is string => Boolean(n)),
+    const targetRoleRows = (rolesRes.data || [])
+      .map((x) => (x as { roles?: { name?: string | null; hierarchy_level?: number | null } | null }).roles)
+      .filter((r): r is { name: string | null; hierarchy_level?: number | null } => Boolean(r));
+    const targetRoleNames = targetRoleRows
+      .map((r) => r.name)
+      .filter((n): n is string => Boolean(n));
+    setRoles(targetRoleNames);
+    // C23 — compute the target's max hierarchy level so penalty buttons
+    // disable when the actor doesn't strictly outrank the target.
+    // F-036 / server-side require_outranks enforces the same rule at
+    // the RPC; this just prevents the UI from offering an action that
+    // will 403.
+    const tMax = Math.max(
+      0,
+      ...targetRoleRows.map((r) => {
+        if (typeof r.hierarchy_level === 'number') return r.hierarchy_level;
+        const n = r.name;
+        return (n && roleLevels[n]) ?? (n ? HIERARCHY_FALLBACK[n] : 0) ?? 0;
+      }),
     );
+    setTargetMaxLevel(tMax);
     setWarnings((warningsRes.data as WarningRow[] | null) || []);
   }
 
@@ -324,12 +371,44 @@ function ModerationConsoleInner() {
             <div>
               <div style={labelStyle}>Penalties</div>
               <div style={{ display: 'flex', gap: S[1], flexWrap: 'wrap' }}>
-                {[1, 2, 3].map((l) => (
-                  <Button key={l} variant="secondary" size="sm" onClick={() => penalty(l)}>
-                    {PENALTY_LABELS[l]}
-                  </Button>
-                ))}
-                <Button variant="danger" size="sm" onClick={() => penalty(4)}>Ban</Button>
+                {(() => {
+                  // C23 — strict outrank: actor must be STRICTLY above
+                  // target to apply any penalty. Self-penalty also
+                  // blocked. Server enforces via F-036; UI mirrors so
+                  // the button doesn't dangle a doomed action.
+                  const cannotPenalise =
+                    !target ||
+                    target.id === '' ||
+                    actorMaxLevel <= targetMaxLevel;
+                  const title = cannotPenalise
+                    ? 'You do not outrank this user'
+                    : undefined;
+                  return (
+                    <>
+                      {[1, 2, 3].map((l) => (
+                        <Button
+                          key={l}
+                          variant="secondary"
+                          size="sm"
+                          disabled={cannotPenalise}
+                          title={title}
+                          onClick={() => penalty(l)}
+                        >
+                          {PENALTY_LABELS[l]}
+                        </Button>
+                      ))}
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        disabled={cannotPenalise}
+                        title={title}
+                        onClick={() => penalty(4)}
+                      >
+                        Ban
+                      </Button>
+                    </>
+                  );
+                })()}
               </div>
             </div>
 
@@ -338,7 +417,9 @@ function ModerationConsoleInner() {
               <div style={{ display: 'flex', gap: S[1], flexWrap: 'wrap' }}>
                 {ROLES.map((r) => {
                   const has = roles.includes(r);
-                  const outOfScope = (HIERARCHY[r] ?? 0) > actorMaxLevel;
+                  // C22 — live DB level with hardcoded fallback.
+                  const roleLevel = roleLevels[r] ?? HIERARCHY_FALLBACK[r] ?? 0;
+                  const outOfScope = roleLevel > actorMaxLevel;
                   const disabled = outOfScope || busy.startsWith('grant:') || busy.startsWith('revoke:');
                   return (
                     <Button
