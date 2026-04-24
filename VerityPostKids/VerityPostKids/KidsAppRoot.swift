@@ -15,6 +15,8 @@ struct KidsAppRoot: View {
     @StateObject private var auth = KidsAuth()
     @StateObject private var state = KidsAppState()
 
+    @Environment(\.scenePhase) private var scenePhase
+
     @State private var selectedTab: KidTab = .home
     @State private var activeSheet: ActiveSheet? = nil
     // K10: when a quiz completes, StreakScene + BadgeUnlockScene enqueue here
@@ -52,6 +54,23 @@ struct KidsAppRoot: View {
         .task(id: auth.kid?.id) {
             guard let kid = auth.kid else { return }
             await state.load(forKidId: kid.id, kidName: kid.name)
+        }
+        // K2: rotate the kid JWT on every foreground transition when it's
+        // under a day from expiry. Launch-time refresh is handled inside
+        // PairingClient.restore(), but a paired device that stays resident
+        // for multiple days can cross the 24h threshold without relaunching
+        // — this covers that path. refreshIfNeeded is a no-op when the
+        // token has more than 24h left.
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active, auth.kid != nil else { return }
+            Task {
+                await PairingClient.shared.refreshIfNeeded()
+                // If refresh cleared state (401 from server), drop KidsAuth
+                // so the UI returns to PairCodeView.
+                if PairingClient.shared.hasCredentials == false {
+                    auth.kid = nil
+                }
+            }
         }
     }
 

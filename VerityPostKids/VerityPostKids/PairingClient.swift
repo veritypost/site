@@ -18,6 +18,13 @@ struct PairSuccess: Decodable {
     let expires_at: String
 }
 
+// K2: /api/kids/refresh response shape (no kid_name — only the rotating fields).
+private struct RefreshSuccess: Decodable {
+    let access_token: String
+    let kid_profile_id: String
+    let expires_at: String
+}
+
 enum PairError: Error, LocalizedError {
     case network
     case invalidCode
@@ -25,6 +32,7 @@ enum PairError: Error, LocalizedError {
     case codeExpired
     case rateLimited
     case notConfigured
+    case unauthorized
     case server(String)
 
     var errorDescription: String? {
@@ -35,6 +43,7 @@ enum PairError: Error, LocalizedError {
         case .codeExpired:    return "This code expired. Ask for a new one."
         case .rateLimited:    return "Too many tries. Wait a minute and try again."
         case .notConfigured:  return "Pairing isn't set up yet."
+        case .unauthorized:   return "Session expired. Ask a parent to pair again."
         case .server(let m):  return m
         }
     }
@@ -60,6 +69,14 @@ final class PairingClient {
         let fresh = UUID().uuidString
         UserDefaults.standard.set(fresh, forKey: deviceKey)
         return fresh
+    }
+
+    /// True when a keychain token + kid id are both present. Consumers use
+    /// this to detect when refreshIfNeeded hit an unauthorized response and
+    /// cleared local state, so the UI can drop back to PairCodeView.
+    var hasCredentials: Bool {
+        keychainReadToken() != nil
+            && UserDefaults.standard.string(forKey: kidIdKey) != nil
     }
 
     // MARK: Pair
@@ -141,7 +158,93 @@ final class PairingClient {
             clear()
             return nil
         }
-        return StoredPair(token: token, kidProfileId: kidId, kidName: kidName)
+
+        // K2 — rotate the JWT on restore if under 24h of TTL remain. A stale
+        // token that silently 401s mid-session was the prior failure mode:
+        // the kid kept browsing against PostgREST with an expired bearer and
+        // RLS blocked every subsequent read with no user-visible signal.
+        // Refresh is best-effort; transient network failures don't clear the
+        // session (the existing token is still valid until exp). A 401 from
+        // /api/kids/refresh means the profile is gone/paused — in that case
+        // we clear + drop the kid back to PairCodeView.
+        await refreshIfNeeded()
+
+        // Re-read in case refresh rotated the persisted values.
+        let refreshedToken = keychainReadToken() ?? token
+        let refreshedKidName = UserDefaults.standard.string(forKey: kidNameKey) ?? kidName
+        return StoredPair(token: refreshedToken, kidProfileId: kidId, kidName: refreshedKidName)
+    }
+
+    // MARK: Refresh (K2)
+
+    /// Check the stored expiry; if under 24h remains, rotate the JWT via
+    /// /api/kids/refresh. Safe to call on foreground + periodically.
+    /// On 401 from the refresh endpoint, clears local state so the UI
+    /// drops back to PairCodeView.
+    func refreshIfNeeded() async {
+        guard let expiresIso = UserDefaults.standard.string(forKey: expiresKey) else { return }
+        let formatter = ISO8601DateFormatter()
+        guard let expires = formatter.date(from: expiresIso) else { return }
+        let secondsLeft = expires.timeIntervalSinceNow
+        // <24h remaining → rotate. >24h → no-op.
+        guard secondsLeft < 24 * 60 * 60 else { return }
+
+        do {
+            try await refresh()
+        } catch PairError.unauthorized {
+            print("[PairingClient] refresh rejected — profile unavailable; clearing session")
+            clear()
+        } catch {
+            // Transient failures (network, rate limit, server hiccup) are
+            // non-fatal — the existing token is still valid; we'll retry on
+            // the next foreground / restore. Only unauthorized clears state.
+            print("[PairingClient] refreshIfNeeded: ", error)
+        }
+    }
+
+    /// Unconditional refresh — rotate the current JWT regardless of age.
+    /// Throws PairError.unauthorized on 401 (caller should clear + re-pair).
+    func refresh() async throws {
+        guard let currentToken = keychainReadToken() else {
+            throw PairError.unauthorized
+        }
+
+        let url = SupabaseKidsClient.shared.siteURL
+            .appendingPathComponent("api/kids/refresh")
+
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(currentToken)", forHTTPHeaderField: "Authorization")
+
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await URLSession.shared.data(for: req)
+        } catch {
+            throw PairError.network
+        }
+
+        guard let http = response as? HTTPURLResponse else {
+            throw PairError.server("Unexpected response")
+        }
+
+        switch http.statusCode {
+        case 200:
+            let success = try JSONDecoder().decode(RefreshSuccess.self, from: data)
+            keychainWriteToken(success.access_token)
+            UserDefaults.standard.set(success.expires_at, forKey: expiresKey)
+            try await applySession(token: success.access_token)
+        case 401:
+            throw PairError.unauthorized
+        case 429:
+            throw PairError.rateLimited
+        case 503:
+            throw PairError.notConfigured
+        default:
+            let msg = (try? JSONDecoder().decode(ServerError.self, from: data))?.error
+                ?? "Refresh failed"
+            throw PairError.server(msg)
+        }
     }
 
     func clear() {
