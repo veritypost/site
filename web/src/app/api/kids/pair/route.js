@@ -81,6 +81,33 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Pair response missing data' }, { status: 500 });
     }
 
+    // C15 — write a structured COPPA consent record tied to this exact
+    // pairing event. parent_user_id ↔ kid_profile_id is the evidentiary
+    // link; consent_method names the ceremony; IP + UA aid forensics.
+    // ON CONFLICT replaces a stale record (e.g., re-pair after unpair)
+    // so the table holds the most recent consent per pair. Best-effort
+    // — a consent-log write failure shouldn't brick pairing, but we
+    // log it loudly so it can be reconciled.
+    try {
+      const userAgent = (request.headers.get('user-agent') || '').slice(0, 512);
+      const { error: consentErr } = await svc.from('parental_consents').upsert(
+        {
+          parent_user_id,
+          kid_profile_id,
+          consent_method: 'pair_code_redeem_v1',
+          consent_ip: ip || null,
+          consent_user_agent: userAgent || null,
+          consented_at: new Date().toISOString(),
+        },
+        { onConflict: 'parent_user_id,kid_profile_id' }
+      );
+      if (consentErr) {
+        console.error('[kids.pair.consent_log_err]', consentErr.message || consentErr);
+      }
+    } catch (err) {
+      console.error('[kids.pair.consent_log_err]', err);
+    }
+
     const now = Math.floor(Date.now() / 1000);
     const exp = now + TOKEN_TTL_SECONDS;
 
