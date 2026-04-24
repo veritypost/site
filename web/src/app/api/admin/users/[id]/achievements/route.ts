@@ -47,7 +47,11 @@ export async function POST(request: Request, { params }: { params: { id: string 
     .select('id, name')
     .eq('name', name)
     .maybeSingle();
-  if (!row) return NextResponse.json({ error: `No achievement named "${name}"` }, { status: 404 });
+  // Ext-L4 — don't echo user-supplied input in the error response.
+  if (!row) {
+    console.error('[admin.user.achievements] unknown achievement requested:', name);
+    return NextResponse.json({ error: 'Unknown achievement' }, { status: 404 });
+  }
 
   const { error } = await service.from('user_achievements').insert({
     user_id: targetId,

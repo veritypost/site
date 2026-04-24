@@ -84,7 +84,32 @@ export async function POST(request) {
   });
   if (error) {
     console.error('[comments.POST]', error);
-    return NextResponse.json({ error: 'Could not post comment' }, { status: 400 });
+    // Ext-F1 — surface known RPC failure modes as actionable copy.
+    // Server log keeps the raw cause; client gets a hint they can act on.
+    const code = error.code;
+    const msg = (error.message || '').toLowerCase();
+    if (code === 'P0001' && (msg.includes('quiz') || msg.includes('not allowed'))) {
+      return NextResponse.json(
+        { error: 'Pass the quiz on this article to join the discussion.' },
+        { status: 403 }
+      );
+    }
+    if (code === '23505' || msg.includes('duplicate')) {
+      return NextResponse.json(
+        { error: 'Looks like that comment already posted.' },
+        { status: 409 }
+      );
+    }
+    if (msg.includes('parent')) {
+      return NextResponse.json(
+        { error: 'Reply target not found — it may have been removed.' },
+        { status: 404 }
+      );
+    }
+    return NextResponse.json(
+      { error: 'Could not post comment. Try again in a moment.' },
+      { status: 400 }
+    );
   }
 
   // Phase 14: award post_comment points + advance streak.

@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { listCustomerSubscriptions, resumeSubscription } from '@/lib/stripe';
 
 // D40: restore from frozen state. Score picks up from frozen_verity_score.
@@ -34,6 +35,20 @@ export async function POST(request) {
   }
 
   const service = createServiceClient();
+
+  // Ext-Q1 — cap resubscribe attempts to prevent Stripe-call thrash.
+  const rate = await checkRateLimit(service, {
+    key: `billing.resubscribe:${user.id}`,
+    policyKey: 'billing_resubscribe',
+    max: 5,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
 
   // Web resubscribe refuses invisible plans (family tiers are iOS-only).
   // is_active=true + is_visible=false = "billing RPCs accept the plan_id

@@ -116,5 +116,27 @@ export async function POST(request) {
     );
   }
 
+  // Ext-M2 — audit the email-change initiation. Only the SUCCESS path
+  // is audited (auth.updateUser already returned ok). Failure paths
+  // earlier in the function never mutated anything, so no audit needed.
+  // Best-effort: don't fail the request if audit insert fails.
+  try {
+    await service.from('audit_log').insert({
+      actor_id: user.id,
+      action: 'auth:email_change_initiated',
+      target_type: 'user',
+      target_id: user.id,
+      metadata: {
+        old_email_hash: user.email
+          ? Buffer.from(user.email.toLowerCase()).toString('base64').slice(0, 16)
+          : null,
+        new_email_hash: Buffer.from(normalized).toString('base64').slice(0, 16),
+        ip,
+      },
+    });
+  } catch (e) {
+    console.error('[auth.email-change] audit_log insert failed:', e);
+  }
+
   return NextResponse.json({ ok: true });
 }

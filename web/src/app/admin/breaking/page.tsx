@@ -58,7 +58,12 @@ function BreakingInner() {
         .select('*, categories!fk_articles_category_id(name)')
         .eq('is_breaking', true)
         .order('published_at', { ascending: false });
-      if (histError) { setLoadError(histError.message); setHistory([]); }
+      if (histError) {
+        // Ext-K6 — generic message in UI; raw cause to server logs.
+        console.error('[admin.breaking] load failed:', histError.message);
+        setLoadError('Could not load breaking-news history.');
+        setHistory([]);
+      }
       else if (data) setHistory(data as unknown as ArticleRow[]);
       setLoading(false);
     })();

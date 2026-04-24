@@ -4009,6 +4009,10 @@ function BillingBundle({
         variant: 'success',
       });
       setConfirmCancel(false);
+      // Ext-C2 — billing cancel flips plan-derived gates; refresh perms cache
+      // so paid affordances disappear in-place instead of staying stale until
+      // next nav.
+      await refreshAllPermissions();
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Cancel failed';
       pushToast({ message: msg, variant: 'danger' });

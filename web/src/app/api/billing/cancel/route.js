@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { listCustomerSubscriptions, cancelSubscriptionAtPeriodEnd } from '@/lib/stripe';
 
 // D40: user cancels → DMs revoked immediately, 7-day grace for
@@ -35,6 +36,22 @@ export async function POST(request) {
   } catch {}
 
   const service = createServiceClient();
+
+  // Ext-Q1 — cap cancel attempts per user. Stripe call + DB state machine
+  // are both expensive; an authenticated abuser flipping cancel/resubscribe
+  // could thrash both. 5/min is generous for legitimate use.
+  const rate = await checkRateLimit(service, {
+    key: `billing.cancel:${user.id}`,
+    policyKey: 'billing_cancel',
+    max: 5,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
 
   // Look up the user's Stripe customer id so we can cancel the active
   // subscription upstream. If the user has never paid (no customer

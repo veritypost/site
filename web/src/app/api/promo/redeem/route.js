@@ -2,6 +2,7 @@
 // @feature-verified subscription 2026-04-18
 import { createServiceClient } from '@/lib/supabase/server';
 import { requirePermission } from '@/lib/auth';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { NextResponse } from 'next/server';
 
 // F-013 — Plan upgrades from a 100% promo must write to `users.plan_id`
@@ -15,6 +16,22 @@ export async function POST(request) {
   try {
     const user = await requirePermission('billing.promo.redeem');
     const supabase = createServiceClient();
+
+    // Ext-Q1 — cap promo-code probing. The case-insensitive lookup is
+    // cheap, but iterating known-format codes from a single user is the
+    // textbook brute-force shape; 10/min is generous for legitimate use.
+    const rate = await checkRateLimit(supabase, {
+      key: `promo.redeem:${user.id}`,
+      policyKey: 'promo_redeem',
+      max: 10,
+      windowSec: 60,
+    });
+    if (rate.limited) {
+      return NextResponse.json(
+        { error: 'Too many attempts' },
+        { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+      );
+    }
 
     const { code } = await request.json();
     if (!code?.trim()) {

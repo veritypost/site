@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { listCustomerSubscriptions, updateSubscriptionPrice } from '@/lib/stripe';
 
 // Upgrade/downgrade between paid plans. Stripe-first: swap the
@@ -31,6 +32,20 @@ export async function POST(request) {
   }
 
   const service = createServiceClient();
+
+  // Ext-Q1 — cap plan changes per user to prevent Stripe-call thrash.
+  const rate = await checkRateLimit(service, {
+    key: `billing.change_plan:${user.id}`,
+    policyKey: 'billing_change_plan',
+    max: 5,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
 
   // Web plan-change refuses invisible plans. Family tiers are iOS-only:
   // is_active=true but is_visible=false means "billing RPCs accept this
