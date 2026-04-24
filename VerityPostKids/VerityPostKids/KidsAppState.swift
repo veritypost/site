@@ -106,6 +106,7 @@ final class KidsAppState: ObservableObject {
             self.categories = rows.enumerated().map { i, r in
                 KidCategory(
                     name: cleanCategoryName(r.name),
+                    slug: r.slug,
                     color: palette[i % palette.count],
                     progress: 0
                 )
@@ -113,11 +114,15 @@ final class KidsAppState: ObservableObject {
 
             await loadProgressCounts(for: rows.map(\.id))
         } catch {
+            // Fallback slugs mirror the seeded `categories` rows so the
+            // category-tap filter in ArticleListView (K3) still works if the
+            // initial fetch fails — it just won't have accurate progress
+            // counts until the next successful load.
             self.categories = [
-                KidCategory(name: "Science", color: K.purple, progress: 0),
-                KidCategory(name: "World",   color: K.teal,   progress: 0),
-                KidCategory(name: "Sports",  color: K.coral,  progress: 0),
-                KidCategory(name: "Tech",    color: K.sky,    progress: 0)
+                KidCategory(name: "Science", slug: "kids-science", color: K.purple, progress: 0),
+                KidCategory(name: "World",   slug: "kids-world",   color: K.teal,   progress: 0),
+                KidCategory(name: "Sports",  slug: "kids-sports",  color: K.coral,  progress: 0),
+                KidCategory(name: "Tech",    slug: "kids-tech",    color: K.sky,    progress: 0)
             ]
             self.loadError = "Using default categories (DB fetch failed): \(error.localizedDescription)"
         }
@@ -206,6 +211,7 @@ final class KidsAppState: ObservableObject {
 struct KidCategory: Identifiable, Equatable {
     let id = UUID()
     let name: String
+    let slug: String?
     let color: Color
     var progress: Int
 }

@@ -28,7 +28,7 @@ struct KidsAppRoot: View {
 
     private enum ActiveSheet: Identifiable {
         case streak(previous: Int, current: Int, milestone: StreakScene.Milestone?)
-        case articles(categoryName: String, categoryColor: Color)
+        case articles(categoryName: String, categoryColor: Color, categorySlug: String?)
         case badge(BadgeUnlockScene)
 
         var id: String {
@@ -119,7 +119,11 @@ struct KidsAppRoot: View {
                 presentStreak(previous: state.streakDays, current: state.streakDays)
             },
             onCategoryTap: { cat in
-                present(.articles(categoryName: cat.name, categoryColor: cat.color))
+                present(.articles(
+                    categoryName: cat.name,
+                    categoryColor: cat.color,
+                    categorySlug: cat.slug
+                ))
             }
         )
     }
@@ -134,11 +138,11 @@ struct KidsAppRoot: View {
                 milestone: milestone,
                 onDone: { activeSheet = nil }
             )
-        case .articles(let name, let color):
+        case .articles(let name, let color, let slug):
             ArticleListView(
                 categoryName: name,
                 categoryColor: color,
-                categorySlug: nil,
+                categorySlug: slug,
                 onClose: { activeSheet = nil },
                 onQuizComplete: { result in
                     handleQuizComplete(result)

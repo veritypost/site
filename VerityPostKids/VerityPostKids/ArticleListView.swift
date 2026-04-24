@@ -155,21 +155,37 @@ struct ArticleListView: View {
         loading = true
         defer { loading = false }
 
+        // K3: resolve categorySlug → category_id first, then filter articles.
+        // If no slug supplied (or resolution fails), fall through to the
+        // unfiltered list so the kid still has something to read.
+        var categoryId: String? = nil
+        if let slug = categorySlug, !slug.isEmpty {
+            struct CatRow: Decodable { let id: String }
+            do {
+                let row: CatRow = try await client
+                    .from("categories")
+                    .select("id")
+                    .eq("slug", value: slug)
+                    .single()
+                    .execute()
+                    .value
+                categoryId = row.id
+            } catch {
+                // Non-fatal — show all kid-safe articles instead of empty list.
+                print("[ArticleListView] category slug lookup failed (\(slug)):", error)
+            }
+        }
+
         do {
-            var query = client
+            let baseQuery = client
                 .from("articles")
                 .select("id, title, slug, excerpt, kids_summary, cover_image_url, category_id, reading_time_minutes, difficulty_level, published_at")
                 .eq("status", value: "published")
                 .eq("is_kids_safe", value: true)
 
-            if let slug = categorySlug, !slug.isEmpty {
-                // Filter by category via category slug lookup would need a join.
-                // For MVP, the caller passes the slug and we do a two-step:
-                // 1) resolve category id, 2) filter articles.
-                // Optimization: cache in state on home.
-            }
+            let filtered = categoryId.map { baseQuery.eq("category_id", value: $0) } ?? baseQuery
 
-            let articles: [KidArticle] = try await query
+            let articles: [KidArticle] = try await filtered
                 .order("published_at", ascending: false)
                 .limit(30)
                 .execute()
