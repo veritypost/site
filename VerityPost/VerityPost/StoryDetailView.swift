@@ -1852,7 +1852,16 @@ struct StoryDetailView: View {
                 if row.is_correct == true { e.correct += 1 }
                 byAttempt[k] = e
             }
-            userPassedQuiz = byAttempt.values.contains { $0.total > 0 && ($0.correct * 10 / max($0.total, 1)) >= 7 }
+            // Server semantic: pass = `correct >= 3` per attempt (hardcoded in
+            // submit_quiz_attempt + user_passed_article_quiz RPCs in
+            // schema/012_phase4_quiz_helpers.sql). The prior integer-division
+            // %ile (`* 10 / total >= 7`) required 4/5 = 80%, locking out users
+            // who scored 3/5 = 60% on web — the actual server pass.
+            // passThreshold (line 125-130) already uses 3 for UI copy; keep it
+            // a single literal here too. If the server ever moves the threshold
+            // off the literal 3 (e.g. read from settings.quiz_pass_score), this
+            // line moves with it.
+            userPassedQuiz = byAttempt.values.contains { $0.total > 0 && $0.correct >= 3 }
 
             await loadMuteState(userId: userId)
         }

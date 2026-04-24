@@ -520,7 +520,10 @@ struct KidDashboardView: View {
                 if row.is_correct == true { e.correct += 1 }
                 grouped[k] = e
             }
-            quizCount = grouped.values.filter { $0.total > 0 && ($0.correct * 10 / max($0.total, 1)) >= 7 }.count
+            // Same server pass semantic as StoryDetailView: correct >= 3.
+            // Prior integer-division %ile undercounted family-dashboard kid
+            // pass totals by missing every 3/5 (60%) attempt.
+            quizCount = grouped.values.filter { $0.total > 0 && $0.correct >= 3 }.count
         } catch {}
     }
 }
