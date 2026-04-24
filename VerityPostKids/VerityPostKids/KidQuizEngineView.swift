@@ -343,8 +343,8 @@ struct KidQuizEngineView: View {
             }
             let verdict: VerdictPayload = try await client
                 .rpc("get_kid_quiz_verdict", params: Params(
-                    p_kid_profile_id: kidId.uuidString,
-                    p_article_id: article.id.uuidString
+                    p_kid_profile_id: kidId,
+                    p_article_id: article.id
                 ))
                 .execute()
                 .value
