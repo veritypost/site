@@ -59,8 +59,12 @@ function EmailTemplatesInner() {
       if (!user) { router.push('/'); return; }
       const { data: profile } = await supabase.from('users').select('id').eq('id', user.id).single();
       const { data: userRoles } = await supabase.from('user_roles').select('roles!fk_user_roles_role_id(name)').eq('user_id', user.id);
-      const roleNames = (userRoles || []).map((r: any) => r.roles?.name).filter(Boolean);
-      if (!profile || !roleNames.some((r: string) => ADMIN_ROLES.has(r))) { router.push('/'); return; }
+      const roleNames = (
+        (userRoles || []) as Array<{ roles: { name: string | null } | null }>
+      )
+        .map((r) => r.roles?.name)
+        .filter((n): n is string => typeof n === 'string');
+      if (!profile || !roleNames.some((r) => ADMIN_ROLES.has(r))) { router.push('/'); return; }
 
       const { data, error: tErr } = await supabase
         .from('email_templates')

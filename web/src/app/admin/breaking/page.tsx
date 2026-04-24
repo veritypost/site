@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/client';
 import Page, { PageHeader } from '@/components/admin/Page';
@@ -46,8 +46,12 @@ function BreakingInner() {
       if (!user) { router.push('/login'); return; }
       const { data: profile } = await supabase.from('users').select('id').eq('id', user.id).single();
       const { data: userRoles } = await supabase.from('user_roles').select('roles!fk_user_roles_role_id(name)').eq('user_id', user.id);
-      const roleNames = (userRoles || []).map((r: any) => r.roles?.name?.toLowerCase()).filter(Boolean);
-      if (!profile || !roleNames.some((r: string) => r === 'owner' || r === 'admin')) { router.push('/'); return; }
+      const roleNames = (
+        (userRoles || []) as Array<{ roles: { name: string | null } | null }>
+      )
+        .map((r) => r.roles?.name?.toLowerCase())
+        .filter((n): n is string => typeof n === 'string');
+      if (!profile || !roleNames.some((r) => r === 'owner' || r === 'admin')) { router.push('/'); return; }
 
       const { data, error: histError } = await supabase
         .from('articles')
@@ -212,7 +216,10 @@ function BreakingInner() {
                 <div style={{ fontSize: F.base, fontWeight: 600, color: C.white, marginBottom: S[1], lineHeight: 1.4 }}>{a.title}</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: S[2], fontSize: F.xs, color: C.dim, alignItems: 'center' }}>
                   {a.categories?.name && <Badge variant="neutral" size="xs">{a.categories.name}</Badge>}
-                  {(a.metadata as any)?.target && <Badge variant="info" size="xs">{(a.metadata as any).target}</Badge>}
+                  {(() => {
+                    const tgt = (a.metadata as { target?: string } | null)?.target;
+                    return tgt ? <Badge variant="info" size="xs">{tgt}</Badge> : null;
+                  })()}
                   <span style={{ marginLeft: 'auto' }}>
                     {(a.published_at || a.created_at) ? new Date(a.published_at || a.created_at || '').toLocaleString() : ''}
                   </span>
@@ -264,7 +271,7 @@ function LabeledNum({ label, value, onChange, suffix }: { label: string; value: 
           value={value}
           block={false}
           style={{ width: 90 }}
-          onChange={(e: any) => onChange(parseInt(e.target.value) || 0)}
+          onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(parseInt(e.target.value) || 0)}
         />
         {suffix && <span style={{ fontSize: F.sm, color: C.muted }}>{suffix}</span>}
       </div>

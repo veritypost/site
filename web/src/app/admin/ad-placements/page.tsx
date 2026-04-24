@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/client';
 import { ADMIN_ROLES } from '@/lib/roles';
@@ -62,7 +62,9 @@ function PlacementsInner() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/'); return; }
       const { data: r } = await supabase.from('user_roles').select('roles(name)').eq('user_id', user.id);
-      const ok = (r || []).some((x: any) => ADMIN_ROLES.has(x.roles?.name));
+      const ok = ((r || []) as Array<{ roles: { name: string | null } | null }>).some(
+        (x) => !!x.roles?.name && ADMIN_ROLES.has(x.roles.name)
+      );
       if (!ok) { router.push('/'); return; }
       setAuthorized(true);
       await loadPlacements();
@@ -447,13 +449,13 @@ function PlacementsInner() {
             <TextInput value={unitForm.cta_text ?? ''} onChange={(e) => setUnitForm({ ...unitForm, cta_text: e.target.value })} />
           </Lbl>
           <Lbl label="Freq cap / user">
-            <NumberInput value={unitForm.frequency_cap_per_user ?? 0} onChange={(e: any) => setUnitForm({ ...unitForm, frequency_cap_per_user: Number(e.target.value) || 0 })} />
+            <NumberInput value={unitForm.frequency_cap_per_user ?? 0} onChange={(e: ChangeEvent<HTMLInputElement>) => setUnitForm({ ...unitForm, frequency_cap_per_user: Number(e.target.value) || 0 })} />
           </Lbl>
           <Lbl label="Freq cap / session">
-            <NumberInput value={unitForm.frequency_cap_per_session ?? 0} onChange={(e: any) => setUnitForm({ ...unitForm, frequency_cap_per_session: Number(e.target.value) || 0 })} />
+            <NumberInput value={unitForm.frequency_cap_per_session ?? 0} onChange={(e: ChangeEvent<HTMLInputElement>) => setUnitForm({ ...unitForm, frequency_cap_per_session: Number(e.target.value) || 0 })} />
           </Lbl>
           <Lbl label="Weight">
-            <NumberInput value={unitForm.weight ?? 100} onChange={(e: any) => setUnitForm({ ...unitForm, weight: Number(e.target.value) || 0 })} />
+            <NumberInput value={unitForm.weight ?? 100} onChange={(e: ChangeEvent<HTMLInputElement>) => setUnitForm({ ...unitForm, weight: Number(e.target.value) || 0 })} />
           </Lbl>
           <Lbl label="Approval">
             <Select value={unitForm.approval_status ?? 'pending'} onChange={(e) => setUnitForm({ ...unitForm, approval_status: e.target.value })}>

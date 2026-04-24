@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { ADMIN_ROLES } from '@/lib/roles';
 import { createClient } from '../../../lib/supabase/client';
@@ -85,7 +85,11 @@ function PromoInner() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/'); return; }
       const { data: userRoles } = await supabase.from('user_roles').select('roles(name)').eq('user_id', user.id);
-      const names = (userRoles || []).map((r: any) => r.roles?.name).filter(Boolean);
+      const names = (
+        (userRoles || []) as Array<{ roles: { name: string | null } | null }>
+      )
+        .map((r) => r.roles?.name)
+        .filter((n): n is string => typeof n === 'string');
       if (!names.some((n: string) => ADMIN_ROLES.has(n))) { router.push('/'); return; }
       setAuthorized(true);
       await loadAll();
@@ -173,7 +177,7 @@ function PromoInner() {
       setError('Max uses per user must be >= 1'); return;
     }
 
-    const row: any = {
+    const row = {
       code,
       description: form.description.trim() || null,
       discount_type: form.discount_type,
@@ -400,20 +404,20 @@ function PromoInner() {
             />
           </Lbl>
           <Lbl label="Duration">
-            <Select value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value as any })}>
+            <Select value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value as PromoForm['duration'] })}>
               {DURATIONS.map((d) => <option key={d} value={d}>{d}</option>)}
             </Select>
           </Lbl>
           {form.duration === 'repeating' && (
             <Lbl label="Duration months">
-              <NumberInput value={form.duration_months} onChange={(e: any) => setForm({ ...form, duration_months: e.target.value })} placeholder="3" />
+              <NumberInput value={form.duration_months} onChange={(e: ChangeEvent<HTMLInputElement>) => setForm({ ...form, duration_months: e.target.value })} placeholder="3" />
             </Lbl>
           )}
           <Lbl label="Max uses total (blank = unlimited)">
-            <NumberInput value={form.max_uses} onChange={(e: any) => setForm({ ...form, max_uses: e.target.value })} />
+            <NumberInput value={form.max_uses} onChange={(e: ChangeEvent<HTMLInputElement>) => setForm({ ...form, max_uses: e.target.value })} />
           </Lbl>
           <Lbl label="Max uses per user">
-            <NumberInput value={form.max_uses_per_user} onChange={(e: any) => setForm({ ...form, max_uses_per_user: Number(e.target.value) || 1 })} />
+            <NumberInput value={form.max_uses_per_user} onChange={(e: ChangeEvent<HTMLInputElement>) => setForm({ ...form, max_uses_per_user: Number(e.target.value) || 1 })} />
           </Lbl>
           <Lbl label="Starts at (optional)">
             <DatePicker includeTime value={form.starts_at} onChange={(e) => setForm({ ...form, starts_at: e.target.value })} />
@@ -452,7 +456,7 @@ function PromoInner() {
           <Checkbox
             label="Active"
             checked={!!form.is_active}
-            onChange={(e: any) => setForm({ ...form, is_active: e.target.checked })}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setForm({ ...form, is_active: e.target.checked })}
           />
         </div>
       </Drawer>

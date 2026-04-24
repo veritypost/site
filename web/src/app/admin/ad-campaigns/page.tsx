@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/client';
 import { ADMIN_ROLES } from '@/lib/roles';
@@ -61,7 +61,9 @@ function CampaignsInner() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/'); return; }
       const { data: r } = await supabase.from('user_roles').select('roles(name)').eq('user_id', user.id);
-      const ok = (r || []).some((x: any) => ADMIN_ROLES.has(x.roles?.name));
+      const ok = ((r || []) as Array<{ roles: { name: string | null } | null }>).some(
+        (x) => !!x.roles?.name && ADMIN_ROLES.has(x.roles.name)
+      );
       if (!ok) { router.push('/'); return; }
       setAuthorized(true);
       await load();
@@ -109,7 +111,7 @@ function CampaignsInner() {
     setSaving(true);
     try {
       const isNew = editing === 'new';
-      const body: any = { ...form };
+      const body: Record<string, unknown> = { ...form };
       ['total_budget_cents', 'daily_budget_cents', 'rate_cents'].forEach((k) => {
         if (body[k] === '' || body[k] === undefined) body[k] = null;
       });
@@ -276,13 +278,13 @@ function CampaignsInner() {
             <DatePicker value={form.end_date ?? ''} onChange={(e) => setForm({ ...form, end_date: e.target.value })} />
           </Lbl>
           <Lbl label="Total budget (cents)">
-            <NumberInput value={form.total_budget_cents ?? 0} onChange={(e: any) => setForm({ ...form, total_budget_cents: Number(e.target.value) || 0 })} />
+            <NumberInput value={form.total_budget_cents ?? 0} onChange={(e: ChangeEvent<HTMLInputElement>) => setForm({ ...form, total_budget_cents: Number(e.target.value) || 0 })} />
           </Lbl>
           <Lbl label="Daily budget (cents)">
-            <NumberInput value={form.daily_budget_cents ?? 0} onChange={(e: any) => setForm({ ...form, daily_budget_cents: Number(e.target.value) || 0 })} />
+            <NumberInput value={form.daily_budget_cents ?? 0} onChange={(e: ChangeEvent<HTMLInputElement>) => setForm({ ...form, daily_budget_cents: Number(e.target.value) || 0 })} />
           </Lbl>
           <Lbl label="Rate (cents)">
-            <NumberInput value={form.rate_cents ?? 0} onChange={(e: any) => setForm({ ...form, rate_cents: Number(e.target.value) || 0 })} />
+            <NumberInput value={form.rate_cents ?? 0} onChange={(e: ChangeEvent<HTMLInputElement>) => setForm({ ...form, rate_cents: Number(e.target.value) || 0 })} />
           </Lbl>
           <Lbl label="Status">
             <Select value={form.status ?? 'draft'} onChange={(e) => setForm({ ...form, status: e.target.value })}>
