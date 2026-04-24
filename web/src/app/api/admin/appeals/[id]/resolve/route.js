@@ -5,6 +5,12 @@ import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { recordAdminAction } from '@/lib/adminMutation';
+
+// H25 — whitelist of valid outcome values. RPC enforces too, but
+// validate at the API boundary so a typo/tampered client gets a
+// readable 400 instead of leaning on implicit RPC error text.
+const APPEAL_OUTCOMES = new Set(['approved', 'denied']);
 
 // POST /api/admin/appeals/[id]/resolve  { outcome: 'approved'|'denied', notes? }
 // On 'approved' the penalty is reversed server-side.
@@ -39,6 +45,9 @@ export async function POST(request, { params }) {
 
   const { outcome, notes } = await request.json().catch(() => ({}));
   if (!outcome) return NextResponse.json({ error: 'outcome required' }, { status: 400 });
+  if (!APPEAL_OUTCOMES.has(outcome)) {
+    return NextResponse.json({ error: 'invalid outcome' }, { status: 400 });
+  }
 
   const { error } = await service.rpc('resolve_appeal', {
     p_mod_id: user.id,
@@ -51,5 +60,15 @@ export async function POST(request, { params }) {
       route: 'admin.appeals.id.resolve',
       fallbackStatus: 400,
     });
+
+  // C21 — audit the appeal resolution. Pre-fix, appeal approve/deny
+  // decisions left zero audit trail.
+  await recordAdminAction({
+    action: 'moderation.appeal.resolve',
+    targetTable: 'warnings',
+    targetId: params.id,
+    newValue: { outcome, notes: notes || null },
+  });
+
   return NextResponse.json({ ok: true });
 }

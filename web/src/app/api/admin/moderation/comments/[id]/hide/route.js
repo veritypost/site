@@ -5,6 +5,7 @@ import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { recordAdminAction } from '@/lib/adminMutation';
 
 export async function POST(request, { params }) {
   let user;
@@ -45,5 +46,15 @@ export async function POST(request, { params }) {
       route: 'admin.moderation.comments.id.hide',
       fallbackStatus: 400,
     });
+
+  // C21 — audit the comment hide. Pre-fix, comment removal left zero
+  // audit trail.
+  await recordAdminAction({
+    action: 'moderation.comment.hide',
+    targetTable: 'comments',
+    targetId: params.id,
+    newValue: { reason: reason || 'moderator action' },
+  });
+
   return NextResponse.json({ ok: true });
 }

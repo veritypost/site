@@ -5,6 +5,12 @@ import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { recordAdminAction } from '@/lib/adminMutation';
+
+// H25 — whitelist of valid resolution values. RPC enforces too, but
+// validate at the API boundary for clear 400s on typos or tampered
+// clients.
+const REPORT_RESOLUTIONS = new Set(['actioned', 'dismissed', 'duplicate']);
 
 // POST /api/admin/moderation/reports/[id]/resolve
 // Body: { resolution, notes? }
@@ -39,6 +45,9 @@ export async function POST(request, { params }) {
 
   const { resolution, notes } = await request.json().catch(() => ({}));
   if (!resolution) return NextResponse.json({ error: 'resolution required' }, { status: 400 });
+  if (!REPORT_RESOLUTIONS.has(resolution)) {
+    return NextResponse.json({ error: 'invalid resolution' }, { status: 400 });
+  }
 
   const { error } = await service.rpc('resolve_report', {
     p_mod_id: user.id,
@@ -51,5 +60,15 @@ export async function POST(request, { params }) {
       route: 'admin.moderation.reports.id.resolve',
       fallbackStatus: 400,
     });
+
+  // C21 — audit the report resolution. Pre-fix, content reports
+  // resolved (actioned / dismissed / duplicate) left zero audit trail.
+  await recordAdminAction({
+    action: 'moderation.report.resolve',
+    targetTable: 'reports',
+    targetId: params.id,
+    newValue: { resolution, notes: notes || null },
+  });
+
   return NextResponse.json({ ok: true });
 }

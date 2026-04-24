@@ -5,7 +5,7 @@ import { requirePermission } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
-import { requireAdminOutranks } from '@/lib/adminMutation';
+import { recordAdminAction, requireAdminOutranks } from '@/lib/adminMutation';
 
 // Blueprint §10 progressive stack:
 //   level 1 = warn
@@ -71,5 +71,16 @@ export async function POST(request, { params }) {
       route: 'admin.moderation.users.id.penalty',
       fallbackStatus: 400,
     });
+
+  // C21 — audit the moderation action. Pre-fix, penalties (warn /
+  // 24h mute / 7d mute / ban) executed with zero audit trail, breaking
+  // chain-of-custody for moderation decisions + compliance review.
+  await recordAdminAction({
+    action: 'moderation.penalty',
+    targetTable: 'users',
+    targetId: params.id,
+    newValue: { level: levelNum, reason, warning_id: data },
+  });
+
   return NextResponse.json({ warning_id: data });
 }
