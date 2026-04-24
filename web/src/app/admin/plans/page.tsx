@@ -23,7 +23,7 @@ import Field from '@/components/admin/Field';
 import Spinner from '@/components/admin/Spinner';
 import EmptyState from '@/components/admin/EmptyState';
 import Badge from '@/components/admin/Badge';
-import { confirm } from '@/components/admin/ConfirmDialog';
+import { confirm, ConfirmDialogHost } from '@/components/admin/ConfirmDialog';
 import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C, F, S } from '@/lib/adminPalette';
 import type { Tables } from '@/types/database-helpers';
@@ -610,6 +610,7 @@ export default function PlansAdmin() {
           )}
         </div>
       </div>
+      <ConfirmDialogHost />
     </Page>
   );
 }

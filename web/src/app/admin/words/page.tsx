@@ -18,7 +18,7 @@ import Spinner from '@/components/admin/Spinner';
 import EmptyState from '@/components/admin/EmptyState';
 import Badge from '@/components/admin/Badge';
 import Toolbar from '@/components/admin/Toolbar';
-import { confirm } from '@/components/admin/ConfirmDialog';
+import { confirm, ConfirmDialogHost } from '@/components/admin/ConfirmDialog';
 import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C, F, S } from '@/lib/adminPalette';
 
@@ -306,6 +306,7 @@ export default function WordsAdmin() {
             : 'Profanity filter words trigger a warning + 30-second cooldown when used in comments. The comment is rejected entirely (not posted with asterisks). User must retype without the word.'}
         </span>
       </div>
+      <ConfirmDialogHost />
     </Page>
   );
 }
