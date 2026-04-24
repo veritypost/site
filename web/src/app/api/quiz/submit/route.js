@@ -39,29 +39,6 @@ export async function POST(request) {
     }
   }
 
-  // Validate length against the article's actual quiz count rather than
-  // hardcoded 5 — quiz length is a DB-level config today (submit_quiz_attempt
-  // RPC reads the quizzes rows by article_id) and the product will want
-  // variable-length quizzes post-launch (recap/weekly might ship different
-  // counts). The route used to reject any length !== 5 on the client side.
-  {
-    const service = createServiceClient();
-    const { count, error: countErr } = await service
-      .from('quizzes')
-      .select('*', { count: 'exact', head: true })
-      .eq('article_id', article_id);
-    if (countErr) {
-      console.error('[quiz.submit] count quizzes', countErr);
-      return NextResponse.json({ error: 'Could not validate quiz' }, { status: 500 });
-    }
-    if (!count || count === 0) {
-      return NextResponse.json({ error: 'No quiz for this article' }, { status: 400 });
-    }
-    if (answers.length !== count) {
-      return NextResponse.json({ error: `Expected ${count} answers` }, { status: 400 });
-    }
-  }
-
   if (kid_profile_id) {
     try {
       await assertKidOwnership(kid_profile_id, { userId: user.id });
@@ -71,6 +48,25 @@ export async function POST(request) {
   }
 
   const service = createServiceClient();
+
+  // Validate length against the article's actual quiz count rather than
+  // hardcoded 5 — quiz length is DB-driven (submit_quiz_attempt reads
+  // quizzes by article_id) and weekly recap / future variable-length
+  // quizzes want different counts. Previously rejected any length !== 5.
+  const { count: quizCount, error: countErr } = await service
+    .from('quizzes')
+    .select('*', { count: 'exact', head: true })
+    .eq('article_id', article_id);
+  if (countErr) {
+    console.error('[quiz.submit] count quizzes', countErr);
+    return NextResponse.json({ error: 'Could not validate quiz' }, { status: 500 });
+  }
+  if (!quizCount || quizCount === 0) {
+    return NextResponse.json({ error: 'No quiz for this article' }, { status: 400 });
+  }
+  if (answers.length !== quizCount) {
+    return NextResponse.json({ error: `Expected ${quizCount} answers` }, { status: 400 });
+  }
 
   // Rate-limit: 30 submits per minute per user. Generous enough for
   // legitimate retries / multi-tab edge cases; tight enough to stop a
