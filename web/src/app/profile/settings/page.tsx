@@ -1330,7 +1330,7 @@ function Row({ children, last }: { children: ReactNode; last?: boolean }): React
         alignItems: 'center',
         gap: S[3],
         padding: `${S[3]}px 0`,
-        borderBottom: last ? 'none' : `1px solid ${C.divider || C.border}`,
+        borderBottom: last ? 'none' : `1px solid ${C.border}`,
         flexWrap: 'wrap',
       }}
     >

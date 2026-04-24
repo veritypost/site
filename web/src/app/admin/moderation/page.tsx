@@ -147,8 +147,12 @@ function ModerationConsoleInner() {
         }
       }
       setRoleLevels(levelsMap);
-      const levelFor = (n: string | null) =>
-        (n && levelsMap[n]) ?? (n ? HIERARCHY_FALLBACK[n] : 0) ?? 0;
+      const levelFor = (n: string | null): number => {
+        if (!n) return 0;
+        const live = levelsMap[n];
+        if (typeof live === 'number') return live;
+        return HIERARCHY_FALLBACK[n] ?? 0;
+      };
       const maxLevel = Math.max(
         0,
         ...roleRows.map((r) => r.hierarchy_level ?? levelFor(r.name)),
@@ -211,10 +215,13 @@ function ModerationConsoleInner() {
     // will 403.
     const tMax = Math.max(
       0,
-      ...targetRoleRows.map((r) => {
+      ...targetRoleRows.map((r): number => {
         if (typeof r.hierarchy_level === 'number') return r.hierarchy_level;
         const n = r.name;
-        return (n && roleLevels[n]) ?? (n ? HIERARCHY_FALLBACK[n] : 0) ?? 0;
+        if (!n) return 0;
+        const live = roleLevels[n];
+        if (typeof live === 'number') return live;
+        return HIERARCHY_FALLBACK[n] ?? 0;
       }),
     );
     setTargetMaxLevel(tMax);

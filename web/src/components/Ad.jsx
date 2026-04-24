@@ -18,6 +18,14 @@ const ADSENSE_PUBLISHER_ID = process.env.NEXT_PUBLIC_ADSENSE_PUBLISHER_ID || '';
 // Props: placement (string, matches ad_placements.name), page (optional),
 // position (optional), articleId (optional for analytics).
 
+/**
+ * @param {{
+ *   placement: string,
+ *   page?: string,
+ *   position?: string,
+ *   articleId?: string | null,
+ * }} props
+ */
 export default function Ad({ placement, page = 'unknown', position = 'inline', articleId = null }) {
   const [ad, setAd] = useState(null);
   const [impressionId, setImpressionId] = useState(null);

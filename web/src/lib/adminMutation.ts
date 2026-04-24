@@ -140,9 +140,9 @@ export async function recordAdminAction(args: RecordAdminActionArgs): Promise<vo
     const authed = createClient();
     const { error } = await authed.rpc('record_admin_action', {
       p_action: args.action,
-      p_target_table: args.targetTable ?? null,
-      p_target_id: args.targetId ?? null,
-      p_reason: args.reason ?? null,
+      p_target_table: args.targetTable ?? undefined,
+      p_target_id: args.targetId ?? undefined,
+      p_reason: args.reason ?? undefined,
       p_old_value: (args.oldValue ?? null) as never,
       p_new_value: (args.newValue ?? null) as never,
     });

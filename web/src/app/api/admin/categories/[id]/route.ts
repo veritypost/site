@@ -256,11 +256,13 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         }
         if (seen.has(cursorId)) break; // pre-existing data corruption — bail safely
         seen.add(cursorId);
-        const { data: ancestor, error: ancErr } = await service
-          .from('categories')
-          .select('parent_id')
-          .eq('id', cursorId)
-          .maybeSingle();
+        const {
+          data: ancestor,
+          error: ancErr,
+        }: {
+          data: { parent_id: string | null } | null;
+          error: { message: string } | null;
+        } = await service.from('categories').select('parent_id').eq('id', cursorId).maybeSingle();
         if (ancErr) {
           console.error('[admin.categories.patch] ancestor walk failed:', ancErr.message);
           return NextResponse.json({ error: 'Could not validate parent chain' }, { status: 500 });

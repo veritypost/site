@@ -128,7 +128,7 @@ export async function POST(request: Request) {
     const { data: sentCount, error: pushErr } = await service.rpc('send_breaking_news', {
       p_article_id: (article as { id: string }).id,
       p_title: title,
-      p_body: story || null,
+      p_body: story || '',
     });
     if (pushErr) throw pushErr;
     return NextResponse.json({ ok: true, article, sent_count: sentCount ?? 0 });

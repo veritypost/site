@@ -22,6 +22,11 @@
 
 const NEXT_RX = /^\/[A-Za-z0-9\-_/.]*(?:\?[A-Za-z0-9\-_/.=&%]*)?(?:#[A-Za-z0-9\-_/.=&%]*)?$/;
 
+/**
+ * @param {unknown} raw
+ * @param {string | null} [fallback]
+ * @returns {string | null}
+ */
 export function resolveNext(raw, fallback = null) {
   if (typeof raw !== 'string') return fallback;
   if (raw.length === 0 || raw.length > 500) return fallback;

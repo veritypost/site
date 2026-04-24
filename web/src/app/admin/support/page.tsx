@@ -301,7 +301,7 @@ export default function SupportAdmin() {
         p_action: 'support.close',
         p_target_table: 'support_tickets',
         p_target_id: id,
-        p_reason: null,
+        p_reason: undefined,
         p_old_value: ticket
           ? { status: ticket.status, ticket_number: ticket.ticket_number }
           : { status: null },

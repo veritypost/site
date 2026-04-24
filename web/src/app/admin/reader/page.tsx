@@ -130,8 +130,8 @@ function ReaderInner() {
     const { error: auditErr } = await supabase.rpc('record_admin_action', {
       p_action: 'reader.config_update',
       p_target_table: 'settings',
-      p_target_id: null,
-      p_reason: null,
+      p_target_id: undefined,
+      p_reason: undefined,
       p_old_value: { key: settingKey, value: String(prev) },
       p_new_value: { key: settingKey, value: String(next) },
     });

@@ -397,7 +397,7 @@ export default function AdminPermissionsPage() {
       p_action: 'permission_set.remove_member',
       p_target_table: 'permission_set_perms',
       p_target_id: setId,
-      p_reason: null,
+      p_reason: undefined,
       p_old_value: { permission_set_id: setId, permission_id: permId },
       p_new_value: null,
     });
@@ -425,7 +425,7 @@ export default function AdminPermissionsPage() {
       p_action: 'permission_set.toggle_role',
       p_target_table: 'role_permission_sets',
       p_target_id: setId,
-      p_reason: null,
+      p_reason: undefined,
       p_old_value: { role_id: roleId, permission_set_id: setId, enabled: !!currentlyOn },
       p_new_value: { role_id: roleId, permission_set_id: setId, enabled: !currentlyOn },
     });
@@ -457,7 +457,7 @@ export default function AdminPermissionsPage() {
       p_action: 'permission_set.toggle_plan',
       p_target_table: 'plan_permission_sets',
       p_target_id: setId,
-      p_reason: null,
+      p_reason: undefined,
       p_old_value: { plan_id: planId, permission_set_id: setId, enabled: !!currentlyOn },
       p_new_value: { plan_id: planId, permission_set_id: setId, enabled: !currentlyOn },
     });

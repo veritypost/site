@@ -146,7 +146,7 @@ export default function AccessAdmin() {
       p_action: 'access_code.toggle',
       p_target_table: 'access_codes',
       p_target_id: code.id,
-      p_reason: null,
+      p_reason: undefined,
       p_old_value: { is_active: !!code.is_active, code: code.code },
       p_new_value: { is_active: next, code: code.code },
     });
@@ -184,7 +184,7 @@ export default function AccessAdmin() {
       p_action: 'access_code.update_expiry',
       p_target_table: 'access_codes',
       p_target_id: editExpiryCode.id,
-      p_reason: null,
+      p_reason: undefined,
       p_old_value: { expires_at: prevExpiry },
       p_new_value: { expires_at: iso },
     });
