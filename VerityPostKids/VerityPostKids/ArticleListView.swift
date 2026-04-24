@@ -16,6 +16,9 @@ struct ArticleListView: View {
     @State private var openArticle: KidArticle? = nil
 
     var onClose: () -> Void
+    // K10: quiz outcome propagates from KidReaderView up to KidsAppRoot so the
+    // celebration scene chain can present. Default no-op for previews/tests.
+    var onQuizComplete: (KidQuizResult) -> Void = { _ in }
 
     private var client: SupabaseClient { SupabaseKidsClient.shared.client }
 
@@ -63,7 +66,9 @@ struct ArticleListView: View {
                 }
             }
             .fullScreenCover(item: $openArticle) { article in
-                KidReaderView(article: article, categoryColor: categoryColor)
+                KidReaderView(article: article, categoryColor: categoryColor) { result in
+                    onQuizComplete(result)
+                }
             }
         }
         .task { await load() }

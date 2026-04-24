@@ -8,6 +8,11 @@ import Supabase
 struct KidReaderView: View {
     let article: KidArticle
     let categoryColor: Color
+    // K10: quiz outcome bubbles up so KidsAppRoot can present StreakScene /
+    // BadgeUnlockScene after the reader + article list unwind. Default no-op
+    // keeps existing callers (previews, future plain-reader presentations)
+    // compiling without passing a callback.
+    var onQuizComplete: (KidQuizResult) -> Void = { _ in }
 
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var auth: KidsAuth
@@ -65,9 +70,17 @@ struct KidReaderView: View {
                 dismissButton
             }
             .fullScreenCover(isPresented: $showQuiz) {
-                KidQuizEngineView(article: article, categoryColor: categoryColor) {
+                KidQuizEngineView(article: article, categoryColor: categoryColor) { result in
                     showQuiz = false
-                    dismiss()
+                    if let r = result {
+                        // Completed — propagate result up so KidsAppRoot can
+                        // unwind the article cover + present scene chain,
+                        // then dismiss the reader too.
+                        onQuizComplete(r)
+                        dismiss()
+                    }
+                    // Cancelled (X tapped in quiz): just close the quiz, stay
+                    // in the reader so the kid can re-read the article.
                 }
             }
         }

@@ -162,7 +162,19 @@ final class KidsAppState: ObservableObject {
 
     // MARK: Mutations
 
-    func completeQuiz(score scoreDelta: Int, biasedSpotted: Bool) -> QuizOutcome {
+    // K1: streak + score + badges only advance on a passing quiz. Failed
+    // quizzes previously bumped streakDays anyway (same return value, same
+    // celebration path) because there was no `passed` signal on the way in.
+    func completeQuiz(passed: Bool, score scoreDelta: Int, biasedSpotted: Bool) -> QuizOutcome {
+        guard passed else {
+            return QuizOutcome(
+                previousStreak: streakDays,
+                newStreak: streakDays,
+                milestone: nil,
+                badge: nil
+            )
+        }
+
         verityScore += scoreDelta
         quizzesPassed += 1
         let oldStreak = streakDays

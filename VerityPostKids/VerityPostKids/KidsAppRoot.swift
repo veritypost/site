@@ -4,9 +4,12 @@ import SwiftUI
 //   - Not paired → PairCodeView
 //   - Paired     → tab-bar app (Home | Ranks | Experts | Me) + scene full-screens
 //
-// Scene flow (from home):
-//   - Tap streak card  → StreakScene
-//   - Tap a category   → QuizPassScene → completeQuiz → StreakScene → BadgeUnlockScene
+// Scene flow:
+//   - Tap streak card   → StreakScene
+//   - Tap a category    → ArticleListView → KidReaderView → KidQuizEngineView
+//                         → on pass: StreakScene → (optional) BadgeUnlockScene
+//                         → on fail: no scenes (streak not bumped)
+//                         → on cancel (X): reader stays open, no scenes
 
 struct KidsAppRoot: View {
     @StateObject private var auth = KidsAuth()
@@ -14,7 +17,11 @@ struct KidsAppRoot: View {
 
     @State private var selectedTab: KidTab = .home
     @State private var activeSheet: ActiveSheet? = nil
-    @State private var queuedBadge: BadgeUnlockScene? = nil
+    // K10: when a quiz completes, StreakScene + BadgeUnlockScene enqueue here
+    // and are popped one at a time by handleDismiss. The queue replaces the
+    // old single-badge slot so passing milestone streaks + badges in the same
+    // session present in sequence instead of colliding.
+    @State private var sceneQueue: [ActiveSheet] = []
     @State private var sceneKey = UUID()
 
     private enum ActiveSheet: Identifiable {
@@ -113,7 +120,10 @@ struct KidsAppRoot: View {
                 categoryName: name,
                 categoryColor: color,
                 categorySlug: nil,
-                onClose: { activeSheet = nil }
+                onClose: { activeSheet = nil },
+                onQuizComplete: { result in
+                    handleQuizComplete(result)
+                }
             )
             .environmentObject(auth)
             .environmentObject(state)
@@ -138,26 +148,43 @@ struct KidsAppRoot: View {
         activeSheet = sheet
     }
 
-    private func completeQuiz() {
-        // Only used by scene dismiss — the real quiz engine writes attempts
-        // directly via KidQuizEngineView + advance_streak RPC.
-        let outcome = state.completeQuiz(score: 12, biasedSpotted: true)
-        queuedBadge = outcome.badge
-        let prev = outcome.previousStreak
-        let cur = outcome.newStreak
-        activeSheet = nil
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-            presentStreak(previous: prev, current: cur)
+    // K1 + K10: real quiz completion from KidQuizEngineView bubbles here via
+    // ArticleListView → onQuizComplete. completeQuiz(passed:) no-ops streak on
+    // failure. On pass, enqueue StreakScene + optional BadgeUnlockScene; they
+    // present one at a time via handleDismiss after the article sheet unwinds.
+    // Score per pass mirrors the server's approximate points rule (10 × correct
+    // answers) — the authoritative total lives in quiz_attempts; this local
+    // delta only drives the in-memory score animation.
+    private func handleQuizComplete(_ result: KidQuizResult) {
+        let scoreDelta = result.correctCount * 10
+        let outcome = state.completeQuiz(
+            passed: result.passed,
+            score: scoreDelta,
+            biasedSpotted: false
+        )
+
+        var queue: [ActiveSheet] = []
+        if outcome.newStreak != outcome.previousStreak {
+            queue.append(.streak(
+                previous: outcome.previousStreak,
+                current: outcome.newStreak,
+                milestone: outcome.milestone
+            ))
         }
+        if let badge = outcome.badge {
+            queue.append(.badge(badge))
+        }
+        sceneQueue = queue
+
+        activeSheet = nil
     }
 
     private func handleDismiss() {
-        if let badge = queuedBadge {
-            queuedBadge = nil
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                sceneKey = UUID()
-                activeSheet = .badge(badge)
-            }
+        guard !sceneQueue.isEmpty else { return }
+        let next = sceneQueue.removeFirst()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            sceneKey = UUID()
+            activeSheet = next
         }
     }
 

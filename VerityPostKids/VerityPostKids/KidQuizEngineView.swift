@@ -6,10 +6,20 @@ import Supabase
 // row per answer (bound to kid_profile_id via RLS), shows per-question
 // feedback, and ends with the V3 QuizPassScene or a "Try again" state.
 
+// K10: outcome payload handed back to KidReaderView → ArticleListView →
+// KidsAppRoot so the scene chain (StreakScene → BadgeUnlockScene) can
+// present based on real quiz state. `nil` in `onDone` means the kid
+// bailed (X button); a non-nil value means they completed the result view.
+struct KidQuizResult {
+    let passed: Bool
+    let correctCount: Int
+    let total: Int
+}
+
 struct KidQuizEngineView: View {
     let article: KidArticle
     let categoryColor: Color
-    var onDone: () -> Void
+    var onDone: (KidQuizResult?) -> Void
 
     @EnvironmentObject private var auth: KidsAuth
     @EnvironmentObject private var state: KidsAppState
@@ -47,7 +57,7 @@ struct KidQuizEngineView: View {
                 questionView
             }
 
-            Button { onDone() } label: {
+            Button { onDone(nil) } label: {
                 Image(systemName: "xmark")
                     .font(.scaledSystem(size: 14, weight: .heavy))
                     .foregroundStyle(K.text)
@@ -125,7 +135,7 @@ struct KidQuizEngineView: View {
                 .font(.scaledSystem(size: 15, weight: .semibold, design: .rounded))
                 .foregroundStyle(K.dim)
                 .multilineTextAlignment(.center)
-            Button { onDone() } label: {
+            Button { onDone(nil) } label: {
                 Text("Back")
                     .font(.scaledSystem(size: 14, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
@@ -302,31 +312,36 @@ struct KidQuizEngineView: View {
 
     // MARK: Result
 
-    private var resultView: some View {
+    private var currentResult: KidQuizResult {
         let total = questions.count
         let passed = correctCount >= max(1, Int(ceil(Double(total) * 0.6)))
+        return KidQuizResult(passed: passed, correctCount: correctCount, total: total)
+    }
+
+    private var resultView: some View {
+        let r = currentResult
         return VStack(spacing: 20) {
             Spacer()
             ZStack {
                 Circle()
-                    .fill(passed ? K.teal.opacity(0.15) : K.coral.opacity(0.15))
+                    .fill(r.passed ? K.teal.opacity(0.15) : K.coral.opacity(0.15))
                     .frame(width: 120, height: 120)
-                Image(systemName: passed ? "checkmark.seal.fill" : "arrow.counterclockwise.circle.fill")
+                Image(systemName: r.passed ? "checkmark.seal.fill" : "arrow.counterclockwise.circle.fill")
                     .font(.scaledSystem(size: 60, weight: .bold))
-                    .foregroundStyle(passed ? K.teal : K.coral)
+                    .foregroundStyle(r.passed ? K.teal : K.coral)
             }
 
-            Text(passed ? "Great job!" : "Give it another go?")
+            Text(r.passed ? "Great job!" : "Give it another go?")
                 .font(.scaledSystem(size: 28, weight: .black, design: .rounded))
                 .foregroundStyle(K.text)
 
-            Text("You got \(correctCount) of \(total) right.")
+            Text("You got \(r.correctCount) of \(r.total) right.")
                 .font(.scaledSystem(size: 15, weight: .semibold, design: .rounded))
                 .foregroundStyle(K.dim)
 
             Spacer()
 
-            Button { onDone() } label: {
+            Button { onDone(r) } label: {
                 Text("Done")
                     .font(.scaledSystem(size: 16, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
@@ -350,7 +365,7 @@ struct KidQuizEngineView: View {
                 .font(.scaledSystem(size: 15, weight: .semibold, design: .rounded))
                 .foregroundStyle(K.dim)
                 .multilineTextAlignment(.center)
-            Button { onDone() } label: {
+            Button { onDone(nil) } label: {
                 Text("Back")
                     .font(.scaledSystem(size: 14, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
