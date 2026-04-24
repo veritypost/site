@@ -15,7 +15,10 @@ import { verifyWebhook, retrieveSubscription } from '@/lib/stripe';
 //   checkout.session.completed        → resubscribe / change_plan
 //   customer.subscription.updated     → change_plan, cancel, or un-cancel
 //   customer.subscription.deleted     → freeze_profile
+//   invoice.payment_succeeded         → clear grace + keep plan active  (B2)
 //   invoice.payment_failed            → log + in-app notification
+//   invoice.upcoming                  → card-expiring notification      (B6)
+//   customer.deleted                  → clear orphan stripe_customer_id (B7)
 //   charge.refunded                   → revoke plan (freeze)
 //   charge.dispute.created            → flag for admin review
 //
@@ -47,6 +50,13 @@ export const dynamic = 'force-dynamic';
 // HMAC check. Checked twice: once against the declared Content-Length
 // (cheap, pre-read) and once against the actual buffered length.
 const MAX_BODY_SIZE = 1024 * 1024;
+
+// B4: a webhook_log row stuck at processing_status='processing' or 'received'
+// for more than this many seconds is assumed abandoned (prior invocation
+// crashed or timed out). The next retry can reclaim it for processing instead
+// of returning in_flight forever. Same tuning as the iOS notification reclaim
+// path (#30, commit 24b6675).
+const STUCK_PROCESSING_SECONDS = 5 * 60;
 
 export async function POST(request) {
   const sig = request.headers.get('stripe-signature');
@@ -93,7 +103,7 @@ export async function POST(request) {
     // constraint. Look up the existing row and decide what to do.
     const { data: prior } = await service
       .from('webhook_log')
-      .select('id, processing_status')
+      .select('id, processing_status, created_at')
       .eq('event_id', event.id)
       .maybeSingle();
 
@@ -108,11 +118,31 @@ export async function POST(request) {
       return NextResponse.json({ received: true, replay: true });
     }
     if (prior.processing_status === 'processing' || prior.processing_status === 'received') {
-      // Another invocation is handling it. 200 stops Stripe's retry
-      // cycle; the other invocation's completion update closes the loop.
-      return NextResponse.json({ received: true, in_flight: true });
-    }
-    if (prior.processing_status === 'failed') {
+      // B4: if the claim is older than STUCK_PROCESSING_SECONDS, assume the
+      // prior invocation crashed and try to reclaim. A conditional UPDATE
+      // on the same status + same id ensures only one racing retry wins.
+      const createdAt = Date.parse(prior.created_at || '');
+      const isStuck =
+        Number.isFinite(createdAt) && Date.now() - createdAt > STUCK_PROCESSING_SECONDS * 1000;
+      if (isStuck) {
+        const { data: reclaimed } = await service
+          .from('webhook_log')
+          .update({ processing_status: 'processing', processing_error: null })
+          .eq('id', prior.id)
+          .in('processing_status', ['processing', 'received'])
+          .select('id')
+          .maybeSingle();
+        if (reclaimed) {
+          logId = reclaimed.id;
+        } else {
+          return NextResponse.json({ received: true, in_flight: true });
+        }
+      } else {
+        // Another invocation is handling it. 200 stops Stripe's retry
+        // cycle; the other invocation's completion update closes the loop.
+        return NextResponse.json({ received: true, in_flight: true });
+      }
+    } else if (prior.processing_status === 'failed') {
       // Re-claim by conditional UPDATE; if two retries race here, only
       // one wins.
       const { data: reclaimed } = await service
@@ -146,8 +176,17 @@ export async function POST(request) {
       case 'customer.subscription.deleted':
         await handleSubscriptionDeleted(service, event.data.object);
         break;
+      case 'invoice.payment_succeeded':
+        await handlePaymentSucceeded(service, event.data.object);
+        break;
       case 'invoice.payment_failed':
         await handlePaymentFailed(service, event.data.object);
+        break;
+      case 'invoice.upcoming':
+        await handleInvoiceUpcoming(service, event.data.object);
+        break;
+      case 'customer.deleted':
+        await handleCustomerDeleted(service, event.data.object);
         break;
       case 'charge.refunded':
         await handleChargeRefunded(service, event.data.object);
@@ -546,4 +585,148 @@ async function handlePaymentFailed(service, invoice) {
     /* swallow — webhook ack takes precedence */
   }
   return invoice.id;
+}
+
+// B2 — invoice.payment_succeeded closes the loop on a subscription renewal
+// that landed cleanly. Prior gap: if customer.subscription.updated arrived
+// out of order with the payment result (rare, but Stripe doesn't guarantee
+// ordering), grace-period state could linger after the charge cleared. This
+// handler clears any outstanding grace marker + plan_status != 'active' on a
+// successful billing charge so the user doesn't sit in a soft-locked state
+// after paying.
+//
+// Scope: only touches users whose plan_status is NOT already 'active' OR has
+// a non-null plan_grace_period_ends_at. A no-op on the common path keeps the
+// webhook fast.
+async function handlePaymentSucceeded(service, invoice) {
+  // We only care about subscription-sourced invoices. One-off invoices
+  // (e.g. an admin manual charge) don't carry subscription state.
+  if (
+    invoice.billing_reason !== 'subscription_cycle' &&
+    invoice.billing_reason !== 'subscription_create' &&
+    invoice.billing_reason !== 'subscription_update'
+  ) {
+    return;
+  }
+  const customerId = invoice.customer;
+  if (!customerId) return;
+
+  const { userRow } = await lookupUserAndPlan(service, customerId, null);
+  if (!userRow) return;
+
+  // Only clear if something needs clearing.
+  if (userRow.plan_status === 'active' && !userRow.plan_grace_period_ends_at) {
+    return;
+  }
+
+  await service
+    .from('users')
+    .update({
+      plan_grace_period_ends_at: null,
+      plan_status: 'active',
+    })
+    .eq('id', userRow.id);
+
+  await service.from('audit_log').insert({
+    actor_id: userRow.id,
+    action: 'billing:payment_succeeded',
+    target_type: 'user',
+    target_id: userRow.id,
+    metadata: {
+      source: 'stripe_webhook',
+      invoice_id: invoice.id,
+      stripe_customer_id: customerId,
+      cleared: {
+        plan_grace_period_ends_at: userRow.plan_grace_period_ends_at || null,
+        prior_plan_status: userRow.plan_status || null,
+      },
+    },
+  });
+}
+
+// B6 — invoice.upcoming fires ~7 days before the next charge. We surface a
+// gentle in-app notification so users see the renewal before the card is
+// hit; card-expiring can be inferred from upcoming with a past-or-soon
+// customer.invoice_settings.default_payment_method.exp date, but Stripe
+// also sends a `billing.upcoming` paper trail without that data. For now
+// the notification is informational. Best-effort — any DB error is silent.
+async function handleInvoiceUpcoming(service, invoice) {
+  const customerId = invoice.customer;
+  if (!customerId) return;
+  try {
+    const { userRow } = await lookupUserAndPlan(service, customerId, null);
+    if (!userRow) return;
+    const amountDollars = Number.isFinite(invoice.amount_due)
+      ? (invoice.amount_due / 100).toFixed(2)
+      : null;
+    const currency = (invoice.currency || 'usd').toUpperCase();
+    const bodyAmount = amountDollars ? `${amountDollars} ${currency}` : 'your subscription';
+    await service.rpc('create_notification', {
+      p_user_id: userRow.id,
+      p_type: 'billing_alert',
+      p_title: 'Upcoming renewal',
+      p_body: `Your subscription renews soon for ${bodyAmount}. Update your card if anything's changed to avoid an interruption.`,
+      p_action_url: '/profile/settings/billing',
+      p_action_type: 'billing',
+      p_action_id: null,
+      p_priority: 'normal',
+      p_metadata: {
+        invoice_id: invoice.id,
+        stripe_customer_id: customerId,
+        amount_due: invoice.amount_due,
+        currency: invoice.currency,
+      },
+    });
+  } catch {
+    /* notification RPC best-effort — webhook ack takes precedence */
+  }
+}
+
+// B7 — customer.deleted orphans users.stripe_customer_id if it isn't cleared.
+// Our F-016 takeover defense then refuses a future upgrade because the dangling
+// customer id on the user row resolves to no live Stripe customer. Clear the
+// column so the next /api/stripe/checkout session can mint a fresh customer.
+//
+// A deleted customer should not carry a live subscription on our side; if a
+// row with plan_status='active' exists anyway we log a warning so an operator
+// notices, but don't auto-freeze — the cleaner handler for a real cancellation
+// is customer.subscription.deleted, which we already handle.
+async function handleCustomerDeleted(service, customer) {
+  const customerId = customer?.id;
+  if (!customerId) return;
+
+  const { data: userRow } = await service
+    .from('users')
+    .select('id, stripe_customer_id, plan_status, plan_id')
+    .eq('stripe_customer_id', customerId)
+    .maybeSingle();
+  if (!userRow) return;
+
+  if (userRow.plan_status === 'active') {
+    console.warn(
+      '[stripe.webhook] customer.deleted for user with active plan_status — ' +
+        `user_id=${userRow.id} customer_id=${customerId}`
+    );
+  }
+
+  await service
+    .from('users')
+    .update({ stripe_customer_id: null })
+    .eq('id', userRow.id)
+    // Guard against clobbering a user whose row was reassigned between the
+    // select + update — only clear if the same customer id still matches.
+    .eq('stripe_customer_id', customerId);
+
+  await service.from('audit_log').insert({
+    actor_id: userRow.id,
+    action: 'billing:customer_deleted',
+    target_type: 'user',
+    target_id: userRow.id,
+    metadata: {
+      source: 'stripe_webhook',
+      stripe_customer_id: customerId,
+      plan_status_at_delete: userRow.plan_status || null,
+      plan_id_at_delete: userRow.plan_id || null,
+    },
+  });
 }
