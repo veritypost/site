@@ -9,6 +9,14 @@ struct ProfileView: View {
     @EnvironmentObject private var auth: KidsAuth
     @EnvironmentObject private var state: KidsAppState
 
+    // K8: URL(string:) of a constant literal that we control and know is
+    // valid can't realistically fail, but force-unwrapping invites a future
+    // refactor from crashing if the string ever gets mutated into something
+    // malformed (e.g. DB-driven in a later release). force-literal `apex`
+    // remains the only place a `!` is safe, since the string is hardcoded
+    // to a real RFC 3986 URL with no interpolation.
+    private static let fallbackLegalURL = URL(string: "https://veritypost.com")!
+
     @State private var badges: [UserAchievement] = []
     @State private var loading: Bool = true
     @State private var loadError: String? = nil
@@ -59,12 +67,15 @@ struct ProfileView: View {
                 .foregroundStyle(K.dim)
 
             VStack(spacing: 0) {
+                // K8: drop force-unwraps. If the literal ever drifts to an
+                // invalid URL, a non-optional fallback keeps the row visible
+                // (tap falls back to the apex domain) instead of crashing.
                 aboutRow(label: "Privacy Policy",
-                         url: URL(string: "https://veritypost.com/privacy")!)
+                         url: URL(string: "https://veritypost.com/privacy") ?? Self.fallbackLegalURL)
                 Divider()
                     .background(K.border)
                 aboutRow(label: "Terms of Service",
-                         url: URL(string: "https://veritypost.com/terms")!)
+                         url: URL(string: "https://veritypost.com/terms") ?? Self.fallbackLegalURL)
             }
             .background(K.card)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
