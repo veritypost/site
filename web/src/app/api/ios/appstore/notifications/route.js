@@ -78,11 +78,23 @@ export async function POST(request) {
 
   const { data: prior } = await service
     .from('webhook_log')
-    .select('id, processing_status')
+    .select('id, processing_status, created_at')
     .eq('event_id', eventId)
     .maybeSingle();
   if (prior?.processing_status === 'processed') {
     return NextResponse.json({ received: true, replay: true });
+  }
+  // Reclaim stuck `received` rows — a prior invocation crashed after
+  // INSERT but before the `processed` transition, so the row sits
+  // forever while Apple retries return 200 via the short-circuit
+  // above. If the stuck row is younger than 5min, assume it's a
+  // concurrent duplicate and short-circuit; older than 5min, treat
+  // it as abandoned and re-run the handler against the existing id.
+  if (prior?.processing_status === 'received') {
+    const ageMs = prior.created_at ? Date.now() - Date.parse(prior.created_at) : 0;
+    if (ageMs < 5 * 60 * 1000) {
+      return NextResponse.json({ received: true, concurrent: true });
+    }
   }
 
   let logId = prior?.id;
