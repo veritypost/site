@@ -835,6 +835,18 @@ async function handlePaymentSucceeded(service, invoice) {
     })
     .eq('id', userRow.id);
 
+  // B1 tail — bump perms cache so paid-feature revocations from the
+  // prior grace window clear immediately when the user returns to
+  // 'active'. The four core billing RPCs bump internally per migration
+  // 148; this handler writes users directly (no RPC) so the bump was
+  // silently skipped. See MASTER_FIX_LIST C27 + Q-CON-01.
+  const { error: bumpErr } = await service.rpc('bump_user_perms_version', {
+    p_user_id: userRow.id,
+  });
+  if (bumpErr) {
+    console.error('[stripe.webhook.payment_succeeded.bump_err]', bumpErr.message);
+  }
+
   await service.from('audit_log').insert({
     actor_id: userRow.id,
     action: 'billing:payment_succeeded',
