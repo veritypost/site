@@ -67,6 +67,12 @@ function ReportsAdminInner() {
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [selected, setSelected] = useState<ReportItem | null>(null);
   const [targetComment, setTargetComment] = useState<TargetComment | null>(null);
+  // C23 mirror — actor and target hierarchy levels so penalty buttons
+  // disable when the operator does not strictly outrank the comment
+  // author. Server-side `require_outranks` enforces the same rule at
+  // the RPC; UI mirrors it so a doomed action is never offered.
+  const [actorMaxLevel, setActorMaxLevel] = useState(0);
+  const [targetMaxLevel, setTargetMaxLevel] = useState(0);
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState('');
   const [destructive, setDestructive] = useState<DestructiveState>(null);
@@ -77,15 +83,21 @@ function ReportsAdminInner() {
       if (!user) { router.push('/'); return; }
       const { data: userRoles } = await supabase
         .from('user_roles')
-        .select('roles(name)')
+        .select('roles(name, hierarchy_level)')
         .eq('user_id', user.id);
-      const names = (userRoles || [])
-        .map((r) => (r as { roles?: { name?: string | null } | null }).roles?.name)
-        .filter((n): n is string => Boolean(n));
+      const roleRows = (userRoles || [])
+        .map((r) => (r as { roles?: { name?: string | null; hierarchy_level?: number | null } | null }).roles)
+        .filter((r): r is { name: string | null; hierarchy_level?: number | null } => Boolean(r));
+      const names = roleRows.map((r) => r.name).filter((n): n is string => Boolean(n));
       if (!names.some((n) => MOD_ROLES.has(n))) {
         router.push('/');
         return;
       }
+      const maxLevel = Math.max(
+        0,
+        ...roleRows.map((r) => (typeof r.hierarchy_level === 'number' ? r.hierarchy_level : 0)),
+      );
+      setActorMaxLevel(maxLevel);
       setAuthorized(true);
       setLoading(false);
     })();
@@ -122,13 +134,31 @@ function ReportsAdminInner() {
     setSelected(r);
     setNotes('');
     setTargetComment(null);
+    setTargetMaxLevel(0);
     if (r.target_type === 'comment') {
       const { data } = await supabase
         .from('comments')
         .select('id, body, article_id, user_id, status, users!fk_comments_user_id(username, avatar_color)')
         .eq('id', r.target_id)
         .maybeSingle();
-      setTargetComment((data as unknown as TargetComment | null) || null);
+      const comment = (data as unknown as TargetComment | null) || null;
+      setTargetComment(comment);
+      // C23 mirror — load the comment author's roles to compute their
+      // max hierarchy level so penalty buttons can disable when the
+      // actor does not strictly outrank them.
+      if (comment?.user_id) {
+        const { data: targetRoles } = await supabase
+          .from('user_roles')
+          .select('roles(hierarchy_level)')
+          .eq('user_id', comment.user_id);
+        const tMax = Math.max(
+          0,
+          ...((targetRoles || [])
+            .map((row) => (row as { roles?: { hierarchy_level?: number | null } | null }).roles?.hierarchy_level)
+            .filter((n): n is number => typeof n === 'number')),
+        );
+        setTargetMaxLevel(tMax);
+      }
     }
   }
 
@@ -349,10 +379,24 @@ function ReportsAdminInner() {
                     ) : (
                       <Badge variant="neutral">Already hidden</Badge>
                     )}
-                    <Button variant="secondary" size="sm" onClick={() => penaltyLevel(1)}>Warn author</Button>
-                    <Button variant="secondary" size="sm" onClick={() => penaltyLevel(2)}>24h mute</Button>
-                    <Button variant="secondary" size="sm" onClick={() => penaltyLevel(3)}>7-day mute</Button>
-                    <Button variant="danger" size="sm" onClick={() => penaltyLevel(4)}>Ban</Button>
+                    {(() => {
+                      // C23 mirror — strict outrank: actor must be
+                      // STRICTLY above target to apply any penalty.
+                      // Server enforces via F-036; UI mirrors so the
+                      // button doesn't dangle a doomed action.
+                      const cannotPenalise = actorMaxLevel <= targetMaxLevel;
+                      const title = cannotPenalise
+                        ? 'You do not outrank this user'
+                        : undefined;
+                      return (
+                        <>
+                          <Button variant="secondary" size="sm" disabled={cannotPenalise} title={title} onClick={() => penaltyLevel(1)}>Warn author</Button>
+                          <Button variant="secondary" size="sm" disabled={cannotPenalise} title={title} onClick={() => penaltyLevel(2)}>24h mute</Button>
+                          <Button variant="secondary" size="sm" disabled={cannotPenalise} title={title} onClick={() => penaltyLevel(3)}>7-day mute</Button>
+                          <Button variant="danger" size="sm" disabled={cannotPenalise} title={title} onClick={() => penaltyLevel(4)}>Ban</Button>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               )}
