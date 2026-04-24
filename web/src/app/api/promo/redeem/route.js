@@ -146,20 +146,51 @@ export async function POST(request) {
       );
     }
 
-    await supabase
+    // B5 — route plan set through the same billing RPC Stripe webhook uses
+    // so both paths serialize on the users row via FOR UPDATE. Previous
+    // code UPDATE'd users.plan_id directly, racing the webhook: two
+    // concurrent writes could leave users.plan_id diverged from
+    // subscriptions.plan_id, and compute_effective_perms would read the
+    // wrong tier's capabilities. billing_change_plan also:
+    //   - writes subscriptions row + subscription_events audit trail
+    //   - clears plan_grace_period_ends_at
+    //   - calls bump_user_perms_version internally (supersedes the route's
+    //     post-update bump — removed below)
+    //   - converts Family-plan trial kids via convert_kid_trial
+    //
+    // Frozen users (plan_status='frozen', frozen_at set) hit a guard in
+    // billing_change_plan; route them through billing_resubscribe instead
+    // so the promo both unfreezes + upgrades in one atomic call. We pre-read
+    // the user row once to branch cleanly (the RPCs themselves re-take the
+    // FOR UPDATE so there's no TOCTOU window for the actual mutation).
+    const { data: userRow } = await supabase
       .from('users')
-      .update({ plan_id: plan.id, plan_status: 'active' })
-      .eq('id', user.id);
-
-    // B1 — perms cache invalidation. The four billing_* RPCs now bump
-    // internally (migration 148), but this route writes users.plan_id
-    // directly without going through them. Single route-level bump
-    // covers the only direct-write callsite. Best-effort; the plan
-    // change is already committed.
-    const { error: bumpErr } = await supabase.rpc('bump_user_perms_version', {
+      .select('frozen_at, plan_id')
+      .eq('id', user.id)
+      .single();
+    const rpcName = userRow?.frozen_at ? 'billing_resubscribe' : 'billing_change_plan';
+    const { error: rpcErr } = await supabase.rpc(rpcName, {
       p_user_id: user.id,
+      p_new_plan_id: plan.id,
     });
-    if (bumpErr) console.error('[promo.redeem] perms_version bump failed:', bumpErr.message);
+    if (rpcErr) {
+      console.error(`[promo.redeem] ${rpcName} failed:`, rpcErr);
+      // Roll back both the promo_uses insert + current_uses claim.
+      await supabase
+        .from('promo_uses')
+        .delete()
+        .eq('promo_code_id', promo.id)
+        .eq('user_id', user.id);
+      await supabase
+        .from('promo_codes')
+        .update({ current_uses: promo.current_uses })
+        .eq('id', promo.id)
+        .eq('current_uses', promo.current_uses + 1);
+      return NextResponse.json(
+        { error: 'Could not apply plan change. Please try again.' },
+        { status: 500 }
+      );
+    }
 
     // F-013 — audit every promo-driven plan upgrade for abuse review.
     await supabase.from('audit_log').insert({
