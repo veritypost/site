@@ -178,6 +178,12 @@ struct KidsAppRoot: View {
     // Score per pass mirrors the server's approximate points rule (10 × correct
     // answers) — the authoritative total lives in quiz_attempts; this local
     // delta only drives the in-memory score animation.
+    //
+    // K4: when result.writeFailures > 0, one or more reading_log / quiz_attempts
+    // writes didn't persist. We still mark the local pass so UI state stays in
+    // sync with the kid's actions, but we SKIP the celebration scenes — the
+    // kid shouldn't see "Day 8!" for a streak the DB trigger never fired. The
+    // next app launch resyncs streakDays from kid_profiles.streak_current.
     private func handleQuizComplete(_ result: KidQuizResult) {
         let scoreDelta = result.correctCount * 10
         let outcome = state.completeQuiz(
@@ -187,15 +193,19 @@ struct KidsAppRoot: View {
         )
 
         var queue: [ActiveSheet] = []
-        if outcome.newStreak != outcome.previousStreak {
-            queue.append(.streak(
-                previous: outcome.previousStreak,
-                current: outcome.newStreak,
-                milestone: outcome.milestone
-            ))
-        }
-        if let badge = outcome.badge {
-            queue.append(.badge(badge))
+        if result.writeFailures == 0 {
+            if outcome.newStreak != outcome.previousStreak {
+                queue.append(.streak(
+                    previous: outcome.previousStreak,
+                    current: outcome.newStreak,
+                    milestone: outcome.milestone
+                ))
+            }
+            if let badge = outcome.badge {
+                queue.append(.badge(badge))
+            }
+        } else {
+            print("[KidsAppRoot] quiz completion had \(result.writeFailures) persistence failure(s); suppressing celebration scenes")
         }
         sceneQueue = queue
 

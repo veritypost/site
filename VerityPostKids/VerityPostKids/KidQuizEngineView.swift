@@ -10,15 +10,25 @@ import Supabase
 // KidsAppRoot so the scene chain (StreakScene → BadgeUnlockScene) can
 // present based on real quiz state. `nil` in `onDone` means the kid
 // bailed (X button); a non-nil value means they completed the result view.
+//
+// K4: writeFailures counts quiz_attempts rows that failed to land after a
+// single retry. Scene code reads this and suppresses streak-bump animations
+// when the underlying persistence didn't actually happen (otherwise the kid
+// sees "Day 8!" and the DB never ticked).
 struct KidQuizResult {
     let passed: Bool
     let correctCount: Int
     let total: Int
+    let writeFailures: Int
 }
 
 struct KidQuizEngineView: View {
     let article: KidArticle
     let categoryColor: Color
+    // K4: forwarded from the reader so writeFailures reflects BOTH the
+    // reading_log double-fail and any quiz_attempts double-fails. Scenes
+    // can check `result.writeFailures > 0` once.
+    var readingLogFailed: Bool = false
     var onDone: (KidQuizResult?) -> Void
 
     @EnvironmentObject private var auth: KidsAuth
@@ -33,6 +43,10 @@ struct KidQuizEngineView: View {
     @State private var loadError: String? = nil
     @State private var startedAt: Date = Date()
     @State private var showResult: Bool = false
+    // K4: per-quiz-session counter of writeAttempt calls that failed both
+    // primary + retry. Surfaced via KidQuizResult so celebration scenes can
+    // avoid celebrating a streak bump that didn't persist.
+    @State private var writeFailures: Int = 0
     // Apple Kids Category review — the quiz must refuse to load if the
     // article isn't kids-safe, even though navigation through the rest of
     // the kids app should never produce a non-safe article. Defense in
@@ -296,17 +310,23 @@ struct KidQuizEngineView: View {
         )
         // T-018 — single retry then log. Prior code swallowed silently,
         // causing leaderboard + streak drift on transient network blips.
-        // Parent-visible telemetry path: follow-up when /api/kids/errors lands.
+        // K4 — bump writeFailures on second fail so KidQuizResult reflects
+        // unpersisted state. Celebration scenes read it to soften claims
+        // ("Keep reading to lock this in" vs "Day 8!") when the write stack
+        // is degraded. Parent-visible telemetry path: follow-up when
+        // /api/kids/errors lands.
+        do {
+            try await client.from("quiz_attempts").insert(attempt).execute()
+            return
+        } catch {
+            print("[KidQuizEngineView] quiz_attempts insert failed:", error)
+        }
+        try? await Task.sleep(nanoseconds: 1_000_000_000)
         do {
             try await client.from("quiz_attempts").insert(attempt).execute()
         } catch {
-            print("[KidQuizEngineView] quiz_attempts insert failed:", error)
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
-            do {
-                try await client.from("quiz_attempts").insert(attempt).execute()
-            } catch {
-                print("[KidQuizEngineView] quiz_attempts insert failed on retry:", error)
-            }
+            print("[KidQuizEngineView] quiz_attempts insert failed on retry:", error)
+            writeFailures += 1
         }
     }
 
@@ -315,7 +335,14 @@ struct KidQuizEngineView: View {
     private var currentResult: KidQuizResult {
         let total = questions.count
         let passed = correctCount >= max(1, Int(ceil(Double(total) * 0.6)))
-        return KidQuizResult(passed: passed, correctCount: correctCount, total: total)
+        // Reader-side reading_log double-fail counts as one extra write failure.
+        let totalFailures = writeFailures + (readingLogFailed ? 1 : 0)
+        return KidQuizResult(
+            passed: passed,
+            correctCount: correctCount,
+            total: total,
+            writeFailures: totalFailures
+        )
     }
 
     private var resultView: some View {

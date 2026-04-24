@@ -23,6 +23,10 @@ struct KidReaderView: View {
     @State private var startTime: Date = Date()
     @State private var logged: Bool = false
     @State private var showQuiz: Bool = false
+    // K4: set when logReading's retry also fails. Propagated into the
+    // KidQuizResult so celebration scenes know a streak-day's read
+    // didn't actually persist.
+    @State private var readingLogFailed: Bool = false
 
     private var client: SupabaseClient { SupabaseKidsClient.shared.client }
 
@@ -70,7 +74,11 @@ struct KidReaderView: View {
                 dismissButton
             }
             .fullScreenCover(isPresented: $showQuiz) {
-                KidQuizEngineView(article: article, categoryColor: categoryColor) { result in
+                KidQuizEngineView(
+                    article: article,
+                    categoryColor: categoryColor,
+                    readingLogFailed: readingLogFailed
+                ) { result in
                     showQuiz = false
                     if let r = result {
                         // Completed — propagate result up so KidsAppRoot can
@@ -128,11 +136,25 @@ struct KidReaderView: View {
                 .foregroundStyle(K.text)
 
             Button {
+                // K4: await the reading_log write so we can tell the quiz
+                // engine (via the result struct the quiz will later produce)
+                // whether the kid's read actually persisted. Non-blocking UX:
+                // we still open the quiz even on double-fail — the kid
+                // shouldn't be punished for a transient network issue —
+                // but the celebration flow gets signaled.
                 if !logged {
                     logged = true
-                    Task { await logReading() }
+                    Task {
+                        do {
+                            try await logReading()
+                        } catch {
+                            readingLogFailed = true
+                        }
+                        showQuiz = true
+                    }
+                } else {
+                    showQuiz = true
                 }
-                showQuiz = true
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "questionmark.circle.fill")
@@ -198,7 +220,7 @@ struct KidReaderView: View {
         }
     }
 
-    private func logReading() async {
+    private func logReading() async throws {
         guard let kidId = auth.kid?.id else { return }
         let elapsed = Int(Date().timeIntervalSince(startTime))
         let row = ReadingLogInsert(
@@ -211,24 +233,25 @@ struct KidReaderView: View {
             source: "kids-ios",
             device_type: "ios"
         )
-        // T-018 — single retry then log. Prior empty catch swallowed
-        // failures silently; kid saw their streak "tick" locally while
-        // the DB trigger never fired. Retry + log closes the loudest
-        // data-loss vector. Parent-visible telemetry TBD.
+        // T-018 — single retry then log. K4 — throw on second failure so the
+        // caller (takeQuiz button → KidQuizResult flag) can tell celebration
+        // scenes the write didn't land. Quiz can still be taken; scene code
+        // decides how to soften the streak claim.
         do {
             try await client
                 .from("reading_log")
                 .insert(row)
                 .execute()
+            return
         } catch {
             print("[KidReaderView] reading_log insert failed:", error)
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
-            do {
-                try await client.from("reading_log").insert(row).execute()
-            } catch {
-                print("[KidReaderView] reading_log insert failed on retry:", error)
-            }
-            // Quiz can still be taken. Logged locally in future.
+        }
+        try? await Task.sleep(nanoseconds: 1_000_000_000)
+        do {
+            try await client.from("reading_log").insert(row).execute()
+        } catch {
+            print("[KidReaderView] reading_log insert failed on retry:", error)
+            throw error
         }
     }
 }
