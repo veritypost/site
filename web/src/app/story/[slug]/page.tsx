@@ -765,7 +765,15 @@ export default function StoryPage() {
   };
 
   const toggleBookmark = async () => {
-    if (!currentUser || !story) return;
+    if (!story) return;
+    // Anon: route to signup with a `next=` so they bounce back here
+    // after creating an account. Previously this was a silent no-op
+    // ("looks like the button works, does nothing") — flagged HIGH by
+    // the user-journey audit (CLAUDE.md: no silent failures).
+    if (!currentUser) {
+      window.location.href = `/signup?next=${encodeURIComponent('/story/' + story.slug)}`;
+      return;
+    }
     setBookmarkError('');
     if (bookmarked && bookmarkId) {
       const res = await fetch(`/api/bookmarks/${bookmarkId}`, { method: 'DELETE' });
@@ -786,12 +794,14 @@ export default function StoryPage() {
       if (res.ok && data?.id) {
         setBookmarked(true);
         setBookmarkId(data.id);
+      } else if (res.status === 422 && data?.error) {
+        // 422 = trigger-raised cap message (`enforce_bookmark_cap` →
+        // P0001 → safeErrorResponse passthrough). Carries actual copy
+        // like "Bookmark limit reached (max N on your plan). Upgrade
+        // for unlimited." Surface it directly so readers know to
+        // upgrade, not just that "something failed".
+        setBookmarkError(data.error);
       } else {
-        // M-11: dedupe cap messaging — the inline banner is the single
-        // source of truth for the at-cap state (the button is disabled
-        // at cap anyway, so this branch is unreachable under normal
-        // use). Fall through to the generic failure copy for edge
-        // cases. Also resolves L-04 (curly-apostrophe copy removed).
         setBookmarkError('Could not save bookmark. Please try again.');
       }
     }
@@ -1484,10 +1494,19 @@ export default function StoryPage() {
                   </div>
                 )}
 
-                {/* Report */}
+                {/* Report — anon: route to signup with `next=` so the
+                    submit doesn't 401 inside an opened modal (silent
+                    dead-end flagged HIGH by the user-journey audit).
+                    Authed: open modal as before. */}
                 <div style={{ marginTop: 24, textAlign: 'right' }}>
                   <button
-                    onClick={() => setShowReportModal(true)}
+                    onClick={() => {
+                      if (!currentUser) {
+                        window.location.href = `/signup?next=${encodeURIComponent('/story/' + story.slug)}`;
+                        return;
+                      }
+                      setShowReportModal(true);
+                    }}
                     style={{
                       background: 'transparent',
                       border: 'none',

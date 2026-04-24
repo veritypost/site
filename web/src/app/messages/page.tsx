@@ -2,6 +2,7 @@
 // @feature-verified messaging 2026-04-18
 'use client';
 import { useState, useEffect, useRef, CSSProperties } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { createClient } from '../../lib/supabase/client';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import { useFocusTrap } from '../../lib/useFocusTrap';
@@ -82,6 +83,14 @@ interface PostgresChangePayload<T> {
 
 export default function MessagesPage() {
   const supabase = createClient();
+  const searchParams = useSearchParams();
+  // `?to=<userId>` deep-link entry — replaces the phantom `/messages/new`
+  // route that two callers (u/[username] + profile/[id] DM CTAs) used to
+  // point at. When set, opens (or creates) a conversation with that user
+  // once auth + the conversations list are ready. Fires once via the ref
+  // so a stale `?to=` doesn't keep firing on every render.
+  const toParam = searchParams.get('to');
+  const dmIntentHandled = useRef<string | null>(null);
 
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authLoaded, setAuthLoaded] = useState<boolean>(false);
@@ -550,6 +559,17 @@ export default function MessagesPage() {
     setSelected(convo.id);
     setShowSearch(false);
   };
+
+  // ?to=<userId> auto-open. Waits for auth + conversations + canCompose,
+  // then runs startConversation once. Replaces the phantom /messages/new
+  // route. See `dmIntentHandled` ref above.
+  useEffect(() => {
+    if (!toParam) return;
+    if (!currentUser || !canCompose || loading) return;
+    if (dmIntentHandled.current === toParam) return;
+    dmIntentHandled.current = toParam;
+    startConversation(toParam);
+  }, [toParam, currentUser, canCompose, loading]);
 
   // R13-C5 Fix 2 — Block the other participant in the currently-open convo.
   // Route toggles, so one POST either blocks or unblocks; we surface both

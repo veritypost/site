@@ -119,6 +119,12 @@ export default function HomePage() {
   const [categoryById, setCategoryById] = useState<Record<string, CategoryRow>>({});
   const [breaking, setBreaking] = useState<HomeStory | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  // Distinct from "no articles today" — set when the fetch itself failed
+  // (RLS, network, 5xx). Without this branch, every fetch failure renders
+  // as the empty-state EmptyDay, which silently lies. Per user-journey
+  // audit 2026-04-23.
+  const [loadFailed, setLoadFailed] = useState<boolean>(false);
+  const [reloadKey, setReloadKey] = useState<number>(0);
 
   const [canBreakingBanner, setCanBreakingBanner] = useState<boolean>(false);
   const [canBreakingBannerPaid, setCanBreakingBannerPaid] = useState<boolean>(false);
@@ -144,6 +150,7 @@ export default function HomePage() {
     let cancelled = false;
     async function fetchData() {
       setLoading(true);
+      setLoadFailed(false);
 
       const [storiesRes, breakingRes, catsRes] = await Promise.all([
         supabase
@@ -168,6 +175,20 @@ export default function HomePage() {
       ]);
 
       if (cancelled) return;
+
+      // If the primary fetch errored we don't know whether today is empty
+      // or the request failed — surface a retry banner instead of the
+      // empty-state UI which would silently lie. The breaking + categories
+      // queries are decorative; only the stories failure flips this.
+      if (storiesRes.error) {
+        console.error('[home.fetch.stories]', storiesRes.error.message);
+        setStories([]);
+        setBreaking(null);
+        setCategoryById({});
+        setLoadFailed(true);
+        setLoading(false);
+        return;
+      }
 
       const raw = (storiesRes.data as HomeStory[] | null) || [];
       // Sort hero-pick first, then most-recent. Done client-side because
@@ -200,7 +221,7 @@ export default function HomePage() {
     return () => {
       cancelled = true;
     };
-  }, [supabase, today.isoDate, today.startUtc]);
+  }, [supabase, today.isoDate, today.startUtc, reloadKey]);
 
   const hero = stories[0] || null;
   const supporting = stories.slice(1, 8);
@@ -238,7 +259,9 @@ export default function HomePage() {
           </p>
         )}
 
-        {!loading && !hero && <EmptyDay loggedIn={loggedIn} />}
+        {!loading && loadFailed && <FetchFailed onRetry={() => setReloadKey((k) => k + 1)} />}
+
+        {!loading && !loadFailed && !hero && <EmptyDay loggedIn={loggedIn} />}
 
         {!loading && hero && (
           <Hero
@@ -616,6 +639,50 @@ function EmptyDay({ loggedIn }: { loggedIn: boolean }) {
           </Link>
         </p>
       ) : null}
+    </section>
+  );
+}
+
+// Distinct from EmptyDay — fires when the fetch itself errored. Without
+// this branch, RLS / network / 5xx errors silently render as "no stories
+// today", which lies to the reader. Retry rebuilds the data fetch.
+function FetchFailed({ onRetry }: { onRetry: () => void }) {
+  return (
+    <section
+      aria-label="Couldn't load today's front page"
+      style={{ textAlign: 'center', padding: '64px 0' }}
+    >
+      <p
+        style={{
+          fontFamily: serifStack,
+          fontStyle: 'italic',
+          fontSize: 16,
+          color: C.dim,
+          margin: 0,
+        }}
+      >
+        Couldn&rsquo;t reach the newsroom.
+      </p>
+      <p style={{ margin: '20px 0 0' }}>
+        <button
+          type="button"
+          onClick={onRetry}
+          style={{
+            fontFamily: serifStack,
+            fontSize: 15,
+            color: C.accent,
+            background: 'transparent',
+            border: 'none',
+            padding: 0,
+            cursor: 'pointer',
+            textDecoration: 'underline',
+            textUnderlineOffset: 4,
+            fontWeight: 500,
+          }}
+        >
+          Try again &rarr;
+        </button>
+      </p>
     </section>
   );
 }

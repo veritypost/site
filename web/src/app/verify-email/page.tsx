@@ -314,6 +314,82 @@ export default function VerifyEmailPage() {
     );
   }
 
+  // Anon URL-poke (or expired session) — getUser() returned null and
+  // status flipped to 'waiting'. The "Check your email" + Resend flow
+  // makes no sense without an email address. Render a Sign in / Create
+  // account fork instead so the visitor isn't stranded with a dead
+  // Resend button. Per user-journey audit 2026-04-23.
+  if (status === 'waiting' && !userEmail) {
+    return (
+      <div style={shell}>
+        <div style={{ ...card, padding: '44px 36px' }}>
+          <div style={wordmark}>Verity Post</div>
+          <h1
+            style={{
+              fontSize: '26px',
+              fontWeight: 700,
+              color: C.text,
+              margin: '0 0 10px 0',
+              letterSpacing: '-0.01em',
+            }}
+          >
+            Verify your email
+          </h1>
+          <p
+            style={{
+              fontSize: '14px',
+              color: C.dim,
+              margin: '0 0 26px 0',
+              lineHeight: 1.55,
+            }}
+          >
+            Sign in to your account to resend the verification link, or create a new account to
+            start.
+          </p>
+          <a
+            href="/login"
+            style={{
+              display: 'block',
+              width: '100%',
+              padding: '13px',
+              fontSize: '15px',
+              fontWeight: 600,
+              color: '#fff',
+              backgroundColor: C.accent,
+              border: 'none',
+              borderRadius: '10px',
+              textDecoration: 'none',
+              marginBottom: '14px',
+              minHeight: 48,
+              boxSizing: 'border-box',
+            }}
+          >
+            Sign in
+          </a>
+          <a
+            href="/signup"
+            style={{
+              display: 'block',
+              width: '100%',
+              padding: '13px',
+              fontSize: '14px',
+              fontWeight: 500,
+              color: C.accent,
+              backgroundColor: C.bg,
+              border: `1px solid ${C.border}`,
+              borderRadius: '10px',
+              textDecoration: 'none',
+              minHeight: 48,
+              boxSizing: 'border-box',
+            }}
+          >
+            Create free account
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   // waiting
   return (
     <div style={shell}>

@@ -596,9 +596,9 @@ export default function PublicProfilePage() {
                 {followLoading ? '…' : isFollowing ? 'Following' : 'Follow'}
               </button>
             )}
-            {!isSelf && canDm && (
+            {!isSelf && canDm && user?.id && (
               <a
-                href={`/messages/new?to=${user?.id || ''}`}
+                href={`/messages?to=${user.id}`}
                 style={{
                   ...actionButton,
                   background: C.card,

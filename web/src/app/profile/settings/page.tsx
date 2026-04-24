@@ -4163,7 +4163,7 @@ function BillingBundle({
           <ConfirmDialog
             open={confirmCancel}
             title="Cancel subscription?"
-            message="DMs turn off immediately. Everything else stays on for 7 days, then your profile freezes."
+            message="Cancellation takes effect at the end of the current billing period — you keep access until then. DMs turn off immediately. After the period ends there's a 7-day grace window, then your profile freezes."
             confirmLabel="Yes, cancel"
             variant="danger"
             busy={busy === 'cancel'}

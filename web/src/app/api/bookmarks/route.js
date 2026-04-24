@@ -5,6 +5,7 @@ import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { v2LiveGuard } from '@/lib/featureFlags';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // POST /api/bookmarks — create. Cap enforced by trigger.
 // Body: { article_id, collection_id?, notes? }
@@ -51,8 +52,16 @@ export async function POST(request) {
     .select('id')
     .single();
   if (error) {
-    console.error('[bookmarks.POST]', error);
-    return NextResponse.json({ error: 'Could not save bookmark' }, { status: 400 });
+    // P0001 from `enforce_bookmark_cap` carries the actual cap message
+    // ("Bookmark limit reached (max N on your plan). Upgrade for unlimited.")
+    // — pass it through at 422 instead of swallowing into a generic 400.
+    // safeErrorResponse maps P0001 → 422 with message passthrough; other
+    // codes fall back to "Could not save bookmark" at 400.
+    return safeErrorResponse(NextResponse, error, {
+      route: 'bookmarks.POST',
+      fallbackStatus: 400,
+      fallbackMessage: 'Could not save bookmark',
+    });
   }
   return NextResponse.json({ id: data.id });
 }

@@ -456,7 +456,7 @@ export default function ProfilePage() {
               )}
               {/* Pass 17 / UJ-609: Send message gated on DM compose permission. */}
               {canSendDm && (
-                <a href={`/messages/new?to=${target.id}`} style={dmLinkStyle}>
+                <a href={`/messages?to=${target.id}`} style={dmLinkStyle}>
                   Send message
                 </a>
               )}

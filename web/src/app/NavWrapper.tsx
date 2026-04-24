@@ -220,9 +220,13 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
   //   showTopBar  — "verity post" wordmark + search icon. Shown on home
   //                 AND on all standard content pages. Hidden on auth,
   //                 admin, ideas preview, and story reader.
-  //   showNav     — bottom 4-item nav bar. Hidden on home (no sign-up
-  //                 push pre-launch), plus all the same surfaces the
-  //                 top bar is hidden on.
+  //   showNav     — bottom nav bar. Hidden on home FOR ANON only — the
+  //                 anon home is meant to read like a publication, not a
+  //                 product (no sign-up push). Logged-in users get the
+  //                 nav on home so they can reach Notifications / Most
+  //                 Informed / Profile from the most-visited surface
+  //                 (was a strand-on-home defect flagged by audit
+  //                 2026-04-23).
   //   showFooter  — Help/Contact/Privacy strip. Follows showTopBar so
   //                 the legal + support links are reachable wherever
   //                 the brand is visible, including home.
@@ -234,7 +238,8 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
   // the wordmark to return home; bottom nav and footer stay off there to
   // keep the reading viewport clean.
   const showTopBar = mounted && SHOW_TOP_BAR && !fullyBare;
-  const showNav = mounted && SHOW_BOTTOM_NAV && !fullyBare && !isStory(path) && path !== '/';
+  const showNav =
+    mounted && SHOW_BOTTOM_NAV && !fullyBare && !isStory(path) && !(path === '/' && !loggedIn);
   const showFooter = mounted && SHOW_FOOTER && !fullyBare && !isStory(path);
   const onAdminPage = mounted && isAdmin(path);
   // UJ-200 (Pass 17): banner is strictly admin+ territory. Editor and

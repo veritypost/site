@@ -117,13 +117,24 @@ export default async function HelpPage() {
       q: 'How do I cancel my subscription?',
       a: (
         <span>
-          Open{' '}
-          <a href="/profile/settings#billing" style={linkStyle}>
-            Settings &gt; Billing
-          </a>{' '}
-          and choose Cancel. On iOS, manage the subscription through the App Store (Settings &gt;
-          your Apple ID &gt; Subscriptions). Cancellation takes effect at the end of the current
-          billing period.
+          {isAuthed ? (
+            <>
+              Open{' '}
+              <a href="/profile/settings#billing" style={linkStyle}>
+                Settings &gt; Billing
+              </a>{' '}
+              and choose Cancel.
+            </>
+          ) : (
+            <>
+              <a href="/login" style={linkStyle}>
+                Sign in
+              </a>{' '}
+              to manage your subscription under Settings &gt; Billing.
+            </>
+          )}{' '}
+          On iOS, manage the subscription through the App Store (Settings &gt; your Apple ID &gt;
+          Subscriptions). Cancellation takes effect at the end of the current billing period.
         </span>
       ),
     },
@@ -131,11 +142,23 @@ export default async function HelpPage() {
       q: 'How do I delete my account?',
       a: (
         <span>
-          Open{' '}
-          <a href="/profile/settings" style={linkStyle}>
-            Settings &gt; Account &gt; Delete
-          </a>
-          . Deletion is a scheduled anonymization with a seven-day grace period; direct messages are
+          {isAuthed ? (
+            <>
+              Open{' '}
+              <a href="/profile/settings" style={linkStyle}>
+                Settings &gt; Account &gt; Delete
+              </a>
+              .
+            </>
+          ) : (
+            <>
+              <a href="/login" style={linkStyle}>
+                Sign in
+              </a>{' '}
+              to delete your account under Settings &gt; Account.
+            </>
+          )}{' '}
+          Deletion is a scheduled anonymization with a seven-day grace period; direct messages are
           cut off immediately. See our{' '}
           <a href="/privacy" style={linkStyle}>
             Privacy Policy
