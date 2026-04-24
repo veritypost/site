@@ -5,7 +5,7 @@ import { requirePermission } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
-import { requireAdminOutranks } from '@/lib/adminMutation';
+import { recordAdminAction, requireAdminOutranks } from '@/lib/adminMutation';
 
 // F-034 — the pre-fix handler only checked that the target role being
 // granted/revoked was at-or-below the actor's level. That blocks a
@@ -47,7 +47,13 @@ export async function POST(request, { params }) {
   const { data: canAssign, error: canErr } = await authed.rpc('caller_can_assign_role', {
     p_role_name: role_name,
   });
-  if (canErr) return NextResponse.json({ error: canErr.message }, { status: 500 });
+  if (canErr) {
+    // H23 / R-6-AGR-04 — don't leak raw PostgREST/Postgres error text to
+    // the client (could expose column names / function names). Log
+    // server-side, return generic copy. Matches role-set/route.js pattern.
+    console.error('[admin.users.[id].roles.can_assign_err]', canErr?.message || canErr);
+    return NextResponse.json({ error: 'Could not check role assignment' }, { status: 500 });
+  }
   if (!canAssign) {
     return NextResponse.json(
       { error: 'Unknown role or above your hierarchy level' },
@@ -81,6 +87,15 @@ export async function POST(request, { params }) {
       route: 'admin.users.id.roles',
       fallbackStatus: 400,
     });
+
+  // C19 / R-6-AGR-01 — audit the role grant. Sibling routes (role-set,
+  // ban, plan) all emit recordAdminAction; this handler was the gap.
+  await recordAdminAction({
+    action: 'user_role.grant',
+    targetTable: 'user_roles',
+    targetId: params.id,
+    newValue: { role: role_name },
+  });
 
   // Bump perms_version so the target's client refetches capabilities on
   // next navigation. Without this, moderation console grants/revokes
@@ -119,7 +134,11 @@ export async function DELETE(request, { params }) {
   const { data: canAssign, error: canErr } = await authed.rpc('caller_can_assign_role', {
     p_role_name: role_name,
   });
-  if (canErr) return NextResponse.json({ error: canErr.message }, { status: 500 });
+  if (canErr) {
+    // H23 / R-6-AGR-04 — generic error to client, real one to server log.
+    console.error('[admin.users.[id].roles.can_assign_err]', canErr?.message || canErr);
+    return NextResponse.json({ error: 'Could not check role assignment' }, { status: 500 });
+  }
   if (!canAssign) {
     return NextResponse.json(
       { error: 'Unknown role or above your hierarchy level' },
@@ -153,6 +172,15 @@ export async function DELETE(request, { params }) {
       route: 'admin.users.id.roles',
       fallbackStatus: 400,
     });
+
+  // C19 / R-6-AGR-01 — audit the role revoke. No sibling route was
+  // covering this path before the fix.
+  await recordAdminAction({
+    action: 'user_role.revoke',
+    targetTable: 'user_roles',
+    targetId: params.id,
+    oldValue: { role: role_name },
+  });
 
   // Bump perms_version so the revoked user's client refetches on next
   // navigation (see POST handler above for rationale). Non-fatal.
