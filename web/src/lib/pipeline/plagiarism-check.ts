@@ -66,6 +66,14 @@ export async function rewriteForPlagiarism(params: {
   cost_usd: number;
   latency_ms: number;
   rewritten: boolean;
+  /**
+   * Distinguishes the soft-degrade modes so the caller can flag the article
+   * for manual review (M4 / Q9 Option B). Values:
+   *   'rewritten'         — fresh body returned (rewritten:true)
+   *   'no_change'         — model returned identical text or <100 chars
+   *   'failed'            — rewrite threw (cost cap / abort rethrow above)
+   */
+  rewrite_status: 'rewritten' | 'no_change' | 'failed';
 }> {
   const start = Date.now();
   const outletsList =
@@ -95,6 +103,7 @@ export async function rewriteForPlagiarism(params: {
         cost_usd: res.cost_usd,
         latency_ms: Date.now() - start,
         rewritten: false,
+        rewrite_status: 'no_change',
       };
     }
     if (cleaned === params.body) {
@@ -103,6 +112,7 @@ export async function rewriteForPlagiarism(params: {
         cost_usd: res.cost_usd,
         latency_ms: Date.now() - start,
         rewritten: false,
+        rewrite_status: 'no_change',
       };
     }
     return {
@@ -110,6 +120,7 @@ export async function rewriteForPlagiarism(params: {
       cost_usd: res.cost_usd,
       latency_ms: Date.now() - start,
       rewritten: true,
+      rewrite_status: 'rewritten',
     };
   } catch (err: unknown) {
     if (err instanceof CostCapExceededError) throw err;
@@ -125,6 +136,7 @@ export async function rewriteForPlagiarism(params: {
       cost_usd: 0,
       latency_ms: Date.now() - start,
       rewritten: false,
+      rewrite_status: 'failed',
     };
   }
 }

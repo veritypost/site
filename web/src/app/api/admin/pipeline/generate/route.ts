@@ -1220,6 +1220,9 @@ Return JSON:
       settings.plagiarism_flag_pct
     );
     let finalPlagOverlap = plagResult.maxOverlap;
+    // M4 / Q9 — track plagiarism step outcome so we can flag the persisted
+    // article for manual review when soft-degrade kept the original body.
+    let plagiarismStatus: 'ok' | 'rewritten' | 'rewrite_kept_original' | 'rewrite_failed' = 'ok';
     if (plagResult.maxOverlap >= settings.plagiarism_rewrite_pct) {
       const flaggedOutlets = plagResult.results
         .filter((r) => r.similarity >= settings.plagiarism_rewrite_pct)
@@ -1235,7 +1238,9 @@ Return JSON:
         additionalInstructions: promptOverrides.get('plagiarism_check'),
       });
       totalCostUsd += rewriteRes.cost_usd;
-      if (rewriteRes.rewritten) {
+      if (rewriteRes.rewrite_status === 'failed') {
+        plagiarismStatus = 'rewrite_failed';
+      } else if (rewriteRes.rewritten) {
         const secondCheck = checkPlagiarism(
           rewriteRes.body,
           sourceTexts.map((s) => ({ outlet: s.outlet, text: s.text })),
@@ -1245,9 +1250,21 @@ Return JSON:
         if (secondCheck.maxOverlap < plagResult.maxOverlap) {
           finalBodyMarkdown = rewriteRes.body;
           finalPlagOverlap = secondCheck.maxOverlap;
+          plagiarismStatus = 'rewritten';
+        } else {
+          plagiarismStatus = 'rewrite_kept_original';
         }
+      } else {
+        // 'no_change' — model returned identical/short text
+        plagiarismStatus = 'rewrite_kept_original';
       }
     }
+    // Flag for manual review whenever soft-degrade kept original near-dup
+    // body OR rewrite errored out. Editors clear before publish (M4 / Q9).
+    const needsManualReview =
+      plagiarismStatus === 'rewrite_failed' ||
+      plagiarismStatus === 'rewrite_kept_original' ||
+      finalPlagOverlap > settings.plagiarism_flag_pct;
     if (finalPlagOverlap > settings.plagiarism_flag_pct) {
       pipelineLog.warn(`newsroom.generate.${plagStepName}`, {
         run_id: runId,
@@ -1534,6 +1551,35 @@ Empty array if all correct.`;
     articleId = persisted.article_id;
     slug = persisted.slug;
     stepTimings[persistStepName] = Date.now() - persistStart;
+
+    // M4 / Q9 — flag for manual review when plagiarism step soft-degraded.
+    // Routed to articles vs kid_articles based on audience (kid pipeline
+    // persists into kid_articles via the same RPC; M4 column lives on both).
+    if (needsManualReview || plagiarismStatus !== 'ok') {
+      const targetTable = audience === 'kid' ? 'kid_articles' : 'articles';
+      // Cast: generated Database types lag behind migration 166; the
+      // columns exist post-deploy. Trigger remains the SoT for status.
+      const { error: flagErr } = await service
+        .from(targetTable)
+        .update({
+          needs_manual_review: needsManualReview,
+          plagiarism_status: plagiarismStatus,
+        } as never)
+        .eq('id', articleId);
+      if (flagErr) {
+        // Non-fatal — pipeline already persisted; log and continue so the
+        // run completes. Editor will still see the row, just without flag.
+        pipelineLog.warn(`newsroom.generate.${persistStepName}`, {
+          run_id: runId,
+          cluster_id,
+          audience,
+          step: persistStepName,
+          flag_update_error: flagErr.message,
+          plagiarism_status: plagiarismStatus,
+          needs_manual_review: needsManualReview,
+        });
+      }
+    }
 
     // Cost row for persist step (non-LLM — audience NOT NULL satisfied)
     await service.from('pipeline_costs').insert({
