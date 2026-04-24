@@ -20,7 +20,9 @@ import { verifyWebhook, retrieveSubscription } from '@/lib/stripe';
 //   invoice.upcoming                  → card-expiring notification      (B6)
 //   customer.deleted                  → clear orphan stripe_customer_id (B7)
 //   charge.refunded                   → revoke plan (freeze)
+//   charge.refund.updated             → unfreeze on status='reversed'   (B11 tail)
 //   charge.dispute.created            → flag for admin review
+//   charge.dispute.closed             → unfreeze on status='won'        (B11 tail)
 //
 // Idempotency
 // -----------
@@ -191,8 +193,14 @@ export async function POST(request) {
       case 'charge.refunded':
         await handleChargeRefunded(service, event.data.object);
         break;
+      case 'charge.refund.updated':
+        await handleRefundUpdated(service, event.data.object);
+        break;
       case 'charge.dispute.created':
         await handleChargeDispute(service, event.data.object);
+        break;
+      case 'charge.dispute.closed':
+        await handleDisputeClosed(service, event.data.object);
         break;
       default:
         // Unknown event types are logged but not treated as errors.
@@ -550,6 +558,80 @@ async function handleChargeDispute(service, dispute) {
   }
 }
 
+// B11 tail — charge.dispute.closed. Stripe sets `status` to 'won', 'lost',
+// 'warning_closed', or 'charge_refunded' when a dispute resolves. Only
+// 'won' is actionable on our side: the dispute was resolved in our favor,
+// so if a prior refund or freeze put the user into a frozen state, we
+// should unfreeze them now that the funds are back with the merchant.
+// Losses stay frozen (merchant paid); warnings + charge_refunded are
+// pre-existing cases already handled by other events.
+async function handleDisputeClosed(service, dispute) {
+  const customerId =
+    dispute.charge && typeof dispute.charge === 'object' ? dispute.charge.customer : null;
+  const chargeId = typeof dispute.charge === 'string' ? dispute.charge : dispute.charge?.id;
+
+  let userRow = null;
+  if (customerId) {
+    const { userRow: row } = await lookupUserAndPlan(service, customerId, null);
+    userRow = row;
+  }
+
+  await service.from('audit_log').insert({
+    actor_id: userRow?.id || null,
+    action: `billing:dispute_${dispute.status || 'closed'}`,
+    target_type: 'user',
+    target_id: userRow?.id || null,
+    metadata: {
+      source: 'stripe_webhook',
+      dispute_id: dispute.id,
+      status: dispute.status,
+      amount: dispute.amount,
+      currency: dispute.currency,
+      charge_id: chargeId,
+      customer_id: customerId,
+    },
+  });
+
+  if (dispute.status !== 'won') {
+    // 'lost' / 'warning_closed' / 'charge_refunded' — no state change needed.
+    return;
+  }
+
+  if (!userRow?.id) {
+    console.warn('[stripe.webhook] dispute.closed won — no user resolved', {
+      dispute_id: dispute.id,
+      charge_id: chargeId,
+    });
+    return;
+  }
+
+  const { data: rpcResult, error: rpcErr } = await service.rpc('billing_unfreeze', {
+    p_user_id: userRow.id,
+  });
+  if (rpcErr) {
+    console.error('[stripe.webhook] billing_unfreeze on dispute-won failed:', rpcErr);
+    throw new Error(`billing_unfreeze: ${rpcErr.message}`);
+  }
+
+  if (!rpcResult?.already_unfrozen && !rpcResult?.skipped) {
+    try {
+      await service.rpc('create_notification', {
+        p_user_id: userRow.id,
+        p_type: 'billing_alert',
+        p_title: 'Subscription restored',
+        p_body: 'The card dispute resolved in your favor, so your paid subscription is back on.',
+        p_action_url: '/profile/settings/billing',
+        p_action_type: 'billing',
+        p_action_id: null,
+        p_priority: 'high',
+        p_metadata: { dispute_id: dispute.id, source: 'dispute_won' },
+      });
+    } catch {
+      /* notification best-effort */
+    }
+  }
+}
+
 async function handleSubscriptionDeleted(service, sub) {
   const customerId = sub.customer;
   const { userRow } = await lookupUserAndPlan(service, customerId, null);
@@ -557,6 +639,80 @@ async function handleSubscriptionDeleted(service, sub) {
   // Skip if already frozen (replay).
   if (userRow.frozen_at) return;
   await service.rpc('billing_freeze_profile', { p_user_id: userRow.id });
+}
+
+// B11 tail — charge.refund.updated with status='reversed' means the refund
+// that triggered handleChargeRefunded's freeze has been returned to us
+// (e.g., customer cancelled their refund request, or the card network
+// reversed it). Symmetric undo: call billing_unfreeze + notify the user
+// their subscription is back.
+//
+// Stripe also fires this event for status='pending' / 'succeeded' / 'failed'
+// at other lifecycle points; only 'reversed' warrants state change on our
+// side. Everything else is logged + ignored.
+async function handleRefundUpdated(service, refund) {
+  if (refund?.status !== 'reversed') {
+    // Not the status we care about — just log and drop.
+    return;
+  }
+  const chargeId = typeof refund.charge === 'string' ? refund.charge : refund.charge?.id;
+  const customerId = typeof refund.charge === 'object' ? refund.charge?.customer : null;
+
+  // Prefer the customer id from the embedded charge object (Stripe sends
+  // it when expand is set). Fall back to refetching via metadata.user_id
+  // if present.
+  const fallbackUserId = refund.metadata?.user_id || null;
+  const { userRow } = await lookupUserAndPlan(service, customerId, null, fallbackUserId);
+  if (!userRow) {
+    console.warn('[stripe.webhook] charge.refund.updated reversed — no user resolved', {
+      refund_id: refund.id,
+      charge_id: chargeId,
+    });
+    return;
+  }
+
+  const { data: rpcResult, error: rpcErr } = await service.rpc('billing_unfreeze', {
+    p_user_id: userRow.id,
+  });
+  if (rpcErr) {
+    console.error('[stripe.webhook] billing_unfreeze failed:', rpcErr);
+    throw new Error(`billing_unfreeze: ${rpcErr.message}`);
+  }
+
+  await service.from('audit_log').insert({
+    actor_id: userRow.id,
+    action: 'billing:refund_reversed',
+    target_type: 'user',
+    target_id: userRow.id,
+    metadata: {
+      source: 'stripe_webhook',
+      refund_id: refund.id,
+      charge_id: chargeId,
+      already_unfrozen: rpcResult?.already_unfrozen || false,
+    },
+  });
+
+  // User-facing notification only when we actually unfroze. Idempotency
+  // guard: if billing_unfreeze already-no-oped (user wasn't frozen, or a
+  // prior event already unfroze), don't re-notify.
+  if (!rpcResult?.already_unfrozen && !rpcResult?.skipped) {
+    try {
+      await service.rpc('create_notification', {
+        p_user_id: userRow.id,
+        p_type: 'billing_alert',
+        p_title: 'Subscription restored',
+        p_body:
+          "The refund on your subscription was reversed, so your paid plan is active again. Let us know if anything's off.",
+        p_action_url: '/profile/settings/billing',
+        p_action_type: 'billing',
+        p_action_id: null,
+        p_priority: 'high',
+        p_metadata: { refund_id: refund.id, source: 'refund_reversed' },
+      });
+    } catch {
+      /* notification best-effort — unfreeze is source of truth */
+    }
+  }
 }
 
 async function handlePaymentFailed(service, invoice) {
