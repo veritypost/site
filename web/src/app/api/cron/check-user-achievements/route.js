@@ -40,16 +40,44 @@ async function run(request) {
     for (const r of quizzers || []) if (r.user_id) ids.add(r.user_id);
     for (const r of commenters || []) if (r.user_id) ids.add(r.user_id);
 
+    // L5: sequential await exceeded maxDuration=60 at scale. 10k active
+    // users × ~10ms per RPC round-trip = 100s and the cron was silently
+    // truncated — the last N users skipped (achievement_events never
+    // fires for them, next tick re-covers) with no observable error.
+    // Parallelize with a concurrency cap so we don't burn the Supabase
+    // connection pool. 10 in flight keeps per-tick latency under 1s per
+    // 1k users at Vercel's cold-start budget while staying well below
+    // the 60-connection default pool.
+    const userIds = [...ids];
+    const CONCURRENCY = 10;
     let awarded = 0;
-    let users = 0;
-    for (const uid of ids) {
-      users += 1;
-      const { data } = await service.rpc('check_user_achievements', { p_user_id: uid });
-      awarded += (data || []).length;
-    }
+    let failed = 0;
+    let cursor = 0;
 
-    await logCronHeartbeat(CRON_NAME, 'end', { users, awarded });
-    return NextResponse.json({ users, awarded, ran_at: new Date().toISOString() });
+    async function worker() {
+      while (true) {
+        const idx = cursor++;
+        if (idx >= userIds.length) return;
+        try {
+          const { data } = await service.rpc('check_user_achievements', {
+            p_user_id: userIds[idx],
+          });
+          awarded += (data || []).length;
+        } catch (err) {
+          failed += 1;
+          console.error('[cron.check-achievements] user rpc failed:', userIds[idx], err);
+        }
+      }
+    }
+    await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+
+    await logCronHeartbeat(CRON_NAME, 'end', { users: userIds.length, awarded, failed });
+    return NextResponse.json({
+      users: userIds.length,
+      awarded,
+      failed,
+      ran_at: new Date().toISOString(),
+    });
   } catch (err) {
     await logCronHeartbeat(CRON_NAME, 'error', { error: err?.message || String(err) });
     throw err;
