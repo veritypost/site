@@ -13,7 +13,32 @@ import { createServerClient } from '@supabase/ssr';
 // (app/admin/layout.tsx) handles its own auth + role check and returns
 // a 404 for anon or non-staff callers. Putting /admin here would redirect
 // anon to /login?next=/admin, disclosing that /admin is a real surface.
-const PROTECTED_PREFIXES = ['/profile', '/messages', '/bookmarks'];
+// Anon = articles only on web (owner directive 2026-04-23). Anonymous
+// visitors see the home page (today's curated front), individual story
+// pages, the auth flow (signup/login/etc), and the legal/marketing
+// surfaces (about, privacy, terms, contact, etc). Everything else
+// requires sign-in. Block surfaces are NOT 404s — they redirect to
+// /login?next=<path> so the value is preserved for the post-login bounce.
+//
+// To unhide a surface to anon: remove its prefix here, no other change
+// needed (matches the launch-hide pattern documented in CLAUDE.md).
+const PROTECTED_PREFIXES = [
+  '/profile',
+  '/messages',
+  '/bookmarks',
+  '/notifications',
+  '/leaderboard',
+  '/browse',
+  '/search',
+  '/category',
+  '/u',
+  '/recap',
+  '/expert-queue',
+  '/billing',
+  '/appeal',
+  '/preview',
+  '/card',
+];
 
 function isProtected(pathname) {
   return PROTECTED_PREFIXES.some(

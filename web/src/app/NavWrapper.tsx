@@ -258,12 +258,22 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
     accent: 'var(--accent)',
   } as const;
 
-  const navItems: NavItem[] = [
-    { label: 'Home', href: '/' },
-    { label: 'Notifications', href: '/notifications' },
-    { label: 'Most Informed', href: '/leaderboard' },
-    loggedIn ? { label: 'Profile', href: '/profile' } : { label: 'Sign in', href: '/login' },
-  ];
+  // Anon = articles only (owner directive 2026-04-23). Anonymous visitors
+  // see Home + the Sign in link; the rest of the nav appears once they
+  // sign in. The protected surfaces themselves are gated in middleware.js
+  // (PROTECTED_PREFIXES) — these nav-item conditionals just keep the chrome
+  // honest so anon doesn't see links that immediately bounce to /login.
+  const navItems: NavItem[] = loggedIn
+    ? [
+        { label: 'Home', href: '/' },
+        { label: 'Notifications', href: '/notifications' },
+        { label: 'Most Informed', href: '/leaderboard' },
+        { label: 'Profile', href: '/profile' },
+      ]
+    : [
+        { label: 'Home', href: '/' },
+        { label: 'Sign in', href: '/login' },
+      ];
 
   const navStyle: CSSProperties = {
     position: 'fixed',

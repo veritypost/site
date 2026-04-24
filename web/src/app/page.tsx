@@ -4,6 +4,7 @@
 import { useState, useEffect, useMemo, Fragment, CSSProperties } from 'react';
 import Link from 'next/link';
 import { createClient } from '../lib/supabase/client';
+import { useAuth } from './NavWrapper';
 import { usePageViewTrack } from '@/lib/useTrack';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import type { Tables } from '@/types/database-helpers';
@@ -108,6 +109,7 @@ function timeShort(dateIso: string | null): string {
 
 export default function HomePage() {
   const supabase = useMemo(() => createClient(), []);
+  const { loggedIn } = useAuth() as { loggedIn: boolean };
 
   usePageViewTrack('home');
 
@@ -236,7 +238,7 @@ export default function HomePage() {
           </p>
         )}
 
-        {!loading && !hero && <EmptyDay />}
+        {!loading && !hero && <EmptyDay loggedIn={loggedIn} />}
 
         {!loading && hero && (
           <Hero
@@ -259,7 +261,7 @@ export default function HomePage() {
           </section>
         )}
 
-        {!loading && hero && <EndOfFrontPage />}
+        {!loading && hero && <EndOfFrontPage loggedIn={loggedIn} />}
       </main>
     </div>
   );
@@ -531,7 +533,11 @@ const hairlineStyle: CSSProperties = {
   margin: 0,
 };
 
-function EndOfFrontPage() {
+// Anon = articles only on web (owner directive 2026-04-23). Anon viewers
+// see the today's-front-page dismount as just "That's today's front page."
+// Logged-in viewers also get the "Browse all categories →" link to /browse,
+// which the middleware locks for anon. Same shape on EmptyDay below.
+function EndOfFrontPage({ loggedIn }: { loggedIn: boolean }) {
   return (
     <footer
       style={{
@@ -552,26 +558,28 @@ function EndOfFrontPage() {
       >
         That&rsquo;s today&rsquo;s front page.
       </p>
-      <p style={{ margin: '12px 0 0' }}>
-        <Link
-          href="/browse"
-          style={{
-            fontFamily: serifStack,
-            fontSize: 16,
-            color: C.accent,
-            textDecoration: 'underline',
-            textUnderlineOffset: 4,
-            fontWeight: 500,
-          }}
-        >
-          Browse all categories &rarr;
-        </Link>
-      </p>
+      {loggedIn ? (
+        <p style={{ margin: '12px 0 0' }}>
+          <Link
+            href="/browse"
+            style={{
+              fontFamily: serifStack,
+              fontSize: 16,
+              color: C.accent,
+              textDecoration: 'underline',
+              textUnderlineOffset: 4,
+              fontWeight: 500,
+            }}
+          >
+            Browse all categories &rarr;
+          </Link>
+        </p>
+      ) : null}
     </footer>
   );
 }
 
-function EmptyDay() {
+function EmptyDay({ loggedIn }: { loggedIn: boolean }) {
   return (
     <section
       aria-label="No articles today"
@@ -591,21 +599,23 @@ function EmptyDay() {
       >
         No new stories yet today.
       </p>
-      <p style={{ margin: '20px 0 0' }}>
-        <Link
-          href="/browse"
-          style={{
-            fontFamily: serifStack,
-            fontSize: 15,
-            color: C.accent,
-            textDecoration: 'underline',
-            textUnderlineOffset: 4,
-            fontWeight: 500,
-          }}
-        >
-          Browse all categories &rarr;
-        </Link>
-      </p>
+      {loggedIn ? (
+        <p style={{ margin: '20px 0 0' }}>
+          <Link
+            href="/browse"
+            style={{
+              fontFamily: serifStack,
+              fontSize: 15,
+              color: C.accent,
+              textDecoration: 'underline',
+              textUnderlineOffset: 4,
+              fontWeight: 500,
+            }}
+          >
+            Browse all categories &rarr;
+          </Link>
+        </p>
+      ) : null}
     </section>
   );
 }
