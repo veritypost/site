@@ -107,10 +107,15 @@ export async function POST(request, { params }) {
     if (freeErr) return NextResponse.json({ error: freeErr.message }, { status: 500 });
     if (!freePlan) return NextResponse.json({ error: 'free plan row missing' }, { status: 500 });
 
-    // 2) Flip the subscription to cancelled and tag it as needing Stripe sync.
+    // 2) Flip the subscription to cancelled. B10: dropped the
+    //    `pending_stripe_sync: true` metadata flag — no cron or sweeper
+    //    ever reads it, so it was silent noise that implied async
+    //    reconciliation that doesn't exist. Audit_log (step 5) is the
+    //    canonical record of "admin changed local state; operator owes
+    //    the Stripe-side mirror." Operator signals Stripe via the
+    //    Dashboard per the note already surfaced in the audit entry.
     const nextMetadata = {
       ...(sub.metadata || {}),
-      pending_stripe_sync: true,
       last_action: 'manual_downgrade',
     };
     const { error: subUpdErr } = await service
@@ -135,10 +140,10 @@ export async function POST(request, { params }) {
       .eq('id', sub.user_id);
     if (userUpdErr) return NextResponse.json({ error: userUpdErr.message }, { status: 500 });
   } else if (action === 'resume') {
-    // 1) Flip subscription back to active.
+    // 1) Flip subscription back to active. B10: dropped
+    //    `pending_stripe_sync` — same reasoning as the downgrade branch.
     const nextMetadata = {
       ...(sub.metadata || {}),
-      pending_stripe_sync: true,
       last_action: 'manual_resume',
     };
     const { error: subUpdErr } = await service
