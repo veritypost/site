@@ -63,6 +63,16 @@ export async function PATCH(request, { params }) {
     return NextResponse.json({ error: 'no updatable fields in body' }, { status: 400 });
   }
 
+  // M10 — capture old values for audit before mutation. Project to the
+  // patched fields only so the audit row is the smallest faithful diff.
+  const patchedKeys = Object.keys(patch);
+  const { data: existingRow } = await service
+    .from('permissions')
+    .select(patchedKeys.join(','))
+    .eq('id', id)
+    .maybeSingle();
+  const oldValue = existingRow ?? null;
+
   const { error } = await service.from('permissions').update(patch).eq('id', id);
   if (error)
     return safeErrorResponse(NextResponse, error, {
@@ -74,6 +84,7 @@ export async function PATCH(request, { params }) {
     action: 'permission.update',
     targetTable: 'permission',
     targetId: id,
+    oldValue,
     newValue: patch,
   });
 
@@ -111,6 +122,13 @@ export async function DELETE(_request, { params }) {
       { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
     );
   }
+  // M10 — capture full row before delete so audit history can reconstruct.
+  const { data: existingRow } = await service
+    .from('permissions')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+
   const { error } = await service.from('permissions').delete().eq('id', id);
   if (error)
     return safeErrorResponse(NextResponse, error, {
@@ -122,6 +140,7 @@ export async function DELETE(_request, { params }) {
     action: 'permission.delete',
     targetTable: 'permission',
     targetId: id,
+    oldValue: existingRow ?? null,
   });
 
   return NextResponse.json({ ok: true });
