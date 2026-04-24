@@ -73,27 +73,26 @@ Notation: **[N/4]** = how many of the 4 unified round-2 agents corroborated. Rou
 **CRITICAL:**
 | # | File:Line | Bug |
 |---|-----------|-----|
-| K1 | `VerityPostKids/VerityPostKids/KidQuizEngineView.swift:307` + `KidsAppState.swift:165` | Quiz pass uses 60% threshold for celebration; `completeQuiz()` increments streak unconditionally without `passed` param. Failed quiz → "Great job!" + streak animation + DB unchanged. |
-| K2 | `VerityPostKids/VerityPostKids/PairingClient.swift:125-130` | Kid JWT 7-day TTL with no refresh path. Backgrounded-then-expired session → silent 401 → no error, no re-pair prompt. |
-| K3 | `VerityPostKids/VerityPostKids/ArticleListView.swift:160-165` | `categorySlug` parameter accepted but never used. Every category card shows the same article list. |
-| K4 | `VerityPostKids/VerityPostKids/KidReaderView.swift:210-217` + `KidQuizEngineView.swift:290-299` | `reading_log` + `quiz_attempts` retry-once then silent log. Streak trigger never fires; kid sees celebration locally but DB has nothing. |
+| K1 | `VerityPostKids/VerityPostKids/KidQuizEngineView.swift:307` + `KidsAppState.swift:165` | Quiz pass uses 60% threshold for celebration; `completeQuiz()` increments streak unconditionally without `passed` param. Failed quiz → "Great job!" + streak animation + DB unchanged. | **SHIPPED 2026-04-24 · 0295c41** — KidQuizResult propagation + completeQuiz(passed:) guard. Bundled with K10. |
+| K2 | `VerityPostKids/VerityPostKids/PairingClient.swift:125-130` | Kid JWT 7-day TTL with no refresh path. Backgrounded-then-expired session → silent 401 → no error, no re-pair prompt. | **SHIPPED 2026-04-24 · f7ef24e** — refreshIfNeeded on launch + scenePhase.active; /api/kids/refresh route + schema/153. |
+| K3 | `VerityPostKids/VerityPostKids/ArticleListView.swift:160-165` | `categorySlug` parameter accepted but never used. Every category card shows the same article list. | **SHIPPED 2026-04-24 · cd894a2** — slug threaded through KidCategory → KidsAppRoot → ArticleListView; two-step resolve slug → category_id → filter query. |
+| K4 | `VerityPostKids/VerityPostKids/KidReaderView.swift:210-217` + `KidQuizEngineView.swift:290-299` | `reading_log` + `quiz_attempts` retry-once then silent log. Streak trigger never fires; kid sees celebration locally but DB has nothing. | **SHIPPED 2026-04-24 · 500dfe2** — throw on double-fail; KidQuizResult.writeFailures propagated; KidsAppRoot suppresses celebration scenes when > 0. |
 
 **HIGH:**
 | # | File:Line | Bug |
 |---|-----------|-----|
 | K5 | `VerityPostKids/VerityPostKids/ParentalGateModal.swift` callers | Gate exists, used only on `/profile` Unpair + Privacy/Terms. NOT on quizzes, expert sessions, settings, reading. COPPA gap. |
-| K6 | `VerityPostKids/VerityPostKids/GreetingScene.swift:375-489` | `DispatchQueue.main.asyncAfter` choreography has no cancellation. View dismiss mid-animation → orphan blocks mutating dead view state. |
-| K7 | `VerityPostKids/VerityPostKids/GreetingScene.swift:468-489` | Typewriter assumes ASCII names. Emoji/multibyte (Zoë, José, 中文) misalign sparkle position. |
-| K8 | `VerityPostKids/VerityPostKids/ProfileView.swift:63,67` | `URL(string:)!` force-unwrap. Crash vector if ever made DB-driven. |
-| K9 | `VerityPostKids/VerityPostKids/KidsTheme.swift:91-113` | `Color(hex:)` returns black on parse failure. Silent invisible UI, no warning. |
+| K6 | `VerityPostKids/VerityPostKids/GreetingScene.swift:375-489` | `DispatchQueue.main.asyncAfter` choreography has no cancellation. View dismiss mid-animation → orphan blocks mutating dead view state. | **SHIPPED 2026-04-24 · bc08acf** — rewritten runChoreography + typeChoreography as async over Task.sleep; .task(id: name) auto-cancels on disappear. |
+| K7 | `VerityPostKids/VerityPostKids/GreetingScene.swift:468-489` | Typewriter assumes ASCII names. Emoji/multibyte (Zoë, José, 中文) misalign sparkle position. | **STALE 2026-04-24** — verified: code uses `typedCharCount < name.count` where name.count is Swift grapheme cluster count; no ASCII Array-indexing exists. Triage claim incorrect. K6 rewrite preserved the correct Character-based loop. |
+| K8 | `VerityPostKids/VerityPostKids/ProfileView.swift:63,67` | `URL(string:)!` force-unwrap. Crash vector if ever made DB-driven. | **SHIPPED 2026-04-24 · 0908817** — URL(string:) ?? fallbackLegalURL (apex domain). |
+| K9 | `VerityPostKids/VerityPostKids/KidsTheme.swift:91-113` | `Color(hex:)` returns black on parse failure. Silent invisible UI, no warning. | **SHIPPED 2026-04-24 · cca0a6e** — scanHexInt64 result + length guard; log warning + return fuchsia sentinel on parse failure. |
 
 **MEDIUM:**
 | # | File:Line | Bug |
 |---|-----------|-----|
-| K10 | `VerityPostKids/VerityPostKids/KidsAppRoot.swift:9` flow comment | Lies about wiring. `completeQuiz()` is dead code with hardcoded values; never called from quiz engine. **All V3 animation scenes (StreakScene, QuizPassScene, BadgeUnlockScene) are unwired** — celebration system structurally broken. |
-| K11 | `VerityPostKids/VerityPostKids/LeaderboardView.swift:263-303` | RLS returns kid's own row only; code uses `i+1` from full unfiltered → kid always sees rank 1 by accident. No real top-N. |
-| K12 | `VerityPostKids/VerityPostKids/ParentalGateModal.swift:207-217` | Lockout uses remaining-seconds not absolute expiry. Re-opening before timer fires resets `lockRemaining` to 0 → premature unlock. |
-| K13 | `VerityPostKids/VerityPostKids/LeaderboardView.swift:125-129` | Category-pill button has empty action. Taps do nothing. |
+| K10 | `VerityPostKids/VerityPostKids/KidsAppRoot.swift:9` flow comment | Lies about wiring. `completeQuiz()` is dead code with hardcoded values; never called from quiz engine. **All V3 animation scenes (StreakScene, QuizPassScene, BadgeUnlockScene) are unwired** — celebration system structurally broken. | **SHIPPED 2026-04-24 · 0295c41** — sceneQueue pattern in KidsAppRoot; StreakScene + BadgeUnlockScene now present after pass. QuizPassScene deferred (requires exposing last-question state in engine). Bundled with K1. |
+| K11 | `VerityPostKids/VerityPostKids/LeaderboardView.swift:263-303` | RLS returns kid's own row only; code uses `i+1` from full unfiltered → kid always sees rank 1 by accident. No real top-N. | **SHIPPED 2026-04-24 · 8729899** — SECURITY DEFINER RPC get_kid_category_rank (schema/154); loadCategory calls RPC + renders entry.rank + footer "Rank X of Y". Bundled with K13. |
+| K13 | `VerityPostKids/VerityPostKids/LeaderboardView.swift:125-129` | Category-pill button has empty action. Taps do nothing. | **SHIPPED 2026-04-24 · 8729899** — pills driven from fetched VPCategory list; tap sets selectedCategory → onChange triggers load. Bundled with K11. |
 
 ### Admin UI (Round 3-B)
 
@@ -107,14 +106,14 @@ Notation: **[N/4]** = how many of the 4 unified round-2 agents corroborated. Rou
 | # | File:Line | Bug |
 |---|-----------|-----|
 | AD3 | `web/src/components/admin/DataTable.jsx:108,111` | `j`/`k`/`Enter`/`Space` keyboard shortcuts — owner banned shortcuts in admin. | **SHIPPED 2026-04-24 · 1d3585f** — remove DataTable keyboard shortcuts. |
-| AD4 | `admin/users/page.tsx:57-60` + `admin/permissions/page.tsx:129-133` | Client gates on `ADMIN_ROLES` while API enforces stricter perm (e.g. `admin.permissions.manage`). Page renders fully then 403s on first action. |
+| AD4 | `admin/users/page.tsx:57-60` + `admin/permissions/page.tsx:129-133` | Client gates on `ADMIN_ROLES` while API enforces stricter perm (e.g. `admin.permissions.manage`). Page renders fully then 403s on first action. | **SHIPPED 2026-04-24 · fdf02bb** — hasPermission('admin.users.list.view') / hasPermission('admin.permissions.catalog.view'). |
 
 **MEDIUM:**
 | # | File:Line | Bug |
 |---|-----------|-----|
-| AD5 | `admin/prompt-presets/page.tsx:29` (EDITOR_ROLES) vs `admin/categories/page.tsx:188` (ADMIN_ROLES) | Inconsistent role thresholds for similarly-privileged surfaces. |
-| AD6 | `admin/pipeline/costs/page.tsx:119` | Load failure sets `err` state but never toasts. User might not notice the page is broken. |
-| AD7 | `admin/kids-story-manager` + `admin/story-manager` | Redefine local color palettes (`accent: '#2563eb'`, `now: '#c2410c'`) overriding `ADMIN_C` — design-token drift. |
+| AD5 | `admin/prompt-presets/page.tsx:29` (EDITOR_ROLES) vs `admin/categories/page.tsx:188` (ADMIN_ROLES) | Inconsistent role thresholds for similarly-privileged surfaces. | **SHIPPED 2026-04-24 · 3f24c16** — both gated on their API perm key (admin.pipeline.presets.manage, admin.pipeline.categories.manage). |
+| AD6 | `admin/pipeline/costs/page.tsx:119` | Load failure sets `err` state but never toasts. User might not notice the page is broken. | **SHIPPED 2026-04-24 · 91ea57e** — ToastProvider + useEffect toast on err; DA-119 sweep on prior `${error.message}` interpolations. |
+| AD7 | `admin/kids-story-manager` + `admin/story-manager` | Redefine local color palettes (`accent: '#2563eb'`, `now: '#c2410c'`) overriding `ADMIN_C` — design-token drift. | **SHIPPED 2026-04-24 · b2e9f56** — promoted now/nowBg to ADMIN_C; story-manager drops override; kids-story-manager keeps only the genuinely unique accent. |
 
 **Pages 3-B deferred:** `/admin/articles/[id]/{edit,review}`, `/admin/recap`, `/admin/breaking`, `/admin/subscriptions`, `/admin/expert-sessions`, `/admin/data-requests`, `/admin/webhooks`, `/admin/streaks`, `/admin/analytics`, `/admin/sponsors`, `/admin/promo`, `/admin/cohorts`, `/admin/reader`. Follow-up agent needed.
 
@@ -124,33 +123,33 @@ Notation: **[N/4]** = how many of the 4 unified round-2 agents corroborated. Rou
 | # | File:Line | Bug |
 |---|-----------|-----|
 | B1 | `web/src/app/api/stripe/webhook/route.js:320-385` + `api/ios/appstore/notifications/route.js:201-246` | Webhooks call `billing_change_plan()` / `billing_resubscribe()` / `billing_freeze_profile()` but never `bump_user_perms_version`. Permission cache stale after every paid plan change. Frozen users retain paid features. (Admin manual-sync DOES bump — webhook path forgotten.) |
-| B2 | `web/src/app/api/stripe/webhook/route.js:139-161` switch | `invoice.payment_succeeded` event NOT handled. Stuck-limbo subscriptions when `customer.subscription.updated` misses or fires out-of-order. |
+| B2 | `web/src/app/api/stripe/webhook/route.js:139-161` switch | `invoice.payment_succeeded` event NOT handled. Stuck-limbo subscriptions when `customer.subscription.updated` misses or fires out-of-order. | **SHIPPED 2026-04-24 · dc7b69d** — new handlePaymentSucceeded clears plan_grace_period_ends_at + plan_status='active' on subscription-source invoice success. |
 | B3 | `web/src/app/api/ios/subscriptions/sync/route.js:26-73` | Receipt hijack — `userId` from bearer token, never cross-checked against JWS `payload.appAccountToken`. Attacker POSTs victim's receipt with own bearer → claims victim's subscription. Combines with #29 in master triage (no user_id filter on existingSub lookup) for clean account-takeover. |
-| B4 | `web/src/app/api/stripe/webhook/route.js:110-113` | Stuck `processing_status='processing'` window — if invocation crashes mid-RPC, row stays `processing` forever, all Stripe retries return 200 immediately. Subscription left inconsistent. Needs >5min reclaim. |
-| B5 | `web/src/app/api/promo/redeem/route.js:144-147` | Direct `users.plan_id` write races concurrent Stripe webhook RPC. `users.plan_id` and `subscriptions.plan_id` diverge. Permission resolver reads users → wrong tier features granted. |
+| B4 | `web/src/app/api/stripe/webhook/route.js:110-113` | Stuck `processing_status='processing'` window — if invocation crashes mid-RPC, row stays `processing` forever, all Stripe retries return 200 immediately. Subscription left inconsistent. Needs >5min reclaim. | **SHIPPED 2026-04-24 · dc7b69d** — age-based reclaim (>5min) on processing/received; mirrors #30 iOS-side fix. |
+| B5 | `web/src/app/api/promo/redeem/route.js:144-147` | Direct `users.plan_id` write races concurrent Stripe webhook RPC. `users.plan_id` and `subscriptions.plan_id` diverge. Permission resolver reads users → wrong tier features granted. | **SHIPPED 2026-04-24 · bbcd785** — routed through billing_change_plan (FOR UPDATE serializes with webhook) or billing_resubscribe for frozen users; dropped redundant route-level perms_version bump. |
 
 **HIGH:**
 | # | File:Line | Bug |
 |---|-----------|-----|
-| B6 | `stripe/webhook/route.js:139-161` | `invoice.upcoming` not handled — no proactive "card expiring" notifications. |
-| B7 | `stripe/webhook/route.js:139-161` | `customer.deleted` not handled — orphan `users.stripe_customer_id`. F-016 defense then refuses upgrade. |
-| B8 | Schema — `subscriptions(user_id, apple_original_transaction_id)` | Verify UNIQUE constraint exists. Concurrent Restore Purchases → duplicate rows. |
-| B9 | `ios/appstore/notifications/route.js:144-162` | S2S notification arriving before iOS sync returns `orphaned: true` and gives up. If sync never fires, all subsequent S2S events for that transaction silently orphan. Should fall back to `transaction.appAccountToken` user lookup. |
-| B10 | `api/admin/subscriptions/[id]/manual-sync/route.js:111-115,139-142` | Sets `pending_stripe_sync: true` but no automation reads it. Admin downgrade-in-DB → Stripe still bills user at next renewal. |
+| B6 | `stripe/webhook/route.js:139-161` | `invoice.upcoming` not handled — no proactive "card expiring" notifications. | **SHIPPED 2026-04-24 · dc7b69d** — new handleInvoiceUpcoming fires a billing_alert notification with upcoming amount + currency. |
+| B7 | `stripe/webhook/route.js:139-161` | `customer.deleted` not handled — orphan `users.stripe_customer_id`. F-016 defense then refuses upgrade. | **SHIPPED 2026-04-24 · dc7b69d** — new handleCustomerDeleted clears orphan stripe_customer_id via guarded UPDATE; audit_log entry + warn when plan_status='active'. |
+| B8 | Schema — `subscriptions(user_id, apple_original_transaction_id)` | Verify UNIQUE constraint exists. Concurrent Restore Purchases → duplicate rows. | **SHIPPED 2026-04-24 · 5d95f2b** — schema/155 adds partial UNIQUE index. Owner applies. |
+| B9 | `ios/appstore/notifications/route.js:144-162` | S2S notification arriving before iOS sync returns `orphaned: true` and gives up. If sync never fires, all subsequent S2S events for that transaction silently orphan. Should fall back to `transaction.appAccountToken` user lookup. | **SHIPPED 2026-04-24 · 91146cb** — before orphaning, look up transaction.appAccountToken → users.id; on match mint a minimal pending row + handler proceeds. |
+| B10 | `api/admin/subscriptions/[id]/manual-sync/route.js:111-115,139-142` | Sets `pending_stripe_sync: true` but no automation reads it. Admin downgrade-in-DB → Stripe still bills user at next renewal. | **SHIPPED 2026-04-24 · 0ca552e** — dropped the unused flag; audit_log is the canonical record of "admin changed local state; operator owes the Stripe-side mirror." |
 | B11 | `stripe/webhook/route.js:392-419` `handleChargeRefunded` | Auto-freezes on apparent full refund. Slow Stripe state, partial-refund-misclassified, chargeback-later-won → harsh freeze with no admin approval. |
-| B12 | `ios/subscriptions/sync/route.js:57-60` + `ios/appstore/notifications/route.js:64-67` | `JWS verification failed: ${err.message}` — DA-119 leak. |
+| B12 | `ios/subscriptions/sync/route.js:57-60` + `ios/appstore/notifications/route.js:64-67` | `JWS verification failed: ${err.message}` — DA-119 leak. | **SHIPPED 2026-04-24 · 91146cb** — both sites log server-side + return generic "Invalid signature". |
 
 **MEDIUM:**
-- B13: Promo `current_uses` ABA race — failed user still inserts into `promo_uses`, analytics drift
-- B14: Apple JWS header timestamp not validated — past-dated receipt replay
-- B15: `/api/ios/subscriptions/sync` no rate limit — JWS-armed attacker can spam webhook_log
-- B16: Apple notification handler marks unknown types as `processed` — future-handler-add can't catch up
-- B17: `billing_cancel_subscription` rejects already-frozen users with no recovery path
+- B13: Promo `current_uses` ABA race — failed user still inserts into `promo_uses`, analytics drift  **STALE 2026-04-24** — current code uses optimistic `.eq('current_uses', n)` claim + rollback on failure; duplicate-use guard prevents re-redeem. Race surface is narrow; not worth more code complexity.
+- B14: Apple JWS header timestamp not validated — past-dated receipt replay  **DEFERRED 2026-04-24** — real concern; needs a real Apple JWS to craft tests against. Flag for follow-up.
+- B15: `/api/ios/subscriptions/sync` no rate limit — JWS-armed attacker can spam webhook_log  **SHIPPED 2026-04-24 · a1b30d7** — 20/min/ip via new `ios_subscription_sync` policy (schema/156). Owner applies.
+- B16: Apple notification handler marks unknown types as `processed` — future-handler-add can't catch up  **SHIPPED 2026-04-24 · a1b30d7** — unknown types stay at `received` + record processing_error hint so future migration can replay.
+- B17: `billing_cancel_subscription` rejects already-frozen users with no recovery path  **DEFERRED 2026-04-24** — RPC-level behavior; separate RPC fix.
 
 **LOW:**
-- B18: No `audit_log` row on Stripe webhook errors (only `webhook_log`)
-- B19: Free plan lookup by `name='free'` — drift risk; should use `is_free_tier` column
-- B20: No user-facing notification on refund freeze
+- B18: No `audit_log` row on Stripe webhook errors (only `webhook_log`)  **DEFERRED 2026-04-24** — `webhook_log` already captures errors + processing_error; second audit_log row would duplicate.
+- B19: Free plan lookup by `name='free'` — drift risk; should use `is_free_tier` column  **SHIPPED 2026-04-24 · a1b30d7** — manual-sync route now uses `tier='free'` matching the RPCs' canonical column.
+- B20: No user-facing notification on refund freeze  **STALE 2026-04-24** — `handleChargeRefunded` creates a `billing_alert` notification as of B11 (commit 8984700, prior session).
 
 **Code paths 3-C deferred:** Google Play IAP (confirm out of scope), family plan seat counting/decrement, win-back/churn cron, invoice record sync (does anything populate `invoices` table?), pause/resume subscriptions (`pause_start`/`pause_end` columns exist, no handlers).
 
@@ -160,35 +159,35 @@ Notation: **[N/4]** = how many of the 4 unified round-2 agents corroborated. Rou
 | # | File:Line | Bug |
 |---|-----------|-----|
 | L1 | `web/src/app/robots.js:12-26` ↔ `middleware.js:33,39` | `robots.js` doesn't list `/category` or `/card` in disallow → robots told they can crawl, middleware then 302s to login. Combined with `sitemap.js` publishing `/category/<slug>` URLs = wasted crawl budget + zero indexing. Either both go public OR both go in disallow. **SHIPPED 2026-04-24 · c012c3f** — removed `/browse`, `/category`, `/card`, `/search`, `/u` from `PROTECTED_PREFIXES` (L1 scope expanded per A/B/C/D consensus; /search + /u added per owner directive to open anon-safe surfaces broadly). `robots.js` unchanged (already did not disallow these). `/card` keeps its layout-level noindex (intentional — prevents ranking for people's names vs canonical `/u/<username>`). Deferred items opened: (a) anon-bookmark upgrade CTA on /category + /browse, (b) /card OG leak for `profile_visibility=private`, (c) /card canonical → /u/<username>, (d) /leaderboard + /recap anon-safety sweep. |
-| L2 | `web/src/lib/permissions.js:67-85` `refreshIfStale` | Stale-fallthrough is a security leak on revocation. Comment says "slightly stale > all-deny" intentionally, but for plan-downgrade / role-revoke, concurrent `hasPermission()` reads still return YES until new fetch lands. Should differentiate grants (stale ok) from revokes (hard-clear). |
+| L2 | `web/src/lib/permissions.js:67-85` `refreshIfStale` | Stale-fallthrough is a security leak on revocation. Comment says "slightly stale > all-deny" intentionally, but for plan-downgrade / role-revoke, concurrent `hasPermission()` reads still return YES until new fetch lands. Should differentiate grants (stale ok) from revokes (hard-clear). | **SHIPPED 2026-04-24 · 0493050** — allPermsCache = null BEFORE awaiting refreshAllPermissions on version bump; fail-closed during the refetch window. |
 
 **HIGH:**
 | # | File:Line | Bug |
 |---|-----------|-----|
-| L3 | `cron/send-push/route.js:27,56` | `BATCH_SIZE=500` + `.in('user_id', userIds)` ≈ 18KB URL → exceeds PostgREST 8KB cap → silent failure, notifications skipped without log. |
-| L4 | `cron/send-emails/route.js:71-82` | `Promise.all` for setup deps; any single failure aborts batch. 50 notifications re-queue → double-send when error clears. |
-| L5 | `cron/check-user-achievements/route.js:45-49` | Sequential `for await rpc(...)` over all 48h-active users. 10k × 10ms = 100s, exceeds `maxDuration=60`. Last users skipped. |
-| L6 | `cron/process-data-exports/route.js:102-109` | Partial-failure reset: RPC succeeded + upload failed → next run re-runs RPC + re-uploads, two download URLs emailed. Idempotency broken. |
-| L7 | `web/src/lib/supabase/server.ts:51-66` `createClientFromToken` | Doesn't validate JWT shape. `bearer="garbage"` passes through, fails at first RPC. No early reject. |
+| L3 | `cron/send-push/route.js:27,56` | `BATCH_SIZE=500` + `.in('user_id', userIds)` ≈ 18KB URL → exceeds PostgREST 8KB cap → silent failure, notifications skipped without log. | **SHIPPED 2026-04-24 · 9d04420** — BATCH_SIZE=200 (~7.4KB URL, comfortable headroom). |
+| L4 | `cron/send-emails/route.js:71-82` | `Promise.all` for setup deps; any single failure aborts batch. 50 notifications re-queue → double-send when error clears. | **SHIPPED 2026-04-24 · 8b304e7** — Promise.allSettled + per-result branching; clean bail leaves email_sent=false for retry. |
+| L5 | `cron/check-user-achievements/route.js:45-49` | Sequential `for await rpc(...)` over all 48h-active users. 10k × 10ms = 100s, exceeds `maxDuration=60`. Last users skipped. | **SHIPPED 2026-04-24 · 7a46e71** — bounded-concurrency worker pool (10 in flight). |
+| L6 | `cron/process-data-exports/route.js:102-109` | Partial-failure reset: RPC succeeded + upload failed → next run re-runs RPC + re-uploads, two download URLs emailed. Idempotency broken. | **SHIPPED 2026-04-24 · cd5b89a** — state-machine guards the 'processing' → 'completed' transition; orphan uploads cleaned on error; notification best-effort after completion. |
+| L7 | `web/src/lib/supabase/server.ts:51-66` `createClientFromToken` | Doesn't validate JWT shape. `bearer="garbage"` passes through, fails at first RPC. No early reject. | **SHIPPED 2026-04-24 · a050234** — regex shape check (three base64url segments); throw at factory boundary. |
 
 **MEDIUM:**
 | # | File:Line | Bug |
 |---|-----------|-----|
-| L8 | `web/src/lib/rateLimit.js:38-42` | Dev fail-open uses `VERCEL_ENV !== production && !== preview`. Custom-VPC staging deploy with `NODE_ENV=development` bypasses rate limits — auth brute-force vector on staging. |
-| L9 | `web/src/lib/apns.js:21-23` | JWT cache checks `expiresAt > now+60` but not `created_at < now-3000`. Long-running cron reusing JWT past 50min hits Apple max-age invalidation. |
-| L10 | `web/src/lib/appleReceipt.js:23` | `EXPECTED_BUNDLE_ID = 'com.veritypost.app'` hardcoded. No env override for white-label/test build. |
-| L11 | `web/src/lib/featureFlags.js:14-26` | Doesn't differentiate "row not found" (PGRST116) from "table missing" (42P01). Whole `feature_flags` table missing → silent `defaultValue` return. Caller passing `defaultValue=true` silently bypasses gate. |
-| L12 | `web/src/lib/plans.js:12-118` | `TIERS`/`PRICING` hardcoded; UI imports them directly. Admin DB change doesn't reflect without redeploy. |
-| L13 | `web/src/lib/roles.js:34-51` | 60s cache. Admin role-assignment dropdowns can show stale rolelist for 60s after a new role is added. |
-| L14 | `web/src/lib/pipeline/persist-article.ts:152-158` | `row = data[0]` if array; if RPC returns `[]`, `row` is undefined and next access silently fails. |
-| L15 | `web/src/lib/pipeline/cost-tracker.ts:78-85` | Settings `value='not-a-number'` throws sentinel `cap_usd=-1`; downstream may treat as uncapped. |
-| L16 | `web/src/middleware.js:180-188` | CSP `Report-Only` is audit-only, not protective. Worth flagging as a scope item once nonces ship to all routes. |
+| L8 | `web/src/lib/rateLimit.js:38-42` | Dev fail-open uses `VERCEL_ENV !== production && !== preview`. Custom-VPC staging deploy with `NODE_ENV=development` bypasses rate limits — auth brute-force vector on staging. | **SHIPPED 2026-04-24 · 4cc5d56** — require NODE_ENV=development AND RATE_LIMIT_ALLOW_FAIL_OPEN=1 explicit opt-in. |
+| L9 | `web/src/lib/apns.js:21-23` | JWT cache checks `expiresAt > now+60` but not `created_at < now-3000`. Long-running cron reusing JWT past 50min hits Apple max-age invalidation. | **STALE 2026-04-24** — verified: jwtCache.expiresAt is set to `now + JWT_MAX_AGE_SECONDS` (50min) at signing time. Check `expiresAt > now + 60` refreshes before 50min elapses. Well under Apple's 60min invalidation. |
+| L10 | `web/src/lib/appleReceipt.js:23` | `EXPECTED_BUNDLE_ID = 'com.veritypost.app'` hardcoded. No env override for white-label/test build. | **SHIPPED 2026-04-24 · 4cc5d56** — `process.env.APPLE_BUNDLE_ID || 'com.veritypost.app'`. |
+| L11 | `web/src/lib/featureFlags.js:14-26` | Doesn't differentiate "row not found" (PGRST116) from "table missing" (42P01). Whole `feature_flags` table missing → silent `defaultValue` return. Caller passing `defaultValue=true` silently bypasses gate. | **SHIPPED 2026-04-24 · 4cc5d56** — real error → fail closed (false); null data → caller's default. |
+| L12 | `web/src/lib/plans.js:12-118` | `TIERS`/`PRICING` hardcoded; UI imports them directly. Admin DB change doesn't reflect without redeploy. | **DEFERRED 2026-04-24** — large DB refactor touching admin UI + checkout + settings. Keep as follow-up. |
+| L13 | `web/src/lib/roles.js:34-51` | 60s cache. Admin role-assignment dropdowns can show stale rolelist for 60s after a new role is added. | **DEFERRED 2026-04-24** — 60s staleness on admin dropdown is acceptable UX; DB pub/sub invalidation would be the right fix but scope exceeds a single-file change. |
+| L14 | `web/src/lib/pipeline/persist-article.ts:152-158` | `row = data[0]` if array; if RPC returns `[]`, `row` is undefined and next access silently fails. | **STALE 2026-04-24** — code already has `if (!row) throw new PersistArticleError('persist_generated_article returned no row')`. Guard exists. |
+| L15 | `web/src/lib/pipeline/cost-tracker.ts:78-85` | Settings `value='not-a-number'` throws sentinel `cap_usd=-1`; downstream may treat as uncapped. | **STALE 2026-04-24** — parseNum throws on non-number; checkCostCap is documented fail-closed with cap_usd=-1 as the SIGNAL (not a silent uncapped). |
+| L16 | `web/src/middleware.js:180-188` | CSP `Report-Only` is audit-only, not protective. Worth flagging as a scope item once nonces ship to all routes. | **STALE 2026-04-24** — intentional audit-only mode; scope item not a bug. |
 
 **LOW:**
-- L17: `sitemap.js:48-49` hardcoded `.limit(5000)` — silently truncates >5000 articles
-- L18: `apiErrors.js:20-21` P0001 passthrough trusts RAISE message; sloppy RPC author can leak secrets
-- L19: `cron/send-push:262-266` no concurrency lock — overlapping cron invocations fight queue
-- L20: `cronAuth.js:35-40` length-equality check leaks length via timing (mitigated by random secret)
+- L17: `sitemap.js:48-49` hardcoded `.limit(5000)` — silently truncates >5000 articles  **SHIPPED 2026-04-24 · 4cc5d56** — console.warn when cap hit. Multi-file sitemap index deferred until actually needed.
+- L18: `apiErrors.js:20-21` P0001 passthrough trusts RAISE message; sloppy RPC author can leak secrets  **SHIPPED 2026-04-24 · 4cc5d56** — sanitize whitespace + cap at 240 chars.
+- L19: `cron/send-push:262-266` no concurrency lock — overlapping cron invocations fight queue  **DEFERRED 2026-04-24** — needs schema (claim column or advisory-lock RPC). Cron schedule tolerable if runs finish within interval.
+- L20: `cronAuth.js:35-40` length-equality check leaks length via timing (mitigated by random secret)  **STALE 2026-04-24** — mitigated by random-secret rotation; LOW priority + already documented trade-off.
 
 **Files 3-D deferred:** `pipeline/call-model.ts` retry/backoff tail, `pipeline/prompt-overrides.ts` injection logic, `pipeline/scrape-article.ts` SSRF allowlist (likely real concern), `app/layout.js` GA4/AdSense CSP/privacy, `apns.js` lifecycle tail, `appleReceipt.js` `resolvePlanByAppleProductId` RLS safety, `cron/pipeline-cleanup` sweeps 3+4.
 
