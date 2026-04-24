@@ -1,7 +1,7 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified messaging 2026-04-18
 'use client';
-import { useState, useEffect, useRef, Suspense, CSSProperties } from 'react';
+import { useState, useEffect, useMemo, useRef, Suspense, CSSProperties } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '../../lib/supabase/client';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
@@ -93,7 +93,17 @@ export default function MessagesPage() {
 }
 
 function MessagesPageInner() {
-  const supabase = createClient();
+  // C6 + C8 — stabilize the supabase client across renders. Prior code
+  // called `createClient()` on every render, so every useEffect in this
+  // component (7 of them) captured a different supabase reference in
+  // its closure. Any dep-array that omitted supabase went stale after
+  // the first render; after Supabase's own background token refresh
+  // rotated the underlying session, the captured client kept trying to
+  // authenticate against the expired reference — silent load failures
+  // in messages sync, stuck realtime subscriptions, incorrect unread
+  // counts. `useMemo([])` pins it to one instance for the component's
+  // lifetime.
+  const supabase = useMemo(() => createClient(), []);
   const searchParams = useSearchParams();
   // `?to=<userId>` deep-link entry — replaces the phantom `/messages/new`
   // route that two callers (u/[username] + profile/[id] DM CTAs) used to

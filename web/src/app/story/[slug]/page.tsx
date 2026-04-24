@@ -2,7 +2,7 @@
 // @feature-verified tts 2026-04-18
 // @feature-verified article_reading 2026-04-18
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import type { User } from '@supabase/supabase-js';
 import { createClient } from '../../../lib/supabase/client';
@@ -306,7 +306,14 @@ function Timeline({ events }: { events: TimelineEvent[] }) {
 export default function StoryPage() {
   const params = useParams<{ slug: string }>();
   const slug = params?.slug;
-  const supabase = createClient();
+  // C5 — stabilize the supabase client across renders. The story-page
+  // useEffect chain (comments loader, quiz-pass check, timeline, sources,
+  // bookmarks, event tracking) all capture `supabase` in closures. With
+  // a fresh client per render, those closures go stale once the session
+  // rotates — silent comment load failures, silent bookmark writes,
+  // corrupted telemetry on page re-renders. `useMemo([])` pins it to
+  // one instance for the component's lifetime.
+  const supabase = useMemo(() => createClient(), []);
   const trackEvent = useTrack();
 
   const [story, setStory] = useState<ArticleRow | null>(null);
