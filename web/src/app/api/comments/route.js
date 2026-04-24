@@ -33,6 +33,28 @@ export async function POST(request) {
 
   const service = createServiceClient();
 
+  // H4 — surface the quiz-gate failure as a specific 403 before
+  // hitting the post_comment RPC. The RPC also enforces, but its
+  // error bubbles up as a generic "Could not post comment" — the
+  // user ends up confused about why commenting is blocked. This
+  // check tells them to pass the quiz.
+  {
+    const { data: passed, error: passErr } = await service.rpc('user_passed_article_quiz', {
+      p_user_id: user.id,
+      p_article_id: article_id,
+    });
+    if (passErr) {
+      console.error('[comments.POST.quiz_check]', passErr.message || passErr);
+      // Fall through to the RPC — it'll re-check; don't block on a
+      // transient precheck failure.
+    } else if (!passed) {
+      return NextResponse.json(
+        { error: 'Pass the quiz on this article to join the discussion.' },
+        { status: 403 }
+      );
+    }
+  }
+
   // Rate-limit: 10 comments per minute per user. Even with the
   // quiz-pass gate, an authenticated abuser could spam threads or
   // mentions; cap their burst rate.

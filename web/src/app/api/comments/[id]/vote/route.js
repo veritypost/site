@@ -50,8 +50,13 @@ export async function POST(request, { params }) {
   // award `receive_upvote` to the author when the actor flips into an
   // upvote (and only on a fresh up-flip — not on a re-affirm or a
   // downvote/clear). Pre-load both before mutating; both are best-effort.
+  // H4 — also fetch article_id so we can re-check the quiz-pass moat
+  // before letting a vote land. RPC toggle_vote is supposed to gate
+  // on the same quiz, but asserting at the API boundary gives a clean
+  // 403 with actionable copy instead of the generic RPC error.
   let priorVoteType = null;
   let commentAuthorId = null;
+  let commentArticleId = null;
   try {
     const [{ data: priorVote }, { data: comment }] = await Promise.all([
       service
@@ -60,12 +65,32 @@ export async function POST(request, { params }) {
         .eq('comment_id', id)
         .eq('user_id', user.id)
         .maybeSingle(),
-      service.from('comments').select('user_id').eq('id', id).maybeSingle(),
+      service.from('comments').select('user_id, article_id').eq('id', id).maybeSingle(),
     ]);
     priorVoteType = priorVote?.vote_type ?? null;
     commentAuthorId = comment?.user_id ?? null;
+    commentArticleId = comment?.article_id ?? null;
   } catch (e) {
     console.error('[comments.id.vote] prior-state lookup', e);
+  }
+
+  // H4 — gate non-clear votes on quiz pass. Clearing an existing vote
+  // is always allowed (you can undo your own action regardless of
+  // whether you re-pass the quiz). Upvote/downvote require pass.
+  if (type !== 'clear' && commentArticleId) {
+    const { data: passed, error: passErr } = await service.rpc('user_passed_article_quiz', {
+      p_user_id: user.id,
+      p_article_id: commentArticleId,
+    });
+    if (passErr) {
+      console.error('[comments.id.vote.quiz_check]', passErr.message || passErr);
+      // Soft-fail to the RPC so a transient precheck doesn't break voting.
+    } else if (!passed) {
+      return NextResponse.json(
+        { error: 'Pass the quiz on this article to vote on comments.' },
+        { status: 403 }
+      );
+    }
   }
 
   const { data, error } = await service.rpc('toggle_vote', {
