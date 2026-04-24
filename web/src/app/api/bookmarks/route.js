@@ -52,6 +52,24 @@ export async function POST(request) {
     .select('id')
     .single();
   if (error) {
+    // C9 — idempotent create on unique-violation. Schema has
+    // uq_bookmarks_user_id_article_id; rapid-click / in-flight double
+    // submit would otherwise 23505 and the client would show "Could
+    // not save bookmark" while the user actually has the bookmark.
+    // Swallow the violation and return the existing row's id so POST
+    // is idempotent at the API boundary.
+    if (error.code === '23505') {
+      const { data: existing } = await service
+        .from('bookmarks')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('article_id', article_id)
+        .maybeSingle();
+      if (existing?.id) return NextResponse.json({ id: existing.id, deduped: true });
+      // Fall through to generic handling if we somehow can't fetch the
+      // colliding row (e.g. RLS gap). Shouldn't happen under correct
+      // policies but be defensive.
+    }
     // P0001 from `enforce_bookmark_cap` carries the actual cap message
     // ("Bookmark limit reached (max N on your plan). Upgrade for unlimited.")
     // — pass it through at 422 instead of swallowing into a generic 400.
