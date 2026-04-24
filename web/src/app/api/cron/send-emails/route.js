@@ -68,7 +68,13 @@ async function runInner() {
   }
 
   const userIds = [...new Set(queued.map((n) => n.user_id))];
-  const [{ data: users }, { data: prefs }, { data: templates }] = await Promise.all([
+  // L4: allSettled so a single fetch failure doesn't poison the whole batch.
+  // If users or templates lookups fail, we bail loudly (no way to render/send
+  // without them) but leave email_sent=false so the next cron tick retries.
+  // If prefs lookup fails we proceed with an empty prefs map — the default
+  // behavior is "send" when there's no explicit opt-out row, matching the
+  // RPC side. Every branch logs the underlying error for debugging.
+  const [usersRes, prefsRes, templatesRes] = await Promise.allSettled([
     service.from('users').select('id, email, username, email_verified').in('id', userIds),
     service
       .from('alert_preferences')
@@ -80,6 +86,32 @@ async function runInner() {
       .in('key', Object.values(TYPE_TO_TEMPLATE))
       .eq('is_active', true),
   ]);
+
+  const usersResult = usersRes.status === 'fulfilled' ? usersRes.value : null;
+  const prefsResult = prefsRes.status === 'fulfilled' ? prefsRes.value : null;
+  const templatesResult = templatesRes.status === 'fulfilled' ? templatesRes.value : null;
+
+  if (!usersResult || usersResult.error || !templatesResult || templatesResult.error) {
+    console.error('[cron.send-emails] required fetch failed:', {
+      users: usersRes.status === 'rejected' ? usersRes.reason : usersResult?.error,
+      templates: templatesRes.status === 'rejected' ? templatesRes.reason : templatesResult?.error,
+    });
+    await logCronHeartbeat(CRON_NAME, 'error', {
+      stage: 'setup_fetch',
+      error: 'users or templates fetch failed — batch re-queued',
+    });
+    return NextResponse.json({ error: 'Setup fetch failed — retrying next tick' }, { status: 500 });
+  }
+
+  if (prefsRes.status === 'rejected' || prefsResult?.error) {
+    console.warn('[cron.send-emails] prefs fetch failed; proceeding with empty map', {
+      error: prefsRes.status === 'rejected' ? prefsRes.reason : prefsResult?.error,
+    });
+  }
+
+  const users = usersResult.data || [];
+  const prefs = prefsResult?.data || [];
+  const templates = templatesResult.data || [];
 
   const userById = Object.fromEntries((users || []).map((u) => [u.id, u]));
   const prefKey = (uid, type) => `${uid}:${type}`;
