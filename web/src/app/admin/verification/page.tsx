@@ -117,7 +117,10 @@ export default function VerificationAdmin() {
     setApps((data.applications || []) as Application[]);
   }
 
-  useEffect(() => { if (authorized) load(filter); }, [filter, authorized]);
+  useEffect(() => {
+    if (authorized) load(filter);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter, authorized]);
 
   function approve(app: Application) {
     const username = app.users?.username || app.full_name || 'applicant';

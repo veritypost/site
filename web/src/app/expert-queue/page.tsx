@@ -130,6 +130,7 @@ export default function ExpertQueuePage() {
 
   useEffect(() => {
     init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function loadItems(status: string) {

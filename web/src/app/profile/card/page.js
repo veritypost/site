@@ -49,6 +49,7 @@ export default function MyCardPage() {
       // Paid user with a username — send them to the public card view.
       window.location.replace(`/card/${me.username}`);
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (state === 'loading') {

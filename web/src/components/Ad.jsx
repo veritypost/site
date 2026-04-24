@@ -180,6 +180,10 @@ export default function Ad({ placement, page = 'unknown', position = 'inline', a
     >
       {sponsoredLabel}
       {safeCreativeUrl && (
+        // Ad creatives come from untrusted advertiser hosts; next/image
+        // would require allow-listing every domain we ever sell to.
+        // Raw img avoids that and lets advertisers serve their own CDN.
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={safeCreativeUrl}
           alt={ad.alt_text || 'Sponsored'}

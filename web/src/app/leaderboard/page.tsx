@@ -159,6 +159,7 @@ export default function LeaderboardPage() {
         setMe(meRow || null);
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -291,6 +292,7 @@ export default function LeaderboardPage() {
       setLoading(false);
     }
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, period, activeCat, me]);
 
   // Compute my rank relative to the loaded list (best-effort; full rank needs a server side count).

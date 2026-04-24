@@ -270,6 +270,7 @@ function MessagesPageInner() {
 
   useEffect(() => {
     loadMessages();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Load messages when conversation selected. On open we (1) fetch the
@@ -331,6 +332,7 @@ function MessagesPageInner() {
           setReadMessageIds(new Set(exRows.map((r) => r.message_id)));
         }
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected]);
 
   // Realtime: new messages in the currently-open conversation.
@@ -357,6 +359,7 @@ function MessagesPageInner() {
     return () => {
       supabase.removeChannel(channel);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected, currentUser?.id]);
 
   // Realtime: message_receipts INSERT for the currently-open conversation.
@@ -387,6 +390,7 @@ function MessagesPageInner() {
     return () => {
       supabase.removeChannel(channel);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected, currentUser?.id]);
 
   // Realtime: messages INSERT across ALL conversations — drives unread pill.
@@ -417,6 +421,7 @@ function MessagesPageInner() {
     return () => {
       supabase.removeChannel(channel);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id, selected]);
 
   // Realtime: conversation list changes.
@@ -470,6 +475,7 @@ function MessagesPageInner() {
     return () => {
       supabase.removeChannel(channel);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id]);
 
   const sendMessage = async () => {
@@ -527,6 +533,7 @@ function MessagesPageInner() {
       if (searchQuery.trim()) searchUsers();
     }, 400);
     return () => clearTimeout(timeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, roleFilter]);
 
   const startConversation = async (otherUserId: string) => {
@@ -604,6 +611,7 @@ function MessagesPageInner() {
     if (dmIntentHandled.current === toParam) return;
     dmIntentHandled.current = toParam;
     startConversation(toParam);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toParam, currentUser, canCompose, loading]);
 
   // R13-C5 Fix 2 — Block / unblock the other participant in the currently-

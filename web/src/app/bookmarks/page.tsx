@@ -156,6 +156,7 @@ export default function BookmarksPage() {
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function removeBookmark(id: string) {

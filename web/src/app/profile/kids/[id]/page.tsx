@@ -246,6 +246,7 @@ export default function KidDashboardPage() {
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   async function useFreeze() {

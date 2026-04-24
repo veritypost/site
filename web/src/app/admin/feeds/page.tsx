@@ -120,6 +120,10 @@ function FeedsAdminInner() {
     failCount: f.error_count ?? 0,
   });
 
+  // normFeed closes over staleHours + brokenFailCount; listing those as
+  // deps is equivalent to listing the function itself (re-created each
+  // render, same inputs). Lint can't see the capture.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const displayFeeds = useMemo(() => feeds.map(normFeed), [feeds, staleHours, brokenFailCount]);
 
   const filtered = useMemo(() => {

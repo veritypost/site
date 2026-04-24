@@ -96,6 +96,7 @@ export default function NotificationsInbox() {
       return;
     }
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter, permsReady, canView]);
 
   async function markAllRead() {

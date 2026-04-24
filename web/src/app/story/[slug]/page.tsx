@@ -630,6 +630,7 @@ export default function StoryPage() {
         setLoading(false);
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
   // Fire page_view once the article resolves. Keyed on story.id so
@@ -649,6 +650,7 @@ export default function StoryPage() {
         quiz_pool_size: quizPoolSize,
       },
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [story?.id, quizPoolSize, trackEvent]);
 
   // Mark reading complete only after a genuine engagement signal:

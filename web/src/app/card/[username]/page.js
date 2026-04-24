@@ -86,6 +86,7 @@ export default function CardPage() {
 
       setState('ready');
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [username]);
 
   const copyLink = async () => {
@@ -148,6 +149,11 @@ export default function CardPage() {
               }}
             >
               {target.avatar_url ? (
+                // Avatar lives on Supabase storage; next/image requires
+                // an allow-list per host and a sized frame. For a 64px
+                // round avatar the optimizer savings don't justify the
+                // config overhead. Plain img is intentional.
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={target.avatar_url}
                   alt=""

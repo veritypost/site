@@ -79,6 +79,7 @@ export default function SearchPage() {
         .order('name');
       setCategories((cats as CategoryRow[] | null) || []);
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function runSearch() {

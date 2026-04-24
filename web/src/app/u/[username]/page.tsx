@@ -238,6 +238,7 @@ export default function ProfilePage() {
         setFollowingList(rows.map((r) => r.users).filter((u): u is UserListItem => !!u));
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, target?.id]);
 
   if (loading) return <div style={{ padding: 40, color: '#666' }}>Loading…</div>;

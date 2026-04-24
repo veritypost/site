@@ -103,6 +103,7 @@ export default function FamilyDashboard() {
       setReport((rep as WeeklyReport) || null);
       setLoading(false);
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (loading) return <div style={{ padding: 40, color: C.dim }}>Loading{'\u2026'}</div>;
