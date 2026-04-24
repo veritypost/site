@@ -1,7 +1,7 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified comments 2026-04-18
 import { NextResponse } from 'next/server';
-import { requirePermission } from '@/lib/auth';
+import { requireAuth, hasPermissionServer } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { scoreCommentPost } from '@/lib/scoring';
 import { v2LiveGuard } from '@/lib/featureFlags';
@@ -14,50 +14,26 @@ import { checkRateLimit } from '@/lib/rateLimit';
 export async function POST(request) {
   const blocked = await v2LiveGuard();
   if (blocked) return blocked;
+
+  // M11 — order: auth → rate-limit → permission → quiz → RPC. Rate-limit
+  // fires before the perms RPC so an authenticated attacker probing for
+  // a permission flip (or running the quiz pre-check as a recon side
+  // channel) gets gated at 10/min instead of being able to spam the
+  // expensive perms+quiz lookups.
   let user;
   try {
-    user = await requirePermission('comments.post');
+    user = await requireAuth();
   } catch (err) {
     if (err.status) {
       console.error('[comments.POST]', err);
-      return NextResponse.json({ error: 'Not allowed to post comments' }, { status: err.status });
+      return NextResponse.json({ error: 'Unauthenticated' }, { status: err.status });
     }
     console.error('[comments.POST]', err);
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
 
-  const { article_id, body, parent_id, mentions } = await request.json().catch(() => ({}));
-  if (!article_id || !body) {
-    return NextResponse.json({ error: 'article_id and body required' }, { status: 400 });
-  }
-
   const service = createServiceClient();
 
-  // H4 — surface the quiz-gate failure as a specific 403 before
-  // hitting the post_comment RPC. The RPC also enforces, but its
-  // error bubbles up as a generic "Could not post comment" — the
-  // user ends up confused about why commenting is blocked. This
-  // check tells them to pass the quiz.
-  {
-    const { data: passed, error: passErr } = await service.rpc('user_passed_article_quiz', {
-      p_user_id: user.id,
-      p_article_id: article_id,
-    });
-    if (passErr) {
-      console.error('[comments.POST.quiz_check]', passErr.message || passErr);
-      // Fall through to the RPC — it'll re-check; don't block on a
-      // transient precheck failure.
-    } else if (!passed) {
-      return NextResponse.json(
-        { error: 'Pass the quiz on this article to join the discussion.' },
-        { status: 403 }
-      );
-    }
-  }
-
-  // Rate-limit: 10 comments per minute per user. Even with the
-  // quiz-pass gate, an authenticated abuser could spam threads or
-  // mentions; cap their burst rate.
   const rate = await checkRateLimit(service, {
     key: `comments:${user.id}`,
     policyKey: 'comments_post',
@@ -65,15 +41,38 @@ export async function POST(request) {
     windowSec: 60,
   });
   if (rate.limited) {
-    // H22 — dynamic Retry-After based on the actual remaining window
-    // from checkRateLimit instead of always "60". If a user posts 9
-    // comments then waits 45s, the 10th shouldn't be told to wait a
-    // full minute more.
     const retryAfter = String(rate.windowSec ?? 60);
     return NextResponse.json(
       { error: 'Posting too quickly. Wait a moment and try again.' },
       { status: 429, headers: { 'Retry-After': retryAfter } }
     );
+  }
+
+  const allowed = await hasPermissionServer('comments.post');
+  if (!allowed) {
+    return NextResponse.json({ error: 'Not allowed to post comments' }, { status: 403 });
+  }
+
+  const { article_id, body, parent_id, mentions } = await request.json().catch(() => ({}));
+  if (!article_id || !body) {
+    return NextResponse.json({ error: 'article_id and body required' }, { status: 400 });
+  }
+
+  // H4 — surface the quiz-gate failure as a specific 403 before
+  // hitting the post_comment RPC.
+  {
+    const { data: passed, error: passErr } = await service.rpc('user_passed_article_quiz', {
+      p_user_id: user.id,
+      p_article_id: article_id,
+    });
+    if (passErr) {
+      console.error('[comments.POST.quiz_check]', passErr.message || passErr);
+    } else if (!passed) {
+      return NextResponse.json(
+        { error: 'Pass the quiz on this article to join the discussion.' },
+        { status: 403 }
+      );
+    }
   }
 
   const { data, error } = await service.rpc('post_comment', {
