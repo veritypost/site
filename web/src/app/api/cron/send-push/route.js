@@ -54,17 +54,19 @@ async function runInner() {
 
   const service = createServiceClient();
 
-  const { data: queued, error: loadErr } = await service
-    .from('notifications')
-    .select('id, user_id, type, title, body, action_url, metadata')
-    .eq('push_sent', false)
-    .neq('channel', 'in_app')
-    .order('created_at')
-    .limit(BATCH_SIZE);
+  // L19: atomic claim via claim_push_batch RPC (FOR UPDATE SKIP LOCKED so
+  // overlapping cron invocations see disjoint rows). Replaces the prior
+  // SELECT-then-mark pattern, which let two concurrent runs pick up the
+  // same 200 notifications and dispatch each one twice. Stale claims
+  // (>5 min old) are reclaimable inside the RPC so a crashed prior run
+  // doesn't permanently lock notifications.
+  const { data: queued, error: loadErr } = await service.rpc('claim_push_batch', {
+    p_limit: BATCH_SIZE,
+  });
   if (loadErr) {
-    console.error('[cron.send-push] load failed:', loadErr);
-    await logCronHeartbeat(CRON_NAME, 'error', { error: loadErr.message, stage: 'load' });
-    return NextResponse.json({ error: 'Load failed' }, { status: 500 });
+    console.error('[cron.send-push] claim failed:', loadErr);
+    await logCronHeartbeat(CRON_NAME, 'error', { error: loadErr.message, stage: 'claim' });
+    return NextResponse.json({ error: 'Claim failed' }, { status: 500 });
   }
   if (!queued?.length) {
     await logCronHeartbeat(CRON_NAME, 'end', { sent: 0, batch: 0 });
