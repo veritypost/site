@@ -69,6 +69,34 @@ export async function POST(request) {
     );
   }
 
+  // B3 — appAccountToken hardening (account-takeover defense, layer 1).
+  // iOS app stamps the purchasing user's Supabase UUID onto every receipt
+  // via Product.PurchaseOption.appAccountToken (StoreManager.swift:128-142).
+  // If the token is present and doesn't match the bearer's userId, the
+  // receipt was either purchased by a different user OR a hijack attempt
+  // is in flight. Reject.
+  //
+  // The `payload.appAccountToken &&` guard preserves backward compat:
+  // receipts purchased before iOS shipped this field (or the rare path
+  // where iOS couldn't read the session at purchase time) lack the field
+  // and pass through here. They are still protected by the existingSub
+  // user_id check below (defense layer 2 — works retroactively).
+  //
+  // Edge cases that intentionally fail (acceptable per 4-agent review):
+  //  - User restores purchases on a NEW Verity account (legitimate sub
+  //    becomes inaccessible — they need the original account).
+  //  - Family sharing where Apple stamps the parent's UUID onto the
+  //    child's surfaced receipt (per Apple docs ambiguity).
+  // If real users hit these, revisit; the alternative is the security
+  // hole. Token comparison is case-insensitive (UUIDs are by spec, but
+  // defensive against any uppercase variant).
+  if (
+    payload.appAccountToken &&
+    String(payload.appAccountToken).toLowerCase() !== String(userId).toLowerCase()
+  ) {
+    return NextResponse.json({ error: 'Receipt belongs to a different user' }, { status: 403 });
+  }
+
   const service = createServiceClient();
   const originalTxId = String(payload.originalTransactionId || payload.transactionId);
   const eventId = `apple_sync:${originalTxId}`;
@@ -140,11 +168,22 @@ export async function POST(request) {
     const periodStart = new Date(periodStartMs).toISOString();
     const periodEnd = new Date(periodEndMs).toISOString();
 
+    // B3 — defense layer 2. Match the existing row by transaction_id
+    // AND user_id so we can never silently overwrite another user's
+    // subscription ownership. Pre-2026-04-16 receipts (no
+    // appAccountToken) bypass the check above but are still gated here.
+    // Also fetch user_id so we can return a clean 403 when an existing
+    // row is owned by someone else (rather than silently inserting a
+    // duplicate row, which would orphan the original).
     const { data: existingSub } = await service
       .from('subscriptions')
-      .select('id')
+      .select('id, user_id')
       .eq('apple_original_transaction_id', originalTxId)
       .maybeSingle();
+
+    if (existingSub && existingSub.user_id !== userId) {
+      return NextResponse.json({ error: 'Receipt belongs to a different user' }, { status: 403 });
+    }
 
     const subRow = {
       user_id: userId,

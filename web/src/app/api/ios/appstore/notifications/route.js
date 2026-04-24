@@ -163,6 +163,28 @@ export async function POST(request) {
 
     const userId = sub.user_id;
 
+    // B3 — appAccountToken hardening on the S2S notification path. If
+    // the JWS-signed transaction's appAccountToken doesn't match the
+    // stored subscription's user_id, the row was either hijacked via
+    // the sync route (now closed by the matching check there) OR Apple
+    // is delivering a notification for a transaction whose ownership
+    // was rewritten between purchase and notification. Either way:
+    // refuse to act on it. The `&&` guard preserves backward compat
+    // for receipts purchased before iOS shipped the token.
+    if (
+      transaction.appAccountToken &&
+      String(transaction.appAccountToken).toLowerCase() !== String(userId).toLowerCase()
+    ) {
+      await service
+        .from('webhook_log')
+        .update({
+          processing_status: 'failed',
+          processing_error: 'transaction.appAccountToken mismatch with subscription owner',
+        })
+        .eq('id', logId);
+      return NextResponse.json({ error: 'appAccountToken mismatch' }, { status: 403 });
+    }
+
     switch (notificationType) {
       case 'DID_CHANGE_RENEWAL_STATUS': {
         const autoRenewOn = renewal?.autoRenewStatus === 1;
