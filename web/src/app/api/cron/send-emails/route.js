@@ -164,7 +164,13 @@ export const POST = withCronLog('send-emails', run);
 
 function absoluteUrl(path) {
   if (!path) return '';
-  if (/^https?:\/\//i.test(path)) return path;
+  // notifications.action_url is stored data. Raw string lands in an
+  // email template's <a href=...>, where HTML-escape doesn't neutralize
+  // dangerous URI schemes (javascript:, data:, vbscript:). Allow https,
+  // http, and mailto; reject anything else that looks like a scheme and
+  // return empty so the template renders a harmless href=''.
+  if (/^(https?|mailto):/i.test(path)) return path;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(path)) return '';
   // getSiteUrl throws in prod when NEXT_PUBLIC_SITE_URL is unset — fail
   // the cron loud rather than ship preview-branch URLs into outgoing
   // email bodies (which would leak prod when run from a preview env).
