@@ -5,7 +5,7 @@ import { requirePermission } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
-import { requireAdminOutranks } from '@/lib/adminMutation';
+import { recordAdminAction, requireAdminOutranks } from '@/lib/adminMutation';
 
 // Admin-triggered cancellation. D40 flow: DMs off immediately,
 // 7-day grace, then freeze.
@@ -60,5 +60,18 @@ export async function POST(request) {
       route: 'admin.billing.cancel',
       fallbackStatus: 400,
     });
+
+  // C20 / R-6-AGR-05 — audit the admin-initiated cancel. Previously
+  // zero trail on destructive billing mutations initiated by admins.
+  // recordAdminAction threads actor_id from the session so the audit
+  // log correctly names the admin, not the affected user
+  // (O-DESIGN-08 Option A).
+  await recordAdminAction({
+    action: 'billing.cancel',
+    targetTable: 'users',
+    targetId: user_id,
+    newValue: { reason: reason || 'admin cancel', initiated_by: 'admin' },
+  });
+
   return NextResponse.json(data);
 }

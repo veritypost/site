@@ -5,7 +5,7 @@ import { requirePermission } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
-import { requireAdminOutranks } from '@/lib/adminMutation';
+import { recordAdminAction, requireAdminOutranks } from '@/lib/adminMutation';
 
 // Skip grace and freeze immediately (D40). Use when an admin
 // needs to close out a user past their grace window without
@@ -55,5 +55,18 @@ export async function POST(request) {
       route: 'admin.billing.freeze',
       fallbackStatus: 400,
     });
+
+  // C20 / R-6-AGR-05 — audit the admin-initiated freeze. Before this
+  // fix, admin-triggered account freezes left no audit trail; a rogue
+  // admin could mass-freeze accounts invisibly. recordAdminAction
+  // automatically captures actor_id from the session so the log row
+  // names the admin, not the affected user (O-DESIGN-08 Option A).
+  await recordAdminAction({
+    action: 'billing.freeze',
+    targetTable: 'users',
+    targetId: user_id,
+    newValue: { plan_status: 'frozen', initiated_by: 'admin' },
+  });
+
   return NextResponse.json(data);
 }
