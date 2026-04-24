@@ -76,7 +76,33 @@ export default function Ad({ placement, page = 'unknown', position = 'inline', a
 
   if (!ad) return null;
 
+  // Scheme allowlist for ad URLs. Both click_url (anchor href) and
+  // creative_url (img src) are admin-supplied via the ad_units table; an
+  // unvalidated `javascript:`, `data:`, or protocol-relative value would
+  // execute on click / render. Inline SVG via `data:image/svg+xml,<svg
+  // onload=...>` is an XSS vector even in img src — same allowlist
+  // applies to both. TODO(item-7-followup): also validate at the
+  // /api/admin/ad-units POST so the DB never holds a poisoned URL.
+  function isSafeAdUrl(url) {
+    if (!url || typeof url !== 'string') return false;
+    const normalized = url.trim().toLowerCase();
+    return normalized.startsWith('https://') || normalized.startsWith('http://');
+  }
+
+  const safeClickUrl = isSafeAdUrl(ad.click_url) ? ad.click_url.trim() : null;
+  const safeCreativeUrl = isSafeAdUrl(ad.creative_url) ? ad.creative_url.trim() : null;
+
+  if (ad.click_url && !safeClickUrl) {
+    console.warn('[ads] rejected click_url (invalid scheme):', ad.click_url);
+  }
+  if (ad.creative_url && !safeCreativeUrl) {
+    console.warn('[ads] rejected creative_url (invalid scheme):', ad.creative_url);
+  }
+
   function handleClick() {
+    // Skip click tracking when the destination was rejected — otherwise
+    // analytics records a "click" for an inert link, distorting CTR.
+    if (!safeClickUrl) return;
     if (impressionId) {
       fetch('/api/ads/click', {
         method: 'POST',
@@ -146,16 +172,16 @@ export default function Ad({ placement, page = 'unknown', position = 'inline', a
 
   return (
     <a
-      href={ad.click_url || '#'}
+      href={safeClickUrl || '#'}
       onClick={handleClick}
-      target="_blank"
-      rel="noopener noreferrer sponsored"
+      target={safeClickUrl ? '_blank' : undefined}
+      rel={safeClickUrl ? 'noopener noreferrer sponsored' : 'sponsored'}
       style={{ ...wrapStyle, display: 'block', textDecoration: 'none', color: 'inherit' }}
     >
       {sponsoredLabel}
-      {ad.creative_url && (
+      {safeCreativeUrl && (
         <img
-          src={ad.creative_url}
+          src={safeCreativeUrl}
           alt={ad.alt_text || 'Sponsored'}
           style={{ maxWidth: '100%', display: 'block', borderRadius: 6 }}
         />
