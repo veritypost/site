@@ -96,7 +96,7 @@ function ModerationConsoleInner() {
       .eq('appeal_status', 'pending')
       .order('created_at', { ascending: false });
     if (error) {
-      toast.push({ message: `Failed to load appeals: ${error.message}`, variant: 'danger' });
+      toast.push({ message: 'Failed to load appeals. Try again.', variant: 'danger' });
       setAppeals([]);
       return;
     }
@@ -143,7 +143,7 @@ function ModerationConsoleInner() {
       .eq(col, q)
       .maybeSingle();
     if (error) {
-      toast.push({ message: `Lookup failed: ${error.message}`, variant: 'danger' });
+      toast.push({ message: 'Lookup failed. Try again.', variant: 'danger' });
       return;
     }
     if (!data) {

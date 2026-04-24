@@ -157,7 +157,7 @@ export default function WebhooksAdmin() {
       .eq('id', log.id);
     setRetrying(false);
     if (error) {
-      push({ message: `Retry failed: ${error.message}`, variant: 'danger' });
+      push({ message: 'Retry failed. Try again.', variant: 'danger' });
       return;
     }
     setLogs((prev) => prev.map((l) => (l.id === log.id

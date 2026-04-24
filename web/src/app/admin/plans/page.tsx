@@ -200,7 +200,7 @@ export default function PlansAdmin() {
       .upsert(row, { onConflict: 'plan_id,feature_key' });
     setSavingFeatureKey(null);
     if (error) {
-      toast.push({ message: `Save failed: ${error.message}`, variant: 'danger' });
+      toast.push({ message: 'Save failed. Try again.', variant: 'danger' });
       return false;
     }
     setFeatures((prev) => prev.map((f) =>
@@ -257,7 +257,7 @@ export default function PlansAdmin() {
       .single();
     setAddingFeature(false);
     if (error) {
-      toast.push({ message: `Add feature failed: ${error.message}`, variant: 'danger' });
+      toast.push({ message: 'Add feature failed. Try again.', variant: 'danger' });
       return;
     }
     setFeatures((prev) => [...prev, data as PlanFeature]);
@@ -279,7 +279,7 @@ export default function PlansAdmin() {
       .eq('plan_id', feature.plan_id)
       .eq('feature_key', feature.feature_key);
     if (error) {
-      toast.push({ message: `Remove failed: ${error.message}`, variant: 'danger' });
+      toast.push({ message: 'Remove failed. Try again.', variant: 'danger' });
       return;
     }
     setFeatures((prev) => prev.filter((f) =>

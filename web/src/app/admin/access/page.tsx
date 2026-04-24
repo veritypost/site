@@ -161,7 +161,7 @@ export default function AccessAdmin() {
       .update({ is_active: next })
       .eq('id', code.id);
     if (error) {
-      toast.push({ message: `Toggle failed: ${error.message}`, variant: 'danger' });
+      toast.push({ message: 'Toggle failed. Try again.', variant: 'danger' });
       setCodes((prev) => prev.map((c) => c.id === code.id ? { ...c, is_active: !next } : c));
       return;
     }
@@ -199,7 +199,7 @@ export default function AccessAdmin() {
       .eq('id', editExpiryCode.id);
     setExpirySaving(false);
     if (error) {
-      toast.push({ message: `Expiry save failed: ${error.message}`, variant: 'danger' });
+      toast.push({ message: 'Expiry save failed. Try again.', variant: 'danger' });
       return;
     }
     setCodes((prev) => prev.map((c) =>
@@ -238,7 +238,7 @@ export default function AccessAdmin() {
       .single();
     setSaving(false);
     if (error) {
-      toast.push({ message: `Create failed: ${error.message}`, variant: 'danger' });
+      toast.push({ message: 'Create failed. Try again.', variant: 'danger' });
       return;
     }
     setCodes((prev) => [data as AccessCode, ...prev]);

@@ -317,7 +317,7 @@ export default function SupportAdmin() {
       .update({ status, updated_at: new Date().toISOString() })
       .eq('id', id);
     if (error) {
-      push({ message: `Could not update status: ${error.message}`, variant: 'danger' });
+      push({ message: 'Could not update status. Try again.', variant: 'danger' });
       return;
     }
     setTickets((prev) => prev.map((t) => (t.id === id ? { ...t, status } : t)));

@@ -497,7 +497,7 @@ export default function AdminPermissionsPage() {
       .limit(20);
     setUserSearchBusy(false);
     if (error) {
-      toast.push({ message: `User search failed: ${error.message}`, variant: 'danger' });
+      toast.push({ message: 'User search failed. Try again.', variant: 'danger' });
       return;
     }
     setUserSearchResults((data || []) as typeof userSearchResults);
@@ -512,7 +512,7 @@ export default function AdminPermissionsPage() {
       .order('granted_at', { ascending: false });
     setUserGrantsBusy(false);
     if (error) {
-      toast.push({ message: `Load grants failed: ${error.message}`, variant: 'danger' });
+      toast.push({ message: 'Load grants failed. Try again.', variant: 'danger' });
       return;
     }
     setUserGrants((data || []) as UserPermissionSet[]);

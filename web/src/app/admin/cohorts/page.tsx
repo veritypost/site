@@ -195,7 +195,7 @@ function CohortsInner() {
         } as any)
         .select('id, name, cohort_id, type, channel, subject, body, sent_count, opened_count, clicked_count, conversion_count, completed_at')
         .single();
-      if (error) { push({ message: `Send failed: ${error.message}`, variant: 'danger' }); return; }
+      if (error) { push({ message: 'Send failed. Try again.', variant: 'danger' }); return; }
       if (inserted) {
         setCampaigns((prev) => [{ ...(inserted as any), cohort_name: cohort.name }, ...prev] as Campaign[]);
         push({ message: 'Campaign sent', variant: 'success' });
