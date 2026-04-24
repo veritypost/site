@@ -4,6 +4,17 @@
 
 import { useState, useEffect, useRef, CSSProperties, FormEvent } from 'react';
 import { createClient } from '../../../lib/supabase/client';
+import { resolveNext } from '@/lib/authRedirect';
+
+// Preserve the OAuth callback's `?next=` through the onboarding chain.
+// Validate client-side (same allowlist as the server) so a tampered
+// query param can't open-redirect on the final hop.
+function readValidatedNext(): string {
+  if (typeof window === 'undefined') return '';
+  const raw = new URLSearchParams(window.location.search).get('next');
+  const safe = resolveNext(raw, null);
+  return safe ? `?next=${encodeURIComponent(safe)}` : '';
+}
 
 // Onboarding step 2 of 3 — pick a username. Post-auth routing only; no
 // role/plan gates.
@@ -82,7 +93,7 @@ export default function PickUsernamePage() {
           }>();
         // If they already have a username, skip straight to /welcome.
         if (me?.username) {
-          window.location.href = '/welcome';
+          window.location.href = `/welcome${readValidatedNext()}`;
           return;
         }
         setSuggestions(buildSuggestions(me?.email || user.email, me?.display_name));
@@ -176,7 +187,7 @@ export default function PickUsernamePage() {
     try {
       const ok = await persistUsername(username);
       if (ok) {
-        window.location.href = '/welcome';
+        window.location.href = `/welcome${readValidatedNext()}`;
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save username. Please try again.');
@@ -195,7 +206,7 @@ export default function PickUsernamePage() {
       try {
         const ok = await persistUsername(candidate);
         if (ok) {
-          window.location.href = '/welcome';
+          window.location.href = `/welcome${readValidatedNext()}`;
           return;
         }
       } catch (err) {

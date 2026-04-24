@@ -2,7 +2,7 @@
 // @feature-verified system_auth 2026-04-18
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { resolveNextForRedirect } from '@/lib/authRedirect';
+import { resolveNext, resolveNextForRedirect } from '@/lib/authRedirect';
 import { getSiteUrl } from '@/lib/siteUrl';
 import { scoreDailyLogin } from '@/lib/scoring';
 
@@ -144,7 +144,13 @@ export async function GET(request) {
         console.error('[callback] scoreDailyLogin threw', e);
       }
 
-      return NextResponse.redirect(`${siteUrl}/signup/pick-username`);
+      // Validate rawNext before forwarding so we don't ship an
+      // open-redirect through the onboarding chain. `resolveNext` rejects
+      // `//evil.com`, backslash tricks, Unicode slash homoglyphs, and
+      // anything non-same-origin; null return = no next to preserve.
+      const validatedNext = resolveNext(rawNext, null);
+      const nextQs = validatedNext ? `?next=${encodeURIComponent(validatedNext)}` : '';
+      return NextResponse.redirect(`${siteUrl}/signup/pick-username${nextQs}`);
     }
 
     const updatePayload = { last_login_at: new Date().toISOString() };
@@ -175,7 +181,9 @@ export async function GET(request) {
     }
 
     if (!existing.username) {
-      return NextResponse.redirect(`${siteUrl}/signup/pick-username`);
+      const validatedNext = resolveNext(rawNext, null);
+      const nextQs = validatedNext ? `?next=${encodeURIComponent(validatedNext)}` : '';
+      return NextResponse.redirect(`${siteUrl}/signup/pick-username${nextQs}`);
     }
 
     // New-to-the-product user who already has a username (OAuth that

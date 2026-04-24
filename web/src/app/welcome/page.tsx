@@ -5,6 +5,23 @@ import { useState, useEffect, useMemo, CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '../../lib/supabase/client';
 import { useTrack } from '@/lib/useTrack';
+import { resolveNext } from '@/lib/authRedirect';
+
+// Final hop of the OAuth-first-login chain. If the callback forwarded a
+// validated `?next=`, respect it here instead of defaulting to `/`. Also
+// re-validate client-side so a user who hand-edits the URL can't open-
+// redirect themselves.
+function getValidatedNextPath(fallback: string): string {
+  if (typeof window === 'undefined') return fallback;
+  const raw = new URLSearchParams(window.location.search).get('next');
+  return resolveNext(raw, fallback) ?? fallback;
+}
+function forwardNextQs(): string {
+  if (typeof window === 'undefined') return '';
+  const raw = new URLSearchParams(window.location.search).get('next');
+  const safe = resolveNext(raw, null);
+  return safe ? `?next=${encodeURIComponent(safe)}` : '';
+}
 
 // Dual-purpose page:
 //   - When NEXT_PUBLIC_SITE_MODE=coming_soon → renders the holding card
@@ -140,11 +157,11 @@ export default function WelcomePage() {
         return;
       }
       if (!me?.username) {
-        router.replace('/signup/pick-username');
+        router.replace(`/signup/pick-username${forwardNextQs()}`);
         return;
       }
       if (me?.onboarding_completed_at) {
-        router.replace('/');
+        router.replace(getValidatedNextPath('/'));
         return;
       }
 
@@ -180,7 +197,7 @@ export default function WelcomePage() {
         content_type: 'welcome',
         payload: { carousel_screen_reached: index + 1 },
       });
-      router.replace('/');
+      router.replace(getValidatedNextPath('/'));
     } catch (err) {
       console.error('Onboarding finish failed', err);
       const msg =
