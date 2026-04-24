@@ -389,15 +389,37 @@ async function handleSubscriptionUpdated(service, sub) {
 // Portal was silently ignored. Policy: treat a full refund as plan
 // revocation (freeze the user); partial refunds log only. This is a
 // conservative default; admins can escalate partial refunds manually.
+//
+// B11 — the prior `Boolean(charge.refunded) || amount === amount_refunded`
+// fallback misclassified partial refunds as full when Stripe's webhook
+// payload was momentarily stale (race during the Stripe API write). Per
+// Stripe docs, `charge.refunded` is the authoritative full-refund flag —
+// it's set to true IFF amount_refunded === amount. The `||` math fallback
+// was redundant AND failure-mode-unsafe (it could fire even when
+// `charge.refunded` is false, freezing a user mid-partial-refund). Use
+// the boolean alone.
+//
+// B11 also adds an in-app notification on freeze — prior code silently
+// locked users out of paid features. Matches the handlePaymentFailed
+// notification pattern below. Best-effort.
+//
+// Deferred (separate items):
+//   - charge.refund.updated (status='reversed') handler + billing_unfreeze
+//     RPC. Stripe DOES fire this and we currently leave reversed-refund
+//     users frozen forever.
+//   - charge.dispute.closed handler. Won-disputes leave the user frozen
+//     if a refund had also fired; today admin must manually unfreeze.
+//   - Apple-side REFUND parity — touched independently. Multi-provider
+//     sync (iOS subscriptions/sync re-validates Apple receipts on launch)
+//     can undo any state change unless both sides agree, which is a
+//     bigger architectural fix.
 async function handleChargeRefunded(service, charge) {
   const customerId = charge.customer;
   if (!customerId) return;
   const { userRow } = await lookupUserAndPlan(service, customerId, null);
   if (!userRow) return;
 
-  const fullyRefunded =
-    Boolean(charge.refunded) ||
-    (charge.amount && charge.amount_refunded && charge.amount === charge.amount_refunded);
+  const fullyRefunded = charge.refunded === true;
 
   await service.from('audit_log').insert({
     actor_id: userRow.id,
@@ -415,6 +437,23 @@ async function handleChargeRefunded(service, charge) {
 
   if (fullyRefunded && !userRow.frozen_at) {
     await service.rpc('billing_freeze_profile', { p_user_id: userRow.id });
+    // B11: tell the user. Best-effort; webhook ack takes precedence.
+    try {
+      await service.rpc('create_notification', {
+        p_user_id: userRow.id,
+        p_type: 'billing_alert',
+        p_title: 'Subscription cancelled — refund processed',
+        p_body:
+          'A refund was processed on your subscription, so paid features are now paused. Contact support if this is unexpected, or resubscribe from Settings.',
+        p_action_url: '/profile/settings/billing',
+        p_action_type: 'billing',
+        p_action_id: null,
+        p_priority: 'high',
+        p_metadata: { charge_id: charge.id, stripe_customer_id: customerId },
+      });
+    } catch {
+      /* swallow — freeze is the source of truth, notification is observability */
+    }
   }
 }
 
