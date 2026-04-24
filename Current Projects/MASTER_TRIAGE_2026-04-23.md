@@ -28,41 +28,41 @@ Notation: **[N/4]** = how many of the 4 unified round-2 agents corroborated. Rou
 
 | # | File:Line | Bug | Corroboration |
 |---|-----------|-----|---------------|
-| 10 | `web/src/components/CommentThread.tsx:425-441` ↔ `web/src/app/api/users/[id]/block/route.js` | POST always returns `{blocked: true}` (split route). UI reads `data.blocked` to toggle. No unblock from comment row; clicking Block again no-ops. Dead unblock branch. | B+D + components |
-| 11 | `web/src/app/api/notifications/preferences/route.js:43, 71-78` | Gate is `notifications.prefs.toggle_push` only — denies email/in-app to free-tier. PATCH `?? true` defaults reset other channels on partial body. | B+D |
-| 12 | `update_own_profile` RPC (Supabase) + `web/src/app/profile/settings/page.tsx:1608-1611` + `VerityPost/VerityPost/SettingsView.swift:1338-1386` | RPC allowlists `username`; `reject_privileged_user_updates` trigger doesn't block it. UI says "Usernames cannot be changed" but DevTools call works. iOS exploits this directly — full rename in patch. | B + settings |
-| 13 | `web/src/app/api/cron/send-emails/route.js:124` | `notifications.action_url` flows into outbound email HTML. `absoluteUrl` only adds `https://` to relative paths; no `javascript:`/`data:` rejection. Stored XSS via email. | A+C + API |
-| 14 | `VerityPost/VerityPost/AuthViewModel.swift:213-217` | Username sanitizer accepts Unicode letters. Cyrillic а vs Latin a homoglyph collision. Server-side signup doesn't normalize either. | A+C+D |
-| 15 | `web/src/app/api/auth/callback/route.js:147, 178` | Drops `?next=` when first-time OAuth user redirects to `/signup/pick-username`. Original destination lost. | B+D |
-| 16 | `web/src/app/api/account/delete/route.js:106-160` | Immediate-delete path doesn't sign out cookie session. Caller can navigate with stale auth until next `getUser()` 401s. | A+D |
-| 17 | `web/src/app/api/auth/signup/route.js:67-94` | Step-by-step service writes with no rollback. `users.upsert` ok → `roles.insert` fails → user has profile with no role → permanent permission lockout. | D + API |
-| 18 | `VerityPost/VerityPost/AuthViewModel.swift:222-240` | Direct PostgREST username/reserved probes via anon client. No rate limit. Web has rate-limited `/api/auth/check-email` + `/api/auth/resolve-username`. Username enumeration. | A+C |
-| 19 | `web/src/app/profile/settings/page.tsx:1520-1530` | Avatar upload to `avatars` storage bucket which doesn't exist (only `banners` + `data-exports` provisioned). 100% failure. Banner has friendly fallback; avatar leaks raw "Bucket not found". | settings (MCP-verified) |
-| 20 | `web/src/app/profile/settings/page.tsx:544` + `VerityPost/VerityPost/AuthViewModel.swift:580` | `select('*')` from `users` — leaks `stripe_customer_id`, `apple_original_transaction_id`, `metadata` (provider tokens), `last_login_ip`, `mute_level`, `failed_login_count`, `frozen_at`. Page consumes ~10 fields. | A+B+D |
-| 21 | `web/src/app/api/messages/route.js:38-47` + `conversations/route.js:39-58` | Status codes derived from `error.message.includes('paid plan' / 'muted' / 'rate limit')`. RPC error rename → 429 silently drops to 400 with no `Retry-After`. | A+C+D + API |
+| 10 | `web/src/components/CommentThread.tsx:425-441` ↔ `web/src/app/api/users/[id]/block/route.js` | POST always returns `{blocked: true}` (split route). UI reads `data.blocked` to toggle. No unblock from comment row; clicking Block again no-ops. Dead unblock branch. | B+D + components | **SHIPPED 2026-04-24 · 5823194** — wire POST/DELETE split into CommentThread + messages block flows. |
+| 11 | `web/src/app/api/notifications/preferences/route.js:43, 71-78` | Gate is `notifications.prefs.toggle_push` only — denies email/in-app to free-tier. PATCH `?? true` defaults reset other channels on partial body. | B+D | **SHIPPED 2026-04-24 · d470e88** — partial-PATCH merge semantics, no channel reset. |
+| 12 | `update_own_profile` RPC (Supabase) + `web/src/app/profile/settings/page.tsx:1608-1611` + `VerityPost/VerityPost/SettingsView.swift:1338-1386` | RPC allowlists `username`; `reject_privileged_user_updates` trigger doesn't block it. UI says "Usernames cannot be changed" but DevTools call works. iOS exploits this directly — full rename in patch. | B + settings | **SHIPPED 2026-04-24 · 710be2b** — freeze username mutation in update_own_profile (schema/152). |
+| 13 | `web/src/app/api/cron/send-emails/route.js:124` | `notifications.action_url` flows into outbound email HTML. `absoluteUrl` only adds `https://` to relative paths; no `javascript:`/`data:` rejection. Stored XSS via email. | A+C + API | **SHIPPED 2026-04-24 · 24c1a3d** — reject javascript: / data: / vbscript: in email action_url. |
+| 14 | `VerityPost/VerityPost/AuthViewModel.swift:213-217` | Username sanitizer accepts Unicode letters. Cyrillic а vs Latin a homoglyph collision. Server-side signup doesn't normalize either. | A+C+D | **SHIPPED 2026-04-24 · 4ebb962** — restrict iOS username to ASCII (Cyrillic homoglyph). |
+| 15 | `web/src/app/api/auth/callback/route.js:147, 178` | Drops `?next=` when first-time OAuth user redirects to `/signup/pick-username`. Original destination lost. | B+D | **SHIPPED 2026-04-24 · edf7791** — preserve OAuth callback ?next= through onboarding chain. |
+| 16 | `web/src/app/api/account/delete/route.js:106-160` | Immediate-delete path doesn't sign out cookie session. Caller can navigate with stale auth until next `getUser()` 401s. | A+D | **SHIPPED 2026-04-24 · a227e8b** — sign out session after immediate account deletion. |
+| 17 | `web/src/app/api/auth/signup/route.js:67-94` | Step-by-step service writes with no rollback. `users.upsert` ok → `roles.insert` fails → user has profile with no role → permanent permission lockout. | D + API | **SHIPPED 2026-04-24 · baff805** — idempotent user_roles insert + post-write role verification. |
+| 18 | `VerityPost/VerityPost/AuthViewModel.swift:222-240` | Direct PostgREST username/reserved probes via anon client. No rate limit. Web has rate-limited `/api/auth/check-email` + `/api/auth/resolve-username`. Username enumeration. | A+C | **SHIPPED 2026-04-24 · 955af8e** — broker iOS username checks through rate-limited /api/auth/check-username (schema/151). |
+| 19 | `web/src/app/profile/settings/page.tsx:1520-1530` | Avatar upload to `avatars` storage bucket which doesn't exist (only `banners` + `data-exports` provisioned). 100% failure. Banner has friendly fallback; avatar leaks raw "Bucket not found". | settings (MCP-verified) | **SHIPPED 2026-04-24 · 1c45eca** — graceful avatar-upload failure when bucket missing. |
+| 20 | `web/src/app/profile/settings/page.tsx:544` + `VerityPost/VerityPost/AuthViewModel.swift:580` | `select('*')` from `users` — leaks `stripe_customer_id`, `apple_original_transaction_id`, `metadata` (provider tokens), `last_login_ip`, `mute_level`, `failed_login_count`, `frozen_at`. Page consumes ~10 fields. | A+B+D | **SHIPPED 2026-04-24 · 93696f9** — replace users select(*) with explicit columns + narrow UserRow. |
+| 21 | `web/src/app/api/messages/route.js:38-47` + `conversations/route.js:39-58` | Status codes derived from `error.message.includes('paid plan' / 'muted' / 'rate limit')`. RPC error rename → 429 silently drops to 400 with no `Retry-After`. | A+C+D + API | **SHIPPED 2026-04-24 · 77625e9** — stable [CODE] prefix on DM RPC errors (schema/150). |
 
 ## TIER 3 — Single-agent CRITICAL (lower confidence; still real)
 
 | # | File:Line | Bug | Source |
 |---|-----------|-----|--------|
-| 22 | `web/src/app/api/promo/redeem/route.js:30-34` | `.ilike('code', code.trim())` no LIKE-wildcard escape. `code: '%'` matches arbitrary promos. | A |
-| 23 | `web/src/app/api/auth/login-failed/route.js:67-82` | Server-side `signInWithPassword` per failed-login report ties up Vercel function's outbound IP against GoTrue's per-IP quota for entire user base. | D |
-| 24 | `web/src/app/api/comments/[id]/vote/route.js:18` | Gates ALL vote types behind `comments.upvote`. Users blocked from downvote can downvote freely. | B |
-| 25 | `web/src/app/api/admin/billing/audit/route.js:22` | Write endpoint gated by `admin.billing.view` (read perm). Anyone with billing-view plants arbitrary audit rows. | API |
-| 26 | `web/src/app/api/account/login-cancel-deletion/route.js:21` | No `isAllowedOrigin` check on cookie branch (sibling `/api/account/delete` does enforce). CSRF on account-state mutation. | API |
-| 27 | `web/src/app/api/events/batch/route.ts:149` | Accepts client-supplied `user_id` with no session cross-check. Analytics attacker-controllable. | API |
-| 28 | `web/src/app/api/kids/reset-pin/route.js:49` | `signInWithPassword` to verify password (DA-092/F-012 anti-pattern). Bypasses lockout, no per-email rate limit, clobbers parent session cookie. | API |
-| 29 | `web/src/app/api/ios/subscriptions/sync/route.js:144-149` | `existingSub` lookup matches only `apple_original_transaction_id`, not user_id. Stolen-receipt replay overwrites another user's sub row. | API |
-| 30 | `web/src/app/api/ios/appstore/notifications/route.js:97` | Apple notif rows stuck at `processing_status='received'`. Reclaim path doesn't include `received` → silently drop subscription state changes. | API |
-| 31 | `web/src/app/api/auth/resolve-username/route.js:60-62` | 404-vs-200 response shape differentiates registered usernames despite rate limit. 14k probes/day enumeration. | C |
-| 32 | iOS `/api/auth/login` bypass | iOS signs in via SDK, writes `last_login_at` via RPC. `login_count`, `audit_log` row, `scoreDailyLogin` all skip iOS users. | C |
-| 33 | `web/src/app/api/quiz/submit/route.js:33-34` | Hardcodes `answers.length !== 5`. Locks quiz size into route forever. Config-via-DB violation. | A+C |
-| 34 | `web/src/app/profile/settings/page.tsx:1525-1530` | Avatar upload doesn't reject SVG. Embedded JS served from `veritypost.com` origin = stored XSS via avatar viewer. | C |
-| 35 | `web/src/app/api/cron/sweep-kid-trials/route.js:39-40` | Exports both GET and POST. CRON_SECRET in URL bar = browser history + access logs. | C |
-| 36 | `web/src/components/Avatar.tsx:27` | `username[0]` for emoji/multi-byte usernames returns broken surrogate half. | A+C+B |
-| 37 | `web/src/components/CommentRow.tsx:79-83` | Mention links `/u/<name>` — `/u/` route doesn't exist. Every @-mention 404s. | A+D |
-| 38 | `web/src/components/AccountStateBanner.tsx:72` | Deletion-banner CTA → `/profile/settings/data` directory which doesn't exist. 404. | A+D |
-| 39 | `web/src/app/api/auth/callback/route.js:155` | Updates `users.email_verified` via cookie-scoped client (RLS). Inconsistent with rest of file (service). Silently no-ops if `users_update` policy ever tightens. | A+C+D |
+| 22 | `web/src/app/api/promo/redeem/route.js:30-34` | `.ilike('code', code.trim())` no LIKE-wildcard escape. `code: '%'` matches arbitrary promos. | A | **SHIPPED 2026-04-24 · 86b0787** — escape LIKE metachars in promo-code lookup. |
+| 23 | `web/src/app/api/auth/login-failed/route.js:67-82` | Server-side `signInWithPassword` per failed-login report ties up Vercel function's outbound IP against GoTrue's per-IP quota for entire user base. | D | **STALE 2026-04-24** — ephemeral-client pattern already in place (verified 2026-04-24). |
+| 24 | `web/src/app/api/comments/[id]/vote/route.js:18` | Gates ALL vote types behind `comments.upvote`. Users blocked from downvote can downvote freely. | B | **SHIPPED 2026-04-24 · 76a13fb** — route vote permission by type (upvote/downvote/clear). |
+| 25 | `web/src/app/api/admin/billing/audit/route.js:22` | Write endpoint gated by `admin.billing.view` (read perm). Anyone with billing-view plants arbitrary audit rows. | API | **SHIPPED 2026-04-24 · 4eb37b4** — gate admin billing audit on billing-write perms, not view. |
+| 26 | `web/src/app/api/account/login-cancel-deletion/route.js:21` | No `isAllowedOrigin` check on cookie branch (sibling `/api/account/delete` does enforce). CSRF on account-state mutation. | API | **SHIPPED 2026-04-24 · 9828613** — require same-origin on cookie-branch cancel-deletion (CSRF). |
+| 27 | `web/src/app/api/events/batch/route.ts:149` | Accepts client-supplied `user_id` with no session cross-check. Analytics attacker-controllable. | API | **SHIPPED 2026-04-24 · 6683aee** — events.batch — ignore client-supplied user_id. |
+| 28 | `web/src/app/api/kids/reset-pin/route.js:49` | `signInWithPassword` to verify password (DA-092/F-012 anti-pattern). Bypasses lockout, no per-email rate limit, clobbers parent session cookie. | API | **STALE 2026-04-24** — ephemeral-client pattern already in place (verified 2026-04-24). |
+| 29 | `web/src/app/api/ios/subscriptions/sync/route.js:144-149` | `existingSub` lookup matches only `apple_original_transaction_id`, not user_id. Stolen-receipt replay overwrites another user's sub row. | API | **STALE 2026-04-24** — defense-in-depth user_id guard already exists at route.js:184. |
+| 30 | `web/src/app/api/ios/appstore/notifications/route.js:97` | Apple notif rows stuck at `processing_status='received'`. Reclaim path doesn't include `received` → silently drop subscription state changes. | API | **SHIPPED 2026-04-24 · 24b6675** — reclaim Apple notif rows stuck at 'received'. |
+| 31 | `web/src/app/api/auth/resolve-username/route.js:60-62` | 404-vs-200 response shape differentiates registered usernames despite rate limit. 14k probes/day enumeration. | C | **SHIPPED 2026-04-24 · 08929cf** — uniform 200 response on resolve-username — close enumeration. |
+| 32 | iOS `/api/auth/login` bypass | iOS signs in via SDK, writes `last_login_at` via RPC. `login_count`, `audit_log` row, `scoreDailyLogin` all skip iOS users. | C | **STALE 2026-04-24** — iOS async login via SDK is intentional / by design. |
+| 33 | `web/src/app/api/quiz/submit/route.js:33-34` | Hardcodes `answers.length !== 5`. Locks quiz size into route forever. Config-via-DB violation. | A+C | **SHIPPED 2026-04-24 · 35c1035** — validate quiz answer length against actual quiz count. |
+| 34 | `web/src/app/profile/settings/page.tsx:1525-1530` | Avatar upload doesn't reject SVG. Embedded JS served from `veritypost.com` origin = stored XSS via avatar viewer. | C | **SHIPPED 2026-04-24 · 3056bc5** — reject SVG avatars — stored XSS vector. |
+| 35 | `web/src/app/api/cron/sweep-kid-trials/route.js:39-40` | Exports both GET and POST. CRON_SECRET in URL bar = browser history + access logs. | C | **STALE 2026-04-24** — CRON_SECRET read from Authorization header (verifyCronAuth), never URL; removing GET would break Vercel cron scheduler. |
+| 36 | `web/src/components/Avatar.tsx:27` | `username[0]` for emoji/multi-byte usernames returns broken surrogate half. | A+C+B | **SHIPPED 2026-04-24 · 34366c7** — Avatar initials split by code point. |
+| 37 | `web/src/components/CommentRow.tsx:79-83` | Mention links `/u/<name>` — `/u/` route doesn't exist. Every @-mention 404s. | A+D | **STALE 2026-04-24** — /u/[username] route exists; PUBLIC_PROFILE_ENABLED kill-switch — prelaunch-parked. |
+| 38 | `web/src/components/AccountStateBanner.tsx:72` | Deletion-banner CTA → `/profile/settings/data` directory which doesn't exist. 404. | A+D | **STALE 2026-04-24** — /profile/settings/data route exists as redirect to #data anchor. |
+| 39 | `web/src/app/api/auth/callback/route.js:155` | Updates `users.email_verified` via cookie-scoped client (RLS). Inconsistent with rest of file (service). Silently no-ops if `users_update` policy ever tightens. | A+C+D | **SHIPPED 2026-04-24 · 2b05dd4** — callback email_verified update uses service client. |
 
 ---
 
@@ -100,13 +100,13 @@ Notation: **[N/4]** = how many of the 4 unified round-2 agents corroborated. Rou
 **CRITICAL:**
 | # | File:Line | Bug |
 |---|-----------|-----|
-| AD1 | `web/src/app/admin/words/page.tsx:118` + `admin/plans/page.tsx:137,269` | `confirm()` called without `<ConfirmDialogHost />` mounted. Silent no-op on every destructive action. (Already on master triage from components agent — 3-B confirms exact lines.) |
-| AD2 | `admin/access/page.tsx`, `admin/permissions/page.tsx`, `admin/moderation/page.tsx`, `admin/cohorts/page.tsx`, `admin/stories/page.tsx`, `admin/support/page.tsx`, `admin/pipeline/costs/page.tsx` | Push raw `error.message` into toasts/error divs. DA-119 violations across the admin tree. |
+| AD1 | `web/src/app/admin/words/page.tsx:118` + `admin/plans/page.tsx:137,269` | `confirm()` called without `<ConfirmDialogHost />` mounted. Silent no-op on every destructive action. (Already on master triage from components agent — 3-B confirms exact lines.) | **SHIPPED 2026-04-24 · aced725** — mount <ConfirmDialogHost /> on admin/words + admin/plans. |
+| AD2 | `admin/access/page.tsx`, `admin/permissions/page.tsx`, `admin/moderation/page.tsx`, `admin/cohorts/page.tsx`, `admin/stories/page.tsx`, `admin/support/page.tsx`, `admin/pipeline/costs/page.tsx` | Push raw `error.message` into toasts/error divs. DA-119 violations across the admin tree. | **SHIPPED 2026-04-24 · 63875c2** — strip raw error.message from admin toasts (DA-119 sweep). |
 
 **HIGH:**
 | # | File:Line | Bug |
 |---|-----------|-----|
-| AD3 | `web/src/components/admin/DataTable.jsx:108,111` | `j`/`k`/`Enter`/`Space` keyboard shortcuts — owner banned shortcuts in admin. |
+| AD3 | `web/src/components/admin/DataTable.jsx:108,111` | `j`/`k`/`Enter`/`Space` keyboard shortcuts — owner banned shortcuts in admin. | **SHIPPED 2026-04-24 · 1d3585f** — remove DataTable keyboard shortcuts. |
 | AD4 | `admin/users/page.tsx:57-60` + `admin/permissions/page.tsx:129-133` | Client gates on `ADMIN_ROLES` while API enforces stricter perm (e.g. `admin.permissions.manage`). Page renders fully then 403s on first action. |
 
 **MEDIUM:**
@@ -159,7 +159,7 @@ Notation: **[N/4]** = how many of the 4 unified round-2 agents corroborated. Rou
 **CRITICAL:**
 | # | File:Line | Bug |
 |---|-----------|-----|
-| L1 | `web/src/app/robots.js:12-26` ↔ `middleware.js:33,39` | `robots.js` doesn't list `/category` or `/card` in disallow → robots told they can crawl, middleware then 302s to login. Combined with `sitemap.js` publishing `/category/<slug>` URLs = wasted crawl budget + zero indexing. Either both go public OR both go in disallow. |
+| L1 | `web/src/app/robots.js:12-26` ↔ `middleware.js:33,39` | `robots.js` doesn't list `/category` or `/card` in disallow → robots told they can crawl, middleware then 302s to login. Combined with `sitemap.js` publishing `/category/<slug>` URLs = wasted crawl budget + zero indexing. Either both go public OR both go in disallow. **SHIPPED 2026-04-24 · c012c3f** — removed `/browse`, `/category`, `/card`, `/search`, `/u` from `PROTECTED_PREFIXES` (L1 scope expanded per A/B/C/D consensus; /search + /u added per owner directive to open anon-safe surfaces broadly). `robots.js` unchanged (already did not disallow these). `/card` keeps its layout-level noindex (intentional — prevents ranking for people's names vs canonical `/u/<username>`). Deferred items opened: (a) anon-bookmark upgrade CTA on /category + /browse, (b) /card OG leak for `profile_visibility=private`, (c) /card canonical → /u/<username>, (d) /leaderboard + /recap anon-safety sweep. |
 | L2 | `web/src/lib/permissions.js:67-85` `refreshIfStale` | Stale-fallthrough is a security leak on revocation. Comment says "slightly stale > all-deny" intentionally, but for plan-downgrade / role-revoke, concurrent `hasPermission()` reads still return YES until new fetch lands. Should differentiate grants (stale ok) from revokes (hard-clear). |
 
 **HIGH:**
