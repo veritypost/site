@@ -1562,6 +1562,20 @@ function ProfileCard({
     // it must exist in the Supabase dashboard. If it's missing the
     // upload fails with "Bucket not found"; match the banners handler
     // and surface a clean message instead of leaking the raw error.
+    //
+    // Reject SVG outright — served from the veritypost.com origin with
+    // an image content-type, an SVG can embed <script> that executes
+    // when rendered as a standalone URL (hover-card preview, share
+    // card, anywhere the raw URL is opened). Raster only.
+    const ALLOWED_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+    if (file.type && !ALLOWED_IMAGE_TYPES.has(file.type)) {
+      pushToast({ message: 'Avatar must be PNG, JPEG, WebP, or GIF.', variant: 'danger' });
+      return;
+    }
+    if (/\.svg$/i.test(file.name)) {
+      pushToast({ message: 'SVG avatars are not supported.', variant: 'danger' });
+      return;
+    }
     try {
       const path = `${userId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
       const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
