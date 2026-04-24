@@ -62,6 +62,13 @@ export async function GET(request) {
     query = query.eq('is_kids_safe', false);
   }
 
+  // H6 — track which filters the caller sent but the server dropped
+  // (either because they're not on advanced tier, or because their
+  // permission matrix has the specific filter gated off). UI can
+  // surface this so a free user hand-editing the URL doesn't get
+  // results that silently ignore their filters.
+  const ignoredFilters = [];
+
   if (canAdvanced) {
     // Migration 046 added articles.search_tsv (generated from title + excerpt + body)
     // with a GIN index. websearch handles bare keywords + quoted phrases + AND/OR the
@@ -69,29 +76,58 @@ export async function GET(request) {
     query = query.textSearch('search_tsv', q, { type: 'websearch', config: 'english' });
     // Per-filter gates so an admin can revoke one field without
     // disabling the whole advanced experience.
-    if (category && (await hasPermissionServer('search.advanced.category'))) {
-      query = query.eq('category_id', category);
+    if (category) {
+      if (await hasPermissionServer('search.advanced.category')) {
+        query = query.eq('category_id', category);
+      } else {
+        ignoredFilters.push('category');
+      }
     }
-    if (subcategory && (await hasPermissionServer('search.advanced.subcategory'))) {
-      query = query.eq('subcategory_id', subcategory);
+    if (subcategory) {
+      if (await hasPermissionServer('search.advanced.subcategory')) {
+        query = query.eq('subcategory_id', subcategory);
+      } else {
+        ignoredFilters.push('subcategory');
+      }
     }
-    if ((from || to) && (await hasPermissionServer('search.advanced.date_range'))) {
-      if (from) query = query.gte('published_at', from);
-      if (to) query = query.lte('published_at', to);
+    if (from || to) {
+      if (await hasPermissionServer('search.advanced.date_range')) {
+        if (from) query = query.gte('published_at', from);
+        if (to) query = query.lte('published_at', to);
+      } else {
+        ignoredFilters.push('date_range');
+      }
     }
-    if (source && (await hasPermissionServer('search.advanced.source'))) {
-      // Source filter requires a join through the sources table.
-      const { data: srcArticleIds } = await service
-        .from('sources')
-        .select('article_id')
-        .ilike('publisher', `%${source}%`)
-        .limit(500);
-      const ids = (srcArticleIds || []).map((r) => r.article_id);
-      if (ids.length === 0) return NextResponse.json({ articles: [], applied: { source } });
-      query = query.in('id', ids);
+    if (source) {
+      if (await hasPermissionServer('search.advanced.source')) {
+        // Source filter requires a join through the sources table.
+        const { data: srcArticleIds } = await service
+          .from('sources')
+          .select('article_id')
+          .ilike('publisher', `%${source}%`)
+          .limit(500);
+        const ids = (srcArticleIds || []).map((r) => r.article_id);
+        if (ids.length === 0) {
+          return NextResponse.json({
+            articles: [],
+            applied: { source },
+            ignored_filters: ignoredFilters,
+          });
+        }
+        query = query.in('id', ids);
+      } else {
+        ignoredFilters.push('source');
+      }
     }
   } else {
     query = query.ilike('title', `%${q}%`);
+    // H6 — in basic mode, record each advanced filter the caller
+    // passed so the UI can show "Advanced filters ignored — upgrade
+    // to apply category / date / source filters."
+    if (category) ignoredFilters.push('category');
+    if (subcategory) ignoredFilters.push('subcategory');
+    if (from || to) ignoredFilters.push('date_range');
+    if (source) ignoredFilters.push('source');
   }
 
   const { data, error } = await query;
@@ -101,5 +137,6 @@ export async function GET(request) {
   return NextResponse.json({
     articles: data || [],
     mode: canAdvanced ? 'advanced' : 'basic',
+    ignored_filters: ignoredFilters,
   });
 }
