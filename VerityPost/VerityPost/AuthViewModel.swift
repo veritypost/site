@@ -278,9 +278,23 @@ final class AuthViewModel: ObservableObject {
                 let username: String
             }
 
-            try await client.from("users")
-                .upsert(UserUpsert(id: userId, email: email, username: normalized), onConflict: "id")
-                .execute()
+            // C17 — wrap the upsert in a do/catch so we can roll back the
+            // auth.users row server-side if the public.users upsert fails.
+            // Without this, a transient RLS / network hiccup on the upsert
+            // left an orphan auth row the user couldn't log back into and
+            // couldn't re-signup around (users.email UNIQUE would collide
+            // on retry). The server-side rollback endpoint requires the
+            // user's fresh bearer token + userId and is the only
+            // service-role path iOS has for deleting an auth row.
+            do {
+                try await client.from("users")
+                    .upsert(UserUpsert(id: userId, email: email, username: normalized), onConflict: "id")
+                    .execute()
+            } catch {
+                await attemptSignupRollback(userId: userId)
+                authError = Self.friendlyAuthError(error)
+                return
+            }
 
             // The default 'user' role and plan_id=free are seeded by the
             // on_auth_user_created trigger (handle_new_auth_user function).
@@ -422,6 +436,43 @@ final class AuthViewModel: ObservableObject {
     }
 
     // MARK: - Login hooks
+
+    /// C17 — roll back a half-completed signup. Called from `signup()`
+    /// when the public.users upsert fails after auth.signUp succeeded
+    /// (otherwise the orphan auth.users row blocks the user's retry —
+    /// users.email UNIQUE collides on re-signup). Sends the fresh bearer
+    /// token + userId to `/api/auth/signup-rollback`, which service-role
+    /// deletes user_roles → public.users → auth.users in the schema-106
+    /// order. Best-effort: logs on failure but doesn't re-throw — the
+    /// caller is already surfacing the original upsert error to the user.
+    private func attemptSignupRollback(userId: String) async {
+        let accessToken: String
+        do {
+            guard let tok = (try? await client.auth.session)?.accessToken else {
+                Log.d("[signup_rollback] no access token available, skipping")
+                return
+            }
+            accessToken = tok
+        }
+        let url = SupabaseManager.shared.siteURL.appendingPathComponent("api/auth/signup-rollback")
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: String] = ["user_id": userId]
+        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        do {
+            let (_, response) = try await URLSession.shared.data(for: req)
+            if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+                Log.d("[signup_rollback] non-2xx: \(http.statusCode)")
+            }
+        } catch {
+            Log.d("[signup_rollback] request failed: \(error)")
+        }
+        // Clear the auth session locally so the half-signup doesn't leak
+        // into the logged-in UI. signOut is idempotent.
+        try? await client.auth.signOut()
+    }
 
     /// POST to /api/account/login-cancel-deletion with the current session
     /// access token so the server's service-role client can call
