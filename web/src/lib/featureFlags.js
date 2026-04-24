@@ -15,11 +15,25 @@ export async function isFlagEnabled(client, key, defaultValue = false) {
   const cached = CACHE.get(key);
   if (cached && Date.now() - cached.ts < TTL_MS) return cached.value;
 
-  const { data } = await client
+  const { data, error } = await client
     .from('feature_flags')
     .select('is_enabled')
     .eq('key', key)
     .maybeSingle();
+
+  // L11: discriminate "no row" from "table missing / RLS / network". Prior
+  // code silently fell through to the caller's defaultValue on any error,
+  // so a caller passing `defaultValue=true` would bypass the gate when the
+  // feature_flags table was unavailable (e.g. during a migration window or
+  // an RLS misconfiguration). Fail closed on real errors — the caller's
+  // default is for the "row not present yet" case only.
+  if (error) {
+    console.error(`[featureFlags] lookup failed for ${key}:`, error);
+    const safe = false;
+    CACHE.set(key, { value: safe, ts: Date.now() });
+    return safe;
+  }
+
   const value = data ? !!data.is_enabled : defaultValue;
   CACHE.set(key, { value, ts: Date.now() });
   return value;

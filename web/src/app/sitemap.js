@@ -55,6 +55,17 @@ export default async function sitemap() {
         .order('slug', { ascending: true }),
     ]);
 
+    // L17: sitemap silently truncates at .limit(5000). If article count
+    // climbs past that, newer URLs silently stop appearing in sitemap.xml
+    // and Google never discovers them. Log a warn when we hit the cap so
+    // the next person on-call can see it before an indexing regression
+    // materializes. Proper fix (multi-file sitemap index) waits until the
+    // cap is an actual concern.
+    if ((storiesRes.data || []).length >= 5000) {
+      console.warn(
+        '[sitemap] hit 5000-article cap — sitemap will silently truncate. Plan a sitemap index file.'
+      );
+    }
     storyRoutes = (storiesRes.data || []).map((s) => ({
       url: `${base}/story/${s.slug}`,
       // Prefer updated_at when set — story edits should nudge crawlers.

@@ -29,17 +29,22 @@ export async function getClientIp() {
 // at all until the migration queue lands.
 //
 // M-15 — widen the prod gate so preview deploys also fail-closed.
-// VERCEL_ENV is set by the Vercel runtime to 'production' | 'preview' |
-// 'development'. NODE_ENV is set to 'production' on Vercel deploys
-// (both prod and preview) and 'development' by `next dev`. Treating
-// any VERCEL_ENV value other than 'development' as production-equivalent
-// closes the prior gap where a preview environment without NODE_ENV
-// set to production could run unlimited.
+//
+// L8 — require an explicit opt-in env var for fail-open even in dev.
+// Prior logic treated "any env that isn't production/preview/NODE_ENV=prod"
+// as dev, so a custom-VPC staging deploy with NODE_ENV=development + no
+// VERCEL_ENV silently fail-open'd rate limits → brute-force vector on
+// staging auth. Now: dev fail-open requires both (a) NODE_ENV=development
+// AND (b) the caller/owner explicitly sets RATE_LIMIT_ALLOW_FAIL_OPEN=1 in
+// .env.local. Any deploy that forgets the env var fails closed.
 const IS_PROD =
   process.env.VERCEL_ENV === 'production' ||
   process.env.VERCEL_ENV === 'preview' ||
   process.env.NODE_ENV === 'production';
-const DEV_FAIL_OPEN = !IS_PROD;
+const DEV_FAIL_OPEN =
+  !IS_PROD &&
+  process.env.NODE_ENV === 'development' &&
+  process.env.RATE_LIMIT_ALLOW_FAIL_OPEN === '1';
 
 // T-003 — DB-backed rate-limit policy lookup with 60s in-memory cache.
 // Routes name a `policyKey` + supply code defaults; a matching row in

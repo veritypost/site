@@ -52,8 +52,14 @@ export function safeErrorResponse(NextResponse, err, options = {}) {
 
   if (mapped) {
     const rawMessage = typeof err?.message === 'string' ? err.message.trim() : '';
+    // L18: sanitize P0001 passthrough. Trigger authors write user-facing
+    // messages intentionally, but a sloppy RAISE EXCEPTION could embed
+    // newlines, tabs, or accidentally interpolated secrets. Cap length +
+    // collapse whitespace so the worst case is a truncated but non-leaky
+    // string. No change to the mapped-string branch (those are hand-authored).
+    const safeMessage = rawMessage.replace(/\s+/g, ' ').slice(0, 240);
     const clientMessage =
-      mapped.client === PASSTHROUGH ? rawMessage || fallbackMessage : mapped.client;
+      mapped.client === PASSTHROUGH ? safeMessage || fallbackMessage : mapped.client;
     return NextResponse.json({ error: clientMessage, code }, { status: mapped.status });
   }
   return NextResponse.json({ error: fallbackMessage }, { status: fallbackStatus });

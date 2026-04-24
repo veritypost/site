@@ -20,7 +20,11 @@ import crypto from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
-const EXPECTED_BUNDLE_ID = 'com.veritypost.app';
+// L10: bundle id env override so staging / TestFlight builds with a
+// distinct bundle (e.g. com.veritypost.app.dev) don't need a code change
+// to verify their own receipts. Defaults to the production bundle so
+// existing deploys behave identically without setting the env var.
+const EXPECTED_BUNDLE_ID = process.env.APPLE_BUNDLE_ID || 'com.veritypost.app';
 const FUTURE_SKEW_MS = 5 * 60 * 1000;
 
 let cachedRootCert = null;
