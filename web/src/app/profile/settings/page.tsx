@@ -3276,16 +3276,29 @@ function BlockedCard({
     void load();
   }, [load]);
 
-  const unblock = async (id: string) => {
-    setBusy(id);
-    const { error } = await supabase.from('blocked_users').delete().eq('id', id);
-    setBusy('');
-    if (error) {
-      pushToast({ message: error.message, variant: 'danger' });
+  const unblock = async (rowId: string, blockedUserId: string | undefined) => {
+    // C3 — route through the API instead of direct table DELETE so
+    // unblock is gated by `settings.blocked.unblock` + email-verified +
+    // rate limit, matching block-POST. The old direct supabase delete
+    // relied solely on RLS and skipped rate-limit + verified-email
+    // gates the API enforces.
+    if (!blockedUserId) {
+      pushToast({ message: 'Cannot unblock — missing user reference.', variant: 'danger' });
       return;
     }
-    setRows((prev) => prev.filter((r) => r.id !== id));
-    pushToast({ message: 'Unblocked.', variant: 'success' });
+    setBusy(rowId);
+    try {
+      const res = await fetch(`/api/users/${blockedUserId}/block`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        pushToast({ message: data?.error || 'Unblock failed.', variant: 'danger' });
+        return;
+      }
+      setRows((prev) => prev.filter((r) => r.id !== rowId));
+      pushToast({ message: 'Unblocked.', variant: 'success' });
+    } finally {
+      setBusy('');
+    }
   };
 
   return (
@@ -3332,7 +3345,7 @@ function BlockedCard({
                 size="sm"
                 disabled={!canUnblock || busy === r.id}
                 loading={busy === r.id}
-                onClick={() => unblock(r.id)}
+                onClick={() => unblock(r.id, r.blocked?.id)}
               >
                 Unblock
               </Button>
