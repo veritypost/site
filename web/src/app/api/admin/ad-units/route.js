@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
 
 export async function GET(request) {
@@ -11,7 +12,10 @@ export async function GET(request) {
   } catch (err) {
     if (err.status) {
       console.error('[admin.ad-units.permission]', err?.message || err);
-      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+      return NextResponse.json(
+        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err.status }
+      );
     }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -35,9 +39,25 @@ export async function POST(request) {
   } catch (err) {
     if (err.status) {
       console.error('[admin.ad-units.permission]', err?.message || err);
-      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+      return NextResponse.json(
+        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err.status }
+      );
     }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+  const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.ad-units.create:${user.id}`,
+    policyKey: 'admin.ad-units.create',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
   }
   const b = await request.json().catch(() => ({}));
   if (!b.name || !b.ad_network || !b.ad_format || !b.placement_id) {
@@ -46,7 +66,6 @@ export async function POST(request) {
       { status: 400 }
     );
   }
-  const service = createServiceClient();
   const { data, error } = await service
     .from('ad_units')
     .insert({

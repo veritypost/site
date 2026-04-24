@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction } from '@/lib/adminMutation';
 
 type CreateBody = {
@@ -21,7 +22,20 @@ export async function POST(request: Request) {
   } catch (err) {
     return permissionError(err);
   }
-  void actor;
+
+  const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.feeds.create:${actor.id}`,
+    policyKey: 'admin.feeds.create',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
 
   const body = (await request.json().catch(() => ({}))) as CreateBody;
   const name = typeof body.name === 'string' ? body.name.trim() : '';
@@ -43,7 +57,6 @@ export async function POST(request: Request) {
     audience, // F7 migration 114 — feeds.audience NOT NULL, defaults to 'adult'; admin can tag 'kid' to route into kid pool
   };
 
-  const service = createServiceClient();
   const { data, error } = await service.from('feeds').insert(row).select('*').single();
   if (error || !data) {
     console.error('[admin.feeds.create]', error?.message || 'no row');

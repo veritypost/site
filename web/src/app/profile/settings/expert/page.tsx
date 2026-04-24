@@ -199,7 +199,7 @@ export default function ExpertSettings() {
         body: JSON.stringify(payload),
         credentials: 'include',
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || 'Submission failed');
       setFlash('Application submitted - you will hear back after editorial review.');
       await load();

@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction, requireAdminOutranks } from '@/lib/adminMutation';
 
 type Body = { achievement_name?: string };
@@ -23,11 +24,24 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const rankErr = await requireAdminOutranks(targetId, actor.id);
   if (rankErr) return rankErr;
 
+  const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.users.achievements:${actor.id}`,
+    policyKey: 'admin.users.achievements',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
+
   const body = (await request.json().catch(() => ({}))) as Body;
   const name = typeof body.achievement_name === 'string' ? body.achievement_name.trim() : '';
   if (!name) return NextResponse.json({ error: 'achievement_name required' }, { status: 400 });
 
-  const service = createServiceClient();
   const { data: row } = await service
     .from('achievements')
     .select('id, name')

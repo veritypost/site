@@ -4,6 +4,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction } from '@/lib/adminMutation';
 
 type Decision = 'approved' | 'denied' | 'partial';
@@ -18,7 +19,20 @@ export async function POST(request: Request) {
   } catch (err) {
     return permissionError(err);
   }
-  void actor;
+
+  const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.billing.refund-decision:${actor.id}`,
+    policyKey: 'admin.billing.refund-decision',
+    max: 10,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
 
   const body = (await request.json().catch(() => ({}))) as Body;
   const invoiceId = typeof body.invoice_id === 'string' ? body.invoice_id : '';
@@ -37,7 +51,6 @@ export async function POST(request: Request) {
         ? 'rejected'
         : decision;
 
-  const service = createServiceClient();
   const { data: current } = await service
     .from('invoices')
     .select('id, metadata')

@@ -3,7 +3,9 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { requireAdminOutranks } from '@/lib/adminMutation';
 
 // Skip grace and freeze immediately (D40). Use when an admin
 // needs to close out a user past their grace window without
@@ -17,7 +19,10 @@ export async function POST(request) {
   } catch (err) {
     if (err.status) {
       console.error('[admin.billing.freeze.permission]', err?.message || err);
-      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+      return NextResponse.json(
+        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err.status }
+      );
     }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -27,20 +32,23 @@ export async function POST(request) {
 
   if (user_id !== user.id) {
     // Q6 — server-side rank guard via require_outranks RPC.
-    const authed = createClient();
-    const { data: outranks, error: rankErr } = await authed.rpc('require_outranks', {
-      target_user_id: user_id,
-    });
-    if (rankErr) return NextResponse.json({ error: rankErr.message }, { status: 500 });
-    if (!outranks) {
-      return NextResponse.json(
-        { error: 'Cannot act on a user whose rank meets or exceeds your own' },
-        { status: 403 }
-      );
-    }
+    const rankErr = await requireAdminOutranks(user_id, actor.id);
+    if (rankErr) return rankErr;
   }
 
   const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.billing.freeze:${user.id}`,
+    policyKey: 'admin.billing.freeze',
+    max: 10,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
   const { data, error } = await service.rpc('billing_freeze_profile', { p_user_id: user_id });
   if (error)
     return safeErrorResponse(NextResponse, error, {

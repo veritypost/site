@@ -1,8 +1,78 @@
 // T-005 — shared helpers for the admin-mutation API shape.
 //
-// Every admin mutation route follows:
-//   requirePermission → (require_outranks if target is a user) →
-//   createServiceClient → mutation → record_admin_action audit → response
+// CANONICAL ADMIN MUTATION ORDER — copy-paste skeleton for new routes.
+// Every admin POST/PATCH/DELETE under /api/admin/** must run these in
+// this order. Drift here was the entire MED-sweep audit-sweep B-C 2026-04-23.
+//
+//   import { NextResponse } from 'next/server';
+//   import { requirePermission } from '@/lib/auth';
+//   import { createServiceClient } from '@/lib/supabase/server';
+//   import { checkRateLimit } from '@/lib/rateLimit';
+//   import { permissionError, recordAdminAction, requireAdminOutranks } from '@/lib/adminMutation';
+//   import { safeErrorResponse } from '@/lib/apiErrors';
+//
+//   export async function POST(request, { params }) {
+//     // 1. Permission gate.
+//     let actor;
+//     try {
+//       actor = await requirePermission('admin.<surface>.<action>');
+//     } catch (err) {
+//       return permissionError(err);
+//     }
+//
+//     // 2. Service-role client (bypass RLS for the admin write).
+//     const service = createServiceClient();
+//
+//     // 3. Rate limit. Per-actor key, per-route policy.
+//     const rate = await checkRateLimit(service, {
+//       key: `admin.<surface>.<action>:${actor.id}`,
+//       policyKey: 'admin.<surface>.<action>',
+//       max: 30,        // 10 for destructive (DELETE / ban / freeze / refund)
+//       windowSec: 60,
+//     });
+//     if (rate.limited) {
+//       return NextResponse.json(
+//         { error: 'Too many requests' },
+//         { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+//       );
+//     }
+//
+//     // 4. Body parse + validate. Cap inputs.
+//     const body = await request.json().catch(() => ({}));
+//     // ...validate...
+//
+//     // 5. Outranks gate ONLY when mutating another user's row.
+//     if (target.user_id && target.user_id !== actor.id) {
+//       const rankErr = await requireAdminOutranks(target.user_id, actor.id);
+//       if (rankErr) return rankErr;
+//     }
+//
+//     // 6. Mutation. Use the service client.
+//     const { error } = await service.from('<table>').update(...).eq(...);
+//     if (error) {
+//       return safeErrorResponse(NextResponse, error, {
+//         route: 'admin.<surface>.<action>',
+//         fallbackStatus: 500,
+//         fallbackMessage: 'Could not save',
+//       });
+//     }
+//
+//     // 7. Canonical audit. Goes to admin_audit_log (NOT the older
+//     //    audit_log table — that one is for system events: auth, stripe,
+//     //    promo). recordAdminAction reads auth.uid() via the
+//     //    cookie-scoped client internally.
+//     await recordAdminAction({
+//       action: '<surface>.<action>',
+//       targetTable: '<table>',
+//       targetId: target.id,
+//       oldValue: { /* pre-state */ },
+//       newValue: { /* post-state */ },
+//       reason: body.reason ?? null,
+//     });
+//
+//     // 8. Response.
+//     return NextResponse.json({ ok: true });
+//   }
 //
 // The permission check + service-role client + error envelope are
 // already idiomatic (see /api/admin/users/[id]/ban/route.js). What
@@ -10,6 +80,12 @@
 // and the audit-log call (via SECURITY DEFINER RPC, auth.uid()-scoped,
 // so it must run through the caller's cookie-scoped client, not the
 // service client).
+//
+// FOLLOW-UP (not in scope of audit-sweep B-C): recordAdminAction does
+// not yet pass `p_ip` / `p_user_agent` through to the RPC. The
+// underlying SQL function accepts them; extending the helper to capture
+// them from the Request object would close the last DA-119 gap on the
+// admin audit trail.
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 

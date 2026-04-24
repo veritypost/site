@@ -3,7 +3,9 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { recordAdminAction } from '@/lib/adminMutation';
 
 // POST /api/admin/permissions   — create a permission row
 //
@@ -17,9 +19,26 @@ export async function POST(request) {
   } catch (err) {
     if (err.status) {
       console.error('[admin.permissions.permission]', err?.message || err);
-      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+      return NextResponse.json(
+        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err.status }
+      );
     }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.permissions.create:${actor.id}`,
+    policyKey: 'admin.permissions.create',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
   }
 
   const body = await request.json().catch(() => ({}));
@@ -31,7 +50,6 @@ export async function POST(request) {
     );
   }
 
-  const service = createServiceClient();
   const row = {
     key,
     display_name,
@@ -50,17 +68,12 @@ export async function POST(request) {
       fallbackStatus: 400,
     });
 
-  try {
-    await service.from('audit_log').insert({
-      actor_id: actor.id,
-      action: 'permission.create',
-      target_type: 'permission',
-      target_id: data.id,
-      metadata: { key, display_name, category },
-    });
-  } catch {
-    /* best-effort */
-  }
+  await recordAdminAction({
+    action: 'permission.create',
+    targetTable: 'permission',
+    targetId: data.id,
+    newValue: { key, display_name, category },
+  });
 
   return NextResponse.json({ permission: data });
 }

@@ -149,9 +149,12 @@ export async function POST(request) {
   } catch (err) {
     if (err.status) {
       {
-      console.error('[stories.read.permission]', err?.message || err);
-      return NextResponse.json({ error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err?.status || 500 });
-    }
+        console.error('[stories.read.permission]', err?.message || err);
+        return NextResponse.json(
+          { error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+          { status: err?.status || 500 }
+        );
+      }
     }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

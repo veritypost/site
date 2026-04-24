@@ -17,7 +17,10 @@ export async function POST(request, { params }) {
   } catch (err) {
     {
       console.error('[recap.[id].submit.permission]', err?.message || err);
-      return NextResponse.json({ error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err?.status || 401 });
+      return NextResponse.json(
+        { error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err?.status || 401 }
+      );
     }
   }
 

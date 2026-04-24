@@ -3,7 +3,9 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { recordAdminAction } from '@/lib/adminMutation';
 
 // POST /api/admin/data-requests/[id]/reject
 // Rejects a data request. Status moves to 'rejected'; reason is appended
@@ -30,9 +32,26 @@ export async function POST(request, { params }) {
   } catch (err) {
     if (err.status) {
       console.error('[admin.data-requests.[id].reject.permission]', err?.message || err);
-      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+      return NextResponse.json(
+        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err.status }
+      );
     }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.data-requests.reject:${user.id}`,
+    policyKey: 'admin.data-requests.reject',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
   }
 
   const { rejection_reason } = await request.json().catch(() => ({}));
@@ -47,7 +66,6 @@ export async function POST(request, { params }) {
     );
   }
 
-  const service = createServiceClient();
   const now = new Date().toISOString();
   const { error } = await service
     .from('data_requests')
@@ -65,18 +83,12 @@ export async function POST(request, { params }) {
     });
 
   // T-023 — GDPR-touching action; needs audit trail.
-  try {
-    await service.from('audit_log').insert({
-      actor_id: user.id,
-      actor_type: 'user',
-      action: 'data_request.reject',
-      target_type: 'data_request',
-      target_id: params.id,
-      metadata: { reason: trimmed.slice(0, 200) },
-    });
-  } catch {
-    /* best-effort */
-  }
+  await recordAdminAction({
+    action: 'data_request.reject',
+    targetTable: 'data_request',
+    targetId: params.id,
+    reason: trimmed.slice(0, 200),
+  });
 
   return NextResponse.json({ ok: true });
 }

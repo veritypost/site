@@ -50,7 +50,7 @@ export default function FollowButton({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ target_user_id: targetUserId }),
       });
-      const data = (await res.json()) as FollowApiResponse;
+      const data = (await res.json().catch(() => ({}))) as FollowApiResponse;
       if (!res.ok) throw new Error(data?.error || 'Follow failed');
       setFollowing(!!data.following);
       onChange?.(!!data.following);

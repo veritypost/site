@@ -112,7 +112,7 @@ export default function CommentComposer({
           mentions,
         }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || 'Could not post');
       setBody('');
       onPosted?.(data.comment || null);

@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction } from '@/lib/adminMutation';
 
 type Body = { key?: string; value?: string | number | boolean };
@@ -18,6 +19,20 @@ export async function POST(request: Request) {
     return permissionError(err);
   }
 
+  const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.settings.upsert:${actor.id}`,
+    policyKey: 'admin.settings.upsert',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
+
   const body = (await request.json().catch(() => ({}))) as Body;
   const key = typeof body.key === 'string' ? body.key.trim() : '';
   if (!key) return NextResponse.json({ error: 'key required' }, { status: 400 });
@@ -26,7 +41,6 @@ export async function POST(request: Request) {
   }
   const value = String(body.value);
 
-  const service = createServiceClient();
   const { data: existing } = await service
     .from('settings')
     .select('id, value, is_sensitive')

@@ -135,7 +135,7 @@ export default function ExpertQueuePage() {
   async function loadItems(status: string) {
     try {
       const res = await fetch(`/api/expert/queue?status=${status}`);
-      const data = (await res.json()) as QueueResponse;
+      const data = (await res.json().catch(() => ({}))) as QueueResponse;
       if (!res.ok) throw new Error(data?.error || 'Queue load failed');
       setItems(data.items || []);
     } catch (err) {
@@ -147,7 +147,7 @@ export default function ExpertQueuePage() {
     if (!categoryId) return;
     try {
       const res = await fetch(`/api/expert/back-channel?category_id=${categoryId}`);
-      const data = (await res.json()) as BackChannelResponse;
+      const data = (await res.json().catch(() => ({}))) as BackChannelResponse;
       if (!res.ok) throw new Error(data?.error || 'Back-channel load failed');
       setBackMessages(data.messages || []);
     } catch (err) {
@@ -189,7 +189,7 @@ export default function ExpertQueuePage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ body }),
     });
-    const data = (await res.json()) as AnswerResponse;
+    const data = (await res.json().catch(() => ({}))) as AnswerResponse;
     if (!res.ok) {
       setError(data?.error || 'Answer failed');
       return;
@@ -215,7 +215,7 @@ export default function ExpertQueuePage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ category_id: activeCategory, body }),
     });
-    const data = (await res.json()) as BackChannelResponse;
+    const data = (await res.json().catch(() => ({}))) as BackChannelResponse;
     if (!res.ok) {
       setError(data?.error || 'Post failed');
       return;

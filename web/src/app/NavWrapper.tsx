@@ -202,7 +202,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
       try {
         const res = await fetch('/api/notifications?unread=1&limit=1');
         if (!res.ok) return;
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         if (!cancelled) setUnreadCount(data.unread_count || 0);
       } catch (e) {
         console.error('[nav] notifications poll', e);

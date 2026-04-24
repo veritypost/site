@@ -15,9 +15,12 @@ export async function POST(request) {
       user = await requirePermission('kids.pin.set');
     } catch (err) {
       {
-      console.error('[kids.set-pin.permission]', err?.message || err);
-      return NextResponse.json({ error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err?.status || 401 });
-    }
+        console.error('[kids.set-pin.permission]', err?.message || err);
+        return NextResponse.json(
+          { error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+          { status: err?.status || 401 }
+        );
+      }
     }
 
     const { kid_profile_id, pin } = await request.json();
@@ -52,9 +55,12 @@ export async function POST(request) {
   } catch (err) {
     if (err.status) {
       {
-      console.error('[kids.set-pin.permission]', err?.message || err);
-      return NextResponse.json({ error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err?.status || 500 });
-    }
+        console.error('[kids.set-pin.permission]', err?.message || err);
+        return NextResponse.json(
+          { error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+          { status: err?.status || 500 }
+        );
+      }
     }
     console.error('[kids/set-pin]', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

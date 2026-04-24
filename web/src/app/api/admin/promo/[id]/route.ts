@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction } from '@/lib/adminMutation';
 
 type PatchBody = { is_active?: boolean };
@@ -16,14 +17,26 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   } catch (err) {
     return permissionError(err);
   }
-  void actor;
+
+  const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.promo.update:${actor.id}`,
+    policyKey: 'admin.promo.update',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
 
   const body = (await request.json().catch(() => ({}))) as PatchBody;
   if (typeof body.is_active !== 'boolean') {
     return NextResponse.json({ error: 'is_active required' }, { status: 400 });
   }
 
-  const service = createServiceClient();
   const { data: prior } = await service
     .from('promo_codes')
     .select('id, code, is_active')
@@ -61,9 +74,21 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   } catch (err) {
     return permissionError(err);
   }
-  void actor;
 
   const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.promo.delete:${actor.id}`,
+    policyKey: 'admin.promo.delete',
+    max: 10,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
+
   const { data: prior } = await service
     .from('promo_codes')
     .select('id, code, discount_type, discount_value')

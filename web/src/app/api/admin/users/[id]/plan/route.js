@@ -3,7 +3,9 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { recordAdminAction, requireAdminOutranks } from '@/lib/adminMutation';
 
 // PATCH /api/admin/users/[id]/plan  { plan_name }
 //
@@ -22,7 +24,10 @@ export async function PATCH(request, { params }) {
   } catch (err) {
     if (err.status) {
       console.error('[admin.users.[id].plan.permission]', err?.message || err);
-      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+      return NextResponse.json(
+        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err.status }
+      );
     }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -35,26 +40,22 @@ export async function PATCH(request, { params }) {
     return NextResponse.json({ error: 'plan_name required' }, { status: 400 });
   }
 
-  if (targetId !== actor.id) {
-    const authed = createClient();
-    const { data: outranks, error: rankErr } = await authed.rpc('require_outranks', {
-      target_user_id: targetId,
-    });
-    if (rankErr)
-      return safeErrorResponse(NextResponse, rankErr, {
-        route: 'admin.users.plan',
-        fallbackStatus: 500,
-        fallbackMessage: 'Rank check failed',
-      });
-    if (!outranks) {
-      return NextResponse.json(
-        { error: 'Cannot act on a user whose rank meets or exceeds your own' },
-        { status: 403 }
-      );
-    }
-  }
+  const rankErr = await requireAdminOutranks(targetId, actor.id);
+  if (rankErr) return rankErr;
 
   const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.users.plan:${actor.id}`,
+    policyKey: 'admin.users.plan',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
 
   let update;
   if (plan_name === 'free') {
@@ -83,17 +84,12 @@ export async function PATCH(request, { params }) {
       fallbackMessage: 'Could not update plan',
     });
 
-  try {
-    await service.from('audit_log').insert({
-      actor_id: actor.id,
-      action: 'plan.set',
-      target_type: 'user',
-      target_id: targetId,
-      metadata: { plan: plan_name },
-    });
-  } catch {
-    /* best-effort */
-  }
+  await recordAdminAction({
+    action: 'plan.set',
+    targetTable: 'users',
+    targetId: targetId,
+    newValue: { plan: plan_name },
+  });
 
   const { error: bumpErr } = await service.rpc('bump_user_perms_version', {
     p_user_id: targetId,

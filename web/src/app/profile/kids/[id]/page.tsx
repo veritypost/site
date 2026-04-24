@@ -258,7 +258,7 @@ export default function KidDashboardPage() {
         method: 'POST',
         credentials: 'include',
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data?.error || 'Freeze failed');
         return;

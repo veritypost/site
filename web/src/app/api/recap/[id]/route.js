@@ -10,7 +10,10 @@ export async function GET(_request, { params }) {
   } catch (err) {
     {
       console.error('[recap.[id].permission]', err?.message || err);
-      return NextResponse.json({ error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err?.status || 401 });
+      return NextResponse.json(
+        { error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err?.status || 401 }
+      );
     }
   }
 

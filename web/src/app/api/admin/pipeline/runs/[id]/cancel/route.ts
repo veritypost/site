@@ -26,6 +26,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction } from '@/lib/adminMutation';
 import { captureWithRedact } from '@/lib/pipeline/redact';
 import type { Json } from '@/types/database';
@@ -45,13 +46,24 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   } catch (err) {
     return permissionError(err);
   }
-  void actor;
 
   if (!UUID_RE.test(params.id)) {
     return NextResponse.json({ error: 'Invalid run id' }, { status: 400 });
   }
 
   const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.pipeline.runs.cancel:${actor.id}`,
+    policyKey: 'admin.pipeline.runs.cancel',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
 
   const { data: run, error: fetchErr } = await service
     .from('pipeline_runs')

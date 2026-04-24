@@ -58,7 +58,7 @@ export default function KidsAppLanding() {
       // Parse error message if JSON, fall back to generic.
       let msg = "Couldn't save. Try again in a moment.";
       try {
-        const j = (await res.json()) as { error?: string };
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
         if (j?.error) msg = j.error;
       } catch {
         // not JSON — keep generic

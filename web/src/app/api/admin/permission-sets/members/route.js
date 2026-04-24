@@ -3,7 +3,9 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { recordAdminAction } from '@/lib/adminMutation';
 
 // POST   /api/admin/permission-sets/members   { permission_set_id, permission_id }
 // DELETE /api/admin/permission-sets/members?permission_set_id=...&permission_id=...
@@ -17,9 +19,26 @@ export async function POST(request) {
   } catch (err) {
     if (err.status) {
       console.error('[admin.permission-sets.members.permission]', err?.message || err);
-      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+      return NextResponse.json(
+        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err.status }
+      );
     }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.permission-sets.members.add:${actor.id}`,
+    policyKey: 'admin.permission-sets.members.add',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
   }
 
   const body = await request.json().catch(() => ({}));
@@ -31,7 +50,6 @@ export async function POST(request) {
     );
   }
 
-  const service = createServiceClient();
   const { error } = await service
     .from('permission_set_perms')
     .insert({ permission_set_id, permission_id });
@@ -41,17 +59,12 @@ export async function POST(request) {
       fallbackStatus: 400,
     });
 
-  try {
-    await service.from('audit_log').insert({
-      actor_id: actor.id,
-      action: 'permission_set.add_member',
-      target_type: 'permission_set',
-      target_id: permission_set_id,
-      metadata: { permission_id },
-    });
-  } catch {
-    /* best-effort */
-  }
+  await recordAdminAction({
+    action: 'permission_set.add_member',
+    targetTable: 'permission_set',
+    targetId: permission_set_id,
+    newValue: { permission_id },
+  });
 
   return NextResponse.json({ ok: true });
 }
@@ -63,9 +76,26 @@ export async function DELETE(request) {
   } catch (err) {
     if (err.status) {
       console.error('[admin.permission-sets.members.permission]', err?.message || err);
-      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+      return NextResponse.json(
+        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err.status }
+      );
     }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.permission-sets.members.remove:${actor.id}`,
+    policyKey: 'admin.permission-sets.members.remove',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
   }
 
   const url = new URL(request.url);
@@ -78,7 +108,6 @@ export async function DELETE(request) {
     );
   }
 
-  const service = createServiceClient();
   const { error } = await service
     .from('permission_set_perms')
     .delete()
@@ -90,17 +119,12 @@ export async function DELETE(request) {
       fallbackStatus: 400,
     });
 
-  try {
-    await service.from('audit_log').insert({
-      actor_id: actor.id,
-      action: 'permission_set.remove_member',
-      target_type: 'permission_set',
-      target_id: permission_set_id,
-      metadata: { permission_id },
-    });
-  } catch {
-    /* best-effort */
-  }
+  await recordAdminAction({
+    action: 'permission_set.remove_member',
+    targetTable: 'permission_set',
+    targetId: permission_set_id,
+    oldValue: { permission_id },
+  });
 
   return NextResponse.json({ ok: true });
 }

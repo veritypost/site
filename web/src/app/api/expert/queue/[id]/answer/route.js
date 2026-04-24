@@ -14,7 +14,10 @@ export async function POST(request, { params }) {
   } catch (err) {
     if (err.status) {
       console.error('[expert.queue.[id].answer.permission]', err?.message || err);
-      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+      return NextResponse.json(
+        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err.status }
+      );
     }
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }

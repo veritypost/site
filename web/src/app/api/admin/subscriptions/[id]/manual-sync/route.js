@@ -3,6 +3,8 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
+import { recordAdminAction, requireAdminOutranks } from '@/lib/adminMutation';
 
 // POST /api/admin/subscriptions/[id]/manual-sync
 //
@@ -43,13 +45,30 @@ export async function POST(request, { params }) {
   } catch (err) {
     if (err.status) {
       console.error('[admin.subscriptions.[id].manual-sync.permission]', err?.message || err);
-      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+      return NextResponse.json(
+        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err.status }
+      );
     }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   const subId = params?.id;
   if (!subId) return NextResponse.json({ error: 'subscription id required' }, { status: 400 });
+
+  const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.subscriptions.manual-sync:${actor.id}`,
+    policyKey: 'admin.subscriptions.manual-sync',
+    max: 10,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
 
   let body;
   try {
@@ -61,8 +80,6 @@ export async function POST(request, { params }) {
   if (!action || !VALID_ACTIONS.has(action)) {
     return NextResponse.json({ error: `unknown action "${action}"` }, { status: 400 });
   }
-
-  const service = createServiceClient();
 
   // Load subscription + user_id; we need both to decide what plan_id to set.
   const { data: sub, error: subErr } = await service
@@ -76,19 +93,8 @@ export async function POST(request, { params }) {
   // F-035-style actor rank check — admin can't downgrade a higher-ranked
   // account. Same pattern as billing/cancel and billing/freeze.
   // Q6 — moved to server-side require_outranks RPC.
-  if (sub.user_id && sub.user_id !== actor.id) {
-    const authed = createClient();
-    const { data: outranks, error: rankErr } = await authed.rpc('require_outranks', {
-      target_user_id: sub.user_id,
-    });
-    if (rankErr) return NextResponse.json({ error: rankErr.message }, { status: 500 });
-    if (!outranks) {
-      return NextResponse.json(
-        { error: 'Cannot act on a user whose rank meets or exceeds your own' },
-        { status: 403 }
-      );
-    }
-  }
+  const rankErr = await requireAdminOutranks(sub.user_id, actor.id);
+  if (rankErr) return rankErr;
 
   if (action === 'downgrade') {
     // 1) Resolve the free plan id. Webhook path uses this same "name='free'"
@@ -163,21 +169,16 @@ export async function POST(request, { params }) {
   if (bumpErr) console.error('[subs.manual-sync] perms_version bump failed:', bumpErr.message);
 
   // 5) Audit trail.
-  try {
-    await service.from('audit_log').insert({
-      actor_id: actor.id,
-      action: `billing:manual_${action}_db_only`,
-      target_type: 'subscription',
-      target_id: subId,
-      metadata: {
-        note: 'Local DB only. Sync in Stripe Dashboard separately.',
-        reason: reason ?? null,
-        user_id: sub.user_id,
-      },
-    });
-  } catch {
-    /* best-effort */
-  }
+  await recordAdminAction({
+    action: `billing:manual_${action}_db_only`,
+    targetTable: 'subscription',
+    targetId: subId,
+    reason: reason ?? null,
+    newValue: {
+      note: 'Local DB only. Sync in Stripe Dashboard separately.',
+      user_id: sub.user_id,
+    },
+  });
 
   return NextResponse.json({ ok: true, action, user_id: sub.user_id });
 }

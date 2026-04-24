@@ -3,7 +3,9 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { requireAdminOutranks } from '@/lib/adminMutation';
 
 // Blueprint §10 progressive stack:
 //   level 1 = warn
@@ -23,7 +25,10 @@ export async function POST(request, { params }) {
   } catch (err) {
     if (err.status) {
       console.error('[admin.moderation.users.[id].penalty.permission]', err?.message || err);
-      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+      return NextResponse.json(
+        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err.status }
+      );
     }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -39,20 +44,22 @@ export async function POST(request, { params }) {
   // Q6 — actor-outranks-target via server-side RPC (canonical
   // roles.hierarchy_level source; replaces the in-code ROLE_HIERARCHY map).
   // RPC reads auth.uid() on the authed supabase client, so we must call it
-  // from `createClient()` (cookie-scoped to the caller), not the service role.
-  const authed = createClient();
-  const { data: outranks, error: rankErr } = await authed.rpc('require_outranks', {
-    target_user_id: params.id,
-  });
-  if (rankErr) return NextResponse.json({ error: rankErr.message }, { status: 500 });
-  if (!outranks) {
-    return NextResponse.json(
-      { error: 'Cannot penalize a user whose rank meets or exceeds your own' },
-      { status: 403 }
-    );
-  }
+  const rankErr = await requireAdminOutranks(params.id, user.id);
+  if (rankErr) return rankErr;
 
   const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.moderation.users.penalty:${user.id}`,
+    policyKey: 'admin.moderation.users.penalty',
+    max: 10,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
   const { data, error } = await service.rpc('apply_penalty', {
     p_mod_id: user.id,
     p_target_id: params.id,

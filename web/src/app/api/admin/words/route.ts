@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction } from '@/lib/adminMutation';
 
 type Kind = 'reserved' | 'blocked';
@@ -25,8 +26,9 @@ export async function POST(request: Request) {
     : [];
   if (words.length === 0) return NextResponse.json({ error: 'words required' }, { status: 400 });
 
+  let actor;
   try {
-    await requirePermission(resolvePermKey(kind));
+    actor = await requirePermission(resolvePermKey(kind));
   } catch (err) {
     return permissionError(err);
   }
@@ -34,6 +36,18 @@ export async function POST(request: Request) {
   const table = resolveTable(kind);
   const col = resolveColumn(kind);
   const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.words.add:${actor.id}`,
+    policyKey: 'admin.words.add',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
 
   const rows = words.map((w) => ({ [col]: w }));
   // @ts-expect-error — union of two table shapes narrows per-kind; runtime uses the right col.
@@ -59,8 +73,9 @@ export async function DELETE(request: Request) {
   const word = typeof body.word === 'string' ? body.word.trim().toLowerCase() : '';
   if (!word) return NextResponse.json({ error: 'word required' }, { status: 400 });
 
+  let actor;
   try {
-    await requirePermission(resolvePermKey(kind));
+    actor = await requirePermission(resolvePermKey(kind));
   } catch (err) {
     return permissionError(err);
   }
@@ -68,6 +83,18 @@ export async function DELETE(request: Request) {
   const table = resolveTable(kind);
   const col = resolveColumn(kind);
   const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.words.delete:${actor.id}`,
+    policyKey: 'admin.words.delete',
+    max: 10,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
 
   await recordAdminAction({
     action: kind === 'reserved' ? 'reserved_username.delete' : 'banned_word.delete',

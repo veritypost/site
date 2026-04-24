@@ -24,7 +24,10 @@ export async function PATCH(request, { params }) {
   } catch (err) {
     {
       console.error('[kids.[id].permission]', err?.message || err);
-      return NextResponse.json({ error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err?.status || 401 });
+      return NextResponse.json(
+        { error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err?.status || 401 }
+      );
     }
   }
 
@@ -64,7 +67,10 @@ export async function DELETE(request, { params }) {
   } catch (err) {
     {
       console.error('[kids.[id].permission]', err?.message || err);
-      return NextResponse.json({ error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err?.status || 401 });
+      return NextResponse.json(
+        { error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err?.status || 401 }
+      );
     }
   }
 

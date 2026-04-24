@@ -3,7 +3,9 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { recordAdminAction } from '@/lib/adminMutation';
 
 // PATCH  /api/admin/permission-sets/[id]  — update a permission set
 // DELETE /api/admin/permission-sets/[id]  — delete a permission set
@@ -18,13 +20,30 @@ export async function PATCH(request, { params }) {
   } catch (err) {
     if (err.status) {
       console.error('[admin.permission-sets.[id].permission]', err?.message || err);
-      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+      return NextResponse.json(
+        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err.status }
+      );
     }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   const id = params?.id;
   if (!id) return NextResponse.json({ error: 'permission_set id required' }, { status: 400 });
+
+  const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.permission-sets.update:${actor.id}`,
+    policyKey: 'admin.permission-sets.update',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
 
   const body = await request.json().catch(() => ({}));
   const patch = {};
@@ -35,7 +54,6 @@ export async function PATCH(request, { params }) {
     return NextResponse.json({ error: 'no updatable fields in body' }, { status: 400 });
   }
 
-  const service = createServiceClient();
   const { error } = await service.from('permission_sets').update(patch).eq('id', id);
   if (error)
     return safeErrorResponse(NextResponse, error, {
@@ -43,17 +61,12 @@ export async function PATCH(request, { params }) {
       fallbackStatus: 400,
     });
 
-  try {
-    await service.from('audit_log').insert({
-      actor_id: actor.id,
-      action: 'permission_set.update',
-      target_type: 'permission_set',
-      target_id: id,
-      metadata: patch,
-    });
-  } catch {
-    /* best-effort */
-  }
+  await recordAdminAction({
+    action: 'permission_set.update',
+    targetTable: 'permission_set',
+    targetId: id,
+    newValue: patch,
+  });
 
   return NextResponse.json({ ok: true });
 }
@@ -65,7 +78,10 @@ export async function DELETE(_request, { params }) {
   } catch (err) {
     if (err.status) {
       console.error('[admin.permission-sets.[id].permission]', err?.message || err);
-      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+      return NextResponse.json(
+        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err.status }
+      );
     }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -74,6 +90,18 @@ export async function DELETE(_request, { params }) {
   if (!id) return NextResponse.json({ error: 'permission_set id required' }, { status: 400 });
 
   const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.permission-sets.delete:${actor.id}`,
+    policyKey: 'admin.permission-sets.delete',
+    max: 10,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
 
   // Block deletes of system sets defensively (mirrors UI guard).
   const { data: existing, error: lookupErr } = await service
@@ -94,17 +122,12 @@ export async function DELETE(_request, { params }) {
       fallbackStatus: 400,
     });
 
-  try {
-    await service.from('audit_log').insert({
-      actor_id: actor.id,
-      action: 'permission_set.delete',
-      target_type: 'permission_set',
-      target_id: id,
-      metadata: { key: existing.key },
-    });
-  } catch {
-    /* best-effort */
-  }
+  await recordAdminAction({
+    action: 'permission_set.delete',
+    targetTable: 'permission_set',
+    targetId: id,
+    oldValue: { key: existing.key },
+  });
 
   return NextResponse.json({ ok: true });
 }

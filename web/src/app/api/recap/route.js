@@ -11,10 +11,7 @@ export async function GET(request) {
     user = await requirePermission('recap.list.view');
   } catch (err) {
     if (err.status === 403) return NextResponse.json({ recaps: [], paid: false });
-    return NextResponse.json(
-      { error: 'Unauthenticated' },
-      { status: err.status || 401 }
-    );
+    return NextResponse.json({ error: 'Unauthenticated' }, { status: err.status || 401 });
   }
 
   const service = createServiceClient();

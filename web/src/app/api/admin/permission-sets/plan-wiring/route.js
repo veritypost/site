@@ -3,6 +3,8 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
+import { recordAdminAction } from '@/lib/adminMutation';
 
 // POST /api/admin/permission-sets/plan-wiring   { plan_id, permission_set_id, enabled }
 //
@@ -14,9 +16,26 @@ export async function POST(request) {
   } catch (err) {
     if (err.status) {
       console.error('[admin.permission-sets.plan-wiring.permission]', err?.message || err);
-      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+      return NextResponse.json(
+        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err.status }
+      );
     }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.permission-sets.plan-wiring:${actor.id}`,
+    policyKey: 'admin.permission-sets.plan-wiring',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
   }
 
   const body = await request.json().catch(() => ({}));
@@ -28,7 +47,6 @@ export async function POST(request) {
     );
   }
 
-  const service = createServiceClient();
   let err;
   if (enabled) {
     ({ error: err } = await service
@@ -42,21 +60,17 @@ export async function POST(request) {
       .eq('permission_set_id', permission_set_id));
   }
   if (err) {
-      console.error('[admin.permission-sets.plan-wiring.db]', err.message);
-      return NextResponse.json({ error: 'Could not save' }, { status: 400 });
-    }
-
-  try {
-    await service.from('audit_log').insert({
-      actor_id: actor.id,
-      action: enabled ? 'permission_set.plan.grant' : 'permission_set.plan.revoke',
-      target_type: 'permission_set',
-      target_id: permission_set_id,
-      metadata: { plan_id },
-    });
-  } catch {
-    /* best-effort */
+    console.error('[admin.permission-sets.plan-wiring.db]', err.message);
+    return NextResponse.json({ error: 'Could not save' }, { status: 400 });
   }
+
+  await recordAdminAction({
+    action: enabled ? 'permission_set.plan.grant' : 'permission_set.plan.revoke',
+    targetTable: 'permission_set',
+    targetId: permission_set_id,
+    newValue: enabled ? { plan_id } : null,
+    oldValue: enabled ? null : { plan_id },
+  });
 
   return NextResponse.json({ ok: true });
 }

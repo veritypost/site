@@ -127,7 +127,7 @@ function RecapInner() {
         push({ message: `Could not load recap: ${body.error || res.statusText}`, variant: 'danger' });
         return;
       }
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       setSelected(data.recap);
       setQuestions(data.questions || []);
       setQEditing(null); setQForm(null);

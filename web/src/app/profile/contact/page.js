@@ -40,7 +40,7 @@ export default function ContactPage() {
         }),
       });
       if (!res.ok) {
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         setError(data.error || 'Failed to submit. Please try again.');
         setSubmitting(false);
         return;

@@ -15,7 +15,10 @@ export async function GET() {
   } catch (err) {
     if (err.status) {
       console.error('[users.blocked.permission]', err?.message || err);
-      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+      return NextResponse.json(
+        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err.status }
+      );
     }
     console.error('[users-blocked:GET]', err);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });

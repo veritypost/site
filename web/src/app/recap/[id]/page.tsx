@@ -101,7 +101,7 @@ export default function RecapPlayer() {
         return;
       }
       const res = await fetch(`/api/recap/${id}`);
-      const data = (await res.json()) as LoadResponse;
+      const data = (await res.json().catch(() => ({}))) as LoadResponse;
       if (!res.ok) {
         setError(data.error || 'Load failed');
         setLoading(false);
@@ -125,7 +125,7 @@ export default function RecapPlayer() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ answers: payload }),
     });
-    const data = (await res.json()) as SubmitResponse & { error?: string };
+    const data = (await res.json().catch(() => ({}))) as SubmitResponse & { error?: string };
     setBusy(false);
     if (!res.ok) {
       setError(data.error || 'Submit failed');

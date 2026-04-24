@@ -3,7 +3,9 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { recordAdminAction, requireAdminOutranks } from '@/lib/adminMutation';
 
 // POST   /api/admin/permissions/user-grants   { user_id, permission_set_id, expires_at?, reason? }
 // DELETE /api/admin/permissions/user-grants?user_id=...&permission_set_id=...
@@ -17,9 +19,26 @@ export async function POST(request) {
   } catch (err) {
     if (err.status) {
       console.error('[admin.permissions.user-grants.permission]', err?.message || err);
-      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+      return NextResponse.json(
+        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err.status }
+      );
     }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.permissions.user-grants.add:${actor.id}`,
+    policyKey: 'admin.permissions.user-grants.add',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
   }
 
   const body = await request.json().catch(() => ({}));
@@ -28,21 +47,9 @@ export async function POST(request) {
     return NextResponse.json({ error: 'user_id and permission_set_id required' }, { status: 400 });
   }
 
-  if (user_id !== actor.id) {
-    const authed = createClient();
-    const { data: outranks, error: rankErr } = await authed.rpc('require_outranks', {
-      target_user_id: user_id,
-    });
-    if (rankErr) return NextResponse.json({ error: rankErr.message }, { status: 500 });
-    if (!outranks) {
-      return NextResponse.json(
-        { error: 'Cannot act on a user whose rank meets or exceeds your own' },
-        { status: 403 }
-      );
-    }
-  }
+  const rankErr = await requireAdminOutranks(user_id, actor.id);
+  if (rankErr) return rankErr;
 
-  const service = createServiceClient();
   const row = {
     user_id,
     permission_set_id,
@@ -57,17 +64,13 @@ export async function POST(request) {
       fallbackStatus: 400,
     });
 
-  try {
-    await service.from('audit_log').insert({
-      actor_id: actor.id,
-      action: 'user_grant.add',
-      target_type: 'user',
-      target_id: user_id,
-      metadata: { permission_set_id, expires_at: row.expires_at, reason: row.reason },
-    });
-  } catch {
-    /* best-effort */
-  }
+  await recordAdminAction({
+    action: 'user_grant.add',
+    targetTable: 'user',
+    targetId: user_id,
+    reason: row.reason,
+    newValue: { permission_set_id, expires_at: row.expires_at },
+  });
 
   const { error: bumpErr } = await service.rpc('bump_user_perms_version', {
     p_user_id: user_id,
@@ -84,9 +87,26 @@ export async function DELETE(request) {
   } catch (err) {
     if (err.status) {
       console.error('[admin.permissions.user-grants.permission]', err?.message || err);
-      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+      return NextResponse.json(
+        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err.status }
+      );
     }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.permissions.user-grants.revoke:${actor.id}`,
+    policyKey: 'admin.permissions.user-grants.revoke',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
   }
 
   const url = new URL(request.url);
@@ -96,21 +116,9 @@ export async function DELETE(request) {
     return NextResponse.json({ error: 'user_id and permission_set_id required' }, { status: 400 });
   }
 
-  if (user_id !== actor.id) {
-    const authed = createClient();
-    const { data: outranks, error: rankErr } = await authed.rpc('require_outranks', {
-      target_user_id: user_id,
-    });
-    if (rankErr) return NextResponse.json({ error: rankErr.message }, { status: 500 });
-    if (!outranks) {
-      return NextResponse.json(
-        { error: 'Cannot act on a user whose rank meets or exceeds your own' },
-        { status: 403 }
-      );
-    }
-  }
+  const rankErr = await requireAdminOutranks(user_id, actor.id);
+  if (rankErr) return rankErr;
 
-  const service = createServiceClient();
   const { error } = await service
     .from('user_permission_sets')
     .delete()
@@ -122,17 +130,12 @@ export async function DELETE(request) {
       fallbackStatus: 400,
     });
 
-  try {
-    await service.from('audit_log').insert({
-      actor_id: actor.id,
-      action: 'user_grant.revoke',
-      target_type: 'user',
-      target_id: user_id,
-      metadata: { permission_set_id },
-    });
-  } catch {
-    /* best-effort */
-  }
+  await recordAdminAction({
+    action: 'user_grant.revoke',
+    targetTable: 'user',
+    targetId: user_id,
+    oldValue: { permission_set_id },
+  });
 
   const { error: bumpErr } = await service.rpc('bump_user_perms_version', {
     p_user_id: user_id,

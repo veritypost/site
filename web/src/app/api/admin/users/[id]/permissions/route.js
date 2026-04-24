@@ -3,6 +3,8 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
+import { recordAdminAction, requireAdminOutranks } from '@/lib/adminMutation';
 
 // POST /api/admin/users/[id]/permissions
 //
@@ -76,9 +78,12 @@ export async function POST(request, { params }) {
   } catch (err) {
     if (err.status) {
       {
-      console.error('[admin.users.[id].permissions.permission]', err?.message || err);
-      return NextResponse.json({ error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err?.status || 500 });
-    }
+        console.error('[admin.users.[id].permissions.permission]', err?.message || err);
+        return NextResponse.json(
+          { error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+          { status: err?.status || 500 }
+        );
+      }
     }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -91,18 +96,21 @@ export async function POST(request, { params }) {
   // an owner). Sibling routes (ban, roles, plan, role-set) all
   // enforce this; this one was missed. Self-edits are allowed (skip the
   // check if actor == target).
-  if (actor.id !== targetUserId) {
-    const authed = await createClient();
-    const { data: outranks, error: outranksErr } = await authed.rpc('require_outranks', {
-      target_user_id: targetUserId,
-    });
-    if (outranksErr) {
-      console.error('[user-perms] require_outranks failed:', outranksErr.message);
-      return serverError('rank check failed');
-    }
-    if (!outranks) {
-      return NextResponse.json({ error: 'Target user outranks you' }, { status: 403 });
-    }
+  const rankErr = await requireAdminOutranks(targetUserId, actor.id);
+  if (rankErr) return rankErr;
+
+  const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.users.permissions:${actor.id}`,
+    policyKey: 'admin.users.permissions',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
   }
 
   let body;
@@ -121,8 +129,6 @@ export async function POST(request, { params }) {
   const expiresCheck = validExpires(expires_at);
   if (!expiresCheck.ok) return badRequest('malformed expires_at');
   const expiresIso = expiresCheck.value;
-
-  const service = createServiceClient();
 
   // Target user must exist.
   const { data: targetUser, error: targetErr } = await service
@@ -267,21 +273,18 @@ export async function POST(request, { params }) {
     console.error('[user-perms] perms_version bump failed:', bumpErr.message);
   }
 
-  // Audit log. Same non-fatal policy — primary write is the source of
-  // truth, audit is observability.
-  const { error: auditErr } = await service.from('admin_audit_log').insert({
-    actor_user_id: actor.id,
+  // Audit log via canonical helper. Same non-fatal policy — primary
+  // write is the source of truth, audit is observability. IP + UA are
+  // folded into new_value because the helper signature does not currently
+  // pass `p_ip` / `p_user_agent` through the SECDEF RPC; preserves the
+  // information without dropping it on the floor.
+  await recordAdminAction({
     action: `user_permissions.${action}`,
-    target_table: 'users',
-    target_id: targetUserId,
+    targetTable: 'users',
+    targetId: targetUserId,
     reason: reason ?? null,
-    new_value: auditNewValue,
-    ip,
-    user_agent: userAgent,
+    newValue: { ...(auditNewValue || {}), ip, user_agent: userAgent },
   });
-  if (auditErr) {
-    console.error('[user-perms] admin_audit_log insert failed:', auditErr.message);
-  }
 
   return NextResponse.json({ ok: true });
 }

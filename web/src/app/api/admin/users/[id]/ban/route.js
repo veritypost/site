@@ -3,7 +3,9 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { recordAdminAction, requireAdminOutranks } from '@/lib/adminMutation';
 
 // POST /api/admin/users/[id]/ban  { banned: boolean, reason?: string }
 //
@@ -34,26 +36,22 @@ export async function POST(request, { params }) {
   const banned = body?.banned === true;
   const reason = typeof body?.reason === 'string' ? body.reason : null;
 
-  if (targetId !== actor.id) {
-    const authed = createClient();
-    const { data: outranks, error: rankErr } = await authed.rpc('require_outranks', {
-      target_user_id: targetId,
-    });
-    if (rankErr)
-      return safeErrorResponse(NextResponse, rankErr, {
-        route: 'admin.users.ban',
-        fallbackStatus: 500,
-        fallbackMessage: 'Rank check failed',
-      });
-    if (!outranks) {
-      return NextResponse.json(
-        { error: 'Cannot act on a user whose rank meets or exceeds your own' },
-        { status: 403 }
-      );
-    }
-  }
+  const rankErr = await requireAdminOutranks(targetId, actor.id);
+  if (rankErr) return rankErr;
 
   const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.users.ban:${actor.id}`,
+    policyKey: 'admin.users.ban',
+    max: 10,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
 
   const update = banned
     ? {
@@ -72,17 +70,13 @@ export async function POST(request, { params }) {
       fallbackMessage: 'Could not update ban state',
     });
 
-  try {
-    await service.from('audit_log').insert({
-      actor_id: actor.id,
-      action: banned ? 'user.ban' : 'user.unban',
-      target_type: 'user',
-      target_id: targetId,
-      metadata: { reason },
-    });
-  } catch {
-    /* best-effort */
-  }
+  await recordAdminAction({
+    action: banned ? 'user.ban' : 'user.unban',
+    targetTable: 'users',
+    targetId: targetId,
+    reason: reason,
+    newValue: { is_banned: banned },
+  });
 
   const { error: bumpErr } = await service.rpc('bump_user_perms_version', {
     p_user_id: targetId,

@@ -81,7 +81,10 @@ export default function SignupPage() {
           setEmailCheck({ status: 'idle' });
           return;
         }
-        const body = (await res.json()) as { checked?: boolean; available?: boolean };
+        const body = (await res.json().catch(() => ({}))) as {
+          checked?: boolean;
+          available?: boolean;
+        };
         if (!body.checked) {
           setEmailCheck({ status: 'idle' });
           return;
@@ -165,7 +168,10 @@ export default function SignupPage() {
         }),
       });
 
-      const data = (await res.json()) as { error?: string; needsEmailConfirmation?: boolean };
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        needsEmailConfirmation?: boolean;
+      };
 
       if (!res.ok) {
         // Duplicate-email detection: the signup route flattens GoTrue's

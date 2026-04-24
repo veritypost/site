@@ -18,6 +18,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction, requireAdminOutranks } from '@/lib/adminMutation';
 
 type ArticleFields = Record<string, unknown>;
@@ -64,6 +65,18 @@ export async function POST(request: Request) {
   }
 
   const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.articles.save:${actor.id}`,
+    policyKey: 'admin.articles.save',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
 
   let articleId = body.article_id as string | null;
   let priorHeroPickForDate: string | null = null;

@@ -4,6 +4,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction } from '@/lib/adminMutation';
 
 type Body = {
@@ -23,7 +24,20 @@ export async function POST(request: Request) {
   } catch (err) {
     return permissionError(err);
   }
-  void actor;
+
+  const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.rate-limits.upsert:${actor.id}`,
+    policyKey: 'admin.rate-limits.upsert',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
 
   const body = (await request.json().catch(() => ({}))) as Body;
   const key = typeof body.key === 'string' ? body.key.trim() : '';
@@ -38,7 +52,6 @@ export async function POST(request: Request) {
     is_active: body.is_active !== false,
   };
 
-  const service = createServiceClient();
   const { data: prior } = await service
     .from('rate_limits')
     .select('id, key, display_name, max_requests, window_seconds, scope, is_active')

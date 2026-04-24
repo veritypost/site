@@ -19,6 +19,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction } from '@/lib/adminMutation';
 import { captureWithRedact } from '@/lib/pipeline/redact';
 
@@ -38,7 +39,6 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   } catch (err) {
     return permissionError(err);
   }
-  void actor;
 
   // 2. Validate id shape
   if (!UUID_RE.test(params.id)) {
@@ -48,6 +48,18 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   // 3. Load the failed run. error_type is read from the dedicated column
   // (migration 120 applied; the one-cycle output_summary stash was dropped).
   const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.pipeline.runs.retry:${actor.id}`,
+    policyKey: 'admin.pipeline.runs.retry',
+    max: 10,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
   const { data: run, error: runErr } = await service
     .from('pipeline_runs')
     .select(

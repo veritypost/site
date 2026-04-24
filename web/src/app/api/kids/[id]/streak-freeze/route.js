@@ -12,7 +12,10 @@ export async function POST(_request, { params }) {
   } catch (err) {
     {
       console.error('[kids.[id].streak-freeze.permission]', err?.message || err);
-      return NextResponse.json({ error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err?.status || 401 });
+      return NextResponse.json(
+        { error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err?.status || 401 }
+      );
     }
   }
 

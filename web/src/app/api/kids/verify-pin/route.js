@@ -16,7 +16,10 @@ export async function POST(request) {
   } catch (err) {
     {
       console.error('[kids.verify-pin.permission]', err?.message || err);
-      return NextResponse.json({ error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err?.status || 401 });
+      return NextResponse.json(
+        { error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err?.status || 401 }
+      );
     }
   }
 

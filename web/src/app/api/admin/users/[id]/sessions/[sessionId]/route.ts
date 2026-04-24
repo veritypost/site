@@ -4,6 +4,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction, requireAdminOutranks } from '@/lib/adminMutation';
 
 export async function DELETE(
@@ -29,6 +30,18 @@ export async function DELETE(
   if (rankErr) return rankErr;
 
   const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.users.sessions.unlink:${actor.id}`,
+    policyKey: 'admin.users.sessions.unlink',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
   const { error } = await service
     .from('user_sessions')
     .delete()

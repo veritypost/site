@@ -57,7 +57,7 @@ export default function NotificationsInbox() {
         setError(data?.error || `Couldn\u2019t load notifications (${res.status}).`);
         setItems([]);
       } else {
-        const data = (await res.json()) as { notifications?: NotificationRow[] };
+        const data = (await res.json().catch(() => ({}))) as { notifications?: NotificationRow[] };
         setItems(data.notifications || []);
       }
     } catch {

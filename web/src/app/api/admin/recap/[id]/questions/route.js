@@ -3,19 +3,38 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
 
 // POST /api/admin/recap/[id]/questions — add a question.
 // Body: { article_id?, question_text, options: [{text, is_correct}], explanation?, sort_order? }
 export async function POST(request, { params }) {
+  let user;
   try {
-    await requirePermission('admin.recap.questions_manage');
+    user = await requirePermission('admin.recap.questions_manage');
   } catch (err) {
     if (err.status) {
       console.error('[admin.recap.[id].questions.permission]', err?.message || err);
-      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+      return NextResponse.json(
+        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err.status }
+      );
     }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.recap.questions.create:${user.id}`,
+    policyKey: 'admin.recap.questions.create',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
   }
 
   const b = await request.json().catch(() => ({}));
@@ -28,7 +47,6 @@ export async function POST(request, { params }) {
       { status: 400 }
     );
   }
-  const service = createServiceClient();
   const { data, error } = await service
     .from('weekly_recap_questions')
     .insert({

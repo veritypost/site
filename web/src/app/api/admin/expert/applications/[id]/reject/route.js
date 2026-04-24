@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
 
 export async function POST(request, { params }) {
@@ -12,16 +13,32 @@ export async function POST(request, { params }) {
   } catch (err) {
     if (err.status) {
       console.error('[admin.expert.applications.[id].reject.permission]', err?.message || err);
-      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+      return NextResponse.json(
+        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err.status }
+      );
     }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.expert.applications.reject:${user.id}`,
+    policyKey: 'admin.expert.applications.reject',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
   }
 
   const { rejection_reason } = await request.json().catch(() => ({}));
   if (!rejection_reason) {
     return NextResponse.json({ error: 'rejection_reason required' }, { status: 400 });
   }
-  const service = createServiceClient();
   const { error } = await service.rpc('reject_expert_application', {
     p_reviewer_id: user.id,
     p_application_id: params.id,

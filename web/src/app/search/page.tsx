@@ -94,7 +94,7 @@ export default function SearchPage() {
     }
     try {
       const res = await fetch(`/api/search?${params.toString()}`);
-      const data = (await res.json()) as SearchResponse;
+      const data = (await res.json().catch(() => ({}))) as SearchResponse;
       if (!res.ok) throw new Error(data?.error || 'Search failed');
       setResults(data.articles || []);
       setMode(data.mode || 'basic');

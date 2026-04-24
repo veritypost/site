@@ -226,7 +226,7 @@ function RunDetailInner() {
         setData(null);
         return;
       }
-      const json = (await res.json()) as DetailResponse;
+      const json = (await res.json().catch(() => ({}))) as DetailResponse;
       setData(json);
       setNotFound(false);
       setLoadError(null);

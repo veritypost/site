@@ -15,6 +15,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction } from '@/lib/adminMutation';
 
 type Body = {
@@ -35,6 +36,20 @@ export async function POST(request: Request) {
     return permissionError(err);
   }
 
+  const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.notifications.broadcast:${actor.id}`,
+    policyKey: 'admin.notifications.broadcast',
+    max: 10,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
+
   const body = (await request.json().catch(() => ({}))) as Body;
   const title = typeof body.title === 'string' ? body.title.trim() : '';
   const text = typeof body.body === 'string' ? body.body.trim() : '';
@@ -42,8 +57,6 @@ export async function POST(request: Request) {
   const recipient: 'all' | 'specific' = body.recipient === 'specific' ? 'specific' : 'all';
   if (!title || !text)
     return NextResponse.json({ error: 'title and body required' }, { status: 400 });
-
-  const service = createServiceClient();
 
   let targetIds: string[] = [];
   if (recipient === 'specific') {

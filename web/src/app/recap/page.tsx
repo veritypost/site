@@ -63,7 +63,7 @@ export default function RecapListPage() {
       }
       try {
         const res = await fetch('/api/recap');
-        const data = (await res.json()) as RecapListResponse;
+        const data = (await res.json().catch(() => ({}))) as RecapListResponse;
         // Server enforces the same key; if it says paid:false, trust it
         // (covers account-state downgrades the client cache hasn't seen).
         if (data.paid === false) setCanView(false);

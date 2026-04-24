@@ -240,7 +240,7 @@ function SubscriptionsInner() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ user_id: lookupResult.id, reason: reason || 'admin manual cancel' }),
           });
-          const data = await res.json();
+          const data = await res.json().catch(() => ({}));
           if (!res.ok) throw new Error(data?.error || 'Cancel failed');
           setCancelFlash(`Cancelled. Grace ends ${new Date(data.grace_ends_at).toLocaleString()}.`);
           push({ message: 'Subscription cancelled', variant: 'success' });
@@ -259,7 +259,7 @@ function SubscriptionsInner() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: lookupResult.id }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || 'Freeze failed');
       setCancelFlash(`Frozen. Score held at ${data.frozen_verity_score}.`);
       push({ message: 'Profile frozen', variant: 'success' });
@@ -272,7 +272,7 @@ function SubscriptionsInner() {
     setCancelBusy('sweep'); setSweepInfo('');
     try {
       const res = await fetch('/api/admin/billing/sweep-grace', { method: 'POST' });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || 'Sweep failed');
       setSweepInfo(`Sweep complete — froze ${data.frozen_count} profile(s).`);
       push({ message: 'Grace sweep complete', variant: 'success' });

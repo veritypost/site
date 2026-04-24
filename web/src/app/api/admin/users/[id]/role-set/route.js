@@ -3,6 +3,8 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
+import { recordAdminAction, requireAdminOutranks } from '@/lib/adminMutation';
 
 // PATCH /api/admin/users/[id]/role-set  { role_name }
 //
@@ -21,7 +23,10 @@ export async function PATCH(request, { params }) {
   } catch (err) {
     if (err.status) {
       console.error('[admin.users.[id].role-set.permission]', err?.message || err);
-      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+      return NextResponse.json(
+        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err.status }
+      );
     }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -51,24 +56,22 @@ export async function PATCH(request, { params }) {
     );
   }
 
-  if (targetId !== actor.id) {
-    const { data: outranks, error: rankErr } = await authed.rpc('require_outranks', {
-      target_user_id: targetId,
-    });
-    if (rankErr) {
-      // DA-119: don't leak raw RPC error message to client.
-      console.error('[admin.users.role-set.outranks]', rankErr.message);
-      return NextResponse.json({ error: 'Could not check rank' }, { status: 500 });
-    }
-    if (!outranks) {
-      return NextResponse.json(
-        { error: 'Cannot act on a user whose rank meets or exceeds your own' },
-        { status: 403 }
-      );
-    }
-  }
+  const rankErr = await requireAdminOutranks(targetId, actor.id);
+  if (rankErr) return rankErr;
 
   const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.users.role-set:${actor.id}`,
+    policyKey: 'admin.users.role-set',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
 
   // Resolve the new role id first so we can fail cleanly before any delete.
   const { data: roleRow, error: roleErr } = await service
@@ -91,17 +94,12 @@ export async function PATCH(request, { params }) {
   if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
 
   // Audit + perms bump.
-  try {
-    await service.from('audit_log').insert({
-      actor_id: actor.id,
-      action: 'role.set',
-      target_type: 'user',
-      target_id: targetId,
-      metadata: { role: role_name },
-    });
-  } catch {
-    /* best-effort */
-  }
+  await recordAdminAction({
+    action: 'role.set',
+    targetTable: 'users',
+    targetId: targetId,
+    newValue: { role: role_name },
+  });
 
   const { error: bumpErr } = await service.rpc('bump_user_perms_version', {
     p_user_id: targetId,

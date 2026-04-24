@@ -3,7 +3,9 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { recordAdminAction } from '@/lib/adminMutation';
 
 // POST /api/admin/permission-sets  — create a permission set
 //
@@ -15,9 +17,26 @@ export async function POST(request) {
   } catch (err) {
     if (err.status) {
       console.error('[admin.permission-sets.permission]', err?.message || err);
-      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+      return NextResponse.json(
+        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err.status }
+      );
     }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.permission-sets.create:${actor.id}`,
+    policyKey: 'admin.permission-sets.create',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
   }
 
   const body = await request.json().catch(() => ({}));
@@ -26,7 +45,6 @@ export async function POST(request) {
     return NextResponse.json({ error: 'key and display_name are required' }, { status: 400 });
   }
 
-  const service = createServiceClient();
   const row = {
     key,
     display_name,
@@ -41,17 +59,12 @@ export async function POST(request) {
       fallbackStatus: 400,
     });
 
-  try {
-    await service.from('audit_log').insert({
-      actor_id: actor.id,
-      action: 'permission_set.create',
-      target_type: 'permission_set',
-      target_id: data.id,
-      metadata: { key, display_name },
-    });
-  } catch {
-    /* best-effort */
-  }
+  await recordAdminAction({
+    action: 'permission_set.create',
+    targetTable: 'permission_set',
+    targetId: data.id,
+    newValue: { key, display_name },
+  });
 
   return NextResponse.json({ permission_set: data });
 }

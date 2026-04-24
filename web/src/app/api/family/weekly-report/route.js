@@ -12,7 +12,10 @@ export async function GET() {
   } catch (err) {
     if (err.status) {
       console.error('[family.weekly-report.permission]', err?.message || err);
-      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+      return NextResponse.json(
+        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err.status }
+      );
     }
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }

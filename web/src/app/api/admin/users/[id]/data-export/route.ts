@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction } from '@/lib/adminMutation';
 
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
@@ -15,9 +16,20 @@ export async function POST(_request: Request, { params }: { params: { id: string
   } catch (err) {
     return permissionError(err);
   }
-  void actor;
 
   const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.users.data-export:${actor.id}`,
+    policyKey: 'admin.users.data-export',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
   const { error } = await service.from('data_requests').insert({
     user_id: targetId,
     type: 'export',

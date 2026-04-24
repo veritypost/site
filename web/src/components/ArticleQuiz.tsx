@@ -94,7 +94,7 @@ export default function ArticleQuiz({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ article_id: articleId, kid_profile_id: kidProfileId }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         const msg = data?.error || 'Could not start quiz';
         if (/pool not ready/i.test(msg))
@@ -143,7 +143,7 @@ export default function ArticleQuiz({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || 'Could not submit quiz');
       setResult(data);
       setStage('result');

@@ -266,7 +266,7 @@ export default function CommentThread({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type }),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       setError(data?.error || 'Vote failed');
       return;
@@ -281,7 +281,7 @@ export default function CommentThread({
 
   async function handleToggleTag(commentId: string) {
     const res = await fetch(`/api/comments/${commentId}/context-tag`, { method: 'POST' });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       setError(data?.error || 'Tag failed');
       return;
@@ -423,7 +423,7 @@ export default function CommentThread({
       }
       if (dialog.action === 'block' && dialog.targetUserId) {
         const res = await fetch(`/api/users/${dialog.targetUserId}/block`, { method: 'POST' });
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         if (!res.ok) {
           setError(data?.error || 'Block failed');
           return;
@@ -473,7 +473,7 @@ export default function CommentThread({
           target_id: articleCategoryId,
         }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || 'Ask failed');
       setExpertQuestion('');
       setExpertDialogOpen(false);

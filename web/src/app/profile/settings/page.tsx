@@ -2760,7 +2760,7 @@ function AlertsCard({
     (async () => {
       try {
         const res = await fetch('/api/notifications/preferences');
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         if (!alive) return;
         const byType: Record<string, AlertPrefRow> = {};
         for (const p of (data.preferences || []) as AlertPrefRow[]) byType[p.alert_type] = p;

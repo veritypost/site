@@ -18,7 +18,10 @@ export async function GET(request) {
   } catch (err) {
     if (err.status) {
       console.error('[notifications.permission]', err?.message || err);
-      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+      return NextResponse.json(
+        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err.status }
+      );
     }
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
@@ -62,7 +65,10 @@ export async function PATCH(request) {
   } catch (err) {
     if (err.status) {
       console.error('[notifications.permission]', err?.message || err);
-      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+      return NextResponse.json(
+        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err.status }
+      );
     }
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }

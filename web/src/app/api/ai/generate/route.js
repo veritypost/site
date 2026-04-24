@@ -176,7 +176,10 @@ export async function POST(request) {
   } catch (err) {
     if (err.status) {
       console.error('[ai.generate.permission]', err?.message || err);
-      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+      return NextResponse.json(
+        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err.status }
+      );
     }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

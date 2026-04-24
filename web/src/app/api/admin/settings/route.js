@@ -3,7 +3,9 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { recordAdminAction } from '@/lib/adminMutation';
 
 // GET — all non-sensitive settings, ordered by category + key.
 // PATCH — body: { key, value } (value as serialized string already in
@@ -16,7 +18,10 @@ export async function GET() {
   } catch (err) {
     if (err.status) {
       console.error('[admin.settings.permission]', err?.message || err);
-      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+      return NextResponse.json(
+        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err.status }
+      );
     }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -42,9 +47,26 @@ export async function PATCH(request) {
   } catch (err) {
     if (err.status) {
       console.error('[admin.settings.permission]', err?.message || err);
-      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+      return NextResponse.json(
+        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err.status }
+      );
     }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.settings.update:${user.id}`,
+    policyKey: 'admin.settings.update',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
   }
 
   const { key, value } = await request.json().catch(() => ({}));
@@ -52,7 +74,6 @@ export async function PATCH(request) {
     return NextResponse.json({ error: 'key + value (string) required' }, { status: 400 });
   }
 
-  const service = createServiceClient();
   const { data: existing } = await service
     .from('settings')
     .select('id, value, value_type, is_sensitive')
@@ -88,15 +109,12 @@ export async function PATCH(request) {
   if (error)
     return safeErrorResponse(NextResponse, error, { route: 'admin.settings', fallbackStatus: 400 });
 
-  await service.from('audit_log').insert({
-    actor_id: user.id,
-    actor_type: 'user',
+  await recordAdminAction({
     action: 'setting.update',
-    target_type: 'setting',
-    target_id: existing.id,
-    old_values: { value: existing.value },
-    new_values: { value },
-    metadata: { key },
+    targetTable: 'setting',
+    targetId: existing.id,
+    oldValue: { value: existing.value, key },
+    newValue: { value, key },
   });
 
   return NextResponse.json({ ok: true });

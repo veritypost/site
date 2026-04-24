@@ -57,7 +57,7 @@ export default function PairDeviceButton({ kidId }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ kid_profile_id: kidId }),
       });
-      const body = await res.json();
+      const body = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(body?.error || 'Could not generate code');
         setBusy(false);

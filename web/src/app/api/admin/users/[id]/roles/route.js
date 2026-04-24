@@ -3,7 +3,9 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { requireAdminOutranks } from '@/lib/adminMutation';
 
 // F-034 — the pre-fix handler only checked that the target role being
 // granted/revoked was at-or-below the actor's level. That blocks a
@@ -20,19 +22,6 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // POST   /api/admin/users/[id]/roles  { role_name }  — grant
 // DELETE /api/admin/users/[id]/roles?role_name=...   — revoke
 
-async function assertActorOutranksTarget(authed, actorId, targetUserId) {
-  if (actorId === targetUserId) return null;
-  const { data: outranks, error } = await authed.rpc('require_outranks', {
-    target_user_id: targetUserId,
-  });
-  if (error) {
-    console.error('[admin.users.roles.outranks]', error.message);
-    return { error: 'Rank check failed' };
-  }
-  if (!outranks) return { blocked: true };
-  return null;
-}
-
 export async function POST(request, { params }) {
   let user;
   try {
@@ -40,7 +29,10 @@ export async function POST(request, { params }) {
   } catch (err) {
     if (err.status) {
       console.error('[admin.users.[id].roles.permission]', err?.message || err);
-      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+      return NextResponse.json(
+        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err.status }
+      );
     }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -63,18 +55,22 @@ export async function POST(request, { params }) {
     );
   }
 
-  const conflict = await assertActorOutranksTarget(authed, user.id, params.id);
-  if (conflict?.error) {
-    return NextResponse.json({ error: conflict.error }, { status: 500 });
-  }
-  if (conflict?.blocked) {
-    return NextResponse.json(
-      { error: 'Cannot grant to a user whose rank meets or exceeds your own' },
-      { status: 403 }
-    );
-  }
+  const rankErr = await requireAdminOutranks(params.id, user.id);
+  if (rankErr) return rankErr;
 
   const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.users.roles.grant:${user.id}`,
+    policyKey: 'admin.users.roles.grant',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
   const { error } = await service.rpc('grant_role', {
     p_admin_id: user.id,
     p_user_id: params.id,
@@ -106,7 +102,10 @@ export async function DELETE(request, { params }) {
   } catch (err) {
     if (err.status) {
       console.error('[admin.users.[id].roles.permission]', err?.message || err);
-      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+      return NextResponse.json(
+        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err.status }
+      );
     }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -140,6 +139,18 @@ export async function DELETE(request, { params }) {
   }
 
   const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.users.roles.revoke:${user.id}`,
+    policyKey: 'admin.users.roles.revoke',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
   const { error } = await service.rpc('revoke_role', {
     p_admin_id: user.id,
     p_user_id: params.id,

@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
 
 const ALLOWED = [
@@ -20,19 +21,35 @@ const ALLOWED = [
 ];
 
 export async function PATCH(request, { params }) {
+  let user;
   try {
-    await requirePermission('admin.ads.sponsors.manage');
+    user = await requirePermission('admin.ads.sponsors.manage');
   } catch (err) {
     if (err.status) {
       console.error('[admin.sponsors.[id].permission]', err?.message || err);
-      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+      return NextResponse.json(
+        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err.status }
+      );
     }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+  const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.sponsors.update:${user.id}`,
+    policyKey: 'admin.sponsors.update',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
   }
   const b = await request.json().catch(() => ({}));
   const update = {};
   for (const k of ALLOWED) if (b[k] !== undefined) update[k] = b[k];
-  const service = createServiceClient();
   const { error } = await service.from('sponsors').update(update).eq('id', params.id);
   if (error)
     return safeErrorResponse(NextResponse, error, {
@@ -43,16 +60,32 @@ export async function PATCH(request, { params }) {
 }
 
 export async function DELETE(_request, { params }) {
+  let user;
   try {
-    await requirePermission('admin.ads.sponsors.manage');
+    user = await requirePermission('admin.ads.sponsors.manage');
   } catch (err) {
     if (err.status) {
       console.error('[admin.sponsors.[id].permission]', err?.message || err);
-      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+      return NextResponse.json(
+        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err.status }
+      );
     }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
   const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.sponsors.delete:${user.id}`,
+    policyKey: 'admin.sponsors.delete',
+    max: 10,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
   const { error } = await service.from('sponsors').delete().eq('id', params.id);
   if (error)
     return safeErrorResponse(NextResponse, error, {

@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction } from '@/lib/adminMutation';
 
 type Body = {
@@ -27,7 +28,20 @@ export async function POST(request: Request) {
   } catch (err) {
     return permissionError(err);
   }
-  void actor;
+
+  const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.promo.create:${actor.id}`,
+    policyKey: 'admin.promo.create',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
 
   const body = (await request.json().catch(() => ({}))) as Body;
   const code = typeof body.code === 'string' ? body.code.trim().toUpperCase() : '';
@@ -57,7 +71,6 @@ export async function POST(request: Request) {
     is_active: body.is_active !== false,
   };
 
-  const service = createServiceClient();
   const { data, error } = await service.from('promo_codes').insert(row).select('*').single();
   if (error || !data) {
     console.error('[admin.promo.create]', error?.message);

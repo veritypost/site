@@ -23,7 +23,7 @@ export default function RecapCard() {
       if (!allowed) return;
       const res = await fetch('/api/recap');
       if (!res.ok || cancelled) return;
-      const data = (await res.json()) as { recaps?: RecapRow[]; paid?: boolean };
+      const data = (await res.json().catch(() => ({}))) as { recaps?: RecapRow[]; paid?: boolean };
       if (cancelled) return;
       if ((data.recaps || []).length > 0) setRecap(data.recaps![0]);
     })();

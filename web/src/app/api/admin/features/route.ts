@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction } from '@/lib/adminMutation';
 
 const KEY_SLUG_RE = /^[a-z0-9_.-]+$/;
@@ -34,7 +35,20 @@ export async function POST(request: Request) {
   } catch (err) {
     return permissionError(err);
   }
-  void actor;
+
+  const service = createServiceClient();
+  const rate = await checkRateLimit(service, {
+    key: `admin.features.create:${actor.id}`,
+    policyKey: 'admin.features.create',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
 
   const body = (await request.json().catch(() => ({}))) as CreateBody;
   const key = typeof body.key === 'string' ? body.key.trim() : '';
@@ -73,7 +87,6 @@ export async function POST(request: Request) {
     if (v !== undefined && v !== null) row[f] = v;
   }
 
-  const service = createServiceClient();
   const { data, error } = await service
     .from('feature_flags')
     // @ts-expect-error — runtime accepts upsert with partial shape.

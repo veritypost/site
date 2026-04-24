@@ -222,7 +222,7 @@ export default function ParentKidsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     setSaving(false);
     if (!res.ok) {
       setError(data?.error || 'Create failed');

@@ -262,7 +262,7 @@ export default function UserPermissionsPage() {
       if (!res.ok) {
         let msg = `Write failed (${res.status})`;
         try {
-          const j = await res.json();
+          const j = await res.json().catch(() => ({}));
           if (j?.error) msg = j.error;
         } catch { /* non-JSON body */ }
         toast.push({ message: msg, variant: 'danger' });
