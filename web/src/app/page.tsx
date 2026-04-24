@@ -168,10 +168,14 @@ export default function HomePage() {
           .gte('published_at', today.startUtc)
           .order('published_at', { ascending: false })
           .limit(1),
-        supabase.from('categories').select('id, name, slug').order('sort_order', {
-          ascending: true,
-          nullsFirst: false,
-        }),
+        supabase
+          .from('categories')
+          .select('id, name, slug')
+          .eq('is_active', true)
+          .order('sort_order', {
+            ascending: true,
+            nullsFirst: false,
+          }),
       ]);
 
       if (cancelled) return;
