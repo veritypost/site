@@ -225,24 +225,41 @@ final class AuthViewModel: ObservableObject {
         }
 
         do {
-            // Reject if username is reserved OR already taken.
-            struct Row: Decodable { let username: String? }
-            let reserved: [Row] = (try? await client.from("reserved_usernames")
-                .select("username")
-                .eq("username", value: normalized)
-                .limit(1)
-                .execute().value) ?? []
-            if !reserved.isEmpty {
+            // Route username availability checks through the rate-limited
+            // server endpoint instead of direct PostgREST probes. The
+            // anon-client .from("reserved_usernames") + .from("users")
+            // queries this path previously used had no throttle and let
+            // any caller enumerate the full reserved-handles list + every
+            // taken username one letter at a time. Web already brokers
+            // these through /api/auth/check-username style routes; iOS
+            // now matches.
+            struct CheckBody: Encodable { let username: String }
+            struct CheckResponse: Decodable { let available: Bool?; let reserved: Bool? }
+            let url = SupabaseManager.shared.siteURL.appendingPathComponent("api/auth/check-username")
+            var req = URLRequest(url: url)
+            req.httpMethod = "POST"
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.httpBody = try? JSONEncoder().encode(CheckBody(username: normalized))
+            let (data, response) = try await URLSession.shared.data(for: req)
+            guard let http = response as? HTTPURLResponse else {
+                authError = "Network error. Try again."
+                return
+            }
+            if http.statusCode == 429 {
+                authError = "Too many attempts. Please wait a minute."
+                return
+            }
+            if !(200...299).contains(http.statusCode) {
+                authError = "Could not check username availability."
+                return
+            }
+            let parsed = (try? JSONDecoder().decode(CheckResponse.self, from: data))
+                ?? CheckResponse(available: nil, reserved: nil)
+            if parsed.reserved == true {
                 authError = "That username is reserved. Try a different one."
                 return
             }
-            struct UserRow: Decodable { let username: String? }
-            let taken: [UserRow] = (try? await client.from("users")
-                .select("username")
-                .eq("username", value: normalized)
-                .limit(1)
-                .execute().value) ?? []
-            if !taken.isEmpty {
+            if parsed.available == false {
                 authError = "That username is already taken."
                 return
             }
