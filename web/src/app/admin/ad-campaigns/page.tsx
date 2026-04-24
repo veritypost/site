@@ -307,7 +307,7 @@ function CampaignsInner() {
         onClose={() => setDestructive(null)}
         onConfirm={async ({ reason }: { reason?: string }) => {
           try { await destructive?.run?.({ reason }); setDestructive(null); }
-          catch (err: any) { push({ message: err?.message || 'Action failed', variant: 'danger' }); setDestructive(null); }
+          catch (err) { push({ message: (err instanceof Error && err.message) || 'Action failed', variant: 'danger' }); setDestructive(null); }
         }}
       />
     </Page>

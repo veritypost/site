@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type KeyboardEvent, type ChangeEvent, type FocusEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/client';
 import {
@@ -53,12 +53,16 @@ type DestructiveState = {
 // admin "all marketed plans" overview. Builds at module-init against the
 // hardcoded snapshot; the inner component filters again at render time
 // with the live DB set to catch mid-session toggles.
+type PlanTiersMap = Record<string, { name: string; features: string[] }>;
+type PlanPricingMap = Record<string, { monthly: { cents: number } }>;
+const TIERS_MAP = TIERS as PlanTiersMap;
+const PRICING_MAP = PRICING as PlanPricingMap;
 const PLANS_ALL = TIER_ORDER.map((tier: string) => ({
   key: tier,
-  name: (TIERS as any)[tier].name,
-  price: tier === 'free' ? 'Free' : formatCents((PRICING as any)[tier].monthly.cents),
+  name: TIERS_MAP[tier].name,
+  price: tier === 'free' ? 'Free' : formatCents(PRICING_MAP[tier].monthly.cents),
   interval: tier === 'free' ? 'forever' : 'month',
-  features: (TIERS as any)[tier].features.slice(0, 4),
+  features: TIERS_MAP[tier].features.slice(0, 4),
 }));
 
 function SubscriptionsInner() {
@@ -109,7 +113,11 @@ function SubscriptionsInner() {
       if (!user) { router.push('/'); return; }
       const { data: profile } = await supabase.from('users').select('id').eq('id', user.id).single();
       const { data: userRoles } = await supabase.from('user_roles').select('roles!fk_user_roles_role_id(name)').eq('user_id', user.id);
-      const roleNames = (userRoles || []).map((r: any) => r.roles?.name).filter(Boolean);
+      const roleNames = (
+        (userRoles || []) as Array<{ roles: { name: string | null } | null }>
+      )
+        .map((r) => r.roles?.name)
+        .filter(Boolean);
       if (!profile || (!roleNames.includes('owner') && !roleNames.includes('admin'))) { router.push('/'); return; }
 
       const { data: subs, error: subsError } = await supabase
@@ -132,8 +140,8 @@ function SubscriptionsInner() {
       setGraceAccounts(subsData.filter((s) => s.status === 'grace_period'));
       setPausedAccounts(subsData.filter((s) => s.status === 'paused'));
       setRefundRequests(invsData.filter((i) => {
-        const rs = (i.metadata as any)?.refund_status;
-        return ['pending', 'approved', 'denied', 'partial', 'approved_pending_stripe', 'rejected'].includes(rs);
+        const rs = (i.metadata as { refund_status?: string } | null)?.refund_status;
+        return !!rs && ['pending', 'approved', 'denied', 'partial', 'approved_pending_stripe', 'rejected'].includes(rs);
       }));
       setLoading(false);
     })();
@@ -282,8 +290,9 @@ function SubscriptionsInner() {
       setCancelFlash(`Frozen. Score held at ${data.frozen_verity_score}.`);
       push({ message: 'Profile frozen', variant: 'success' });
       await lookupUser();
-    } catch (err: any) { setLookupError(err.message); }
-    finally { setCancelBusy(''); }
+    } catch (err) {
+      setLookupError(err instanceof Error ? err.message : 'Freeze failed');
+    } finally { setCancelBusy(''); }
   };
 
   const handleSweepGrace = async () => {
@@ -294,9 +303,10 @@ function SubscriptionsInner() {
       if (!res.ok) throw new Error(data?.error || 'Sweep failed');
       setSweepInfo(`Sweep complete — froze ${data.frozen_count} profile(s).`);
       push({ message: 'Grace sweep complete', variant: 'success' });
-    } catch (err: any) {
-      setSweepInfo(`Error: ${err.message}`);
-      push({ message: err.message, variant: 'danger' });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Sweep failed';
+      setSweepInfo(`Error: ${msg}`);
+      push({ message: msg, variant: 'danger' });
     } finally { setCancelBusy(''); }
   };
 
@@ -319,7 +329,10 @@ function SubscriptionsInner() {
   }
 
   const today = new Date();
-  const pendingRefundCount = refundRequests.filter((r) => ((r.metadata as any)?.refund_status || 'pending') === 'pending').length;
+  const pendingRefundCount = refundRequests.filter(
+    (r) =>
+      ((r.metadata as { refund_status?: string } | null)?.refund_status || 'pending') === 'pending'
+  ).length;
 
   const tabs = [
     { k: 'cancel', l: 'Cancellations' },
@@ -395,7 +408,7 @@ function SubscriptionsInner() {
             key={t.k}
             size="sm"
             variant={tab === t.k ? 'primary' : 'secondary'}
-            onClick={() => setTab(t.k as any)}
+            onClick={() => setTab(t.k)}
           >{t.l}</Button>
         ))}
       </div>
@@ -414,7 +427,9 @@ function SubscriptionsInner() {
                 <TextInput
                   value={lookupQuery}
                   onChange={(e) => setLookupQuery(e.target.value)}
-                  onKeyDown={(e: any) => e.key === 'Enter' && lookupUser()}
+                  onKeyDown={(e: KeyboardEvent<HTMLInputElement>) =>
+                    e.key === 'Enter' && lookupUser()
+                  }
                   placeholder="Email or username"
                 />
               </div>
@@ -594,8 +609,8 @@ function SubscriptionsInner() {
             <EmptyState title="No paused accounts" />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: S[2] }}>
-              {pausedAccounts.map((a: any) => {
-                const resumesAt = a.pause_end;
+              {pausedAccounts.map((a) => {
+                const resumesAt = (a as Subscription & { pause_end?: string | null }).pause_end;
                 const dl = resumesAt ? Math.max(0, Math.ceil((new Date(resumesAt).getTime() - today.getTime()) / 86400000)) : 0;
                 return (
                   <div key={a.id} style={{
@@ -628,7 +643,8 @@ function SubscriptionsInner() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: S[2] }}>
               {refundRequests.map((r) => {
-                const status = (r.metadata as any)?.refund_status || 'pending';
+                const status =
+                  (r.metadata as { refund_status?: string } | null)?.refund_status || 'pending';
                 const variant = status === 'pending' ? 'warn' : status === 'approved' || status === 'approved_pending_stripe' ? 'success' : 'danger';
                 return (
                   <div key={r.id} style={{
@@ -717,7 +733,7 @@ function SubscriptionsInner() {
         onClose={() => setDestructive(null)}
         onConfirm={async ({ reason }: { reason?: string }) => {
           try { await destructive?.run?.({ reason }); setDestructive(null); }
-          catch (err: any) { setLookupError(err?.message || 'Action failed'); setDestructive(null); }
+          catch (err) { setLookupError((err instanceof Error && err.message) || 'Action failed'); setDestructive(null); }
         }}
       />
 
@@ -767,8 +783,8 @@ function LabeledNum({ label, value, onChange, onBlur, unit }: {
           block={false}
           style={{ width: 80 }}
           value={value}
-          onChange={(e: any) => onChange(parseInt(e.target.value) || 0)}
-          onBlur={(e: any) => onBlur?.(parseInt(e.target.value) || 0)}
+          onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(parseInt(e.target.value) || 0)}
+          onBlur={(e: FocusEvent<HTMLInputElement>) => onBlur?.(parseInt(e.target.value) || 0)}
         />
         {unit && <span style={{ fontSize: F.sm, color: C.muted }}>{unit}</span>}
       </div>
