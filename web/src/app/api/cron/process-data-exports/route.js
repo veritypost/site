@@ -17,6 +17,8 @@ const CRON_NAME = 'process-data-exports';
 // frequently (every 15 minutes) so queue depth doesn't build.
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+// Pin to 60s — single export per run keeps memory + wall-clock bounded.
+export const maxDuration = 60;
 
 const BUCKET = 'data-exports';
 const SIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days

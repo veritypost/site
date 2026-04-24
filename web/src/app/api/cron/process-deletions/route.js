@@ -30,6 +30,8 @@ const CRON_NAME = 'process-deletions';
 // is logged but does not fail the cron — the next run retries.
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+// Pin to 60s — sweep RPC limits 500 rows/run; fails loudly if it drags.
+export const maxDuration = 60;
 
 async function run(request) {
   if (!verifyCronAuth(request).ok) {

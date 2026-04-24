@@ -16,6 +16,8 @@ const CRON_NAME = 'flag-expert-reverifications';
 // via /admin/verification. No auto-revoke.
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+// Pin to 60s — weekly sweep, RPC-bounded; fails loudly if anything stalls.
+export const maxDuration = 60;
 
 async function run(request) {
   if (!verifyCronAuth(request).ok)

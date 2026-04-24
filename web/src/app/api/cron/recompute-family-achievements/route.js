@@ -15,6 +15,8 @@ const CRON_NAME = 'recompute-family-achievements';
 // newly satisfied ones. Daily cadence — the lag is acceptable.
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+// Pin to 60s — daily sweep over active family owners; RPC-bounded work.
+export const maxDuration = 60;
 
 async function run(request) {
   if (!verifyCronAuth(request).ok) {

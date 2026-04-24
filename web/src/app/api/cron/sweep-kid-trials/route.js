@@ -13,6 +13,8 @@ const CRON_NAME = 'sweep-kid-trials';
 // Auth: CRON_SECRET via verifyCronAuth. Fail-closed 403.
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+// Pin to 60s — matches other cron routes, fails loudly if RPC hangs.
+export const maxDuration = 60;
 
 async function run(request) {
   if (!verifyCronAuth(request).ok)

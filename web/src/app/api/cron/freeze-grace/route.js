@@ -14,6 +14,11 @@ const CRON_NAME = 'freeze-grace';
 // No user-session gate; fail-closed 403 on bad/missing secret.
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+// Vercel default cron timeout is long; pin to 60s to fail loudly if the
+// RPC misbehaves rather than letting a stuck call soak the serverless
+// budget. 60s is Hobby-tier ceiling; bump to higher value on Pro once
+// we measure real p99 runtime.
+export const maxDuration = 60;
 
 async function run(request) {
   if (!verifyCronAuth(request).ok) {
