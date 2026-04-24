@@ -32,7 +32,14 @@ export const maxDuration = 60;
 // 200 keeps the URL under ~7.4 KB with a comfortable headroom. maxDuration=60
 // still clears a full fan-out in multiple cron ticks.
 const BATCH_SIZE = 200;
-const CONCURRENCY = 50;
+// H19 — CONCURRENCY lowered from 50 → 20. At 50, a breaking-news
+// fan-out could pin ~83% of Supabase's default 60-connection pool for
+// the batch duration, starving other routes (reader fetches, RPC
+// calls from other crons). 20 is a safer ceiling that still drains
+// a 200-row batch in seconds via APNs pipelining. Bump back up once
+// we upsize the Supabase pool or confirm the prior saturation
+// headroom via live observation.
+const CONCURRENCY = 20;
 
 async function run(request) {
   if (!verifyCronAuth(request).ok)
@@ -74,7 +81,15 @@ async function runInner() {
   }
 
   const userIds = [...new Set(queued.map((n) => n.user_id))];
-  const [{ data: prefs }, { data: tokens }, { data: planRows }] = await Promise.all([
+  // H15 — Promise.allSettled matches send-emails' resilience pattern.
+  // Prior Promise.all aborted the entire setup on a single DB failure,
+  // leaving the claimed notifications stuck in 'processing' state
+  // until the stale-claim reclaim window (5 min) freed them. Any of
+  // these three fetches can now fail independently; the batch
+  // continues with empty results for the failed queries (downstream
+  // logic already tolerates empty prefs / tokens / planRows via the
+  // per-notification checks). Log each failure loudly so ops notices.
+  const [prefsRes, tokensRes, plansRes] = await Promise.allSettled([
     service
       .from('alert_preferences')
       .select('user_id, alert_type, channel_push, is_enabled, quiet_hours_start, quiet_hours_end')
@@ -87,6 +102,15 @@ async function runInner() {
       .is('invalidated_at', null),
     service.from('users').select('id, timezone, plans(tier)').in('id', userIds),
   ]);
+  if (prefsRes.status === 'rejected')
+    console.error('[cron.send-push] alert_preferences fetch failed', prefsRes.reason);
+  if (tokensRes.status === 'rejected')
+    console.error('[cron.send-push] user_push_tokens fetch failed', tokensRes.reason);
+  if (plansRes.status === 'rejected')
+    console.error('[cron.send-push] users fetch failed', plansRes.reason);
+  const prefs = prefsRes.status === 'fulfilled' ? (prefsRes.value.data ?? []) : [];
+  const tokens = tokensRes.status === 'fulfilled' ? (tokensRes.value.data ?? []) : [];
+  const planRows = plansRes.status === 'fulfilled' ? (plansRes.value.data ?? []) : [];
 
   // Bug 98: belt-and-suspenders quiet-hours check. The create_notification RPC
   // already forces channel='in_app' when quiet hours are active — but it evaluates
