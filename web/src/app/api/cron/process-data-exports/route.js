@@ -39,6 +39,21 @@ async function run(request) {
     return NextResponse.json({ processed: 0, ran_at: new Date().toISOString() });
   }
 
+  // L6: state-machine the run so a failure in a late step doesn't reset a
+  // row that's already been marked complete. Prior code caught ANY error
+  // and reset status → 'pending' unconditionally, so:
+  //   - upload OK + data_requests.update FAILED → reset → next tick
+  //     re-uploads to a different path, re-completes with a different URL.
+  //   - data_requests.update OK + create_notification FAILED → reset
+  //     overwrites a completed row + second tick creates a second
+  //     notification + second download URL. User emailed twice.
+  //
+  // Track which phase we reached, only reset if the row is still in the
+  // pre-complete state AND delete any orphan blob so the storage bucket
+  // doesn't accumulate dead exports. Notification is best-effort after
+  // the row is marked complete — a missed notification is recoverable
+  // (user sees the completed data_request in their dashboard).
+  let uploadedPath = null;
   try {
     const { data: snapshot, error: snapErr } = await service.rpc('export_user_data', {
       p_user_id: claimed.user_id,
@@ -55,6 +70,7 @@ async function run(request) {
       upsert: false,
     });
     if (uploadErr) throw new Error(`upload: ${uploadErr.message}`);
+    uploadedPath = path;
 
     const { data: signed, error: signErr } = await service.storage
       .from(BUCKET)
@@ -63,7 +79,10 @@ async function run(request) {
 
     const expiresAt = new Date(Date.now() + SIGNED_URL_TTL_SECONDS * 1000).toISOString();
 
-    await service
+    // Guarded transition → 'completed'. Condition on status='processing' so
+    // a concurrent admin mark-cancel or duplicate worker (shouldn't happen
+    // under claim_next_export_request, but belt-and-braces) can't clobber.
+    const { data: completed, error: updateErr } = await service
       .from('data_requests')
       .update({
         status: 'completed',
@@ -72,20 +91,43 @@ async function run(request) {
         download_expires_at: expiresAt,
         file_size_bytes: size,
       })
-      .eq('id', claimed.id);
+      .eq('id', claimed.id)
+      .eq('status', 'processing')
+      .select('id')
+      .maybeSingle();
+    if (updateErr) throw new Error(`data_requests.update: ${updateErr.message}`);
+    if (!completed) {
+      // Row was cancelled or reclaimed by another path — drop our orphan
+      // upload and exit cleanly. No notification.
+      await service.storage
+        .from(BUCKET)
+        .remove([path])
+        .catch((e) => console.warn('[cron.process-data-exports] orphan cleanup:', e));
+      await logCronHeartbeat(CRON_NAME, 'end', { processed: 0, reason: 'status_changed' });
+      return NextResponse.json({ processed: 0, reason: 'status_changed' });
+    }
 
-    // In-app notification; the send-emails cron will fan out email.
-    await service.rpc('create_notification', {
-      p_user_id: claimed.user_id,
-      p_type: 'data_export_ready',
-      p_title: 'Your data export is ready',
-      p_body: 'Your personal data archive is available to download. The link expires in 7 days.',
-      p_action_url: signed.signedUrl,
-      p_action_type: 'data_request',
-      p_action_id: claimed.id,
-      p_priority: 'normal',
-      p_metadata: { data_request_id: claimed.id, expires_at: expiresAt },
-    });
+    // Row is 'completed' — from here on any failure is recoverable (user
+    // can see the row + download URL in the dashboard). Notification +
+    // anything after is best-effort; do NOT reset on failure.
+    try {
+      await service.rpc('create_notification', {
+        p_user_id: claimed.user_id,
+        p_type: 'data_export_ready',
+        p_title: 'Your data export is ready',
+        p_body: 'Your personal data archive is available to download. The link expires in 7 days.',
+        p_action_url: signed.signedUrl,
+        p_action_type: 'data_request',
+        p_action_id: claimed.id,
+        p_priority: 'normal',
+        p_metadata: { data_request_id: claimed.id, expires_at: expiresAt },
+      });
+    } catch (notifErr) {
+      console.error(
+        '[cron.process-data-exports] notification failed (export still delivered):',
+        notifErr
+      );
+    }
 
     await logCronHeartbeat(CRON_NAME, 'end', {
       processed: 1,
@@ -99,6 +141,14 @@ async function run(request) {
       ran_at: new Date().toISOString(),
     });
   } catch (err) {
+    // Pre-complete failure path. Reset only if the row is still in
+    // 'processing' — never clobber a successful completion.
+    if (uploadedPath) {
+      await service.storage
+        .from(BUCKET)
+        .remove([uploadedPath])
+        .catch((e) => console.warn('[cron.process-data-exports] upload cleanup on error:', e));
+    }
     await service
       .from('data_requests')
       .update({
@@ -106,7 +156,8 @@ async function run(request) {
         processing_started_at: null,
         notes: `worker error: ${err.message}`,
       })
-      .eq('id', claimed.id);
+      .eq('id', claimed.id)
+      .eq('status', 'processing');
     console.error('[cron.process-data-exports] worker error:', err);
     await logCronHeartbeat(CRON_NAME, 'error', {
       error: err?.message || String(err),
