@@ -25,7 +25,7 @@ import Button from './Button';
  *   - Click a column header to sort (if sortable).
  *   - Sticky header (scroll wrapper sets max-height via `maxHeight` prop).
  *   - Row hover background.
- *   - Keyboard: j/k for next/prev row, Enter/Space to open the focused row
+ *   - Click-driven (no keyboard shortcuts — admin UI is mouse-first)
  *     via onRowClick. Arrow keys also work. Focus indicator is a 2px ring.
  *   - Pagination: page-size select (25/50/100), prev/next.
  *   - Empty state: renders the `empty` slot or a default EmptyState.
@@ -61,7 +61,6 @@ export default function DataTable({
   const [sortState, setSortState] = useState({ key: null, dir: 'asc' });
   const [pageSize, setPageSize] = useState(defaultPageSize);
   const [page, setPage] = useState(0);
-  const [focusIdx, setFocusIdx] = useState(-1);
   const tableRef = useRef(null);
 
   const keyFor = useCallback((row, i) => (rowKey ? rowKey(row, i) : (row?.id ?? i)), [rowKey]);
@@ -89,11 +88,6 @@ export default function DataTable({
     ? sorted.slice(currentPage * pageSize, currentPage * pageSize + pageSize)
     : sorted;
 
-  // Reset focus when rows change
-  useEffect(() => {
-    setFocusIdx((idx) => (idx >= pageRows.length ? -1 : idx));
-  }, [pageRows.length]);
-
   const toggleSort = (col) => {
     if (col.sortable === false) return;
     setSortState((prev) => {
@@ -103,25 +97,9 @@ export default function DataTable({
     });
   };
 
-  const handleKeyDown = (e) => {
-    if (!pageRows.length) return;
-    if (e.key === 'j' || e.key === 'ArrowDown') {
-      e.preventDefault();
-      setFocusIdx((idx) => Math.min(pageRows.length - 1, idx < 0 ? 0 : idx + 1));
-    } else if (e.key === 'k' || e.key === 'ArrowUp') {
-      e.preventDefault();
-      setFocusIdx((idx) => Math.max(0, idx < 0 ? 0 : idx - 1));
-    } else if ((e.key === 'Enter' || e.key === ' ') && focusIdx >= 0) {
-      e.preventDefault();
-      onRowClick?.(pageRows[focusIdx]);
-    } else if (e.key === 'Home') {
-      e.preventDefault();
-      setFocusIdx(0);
-    } else if (e.key === 'End') {
-      e.preventDefault();
-      setFocusIdx(pageRows.length - 1);
-    }
-  };
+  // Keyboard shortcuts removed per owner directive — admin UI is
+  // click-driven. The table retains tabIndex for accessibility focus
+  // (outline on Tab) but does not bind arrow/j/k/Enter/Space handlers.
 
   const cellPadY = density === 'compact' ? 4 : 8;
   const cellPadX = S[3];
@@ -142,7 +120,6 @@ export default function DataTable({
         }}
       >
         <div
-          onKeyDown={handleKeyDown}
           tabIndex={0}
           ref={tableRef}
           onFocus={(e) => {
@@ -245,21 +222,19 @@ export default function DataTable({
 
               {hasRows &&
                 pageRows.map((row, i) => {
-                  const focused = focusIdx === i;
                   return (
                     <tr
                       key={keyFor(row, i)}
                       onClick={() => onRowClick?.(row)}
                       onMouseEnter={(e) => {
-                        if (!focused) e.currentTarget.style.background = ADMIN_C.hover;
+                        e.currentTarget.style.background = ADMIN_C.hover;
                       }}
                       onMouseLeave={(e) => {
-                        if (!focused) e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.background = 'transparent';
                       }}
                       style={{
                         cursor: onRowClick ? 'pointer' : 'default',
-                        background: focused ? ADMIN_C.hover : 'transparent',
-                        boxShadow: focused ? `inset 2px 0 0 ${ADMIN_C.accent}` : 'none',
+                        background: 'transparent',
                         transition: 'background 90ms ease',
                       }}
                     >
