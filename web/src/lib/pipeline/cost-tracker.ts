@@ -40,10 +40,18 @@ interface Caps {
 }
 
 // ----------------------------------------------------------------------------
-// Caps cache (60s)
+// Caps cache (15s)
 // ----------------------------------------------------------------------------
+//
+// H17 — lowered from 60s to 15s after Round-2 lens audit flagged the
+// 60s TTL as too wide a stale-enforcement window when an operator
+// lowers the daily cap mid-spend. 15s is a reasonable compromise
+// between hot-path read pressure (cap lookup happens per generate
+// call) and policy freshness. True real-time enforcement would
+// require a Realtime subscription on `settings`; not worth the
+// complexity at current scale.
 
-const CAPS_TTL_MS = 60_000;
+const CAPS_TTL_MS = 15_000;
 let _capsCache: Caps | null = null;
 
 async function getCaps(): Promise<Caps> {
