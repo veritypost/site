@@ -56,14 +56,23 @@ export async function fetchVersion() {
   return data || null;
 }
 
-// If the global or user version has bumped since last check, invalidate the
-// cached sections and AWAIT a full-perms refresh so any caller that resumes
-// after this returns reads coherent permissions. Previously we cleared the
-// cache and fired the refresh fire-and-forget; a synchronous `hasPermission`
-// call between cache-null and refresh-completion saw `allPermsCache === null`,
-// fell through to the empty section cache, and returned `false` for every key.
-// That window manifested as random "you don't have permission" toasts on first
-// nav after any role/plan change. Awaiting the in-flight refresh closes it.
+// L2: on a version bump, hard-clear the cache BEFORE awaiting the refetch
+// so any synchronous hasPermission() read during the refetch window returns
+// false (fail-closed) instead of a stale grant. Previous policy kept the
+// old cache populated "to avoid a brief all-deny window" — that's a security
+// leak for revokes: a revoked admin / downgraded plan / lifted permission
+// kept the capability for the full duration of the refetch (typically
+// 100-500ms, longer on cold starts).
+//
+// The grant-side UX cost is tolerable because:
+//   1. perm changes are infrequent (admin action, plan upgrade, role flip).
+//   2. refreshIfStale is awaited by every PermissionsProvider entry point,
+//      so a component rendered after the await reads the coherent new cache.
+//   3. the 60s version poll bounds how long a client can miss a revoke.
+//
+// The asymmetry (revokes hard-clear, grants tolerate a brief deny) matches
+// the server-side security posture: deny is always safe; grant requires
+// positive confirmation.
 export async function refreshIfStale() {
   const v = await fetchVersion();
   if (!v) return;
@@ -73,12 +82,11 @@ export async function refreshIfStale() {
   if (bumped) {
     versionState = { ...v, checkedAt: Date.now() };
     sectionCache.clear();
-    // Drop only the inflight handle + timestamp — keep `allPermsCache` populated
-    // until the new fetch lands so concurrent `hasPermission` reads return the
-    // last-known-good answer (slightly stale > all-deny). `refreshAllPermissions`
-    // overwrites the cache atomically once the RPC resolves.
     _allPermsFetchedAt = 0;
     allPermsInflight = null;
+    // L2 — hard-clear. Synchronous readers during the refetch get deny-all;
+    // refreshAllPermissions swaps in the new map once it resolves.
+    allPermsCache = null;
     await refreshAllPermissions();
   } else {
     versionState.checkedAt = Date.now();
@@ -102,7 +110,13 @@ export async function refreshAllPermissions() {
       const { data, error } = await supabase.rpc('compute_effective_perms', { p_user_id: userId });
       if (error) {
         console.warn('[permissions] compute_effective_perms failed', error);
-        // Leave cache as-is on error so stale reads keep working.
+        // L2 — on refetch error AFTER a version-bump hard-clear we leave
+        // allPermsCache = null so hasPermission continues to deny-all. That's
+        // fail-closed; a next poll or focus event will retry and swap in the
+        // fresh map on success. On refresh errors during the initial load
+        // (no prior cache) the same null-deny semantics apply. Previously
+        // this branch returned the prior cache, which re-exposed any stale
+        // grant that the revoke-driven version bump was trying to clear.
         return allPermsCache;
       }
       const next = new Map();
