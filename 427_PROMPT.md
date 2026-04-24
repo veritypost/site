@@ -110,8 +110,12 @@ As noted above — if the owner wants these this session, they need:
 
 ## Owner action items still pending
 
-1. **Apply schema/153, 154, 155, 156** via Supabase SQL editor. Every route works with the code defaults pre-apply, but the seeded rate-limit rows + the RPC + the unique index are all production-quality improvements.
-2. **Create `avatars` Supabase Storage bucket** (carried from Session 1). Public read + own-folder upload RLS (mirror `banners`). Code already handles the "bucket not configured" case gracefully (commit 1c45eca).
+1. ~~**Apply schema/153, 154, 155, 156**~~ **DONE 2026-04-24** — all four verified live via MCP (rate_limits.kids_refresh + ios_subscription_sync rows, get_kid_category_rank RPC, subscriptions_user_apple_unique index).
+2. ~~**Create `avatars` Supabase Storage bucket**~~ **DONE 2026-04-24** — schema/160 applied via SQL editor; bucket live with 4 own-folder RLS policies. Graceful "bucket not configured" fallback from 1c45eca no longer triggers.
+3. **Apply schema/157, 158, 159** via Supabase SQL editor — the Session 2 continuation batch:
+   - `157` — billing_cancel_subscription idempotent on already-frozen users (B17)
+   - `158` — billing_unfreeze RPC for charge.refund.updated + charge.dispute.closed handlers (B11 tail)
+   - `159` — notifications.push_claimed_at column + claim_push_batch RPC for cron/send-push atomic claim (L19)
 
 ---
 
