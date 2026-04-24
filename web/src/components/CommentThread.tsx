@@ -422,21 +422,20 @@ export default function CommentThread({
         return;
       }
       if (dialog.action === 'block' && dialog.targetUserId) {
+        // The API (/api/users/[id]/block) is POST-to-block, DELETE-to-unblock
+        // per the Apple Guideline 1.2 split. The comment-row surface only
+        // blocks — unblock lives in profile/settings, because blocked authors'
+        // comments are filtered out below (see `visible` below) and the row
+        // menu is unreachable for them.
         const res = await fetch(`/api/users/${dialog.targetUserId}/block`, { method: 'POST' });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
           setError(data?.error || 'Block failed');
           return;
         }
-        if (data.blocked) {
-          setBlockedIds((prev) => new Set([...prev, dialog.targetUserId as string]));
-        } else {
-          setBlockedIds((prev) => {
-            const n = new Set(prev);
-            n.delete(dialog.targetUserId as string);
-            return n;
-          });
-        }
+        setBlockedIds((prev) => new Set([...prev, dialog.targetUserId as string]));
+        setFlashMessage('Blocked. Manage blocks in Settings.');
+        setTimeout(() => setFlashMessage(''), 3000);
         closeDialog();
       }
     } finally {

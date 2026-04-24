@@ -130,12 +130,14 @@ function MessagesPageInner() {
   const [searching, setSearching] = useState<boolean>(false);
 
   // R13-C5 Fix 2: conversation overflow menu for block / report actions.
-  // Routes verified: POST /api/users/[id]/block (toggle) and POST /api/reports
-  // (body { targetType, targetId, reason }) both exist.
+  // Routes: POST /api/users/[id]/block (block), DELETE (unblock) per the
+  // Apple Guideline 1.2 split. POST /api/reports (body { targetType,
+  // targetId, reason }) for reports.
   const [showConvoMenu, setShowConvoMenu] = useState<boolean>(false);
   const [showReportDialog, setShowReportDialog] = useState<boolean>(false);
   const [reportReason, setReportReason] = useState<string>('');
   const [actionToast, setActionToast] = useState<string>('');
+  const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set());
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const searchModalRef = useRef<HTMLDivElement | null>(null);
@@ -168,6 +170,18 @@ function MessagesPageInner() {
 
       setCurrentUser(user);
       setAuthLoaded(true);
+
+      // Load this user's OUTGOING blocks only (rows where blocker_id = me).
+      // The convo menu label + DELETE decision must use one-directional
+      // state: if the other participant blocked me, I don't own that row
+      // and DELETE would silently no-op against the API's idempotent
+      // (blocker_id=me, blocked_id=them) filter — producing a misleading
+      // "User unblocked" toast while the other side's block persists.
+      const { data: blockRows } = await supabase
+        .from('blocked_users')
+        .select('blocked_id')
+        .eq('blocker_id', user.id);
+      setBlockedUserIds(new Set((blockRows || []).map((r) => r.blocked_id)));
 
       const { data: me, error: meErr } = await supabase
         .from('users')
@@ -582,9 +596,9 @@ function MessagesPageInner() {
     startConversation(toParam);
   }, [toParam, currentUser, canCompose, loading]);
 
-  // R13-C5 Fix 2 — Block the other participant in the currently-open convo.
-  // Route toggles, so one POST either blocks or unblocks; we surface both
-  // outcomes in the toast so the user knows which happened.
+  // R13-C5 Fix 2 — Block / unblock the other participant in the currently-
+  // open convo. Route is POST-to-block, DELETE-to-unblock (Apple Guideline
+  // 1.2 split); we pick the method from `blockedUserIds` state.
   const blockOtherUser = async () => {
     const convo = conversations.find((c) => c.id === selected);
     const other = convo?.conversation_participants?.find((p) => p.user_id !== currentUser?.id);
@@ -594,24 +608,31 @@ function MessagesPageInner() {
       setTimeout(() => setActionToast(''), 3000);
       return;
     }
+    const isBlocked = blockedUserIds.has(otherId);
     try {
       const res = await fetch(`/api/users/${otherId}/block`, {
-        method: 'POST',
+        method: isBlocked ? 'DELETE' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: 'dm_header_action' }),
+        body: isBlocked ? undefined : JSON.stringify({ reason: 'dm_header_action' }),
       });
       if (!res.ok) {
-        console.error('[messages] block user failed', res.status);
-        setActionToast('Could not block this user. Please try again.');
+        console.error('[messages] block mutation failed', res.status);
+        setActionToast(
+          isBlocked
+            ? 'Could not unblock this user. Please try again.'
+            : 'Could not block this user. Please try again.'
+        );
       } else {
-        const data = await res.json().catch((err) => {
-          console.error('[messages] block parse', err);
-          return {} as { blocked?: boolean };
+        setBlockedUserIds((prev) => {
+          const next = new Set(prev);
+          if (isBlocked) next.delete(otherId);
+          else next.add(otherId);
+          return next;
         });
-        setActionToast(data?.blocked === false ? 'User unblocked.' : 'User blocked.');
+        setActionToast(isBlocked ? 'User unblocked.' : 'User blocked.');
       }
     } catch (e) {
-      console.error('[messages] block user', e);
+      console.error('[messages] block mutation', e);
       setActionToast('Network error. Try again.');
     }
     setShowConvoMenu(false);
@@ -1087,7 +1108,14 @@ function MessagesPageInner() {
                           cursor: 'pointer',
                         }}
                       >
-                        Block user
+                        {(() => {
+                          const otherId = currentConvo?.conversation_participants?.find(
+                            (p) => p.user_id !== currentUser?.id
+                          )?.user_id;
+                          return otherId && blockedUserIds.has(otherId)
+                            ? 'Unblock user'
+                            : 'Block user';
+                        })()}
                       </button>
                       <button
                         onClick={() => {
