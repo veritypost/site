@@ -218,10 +218,22 @@ export default function SignupPage() {
     try {
       const { createClient } = await import('../../lib/supabase/client');
       const supabase = createClient();
-      await supabase.auth.signInWithOAuth({
+      // signInWithOAuth returns { data, error } and does NOT throw on
+      // configuration failure (e.g. provider disabled in Supabase Auth
+      // dashboard). Without destructuring `error`, the catch never fires
+      // and the button stays in its loading state forever — the most
+      // common "I cannot sign up" symptom. Fix per signup-diagnostic
+      // agent 2026-04-23.
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider,
         options: { redirectTo: window.location.origin + '/api/auth/callback' },
       });
+      if (oauthError) {
+        setProviderLoading(null);
+        setError(
+          `Sign in with ${provider === 'apple' ? 'Apple' : 'Google'} is unavailable right now. Try email instead.`
+        );
+      }
     } catch {
       setProviderLoading(null);
       setError('Sign up failed. Try again.');

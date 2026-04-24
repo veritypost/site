@@ -36,8 +36,9 @@ const PROTECTED_PREFIXES = [
   '/expert-queue',
   '/billing',
   '/appeal',
-  '/preview',
   '/card',
+  // NOT included: `/preview` — owner's coming-soon-mode bypass route
+  // (sets the bypass cookie). Gating it would defeat the bypass.
 ];
 
 function isProtected(pathname) {

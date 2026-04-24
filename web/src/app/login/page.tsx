@@ -96,10 +96,19 @@ function LoginPageInner() {
     const supabase = createClient();
     const callback = new URL('/api/auth/callback', window.location.origin);
     if (nextParam) callback.searchParams.set('next', nextParam);
-    await supabase.auth.signInWithOAuth({
+    // Same defensive check as /signup — signInWithOAuth doesn't throw
+    // when the provider isn't configured server-side; it returns
+    // { error }. Surfacing the error keeps the button from looking
+    // frozen and tells the user to fall back to email.
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider,
       options: { redirectTo: callback.toString() },
     });
+    if (oauthError) {
+      setError(
+        `Sign in with ${provider === 'apple' ? 'Apple' : 'Google'} is unavailable right now. Use email below.`
+      );
+    }
   };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {

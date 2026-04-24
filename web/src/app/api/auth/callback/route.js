@@ -83,15 +83,22 @@ export async function GET(request) {
       // (Round E H-02 item, safe to ship here).
       const service = createServiceClient();
 
-      await service.from('users').insert({
-        id: user.id,
-        email: user.email,
-        email_verified: !!user.email_confirmed_at,
-        email_verified_at: user.email_confirmed_at || null,
-        display_name: safeDisplayName,
-        avatar_url: safeAvatarUrl,
-        primary_auth_provider: provider,
-      });
+      // Upsert (not insert) — the `handle_new_auth_user` DB trigger
+      // already creates a public.users row from the auth.users insert.
+      // A bare INSERT here would PK-conflict on every OAuth signup.
+      // Verified by signup-diagnostic agent 2026-04-23.
+      await service.from('users').upsert(
+        {
+          id: user.id,
+          email: user.email,
+          email_verified: !!user.email_confirmed_at,
+          email_verified_at: user.email_confirmed_at || null,
+          display_name: safeDisplayName,
+          avatar_url: safeAvatarUrl,
+          primary_auth_provider: provider,
+        },
+        { onConflict: 'id' }
+      );
 
       await service.from('auth_providers').insert({
         user_id: user.id,
