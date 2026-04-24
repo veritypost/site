@@ -27,6 +27,42 @@ import path from 'node:path';
 const EXPECTED_BUNDLE_ID = process.env.APPLE_BUNDLE_ID || 'com.veritypost.app';
 const FUTURE_SKEW_MS = 5 * 60 * 1000;
 
+// B14 — signedDate anti-replay windows.
+//
+// App Store Server Notifications V2 carry a top-level `signedDate` (when
+// Apple signed the envelope). The inner transaction JWS also carries a
+// `signedDate` distinct from `purchaseDate`. Without a past-date bound,
+// a captured-and-replayed old receipt passes signature verification and
+// gets treated as fresh — the attacker can re-mint a sub after cancellation
+// or re-activate a refunded one.
+//
+// Tolerances:
+//   - Notifications: tight (5 min). S2S delivery is near-realtime; anything
+//     older is either a retry storm (Apple caps retries at ~5 days but a
+//     5-min window still lets legit retries land) or a replay.
+//   - Transaction sync on first pair: LOOSE (24h). A user may pair their
+//     device hours or a day after completing the purchase in another app;
+//     rejecting a day-old receipt would lock out legitimate first-time
+//     sync. 24h is the cap because Apple re-signs receipts on each fetch
+//     so a stale signedDate at this magnitude is suspicious.
+const SIGNED_DATE_MAX_AGE_NOTIFICATION_MS = 5 * 60 * 1000;
+const SIGNED_DATE_MAX_AGE_TRANSACTION_MS = 24 * 60 * 60 * 1000;
+
+function assertSignedDateFresh(signedDate, maxAgeMs, context) {
+  if (typeof signedDate !== 'number') {
+    // Absent signedDate is suspicious — every real Apple JWS carries one.
+    // Refuse rather than silently accepting an unverifiable timestamp.
+    throw new Error(`${context}: signedDate missing`);
+  }
+  const now = Date.now();
+  if (signedDate > now + FUTURE_SKEW_MS) {
+    throw new Error(`${context}: signedDate is in the future`);
+  }
+  if (now - signedDate > maxAgeMs) {
+    throw new Error(`${context}: signedDate older than allowed window`);
+  }
+}
+
 let cachedRootCert = null;
 
 function loadRootCert() {
@@ -157,6 +193,12 @@ export function verifyTransactionJWS(receiptBase64) {
     throw new Error('purchaseDate is in the future');
   }
 
+  // B14 — reject past-dated receipts to close the replay window. Transaction
+  // JWSes re-sign on each fetch so a stale signedDate past 24h is either a
+  // captured-and-replayed blob or a dramatically stale device state; either
+  // way we should refuse to mint / re-activate subscription state.
+  assertSignedDateFresh(payload.signedDate, SIGNED_DATE_MAX_AGE_TRANSACTION_MS, 'transaction JWS');
+
   return payload;
 }
 
@@ -175,12 +217,30 @@ export function verifyNotificationJWS(signedPayload) {
     throw new Error(`notification bundleId mismatch: ${bundleId}`);
   }
 
+  // B14 — S2S notifications have tight freshness. Apple signs + delivers
+  // in near-realtime; a >5min gap means either an abusive retry / replay
+  // or a clock-skewed server we'd rather surface than silently accept.
+  assertSignedDateFresh(
+    notification.signedDate,
+    SIGNED_DATE_MAX_AGE_NOTIFICATION_MS,
+    'notification JWS'
+  );
+
   let transaction = null;
   if (notification.data?.signedTransactionInfo) {
     transaction = verifyJWS(notification.data.signedTransactionInfo);
     if (transaction.bundleId !== EXPECTED_BUNDLE_ID) {
       throw new Error(`nested transaction bundleId mismatch: ${transaction.bundleId}`);
     }
+    // Nested transaction gets the same notification-tight window — if
+    // Apple signed the envelope now, the embedded transaction should be
+    // recent too. A stale nested transaction + fresh envelope is the
+    // classic replay pattern.
+    assertSignedDateFresh(
+      transaction.signedDate,
+      SIGNED_DATE_MAX_AGE_NOTIFICATION_MS,
+      'nested transaction JWS'
+    );
   }
 
   let renewal = null;
