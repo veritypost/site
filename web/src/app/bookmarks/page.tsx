@@ -122,13 +122,19 @@ export default function BookmarksPage() {
       if (typeof cap === 'number') setBookmarkCap(cap);
     }
 
+    // H5 — cap at 100 most recent bookmarks so unlimited-tier power
+    // users don't blow out the client state / initial paint. Proper
+    // cursor pagination is a follow-up (this page pre-dates the
+    // paid-unlimited tier). 100 is enough for the browse + filter UX
+    // on load; older bookmarks surface via filter/collection scope.
     const { data: bms, error: bmsErr } = await supabase
       .from('bookmarks')
       .select(
         'id, notes, created_at, collection_id, articles!fk_bookmarks_article_id(id, title, slug, excerpt, published_at, categories!fk_articles_category_id(name))'
       )
       .eq('user_id', authUser.id)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(100);
     if (bmsErr) console.error('[bookmarks] load failed', bmsErr);
     setItems((bms as unknown as BookmarkRow[] | null) || []);
 
