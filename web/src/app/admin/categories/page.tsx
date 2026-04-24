@@ -20,9 +20,9 @@
  *   - Archive: soft-delete via DELETE; restore button on archived rows
  *     issues a PATCH that sets deleted_at = null + is_active = true.
  *
- * Page-level access: client gates on ADMIN_ROLES (consistent with the
- * other Newsroom pages). Per-mutation gate is `admin.pipeline.categories.manage`
- * server-side.
+ * Page-level access: client gate reads `admin.pipeline.categories.manage`
+ * from the resolver — same key the API enforces on every mutation — so denial
+ * is a redirect instead of a shell that 403s on every action.
  */
 
 'use client';
@@ -32,7 +32,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 import { createClient } from '@/lib/supabase/client';
-import { ADMIN_ROLES } from '@/lib/roles';
+import { hasPermission, refreshAllPermissions } from '@/lib/permissions';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 import type { Tables } from '@/types/database-helpers';
 
@@ -177,15 +177,9 @@ function CategoriesAdminInner() {
         router.push('/');
         return;
       }
-      const { data: roleRows } = await supabase
-        .from('user_roles')
-        .select('roles(name)')
-        .eq('user_id', user.id);
+      await refreshAllPermissions();
       if (cancelled) return;
-      const names = ((roleRows || []) as Array<{ roles: { name: string } | null }>)
-        .map((r) => r.roles?.name)
-        .filter(Boolean) as string[];
-      if (!names.some((n) => ADMIN_ROLES.has(n))) {
+      if (!hasPermission('admin.pipeline.categories.manage')) {
         router.push('/');
         return;
       }

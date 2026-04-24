@@ -7,8 +7,9 @@
  * which is the auto-applied per-category Layer 1 system; presets are
  * USER-SELECTED.
  *
- * Auth: client-side EDITOR_ROLES gate (matches /admin/categories), and
- * the API additionally enforces `admin.pipeline.presets.manage` server-side.
+ * Auth: client-side gate reads `admin.pipeline.presets.manage` from the
+ * resolver — same key the API enforces, so denial is a redirect instead of
+ * a rendered shell that 403s on every write.
  *
  * Behavior:
  *   - Tabs filter by audience: All / Adult / Kid / Both.
@@ -26,7 +27,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { EDITOR_ROLES } from '@/lib/roles';
+import { hasPermission, refreshAllPermissions } from '@/lib/permissions';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 import type { Tables } from '@/types/database-helpers';
 
@@ -174,20 +175,8 @@ function PromptPresetsAdminInner() {
         router.push('/');
         return;
       }
-      const { data: roleRows } = await supabase
-        .from('user_roles')
-        .select('roles(name)')
-        .eq('user_id', user.id);
-      const roleNames = ((roleRows || []) as Array<{
-        roles: { name: string } | { name: string }[] | null;
-      }>)
-        .map((r) => {
-          const rel = r.roles;
-          if (Array.isArray(rel)) return rel[0]?.name;
-          return rel?.name;
-        })
-        .filter(Boolean) as string[];
-      if (!roleNames.some((n) => EDITOR_ROLES.has(n))) {
+      await refreshAllPermissions();
+      if (!hasPermission('admin.pipeline.presets.manage')) {
         router.push('/');
         return;
       }
