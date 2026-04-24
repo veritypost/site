@@ -520,15 +520,18 @@ private struct NameFramePreferenceKey: PreferenceKey {
 }
 
 #Preview("Greeting — Lila, 6 day streak") {
+    // Preview callers must pass `slug` since K3 added it to KidCategory.
+    // Stable test slugs matching the `kids-*` convention the runtime
+    // loader uses.
     GreetingScene(
         name: "Lila",
         streakDays: 6,
         streakSubtext: "Read one more to keep it alive",
         categories: [
-            .init(name: "Science", color: K.purple, progress: 4),
-            .init(name: "World",   color: K.teal,   progress: 2),
-            .init(name: "Sports",  color: K.coral,  progress: 0),
-            .init(name: "Tech",    color: K.sky,    progress: 3)
+            .init(name: "Science", slug: "kids-science", color: K.purple, progress: 4),
+            .init(name: "World",   slug: "kids-world",   color: K.teal,   progress: 2),
+            .init(name: "Sports",  slug: "kids-sports",  color: K.coral,  progress: 0),
+            .init(name: "Tech",    slug: "kids-tech",    color: K.sky,    progress: 3)
         ]
     )
 }
@@ -539,9 +542,9 @@ private struct NameFramePreferenceKey: PreferenceKey {
         streakDays: 14,
         streakSubtext: "Two weeks strong",
         categories: [
-            .init(name: "Science", color: K.purple, progress: 5),
-            .init(name: "World",   color: K.teal,   progress: 4),
-            .init(name: "Sports",  color: K.coral,  progress: 2)
+            .init(name: "Science", slug: "kids-science", color: K.purple, progress: 5),
+            .init(name: "World",   slug: "kids-world",   color: K.teal,   progress: 4),
+            .init(name: "Sports",  slug: "kids-sports",  color: K.coral,  progress: 2)
         ]
     )
 }

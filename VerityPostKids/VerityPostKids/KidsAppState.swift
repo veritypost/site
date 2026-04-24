@@ -158,7 +158,15 @@ final class KidsAppState: ObservableObject {
             self.categories = self.categories.enumerated().map { i, cat in
                 let catId = categoryIds[safe: i] ?? ""
                 let count = countByCat[catId] ?? 0
-                return KidCategory(name: cat.name, color: cat.color, progress: min(count, 5))
+                // K3 added `slug` to KidCategory — preserve it through
+                // the rebuild so ArticleListView's category-filter pill
+                // still matches against the same slug the loader set.
+                return KidCategory(
+                    name: cat.name,
+                    slug: cat.slug,
+                    color: cat.color,
+                    progress: min(count, 5)
+                )
             }
         } catch {
             // non-fatal; progress stays at 0
