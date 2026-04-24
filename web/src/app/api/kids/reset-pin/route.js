@@ -13,7 +13,10 @@ export async function POST(request) {
     try {
       user = await requirePermission('kids.pin.reset');
     } catch (err) {
-      return NextResponse.json({ error: err.message }, { status: err.status || 401 });
+      {
+      console.error('[kids.reset-pin.permission]', err?.message || err);
+      return NextResponse.json({ error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err?.status || 401 });
+    }
     }
 
     // Rate-limit parent-password brute-force: 5 reset attempts per hour per user.
@@ -70,7 +73,10 @@ export async function POST(request) {
     return NextResponse.json({ ok: true });
   } catch (err) {
     if (err.status) {
-      return NextResponse.json({ error: err.message }, { status: err.status });
+      {
+      console.error('[kids.reset-pin.permission]', err?.message || err);
+      return NextResponse.json({ error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err?.status || 500 });
+    }
     }
     console.error('[kids/reset-pin]', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

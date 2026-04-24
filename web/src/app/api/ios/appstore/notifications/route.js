@@ -275,6 +275,9 @@ export async function POST(request) {
         .eq('id', logId);
     }
     // 500 → Apple retries per its schedule (up to ~24h).
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    {
+      console.error('[ios.appstore.notifications.error]', err?.message || err);
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    }
   }
 }

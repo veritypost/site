@@ -188,6 +188,9 @@ export async function POST(request) {
         })
         .eq('id', logId);
     }
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    {
+      console.error('[ios.subscriptions.sync.error]', err?.message || err);
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    }
   }
 }

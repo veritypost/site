@@ -57,9 +57,14 @@ type ArticleRow = Pick<
   'id' | 'title' | 'slug' | 'category_id' | 'published_at'
 >;
 
+interface TrendingItem {
+  title: string | null;
+  slug: string | null;
+}
+
 interface EnrichedCategory extends CategoryRow, CategoryStyle {
   count: number;
-  trending: string[];
+  trending: TrendingItem[];
 }
 
 interface FeaturedCard {
@@ -139,7 +144,7 @@ export default function BrowsePage() {
           ...cat,
           ...style,
           count: catStories.length,
-          trending: catStories.slice(0, 3).map((s) => s.title),
+          trending: catStories.slice(0, 3).map((s) => ({ title: s.title, slug: s.slug })),
         };
       });
 
@@ -218,27 +223,12 @@ export default function BrowsePage() {
             />
           </div>
 
-          {/* Filters */}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', paddingBottom: 14 }}>
-            {FILTERS.map((f) => (
-              <button
-                key={f}
-                onClick={() => setActiveFilter(f)}
-                style={{
-                  padding: '7px 14px',
-                  borderRadius: 8,
-                  border: `1.5px solid ${activeFilter === f ? PALETTE.accent : PALETTE.border}`,
-                  background: activeFilter === f ? PALETTE.accent : PALETTE.bg,
-                  color: activeFilter === f ? '#fff' : PALETTE.dim,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                {f}
-              </button>
-            ))}
-          </div>
+          {/* Filters removed: the Most Recent / Most Verified / Trending
+              pills were rendered but `activeFilter` state was never
+              read by the data fetch — pure UI noise that lied about
+              being interactive. Restore when filter wiring + view_count
+              tracking ships (Phase B). State + FILTERS const left in
+              place so re-enable is a one-line revert. */}
         </div>
       </div>
 
@@ -252,8 +242,13 @@ export default function BrowsePage() {
             {/* Trending Now */}
             <div style={{ marginBottom: 28 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                {/* Audit fix: section was titled "Trending Now" but
+                    actually showed `featured` = the 3 most-recent
+                    published articles. Renamed to match the data
+                    shape; switching to real trending requires
+                    view_count tracking, deferred to Phase B. */}
                 <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, letterSpacing: '-0.02em' }}>
-                  Trending Now
+                  Latest
                 </h2>
               </div>
               <div
@@ -446,26 +441,47 @@ export default function BrowsePage() {
                             No articles yet.
                           </div>
                         ) : (
-                          cat.trending.map((h, i) => (
-                            <div
-                              key={i}
-                              style={{
-                                padding: '8px 0',
-                                borderTop: i === 0 ? 'none' : `1px solid ${PALETTE.border}`,
-                                fontSize: 13,
-                                fontWeight: 600,
-                                color: PALETTE.text,
-                                display: 'flex',
-                                alignItems: 'flex-start',
-                                gap: 8,
-                              }}
-                            >
-                              <span style={{ color: cat.accent, fontWeight: 800, minWidth: 18 }}>
-                                {i + 1}.
-                              </span>
-                              {h}
-                            </div>
-                          ))
+                          cat.trending.map((h, i) => {
+                            // Audit fix: numbered titles were plain
+                            // divs — looked clickable, weren't. Wrap
+                            // in a Link to /story/<slug> when slug
+                            // present; fall back to non-link text on
+                            // the rare slug-null row.
+                            const inner = (
+                              <>
+                                <span
+                                  style={{
+                                    color: cat.accent,
+                                    fontWeight: 800,
+                                    minWidth: 18,
+                                  }}
+                                >
+                                  {i + 1}.
+                                </span>
+                                <span style={{ flex: 1 }}>{h.title}</span>
+                              </>
+                            );
+                            const rowStyle: CSSProperties = {
+                              padding: '8px 0',
+                              borderTop: i === 0 ? 'none' : `1px solid ${PALETTE.border}`,
+                              fontSize: 13,
+                              fontWeight: 600,
+                              color: PALETTE.text,
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              gap: 8,
+                              textDecoration: 'none',
+                            };
+                            return h.slug ? (
+                              <a key={i} href={`/story/${h.slug}`} style={rowStyle}>
+                                {inner}
+                              </a>
+                            ) : (
+                              <div key={i} style={rowStyle}>
+                                {inner}
+                              </div>
+                            );
+                          })
                         )}
                         <a
                           href={`/category/${cat.slug}`}

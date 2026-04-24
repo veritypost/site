@@ -17,7 +17,10 @@ export async function POST(_request, { params }) {
   try {
     user = await requirePermission('comments.context_tag');
   } catch (err) {
-    if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
+    if (err.status) {
+      console.error('[comments.[id].context-tag.permission]', err?.message || err);
+      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+    }
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
 

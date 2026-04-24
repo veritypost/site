@@ -12,7 +12,10 @@ export async function GET() {
   try {
     user = await requirePermission('kids.parent.weekly_report.view');
   } catch (err) {
-    if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
+    if (err.status) {
+      console.error('[reports.weekly-reading-report.permission]', err?.message || err);
+      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+    }
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 

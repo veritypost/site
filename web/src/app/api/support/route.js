@@ -44,7 +44,10 @@ export async function POST(request) {
 
     return NextResponse.json({ ticket });
   } catch (err) {
-    if (err && err.status) return NextResponse.json({ error: err.message }, { status: err.status });
+    if (err && err.status) {
+      console.error('[support.permission]', err?.message || err);
+      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+    }
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }
@@ -64,7 +67,10 @@ export async function GET(request) {
 
     return NextResponse.json({ tickets: data || [] });
   } catch (err) {
-    if (err && err.status) return NextResponse.json({ error: err.message }, { status: err.status });
+    if (err && err.status) {
+      console.error('[support.permission]', err?.message || err);
+      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+    }
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

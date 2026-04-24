@@ -21,7 +21,10 @@ export async function POST(request) {
     try {
       user = await requireAuth();
     } catch (err) {
-      return NextResponse.json({ error: err.message }, { status: err.status || 401 });
+      {
+      console.error('[kids.generate-pair-code.permission]', err?.message || err);
+      return NextResponse.json({ error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err?.status || 401 });
+    }
     }
 
     // Rate-limit: 10 codes per minute per authenticated parent (NOT per-IP,

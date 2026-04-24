@@ -9,7 +9,10 @@ export async function GET() {
   try {
     await requirePermission('admin.ads.view');
   } catch (err) {
-    if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
+    if (err.status) {
+      console.error('[admin.ad-campaigns.permission]', err?.message || err);
+      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+    }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
   const service = createServiceClient();
@@ -31,7 +34,10 @@ export async function POST(request) {
   try {
     user = await requirePermission('admin.ads.campaigns.create');
   } catch (err) {
-    if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
+    if (err.status) {
+      console.error('[admin.ad-campaigns.permission]', err?.message || err);
+      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+    }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
   const b = await request.json().catch(() => ({}));

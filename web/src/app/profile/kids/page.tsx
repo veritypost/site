@@ -367,7 +367,15 @@ export default function ParentKidsPage() {
       )}
 
       {trialActive && <TrialHero endsAt={trial.kid_trial_ends_at || null} />}
-      {trialExpired && <TrialExpiredHero />}
+      {trialExpired && (
+        <TrialExpiredHero
+          // Trial limit is 1 kid, so the trial-expired kid is kids[0]
+          // when present. If the array is empty (kid was already
+          // deleted), the delete CTA is hidden.
+          trialKid={kids[0] || null}
+          onDelete={(kid) => requestRemoveKid(kid)}
+        />
+      )}
 
       {canViewKpis && (canAdd || trialActive) && <KpiRow kpis={kpis} />}
 
@@ -469,7 +477,11 @@ export default function ParentKidsPage() {
             cursor: 'pointer',
           }}
         >
-          + Add kid profile ({kids.length})
+          {/* Audit fix: bare `({kids.length})` was misread as "slots
+              remaining" but actually showed existing-count. Removed —
+              the kids list is rendered directly above this button so
+              the count is already visible. */}
+          + Add kid profile
         </button>
       )}
 
@@ -572,7 +584,13 @@ function TrialHero({ endsAt }: { endsAt: string | null }) {
   );
 }
 
-function TrialExpiredHero() {
+function TrialExpiredHero({
+  trialKid,
+  onDelete,
+}: {
+  trialKid: KidRow | null;
+  onDelete: (kid: KidRow) => void;
+}) {
   return (
     <div
       style={{
@@ -589,21 +607,42 @@ function TrialExpiredHero() {
       <p style={{ fontSize: 13, color: '#7f1d1d', margin: '0 0 12px' }}>
         Progress is saved. Upgrade to Verity Family and the profile unfreezes where it left off.
       </p>
-      <a
-        href="/profile/settings#billing"
-        style={{
-          display: 'inline-block',
-          padding: '10px 18px',
-          borderRadius: 9,
-          background: C.danger,
-          color: '#fff',
-          fontSize: 13,
-          fontWeight: 700,
-          textDecoration: 'none',
-        }}
-      >
-        Upgrade to Family
-      </a>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+        <a
+          href="/profile/settings#billing"
+          style={{
+            display: 'inline-block',
+            padding: '10px 18px',
+            borderRadius: 9,
+            background: C.danger,
+            color: '#fff',
+            fontSize: 13,
+            fontWeight: 700,
+            textDecoration: 'none',
+          }}
+        >
+          Upgrade to Family
+        </a>
+        {trialKid && (
+          <button
+            type="button"
+            onClick={() => onDelete(trialKid)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              padding: '10px 4px',
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#7f1d1d',
+              textDecoration: 'underline',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            Delete the trial profile
+          </button>
+        )}
+      </div>
     </div>
   );
 }

@@ -29,7 +29,10 @@ export async function GET(request, { params }) {
 
     return NextResponse.json({ messages: data || [] });
   } catch (err) {
-    if (err && err.status) return NextResponse.json({ error: err.message }, { status: err.status });
+    if (err && err.status) {
+      console.error('[support.[id].messages.permission]', err?.message || err);
+      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+    }
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }
@@ -80,7 +83,10 @@ export async function POST(request, { params }) {
       });
     return NextResponse.json({ message: data });
   } catch (err) {
-    if (err && err.status) return NextResponse.json({ error: err.message }, { status: err.status });
+    if (err && err.status) {
+      console.error('[support.[id].messages.permission]', err?.message || err);
+      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+    }
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

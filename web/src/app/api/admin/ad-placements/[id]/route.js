@@ -26,7 +26,10 @@ export async function PATCH(request, { params }) {
   try {
     await requirePermission('admin.ads.placements.edit');
   } catch (err) {
-    if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
+    if (err.status) {
+      console.error('[admin.ad-placements.[id].permission]', err?.message || err);
+      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+    }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
   const b = await request.json().catch(() => ({}));
@@ -46,7 +49,10 @@ export async function DELETE(_request, { params }) {
   try {
     await requirePermission('admin.ads.placements.delete');
   } catch (err) {
-    if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
+    if (err.status) {
+      console.error('[admin.ad-placements.[id].permission]', err?.message || err);
+      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+    }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
   const service = createServiceClient();

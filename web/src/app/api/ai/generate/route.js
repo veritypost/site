@@ -174,7 +174,10 @@ export async function POST(request) {
 
     return NextResponse.json({ success: true, action, preview: generated.slice(0, 200) });
   } catch (err) {
-    if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
+    if (err.status) {
+      console.error('[ai.generate.permission]', err?.message || err);
+      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

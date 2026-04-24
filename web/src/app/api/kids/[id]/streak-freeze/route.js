@@ -10,7 +10,10 @@ export async function POST(_request, { params }) {
   try {
     user = await requirePermission('kids.streak.freeze.use');
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: err.status || 401 });
+    {
+      console.error('[kids.[id].streak-freeze.permission]', err?.message || err);
+      return NextResponse.json({ error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err?.status || 401 });
+    }
   }
 
   const service = createServiceClient();

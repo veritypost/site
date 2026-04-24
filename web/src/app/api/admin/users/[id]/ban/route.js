@@ -20,8 +20,11 @@ export async function POST(request, { params }) {
   try {
     actor = await requirePermission('admin.users.ban');
   } catch (err) {
-    if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    // DA-119: don't return raw err.message — leaks internal RLS / policy
+    // names. Log server-side, return generic copy. requirePermission
+    // already encodes status (401/403), so trust it for the code.
+    console.error('[admin.users.ban.permission]', err?.message || err);
+    return NextResponse.json({ error: 'Forbidden' }, { status: err?.status || 403 });
   }
 
   const targetId = params?.id;

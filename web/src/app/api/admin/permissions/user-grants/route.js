@@ -15,7 +15,10 @@ export async function POST(request) {
   try {
     actor = await requirePermission('admin.permissions.assign_to_user');
   } catch (err) {
-    if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
+    if (err.status) {
+      console.error('[admin.permissions.user-grants.permission]', err?.message || err);
+      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+    }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
@@ -79,7 +82,10 @@ export async function DELETE(request) {
   try {
     actor = await requirePermission('admin.permissions.assign_to_user');
   } catch (err) {
-    if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
+    if (err.status) {
+      console.error('[admin.permissions.user-grants.permission]', err?.message || err);
+      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+    }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

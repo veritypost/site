@@ -10,7 +10,10 @@ export async function POST(_request, { params }) {
   try {
     user = await requirePermission('admin.moderation.comment.approve');
   } catch (err) {
-    if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
+    if (err.status) {
+      console.error('[admin.moderation.comments.[id].unhide.permission]', err?.message || err);
+      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+    }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

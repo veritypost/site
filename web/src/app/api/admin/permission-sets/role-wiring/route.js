@@ -13,7 +13,10 @@ export async function POST(request) {
   try {
     actor = await requirePermission('admin.permissions.assign_to_role');
   } catch (err) {
-    if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
+    if (err.status) {
+      console.error('[admin.permission-sets.role-wiring.permission]', err?.message || err);
+      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+    }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
@@ -39,7 +42,10 @@ export async function POST(request) {
       .eq('role_id', role_id)
       .eq('permission_set_id', permission_set_id));
   }
-  if (err) return NextResponse.json({ error: err.message }, { status: 400 });
+  if (err) {
+      console.error('[admin.permission-sets.role-wiring.db]', err.message);
+      return NextResponse.json({ error: 'Could not save' }, { status: 400 });
+    }
 
   try {
     await service.from('audit_log').insert({

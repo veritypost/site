@@ -19,7 +19,10 @@ export async function PATCH(request, { params }) {
   try {
     actor = await requirePermission('admin.moderation.role.grant');
   } catch (err) {
-    if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
+    if (err.status) {
+      console.error('[admin.users.[id].role-set.permission]', err?.message || err);
+      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+    }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
@@ -36,7 +39,11 @@ export async function PATCH(request, { params }) {
   const { data: canAssign, error: canErr } = await authed.rpc('caller_can_assign_role', {
     p_role_name: role_name,
   });
-  if (canErr) return NextResponse.json({ error: canErr.message }, { status: 500 });
+  if (canErr) {
+    // DA-119: don't leak raw RPC error message to client.
+    console.error('[admin.users.role-set.canAssign]', canErr.message);
+    return NextResponse.json({ error: 'Could not check role assignment' }, { status: 500 });
+  }
   if (!canAssign) {
     return NextResponse.json(
       { error: 'Unknown role or above your hierarchy level' },
@@ -48,7 +55,11 @@ export async function PATCH(request, { params }) {
     const { data: outranks, error: rankErr } = await authed.rpc('require_outranks', {
       target_user_id: targetId,
     });
-    if (rankErr) return NextResponse.json({ error: rankErr.message }, { status: 500 });
+    if (rankErr) {
+      // DA-119: don't leak raw RPC error message to client.
+      console.error('[admin.users.role-set.outranks]', rankErr.message);
+      return NextResponse.json({ error: 'Could not check rank' }, { status: 500 });
+    }
     if (!outranks) {
       return NextResponse.json(
         { error: 'Cannot act on a user whose rank meets or exceeds your own' },

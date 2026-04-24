@@ -12,7 +12,10 @@ export async function POST(request, { params }) {
   try {
     user = await requirePermission('admin.expert.applications.mark_probation_complete');
   } catch (err) {
-    if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
+    if (err.status) {
+      console.error('[admin.expert.applications.[id].mark-probation-complete.permission]', err?.message || err);
+      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+    }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

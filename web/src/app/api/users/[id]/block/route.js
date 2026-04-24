@@ -39,7 +39,10 @@ export async function POST(request, { params }) {
   try {
     user = await gate(params.id);
   } catch (err) {
-    if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
+    if (err.status) {
+      console.error('[users.[id].block.permission]', err?.message || err);
+      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+    }
     console.error('[users-block:POST]', err);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
@@ -83,7 +86,10 @@ export async function DELETE(_request, { params }) {
   try {
     user = await gate(params.id);
   } catch (err) {
-    if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
+    if (err.status) {
+      console.error('[users.[id].block.permission]', err?.message || err);
+      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+    }
     console.error('[users-block:DELETE]', err);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }

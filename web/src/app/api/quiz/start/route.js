@@ -14,7 +14,10 @@ export async function POST(request) {
   try {
     user = await requirePermission('quiz.attempt.start');
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: err.status || 401 });
+    // DA-119: don't leak raw err.message to the client. requirePermission
+    // attaches a status (401/403); use that with generic copy.
+    console.error('[quiz.start.permission]', err?.message || err);
+    return NextResponse.json({ error: 'Not allowed to start quiz' }, { status: err?.status || 401 });
   }
 
   const { article_id, kid_profile_id } = await request.json().catch(() => ({}));

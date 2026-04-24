@@ -13,7 +13,10 @@ export async function GET(request) {
   try {
     await requirePermission('kids_expert.sessions.list.view');
   } catch (err) {
-    if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
+    if (err.status) {
+      console.error('[expert-sessions.permission]', err?.message || err);
+      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+    }
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
 
@@ -41,7 +44,10 @@ export async function POST(request) {
   try {
     await requirePermission('admin.expert_sessions.create');
   } catch (err) {
-    if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
+    if (err.status) {
+      console.error('[expert-sessions.permission]', err?.message || err);
+      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+    }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

@@ -12,7 +12,7 @@ export async function GET(request) {
   } catch (err) {
     if (err.status === 403) return NextResponse.json({ recaps: [], paid: false });
     return NextResponse.json(
-      { error: err.message || 'Unauthenticated' },
+      { error: 'Unauthenticated' },
       { status: err.status || 401 }
     );
   }

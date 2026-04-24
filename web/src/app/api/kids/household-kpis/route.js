@@ -9,7 +9,10 @@ export async function GET() {
   try {
     user = await requirePermission('kids.parent.household_kpis');
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: err.status || 401 });
+    {
+      console.error('[kids.household-kpis.permission]', err?.message || err);
+      return NextResponse.json({ error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err?.status || 401 });
+    }
   }
 
   const service = createServiceClient();

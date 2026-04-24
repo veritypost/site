@@ -22,7 +22,10 @@ export async function PATCH(request, { params }) {
   try {
     user = await requirePermission('kids.profile.update');
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: err.status || 401 });
+    {
+      console.error('[kids.[id].permission]', err?.message || err);
+      return NextResponse.json({ error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err?.status || 401 });
+    }
   }
 
   const service = createServiceClient();
@@ -59,7 +62,10 @@ export async function DELETE(request, { params }) {
   try {
     user = await requirePermission('kids.profile.delete');
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: err.status || 401 });
+    {
+      console.error('[kids.[id].permission]', err?.message || err);
+      return NextResponse.json({ error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err?.status || 401 });
+    }
   }
 
   // Require explicit ?confirm=1 so an accidental DELETE fetch can't wipe a

@@ -20,7 +20,10 @@ export async function POST(request) {
   try {
     await requirePermission('admin.push.send_test');
   } catch (err) {
-    if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
+    if (err.status) {
+      console.error('[push.send.permission]', err?.message || err);
+      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+    }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
@@ -50,6 +53,9 @@ export async function POST(request) {
     });
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    {
+      console.error('[push.send.error]', err?.message || err);
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    }
   }
 }

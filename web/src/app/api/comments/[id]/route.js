@@ -11,7 +11,10 @@ export async function PATCH(request, { params }) {
   try {
     user = await requirePermission('comments.edit.own');
   } catch (err) {
-    if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
+    if (err.status) {
+      console.error('[comments.[id].permission]', err?.message || err);
+      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+    }
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
 
@@ -36,7 +39,10 @@ export async function DELETE(_request, { params }) {
   try {
     user = await requirePermission('comments.delete.own');
   } catch (err) {
-    if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
+    if (err.status) {
+      console.error('[comments.[id].permission]', err?.message || err);
+      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+    }
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
 

@@ -15,7 +15,10 @@ export async function POST(request, { params }) {
   try {
     user = await requirePermission('recap.list.view');
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: err.status || 401 });
+    {
+      console.error('[recap.[id].submit.permission]', err?.message || err);
+      return NextResponse.json({ error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err?.status || 401 });
+    }
   }
 
   const { answers } = await request.json().catch(() => ({}));

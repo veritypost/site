@@ -11,7 +11,10 @@ export async function GET() {
   try {
     user = await requirePermission('bookmarks.export');
   } catch (err) {
-    if (err.status) return NextResponse.json({ error: err.message }, { status: err.status });
+    if (err.status) {
+      console.error('[bookmarks.export.permission]', err?.message || err);
+      return NextResponse.json({ error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err.status });
+    }
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
 

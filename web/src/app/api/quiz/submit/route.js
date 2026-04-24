@@ -15,7 +15,10 @@ export async function POST(request) {
   try {
     user = await requirePermission('quiz.attempt.submit');
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: err.status || 401 });
+    {
+      console.error('[quiz.submit.permission]', err?.message || err);
+      return NextResponse.json({ error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err?.status || 401 });
+    }
   }
 
   const body = await request.json().catch(() => ({}));

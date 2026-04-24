@@ -14,7 +14,10 @@ export async function POST(request) {
   try {
     user = await requirePermission('kids.pin.verify');
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: err.status || 401 });
+    {
+      console.error('[kids.verify-pin.permission]', err?.message || err);
+      return NextResponse.json({ error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err?.status || 401 });
+    }
   }
 
   // Outer guard over the DB-level per-kid lockout: 30 attempts/min per parent across all kids.

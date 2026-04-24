@@ -75,7 +75,10 @@ export async function POST(request, { params }) {
     actor = await requirePermission('admin.permissions.scope_override');
   } catch (err) {
     if (err.status) {
-      return NextResponse.json({ error: err.message }, { status: err.status });
+      {
+      console.error('[admin.users.[id].permissions.permission]', err?.message || err);
+      return NextResponse.json({ error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err?.status || 500 });
+    }
     }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }

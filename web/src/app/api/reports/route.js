@@ -70,7 +70,10 @@ export async function POST(request) {
     return NextResponse.json({ report });
   } catch (err) {
     if (err.status) {
-      return NextResponse.json({ error: err.message }, { status: err.status });
+      {
+      console.error('[reports.permission]', err?.message || err);
+      return NextResponse.json({ error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' }, { status: err?.status || 500 });
+    }
     }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
