@@ -18,10 +18,32 @@ import { createClient, createClientFromToken, createServiceClient } from '@/lib/
 // Idempotent: cancel_account_deletion RETURNs quietly when nothing is
 // scheduled; the row-lock overhead is negligible. No 4xx leaks info about
 // whether a deletion was or wasn't pending.
+//
+// CSRF: cookie branch (no bearer) mutates account state — mirror the
+// /api/account/delete origin allowlist. Bearer branch skips the origin
+// check because mobile clients don't send a trustworthy Origin.
+function isAllowedOrigin(origin) {
+  if (!origin) return false;
+  const allowed = [
+    process.env.NEXT_PUBLIC_SITE_URL,
+    'http://localhost:3333',
+    'https://veritypost.com',
+    'https://www.veritypost.com',
+  ].filter(Boolean);
+  return allowed.includes(origin);
+}
+
 export async function POST(request) {
   try {
     const auth = request.headers.get('authorization') || '';
     const bearer = auth.toLowerCase().startsWith('bearer ') ? auth.slice(7).trim() : null;
+
+    if (!bearer) {
+      const origin = request.headers.get('origin');
+      if (!isAllowedOrigin(origin)) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    }
 
     const authClient = bearer ? createClientFromToken(bearer) : await createClient();
     const {
