@@ -1,6 +1,6 @@
 export const metadata = {
-  title: 'Leaderboard — Verity Post',
-  description: 'Top contributors and expert voices on Verity Post.',
+  title: 'Most Informed — Verity Post',
+  description: 'Readers who pass the most quizzes. Comprehension, not engagement, is the rank.',
 };
 
 export default function LeaderboardLayout({ children }) {

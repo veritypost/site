@@ -261,7 +261,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
   const navItems: NavItem[] = [
     { label: 'Home', href: '/' },
     { label: 'Notifications', href: '/notifications' },
-    { label: 'Leaderboard', href: '/leaderboard' },
+    { label: 'Most Informed', href: '/leaderboard' },
     loggedIn ? { label: 'Profile', href: '/profile' } : { label: 'Sign in', href: '/login' },
   ];
 

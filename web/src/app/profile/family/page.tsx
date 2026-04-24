@@ -146,7 +146,7 @@ export default function FamilyDashboard() {
 
       {canViewLeaderboard && (
         <>
-          <h2 style={{ fontSize: 15, fontWeight: 700, margin: '12px 0 8px' }}>Leaderboard</h2>
+          <h2 style={{ fontSize: 15, fontWeight: 700, margin: '12px 0 8px' }}>Most Informed</h2>
           <div
             style={{
               background: C.card,

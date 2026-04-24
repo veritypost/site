@@ -317,7 +317,7 @@ export default function LeaderboardPage() {
     <div className="vp-dark">
       <div style={{ maxWidth: 800, margin: '0 auto', padding: '20px 16px 80px' }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 20px', letterSpacing: '-0.02em' }}>
-          Leaderboard
+          Most Informed
         </h1>
         {/* Your rank */}
         {me && (

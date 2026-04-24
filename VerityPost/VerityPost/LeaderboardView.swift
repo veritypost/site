@@ -83,7 +83,7 @@ struct LeaderboardView: View {
                 // floating glass nav bubble + gray scroll-edge shadow. Uses
                 // `.toolbar(.hidden, for: .navigationBar)` below.
                 HStack(spacing: 0) {
-                    Text("leaderboard")
+                    Text("most informed")
                         .font(.system(size: 15, weight: .heavy))
                         .tracking(-0.15)
                         .foregroundColor(VP.text)
@@ -233,7 +233,7 @@ struct LeaderboardView: View {
                                 .allowsHitTesting(false)
 
                                 VStack(spacing: 8) {
-                                    Text(isLoggedIn ? "Verify your email to see ranks beyond top 3." : "Full leaderboard locked")
+                                    Text(isLoggedIn ? "Verify your email to see ranks beyond top 3." : "Full ranking locked")
                                         .font(.system(.headline, design: .default, weight: .bold))
                                         .foregroundColor(VP.text)
                                         .multilineTextAlignment(.center)

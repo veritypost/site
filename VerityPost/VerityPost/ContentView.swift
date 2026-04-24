@@ -255,7 +255,7 @@ struct TextTabBar: View {
         [
             Item(id: .home, label: "Home"),
             Item(id: .notifications, label: "Notifications"),
-            Item(id: .leaderboard, label: "Leaderboard"),
+            Item(id: .leaderboard, label: "Most Informed"),
             Item(id: .profile, label: isLoggedIn ? "Profile" : "Sign in"),
         ]
     }
