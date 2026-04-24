@@ -153,17 +153,23 @@ export async function GET(request) {
       return NextResponse.redirect(`${siteUrl}/signup/pick-username${nextQs}`);
     }
 
+    // D40: silent welcome-back — if the account is still inside the 30-day
+    // deletion grace window, clear the timer. RPC is idempotent. Best-effort;
+    // failure does not block login.
+    const serviceForExisting = createServiceClient();
+
     const updatePayload = { last_login_at: new Date().toISOString() };
     if (user.email_confirmed_at) {
       updatePayload.email_verified = true;
       updatePayload.email_verified_at = user.email_confirmed_at;
     }
-    await supabase.from('users').update(updatePayload).eq('id', user.id);
-
-    // D40: silent welcome-back — if the account is still inside the 30-day
-    // deletion grace window, clear the timer. RPC is idempotent. Best-effort;
-    // failure does not block login.
-    const serviceForExisting = createServiceClient();
+    // Use the service client so this write is consistent with the rest
+    // of the handler and doesn't silently no-op if the `users` table's
+    // UPDATE RLS policy tightens in the future. email_verified +
+    // email_verified_at are gated columns (update_own_profile allowlist
+    // doesn't cover them), so the cookie-scoped client could only
+    // write them because of a currently-permissive row policy.
+    await serviceForExisting.from('users').update(updatePayload).eq('id', user.id);
     try {
       await serviceForExisting.rpc('cancel_account_deletion', { p_user_id: user.id });
     } catch {}
