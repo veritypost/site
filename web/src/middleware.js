@@ -13,12 +13,17 @@ import { createServerClient } from '@supabase/ssr';
 // (app/admin/layout.tsx) handles its own auth + role check and returns
 // a 404 for anon or non-staff callers. Putting /admin here would redirect
 // anon to /login?next=/admin, disclosing that /admin is a real surface.
-// Anon = articles only on web (owner directive 2026-04-23). Anonymous
-// visitors see the home page (today's curated front), individual story
-// pages, the auth flow (signup/login/etc), and the legal/marketing
-// surfaces (about, privacy, terms, contact, etc). Everything else
-// requires sign-in. Block surfaces are NOT 404s — they redirect to
-// /login?next=<path> so the value is preserved for the post-login bounce.
+// Anon access model (owner directive 2026-04-24, supersedes 2026-04-23):
+// anon visitors can see the home page, story pages, auth flow, legal +
+// marketing surfaces, plus every sitemap-published surface (/browse,
+// /category, /card, /search) and the /u profile shell (which carries
+// its own launch kill-switch). Surfaces that only exist as per-user
+// private state (profile settings, messages, bookmarks, notifications,
+// billing, appeal, expert queue) remain sign-in-gated because they
+// have nothing to render for anon. /leaderboard + /recap stay protected
+// pending a separate anon-safety sweep. Block surfaces are NOT 404s —
+// they redirect to /login?next=<path> so the value is preserved for
+// the post-login bounce.
 //
 // To unhide a surface to anon: remove its prefix here, no other change
 // needed (matches the launch-hide pattern documented in CLAUDE.md).
@@ -28,15 +33,10 @@ const PROTECTED_PREFIXES = [
   '/bookmarks',
   '/notifications',
   '/leaderboard',
-  '/browse',
-  '/search',
-  '/category',
-  '/u',
   '/recap',
   '/expert-queue',
   '/billing',
   '/appeal',
-  '/card',
   // NOT included: `/preview` — owner's coming-soon-mode bypass route
   // (sets the bypass cookie). Gating it would defeat the bypass.
 ];

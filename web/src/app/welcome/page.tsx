@@ -22,26 +22,52 @@ function HoldingCard() {
         minHeight: '100vh',
         background: '#ffffff',
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
         padding: '24px',
+        gap: '20px',
       }}
     >
-      <h1
+      <div
         style={{
-          fontSize: 'clamp(64px, 14vw, 180px)',
-          fontWeight: 800,
-          letterSpacing: '-0.04em',
-          color: '#111111',
-          margin: 0,
-          lineHeight: 1,
-          fontFamily: 'var(--font-source-serif), Georgia, "Times New Roman", serif',
-          textAlign: 'center',
+          fontSize: 'clamp(14px, 2.2vw, 18px)',
+          fontWeight: 700,
+          letterSpacing: '0.18em',
+          textTransform: 'uppercase',
+          color: '#666666',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
           userSelect: 'none',
         }}
       >
         Verity Post
+      </div>
+      <h1
+        style={{
+          fontSize: 'clamp(44px, 9vw, 112px)',
+          fontWeight: 800,
+          letterSpacing: '-0.03em',
+          color: '#111111',
+          margin: 0,
+          lineHeight: 1.05,
+          fontFamily: 'var(--font-source-serif), Georgia, "Times New Roman", serif',
+          textAlign: 'center',
+          maxWidth: '12ch',
+          userSelect: 'none',
+        }}
+      >
+        Proofreading the proofreader.
       </h1>
+      <p
+        style={{
+          fontSize: 'clamp(15px, 1.8vw, 18px)',
+          color: '#666666',
+          margin: 0,
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        }}
+      >
+        Back shortly.
+      </p>
     </main>
   );
 }
