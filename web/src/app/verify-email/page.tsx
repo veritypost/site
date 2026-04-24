@@ -30,7 +30,13 @@ const C = {
   danger: '#b91c1c',
 } as const;
 
-type Status = 'loading' | 'waiting' | 'success' | 'expired';
+// H1 — `rate_limited` is distinct from `expired`. Pre-fix the 429
+// response from /api/auth/resend-verification mapped to `expired`,
+// which shared UI with actual link expiry: same "Send yourself a
+// fresh one" button that re-fired the resend and hit 429 again —
+// infinite retry loop. Separate state gets its own copy + disables
+// the resend button until the cooldown window closes.
+type Status = 'loading' | 'waiting' | 'success' | 'expired' | 'rate_limited';
 
 function maskEmail(e: string): string {
   const [local, domain] = e.split('@');
@@ -102,7 +108,8 @@ export default function VerifyEmailPage() {
       // user). Client cooldown stays for UX polish.
       const res = await fetch('/api/auth/resend-verification', { method: 'POST' });
       if (res.status === 429) {
-        setStatus('expired');
+        // H1 — dedicated rate_limited state instead of reusing `expired`.
+        setStatus('rate_limited');
         setError('Too many verification resends. Try again in an hour.');
         setResending(false);
         return;
@@ -263,6 +270,41 @@ export default function VerifyEmailPage() {
           >
             Continue
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === 'rate_limited') {
+    // H1 — rate-limit lockout view. No resend button — the previous
+    // "Send yourself a fresh one" button reused on `expired` just
+    // looped back into another 429. Copy names the wait window
+    // explicitly. Re-enter via a page refresh once the hour ticks.
+    return (
+      <div style={shell}>
+        <div style={card}>
+          <div style={wordmark}>Verity Post</div>
+          <h1
+            style={{
+              fontSize: '26px',
+              fontWeight: 700,
+              color: C.text,
+              margin: '0 0 10px 0',
+              letterSpacing: '-0.01em',
+            }}
+          >
+            Too many attempts
+          </h1>
+          <p
+            style={{
+              fontSize: '14px',
+              color: C.dim,
+              margin: '0 0 28px 0',
+              lineHeight: 1.55,
+            }}
+          >
+            {error || 'Too many verification resends. Try again in about an hour.'}
+          </p>
         </div>
       </div>
     );
