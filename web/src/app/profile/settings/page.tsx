@@ -1498,13 +1498,21 @@ function ProfileCard({
     // Persist the 2-tone + initials payload in metadata.avatar because the
     // current schema has no `users.avatar` jsonb column. We still write
     // avatar_color (varchar) so non-JSON consumers keep rendering a ring.
-    const prevMeta = readMeta(user);
+    //
+    // C2 — send only the `avatar` metadata delta, not a read-merged full
+    // blob. update_own_profile uses `metadata = metadata || (incoming)`
+    // (shallow jsonb merge) server-side, so `{metadata: {avatar: ...}}`
+    // atomically replaces just the avatar subtree and preserves every
+    // other top-level key (feed, a11y, expertWatchlist, etc.). The old
+    // read-merge-write pattern read stale `user` state, producing a
+    // concurrent-edit clobber when another tab saved a different subtree
+    // in the meantime. No more read-merge — the merge only happens on
+    // the server, atomically, against the current row.
     const avatarPayload = {
       outer: avatarOuter,
       inner: avatarInner,
       initials: avatarInitials,
     };
-    const mergedMeta = { ...(prevMeta || {}), avatar: avatarPayload };
     // Round 5 Item 2: all self-profile writes go through the SECDEF
     // update_own_profile RPC (20-column allowlist, server-side metadata
     // merge). Direct `from('users').update(...)` is blocked on privileged
@@ -1523,7 +1531,7 @@ function ProfileCard({
       show_on_leaderboard: showOnLeaderboard,
       allow_messages: allowMessages,
       dm_read_receipts_enabled: dmReadReceipts,
-      metadata: mergedMeta,
+      metadata: { avatar: avatarPayload },
     };
     const { error } = await supabase.rpc('update_own_profile', { p_fields: patch });
     setSaving(false);
@@ -2128,17 +2136,32 @@ function EmailsCard({
   const saveNotifs = async () => {
     if (!user) return;
     setSavingNotif(true);
-    const prevMeta = readMeta(user);
-    const merged = {
-      ...(prevMeta || {}),
-      notification_prefs: {
-        ...(prevMeta.notification_prefs || {}),
-        newsletter,
-        commentReplies,
-        securityAlerts,
+    // C2 — M16 now happens at the notification_prefs subtree: read the
+    // CURRENT subtree from the DB immediately before write so
+    // simultaneous edits to unrelated notification_prefs subkeys don't
+    // clobber us, then send just the notification_prefs delta (not the
+    // full metadata blob). Top-level merge is handled server-side by
+    // update_own_profile's `||` operator.
+    const { data: fresh } = await supabase
+      .from('users')
+      .select('metadata')
+      .eq('id', userId)
+      .maybeSingle();
+    const freshPrefs =
+      ((fresh as { metadata?: Record<string, unknown> } | null)?.metadata as SettingsMeta | null)
+        ?.notification_prefs || {};
+    const { error } = await supabase.rpc('update_own_profile', {
+      p_fields: {
+        metadata: {
+          notification_prefs: {
+            ...freshPrefs,
+            newsletter,
+            commentReplies,
+            securityAlerts,
+          },
+        },
       },
-    };
-    const { error } = await supabase.rpc('update_own_profile', { p_fields: { metadata: merged } });
+    });
     setSavingNotif(false);
     if (error) {
       pushToast({ message: error.message, variant: 'danger' });
@@ -2690,31 +2713,38 @@ function FeedCard({
   const handleSave = async () => {
     if (!user) return;
     setSaving(true);
-    // M16: re-read metadata immediately before writing so concurrent edits
-    // on a different sub-key (a11y, expertWatchlist) don't get clobbered.
+    // C2 — read just the current `feed` subtree from the DB so we
+    // preserve any feed-scoped keys not edited in this card, then
+    // send only the feed delta (not the full metadata blob). Server's
+    // `metadata || (incoming)` shallow merge atomically replaces just
+    // the feed subtree and leaves every other top-level key alone —
+    // so a concurrent A11yCard or ExpertWatchlistCard save can't be
+    // clobbered by this one, and vice versa.
     const { data: fresh } = await supabase
       .from('users')
       .select('metadata')
       .eq('id', userId)
       .maybeSingle();
-    const freshMeta = (fresh as { metadata?: Record<string, unknown> } | null)
-      ?.metadata as SettingsMeta | null;
-    const prevFeed = freshMeta?.feed || {};
-    const merged = {
-      ...(freshMeta || {}),
-      feed: {
-        ...prevFeed,
-        cats: [...selectedCats],
-        kidSafe,
-        hideLowCred,
-        showBreaking,
-        showTrending,
-        showRecommended,
-        minScore,
-        display,
+    const freshFeed =
+      ((fresh as { metadata?: Record<string, unknown> } | null)?.metadata as SettingsMeta | null)
+        ?.feed || {};
+    const { error } = await supabase.rpc('update_own_profile', {
+      p_fields: {
+        metadata: {
+          feed: {
+            ...freshFeed,
+            cats: [...selectedCats],
+            kidSafe,
+            hideLowCred,
+            showBreaking,
+            showTrending,
+            showRecommended,
+            minScore,
+            display,
+          },
+        },
       },
-    };
-    const { error } = await supabase.rpc('update_own_profile', { p_fields: { metadata: merged } });
+    });
     setSaving(false);
     if (error) {
       pushToast({ message: error.message, variant: 'danger' });
@@ -3164,20 +3194,19 @@ function AccessibilityCard({
   const handleSave = async () => {
     if (!user) return;
     setSaving(true);
-    // M16: re-read metadata immediately before write so a concurrent
-    // feed/expertWatchlist save doesn't clobber us.
-    const { data: fresh } = await supabase
-      .from('users')
-      .select('metadata')
-      .eq('id', userId)
-      .maybeSingle();
-    const freshMeta = (fresh as { metadata?: Record<string, unknown> } | null)
-      ?.metadata as SettingsMeta | null;
-    const merged = {
-      ...(freshMeta || {}),
-      a11y: { ttsDefault, textSize, reduceMotion, highContrast },
-    };
-    const { error } = await supabase.rpc('update_own_profile', { p_fields: { metadata: merged } });
+    // C2 — send only the a11y delta. A11yCard owns every key under
+    // metadata.a11y (ttsDefault, textSize, reduceMotion, highContrast),
+    // so no prev-merge is needed — we always write the full a11y
+    // subtree. Other top-level keys (feed, avatar, expertWatchlist)
+    // are preserved by the server's `||` shallow merge. Eliminates
+    // the concurrent-save race with other cards entirely.
+    const { error } = await supabase.rpc('update_own_profile', {
+      p_fields: {
+        metadata: {
+          a11y: { ttsDefault, textSize, reduceMotion, highContrast },
+        },
+      },
+    });
     setSaving(false);
     if (error) {
       pushToast({ message: error.message, variant: 'danger' });
@@ -4782,17 +4811,13 @@ function ExpertVacationCard({
   const toggle = async (next: boolean) => {
     if (!user) return;
     setBusy(true);
-    // M16: re-read metadata right before write to avoid clobbering
-    // sibling sub-keys (feed, a11y, expertWatchlist).
-    const { data: fresh } = await supabase
-      .from('users')
-      .select('metadata')
-      .eq('id', userId)
-      .maybeSingle();
-    const freshMeta = (fresh as { metadata?: Record<string, unknown> } | null)
-      ?.metadata as SettingsMeta | null;
-    const merged = { ...(freshMeta || {}), expertVacation: next };
-    const { error } = await supabase.rpc('update_own_profile', { p_fields: { metadata: merged } });
+    // C2 — expertVacation is a scalar under metadata, no subtree merge
+    // needed. Send only the delta; server's `||` shallow merge at the
+    // top level preserves every other key (feed, a11y, avatar,
+    // expertWatchlist, notification_prefs).
+    const { error } = await supabase.rpc('update_own_profile', {
+      p_fields: { metadata: { expertVacation: next } },
+    });
     setBusy(false);
     if (error) {
       pushToast({ message: error.message, variant: 'danger' });
@@ -4897,14 +4922,14 @@ function ExpertWatchlistCard({
     const nextCats = cats.map((c) => (c.id === id ? { ...c, watched: !c.watched } : c));
     setCats(nextCats);
     const watched = nextCats.filter((c) => c.watched).map((c) => c.id);
-    const { data: u } = await supabase
-      .from('users')
-      .select('metadata')
-      .eq('id', userId)
-      .maybeSingle();
-    const prevMeta = (u as { metadata?: Record<string, unknown> } | null)?.metadata || {};
-    const merged = { ...prevMeta, expertWatchlist: watched };
-    const { error } = await supabase.rpc('update_own_profile', { p_fields: { metadata: merged } });
+    // C2 — expertWatchlist is a flat array replaced wholesale on each
+    // toggle, so no subtree merge is needed. Send only the delta;
+    // server's `||` shallow merge preserves every other top-level
+    // metadata key (feed, a11y, avatar, expertVacation,
+    // notification_prefs).
+    const { error } = await supabase.rpc('update_own_profile', {
+      p_fields: { metadata: { expertWatchlist: watched } },
+    });
     if (error) {
       setCats(prev);
       pushToast({ message: error.message, variant: 'danger' });
