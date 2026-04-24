@@ -105,6 +105,13 @@ struct ContentView: View {
         }
         .onChange(of: auth.currentUser?.id) { _, newId in
             PushRegistration.shared.setCurrentUser(newId)
+            // H12 — kick off APNs registration now that we have a user.
+            // Prior code defined registerIfPermitted() but never called
+            // it here; the device-token upload chain only fired when the
+            // user manually visited the Alerts tab (if ever). Fire and
+            // forget; registerIfPermitted() is a no-op if permission
+            // hasn't been granted yet.
+            Task { await PushRegistration.shared.registerIfPermitted() }
             // Apple Guideline 1.2 — block-list cache follows the auth user.
             // Loaded fresh on login/logout so comment + DM filters always
             // resolve against the current viewer's perspective.

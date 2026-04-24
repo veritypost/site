@@ -133,6 +133,18 @@ final class AuthViewModel: ObservableObject {
                 case .tokenRefreshed, .signedIn, .initialSession:
                     if let uid = session?.user.id.uuidString {
                         await self.loadUser(id: uid)
+                        // H13 — invalidate + reload the permission cache
+                        // whenever the session identity refreshes. Prior
+                        // code only called loadUser; permission grants
+                        // on the server (plan upgrade, role change)
+                        // wouldn't propagate to iOS until a manual
+                        // restart / navigation triggered a refresh.
+                        // Fire-and-forget — loadUser is the gating call,
+                        // permissions are observability-adjacent.
+                        Task {
+                            await PermissionService.shared.invalidate()
+                            await PermissionService.shared.loadAll()
+                        }
                         self.isLoggedIn = true
                         self.wasLoggedIn = true
                         self.sessionExpired = false

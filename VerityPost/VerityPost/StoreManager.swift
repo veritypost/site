@@ -147,13 +147,25 @@ final class StoreManager: ObservableObject {
         case .success(let verification):
             let transaction = try checkVerified(verification)
             purchasedProductIDs.insert(product.id)
-            await syncPurchaseToServer(
+            // C18 — only finish the transaction if the server confirmed.
+            // If sync fails (4xx/5xx/network), leave the transaction un-
+            // finished so StoreKit re-delivers it to
+            // `Transaction.updates` on next launch — that's the
+            // rediscovery path for lost-sync receipts. The caller is
+            // also notified via .vpSubscriptionSyncFailed for UI recovery
+            // (SubscriptionView surfaces a "Purchase didn't sync — tap
+            // Restore Purchases" banner).
+            let ok = await syncPurchaseToServer(
                 productID: product.id,
                 transactionID: transaction.id,
                 receipt: transaction.jsonRepresentation.base64EncodedString(),
                 price: product.price
             )
-            await transaction.finish()
+            if ok {
+                await transaction.finish()
+            } else {
+                Log.d("StoreManager: keeping transaction un-finished for retry on next launch")
+            }
             return true
 
         case .userCancelled:
@@ -181,13 +193,18 @@ final class StoreManager: ObservableObject {
                     await MainActor.run {
                         self.purchasedProductIDs.insert(transaction.productID)
                     }
-                    await self.syncPurchaseToServer(
+                    // C18 — same gate as purchase(): only finish on
+                    // server-confirmed sync. Un-synced re-deliveries
+                    // bounce back through this listener on next launch.
+                    let ok = await self.syncPurchaseToServer(
                         productID: transaction.productID,
                         transactionID: transaction.id,
                         receipt: transaction.jsonRepresentation.base64EncodedString(),
                         price: product?.price
                     )
-                    await transaction.finish()
+                    if ok {
+                        await transaction.finish()
+                    }
                 } catch {
                     Log.d("Transaction update verification failed:", error)
                 }
@@ -214,10 +231,18 @@ final class StoreManager: ObservableObject {
 
     // MARK: - Sync to server
 
-    private func syncPurchaseToServer(productID: String, transactionID: UInt64, receipt: String?, price: Decimal?) async {
+    // C18 — returns true when the server confirmed entitlement. Callers
+    // (purchase(), Transaction.updates listener, restorePurchases) MUST
+    // gate their `transaction.finish()` on this return value so StoreKit
+    // re-delivers the transaction on next app launch if the server sync
+    // never confirmed. Prior code always called `.finish()` — un-synced
+    // purchases then silently dropped off StoreKit and the only recovery
+    // was a manual Restore.
+    @discardableResult
+    private func syncPurchaseToServer(productID: String, transactionID: UInt64, receipt: String?, price: Decimal?) async -> Bool {
         guard let session = try? await client.auth.session else {
             Log.d("StoreManager: No auth session for sync")
-            return
+            return false
         }
 
         let priceCents: Int = {
@@ -277,6 +302,7 @@ final class StoreManager: ObservableObject {
         if syncedOk {
             NotificationCenter.default.post(name: .vpSubscriptionDidChange, object: nil)
         }
+        return syncedOk
     }
 
     // MARK: - Restore Purchases
