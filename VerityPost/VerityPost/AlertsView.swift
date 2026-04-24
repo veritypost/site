@@ -90,7 +90,13 @@ struct AlertsView: View {
                         PushRegistration.shared.setCurrentUser(uid)
                     }
                 },
-                onDecline: {}
+                onDecline: {
+                    // H14 — stamp the decline so we don't re-open this
+                    // sheet on every visit to Alerts. 7-day cooldown
+                    // via PushPermission. Re-ask after that at the next
+                    // value moment.
+                    push.markPrePromptDeclined()
+                }
             )
         }
         .task { await push.refresh() }

@@ -1975,7 +1975,11 @@ struct NotificationsSettingsView: View {
                         PushRegistration.shared.setCurrentUser(uid)
                     }
                 },
-                onDecline: {}
+                onDecline: {
+                    // H14 — stamp the decline; see PushPermission
+                    // for the 7-day cooldown logic.
+                    push.markPrePromptDeclined()
+                }
             )
         }
     }

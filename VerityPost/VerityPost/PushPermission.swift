@@ -21,12 +21,43 @@ final class PushPermission: ObservableObject {
     @Published private(set) var lastRefreshed: Date = .distantPast
 
     private let promptedKey = "vp_push_prompted"
+    // H14 — stamp when the user taps "Not now" on the pre-prompt sheet
+    // so we don't re-show the pre-prompt on every session. Pre-prompt
+    // is different from the OS dialog (which we only get one shot at);
+    // the PRE-prompt can be shown multiple times at value moments, but
+    // not back-to-back. 7-day cooldown after a decline is a reasonable
+    // "leave them alone" window; after that we can re-ask at a later
+    // value moment (e.g. breaking-news alert intent from Alerts).
+    private let prePromptDeclinedKey = "vp_push_preprompt_declined_at"
+    private let prePromptCooldown: TimeInterval = 7 * 24 * 60 * 60
 
     /// True after we've shown the iOS system dialog at least once, regardless
     /// of the user's answer. Used to pick between "pre-prompt" vs. "open
     /// Settings" in UI copy.
     var hasBeenPrompted: Bool {
         UserDefaults.standard.bool(forKey: promptedKey)
+    }
+
+    /// True if the user tapped "Not now" on the pre-prompt sheet within
+    /// the cooldown window. Callers should skip showing the pre-prompt
+    /// while this is true so a declined user isn't nagged every session.
+    var prePromptRecentlyDeclined: Bool {
+        guard let ts = UserDefaults.standard.object(forKey: prePromptDeclinedKey) as? Date else {
+            return false
+        }
+        return Date().timeIntervalSince(ts) < prePromptCooldown
+    }
+
+    /// Record that the user dismissed the pre-prompt without continuing
+    /// to the OS dialog. Call from the PushPromptSheet onDecline closure.
+    func markPrePromptDeclined() {
+        UserDefaults.standard.set(Date(), forKey: prePromptDeclinedKey)
+    }
+
+    /// Clear the pre-prompt decline cooldown — e.g. when the user later
+    /// grants permission via Settings.app so we don't dead-lock the UX.
+    func clearPrePromptDecline() {
+        UserDefaults.standard.removeObject(forKey: prePromptDeclinedKey)
     }
 
     /// Cheap read of current authorization state. Call from .task on views
