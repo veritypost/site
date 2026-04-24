@@ -1557,6 +1557,33 @@ function ProfileCard({
   const previewInnerBg = avatarInner || 'transparent';
   const previewTextColor = avatarInner ? '#111111' : avatarOuter;
 
+  // Safe CSS url() interpolation for avatar/banner previews. Both columns
+  // are TEXT with no DB-side CHECK constraint; OAuth + Supabase storage
+  // upload paths sanitize on write, but a direct DB poke or a future write
+  // path that skips sanitisation could land a value containing `")` or `'`,
+  // breaking out of the url() context to inject CSS (cookie exfiltration
+  // via background-image network request). CSP currently allows
+  // 'unsafe-inline' on style-src, so React inline styles are not a backstop.
+  // Validate scheme is https://, then escape `\` and `"` and wrap in
+  // url("..."). TODO: add CHECK constraints on users.avatar_url / banner_url
+  // in a follow-up migration so the DB itself rejects bad values.
+  function safeCssBackgroundImage(url: string | null | undefined): string | undefined {
+    if (!url || typeof url !== 'string') return undefined;
+    const trimmed = url.trim();
+    let parsed;
+    try {
+      parsed = new URL(trimmed);
+    } catch {
+      return undefined;
+    }
+    if (parsed.protocol !== 'https:') return undefined;
+    const escaped = trimmed.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    return `url("${escaped}")`;
+  }
+
+  const avatarBgImage = safeCssBackgroundImage(avatarUrl);
+  const bannerBgImage = safeCssBackgroundImage(bannerUrl);
+
   return (
     <Card
       id="profile"
@@ -1785,7 +1812,7 @@ function ProfileCard({
                     height: 56,
                     borderRadius: '50%',
                     border: `1px solid ${C.border}`,
-                    backgroundImage: avatarUrl ? `url(${avatarUrl})` : undefined,
+                    backgroundImage: avatarBgImage,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
                     display: 'flex',
@@ -1793,10 +1820,10 @@ function ProfileCard({
                     justifyContent: 'center',
                     color: C.dim,
                     fontSize: F.xs,
-                    background: avatarUrl ? undefined : C.card,
+                    background: avatarBgImage ? undefined : C.card,
                   }}
                 >
-                  {!avatarUrl && 'None'}
+                  {!avatarBgImage && 'None'}
                 </div>
                 <label style={{ cursor: 'pointer' }}>
                   <input
@@ -1844,10 +1871,10 @@ function ProfileCard({
                   borderRadius: 6,
                   maxWidth: '100%',
                   border: `1px solid ${C.border}`,
-                  backgroundImage: bannerUrl ? `url(${bannerUrl})` : undefined,
+                  backgroundImage: bannerBgImage,
                   backgroundSize: 'cover',
                   backgroundPosition: 'center',
-                  background: bannerUrl ? undefined : C.card,
+                  background: bannerBgImage ? undefined : C.card,
                   flexShrink: 0,
                 }}
               />
