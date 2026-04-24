@@ -280,7 +280,15 @@ export default function BookmarksPage() {
           }}
         >
           <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>
-            Bookmarks · {canUnlimited ? items.length : `${items.length} of ${bookmarkCap}`}
+            Bookmarks ·{' '}
+            {/* M14 — when a collection filter is active, show
+                "<filtered> of <total>" so the count matches the visible
+                rows; "<total>" alone hid empty/sparse collections. */}
+            {activeCollection !== 'all'
+              ? `${filtered.length} of ${items.length}`
+              : canUnlimited
+                ? items.length
+                : `${items.length} of ${bookmarkCap}`}
           </h1>
           {(canExport || canCollections) && (
             <div style={{ display: 'flex', gap: 8 }}>
