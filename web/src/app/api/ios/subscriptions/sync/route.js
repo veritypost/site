@@ -56,7 +56,10 @@ export async function POST(request) {
   try {
     payload = verifyTransactionJWS(receipt);
   } catch (err) {
-    return NextResponse.json({ error: `JWS verification failed: ${err.message}` }, { status: 400 });
+    // B12 / DA-119: err.message from verifyTransactionJWS leaks certificate
+    // chain internals and key-id strings. Log server-side, return generic.
+    console.error('[ios.subscriptions.sync] JWS verification failed:', err?.message || err);
+    return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
   if (payload.productId !== productId) {

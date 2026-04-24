@@ -63,7 +63,11 @@ export async function POST(request) {
   try {
     ({ notification, transaction, renewal } = verifyNotificationJWS(signedPayload));
   } catch (err) {
-    return NextResponse.json({ error: `JWS verification failed: ${err.message}` }, { status: 400 });
+    // B12 / DA-119: don't leak err.message (carries root_certificate, chain
+    // mismatch details, etc.) back to Apple's webhook logs or our error
+    // reporters. Server-side console keeps the full context.
+    console.error('[ios.appstore.notif] JWS verification failed:', err?.message || err);
+    return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
   const notificationType = notification.notificationType;
@@ -154,13 +158,53 @@ export async function POST(request) {
 
   try {
     // Find the user via the subscriptions row the sync route inserted.
-    const { data: sub } = await service
+    let { data: sub } = await service
       .from('subscriptions')
       .select('id, user_id, plan_id, status')
       .eq('apple_original_transaction_id', originalTxId)
       .maybeSingle();
 
-    // Orphan: notification arrived before sync. Log and 200; sync will catch up.
+    // B9: before orphaning, try `transaction.appAccountToken` → users.id
+    // lookup. The sync route normally inserts the subscriptions row before
+    // S2S notifications arrive, but Apple doesn't guarantee ordering — if
+    // a notification races in first (or the device sync failed), we'd
+    // orphan forever. appAccountToken is iOS's kid-of-the-purchase hint
+    // bound to the UUID we set on the transaction, so it's a reliable
+    // user lookup even without a pre-existing subscriptions row.
+    if (!sub && transaction.appAccountToken) {
+      const candidate = String(transaction.appAccountToken);
+      const { data: ownerRow } = await service
+        .from('users')
+        .select('id')
+        .eq('id', candidate)
+        .maybeSingle();
+      if (ownerRow?.id) {
+        // Mint a minimal pending row so the handler below can update it in
+        // place. plan_id stays NULL here; the per-type branches below call
+        // resolvePlanByAppleProductId + set plan_id when the notification
+        // carries a productId. status='pending' keeps this out of any
+        // "active subscription" reads until the handler confirms it.
+        const { data: created, error: insertErr } = await service
+          .from('subscriptions')
+          .insert({
+            user_id: ownerRow.id,
+            apple_original_transaction_id: originalTxId,
+            status: 'pending',
+            source: 'apple',
+          })
+          .select('id, user_id, plan_id, status')
+          .single();
+        if (!insertErr && created) {
+          sub = created;
+        } else if (insertErr) {
+          console.error('[ios.appstore.notif] mint-on-fallback failed:', insertErr);
+        }
+      }
+    }
+
+    // Orphan: no subscriptions row, no usable appAccountToken. Log + 200;
+    // the next device sync (or a retry after appAccountToken lands) will
+    // catch up.
     if (!sub) {
       await service
         .from('webhook_log')
