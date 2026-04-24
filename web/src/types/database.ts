@@ -1342,6 +1342,9 @@ export type Database = {
           generated_at: string | null
           generated_by_model: string | null
           generated_by_provider: string | null
+          hero_pick_for_date: string | null
+          hero_pick_set_at: string | null
+          hero_pick_set_by: string | null
           id: string
           is_ai_generated: boolean
           is_breaking: boolean
@@ -1412,6 +1415,9 @@ export type Database = {
           generated_at?: string | null
           generated_by_model?: string | null
           generated_by_provider?: string | null
+          hero_pick_for_date?: string | null
+          hero_pick_set_at?: string | null
+          hero_pick_set_by?: string | null
           id?: string
           is_ai_generated?: boolean
           is_breaking?: boolean
@@ -1482,6 +1488,9 @@ export type Database = {
           generated_at?: string | null
           generated_by_model?: string | null
           generated_by_provider?: string | null
+          hero_pick_for_date?: string | null
+          hero_pick_set_at?: string | null
+          hero_pick_set_by?: string | null
           id?: string
           is_ai_generated?: boolean
           is_breaking?: boolean

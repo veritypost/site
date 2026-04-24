@@ -4,6 +4,19 @@
 **Depends on:** `00_CHARTER.md` (commitment 2), `05_EDITOR_SYSTEM.md`, `08_DESIGN_TOKENS.md`, `10_SUMMARY_FORMAT.md`.
 **Affects:** `web/src/app/page.tsx`, adult iOS `HomeView.swift`, new `front_page_state` data source, category and subcategory read flow.
 
+> **Bridge note (2026-04-23 staged ship):** the Phase-1 implementation reads
+> the hero pick from `articles.hero_pick_for_date` (DATE column added in
+> `schema/144_articles_hero_pick.sql`), not from `front_page_state`. Owner
+> stripped: editor names, sourcing-strength row, corrections badge,
+> totals — those sections of this spec are deferred. The visual
+> architecture (masthead, hero, 7 supporting, page ends), the breaking
+> strip, and the date prominence ARE shipped. **Do not build new features
+> against `hero_pick_for_date` directly** — when the editor system
+> (`05_EDITOR_SYSTEM.md`) ships, migrate the hero query to
+> `front_page_state` and drop the three columns. Audit trail
+> (`hero_pick_set_by`, `hero_pick_set_at`) is preserved so the migration
+> can backfill cleanly.
+
 ---
 
 ## Current state (verified 2026-04-21)

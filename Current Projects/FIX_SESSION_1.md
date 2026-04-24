@@ -1050,28 +1050,24 @@ These are **feature-level work**, not fixes. Rolled up here for full-scope visib
 ### F4. Quiet home feed (`F4-quiet-home-feed.md`)
 **What:** Strip home to serif headlines + small-caps meta. Remove cover images, category pills, ads, recap, breaking banner.
 
-**Verified 2026-04-21 (2 agents): MOSTLY DONE** — ~2-3 hrs remaining.
+**SHIPPED 2026-04-23 — superseded by full home rebuild per Future Projects/09_HOME_FEED_REBUILD.md**
 
-**Already shipped** via launch kill switches:
-- Category pills hidden (`page.tsx:729`)
-- Subcategory pills hidden (`page.tsx:756`)
-- Recap card hidden (`page.tsx:820`)
-- Cover images: never in current card design (lines 821-857 render title + excerpt + badge + date only)
+Scope grew from "card restyle (~2-3 hrs)" to "full home rebuild" (~6-8 hrs) when it became clear the right move was to ship the Future Projects spec rather than patch the existing layout. Final shipped scope:
 
-**Left to do:**
-1. Force-hide breaking banner regardless of `canBreakingBanner` permission — wrap `page.tsx:697-722` in `{false && ...}` or remove outright
-2. Remove ad slots from feed loop — delete `page.tsx:858-862` (`{(idx + 1) % 6 === 0 && <Ad />}`)
-3. Card restyle per F4 spec:
-   - Source Serif 4 headlines (~28pt)
-   - Small-caps meta line (11pt, 0.06em letter-spacing, muted) with category · read time · source count
-   - Horizontal rules between articles
-   - 40/28px vertical spacing
-4. Optional: date line above feed ("Wednesday, April 20"); "Editor's Pick" glyph variant
+- **Schema:** `schema/144_articles_hero_pick.sql` adds `articles.hero_pick_for_date DATE` + audit columns (`hero_pick_set_by`, `hero_pick_set_at`); partial index on the hero column. DATE-typed (not boolean) so the flag auto-clears via date semantics — no midnight cron needed. Bridge proxy for `front_page_state` per spec.
+- **Web:** `web/src/app/page.tsx` rewritten 1365 → ~430 lines. Masthead = serif wordmark + editorial date (America/New_York) + "Today's stories, chosen by an editor." Hero = 36pt serif, longer dek. Up to 7 supporting = 22pt serif, hairline dividers, no card chrome. Page ends with "Browse all categories →" link to `/browse`. Breaking strip kept above masthead per spec. Stripped: category pills, search overlay, ad slots, Load more, RecapCard, FALLBACK_CATEGORIES.
+- **iOS:** `VerityPost/VerityPost/HomeView.swift` rewritten 1011 → ~480 lines, mirrors web architecture. Same strips. Streak already moved to ProfileView (prior work). Breaking banner kept (now consistent with web). Registration wall preserved. New `BrowseLanding` placeholder destination so the front-page CTA isn't dangling.
+- **Models:** `VerityPost/VerityPost/Models.swift` adds `Story.heroPickForDate: String?` field with codingkey `hero_pick_for_date`; `excerpt` computed alias added for parity with web naming.
+- **Admin:** `web/src/app/admin/story-manager/page.tsx` adds "Today's hero" toggle button next to Breaking + Developing. Sets `hero_pick_for_date = today_in_editorial_tz` when on; null when off.
+- **API:** `web/src/app/api/admin/articles/save/route.ts` server-side stamps `hero_pick_set_by = actor.id` + `hero_pick_set_at = now()` whenever the hero column is in the payload (audit trail, big-picture reviewer amendment).
+- **Types:** `web/src/types/database.ts` manually amended with the three new article columns (regenerate from MCP next session).
+- **Docs:** `Future Projects/09_HOME_FEED_REBUILD.md` gets a bridge note at the top documenting the staged ship; `Reference/STATUS.md` gets a Home page row.
 
-**Scope:** 2-3 hrs (mostly card redesign).
-**Owner decisions:** breaking banner force-hidden or permission-gated; ads removed from feed or kept; approve typography + spacing.
+**Owner-stripped from spec:** editor names, sourcing-strength row, corrections badge, totals. **Owner-confirmed:** breaking strip kept (per spec) — only thing initially stripped from plan was reverted.
 
-**Note:** overlaps with UI audit `Track A` (#4 responsive) — both touch `web/src/app/page.tsx`. If shipping Track A and F4, plan them together.
+**4-agent pre-impl review:** investigator (codebase recon) + planner (synthesis) + big-picture reviewer APPROVE-WITH-AMENDMENTS (3 amendments incorporated: audit columns, masthead promise line, bridge note) + adversary REJECT-then-resolved (5 blockers fixed: browse link destination, boolean → DATE column shape, editorial timezone definition, breaking strip kept, F4 entry expansion).
+
+**Migration application:** owner pastes `schema/144_articles_hero_pick.sql` in Supabase SQL editor (MCP was in read-only mode this session).
 
 ---
 

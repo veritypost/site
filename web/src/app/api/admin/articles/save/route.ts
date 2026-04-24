@@ -66,10 +66,11 @@ export async function POST(request: Request) {
   const service = createServiceClient();
 
   let articleId = body.article_id as string | null;
+  let priorHeroPickForDate: string | null = null;
   if (isUpdate) {
     const { data: prior } = await service
       .from('articles')
-      .select('id, author_id, status')
+      .select('id, author_id, status, hero_pick_for_date')
       .eq('id', articleId!)
       .maybeSingle();
     if (!prior) return NextResponse.json({ error: 'Article not found' }, { status: 404 });
@@ -77,9 +78,29 @@ export async function POST(request: Request) {
       const rankErr = await requireAdminOutranks(prior.author_id, actor.id);
       if (rankErr) return rankErr;
     }
+    priorHeroPickForDate =
+      (prior as { hero_pick_for_date?: string | null }).hero_pick_for_date ?? null;
   }
 
   const articleRow: ArticleFields = { ...body.article };
+
+  // Audit trail for the hero-pick column (schema/144). Only stamp when
+  // the value actually changes — story-manager passes `hero_pick_for_date`
+  // on every save, so a no-op edit (e.g., owner re-publishes an article
+  // without touching the hero toggle) would otherwise overwrite the audit
+  // trail with the most recent save time + actor instead of the actual
+  // last-changed metadata. Compare prior vs incoming and skip if equal.
+  // Big-picture reviewer amendment 2026-04-23: preserves the "auditable"
+  // half of Charter Commitment 2 even before the full editor/
+  // front_page_state system ships.
+  if (Object.prototype.hasOwnProperty.call(articleRow, 'hero_pick_for_date')) {
+    const incoming = (articleRow.hero_pick_for_date as string | null) ?? null;
+    const changed = isUpdate ? incoming !== priorHeroPickForDate : incoming !== null;
+    if (changed) {
+      articleRow.hero_pick_set_by = actor.id;
+      articleRow.hero_pick_set_at = new Date().toISOString();
+    }
+  }
 
   if (isUpdate) {
     articleRow.updated_at = new Date().toISOString();

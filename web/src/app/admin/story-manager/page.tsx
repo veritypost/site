@@ -22,6 +22,17 @@ import { ADMIN_C, F, S } from '@/lib/adminPalette';
 
 const C = { ...ADMIN_C, now: '#c2410c', nowBg: '#fff3e0' };
 
+// Editorial day = America/New_York. Same constant the home page uses
+// to filter today's hero. Returns "YYYY-MM-DD".
+function todayInEditorialTz(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
 // T-018: categories + subcategories load from the `categories` table
 // on mount. Prior code hardcoded a 7-entry CATEGORIES array and a
 // 3-key SUBCATEGORIES map; editors couldn't pick newly-seeded
@@ -41,6 +52,7 @@ type StoryForm = {
   subcategory: string;
   is_breaking: boolean;
   is_developing: boolean;
+  hero_pick_for_date: string | null;
   created_at?: string;
   author?: string;
   sources: StorySource[];
@@ -58,6 +70,7 @@ const EMPTY_STORY: StoryForm = {
   subcategory: '',
   is_breaking: false,
   is_developing: false,
+  hero_pick_for_date: null,
   sources: [],
 };
 
@@ -237,6 +250,7 @@ function StoryEditorInner() {
         subcategory: (cast as unknown as { subcategory_id?: string | null }).subcategory_id || '',
         is_breaking: cast.is_breaking || false,
         is_developing: cast.is_developing || false,
+        hero_pick_for_date: cast.hero_pick_for_date || null,
         created_at: cast.created_at || '',
         sources: (sourceData || []).map((s) => ({
           id: s.id,
@@ -498,6 +512,7 @@ function StoryEditorInner() {
             category_id: categoryId,
             is_breaking: story.is_breaking || false,
             is_developing: story.is_developing || false,
+            hero_pick_for_date: story.hero_pick_for_date,
             published_at: publishedAtIso,
           },
           timeline_entries: entries.map((entry) => ({
@@ -830,6 +845,22 @@ function StoryEditorInner() {
           >
             Developing{story.is_developing ? ' (on)' : ''}
           </Button>
+          {(() => {
+            const today = todayInEditorialTz();
+            const isHeroToday = story.hero_pick_for_date === today;
+            return (
+              <Button
+                variant={isHeroToday ? 'primary' : 'secondary'}
+                size="sm"
+                onClick={() => {
+                  updateStory('hero_pick_for_date', isHeroToday ? null : today);
+                }}
+                title="When set, this article surfaces as the hero on today's home page front page (per spec/144). Auto-clears via date semantics tomorrow."
+              >
+                Today&rsquo;s hero{isHeroToday ? ' (on)' : ''}
+              </Button>
+            );
+          })()}
         </div>
       </PageSection>
 

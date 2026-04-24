@@ -136,6 +136,11 @@ struct Story: Codable, Identifiable, Hashable {
     var isDeveloping: Bool?
     var publishedAt: Date?
     var createdAt: Date?
+    /// Editorial flag from schema/144 — when this date matches today in
+    /// editorial TZ (America/New_York), the article surfaces as the hero
+    /// on the home page. Comes back from PostgREST as an ISO date string
+    /// ("YYYY-MM-DD"); kept as String to avoid Date-formatter ambiguity.
+    var heroPickForDate: String?
 
     enum CodingKeys: String, CodingKey {
         case id, title, slug, status
@@ -147,7 +152,13 @@ struct Story: Codable, Identifiable, Hashable {
         case isDeveloping = "is_developing"
         case publishedAt = "published_at"
         case createdAt = "created_at"
+        case heroPickForDate = "hero_pick_for_date"
     }
+
+    /// Convenience alias for the home/reader views — same column as
+    /// `summary` (PostgREST column is `excerpt`); keeping the alias
+    /// because the home page reads as "excerpt" to match the web API.
+    var excerpt: String? { summary }
 
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
     static func == (lhs: Story, rhs: Story) -> Bool { lhs.id == rhs.id }
