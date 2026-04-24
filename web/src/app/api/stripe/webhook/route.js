@@ -225,9 +225,61 @@ export async function POST(request) {
         processing_error: err?.message || 'unknown',
       })
       .eq('id', logId);
+
+    // B18: mirror to audit_log so admin surfaces (op dashboards, compliance
+    // review) see handler failures alongside other billing actions. webhook_log
+    // is the machine-facing state machine; audit_log is the human-facing op
+    // trail. Best-effort — if the audit insert fails we still return 500 so
+    // Stripe retries the underlying event.
+    try {
+      const actorId = await resolveUserFromEvent(service, event).catch(() => null);
+      const rawMessage = typeof err?.message === 'string' ? err.message : String(err);
+      const safeMessage = rawMessage.replace(/\s+/g, ' ').slice(0, 500);
+      await service.from('audit_log').insert({
+        actor_id: actorId,
+        action: 'billing:webhook_handler_failed',
+        target_type: 'user',
+        target_id: actorId,
+        metadata: {
+          source: 'stripe_webhook',
+          event_type: event.type,
+          event_id: event.id,
+          error_message: safeMessage,
+          webhook_log_id: logId,
+        },
+      });
+    } catch (auditErr) {
+      console.error('[stripe.webhook] audit_log mirror failed:', auditErr);
+    }
+
     // Returning 500 tells Stripe to retry; body text doesn't affect retry.
     return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 });
   }
+}
+
+// B18 helper: best-effort user resolution from an arbitrary Stripe event
+// so the audit_log row carries a target_id when possible. Never throws —
+// falls through to `null` if the event shape doesn't carry a customer id
+// we can resolve, or if the lookup errors.
+async function resolveUserFromEvent(service, event) {
+  const obj = event?.data?.object;
+  if (!obj) return null;
+
+  // Most billing events carry `customer` on the top-level object. Charge /
+  // dispute events nest one level deeper through the charge object.
+  const customerId =
+    typeof obj.customer === 'string'
+      ? obj.customer
+      : typeof obj.charge === 'object'
+        ? obj.charge?.customer
+        : null;
+
+  const fallbackUserId = obj.client_reference_id || obj.metadata?.user_id || null;
+
+  if (!customerId && !fallbackUserId) return null;
+
+  const { userRow } = await lookupUserAndPlan(service, customerId, null, fallbackUserId);
+  return userRow?.id || null;
 }
 
 // ----- Event handlers -----
