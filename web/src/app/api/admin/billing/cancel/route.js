@@ -34,7 +34,7 @@ export async function POST(request) {
 
   if (user_id !== user.id) {
     // Q6 — server-side rank guard via require_outranks RPC.
-    const rankErr = await requireAdminOutranks(user_id, actor.id);
+    const rankErr = await requireAdminOutranks(user_id, user.id);
     if (rankErr) return rankErr;
   }
 

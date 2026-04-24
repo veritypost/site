@@ -127,16 +127,8 @@ export async function DELETE(request, { params }) {
     );
   }
 
-  const conflict = await assertActorOutranksTarget(authed, user.id, params.id);
-  if (conflict?.error) {
-    return NextResponse.json({ error: conflict.error }, { status: 500 });
-  }
-  if (conflict?.blocked) {
-    return NextResponse.json(
-      { error: 'Cannot revoke from a user whose rank meets or exceeds your own' },
-      { status: 403 }
-    );
-  }
+  const rankErr = await requireAdminOutranks(params.id, user.id);
+  if (rankErr) return rankErr;
 
   const service = createServiceClient();
   const rate = await checkRateLimit(service, {

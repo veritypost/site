@@ -1,7 +1,7 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified messaging 2026-04-18
 'use client';
-import { useState, useEffect, useRef, CSSProperties } from 'react';
+import { useState, useEffect, useRef, Suspense, CSSProperties } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '../../lib/supabase/client';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
@@ -82,6 +82,17 @@ interface PostgresChangePayload<T> {
 }
 
 export default function MessagesPage() {
+  // Next 14 requires useSearchParams to be inside a Suspense boundary so
+  // the prerender can bail out cleanly. The page itself is auth-gated and
+  // never has anything useful to prerender, but the build still walks it.
+  return (
+    <Suspense fallback={null}>
+      <MessagesPageInner />
+    </Suspense>
+  );
+}
+
+function MessagesPageInner() {
   const supabase = createClient();
   const searchParams = useSearchParams();
   // `?to=<userId>` deep-link entry — replaces the phantom `/messages/new`
