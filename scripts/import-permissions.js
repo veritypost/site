@@ -24,6 +24,7 @@
 // ============================================================================
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { execSync } = require('child_process');
 
@@ -59,7 +60,10 @@ function parseXlsx() {
   //   2. matrix/permissions.xlsx inside the repo (preferred canonical location)
   //   3. ~/Desktop/verity post/permissions.xlsx (legacy owner workflow)
   const repoPath = path.resolve(__dirname, '..', 'matrix', 'permissions.xlsx');
-  const legacyPath = '/Users/veritypost/Desktop/verity post/permissions.xlsx';
+  // M5 — derive legacy path from os.homedir() so the script works for
+  // any local user (not just veritypost). The "verity post" directory
+  // name (with the space) is the canonical owner workflow per CLAUDE.md.
+  const legacyPath = path.join(os.homedir(), 'Desktop', 'verity post', 'permissions.xlsx');
   const candidates = [process.env.PERMISSIONS_XLSX_PATH, repoPath, legacyPath].filter(Boolean);
   const xlsxPath = candidates.find(p => fs.existsSync(p));
   if (!xlsxPath) {

@@ -27,7 +27,6 @@ import Supabase
 struct FamilyDashboardView: View {
     @EnvironmentObject var auth: AuthViewModel
     @StateObject private var perms = PermissionStore.shared
-    private let client = SupabaseManager.shared.client
 
     @State private var kids: [KidProfile] = []
     @State private var loading = true
@@ -383,16 +382,11 @@ struct FamilyDashboardView: View {
     // MARK: - Loading + mutations
 
     private func load() async {
-        guard let userId = auth.currentUser?.id else { loading = false; return }
+        guard auth.currentUser?.id != nil else { loading = false; return }
         do {
-            // Match the /api/kids GET filter: only show is_active=true rows so
-            // soft-deleted profiles disappear immediately after a remove.
-            let rows: [KidProfile] = try await client.from("kid_profiles")
-                .select()
-                .eq("parent_user_id", value: userId)
-                .eq("is_active", value: true)
-                .order("created_at", ascending: true)
-                .execute().value
+            // M17 — route through API; server enforces parent-view permission
+            // + is_active filter so the schema contract lives in one place.
+            let rows = try await KidsAPI.listKids()
             await MainActor.run { kids = rows; loading = false }
         } catch {
             await MainActor.run { loading = false }
@@ -400,14 +394,9 @@ struct FamilyDashboardView: View {
     }
 
     private func reload() async {
-        guard let userId = auth.currentUser?.id else { return }
+        guard auth.currentUser?.id != nil else { return }
         do {
-            let rows: [KidProfile] = try await client.from("kid_profiles")
-                .select()
-                .eq("parent_user_id", value: userId)
-                .eq("is_active", value: true)
-                .order("created_at", ascending: true)
-                .execute().value
+            let rows = try await KidsAPI.listKids()
             await MainActor.run { kids = rows }
         } catch {
             // Stale list is better than empty; surface the error.
@@ -760,6 +749,25 @@ enum KidsAPI {
             return (true, decoded?.id, nil)
         }
         return (false, nil, decodeError(from: data) ?? "Could not add kid (HTTP \(status)).")
+    }
+
+    /// M17 — list kids via the API (mirrors web /api/kids GET) instead of
+    /// hitting `kid_profiles` over PostgREST. Centralises the parent-side
+    /// auth/RLS contract on the server: the API gates with the
+    /// `kids.parent.view` permission and applies the is_active filter.
+    struct ListResponse: Decodable { let kids: [KidProfile] }
+    static func listKids() async throws -> [KidProfile] {
+        var req = URLRequest(url: endpoint("api/kids"))
+        req.httpMethod = "GET"
+        req.setValue("Bearer \(try await bearer())", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: req)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        if status == 200 {
+            let decoded = try JSONDecoder().decode(ListResponse.self, from: data)
+            return decoded.kids
+        }
+        let msg = decodeError(from: data) ?? "Could not load kids (HTTP \(status))."
+        throw NSError(domain: "KidsAPI.listKids", code: status, userInfo: [NSLocalizedDescriptionKey: msg])
     }
 
     static func deleteKid(id: String) async throws -> DeleteResponse {

@@ -234,8 +234,10 @@ export async function POST(req: Request) {
     // 9. Dedup + insert into the single discovery_items pool.
     const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
 
-    async function processItems(items: FlatItem[]): Promise<{ inserted: number; skipped: number }> {
-      if (items.length === 0) return { inserted: 0, skipped: 0 };
+    async function processItems(
+      items: FlatItem[]
+    ): Promise<{ inserted: number; skipped: number; raceDeduped: number }> {
+      if (items.length === 0) return { inserted: 0, skipped: 0, raceDeduped: 0 };
 
       // Dedup query in batches of 100
       const existingUrls = new Set<string>();
@@ -272,7 +274,7 @@ export async function POST(req: Request) {
         fresh.push(it);
       }
 
-      if (fresh.length === 0) return { inserted: 0, skipped };
+      if (fresh.length === 0) return { inserted: 0, skipped, raceDeduped: 0 };
 
       // Map to insert rows
       const rows: DiscoveryInsert[] = fresh.map((it) => ({
@@ -287,6 +289,7 @@ export async function POST(req: Request) {
 
       // Upsert in batches of 500
       let inserted = 0;
+      let raceDeduped = 0;
       for (let i = 0; i < rows.length; i += 500) {
         const batch = rows.slice(i, i + 500);
         const { data: insData, error: insErr } = await service
@@ -299,13 +302,26 @@ export async function POST(req: Request) {
         if (insErr) {
           throw new Error(`discovery_items upsert failed: ${insErr.message}`);
         }
-        inserted += (insData ?? []).length;
+        const written = (insData ?? []).length;
+        inserted += written;
+        // M6 — visibility on race-window dedup. ignoreDuplicates silently
+        // drops rows that another concurrent ingest (or a re-run within
+        // the same minute) already inserted between our SELECT-dedup pass
+        // and this UPSERT. Surfacing the gap makes "fresh feed but zero
+        // inserted" debuggable instead of mysterious.
+        if (written < batch.length) {
+          raceDeduped += batch.length - written;
+        }
       }
 
-      return { inserted, skipped };
+      return { inserted, skipped, raceDeduped };
     }
 
-    const { inserted: itemsInserted, skipped: itemsSkipped } = await processItems(allItems);
+    const {
+      inserted: itemsInserted,
+      skipped: itemsSkipped,
+      raceDeduped: itemsRaceDeduped,
+    } = await processItems(allItems);
 
     // ----------------------------------------------------------------------
     // 10. Clustering orchestration (F7 Phase 2 wire-up — closes F1).
@@ -481,6 +497,7 @@ export async function POST(req: Request) {
       feedsFailed,
       itemsInserted,
       itemsSkipped,
+      itemsRaceDeduped, // M6 — surface concurrent-ingest dedup count
       clustering: clusterRun.summary,
     } as unknown as Json;
 
@@ -529,6 +546,7 @@ export async function POST(req: Request) {
       totalScanned: itemsProcessed,
       itemsInserted,
       skippedDuplicates,
+      raceDeduped: itemsRaceDeduped, // M6 — visibility on concurrent-ingest collisions
       durationMs,
       clustering: clusterRun.summary,
     });

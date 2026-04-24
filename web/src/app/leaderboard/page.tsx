@@ -340,7 +340,12 @@ export default function LeaderboardPage() {
                   Your rank
                 </span>
                 <span style={{ fontSize: 13, color: 'var(--dim)', marginLeft: 6 }}>
-                  {myRank ? `#${myRank}` : 'unranked in this view'}
+                  {/* M15 — say WHICH view to make "unranked" actionable.
+                      "This view" was ambiguous; users couldn't tell whether
+                      changing tab/category/period would surface their rank. */}
+                  {myRank
+                    ? `#${myRank}`
+                    : `not in the top ${users.length || 'list'} for ${activeTab}`}
                 </span>
               </div>
             </div>
