@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 // POST /api/conversations -- authoritative convo-create path. Pairs with
 // POST /api/messages. Replaces direct `conversations.insert` +
@@ -32,6 +33,26 @@ export async function POST(request) {
   }
 
   const service = createServiceClient();
+
+  // H27 — throttle conversation starts. The underlying RPC dedupes
+  // on an existing direct convo so re-tries don't create rows, but
+  // a user enumerating other_user_ids would still probe the
+  // self-start / paid-gate / muted-target error codes. Cap at 10/min
+  // per caller. Composing messages within an existing convo is gated
+  // separately by /api/messages rate limits.
+  const rate = await checkRateLimit(service, {
+    key: `conversations.start:${user.id}`,
+    policyKey: 'conversations.start',
+    max: 10,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many conversation starts. Slow down.' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
+
   const { data, error } = await service.rpc('start_conversation', {
     p_user_id: user.id,
     p_other_user_id: other_user_id,

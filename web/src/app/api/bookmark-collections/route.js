@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
 
 // GET  — list the caller's collections.
@@ -54,6 +55,24 @@ export async function POST(request) {
 
   const { name, description } = await request.json().catch(() => ({}));
   const service = createServiceClient();
+
+  // H27 — cap collection creation so a paid user can't spam the
+  // bookmark_collections table. 20 collections created in 60s is
+  // ample for reasonable organization; anything faster is almost
+  // certainly bot / automation.
+  const rate = await checkRateLimit(service, {
+    key: `bookmark-collections:${user.id}`,
+    policyKey: 'bookmark-collections.create',
+    max: 20,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Slow down — too many collections created too fast.' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
+
   const { data, error } = await service.rpc('create_bookmark_collection', {
     p_user_id: user.id,
     p_name: name,
