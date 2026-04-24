@@ -80,17 +80,50 @@ export async function POST(request) {
         { onConflict: 'id' }
       );
 
+      // The `handle_new_auth_user` trigger on auth.users INSERT already
+      // upserts the 'user' role idempotently (ON CONFLICT DO NOTHING) —
+      // see schema trigger body. The route's insert here acts as a
+      // belt-and-suspenders backup if the trigger somehow didn't fire
+      // or couldn't resolve the role. Use upsert with ignoreDuplicates
+      // so a trigger-won race doesn't fail the signup response and
+      // leave the user locked out (the original bug: non-idempotent
+      // insert threw 23505, trigger already had it, user got 500).
       const { data: userRole } = await service
         .from('roles')
         .select('id')
         .eq('name', 'user')
         .single();
       if (userRole) {
-        await service.from('user_roles').insert({
-          user_id: userId,
-          role_id: userRole.id,
-          assigned_by: userId,
-        });
+        await service.from('user_roles').upsert(
+          {
+            user_id: userId,
+            role_id: userRole.id,
+            assigned_by: userId,
+          },
+          { onConflict: 'user_id,role_id', ignoreDuplicates: true }
+        );
+      }
+
+      // Defensive check: whether the trigger or the upsert above did the
+      // work, the user MUST have at least one role at this point. A
+      // roleless user hits RLS deny on every read — worse than a failed
+      // signup. If we find none, surface the failure rather than let
+      // the user complete signup into a broken state.
+      const { count: roleCount } = await service
+        .from('user_roles')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId);
+      if (!roleCount) {
+        console.error('[auth.signup] user has no role after signup', { userId });
+        // Roll back the auth row so the user can retry cleanly. The
+        // users-table upsert above stays (its data is harmless without
+        // an auth row) and the cron reconciler will eventually sweep it.
+        try {
+          await service.auth.admin.deleteUser(userId);
+        } catch (rollbackErr) {
+          console.error('[auth.signup] rollback deleteUser failed', rollbackErr);
+        }
+        return NextResponse.json({ error: 'Signup failed. Please try again.' }, { status: 500 });
       }
 
       await service.from('audit_log').insert({
