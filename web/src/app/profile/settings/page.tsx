@@ -1543,6 +1543,11 @@ function ProfileCard({
     setEditing(false);
     markDirty(false);
     await onSaved();
+    // H8 — refresh permission cache after profile save. A change to
+    // allow_messages / profile_visibility can flip a downstream gate
+    // (messages compose, leaderboard-opt-in). Without invalidation the
+    // UI stays on the pre-save gate decision until the 60s TTL expires.
+    await refreshAllPermissions();
   };
 
   const handleCancel = () => {
