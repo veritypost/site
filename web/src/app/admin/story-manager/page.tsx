@@ -18,9 +18,7 @@ import Drawer from '@/components/admin/Drawer';
 import Spinner from '@/components/admin/Spinner';
 import { confirm, ConfirmDialogHost } from '@/components/admin/ConfirmDialog';
 import { ToastProvider, useToast } from '@/components/admin/Toast';
-import { ADMIN_C, F, S } from '@/lib/adminPalette';
-
-const C = { ...ADMIN_C, now: '#c2410c', nowBg: '#fff3e0' };
+import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 
 // Editorial day = America/New_York. Same constant the home page uses
 // to filter today's hero. Returns "YYYY-MM-DD".

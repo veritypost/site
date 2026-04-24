@@ -21,9 +21,12 @@
 // other; renaming across both would cause ~880 call-site edits for no
 // behavioural gain.
 //
-// Per-page variations (e.g. kids-story-manager's blue accent, story-manager's
-// now/nowBg highlight colors) use the spread-override pattern:
-//   const C = { ...ADMIN_C, accent: '#2563eb', now: '#c2410c', nowBg: '#fff3e0' };
+// Per-page variations that are TRULY one-off (e.g. kids-story-manager's blue
+// accent) still use the spread-override pattern:
+//   const C = { ...ADMIN_C, accent: '#2563eb' };
+// Tokens that recur across two or more pages (e.g. `now`/`nowBg` used by both
+// story-manager + kids-story-manager) belong directly on ADMIN_C, not duplicated
+// in per-page overrides.
 //
 // Structural outliers: `admin/permissions/page.js` and `admin/stories/page.js`
 // use inline hex colors + custom style constants by design; they do not follow
@@ -54,6 +57,12 @@ export const ADMIN_C = {
   // Divider: horizontal rules + section separators. Slightly softer than
   // `border` (which is used for outline-weight edges).
   divider: '#e5e5e5',
+  // "Currently live" row highlight — used by story-manager + kids-story-manager
+  // to mark the is_current timeline entry. Burnt-orange foreground over a pale
+  // orange wash. Shared here so the two pages stop redeclaring identical
+  // constants.
+  now: '#c2410c',
+  nowBg: '#fff3e0',
 };
 
 export const ADMIN_C_LIGHT = {

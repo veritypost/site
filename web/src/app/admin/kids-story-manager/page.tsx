@@ -20,8 +20,9 @@ import { confirm, ConfirmDialogHost } from '@/components/admin/ConfirmDialog';
 import { ToastProvider, useToast } from '@/components/admin/Toast';
 import { ADMIN_C, F, S } from '@/lib/adminPalette';
 
-// Per-page accent override: kids experience uses a blue accent.
-const C = { ...ADMIN_C, accent: '#2563eb', now: '#c2410c', nowBg: '#fff3e0' };
+// Per-page accent override: kids experience uses a blue accent. `now`/`nowBg`
+// are shared story-timeline tokens and live on ADMIN_C directly.
+const C = { ...ADMIN_C, accent: '#2563eb' };
 
 type KidsCategory = { id: string; name: string; slug: string | null; parent_id: string | null; sort_order: number | null };
 
