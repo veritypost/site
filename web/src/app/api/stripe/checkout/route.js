@@ -45,10 +45,18 @@ export async function POST(request) {
 
   const { plan_name } = await request.json().catch(() => ({}));
   if (!plan_name) return NextResponse.json({ error: 'plan_name required' }, { status: 400 });
+  // Web checkout refuses plans not marked visible. Family + family_xl tiers
+  // are sold via iOS StoreKit only — their plan rows stay `is_active=true`
+  // so billing RPCs can mint subscriptions when Apple signs a receipt, but
+  // `is_visible=false` locks the web Stripe path. A direct POST from a
+  // crafted client with `plan_name='verity_family_monthly'` 404s here
+  // instead of succeeding against an invisible plan.
   const { data: plan } = await service
     .from('plans')
     .select('id, tier, stripe_price_id, display_name')
     .eq('name', plan_name)
+    .eq('is_active', true)
+    .eq('is_visible', true)
     .maybeSingle();
   if (!plan) return NextResponse.json({ error: 'Unknown plan' }, { status: 404 });
   if (!plan.stripe_price_id) {

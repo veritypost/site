@@ -3,7 +3,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/client';
-import { TIERS, TIER_ORDER, PRICING, formatCents } from '../../../lib/plans';
+import {
+  TIERS,
+  TIER_ORDER,
+  PRICING,
+  formatCents,
+  getWebVisibleTiers,
+} from '../../../lib/plans';
 import DestructiveActionConfirm from '@/components/admin/DestructiveActionConfirm';
 import Page, { PageHeader } from '@/components/admin/Page';
 import PageSection from '@/components/admin/PageSection';
@@ -42,7 +48,12 @@ type DestructiveState = {
   oldValue: unknown; newValue: unknown; run: (ctx: { reason?: string }) => Promise<void>;
 };
 
-const PLANS = TIER_ORDER.map((tier: string) => ({
+// PLANS is derived from the DB-visible tier set, not the full hardcoded
+// TIER_ORDER, so iOS-only tiers (family / family_xl) don't appear in the
+// admin "all marketed plans" overview. Builds at module-init against the
+// hardcoded snapshot; the inner component filters again at render time
+// with the live DB set to catch mid-session toggles.
+const PLANS_ALL = TIER_ORDER.map((tier: string) => ({
   key: tier,
   name: (TIERS as any)[tier].name,
   price: tier === 'free' ? 'Free' : formatCents((PRICING as any)[tier].monthly.cents),
@@ -75,6 +86,22 @@ function SubscriptionsInner() {
   const [maxPauseDays, setMaxPauseDays] = useState(30);
   const [refundWindowDays, setRefundWindowDays] = useState(30);
   const [freezeConfirmOpen, setFreezeConfirmOpen] = useState(false);
+  // Live DB-visible tier set. Filters PLANS_ALL so family / family_xl (sold
+  // via iOS only) don't inflate the "marketed plans" overview with tiers
+  // no web user can actually purchase. Initialised to the full hardcoded
+  // set so the overview renders before the DB fetch lands; replaced with
+  // the live set once getWebVisibleTiers resolves.
+  const [webVisibleTiers, setWebVisibleTiers] = useState<Set<string>>(
+    () => new Set(TIER_ORDER)
+  );
+
+  useEffect(() => {
+    getWebVisibleTiers(supabase).then(setWebVisibleTiers).catch(() => {
+      // Swallow — keep the full set on lookup failure so the overview
+      // doesn't disappear; the API-side guard in /api/stripe/checkout
+      // still blocks invisible-plan purchases regardless.
+    });
+  }, [supabase]);
 
   useEffect(() => {
     (async () => {
@@ -119,7 +146,10 @@ function SubscriptionsInner() {
     return acc;
   }, {});
 
-  const plansWithCounts = PLANS.map((p) => ({ ...p, users: planCounts[p.name] || 0 }));
+  const plansWithCounts = PLANS_ALL.filter((p) => webVisibleTiers.has(p.key)).map((p) => ({
+    ...p,
+    users: planCounts[p.name] || 0,
+  }));
   const totalMRR = plansWithCounts.reduce((a, p) => a + (parseFloat(String(p.price).replace('$', '')) || 0) * p.users, 0);
   const totalPaid = plansWithCounts.filter((p) => p.price !== 'Free' && p.price !== '$0').reduce((a, p) => a + p.users, 0);
   const totalUsers = plansWithCounts.reduce((a, p) => a + p.users, 0);

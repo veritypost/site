@@ -35,10 +35,15 @@ export async function POST(request) {
 
   const service = createServiceClient();
 
+  // Web resubscribe refuses invisible plans (family tiers are iOS-only).
+  // is_active=true + is_visible=false = "billing RPCs accept the plan_id
+  // when iOS StoreKit mints it, but the web surface can't revive into it."
   const { data: plan, error: planErr } = await service
     .from('plans')
     .select('id, tier')
     .eq('name', planName)
+    .eq('is_active', true)
+    .eq('is_visible', true)
     .maybeSingle();
   if (planErr || !plan) {
     return NextResponse.json({ error: 'Unknown plan' }, { status: 404 });

@@ -32,10 +32,16 @@ export async function POST(request) {
 
   const service = createServiceClient();
 
+  // Web plan-change refuses invisible plans. Family tiers are iOS-only:
+  // is_active=true but is_visible=false means "billing RPCs accept this
+  // plan_id when iOS mints it, but the web surface can't switch into it."
+  // See api/stripe/checkout for the matching guard.
   const { data: plan, error: planErr } = await service
     .from('plans')
     .select('id, tier, stripe_price_id')
     .eq('name', planName)
+    .eq('is_active', true)
+    .eq('is_visible', true)
     .maybeSingle();
   if (planErr || !plan) {
     return NextResponse.json({ error: 'Unknown plan' }, { status: 404 });

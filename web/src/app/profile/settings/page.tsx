@@ -215,7 +215,10 @@ type InvoiceRow = Pick<
   | 'invoice_url'
   | 'invoice_pdf_url'
 >;
-type PlanRow = Pick<Tables<'plans'>, 'id' | 'tier' | 'billing_period' | 'price_cents' | 'name'>;
+type PlanRow = Pick<
+  Tables<'plans'>,
+  'id' | 'tier' | 'billing_period' | 'price_cents' | 'name' | 'is_active' | 'is_visible'
+>;
 type PlanFeatureRow = Pick<Tables<'plan_features'>, 'plan_id' | 'feature_name' | 'is_enabled'>;
 type SubscriptionRow = Pick<
   Tables<'subscriptions'>,
@@ -3744,6 +3747,12 @@ function BillingBundle({
   const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
   const [plans, setPlans] = useState<PlanRow[]>([]);
   const [planFeatures, setPlanFeatures] = useState<PlanFeatureRow[]>([]);
+  // Tiers the DB has marked is_active=true AND is_visible=true — filters
+  // the TIER_ORDER loop in the billing picker so DB-hidden plans (family /
+  // family_xl, sold via iOS StoreKit only) never render on the web
+  // surface. Initialised to TIER_ORDER so first-paint doesn't flash an
+  // empty picker; replaced when the DB fetch lands.
+  const [webVisibleTiers, setWebVisibleTiers] = useState<Set<string>>(() => new Set(TIER_ORDER));
   const [cycle, setCycle] = useState<'monthly' | 'annual'>('monthly');
   const [busy, setBusy] = useState<string>('');
   const [confirmCancel, setConfirmCancel] = useState(false);
@@ -3779,7 +3788,7 @@ function BillingBundle({
             .order('created_at', { ascending: false }),
           supabase
             .from('plans')
-            .select('id, tier, billing_period, price_cents, name')
+            .select('id, tier, billing_period, price_cents, name, is_active, is_visible')
             .eq('is_active', true)
             .order('sort_order'),
           // M10: plan feature bullets — restore the per-plan features list.
@@ -3792,8 +3801,17 @@ function BillingBundle({
         setUserBilling(uq.data as typeof userBilling);
         setSubscription((sq.data as SubscriptionRow | null) || null);
         setInvoices((iq.data as InvoiceRow[] | null) || []);
-        setPlans((pq.data as PlanRow[] | null) || []);
+        const planRows = (pq.data as PlanRow[] | null) || [];
+        setPlans(planRows);
         setPlanFeatures((pfq.data as PlanFeatureRow[] | null) || []);
+        // Derive visible-tier filter from the same DB result — family tiers
+        // that are is_visible=false stay out of the picker even though they
+        // resolve for the current user's plan label.
+        const visible = new Set<string>(['free']);
+        for (const p of planRows) {
+          if (p.is_active && p.is_visible && p.tier) visible.add(p.tier);
+        }
+        setWebVisibleTiers(visible);
       } catch (err) {
         if (alive) pushToast({ message: 'Could not load billing info.', variant: 'danger' });
       } finally {
@@ -4177,7 +4195,7 @@ function BillingBundle({
               gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))',
             }}
           >
-            {TIER_ORDER.map((tier) => {
+            {TIER_ORDER.filter((tier) => webVisibleTiers.has(tier)).map((tier) => {
               const t = (TIERS as Record<string, { name: string; tagline: string }>)[tier];
               const isCurrent = tier === currentTier && !isFrozen;
               const action = actionFor(tier);

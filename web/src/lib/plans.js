@@ -155,6 +155,21 @@ export async function getPlans(supabase) {
   return _cache;
 }
 
+// Tier set that should appear in web-surface purchase pickers. Used to
+// filter the hardcoded TIER_ORDER loop so DB-hidden plans (family + family_xl
+// are sold via iOS StoreKit only) don't render on the web billing page or
+// the admin subscriptions picker. Bundles `free` unconditionally — it's the
+// baseline and always visible even when the DB row is intentionally
+// non-purchasable.
+export async function getWebVisibleTiers(supabase) {
+  const plans = await getPlans(supabase);
+  const visible = new Set(['free']);
+  for (const p of plans) {
+    if (p.is_active && p.is_visible && p.tier) visible.add(p.tier);
+  }
+  return visible;
+}
+
 // ---- plan_features limit lookup ----
 //
 // T-016 — route callers that need a per-plan numeric limit (bookmark
