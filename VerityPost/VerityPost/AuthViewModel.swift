@@ -207,12 +207,20 @@ final class AuthViewModel: ObservableObject {
         }
 
         // Normalize + validate username client-side before touching auth.
+        // Swift's `isLetter` matches ANY Unicode letter, which lets Cyrillic
+        // `а` (U+0430) and Latin `a` (U+0061) both slip through — a
+        // homoglyph-collision / impersonation vector. Restrict to ASCII
+        // letters + digits + underscore, matching the web signup filter
+        // in web/src/app/signup/pick-username/page.tsx handleChange().
+        // NFC-normalise first so any precomposed Latin variants collapse
+        // before the ASCII gate.
         let normalized = username
+            .precomposedStringWithCanonicalMapping
             .lowercased()
             .trimmingCharacters(in: .whitespaces)
-            .filter { $0.isLetter || $0.isNumber || $0 == "_" }
+            .filter { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_") }
         guard normalized.count >= 3 else {
-            authError = "Username must be at least 3 characters (letters, numbers, underscores)."
+            authError = "Username must be at least 3 characters (a-z, 0-9, underscore)."
             return
         }
 
