@@ -14,6 +14,11 @@ import type { Tables } from '@/types/database-helpers';
 // fallback if the plan_features row is missing.
 const FALLBACK_BOOKMARK_CAP = 10;
 
+// H5 follow-up — cursor pagination. PAGE_SIZE rows per request; the
+// cursor is the last loaded row's created_at (desc order). `hasMore`
+// is inferred: if the fetch returned a full page, there MAY be more.
+const PAGE_SIZE = 50;
+
 // Shape of a row returned by the bookmarks list query: Row + nested article
 // projection + nested category name. Kept local because this is the only place
 // that slices it this way.
@@ -78,6 +83,12 @@ export default function BookmarksPage() {
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [deleteBusy, setDeleteBusy] = useState<boolean>(false);
 
+  // Cursor pagination state. `hasMore` flips false once a fetch returns
+  // fewer than PAGE_SIZE rows. `loadingMore` gates the Load more button
+  // so rapid clicks don't fire overlapping queries.
+  const [hasMore, setHasMore] = useState<boolean>(false);
+  const [loadingMore, setLoadingMore] = useState<boolean>(false);
+
   const atCap = !canUnlimited && items.length >= bookmarkCap;
 
   async function load() {
@@ -122,11 +133,9 @@ export default function BookmarksPage() {
       if (typeof cap === 'number') setBookmarkCap(cap);
     }
 
-    // H5 — cap at 100 most recent bookmarks so unlimited-tier power
-    // users don't blow out the client state / initial paint. Proper
-    // cursor pagination is a follow-up (this page pre-dates the
-    // paid-unlimited tier). 100 is enough for the browse + filter UX
-    // on load; older bookmarks surface via filter/collection scope.
+    // First page: PAGE_SIZE most recent bookmarks, cursor-paginated by
+    // created_at desc. Subsequent pages fetched by loadMore() using the
+    // last row's created_at as the keyset cursor.
     const { data: bms, error: bmsErr } = await supabase
       .from('bookmarks')
       .select(
@@ -134,9 +143,11 @@ export default function BookmarksPage() {
       )
       .eq('user_id', authUser.id)
       .order('created_at', { ascending: false })
-      .limit(100);
+      .limit(PAGE_SIZE);
     if (bmsErr) console.error('[bookmarks] load failed', bmsErr);
-    setItems((bms as unknown as BookmarkRow[] | null) || []);
+    const firstPage = (bms as unknown as BookmarkRow[] | null) || [];
+    setItems(firstPage);
+    setHasMore(firstPage.length === PAGE_SIZE);
 
     if (collectionsOk) {
       const { data: cols, error: colsErr } = await supabase
@@ -158,6 +169,40 @@ export default function BookmarksPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function loadMore() {
+    if (loadingMore || !hasMore) return;
+    const last = items[items.length - 1];
+    if (!last) return;
+    setLoadingMore(true);
+    setError('');
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser();
+    if (!authUser) {
+      setLoadingMore(false);
+      return;
+    }
+    const { data: bms, error: bmsErr } = await supabase
+      .from('bookmarks')
+      .select(
+        'id, notes, created_at, collection_id, articles!fk_bookmarks_article_id(id, title, slug, excerpt, published_at, categories!fk_articles_category_id(name))'
+      )
+      .eq('user_id', authUser.id)
+      .lt('created_at', last.created_at)
+      .order('created_at', { ascending: false })
+      .limit(PAGE_SIZE);
+    if (bmsErr) {
+      console.error('[bookmarks] loadMore failed', bmsErr);
+      setError('Could not load more bookmarks.');
+      setLoadingMore(false);
+      return;
+    }
+    const next = (bms as unknown as BookmarkRow[] | null) || [];
+    setItems((prev) => [...prev, ...next]);
+    setHasMore(next.length === PAGE_SIZE);
+    setLoadingMore(false);
+  }
 
   async function removeBookmark(id: string) {
     const res = await fetch(`/api/bookmarks/${id}`, { method: 'DELETE' });
@@ -567,6 +612,32 @@ export default function BookmarksPage() {
               >
                 Browse articles
               </a>
+            </div>
+          )}
+          {/* Load more — keyset cursor on created_at desc. Only shown
+              when the last fetch returned a full page (hasMore). Hidden
+              when a collection filter is active because the cursor
+              operates on the unfiltered timeline; mixing cursor
+              advance with client-side filter would yield gaps. */}
+          {hasMore && activeCollection === 'all' && items.length > 0 && (
+            <div style={{ textAlign: 'center', padding: '20px 0 0' }}>
+              <button
+                onClick={loadMore}
+                disabled={loadingMore}
+                style={{
+                  padding: '10px 20px',
+                  background: '#111',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 10,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: loadingMore ? 'default' : 'pointer',
+                  opacity: loadingMore ? 0.6 : 1,
+                }}
+              >
+                {loadingMore ? 'Loading…' : 'Load more'}
+              </button>
             </div>
           )}
         </div>
