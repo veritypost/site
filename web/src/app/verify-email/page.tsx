@@ -4,6 +4,7 @@
 
 import { useState, useEffect, CSSProperties } from 'react';
 import { createClient } from '../../lib/supabase/client';
+import { resolveNext } from '../../lib/authRedirect';
 
 // Premium conversion moment. Three states:
 //   - waiting  — user hasn't clicked the link yet. Masked email, resend,
@@ -174,7 +175,18 @@ export default function VerifyEmailPage() {
   };
 
   const handleContinue = () => {
-    window.location.href = usernameMissing ? '/signup/pick-username' : '/welcome';
+    // H2 / L2-02-auth-002 — preserve ?next= through the verify-email
+    // step. A user who arrived at signup with ?next= should land on
+    // that target after verifying email, not on /welcome. The
+    // pick-username page also forwards ?next= downstream, so the
+    // chain stays intact regardless of which leg we take here.
+    const raw =
+      typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('next') || ''
+        : '';
+    const safe = resolveNext(raw, null);
+    const nextQs = safe ? `?next=${encodeURIComponent(safe)}` : '';
+    window.location.href = (usernameMissing ? '/signup/pick-username' : '/welcome') + nextQs;
   };
 
   const shell: CSSProperties = {

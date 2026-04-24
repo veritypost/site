@@ -106,10 +106,18 @@ export default function SignupPage() {
     (async () => {
       const { createClient } = await import('../../lib/supabase/client');
       const supabase = createClient();
+      const { resolveNext } = await import('../../lib/authRedirect');
       const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
         if (!mounted) return;
         if (event === 'SIGNED_IN' && session) {
-          window.location.href = '/signup/pick-username';
+          // H2 / L2-02-auth-003 — preserve ?next= on the OAuth SIGNED_IN
+          // listener branch too. The callback route forwards ?next= to
+          // /signup/pick-username but this page also catches SIGNED_IN
+          // events and was redirecting without the query string.
+          const raw = new URLSearchParams(window.location.search).get('next') || '';
+          const safeNext = resolveNext(raw, null);
+          const nextQs = safeNext ? `?next=${encodeURIComponent(safeNext)}` : '';
+          window.location.href = '/signup/pick-username' + nextQs;
         }
       });
       return () => sub.subscription.unsubscribe();
@@ -206,9 +214,20 @@ export default function SignupPage() {
           method: 'email',
         },
       });
-      window.location.href = data.needsEmailConfirmation
-        ? '/verify-email'
-        : '/signup/pick-username';
+      // H2 / L2-02-auth-001 — forward the ?next= query param into the
+      // onboarding chain. Without this, a user who arrived at /signup
+      // via an intent-link with ?next= loses it on email-signup and
+      // lands on the default post-login page instead of their target.
+      // OAuth callback handles this server-side; email signup has to
+      // thread it client-side.
+      {
+        const raw = new URLSearchParams(window.location.search).get('next') || '';
+        const { resolveNext } = await import('../../lib/authRedirect');
+        const safeNext = resolveNext(raw, null);
+        const nextQs = safeNext ? `?next=${encodeURIComponent(safeNext)}` : '';
+        window.location.href =
+          (data.needsEmailConfirmation ? '/verify-email' : '/signup/pick-username') + nextQs;
+      }
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'We couldn’t create your account. Try again.';
