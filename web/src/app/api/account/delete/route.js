@@ -153,6 +153,23 @@ export async function POST(request) {
       console.error('[account.delete.immediate] auth delete throw', e?.message);
     }
 
+    // 5. Tear down the caller's session cookies. Without this, the
+    //    browser keeps the sb-*-auth-token cookie and every next
+    //    navigation sends it to the API — which 401s (auth row is
+    //    gone) but still exposes a window where the client thinks
+    //    it's signed in, shows stale UI, and races on render. The
+    //    authClient is a @supabase/ssr server client with cookie
+    //    read/write handlers wired through Next's response; signOut
+    //    invalidates the local session + triggers the cookie-clear
+    //    path (same mechanism as /api/auth/logout). Server-side
+    //    revoke may error because the GoTrue row is already gone —
+    //    that's fine, the cookie-clear happens regardless.
+    try {
+      await authClient.auth.signOut();
+    } catch (e) {
+      console.error('[account.delete.immediate] signOut', e?.message);
+    }
+
     return NextResponse.json({
       deleted: true,
       mode: 'immediate',
