@@ -26,7 +26,7 @@
 
 import { NextResponse } from 'next/server';
 import { createHash } from 'crypto';
-import { createServiceClient } from '@/lib/supabase/server';
+import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { isBotUserAgent } from '@/lib/botDetect';
 import type { TrackEvent, BatchResponseBody } from '@/lib/events/types';
 
@@ -115,7 +115,7 @@ interface SanitizedEvent {
 
 function sanitize(
   raw: unknown,
-  ctx: { ua: string | null; ip: string; isBot: boolean }
+  ctx: { ua: string | null; ip: string; isBot: boolean; authedUserId: string | null }
 ): SanitizedEvent | null {
   if (!raw || typeof raw !== 'object') return null;
   const e = raw as Record<string, unknown>;
@@ -146,7 +146,11 @@ function sanitize(
     event_name,
     event_category: cat,
     occurred_at: e.occurred_at,
-    user_id: looksLikeUUID(e.user_id) ? (e.user_id as string) : null,
+    // user_id is AUTHORITATIVELY the session user (or null for anon).
+    // Client-supplied e.user_id is ignored — previously attackers could
+    // attribute arbitrary events to any user UUID they guessed or
+    // scraped, poisoning analytics + triggering false abuse signals.
+    user_id: ctx.authedUserId,
     session_id,
     device_id: clampString(e.device_id, 128),
     user_tier: clampString(e.user_tier, 32),
@@ -210,10 +214,24 @@ export async function POST(request: Request) {
   const ip = getClientIp(request);
   const isBot = isBotUserAgent(ua);
 
+  // Resolve the session user authoritatively. Anon callers legitimately
+  // have no user_id; authed callers get theirs from the cookie, never
+  // from the request body.
+  let authedUserId: string | null = null;
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    authedUserId = user?.id ?? null;
+  } catch {
+    authedUserId = null;
+  }
+
   const rows: SanitizedEvent[] = [];
   let rejectedInvalid = 0;
   for (const raw of events) {
-    const row = sanitize(raw, { ua, ip, isBot });
+    const row = sanitize(raw, { ua, ip, isBot, authedUserId });
     if (row) rows.push(row);
     else rejectedInvalid++;
   }
