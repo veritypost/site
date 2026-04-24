@@ -134,20 +134,28 @@ export default function VerifyEmailPage() {
     setUpdateLoading(true);
     setError('');
     try {
-      const supabase = createClient();
-      // UJ-702 + UJ-722: flip public.users.email_verified back to false
-      // server-side and trigger the Supabase email-change confirmation.
-      const preRes = await fetch('/api/auth/email-change', {
+      // /api/auth/email-change now owns the entire flow: validates the
+      // email, calls auth.updateUser server-side (which queues the
+      // pending change AND sends the confirmation email), then flips
+      // our local email_verified flag. Client used to also call
+      // auth.updateUser here, racing the server's flag flip and
+      // splitting auth state across two surfaces. Removed.
+      const res = await fetch('/api/auth/email-change', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: newEmail }),
       });
-      if (preRes.status === 429) {
+      if (res.status === 429) {
         setError('Too many email-change attempts. Try again later.');
         return;
       }
-      const { error: updateError } = await supabase.auth.updateUser({ email: newEmail });
-      if (updateError) throw updateError;
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setError(
+          typeof body?.error === 'string' ? body.error : 'Failed to update email. Please try again.'
+        );
+        return;
+      }
       setUserEmail(newEmail);
       setChangeEmail(false);
       setNewEmail('');
