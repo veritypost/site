@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent, type FocusEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { ADMIN_ROLES } from '@/lib/roles';
 import { createClient } from '../../../lib/supabase/client';
@@ -79,8 +79,12 @@ function StreaksInner() {
       if (!user) { router.push('/'); return; }
       const { data: me } = await supabase.from('users').select('id').eq('id', user.id).single();
       const { data: userRoles } = await supabase.from('user_roles').select('roles(name)').eq('user_id', user.id);
-      const roleNames = (userRoles || []).map((r: any) => r.roles?.name).filter(Boolean);
-      if (!me || !roleNames.some((r: string) => ADMIN_ROLES.has(r))) { router.push('/'); return; }
+      const roleNames = (
+        (userRoles || []) as Array<{ roles: { name: string | null } | null }>
+      )
+        .map((r) => r.roles?.name)
+        .filter((n): n is string => typeof n === 'string');
+      if (!me || !roleNames.some((r) => ADMIN_ROLES.has(r))) { router.push('/'); return; }
 
       const { data: streakRows } = await supabase
         .from('users')
@@ -93,10 +97,10 @@ function StreaksInner() {
       if (settingsRows) {
         const cfg: Record<string, boolean> = {};
         const n: Record<string, number> = {};
-        (settingsRows as any[]).forEach((row) => {
+        (settingsRows as Array<{ key: string; value: string | null }>).forEach((row) => {
           const k = row.key.replace('streak_config_', '').replace('streak_num_', '');
           if (row.key.startsWith('streak_config_')) cfg[k] = row.value === 'true';
-          if (row.key.startsWith('streak_num_')) n[k] = parseFloat(row.value) || 0;
+          if (row.key.startsWith('streak_num_')) n[k] = parseFloat(row.value || '') || 0;
         });
         if (Object.keys(cfg).length) setConfig((prev) => ({ ...prev, ...cfg }));
         if (Object.keys(n).length) setNums((prev) => ({ ...prev, ...n }));
@@ -201,7 +205,7 @@ function StreaksInner() {
                       {u.username}
                     </span>
                     {u.last_active_at && <span style={{ fontSize: F.xs, color: C.muted }}>{new Date(u.last_active_at).toLocaleDateString()}</span>}
-                    <span style={{ fontSize: F.md, fontWeight: 700, color: C.warn }}>{(u as any).streak_current || 0}d</span>
+                    <span style={{ fontSize: F.md, fontWeight: 700, color: C.warn }}>{u.streak_current || 0}d</span>
                   </div>
                 ))}
               </div>
@@ -272,8 +276,8 @@ function ConfigGroup({
                     block={false}
                     style={{ width: 70 }}
                     value={nums[item.num]}
-                    onChange={(e: any) => setNums((prev) => ({ ...prev, [item.num as string]: parseFloat(e.target.value) || 0 }))}
-                    onBlur={(e: any) => onNum(item.num as string, e.target.value)}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => setNums((prev) => ({ ...prev, [item.num as string]: parseFloat(e.target.value) || 0 }))}
+                    onBlur={(e: FocusEvent<HTMLInputElement>) => onNum(item.num as string, e.target.value)}
                   />
                   {item.unit && <span style={{ fontSize: F.xs, color: C.muted }}>{item.unit}</span>}
                 </div>
@@ -304,8 +308,8 @@ function LabeledNum({ label, value, onBlur, onChange, unit }: {
           block={false}
           style={{ width: 90 }}
           value={value}
-          onChange={(e: any) => onChange(parseFloat(e.target.value) || 0)}
-          onBlur={(e: any) => onBlur(parseFloat(e.target.value) || 0)}
+          onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(parseFloat(e.target.value) || 0)}
+          onBlur={(e: FocusEvent<HTMLInputElement>) => onBlur(parseFloat(e.target.value) || 0)}
         />
         {unit && <span style={{ fontSize: F.sm, color: C.muted }}>{unit}</span>}
       </div>

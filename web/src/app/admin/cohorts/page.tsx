@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent, type MouseEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { ADMIN_ROLES } from '@/lib/roles';
 import { createClient } from '../../../lib/supabase/client';
@@ -153,8 +153,12 @@ function CohortsInner() {
       if (!user) { router.push('/'); return; }
       const { data: me } = await supabase.from('users').select('id').eq('id', user.id).single();
       const { data: userRoles } = await supabase.from('user_roles').select('roles(name)').eq('user_id', user.id);
-      const roleNames = (userRoles || []).map((r: any) => r.roles?.name).filter(Boolean);
-      if (!me || !roleNames.some((r: string) => ADMIN_ROLES.has(r))) { router.push('/'); return; }
+      const roleNames = (
+        (userRoles || []) as Array<{ roles: { name: string | null } | null }>
+      )
+        .map((r) => r.roles?.name)
+        .filter((n): n is string => typeof n === 'string');
+      if (!me || !roleNames.some((r) => ADMIN_ROLES.has(r))) { router.push('/'); return; }
 
       const { data: cohortRows } = await supabase
         .from('cohorts').select('*').order('created_at', { ascending: false });
@@ -165,7 +169,12 @@ function CohortsInner() {
         .select('id, name, cohort_id, type, channel, subject, body, sent_count, opened_count, clicked_count, conversion_count, completed_at, cohorts ( name )')
         .order('completed_at', { ascending: false, nullsFirst: false })
         .limit(20);
-      setCampaigns(((campaignRows || []) as any[]).map((c) => ({ ...c, cohort_name: c.cohorts?.name || null })) as Campaign[]);
+      setCampaigns(
+        ((campaignRows || []) as Campaign[]).map((c) => ({
+          ...c,
+          cohort_name: c.cohorts?.name || null,
+        }))
+      );
       setLoading(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -192,12 +201,14 @@ function CohortsInner() {
           subject: msgSubject || null,
           body: msgBody || null,
           completed_at: new Date().toISOString(),
-        } as any)
+        })
         .select('id, name, cohort_id, type, channel, subject, body, sent_count, opened_count, clicked_count, conversion_count, completed_at')
         .single();
       if (error) { push({ message: 'Send failed. Try again.', variant: 'danger' }); return; }
       if (inserted) {
-        setCampaigns((prev) => [{ ...(inserted as any), cohort_name: cohort.name }, ...prev] as Campaign[]);
+        setCampaigns(
+          (prev) => [{ ...(inserted as Campaign), cohort_name: cohort.name }, ...prev]
+        );
         push({ message: 'Campaign sent', variant: 'success' });
       }
       setShowCompose(false); setMsgSubject(''); setMsgBody('');
@@ -238,14 +249,14 @@ function CohortsInner() {
             <NumberInput
               size="sm" block={false} style={{ width: 60 }}
               value={minV} placeholder="min"
-              onChange={(e: any) => updateFilter(filter.minKey, e.target.value)}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => updateFilter(filter.minKey, e.target.value)}
             />
             <span style={{ fontSize: F.xs, color: C.dim }}>to</span>
             {filter.prefix && <span style={{ fontSize: F.xs, color: C.soft }}>{filter.prefix}</span>}
             <NumberInput
               size="sm" block={false} style={{ width: 60 }}
               value={maxV} placeholder="max"
-              onChange={(e: any) => updateFilter(filter.maxKey, e.target.value)}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => updateFilter(filter.maxKey, e.target.value)}
             />
             {filter.unit && <span style={{ fontSize: F.xs, color: C.dim }}>{filter.unit}</span>}
           </div>
@@ -261,7 +272,7 @@ function CohortsInner() {
           <NumberInput
             size="sm" block={false} style={{ width: 60 }}
             value={filters[filter.inputKey]}
-            onChange={(e: any) => updateFilter(filter.inputKey, e.target.value)}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => updateFilter(filter.inputKey, e.target.value)}
           />
           {filter.unit && <span style={{ fontSize: F.xs, color: C.dim }}>{filter.unit}</span>}
         </div>
@@ -320,7 +331,7 @@ function CohortsInner() {
                     <div style={{ fontSize: F.xl, fontWeight: 600, color: C.accent }}>{cohort.count ?? '—'}</div>
                     <div style={{ fontSize: F.xs, color: C.dim }}>users</div>
                   </div>
-                  <Button size="sm" variant="primary" onClick={(e: any) => { e.stopPropagation(); setSelectedCohort(cohort.id); setShowCompose(true); }}>
+                  <Button size="sm" variant="primary" onClick={(e: MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); setSelectedCohort(cohort.id); setShowCompose(true); }}>
                     Message
                   </Button>
                 </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/client';
 import Page, { PageHeader } from '@/components/admin/Page';
@@ -65,7 +65,11 @@ function AnalyticsInner() {
       if (!user) { router.push('/'); return; }
       const { data: profile } = await supabase.from('users').select('id').eq('id', user.id).single();
       const { data: userRoles } = await supabase.from('user_roles').select('roles!fk_user_roles_role_id(name)').eq('user_id', user.id);
-      const roleNames = (userRoles || []).map((r: any) => r.roles?.name).filter(Boolean);
+      const roleNames = (
+        (userRoles || []) as Array<{ roles: { name: string | null } | null }>
+      )
+        .map((r) => r.roles?.name)
+        .filter((n): n is string => typeof n === 'string');
       if (!profile || (!roleNames.includes('owner') && !roleNames.includes('admin'))) { router.push('/'); return; }
 
       const [userRes, storyRes, commentRes, readingRes] = await Promise.all([
@@ -95,13 +99,22 @@ function AnalyticsInner() {
         .select('quiz_id, is_correct');
       if (resultsErr) setLoadError(resultsErr.message);
       const resultsByQuiz: Record<string, { total: number; failed: number }> = {};
-      (resultsData || []).forEach((r: any) => {
-        const id = r.quiz_id as string;
+      type AttemptRow = { quiz_id: string | null; is_correct: boolean | null };
+      ((resultsData || []) as AttemptRow[]).forEach((r) => {
+        const id = r.quiz_id;
+        if (!id) return;
         if (!resultsByQuiz[id]) resultsByQuiz[id] = { total: 0, failed: 0 };
         resultsByQuiz[id].total++;
         if (!r.is_correct) resultsByQuiz[id].failed++;
       });
-      setQuizFailures(((quizData || []) as any[]).map((q) => {
+      type QuizRow = {
+        id: string;
+        article_id: string | null;
+        title: string | null;
+        options: unknown;
+        articles: { title: string | null } | null;
+      };
+      setQuizFailures(((quizData || []) as QuizRow[]).map((q) => {
         const stats = resultsByQuiz[q.id] || { total: 0, failed: 0 };
         const failRate = stats.total > 0 ? Math.round((stats.failed / stats.total) * 100) : 0;
         return {
@@ -122,7 +135,9 @@ function AnalyticsInner() {
         .gte('created_at', sevenDaysAgo.toISOString());
       const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       const dayMap: Record<string, { views: number; users: Set<string> }> = {};
-      (historyData || []).forEach((h: any) => {
+      type HistoryRow = { created_at: string | null; user_id: string | null };
+      ((historyData || []) as HistoryRow[]).forEach((h) => {
+        if (!h.created_at) return;
         const d = days[new Date(h.created_at).getDay()];
         if (!dayMap[d]) dayMap[d] = { views: 0, users: new Set() };
         dayMap[d].views++;
@@ -285,12 +300,12 @@ function AnalyticsInner() {
             <div>
               <label style={lblStyle}>Red threshold</label>
               <NumberInput block={false} style={{ width: 80 }} value={failRedThreshold}
-                onChange={(e: any) => setFailRedThreshold(parseInt(e.target.value) || 0)} />
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setFailRedThreshold(parseInt(e.target.value) || 0)} />
             </div>
             <div>
               <label style={lblStyle}>Yellow threshold</label>
               <NumberInput block={false} style={{ width: 80 }} value={failYellowThreshold}
-                onChange={(e: any) => setFailYellowThreshold(parseInt(e.target.value) || 0)} />
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setFailYellowThreshold(parseInt(e.target.value) || 0)} />
             </div>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: S[1] }}>
               {([
@@ -364,12 +379,12 @@ function AnalyticsInner() {
             <div>
               <label style={lblStyle}>Warning at</label>
               <NumberInput block={false} style={{ width: 80 }} value={resourceWarnPct}
-                onChange={(e: any) => setResourceWarnPct(parseInt(e.target.value) || 0)} />
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setResourceWarnPct(parseInt(e.target.value) || 0)} />
             </div>
             <div>
               <label style={lblStyle}>Danger at</label>
               <NumberInput block={false} style={{ width: 80 }} value={resourceDangerPct}
-                onChange={(e: any) => setResourceDangerPct(parseInt(e.target.value) || 0)} />
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setResourceDangerPct(parseInt(e.target.value) || 0)} />
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: S[2] }}>
