@@ -65,23 +65,47 @@ export async function PATCH(request) {
     .eq('alert_type', b.alert_type)
     .maybeSingle();
 
-  const payload = {
-    user_id: user.id,
-    alert_type: b.alert_type,
-    channel_push: b.channel_push ?? true,
-    channel_email: b.channel_email ?? true,
-    channel_in_app: b.channel_in_app ?? true,
-    channel_sms: b.channel_sms ?? false,
-    is_enabled: b.is_enabled ?? true,
-    quiet_hours_start: b.quiet_hours_start || null,
-    quiet_hours_end: b.quiet_hours_end || null,
-    frequency: b.frequency || null,
-    updated_at: new Date().toISOString(),
-  };
+  // Partial-PATCH semantics: only fields present in the body get written.
+  // Omitted fields preserve their existing value (for updates) or fall back
+  // to the DB schema default (for inserts). Prior `?? true` defaulting
+  // clobbered untouched channels when a client sent e.g. just `{push:false}`.
+  // Matches the ALLOWED-list pattern in api/admin/ad-units + ad-campaigns.
+  //
+  // `null` is treated as "field not supplied" so callers can't poke a null
+  // into the NOT NULL boolean channels. Empty strings in the two time
+  // fields coerce to null to match the prior `|| null` behavior (a UI
+  // that clears an input may send '' instead of null).
+  const ALLOWED = [
+    'channel_push',
+    'channel_email',
+    'channel_in_app',
+    'channel_sms',
+    'is_enabled',
+    'quiet_hours_start',
+    'quiet_hours_end',
+    'frequency',
+  ];
+  const TIME_FIELDS = new Set(['quiet_hours_start', 'quiet_hours_end']);
+  const update = { updated_at: new Date().toISOString() };
+  for (const k of ALLOWED) {
+    const v = b[k];
+    if (v === undefined || v === null) continue;
+    if (TIME_FIELDS.has(k) && v === '') {
+      update[k] = null;
+      continue;
+    }
+    update[k] = v;
+  }
 
   const { error } = existing
-    ? await service.from('alert_preferences').update(payload).eq('id', existing.id)
-    : await service.from('alert_preferences').insert(payload);
+    ? await service
+        .from('alert_preferences')
+        .update(update)
+        .eq('id', existing.id)
+        .eq('user_id', user.id)
+    : await service
+        .from('alert_preferences')
+        .insert({ user_id: user.id, alert_type: b.alert_type, ...update });
   if (error)
     return safeErrorResponse(NextResponse, error, {
       route: 'notifications.preferences',
