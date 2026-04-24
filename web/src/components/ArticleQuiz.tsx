@@ -361,13 +361,79 @@ export default function ArticleQuiz({
     const { passed, correct, total, percentile, attempts_remaining, results } = result;
     const outOfAttempts = !isPaid && attempts_remaining === 0 && !passed;
     const showRetakeButton = !passed && !outOfAttempts && canRetake;
+
+    // Signature moment per Future Projects/13_QUIZ_UNLOCK_MOMENT.md:
+    // passing isn't winning, it's *arriving*. Calm card, no fanfare,
+    // no celebration banner. The score is incidental; "you're in" is
+    // the line that carries the weight. Composer auto-focus + comment
+    // stagger fade-in are handled in the parent (page.tsx + CommentThread).
+    if (passed) {
+      return (
+        <>
+          {interstitialNode}
+          <div
+            role="status"
+            aria-live="polite"
+            style={{
+              background: 'var(--card, #f7f7f7)',
+              border: `1px solid ${C.border}`,
+              borderRadius: 14,
+              padding: '24px 24px 22px',
+              marginTop: 24,
+              textAlign: 'left',
+            }}
+          >
+            <div
+              style={{
+                fontSize: 34,
+                fontWeight: 700,
+                color: C.text,
+                lineHeight: 1.1,
+                letterSpacing: '-0.02em',
+              }}
+            >
+              {correct} of {total}.
+            </div>
+            <div
+              style={{
+                fontSize: 20,
+                fontWeight: 500,
+                color: C.text,
+                marginTop: 14,
+                lineHeight: 1.35,
+              }}
+            >
+              You&rsquo;re in.{' '}
+              <span style={{ color: C.dim, fontWeight: 400 }}>The conversation is below.</span>
+            </div>
+            {percentile != null && (
+              <div
+                style={{
+                  marginTop: 16,
+                  display: 'inline-block',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: C.dim,
+                  background: 'rgba(0,0,0,0.04)',
+                  padding: '4px 10px',
+                  borderRadius: 99,
+                }}
+              >
+                Better than {percentile}% of readers on this article
+              </div>
+            )}
+          </div>
+        </>
+      );
+    }
+
     return (
       <>
         {interstitialNode}
         <div
           style={{
-            background: passed ? '#ecfdf5' : '#fef2f2',
-            border: `1px solid ${passed ? C.success : C.danger}`,
+            background: '#fef2f2',
+            border: `1px solid ${C.danger}`,
             borderRadius: 14,
             padding: '18px 20px',
             marginTop: 24,
@@ -377,13 +443,11 @@ export default function ArticleQuiz({
             style={{
               fontSize: 16,
               fontWeight: 800,
-              color: passed ? C.success : C.danger,
+              color: C.danger,
               marginBottom: 4,
             }}
           >
-            {passed
-              ? `Passed \u2014 ${correct} of ${total}. Discussion unlocked.`
-              : `${correct} of ${total}. The bar is 3 to unlock the discussion.`}
+            {correct} of {total}. The bar is 3 to unlock the discussion.
           </div>
           <div style={{ fontSize: 13, color: C.text, marginBottom: 14 }}>
             Better than {percentile}% of readers on this article.
@@ -455,7 +519,7 @@ export default function ArticleQuiz({
             <div style={{ marginTop: 8 }}>
               <div style={{ fontSize: 13, color: C.text, marginBottom: 8 }}>
                 Both free attempts used on this article. Verity Pro removes the cap, or come back
-                and try a different article \u2014 each one has its own quiz.
+                and try a different article &mdash; each one has its own quiz.
               </div>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                 <a

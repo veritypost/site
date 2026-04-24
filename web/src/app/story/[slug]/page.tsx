@@ -348,6 +348,13 @@ export default function StoryPage() {
   const [showAnonInterstitial, setShowAnonInterstitial] = useState<boolean>(false);
   const [userPassedQuiz, setUserPassedQuiz] = useState<boolean>(false);
   const [quizPassError, setQuizPassError] = useState<boolean>(false);
+  // Signature moment per Future Projects/13_QUIZ_UNLOCK_MOMENT.md.
+  // Flips true on the false→true transition of `userPassedQuiz` within
+  // this session — the just-passed reveal triggers comment composer
+  // auto-focus + first-five-comments stagger fade-in. A returning reader
+  // who already passed previously enters with userPassedQuiz=true from
+  // the start, so this stays false and the thread renders instantly.
+  const [justRevealedThisSession, setJustRevealedThisSession] = useState<boolean>(false);
   const [quizPoolSize, setQuizPoolSize] = useState<number>(0);
 
   const [activeTab, setActiveTab] = useState<'Article' | 'Timeline' | 'Discussion'>('Article');
@@ -863,7 +870,10 @@ export default function StoryPage() {
           articleId={story.id}
           initialPassed={userPassedQuiz}
           userTier={userTier}
-          onPass={() => setUserPassedQuiz(true)}
+          onPass={() => {
+            setUserPassedQuiz(true);
+            setJustRevealedThisSession(true);
+          }}
         />
       );
     } else {
@@ -962,6 +972,7 @@ export default function StoryPage() {
       articleCategoryId={story.category_id}
       currentUserId={currentUser?.id}
       currentUserTier={userTier}
+      justRevealed={justRevealedThisSession}
     />
   ) : currentUser && currentUser.email_confirmed_at ? (
     // Pass 17 / UJ-1102: verified users who haven't passed the quiz see

@@ -1,7 +1,15 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified comments 2026-04-18
 'use client';
-import { useState, useEffect, useCallback, useRef, CSSProperties, ReactNode } from 'react';
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  CSSProperties,
+  Fragment,
+  ReactNode,
+} from 'react';
 import { createClient } from '../lib/supabase/client';
 import CommentComposer from './CommentComposer';
 import CommentRow, { EnrichedComment } from './CommentRow';
@@ -28,6 +36,12 @@ interface CommentThreadProps {
   articleCategoryId?: string | null;
   currentUserId?: string | null;
   currentUserTier?: string;
+  // Signature moment per Future Projects/13_QUIZ_UNLOCK_MOMENT.md.
+  // Set true ONLY on the first reveal after the reader passes the quiz
+  // in this session — the first five comments fade in 50ms-staggered.
+  // Subsequent visits (already-passed reader returning) render instantly.
+  // Honored only when prefers-reduced-motion: no-preference.
+  justRevealed?: boolean;
 }
 
 type DialogAction = 'delete' | 'report' | 'flag' | 'hide' | 'block';
@@ -48,6 +62,7 @@ export default function CommentThread({
   articleCategoryId,
   currentUserId,
   currentUserTier,
+  justRevealed = false,
 }: CommentThreadProps) {
   const supabase = createClient();
   const [comments, setComments] = useState<CommentWithAuthor[]>([]);
@@ -472,7 +487,7 @@ export default function CommentThread({
   if (!permsLoaded) {
     return (
       <div style={{ color: 'var(--dim, #666)', fontSize: 13, padding: 12 }}>
-        Loading discussion\u2026
+        Loading discussion&hellip;
       </div>
     );
   }
@@ -482,7 +497,7 @@ export default function CommentThread({
   if (loading) {
     return (
       <div style={{ color: 'var(--dim, #666)', fontSize: 13, padding: 12 }}>
-        Loading discussion\u2026
+        Loading discussion&hellip;
       </div>
     );
   }
@@ -568,6 +583,7 @@ export default function CommentThread({
           articleId={articleId}
           currentUserTier={currentUserTier}
           onPosted={handlePosted}
+          autoFocus={justRevealed}
         />
       )}
 
@@ -588,7 +604,7 @@ export default function CommentThread({
           }}
         >
           <div style={{ fontSize: 12, fontWeight: 700, color: '#b45309', marginBottom: 6 }}>
-            Ask an Expert \u2014 routes to the category queue
+            Ask an Expert &mdash; routes to the category queue
           </div>
           <textarea
             value={expertQuestion}
@@ -828,10 +844,45 @@ export default function CommentThread({
             padding: '30px 0',
           }}
         >
-          No comments yet \u2014 be the first.
+          No comments yet &mdash; be the first.
         </div>
       ) : (
-        tops.map((c) => renderWithReplies(c))
+        <>
+          {/* Signature moment fade-in cascade per
+              Future Projects/13_QUIZ_UNLOCK_MOMENT.md. First five comments
+              arrive 50ms-staggered when the reader has just passed the quiz
+              this session; subsequent visits render instantly. Honored only
+              under prefers-reduced-motion: no-preference. */}
+          {justRevealed && (
+            <style>{`
+              @media (prefers-reduced-motion: no-preference) {
+                .vp-comment-stagger {
+                  opacity: 0;
+                  transform: translateY(8px);
+                  animation: vp-comment-arrive 400ms ease-out forwards;
+                }
+              }
+              @keyframes vp-comment-arrive {
+                to { opacity: 1; transform: translateY(0); }
+              }
+            `}</style>
+          )}
+          {tops.map((c, idx) => {
+            const stagger = justRevealed && idx < 5;
+            const node = renderWithReplies(c);
+            return stagger ? (
+              <div
+                key={`stagger-${c.id}`}
+                className="vp-comment-stagger"
+                style={{ animationDelay: `${idx * 50}ms` }}
+              >
+                {node}
+              </div>
+            ) : (
+              <Fragment key={`row-${c.id}`}>{node}</Fragment>
+            );
+          })}
+        </>
       )}
     </div>
   );
