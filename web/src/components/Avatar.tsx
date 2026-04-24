@@ -24,7 +24,12 @@ export default function Avatar({ user, size = 32 }: AvatarProps) {
   const fallbackOuter = user?.avatar_color || '#777777';
   const outer = user?.avatar?.outer || fallbackOuter;
   const inner = user?.avatar?.inner || 'transparent';
-  const initials = (user?.avatar?.initials || (user?.username ? user.username[0] : '?'))
+  // Username may contain emoji / astral / combining characters; `[0]`
+  // on a JS string returns a UTF-16 code unit and splits surrogate
+  // pairs, rendering a broken half-char (e.g. the tofu glyph). Split
+  // via Array.from so each entry is one full code point.
+  const firstChar = user?.username ? Array.from(user.username)[0] : '?';
+  const initials = (user?.avatar?.initials || firstChar || '?')
     .toString()
     .slice(0, 3)
     .toUpperCase();
