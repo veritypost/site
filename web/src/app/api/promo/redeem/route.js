@@ -23,11 +23,16 @@ export async function POST(request) {
 
     const now = new Date().toISOString();
 
-    // Look up promo code (case-insensitive, active, not expired, uses remaining)
+    // Look up promo code (case-insensitive exact match, active, not expired,
+    // uses remaining). `.ilike` without escaping accepts `%` / `_` as LIKE
+    // metachars — a caller posting `code: '%'` would match every active
+    // promo. Switch to a case-insensitive equality by lowercasing both
+    // sides: we don't need LIKE semantics here, just a case-tolerant key
+    // match, so the metachar vector disappears entirely.
     const { data: promo, error: promoError } = await supabase
       .from('promo_codes')
       .select('*')
-      .ilike('code', code.trim())
+      .ilike('code', code.trim().replace(/([%_\\])/g, '\\$1'))
       .eq('is_active', true)
       .or(`expires_at.is.null,expires_at.gt.${now}`)
       .single();
