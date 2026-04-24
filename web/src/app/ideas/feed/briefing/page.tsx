@@ -1,5 +1,5 @@
 import PhoneFrame from '../PhoneFrame';
-import { STORIES, EDITION_DATE, BREAKING, T, type Story } from '../sharedData';
+import { STORIES, EDITION_DATE, T, type Story } from '../sharedData';
 
 function BreakingStrip() {
   const showBreaking = true; // flip to BREAKING.active in prod; forced on here to show the conditional surface

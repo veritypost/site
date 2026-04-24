@@ -48,6 +48,7 @@ const DEFAULT_STYLE: CategoryStyle = { icon: '', color: '#f3f4f6', accent: '#6b7
 // Featured card accent colors cycle for stories that have no category style match
 const FEATURED_COLORS = ['#111111', '#6ee7b7', '#fca5a5', '#fcd34d', '#cccccc'] as const;
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const FILTERS = ['Most Recent', 'Most Verified', 'Trending'] as const;
 type FilterKey = (typeof FILTERS)[number];
 
@@ -89,6 +90,7 @@ function timeAgo(dateString: string | null | undefined): string {
 export default function BrowsePage() {
   usePageViewTrack('browse');
   const [search, setSearch] = useState<string>('');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [activeFilter, setActiveFilter] = useState<FilterKey>('Most Recent');
   const [expandedCat, setExpandedCat] = useState<string | null>(null);
 

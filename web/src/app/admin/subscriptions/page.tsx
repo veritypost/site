@@ -166,18 +166,6 @@ function SubscriptionsInner() {
     push({ message: `Grace extended by ${days} days`, variant: 'success' });
   };
 
-  const insertBillingAudit = async (action: string, target_type: string, target_id: string, metadata: unknown) => {
-    // Round A (C-06): authenticated INSERT on audit_log is revoked.
-    // Route through the service-role /api/admin/billing/audit endpoint.
-    try {
-      await fetch('/api/admin/billing/audit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, target_type, target_id, metadata }),
-      });
-    } catch { /* best-effort */ }
-  };
-
   // Gap 3 fix — manual downgrade/resume now routes through
   // /api/admin/subscriptions/[id]/manual-sync so users.plan_id is
   // re-bound server-side and perms_version is bumped. The prior

@@ -73,7 +73,7 @@ export default function ContactPage() {
           Contact Us
         </h1>
         <p style={{ fontSize: 13, color: 'var(--dim)', margin: '0 0 24px' }}>
-          Have a question or need help? Send us a message and we'll get back to you.
+          Have a question or need help? Send us a message and we&apos;ll get back to you.
         </p>
 
         {submitted ? (
@@ -97,7 +97,7 @@ export default function ContactPage() {
               Message sent
             </div>
             <div style={{ fontSize: 13, color: 'var(--dim)', marginBottom: 16 }}>
-              We'll get back to you as soon as possible.
+              We&apos;ll get back to you as soon as possible.
             </div>
             <button
               onClick={() => {

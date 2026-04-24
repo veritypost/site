@@ -523,19 +523,6 @@ export default function AdminPermissionsPage() {
     await loadUserGrants(u.id);
   };
 
-  // Bump target's perms_version so their client refetches capabilities
-  // on next nav. Non-fatal — primary write is the source of truth.
-  //
-  // Atomic SQL-level increment via RPC (bump_user_perms_version) — avoids
-  // the TOCTOU race where two admin writes against one user could lose
-  // a bump under the prior read-modify-write pattern.
-  const bumpPermsVersion = async (userId: string) => {
-    const { error } = await supabase.rpc('bump_user_perms_version', {
-      p_user_id: userId,
-    });
-    if (error) console.error('[permissions] perms_version bump failed:', error.message);
-  };
-
   const grantSetToUser = async () => {
     if (!selectedUser || !grantSetId) {
       toast.push({ message: 'Select a user and a set first', variant: 'danger' });

@@ -94,7 +94,7 @@ export default function AdminHubPage() {
   const [featuredStories, setFeaturedStories] = useState<FeaturedStory[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [authorized, setAuthorized] = useState<boolean>(false);
-  const [restrictedRole, setRestrictedRole] = useState<string | null>(null);
+  const [, setRestrictedRole] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {

@@ -92,7 +92,7 @@ export default function UsersAdmin() {
   const toast = useToast();
 
   const [users, setUsers] = useState<UserRow[]>([]);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [, setCurrentUserId] = useState<string | null>(null);
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');

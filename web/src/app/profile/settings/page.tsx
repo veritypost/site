@@ -58,10 +58,10 @@ import { ToastProvider, useToast } from '@/components/admin/Toast';
 import EmptyState from '@/components/admin/EmptyState';
 import Badge from '@/components/admin/Badge';
 import Spinner from '@/components/admin/Spinner';
-import SkeletonRow, { SkeletonBar } from '@/components/admin/SkeletonRow';
+import { SkeletonBar } from '@/components/admin/SkeletonRow';
 import { ADMIN_C_LIGHT, F, S } from '@/lib/adminPalette';
 
-import type { Tables, TableInsert, DbClient } from '@/types/database-helpers';
+import type { Tables, DbClient } from '@/types/database-helpers';
 
 // ---------------------------------------------------------------------------
 // Permission keys
@@ -2277,7 +2277,11 @@ function EmailsCard({
 // ---------------------------------------------------------------------------
 
 function PasswordCard({
-  authEmail,
+  // authEmail is still passed by the caller for future reset-email flows
+  // but isn't read inside PasswordCard today (the change uses the active
+  // session). Underscore-prefix silences the lint without breaking the
+  // caller's prop contract.
+  authEmail: _authEmail,
   highlight,
   supabase,
   pushToast,
@@ -2908,7 +2912,7 @@ function AlertsCard({
         const byType: Record<string, AlertPrefRow> = {};
         for (const p of (data.preferences || []) as AlertPrefRow[]) byType[p.alert_type] = p;
         setPrefs(byType);
-      } catch (err) {
+      } catch {
         pushToast({ message: 'Could not load alerts.', variant: 'danger' });
       } finally {
         if (alive) setLoading(false);
@@ -3151,7 +3155,7 @@ function AccessibilityCard({
   highlight,
   supabase,
   pushToast,
-  userId,
+  userId: _userId,
   onSaved,
   markDirty,
 }: {
@@ -3484,7 +3488,7 @@ function DataExportCard({
         <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: S[3] }}>
           <div style={{ fontSize: F.base, fontWeight: 600 }}>Data export</div>
           <div style={{ fontSize: F.sm, color: C.dim, marginBottom: S[2] }}>
-            We'll email a download link when the bundle is ready (up to 30 days per GDPR).
+            We&apos;ll email a download link when the bundle is ready (up to 30 days per GDPR).
           </div>
           {activeExport ? (
             <Badge variant="info" size="xs">
@@ -3869,7 +3873,7 @@ function BillingBundle({
           if (p.is_active && p.is_visible && p.tier) visible.add(p.tier);
         }
         setWebVisibleTiers(visible);
-      } catch (err) {
+      } catch {
         if (alive) pushToast({ message: 'Could not load billing info.', variant: 'danger' });
       } finally {
         if (alive) setLoading(false);
@@ -4805,7 +4809,7 @@ function ExpertProfileCard({
 
 function ExpertVacationCard({
   user,
-  userId,
+  userId: _userId,
   highlight,
   supabase,
   pushToast,
@@ -5000,9 +5004,9 @@ function ExpertWatchlistCard({
 // ---------------------------------------------------------------------------
 
 function DeleteAccountCard({
-  userId,
+  userId: _userId,
   highlight,
-  supabase,
+  supabase: _supabase,
   pushToast,
   userRow,
   onChanged,

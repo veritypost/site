@@ -43,7 +43,7 @@ function AnalyticsInner() {
 
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<'overview' | 'stories' | 'quizzes' | 'resources'>('overview');
-  const [period, setPeriod] = useState<'7d' | '30d' | '90d'>('7d');
+  const [, setPeriod] = useState<'7d' | '30d' | '90d'>('7d');
   const [quizSort, setQuizSort] = useState<'failRate' | 'attempts' | 'flagged'>('failRate');
   const [failRedThreshold, setFailRedThreshold] = useState(40);
   const [failYellowThreshold, setFailYellowThreshold] = useState(25);

@@ -154,7 +154,6 @@ async function runInner() {
   const freeUserIds = (planRows || [])
     .filter((u) => !u.plans?.tier || u.plans.tier === 'free')
     .map((u) => u.id);
-  const freePlanRow = (planRows || []).find((u) => u.plans?.tier === 'free' && u.plans)?.plans;
   const freePlanId =
     (planRows || []).find((u) => u.plan_id && u.plans?.tier === 'free')?.plan_id ?? null;
   const breakingDailyCap =

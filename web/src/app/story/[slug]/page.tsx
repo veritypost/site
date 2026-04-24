@@ -96,17 +96,6 @@ function formatDate(iso: string | null | undefined): string {
   });
 }
 
-function timeAgo(iso: string | null | undefined): string {
-  if (!iso) return '';
-  const ms = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(ms / 60000);
-  const h = Math.floor(ms / 3600000);
-  const d = Math.floor(ms / 86400000);
-  if (m < 60) return m <= 1 ? 'just now' : `${m}m`;
-  if (h < 24) return `${h}h`;
-  return `${d}d`;
-}
-
 // Compact source list — one card per cited outlet. Each card opens the
 // canonical URL in a new tab (rel=noopener,noreferrer); the card itself is
 // the full click target so the favicon-stand-in initial doesn't need to be

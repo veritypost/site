@@ -203,10 +203,10 @@ export default function EarnedChromeMockup() {
               lineHeight: 1.6,
             }}
           >
-            <strong style={{ color: T.text }}>The design move:</strong> no locked panel. No "sign up
-            to comment" CTA. No "be the first to comment." When the quiz hasn\u2019t been passed,
-            the discussion section simply doesn\u2019t exist. Toggle the state above to see the
-            reveal. This is the only idea of the four that{' '}
+            <strong style={{ color: T.text }}>The design move:</strong> no locked panel. No
+            &ldquo;sign up to comment&rdquo; CTA. No &ldquo;be the first to comment.&rdquo; When the
+            quiz hasn\u2019t been passed, the discussion section simply doesn\u2019t exist. Toggle
+            the state above to see the reveal. This is the only idea of the four that{' '}
             <em>competitors literally can\u2019t copy</em> without changing their business model.
           </div>
         </article>

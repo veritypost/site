@@ -96,9 +96,9 @@ export default function QuietFeedMockup() {
           }}
         >
           <strong style={{ color: T.text }}>The design move:</strong> no category pills, no trending
-          rail, no "popular" section, no breaking banner, no cover images, no ads. NYT\u2019s home
-          page has ~47 modules. This has one: a list of headlines. Only works because Verity\u2019s
-          revenue isn\u2019t ad-density.
+          rail, no &ldquo;popular&rdquo; section, no breaking banner, no cover images, no ads.
+          NYT\u2019s home page has ~47 modules. This has one: a list of headlines. Only works
+          because Verity\u2019s revenue isn\u2019t ad-density.
         </div>
       </div>
     </main>

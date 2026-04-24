@@ -10,7 +10,7 @@ import { scoreDailyLogin } from '@/lib/scoring';
 // the same session. We no longer re-run signInWithPassword on the server
 // (that caused a duplicate auth call on every login). Rate-limit, audit-log,
 // last_login_at, login_count, and the D40 deletion-cancel RPC all still run.
-export async function POST(request) {
+export async function POST(_request) {
   try {
     const supabase = await createClient();
 

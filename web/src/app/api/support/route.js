@@ -17,7 +17,9 @@ export async function POST(request) {
   try {
     const token = bearerToken(request);
     const supabase = token ? createClientFromToken(token) : await createClient();
-    const user = await requireAuth(supabase);
+    // requireAuth throws on unauth — we don't need the returned user here,
+    // just its gating side effect before processing the ticket body.
+    await requireAuth(supabase);
     const { category, subject, description } = await request.json();
 
     if (!category || !subject || !description) {

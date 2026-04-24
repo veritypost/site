@@ -28,7 +28,7 @@ import { NextResponse } from 'next/server';
 import { createHash } from 'crypto';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { isBotUserAgent } from '@/lib/botDetect';
-import type { TrackEvent, BatchResponseBody } from '@/lib/events/types';
+import type { BatchResponseBody } from '@/lib/events/types';
 
 export const runtime = 'nodejs';
 

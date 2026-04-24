@@ -2,7 +2,7 @@
 // @feature-verified admin_api 2026-04-19
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
-import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
 import { recordAdminAction, requireAdminOutranks } from '@/lib/adminMutation';

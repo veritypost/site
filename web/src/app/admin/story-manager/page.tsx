@@ -625,7 +625,6 @@ function StoryEditorInner() {
     });
   };
 
-  const currentEntry = entries.find((e) => e.is_current) || entries[entries.length - 1];
   const sortedEntries = [...entries].sort(
     (a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime(),
   );
@@ -643,7 +642,6 @@ function StoryEditorInner() {
   }
 
   if (viewMode === 'preview') {
-    const e = currentEntry;
     return (
       <Page>
         <PageHeader
