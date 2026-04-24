@@ -1614,6 +1614,13 @@ Empty array if all correct.`;
         if (finalStatus === 'completed') nextState = 'published';
         else if (audienceMismatch) nextState = 'ignored';
         else nextState = 'clustered';
+        // H18 — add a status guard so a concurrent cancel (which may
+        // have already reset discovery items to 'clustered' via its
+        // own path) can't be clobbered by this finally block running
+        // a few ms later. Only transition items that are still in
+        // the 'generating' state this run left them in. The
+        // pipeline_runs UPDATE a few blocks below uses the same
+        // `.eq('status', 'running')` guard for the same reason.
         await service
           .from(discoveryTable)
           .update({
@@ -1621,7 +1628,8 @@ Empty array if all correct.`;
             ...(articleId ? { article_id: articleId } : {}),
             updated_at: new Date().toISOString(),
           })
-          .in('id', itemIds);
+          .in('id', itemIds)
+          .eq('state', 'generating');
       } catch (stateErr) {
         console.error('[newsroom.generate.finally.state]', stateErr);
       }
