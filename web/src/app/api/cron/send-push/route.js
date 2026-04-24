@@ -24,7 +24,14 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-const BATCH_SIZE = 500;
+// L3: BATCH_SIZE lowered from 500 → 200 to stay under PostgREST's 8 KB URL
+// cap on the downstream `.in('user_id', userIds)` queries. A batch of 500
+// distinct UUID v4 strings joins to ~18 KB which PostgREST silently truncates
+// mid-list (no 414 error surfaced to the client), so the alert_preferences /
+// user_push_tokens / users lookups returned partial data for most batches.
+// 200 keeps the URL under ~7.4 KB with a comfortable headroom. maxDuration=60
+// still clears a full fan-out in multiple cron ticks.
+const BATCH_SIZE = 200;
 const CONCURRENCY = 50;
 
 async function run(request) {
