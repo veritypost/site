@@ -97,12 +97,15 @@ export async function POST(request, { params }) {
   if (rankErr) return rankErr;
 
   if (action === 'downgrade') {
-    // 1) Resolve the free plan id. Webhook path uses this same "name='free'"
-    //    lookup (see billing_freeze_profile + handleChargeRefunded).
+    // B19: resolve the free plan by `tier='free'` (the canonical column)
+    // rather than by name. The `name` column is a human-readable key that
+    // could drift if the row is ever renamed; `tier` is the enum the
+    // billing RPCs themselves branch on, so matching on it here keeps
+    // this route + webhooks + RPCs reading the same source of truth.
     const { data: freePlan, error: freeErr } = await service
       .from('plans')
       .select('id')
-      .eq('name', 'free')
+      .eq('tier', 'free')
       .maybeSingle();
     if (freeErr) return NextResponse.json({ error: freeErr.message }, { status: 500 });
     if (!freePlan) return NextResponse.json({ error: 'free plan row missing' }, { status: 500 });

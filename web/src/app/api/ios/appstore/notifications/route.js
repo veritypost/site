@@ -130,13 +130,21 @@ export async function POST(request) {
     return NextResponse.json({ received: true, ignored: true, notificationType });
   }
 
-  // Unknown types: also 200 (Apple won't retry; we just don't care yet).
+  // B16: unknown types stay at processing_status='received' rather than
+  // jumping straight to 'processed'. When we later add a handler for a
+  // previously-unknown Apple type, a script can replay rows WHERE
+  // processing_status='received' to backfill the effect without also
+  // re-running everything that actually did process cleanly. Prior code
+  // marked unknown types 'processed', which hid the gap and made future
+  // handler-add a history-lost migration.
+  //
+  // Response is still 200 so Apple's retries stop — we just keep the row
+  // discoverable for later reconciliation.
   if (!HANDLED_TYPES.has(notificationType)) {
     await service
       .from('webhook_log')
       .update({
-        processing_status: 'processed',
-        processed_at: new Date().toISOString(),
+        processing_error: `unhandled notification type: ${notificationType}`,
       })
       .eq('id', logId);
     return NextResponse.json({ received: true, unhandled: true, notificationType });

@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { createClientFromToken, createServiceClient } from '@/lib/supabase/server';
 import { verifyTransactionJWS, resolvePlanByAppleProductId } from '@/lib/appleReceipt';
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 
 // Auth: dual — user Supabase bearer token (so we know WHICH user is syncing)
 // AND Apple JWS signature on the transaction receipt (so the client can't
@@ -28,6 +29,26 @@ export async function POST(request) {
   const token = authHeader.toLowerCase().startsWith('bearer ') ? authHeader.slice(7).trim() : null;
   if (!token) {
     return NextResponse.json({ error: 'Missing bearer token' }, { status: 401 });
+  }
+
+  // B15: rate limit per IP. Prior code had no brake, so a JWS-armed attacker
+  // could spam this endpoint and fill webhook_log with (valid-signature)
+  // churn. 20/min/ip is generous for real StoreKit2 restore flows (one
+  // legitimate restore = a handful of product ids per tap) but low enough
+  // to disqualify bot traffic. Fail-closed via checkRateLimit policyKey.
+  const serviceRate = createServiceClient();
+  const ip = await getClientIp();
+  const rate = await checkRateLimit(serviceRate, {
+    key: `ios-sub-sync:${ip}`,
+    policyKey: 'ios_subscription_sync',
+    max: 20,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many sync attempts — try again shortly' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec || 60) } }
+    );
   }
 
   const userClient = createClientFromToken(token);
