@@ -531,17 +531,37 @@ export default function CommentThread({
 
   return (
     <div style={{ maxWidth: 640, margin: '0 auto' }}>
-      <div
-        style={{
-          fontSize: 11,
-          textTransform: 'uppercase',
-          fontWeight: 700,
-          color: 'var(--dim, #666)',
-          marginBottom: 12,
-        }}
-      >
-        Discussion \u00b7 {visible.length}
-      </div>
+      {/* Quiz Gate Brand — make the moat visible. Header is the trust
+          signal: every commenter passed the comprehension quiz, by
+          construction (schema/013 post_comment RPC; no role bypass).
+          Suppressed on empty threads where "Every reader here" would
+          contradict the "be the first" empty-state copy below. */}
+      {visible.length > 0 && (
+        <>
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: 'var(--text-primary)',
+              marginBottom: 4,
+            }}
+          >
+            Every reader here passed the quiz.
+          </div>
+          <div
+            style={{
+              fontSize: 11,
+              textTransform: 'uppercase',
+              fontWeight: 700,
+              color: 'var(--dim, #666)',
+              letterSpacing: '0.04em',
+              marginBottom: 12,
+            }}
+          >
+            {visible.length} {visible.length === 1 ? 'comment' : 'comments'}
+          </div>
+        </>
+      )}
 
       {currentUserId && (
         <CommentComposer

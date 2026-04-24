@@ -347,6 +347,7 @@ export default function StoryPage() {
   const [regWallDismissed, setRegWallDismissed] = useState<boolean>(false);
   const [showAnonInterstitial, setShowAnonInterstitial] = useState<boolean>(false);
   const [userPassedQuiz, setUserPassedQuiz] = useState<boolean>(false);
+  const [quizPassError, setQuizPassError] = useState<boolean>(false);
   const [quizPoolSize, setQuizPoolSize] = useState<number>(0);
 
   const [activeTab, setActiveTab] = useState<'Article' | 'Timeline' | 'Discussion'>('Article');
@@ -535,14 +536,25 @@ export default function StoryPage() {
 
         // D6: check pass status BEFORE fetching comments. If not passed,
         // skip the comments fetch entirely — discussion is invisible.
+        // RPC failure used to be silent (FIX_SESSION_1 #11) — now we
+        // surface a retry banner so a passed reader doesn't see a stale
+        // lock panel forever. Server-side `post_comment` enforces the
+        // gate independently, so a UI miscount here is a UX bug, not a
+        // security hole.
         let passedQuiz = false;
         if (authUser) {
-          const { data: passData } = await supabase.rpc('user_passed_article_quiz', {
-            p_user_id: authUser.id,
-            p_article_id: storyId,
-          });
-          passedQuiz = !!passData;
-          setUserPassedQuiz(passedQuiz);
+          const { data: passData, error: passErr } = await supabase.rpc(
+            'user_passed_article_quiz',
+            { p_user_id: authUser.id, p_article_id: storyId }
+          );
+          if (passErr) {
+            console.error('[story.user_passed_article_quiz]', passErr.message);
+            setQuizPassError(true);
+          } else {
+            setQuizPassError(false);
+            passedQuiz = !!passData;
+            setUserPassedQuiz(passedQuiz);
+          }
         }
 
         const [timelineRes, sourcesRes, quizPoolRes] = await Promise.all([
@@ -925,7 +937,26 @@ export default function StoryPage() {
     textDecoration: 'none',
   };
 
-  const discussionSection = userPassedQuiz ? (
+  const discussionSection = quizPassError ? (
+    // RPC failed (network blip / schema drift). Don't pretend the user
+    // hasn't passed — surface a retry. Server-side post_comment will
+    // still enforce the gate independently if they try to post.
+    <div style={lockPanelStyle}>
+      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
+        Couldn&rsquo;t check your quiz status.
+      </div>
+      <div style={{ fontSize: 13, color: 'var(--dim)', lineHeight: 1.5, marginBottom: 12 }}>
+        We&rsquo;ll know once we can reach the server again.
+      </div>
+      <button
+        type="button"
+        onClick={() => window.location.reload()}
+        style={{ ...lockCtaStyle, border: 'none', cursor: 'pointer' }}
+      >
+        Try again
+      </button>
+    </div>
+  ) : userPassedQuiz ? (
     <CommentThread
       articleId={story.id}
       articleCategoryId={story.category_id}
@@ -1509,72 +1540,16 @@ export default function StoryPage() {
           )}
         </div>
 
-        {/* Quiz + Discussion — launch-phase hide. Flip `false` → original
-            `(isDesktop || showMobileDiscussion)` to unhide. All state,
-            data fetches, and child components stay mounted upstream. */}
-        {false && (isDesktop || showMobileDiscussion) && (
+        {/* Quiz + Discussion. The "Pass to comment" gate is the product
+            spine — see Future Projects/12_QUIZ_GATE_BRAND.md. Always
+            visible at the end of every article (mobile gates via the
+            Discussion tab). The dated "You might also like" exit-card
+            from the launch-hide era was removed in the 2026-04-23 quiz
+            gate ship — top nav + the home page already cover navigation. */}
+        {(isDesktop || showMobileDiscussion) && (
           <div style={{ marginTop: isDesktop ? 48 : 0 }}>
             {quizNode}
             {discussionSection}
-            {/* R13-C5 Fix 4 — simple exit path after article + comments.
-                No related-article selection (new product work); just a
-                clear "where to next" so readers aren't stranded. */}
-            <div
-              style={{
-                marginTop: 32,
-                padding: '20px 20px 24px',
-                borderRadius: 12,
-                border: '1px solid var(--border)',
-                background: 'var(--card)',
-                textAlign: 'center',
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 11,
-                  textTransform: 'uppercase',
-                  fontWeight: 600,
-                  color: 'var(--dim)',
-                  letterSpacing: '0.04em',
-                  marginBottom: 10,
-                }}
-              >
-                You might also like
-              </div>
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-                <a
-                  href="/"
-                  style={{
-                    display: 'inline-block',
-                    padding: '10px 20px',
-                    borderRadius: 10,
-                    background: 'var(--accent)',
-                    color: '#fff',
-                    fontSize: 13,
-                    fontWeight: 700,
-                    textDecoration: 'none',
-                  }}
-                >
-                  Back to home
-                </a>
-                <a
-                  href="/browse"
-                  style={{
-                    display: 'inline-block',
-                    padding: '10px 20px',
-                    borderRadius: 10,
-                    border: '1px solid var(--border)',
-                    background: 'transparent',
-                    color: 'var(--text-primary)',
-                    fontSize: 13,
-                    fontWeight: 600,
-                    textDecoration: 'none',
-                  }}
-                >
-                  Browse articles
-                </a>
-              </div>
-            </div>
           </div>
         )}
       </div>

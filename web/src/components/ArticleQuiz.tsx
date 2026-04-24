@@ -383,14 +383,15 @@ export default function ArticleQuiz({
           >
             {passed
               ? `Passed \u2014 ${correct} of ${total}. Discussion unlocked.`
-              : `Scored ${correct} of ${total}. Needed 3 to pass.`}
+              : `${correct} of ${total}. The bar is 3 to unlock the discussion.`}
           </div>
           <div style={{ fontSize: 13, color: C.text, marginBottom: 14 }}>
             Better than {percentile}% of readers on this article.
-            {!isPaid &&
-              attempts_remaining != null &&
-              !passed &&
-              ` You have ${attempts_remaining} attempt${attempts_remaining === 1 ? '' : 's'} left.`}
+            {/* Quiz Gate Brand: keep the cap visible (no surprise wall),
+                but drop the punitive "X attempts left" framing for a
+                quieter voice. The hard cap on free tier is enforced by
+                `attempts_remaining` going to 0; that triggers the
+                `outOfAttempts` panel below. */}
           </div>
 
           {results?.map((r, i) => (
@@ -447,14 +448,14 @@ export default function ArticleQuiz({
                 marginTop: 4,
               }}
             >
-              Retake with fresh questions
+              Take another look and try again
             </button>
           )}
           {outOfAttempts && (
             <div style={{ marginTop: 8 }}>
               <div style={{ fontSize: 13, color: C.text, marginBottom: 8 }}>
-                You\u2019ve used both free attempts on this article. Quizzes are per-article \u2014
-                try another one, or unlock unlimited retakes on a paid plan.
+                Both free attempts used on this article. Verity Pro removes the cap, or come back
+                and try a different article \u2014 each one has its own quiz.
               </div>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                 <a

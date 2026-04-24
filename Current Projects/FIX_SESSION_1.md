@@ -1018,6 +1018,11 @@ These are **feature-level work**, not fixes. Rolled up here for full-scope visib
 
 **Effort:** 10 sec code change. Owner-decision effort is the judgment call, not the edit.
 
+**SHIPPED 2026-04-23** (Quiz Gate Brand Phase A, per `Future Projects/12_QUIZ_GATE_BRAND.md`):
+- Launch-hide wrapper on quiz + discussion block fully removed (not re-skinned — the `{false && ...}` shape and breadcrumb comment both deleted).
+- Bonus regression fix: `user_passed_article_quiz` RPC error path (FIX_SESSION_1 #11 first bullet) — added explicit `error` destructure + `quizPassError` state + retry banner in the `discussionSection`. Server-side `post_comment` enforces the gate independently, so a UI miscount is no longer a confusing dead-end for passed readers when the RPC blips.
+- Bonus cleanup: dated "You might also like" exit-card (Back to home / Browse articles) removed — top nav + the rebuilt home page handle navigation.
+
 ---
 
 ### F3. Earned chrome comments (`F3-earned-chrome-comments.md`)

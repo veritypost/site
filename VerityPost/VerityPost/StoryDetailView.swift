@@ -497,7 +497,70 @@ struct StoryDetailView: View {
 
             if canViewSources && !sources.isEmpty { sourcePillsSection.padding(.top, 20) }
 
+            // Quiz Gate Brand — make the moat visible at the end of every
+            // article. Spec/12_QUIZ_GATE_BRAND.md: "always visible" CTA
+            // describing the gate. Mirrors the web /story[slug] flow.
+            // Anonymous: nudge to sign-in. Logged-in but not passed:
+            // switch to Discussion tab (where the quiz player lives).
+            // Already passed: skip — don't ask them to do it again.
+            passToCommentCTA
+
             Spacer().frame(height: 80)
+        }
+    }
+
+    @ViewBuilder private var passToCommentCTA: some View {
+        let quizRequired = SettingsService.shared.commentBool("quiz_required")
+        if quizRequired && !userPassedQuiz {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("PASS TO COMMENT")
+                    .font(.system(.caption2, design: .default, weight: .bold))
+                    .tracking(1)
+                    .foregroundColor(VP.dim)
+                Text("5 questions about what you just read. Get 3 right and the conversation opens.")
+                    .font(.callout)
+                    .foregroundColor(VP.text)
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                if auth.isLoggedIn {
+                    Button {
+                        activeTab = .discussion
+                    } label: {
+                        Text("Start quiz")
+                            .font(.system(.subheadline, design: .default, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(VP.accent)
+                            .cornerRadius(9)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    NavigationLink {
+                        SignupView().environmentObject(auth)
+                    } label: {
+                        Text("Create free account")
+                            .font(.system(.subheadline, design: .default, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(VP.accent)
+                            .cornerRadius(9)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(20)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(VP.card)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(VP.border, lineWidth: 1)
+            )
+            .padding(.horizontal, 20)
+            .padding(.top, 28)
         }
     }
 
@@ -774,12 +837,15 @@ struct StoryDetailView: View {
 
     @ViewBuilder private var quizIdleCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Unlock the discussion")
+            // Voice unified with the Article-tab `passToCommentCTA` per
+            // adversary review — single phrase across both entry points
+            // so readers don't see two flavors of the same mechanic.
+            Text("Pass to comment.")
                 .font(.system(.callout, design: .default, weight: .bold))
                 .foregroundColor(VP.text)
             Text(hasUnlimitedQuizAttempts
-                 ? "Answer 5 questions about this article. 3 correct unlocks the comment section. Unlimited attempts on your plan."
-                 : "Answer 5 questions about this article. 3 correct unlocks the comment section. Free accounts get 2 attempts; each pulls a fresh set of questions.")
+                 ? "5 questions about what you just read. Get 3 right and the conversation opens. Unlimited attempts on your plan."
+                 : "5 questions about what you just read. Get 3 right and the conversation opens. Free accounts get 2 attempts; each pulls a fresh set of questions.")
                 .font(.caption)
                 .foregroundColor(VP.soft)
                 .lineSpacing(2)
