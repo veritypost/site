@@ -30,15 +30,35 @@ export async function POST(request) {
   if (!article_id || !Array.isArray(answers)) {
     return NextResponse.json({ error: 'article_id and answers[] required' }, { status: 400 });
   }
-  if (answers.length !== 5) {
-    return NextResponse.json({ error: 'Expected 5 answers' }, { status: 400 });
-  }
   for (const a of answers) {
     if (!a?.quiz_id || typeof a.selected_answer !== 'number') {
       return NextResponse.json(
         { error: 'each answer needs {quiz_id, selected_answer:int}' },
         { status: 400 }
       );
+    }
+  }
+
+  // Validate length against the article's actual quiz count rather than
+  // hardcoded 5 — quiz length is a DB-level config today (submit_quiz_attempt
+  // RPC reads the quizzes rows by article_id) and the product will want
+  // variable-length quizzes post-launch (recap/weekly might ship different
+  // counts). The route used to reject any length !== 5 on the client side.
+  {
+    const service = createServiceClient();
+    const { count, error: countErr } = await service
+      .from('quizzes')
+      .select('*', { count: 'exact', head: true })
+      .eq('article_id', article_id);
+    if (countErr) {
+      console.error('[quiz.submit] count quizzes', countErr);
+      return NextResponse.json({ error: 'Could not validate quiz' }, { status: 500 });
+    }
+    if (!count || count === 0) {
+      return NextResponse.json({ error: 'No quiz for this article' }, { status: 400 });
+    }
+    if (answers.length !== count) {
+      return NextResponse.json({ error: `Expected ${count} answers` }, { status: 400 });
     }
   }
 
