@@ -13,9 +13,26 @@ import { scoreReceiveUpvote } from '@/lib/scoring';
 export async function POST(request, { params }) {
   const blocked = await v2LiveGuard();
   if (blocked) return blocked;
+
+  const { id } = params;
+  const { type } = await request.json().catch(() => ({}));
+  if (!['upvote', 'downvote', 'clear'].includes(type)) {
+    return NextResponse.json({ error: 'type must be upvote/downvote/clear' }, { status: 400 });
+  }
+
+  // Each vote type has its own permission. The original single gate on
+  // `comments.upvote` let any upvote-enabled user bypass downvote
+  // restrictions (mod/admin tools that disable downvotes alone had no
+  // effect). `comments.vote.clear` covers un-voting.
+  const permKey =
+    type === 'upvote'
+      ? 'comments.upvote'
+      : type === 'downvote'
+        ? 'comments.downvote'
+        : 'comments.vote.clear';
   let user;
   try {
-    user = await requirePermission('comments.upvote');
+    user = await requirePermission(permKey);
   } catch (err) {
     if (err.status) {
       console.error('[comments.[id].vote.permission]', err?.message || err);
@@ -25,12 +42,6 @@ export async function POST(request, { params }) {
       );
     }
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
-  }
-
-  const { id } = params;
-  const { type } = await request.json().catch(() => ({}));
-  if (!['upvote', 'downvote', 'clear'].includes(type)) {
-    return NextResponse.json({ error: 'type must be upvote/downvote/clear' }, { status: 400 });
   }
 
   const service = createServiceClient();
