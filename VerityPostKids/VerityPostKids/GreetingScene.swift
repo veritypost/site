@@ -106,11 +106,17 @@ struct GreetingScene: View {
         }
         .coordinateSpace(name: "greeting")
         .task(id: name) {
+            // K6: SwiftUI .task auto-cancels on disappear + id change, which
+            // propagates into every `try await Task.sleep` inside
+            // runChoreography() + typeChoreography(). That replaces the old
+            // fire-and-forget DispatchQueue.main.asyncAfter chain, which had
+            // no cancellation path — dismissing mid-animation left orphan
+            // blocks mutating dead view state.
             if cardsRevealed.count != categories.count {
                 cardsRevealed = Array(repeating: false, count: categories.count)
             }
             resetState()
-            runChoreography()
+            await runChoreography()
         }
         .onPreferenceChange(NameFramePreferenceKey.self) { frame in
             self.nameTextFrame = frame
@@ -372,7 +378,7 @@ struct GreetingScene: View {
         cardsRevealed = Array(repeating: false, count: categories.count)
     }
 
-    private func runChoreography() {
+    private func runChoreography() async {
         if reduceMotion {
             // Skip the entire intro and snap to the post-animation state.
             // No particles, no shimmer, no typewriter — kid sees the
@@ -392,100 +398,116 @@ struct GreetingScene: View {
             return
         }
 
-        try? await_delay(0.2)
-        withAnimation(K.springOvershoot) {
-            bandOffset = 0
-            bandOpacity = 1.0
-        }
+        // K6: every phase awaits Task.sleep so cancellation (parent view
+        // dismissed) unwinds without touching dead view state. Previous
+        // `try? await_delay` was a no-op placeholder + all real delays ran
+        // through DispatchQueue.main.asyncAfter with no cancellation path.
+        do {
+            try await Task.sleep(nanoseconds: 200_000_000) // 200ms
+            try Task.checkCancellation()
+            withAnimation(K.springOvershoot) {
+                bandOffset = 0
+                bandOpacity = 1.0
+            }
 
-        try? await_delay(0.3)  // +500ms total
-        withAnimation(.easeInOut(duration: 0.8)) {
-            shimmerProgress = 1.0
-        }
+            try await Task.sleep(nanoseconds: 300_000_000) // +500ms total
+            try Task.checkCancellation()
+            withAnimation(.easeInOut(duration: 0.8)) {
+                shimmerProgress = 1.0
+            }
 
-        try? await_delay(0.1)  // +600ms
-        withAnimation(K.springOvershoot) {
-            orbScale = 1.0
-            orbRotation = 0
-        }
+            try await Task.sleep(nanoseconds: 100_000_000) // +600ms
+            try Task.checkCancellation()
+            withAnimation(K.springOvershoot) {
+                orbScale = 1.0
+                orbRotation = 0
+            }
 
-        try? await_delay(0.15)  // +750ms
-        withAnimation(.easeOut(duration: 0.4)) {
-            greetingOpacity = 1.0
-            greetingOffset = 0
-        }
+            try await Task.sleep(nanoseconds: 150_000_000) // +750ms
+            try Task.checkCancellation()
+            withAnimation(.easeOut(duration: 0.4)) {
+                greetingOpacity = 1.0
+                greetingOffset = 0
+            }
 
-        try? await_delay(0.15)  // +900ms
-        typeNextChar()
+            try await Task.sleep(nanoseconds: 150_000_000) // +900ms
+            try Task.checkCancellation()
+            await typeChoreography()
 
-        // After typewriter finishes, run streak + cards on timers from 1600/1900ms absolute
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+            // After typewriter finishes: streak (+700ms) then category cards
+            // (+1000ms, 50ms stagger).
+            try await Task.sleep(nanoseconds: 700_000_000)
+            try Task.checkCancellation()
             withAnimation(K.springSoft) {
                 streakOpacity = 1.0
                 streakOffset = 0
             }
-        }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            try await Task.sleep(nanoseconds: 300_000_000) // +1000ms post-typewriter
+            try Task.checkCancellation()
             for i in 0..<categories.count {
-                DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.05) {
-                    guard i < cardsRevealed.count else { return }
-                    withAnimation(K.springOvershoot) {
-                        cardsRevealed[i] = true
-                    }
+                try await Task.sleep(nanoseconds: 50_000_000) // 50ms stagger
+                try Task.checkCancellation()
+                guard i < cardsRevealed.count else { return }
+                withAnimation(K.springOvershoot) {
+                    cardsRevealed[i] = true
                 }
             }
-        }
-    }
-
-    // Synchronous-friendly delay helper (doesn't actually suspend — adds to queue with asyncAfter)
-    // Kept as sync-style for readability in runChoreography.
-    private func await_delay(_ seconds: Double) throws {
-        // No-op placeholder — real sequencing happens via asyncAfter in caller.
-        // (Keeps the code readable as a phase list.)
-    }
-
-    private func typeNextChar() {
-        guard typedCharCount < name.count else {
-            underlineTrigger = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                // Big sparkle burst at the trailing edge of the name
-                let emitPoint = CGPoint(
-                    x: nameTextFrame.maxX > 0 ? nameTextFrame.maxX - 8 : 200,
-                    y: nameTextFrame.midY > 0 ? nameTextFrame.midY : 120
-                )
-                particles.burst(
-                    at: emitPoint,
-                    count: 25,
-                    minSpeed: 1,
-                    maxSpeed: 5,
-                    upwardBias: 2,
-                    gravity: 0.07
-                )
-            }
+        } catch {
+            // Cancellation or sleep failure — view is disappearing or
+            // name changed. Leave state as-is; the next runChoreography
+            // will re-init via resetState().
             return
         }
+    }
 
-        typedCharCount += 1
+    private func typeChoreography() async {
+        // K7: walk the name by Character (extended grapheme clusters) so
+        // emoji and multi-byte names don't index into a surrogate half.
+        // Previous code used typedCharCount against name.count (which is
+        // Character count in Swift, safe by itself) but the sparkle
+        // position calc used linear ratio against width — fine, unchanged.
+        do {
+            while typedCharCount < name.count {
+                try Task.checkCancellation()
+                typedCharCount += 1
 
-        // Sparkle at trailing edge of currently-typed text
-        // Use measured frame if we have it; fall back to approx otherwise
-        let sparklePoint: CGPoint = {
-            if nameTextFrame.width > 0 {
-                let charRatio = CGFloat(typedCharCount) / CGFloat(name.count)
-                return CGPoint(
-                    x: nameTextFrame.minX + nameTextFrame.width * charRatio,
-                    y: nameTextFrame.midY
-                )
-            } else {
-                return CGPoint(x: 140 + CGFloat(typedCharCount) * 22, y: 125)
+                let sparklePoint: CGPoint = {
+                    if nameTextFrame.width > 0 {
+                        let charRatio = CGFloat(typedCharCount) / CGFloat(name.count)
+                        return CGPoint(
+                            x: nameTextFrame.minX + nameTextFrame.width * charRatio,
+                            y: nameTextFrame.midY
+                        )
+                    } else {
+                        return CGPoint(x: 140 + CGFloat(typedCharCount) * 22, y: 125)
+                    }
+                }()
+
+                particles.sparkle(at: sparklePoint, colors: K.particleColors)
+
+                try await Task.sleep(nanoseconds: 90_000_000) // 90ms per char
             }
-        }()
 
-        particles.sparkle(at: sparklePoint, colors: K.particleColors)
+            underlineTrigger = true
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.09) {
-            typeNextChar()
+            try await Task.sleep(nanoseconds: 200_000_000)
+            try Task.checkCancellation()
+
+            let emitPoint = CGPoint(
+                x: nameTextFrame.maxX > 0 ? nameTextFrame.maxX - 8 : 200,
+                y: nameTextFrame.midY > 0 ? nameTextFrame.midY : 120
+            )
+            particles.burst(
+                at: emitPoint,
+                count: 25,
+                minSpeed: 1,
+                maxSpeed: 5,
+                upwardBias: 2,
+                gravity: 0.07
+            )
+        } catch {
+            return
         }
     }
 }
