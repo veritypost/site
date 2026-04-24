@@ -1,7 +1,7 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified notifications 2026-04-18
 import { NextResponse } from 'next/server';
-import { requirePermission } from '@/lib/auth';
+import { requirePermission, hasPermissionServer } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { safeErrorResponse } from '@/lib/apiErrors';
 
@@ -38,9 +38,14 @@ export async function GET() {
 }
 
 export async function PATCH(request) {
+  // H7 — establish authed user via the weakest permission (view) since
+  // per-field permission checks run below. The PATCH used to hard-gate
+  // on `notifications.prefs.toggle_push` for every call, so a user
+  // without push permission couldn't even toggle email or in-app
+  // alerts.
   let user;
   try {
-    user = await requirePermission('notifications.prefs.toggle_push');
+    user = await requirePermission('notifications.prefs.view');
   } catch (err) {
     if (err.status) {
       console.error('[notifications.preferences.permission]', err?.message || err);
@@ -75,26 +80,50 @@ export async function PATCH(request) {
   // into the NOT NULL boolean channels. Empty strings in the two time
   // fields coerce to null to match the prior `|| null` behavior (a UI
   // that clears an input may send '' instead of null).
-  const ALLOWED = [
-    'channel_push',
-    'channel_email',
-    'channel_in_app',
-    'channel_sms',
-    'is_enabled',
-    'quiet_hours_start',
-    'quiet_hours_end',
-    'frequency',
-  ];
+  //
+  // H7 — per-field permission gate. Channel toggles each require their
+  // own `notifications.prefs.toggle_<channel>` permission. Non-channel
+  // fields (is_enabled, quiet hours, frequency) fall under the
+  // generic `notifications.prefs.edit` permission. If the user lacks
+  // a specific field's permission, that field is dropped from the
+  // update and surfaced in `ignored_fields` so the client can toast.
+  const FIELD_PERMS = {
+    channel_push: 'notifications.prefs.toggle_push',
+    channel_email: 'notifications.prefs.toggle_email',
+    channel_in_app: 'notifications.prefs.toggle_in_app',
+    channel_sms: 'notifications.prefs.toggle_sms',
+    is_enabled: 'notifications.prefs.edit',
+    quiet_hours_start: 'notifications.prefs.edit',
+    quiet_hours_end: 'notifications.prefs.edit',
+    frequency: 'notifications.prefs.edit',
+  };
   const TIME_FIELDS = new Set(['quiet_hours_start', 'quiet_hours_end']);
   const update = { updated_at: new Date().toISOString() };
-  for (const k of ALLOWED) {
+  const ignoredFields = [];
+  for (const [k, perm] of Object.entries(FIELD_PERMS)) {
     const v = b[k];
     if (v === undefined || v === null) continue;
+    // Check the field-specific permission. If the user lacks it, skip
+    // the field rather than 403'ing the whole request.
+    // eslint-disable-next-line no-await-in-loop
+    const ok = await hasPermissionServer(perm);
+    if (!ok) {
+      ignoredFields.push(k);
+      continue;
+    }
     if (TIME_FIELDS.has(k) && v === '') {
       update[k] = null;
       continue;
     }
     update[k] = v;
+  }
+  // If every supplied field was dropped, return 403 with a clear
+  // reason so the client doesn't silently no-op.
+  if (Object.keys(update).length === 1 && ignoredFields.length > 0) {
+    return NextResponse.json(
+      { error: 'No permission to modify the requested fields', ignored_fields: ignoredFields },
+      { status: 403 }
+    );
   }
 
   const { error } = existing
@@ -111,5 +140,5 @@ export async function PATCH(request) {
       route: 'notifications.preferences',
       fallbackStatus: 400,
     });
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, ignored_fields: ignoredFields });
 }
