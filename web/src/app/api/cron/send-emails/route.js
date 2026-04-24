@@ -6,6 +6,7 @@ import { renderTemplate, sendEmail } from '@/lib/email';
 import { verifyCronAuth } from '@/lib/cronAuth';
 import { withCronLog } from '@/lib/cronLog';
 import { logCronHeartbeat } from '@/lib/cronHeartbeat';
+import { getSiteUrl } from '@/lib/siteUrl';
 
 const CRON_NAME = 'send-emails';
 
@@ -164,6 +165,8 @@ export const POST = withCronLog('send-emails', run);
 function absoluteUrl(path) {
   if (!path) return '';
   if (/^https?:\/\//i.test(path)) return path;
-  const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://veritypost.com';
-  return `${base.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`;
+  // getSiteUrl throws in prod when NEXT_PUBLIC_SITE_URL is unset — fail
+  // the cron loud rather than ship preview-branch URLs into outgoing
+  // email bodies (which would leak prod when run from a preview env).
+  return `${getSiteUrl()}/${path.replace(/^\/+/, '')}`;
 }

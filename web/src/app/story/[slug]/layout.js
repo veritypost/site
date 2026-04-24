@@ -1,6 +1,7 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified article_reading 2026-04-18
 import { createClient } from '../../../lib/supabase/server';
+import { getSiteUrl } from '../../../lib/siteUrl';
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
@@ -16,7 +17,7 @@ export async function generateMetadata({ params }) {
     return { title: 'Article not found — Verity Post' };
   }
 
-  const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://veritypost.com';
+  const base = getSiteUrl();
   const title = `${story.title} — Verity Post`;
   const description = story.excerpt?.slice(0, 160) || 'News you can trust.';
   const path = `/story/${slug}`;

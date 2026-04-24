@@ -55,7 +55,7 @@ export default function RecapCard() {
 
   if (!canView) {
     return (
-      <a href="/profile/settings/billing" style={cardStyle}>
+      <a href="/profile/settings#billing" style={cardStyle}>
         <div style={eyebrowStyle}>Weekly recap</div>
         <div style={titleStyle}>See what you missed this week</div>
         <div style={subStyle}>Available on paid plans.</div>

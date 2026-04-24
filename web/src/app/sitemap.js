@@ -1,7 +1,10 @@
 import { createClient } from '../lib/supabase/server';
+import { getSiteUrl } from '../lib/siteUrl';
 
 export default async function sitemap() {
-  const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://veritypost.com';
+  // getSiteUrl throws in prod when NEXT_PUBLIC_SITE_URL is unset — fail
+  // loud rather than silently emit prod URLs from a preview branch.
+  const base = getSiteUrl();
 
   // Public-facing, index-worthy anon routes only.
   //

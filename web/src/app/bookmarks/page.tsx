@@ -295,7 +295,7 @@ export default function BookmarksPage() {
         {atCap && (
           <Banner tone="warn" title="You’ve hit the free bookmark cap.">
             Unlimited bookmarks, collections, notes, and export are available on paid plans.{' '}
-            <a href="/profile/settings/billing" style={{ color: '#111', fontWeight: 600 }}>
+            <a href="/profile/settings#billing" style={{ color: '#111', fontWeight: 600 }}>
               View plans →
             </a>
           </Banner>

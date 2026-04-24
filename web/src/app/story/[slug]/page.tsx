@@ -1394,7 +1394,7 @@ export default function StoryPage() {
                     >
                       You&apos;ve used {bookmarkCap} of {bookmarkCap} free bookmarks.{' '}
                       <a
-                        href="/profile/settings/billing"
+                        href="/profile/settings#billing"
                         style={{ color: '#b45309', fontWeight: 700 }}
                       >
                         Upgrade for unlimited
@@ -1450,7 +1450,7 @@ export default function StoryPage() {
                       Your current plan does not include full article access.
                     </div>
                     <a
-                      href="/profile/settings/billing"
+                      href="/profile/settings#billing"
                       style={{
                         display: 'inline-block',
                         padding: '10px 18px',

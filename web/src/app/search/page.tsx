@@ -225,7 +225,7 @@ export default function SearchPage() {
           }}
         >
           Advanced filters (date range, category, source) are available on paid plans.{' '}
-          <a href="/profile/settings/billing" style={{ color: '#111', fontWeight: 700 }}>
+          <a href="/profile/settings#billing" style={{ color: '#111', fontWeight: 700 }}>
             View plans →
           </a>
         </div>

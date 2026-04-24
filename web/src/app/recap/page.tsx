@@ -83,7 +83,7 @@ export default function RecapListPage() {
         <p style={{ fontSize: 14, color: C.dim, lineHeight: 1.6, marginBottom: 20 }}>
           Test what you kept up with this week. See which articles you missed.
         </p>
-        <a href="/profile/settings/billing" style={upgradeBtn}>
+        <a href="/profile/settings#billing" style={upgradeBtn}>
           Upgrade
         </a>
       </div>

@@ -306,7 +306,7 @@ export default function ParentKidsPage() {
           quizzes, and expert sessions.
         </p>
         <a
-          href="/profile/settings/billing"
+          href="/profile/settings#billing"
           style={{
             display: 'inline-block',
             padding: '10px 18px',
@@ -554,7 +554,7 @@ function TrialHero({ endsAt }: { endsAt: string | null }) {
         <div style={{ width: `${pct}%`, height: '100%', background: C.warn }} />
       </div>
       <a
-        href="/profile/settings/billing"
+        href="/profile/settings#billing"
         style={{
           display: 'inline-block',
           padding: '10px 18px',
@@ -590,7 +590,7 @@ function TrialExpiredHero() {
         Progress is saved. Upgrade to Verity Family and the profile unfreezes where it left off.
       </p>
       <a
-        href="/profile/settings/billing"
+        href="/profile/settings#billing"
         style={{
           display: 'inline-block',
           padding: '10px 18px',

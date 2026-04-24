@@ -1,6 +1,7 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified profile_card 2026-04-18
 import { createClient } from '../../../lib/supabase/server';
+import { getSiteUrl } from '../../../lib/siteUrl';
 
 export async function generateMetadata({ params }) {
   const { username } = await params;
@@ -26,7 +27,7 @@ export async function generateMetadata({ params }) {
     };
   }
 
-  const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://veritypost.com';
+  const base = getSiteUrl();
   const name = target.display_name || target.username;
   const title = `${name} on Verity Post`;
   const description =

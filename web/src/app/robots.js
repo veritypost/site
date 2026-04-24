@@ -1,5 +1,9 @@
+import { getSiteUrl } from '../lib/siteUrl';
+
 export default function robots() {
-  const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://veritypost.com';
+  // getSiteUrl throws in prod when NEXT_PUBLIC_SITE_URL is unset — fail
+  // loud rather than emit prod URLs from a preview branch into Google.
+  const base = getSiteUrl();
   return {
     rules: [
       {

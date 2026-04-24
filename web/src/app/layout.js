@@ -9,6 +9,7 @@ import { ToastProvider } from '../components/Toast';
 import ObservabilityInit from '../components/ObservabilityInit';
 import { PermissionsProvider } from '../components/PermissionsProvider';
 import GAListener from '../components/GAListener';
+import { getSiteUrl } from '../lib/siteUrl';
 
 // GA4 measurement ID. Set via NEXT_PUBLIC_GA_MEASUREMENT_ID in Vercel env;
 // fallback literal is the Verity Post production property so the tag ships
@@ -40,7 +41,10 @@ const sourceSerif = Source_Serif_4({
 });
 
 export const metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://veritypost.com'),
+  // metadataBase resolves OG image + canonical URLs. Using getSiteUrl
+  // (which throws in prod when NEXT_PUBLIC_SITE_URL is unset) prevents
+  // a preview branch from silently emitting prod URLs in OG tags.
+  metadataBase: new URL(getSiteUrl()),
   title: 'Verity Post — Read. Prove it. Discuss.',
   description:
     'News with a quiz-gated comment section. Score 3/5 on the article quiz to join the discussion — every commenter read the article.',

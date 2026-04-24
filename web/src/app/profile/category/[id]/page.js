@@ -70,7 +70,7 @@ export default function ProfileCategoryDrillIn() {
   return (
     <div style={{ maxWidth: 680, margin: '0 auto', padding: '24px 16px' }}>
       <a
-        href="/profile?tab=Categories"
+        href="/profile?tab=categories"
         style={{
           display: 'inline-block',
           fontSize: 12,

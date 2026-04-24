@@ -71,7 +71,7 @@ export default function MyCardPage() {
           Shareable profile cards are available on paid plans.
         </p>
         <a
-          href="/profile/settings/billing"
+          href="/profile/settings#billing"
           style={{
             display: 'inline-block',
             padding: '10px 18px',

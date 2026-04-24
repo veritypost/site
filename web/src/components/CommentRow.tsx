@@ -317,7 +317,7 @@ export default function CommentRow({
             <div style={{ fontSize: 12, marginTop: 6, color: 'var(--dim, #666)' }}>
               Expert response \u2014{' '}
               <a
-                href="/profile/settings/billing"
+                href="/profile/settings#billing"
                 style={{ color: 'var(--accent, #111)', fontWeight: 600 }}
               >
                 available on paid plans

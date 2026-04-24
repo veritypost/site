@@ -1,6 +1,7 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified shared_components 2026-04-18
 import { createClient } from '../../../lib/supabase/server';
+import { getSiteUrl } from '../../../lib/siteUrl';
 
 export async function generateMetadata({ params }) {
   const { username } = await params;
@@ -25,7 +26,9 @@ export async function generateMetadata({ params }) {
     };
   }
 
-  const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://veritypost.com';
+  // getSiteUrl throws in prod when NEXT_PUBLIC_SITE_URL is unset — keep
+  // OG share URLs from leaking prod from a preview branch.
+  const base = getSiteUrl();
   const name = target.display_name || target.username;
   const title = `${name}'s card — Verity Post`;
   const description =
