@@ -47,7 +47,11 @@ const CRON_NAME = 'pipeline-cleanup';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-export const maxDuration = 15;
+// M12 — bumped from 15s. The 4 sweeps include a capped 500/run cluster
+// archive loop that on a busy week can take 30s+ on its own; 15s gave
+// no headroom for the 3 prior sweeps and risked a half-completed pass.
+// 60s is the Vercel Hobby tier max and matches the other cron routes.
+export const maxDuration = 60;
 
 async function run(request: Request) {
   if (!verifyCronAuth(request).ok) {

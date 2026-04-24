@@ -83,6 +83,27 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     reason = trimmed.length === 0 ? null : trimmed;
   }
 
+  // M7 — pre-check archived_at so we can skip writing a duplicate audit
+  // row when the cluster is already archived. The RPC itself is idempotent
+  // at the data layer (COALESCE preserves the original archived_at), but
+  // recordAdminAction was firing on every call, generating one audit row
+  // per click. Rapid double-clicks produced a phantom-audit-trail.
+  const { data: existing, error: existingErr } = await service
+    .from('feed_clusters')
+    .select('id, archived_at')
+    .eq('id', clusterId)
+    .maybeSingle();
+
+  if (existingErr) {
+    console.error('[newsroom.clusters.archive] cluster lookup failed:', existingErr.message);
+    Sentry.captureException(existingErr);
+    return NextResponse.json({ error: 'Could not archive cluster' }, { status: 500 });
+  }
+  if (!existing) {
+    return NextResponse.json({ error: 'Cluster not found' }, { status: 404 });
+  }
+  const wasAlreadyArchived = existing.archived_at != null;
+
   const rpc = service.rpc as unknown as RpcCall;
   const { data, error } = await rpc('archive_cluster', {
     p_cluster_id: clusterId,
@@ -102,14 +123,16 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     return NextResponse.json({ error: 'Could not archive cluster' }, { status: 500 });
   }
 
-  await recordAdminAction({
-    action: 'cluster.archive',
-    targetTable: 'feed_clusters',
-    targetId: clusterId,
-    reason,
-    oldValue: null,
-    newValue: data ?? { cluster_id: clusterId, reason },
-  });
+  if (!wasAlreadyArchived) {
+    await recordAdminAction({
+      action: 'cluster.archive',
+      targetTable: 'feed_clusters',
+      targetId: clusterId,
+      reason,
+      oldValue: null,
+      newValue: data ?? { cluster_id: clusterId, reason },
+    });
+  }
 
   return NextResponse.json(data ?? { ok: true });
 }

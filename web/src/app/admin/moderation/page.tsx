@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { ADMIN_ROLES } from '@/lib/roles';
+import { ADMIN_ROLES, MOD_ROLES } from '@/lib/roles';
 import DestructiveActionConfirm from '@/components/admin/DestructiveActionConfirm';
 
 import Page, { PageHeader } from '@/components/admin/Page';
@@ -136,7 +136,9 @@ function ModerationConsoleInner() {
         .filter((r): r is { name: string | null; hierarchy_level: number | null } => Boolean(r));
       const names = roleRows.map((r) => r.name).filter((n): n is string => Boolean(n));
       const admin = names.some((n) => ADMIN_ROLES.has(n));
-      const mod = admin || names.some((n) => ['moderator', 'editor'].includes(n));
+      // M8 — derive `mod` from MOD_ROLES (single source of truth in
+      // lib/roles) instead of re-enumerating moderator+editor inline.
+      const mod = names.some((n) => MOD_ROLES.has(n));
       // Build the live name→level map. If the fetch failed, leave it
       // empty and fall through to HIERARCHY_FALLBACK at call sites.
       const levelsMap: Record<string, number> = {};

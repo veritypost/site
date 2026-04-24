@@ -61,6 +61,11 @@ export default function DestructiveActionConfirm({
     setBusy(true);
     setError('');
     try {
+      // M9 — run the destructive action FIRST. Audit only on success so
+      // a failed mutation can't leave a phantom record_admin_action row
+      // saying "admin deleted X" when X is still there. If onConfirm
+      // throws, we surface the error and skip the audit write entirely.
+      await onConfirm?.({ reason: reason.trim() });
       const supabase = createClient();
       const { error: rpcErr } = await supabase.rpc('record_admin_action', {
         p_action: action,
@@ -71,11 +76,13 @@ export default function DestructiveActionConfirm({
         p_new_value: (newValue ?? null) as never,
       });
       if (rpcErr) {
-        setError(`Audit log write failed: ${rpcErr.message}`);
+        // Don't roll back — the destructive action already succeeded.
+        // Surface the audit gap so the operator knows to follow up.
+        console.error('[DestructiveActionConfirm] audit write failed:', rpcErr.message);
+        setError(`Action succeeded but audit log write failed: ${rpcErr.message}`);
         setBusy(false);
         return;
       }
-      await onConfirm?.({ reason: reason.trim() });
     } catch (err) {
       const e = err as { message?: string };
       setError(e?.message || 'Action failed');
