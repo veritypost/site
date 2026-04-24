@@ -393,23 +393,13 @@ export default function AdminPermissionsPage() {
   };
 
   const removePermFromSet = async (setId: string, permId: string) => {
-    const { error: auditErr } = await supabase.rpc('record_admin_action', {
-      p_action: 'permission_set.remove_member',
-      p_target_table: 'permission_set_perms',
-      p_target_id: setId,
-      p_reason: undefined,
-      p_old_value: { permission_set_id: setId, permission_id: permId },
-      p_new_value: null,
-    });
-    if (auditErr) {
-      toast.push({ message: `Audit log write failed: ${auditErr.message}`, variant: 'danger' });
-      return;
-    }
+    // H24 — audit lives server-side in /api/admin/permission-sets/members
+    // DELETE; client no longer fires record_admin_action so the audit log
+    // doesn't double-write. Optimistic UI flip + rollback on failure.
     const prev = permSetMembers;
     setPermSetMembers(permSetMembers.filter((sp) =>
       !(sp.permission_set_id === setId && sp.permission_id === permId),
     ));
-    // Round A (C-05): service-role endpoint.
     const res = await fetch(`/api/admin/permission-sets/members?permission_set_id=${encodeURIComponent(setId)}&permission_id=${encodeURIComponent(permId)}`, {
       method: 'DELETE',
     });
@@ -421,20 +411,8 @@ export default function AdminPermissionsPage() {
   };
 
   const toggleRoleSet = async (roleId: string, setId: string, currentlyOn: boolean) => {
-    const { error: auditErr } = await supabase.rpc('record_admin_action', {
-      p_action: 'permission_set.toggle_role',
-      p_target_table: 'role_permission_sets',
-      p_target_id: setId,
-      p_reason: undefined,
-      p_old_value: { role_id: roleId, permission_set_id: setId, enabled: !!currentlyOn },
-      p_new_value: { role_id: roleId, permission_set_id: setId, enabled: !currentlyOn },
-    });
-    if (auditErr) {
-      toast.push({ message: `Audit log write failed: ${auditErr.message}`, variant: 'danger' });
-      return;
-    }
+    // H24 — server-side endpoint owns the audit. Client-only optimistic flip.
     const prev = roleSets;
-    // Round A (C-05): service-role endpoint handles both insert + delete.
     if (currentlyOn) {
       setRoleSets(roleSets.filter((rs) => !(rs.role_id === roleId && rs.permission_set_id === setId)));
     } else {
@@ -453,18 +431,7 @@ export default function AdminPermissionsPage() {
   };
 
   const togglePlanSet = async (planId: string, setId: string, currentlyOn: boolean) => {
-    const { error: auditErr } = await supabase.rpc('record_admin_action', {
-      p_action: 'permission_set.toggle_plan',
-      p_target_table: 'plan_permission_sets',
-      p_target_id: setId,
-      p_reason: undefined,
-      p_old_value: { plan_id: planId, permission_set_id: setId, enabled: !!currentlyOn },
-      p_new_value: { plan_id: planId, permission_set_id: setId, enabled: !currentlyOn },
-    });
-    if (auditErr) {
-      toast.push({ message: `Audit log write failed: ${auditErr.message}`, variant: 'danger' });
-      return;
-    }
+    // H24 — server-side endpoint owns the audit. Client-only optimistic flip.
     const prev = planSets;
     // Round A (C-05): service-role endpoint handles both insert + delete.
     if (currentlyOn) {

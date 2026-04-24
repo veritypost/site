@@ -2175,6 +2175,8 @@ function EmailsCard({
     pushToast({ message: 'Email notifications saved.', variant: 'success' });
     notifSnap.current = notifCurrent;
     await onSaved();
+    // H8 — refresh perms cache so any preference-derived gate updates next render
+    await refreshAllPermissions();
   };
 
   return (
@@ -2762,6 +2764,8 @@ function FeedCard({
     pushToast({ message: 'Feed preferences saved.', variant: 'success' });
     markDirty(false);
     await onSaved();
+    // H8 — refresh perms cache (feed-derived gates can flip)
+    await refreshAllPermissions();
   };
 
   return (
@@ -3224,6 +3228,8 @@ function AccessibilityCard({
     pushToast({ message: 'Accessibility saved.', variant: 'success' });
     markDirty(false);
     await onSaved();
+    // H8 — refresh perms cache so dependent gates resolve fresh
+    await refreshAllPermissions();
   };
 
   return (
@@ -4692,6 +4698,8 @@ function ExpertProfileCard({
     pushToast({ message: 'Expert profile saved.', variant: 'success' });
     markDirty(false);
     await onSaved();
+    // H8 — refresh perms cache (expert profile fields feed expert gates)
+    await refreshAllPermissions();
   };
 
   const credList = Array.isArray(application?.credentials)
@@ -4847,6 +4855,8 @@ function ExpertVacationCard({
       variant: 'success',
     });
     await onSaved();
+    // H8 — refresh perms cache (vacation mode flips expert-related gates)
+    await refreshAllPermissions();
   };
 
   return (
@@ -4954,6 +4964,8 @@ function ExpertWatchlistCard({
       pushToast({ message: error.message, variant: 'danger' });
     } else {
       pushToast({ message: 'Watchlist updated.', variant: 'success' });
+      // H8 — refresh perms cache (watchlist categories feed expert-area gates)
+      await refreshAllPermissions();
     }
   };
 

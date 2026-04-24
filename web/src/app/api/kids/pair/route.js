@@ -25,7 +25,7 @@ const TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days — kid re-pairs weekly
 
 export async function POST(request) {
   try {
-    // Rate-limit: 10 attempts per minute per IP. Fails CLOSED in prod.
+    // First-line per-IP rate limit (10/min). Fails CLOSED in prod.
     const svc = createServiceClient();
     const ip = await getClientIp();
     const rate = await checkRateLimit(svc, {
@@ -53,6 +53,28 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Invalid code' }, { status: 400 });
     }
     const normalised = code.trim().toUpperCase();
+
+    // H11 — secondary per-device rate-limit. An attacker that rotates IPs
+    // but reuses a device (or vice versa) was uncapped by IP-only keying.
+    // Truncate device to a stable suffix so the key length stays bounded;
+    // fallback to a separate `nodevice` bucket so devices not yet
+    // sending the field don't share the same key as everyone else.
+    const deviceTag =
+      typeof device === 'string' && device.trim().length > 0
+        ? device.trim().slice(0, 64)
+        : 'nodevice';
+    const deviceRate = await checkRateLimit(svc, {
+      key: `kids-pair-device:${deviceTag}`,
+      policyKey: 'kids_pair',
+      max: 10,
+      windowSec: 60,
+    });
+    if (deviceRate.limited) {
+      return NextResponse.json(
+        { error: 'Too many attempts — try again shortly' },
+        { status: 429, headers: { 'Retry-After': '60' } }
+      );
+    }
 
     const jwtSecret = process.env.SUPABASE_JWT_SECRET;
     if (!jwtSecret) {
