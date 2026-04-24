@@ -33,6 +33,10 @@ function forwardNextQs(): string {
 const IS_COMING_SOON = process.env.NEXT_PUBLIC_SITE_MODE === 'coming_soon';
 
 function HoldingCard() {
+  // Coming-soon mode: only text on the page is the domain itself. No brand
+  // name, no tagline, no status copy — anything here is scrape-able by
+  // Google as snippet fallback, so keep it bare. Restore a proper holding
+  // card (wordmark + tagline + status) when coming-soon flips off.
   return (
     <main
       style={{
@@ -43,48 +47,20 @@ function HoldingCard() {
         alignItems: 'center',
         justifyContent: 'center',
         padding: '24px',
-        gap: '20px',
       }}
     >
       <div
         style={{
-          fontSize: 'clamp(14px, 2.2vw, 18px)',
-          fontWeight: 700,
-          letterSpacing: '0.18em',
-          textTransform: 'uppercase',
-          color: '#666666',
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-          userSelect: 'none',
-        }}
-      >
-        Verity Post
-      </div>
-      <h1
-        style={{
-          fontSize: 'clamp(44px, 9vw, 112px)',
-          fontWeight: 800,
-          letterSpacing: '-0.03em',
+          fontSize: 'clamp(18px, 3vw, 28px)',
+          fontWeight: 600,
           color: '#111111',
-          margin: 0,
-          lineHeight: 1.05,
-          fontFamily: 'var(--font-source-serif), Georgia, "Times New Roman", serif',
-          textAlign: 'center',
-          maxWidth: '12ch',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+          letterSpacing: '-0.01em',
           userSelect: 'none',
         }}
       >
-        Proofreading the proofreader.
-      </h1>
-      <p
-        style={{
-          fontSize: 'clamp(15px, 1.8vw, 18px)',
-          color: '#666666',
-          margin: 0,
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        }}
-      >
-        Back shortly.
-      </p>
+        veritypost.com
+      </div>
     </main>
   );
 }

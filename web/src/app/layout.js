@@ -45,23 +45,36 @@ export const metadata = {
   // (which throws in prod when NEXT_PUBLIC_SITE_URL is unset) prevents
   // a preview branch from silently emitting prod URLs in OG tags.
   metadataBase: new URL(getSiteUrl()),
-  title: 'Verity Post — Read. Prove it. Discuss.',
-  description:
-    'News with a quiz-gated comment section. Score 3/5 on the article quiz to join the discussion — every commenter read the article.',
+  // Coming-soon mode: Google result reduced to URL only.
+  // - title=domain so the title line reads the same as the URL line.
+  // - empty description + max-snippet:0 + max-image-preview:none so Google
+  //   has nothing to show under the link and no preview image.
+  // - OG + Twitter stripped so social unfurls reveal nothing either.
+  // Restore at launch: title "Verity Post — Read. Prove it. Discuss.",
+  // quiz-gated description, normal OG/Twitter cards.
+  title: 'veritypost.com',
+  description: '',
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-snippet': 0,
+      'max-image-preview': 'none',
+      'max-video-preview': 0,
+      noarchive: true,
+      notranslate: true,
+    },
+  },
   openGraph: {
-    title: 'Verity Post — Read. Prove it. Discuss.',
-    description:
-      'News with a quiz-gated comment section. Score 3/5 on the article quiz to join the discussion — every commenter read the article.',
-    siteName: 'Verity Post',
+    title: 'veritypost.com',
+    siteName: 'veritypost.com',
     type: 'website',
   },
   twitter: {
     card: 'summary',
-    site: '@VerityPostApp',
-    creator: '@VerityPostApp',
-    title: 'Verity Post — Read. Prove it. Discuss.',
-    description:
-      'News with a quiz-gated comment section. Score 3/5 on the article quiz to join the discussion.',
+    title: 'veritypost.com',
   },
   // DA-183 — apple mobile PWA hints. Without these, iOS Add-to-Home-Screen
   // installs with a blurred screenshot icon. `themeColor` moved to the

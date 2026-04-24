@@ -1,10 +1,31 @@
 import { createClient } from '../lib/supabase/server';
 import { getSiteUrl } from '../lib/siteUrl';
 
+// Coming-soon gate: while the site is in holding, sitemap.xml advertises
+// only the root URL. Broadcasting /story/*, /category/*, /browse, /privacy,
+// etc. tells Google the URL structure even though middleware redirects
+// each of those to /welcome (which is disallowed in robots.js). Keep the
+// sitemap silent in coming-soon mode so the crawler doesn't have a list
+// of structured URLs to index-attempt. Flip back to full sitemap (static
+// routes + story + category) once NEXT_PUBLIC_SITE_MODE is no longer
+// 'coming_soon'.
+const IS_COMING_SOON = process.env.NEXT_PUBLIC_SITE_MODE === 'coming_soon';
+
 export default async function sitemap() {
   // getSiteUrl throws in prod when NEXT_PUBLIC_SITE_URL is unset — fail
   // loud rather than silently emit prod URLs from a preview branch.
   const base = getSiteUrl();
+
+  if (IS_COMING_SOON) {
+    return [
+      {
+        url: base,
+        lastModified: new Date(),
+        changeFrequency: 'daily',
+        priority: 1.0,
+      },
+    ];
+  }
 
   // Public-facing, index-worthy anon routes only.
   //
