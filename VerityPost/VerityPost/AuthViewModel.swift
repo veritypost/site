@@ -575,9 +575,18 @@ final class AuthViewModel: ObservableObject {
         // v2: tier lives on the joined plans table — without the join,
         // every user shows up as "free" and tier-gated UI (Kids row,
         // Messages, Recap, etc.) never appears.
+        //
+        // Explicit column list — never `select("*")` on `users` from a
+        // client surface. The wildcard would ship stripe_customer_id,
+        // apple_original_transaction_id (receipts live in subscription
+        // rows), last_login_ip, mute_level, failed_login_count,
+        // password_hash, kids_pin_hash into the iOS bundle's response
+        // cache. Only the VPUser-mapped fields are read by the app.
         do {
             let response: VPUser = try await client.from("users")
-                .select("*, plans(tier)")
+                .select(
+                    "id, email, email_verified, username, display_name, bio, avatar_color, metadata, is_expert, expert_title, is_verified_public_figure, frozen_at, verity_score, articles_read_count, quizzes_completed_count, streak_current, streak_best, comment_count, followers_count, following_count, show_activity, created_at, onboarding_completed_at, plans(tier)"
+                )
                 .eq("id", value: id)
                 .single()
                 .execute()

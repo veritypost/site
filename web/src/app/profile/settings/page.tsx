@@ -148,7 +148,35 @@ interface SettingsMeta {
   };
 }
 
-type UserRow = Tables<'users'>;
+// Narrowed — the client surface only reads these columns. Full-row
+// access (stripe_customer_id, last_login_ip, mute_level, etc.) stays
+// server-side, so this type intentionally excludes the privileged
+// columns that `users.*` would otherwise expose.
+type UserRow = Pick<
+  Tables<'users'>,
+  | 'id'
+  | 'email'
+  | 'email_verified'
+  | 'username'
+  | 'display_name'
+  | 'bio'
+  | 'avatar_url'
+  | 'avatar_color'
+  | 'banner_url'
+  | 'metadata'
+  | 'deletion_scheduled_for'
+  | 'is_expert'
+  | 'expert_title'
+  | 'expert_organization'
+  | 'is_verified_public_figure'
+  | 'allow_messages'
+  | 'dm_read_receipts_enabled'
+  | 'profile_visibility'
+  | 'show_activity'
+  | 'show_on_leaderboard'
+  | 'created_at'
+  | 'onboarding_completed_at'
+>;
 type CategoryRow = Pick<Tables<'categories'>, 'id' | 'name' | 'is_kids_safe'>;
 type AlertPrefRow = Tables<'alert_preferences'>;
 type BlockedRow = {
@@ -541,7 +569,19 @@ function SettingsInner(): ReactElement {
 
   const reloadUser = useCallback(async () => {
     if (!userId) return;
-    const { data, error } = await supabase.from('users').select('*').eq('id', userId).maybeSingle();
+    // Explicit column list — never `select('*')` on `users` from a client
+    // surface. The wildcard exposes stripe_customer_id, last_login_ip,
+    // mute_level, failed_login_count, apple_original_transaction_id,
+    // password_hash, frozen_at, etc., which should never ship to a
+    // browser context. Billing IDs live in separate joined queries
+    // (userBilling, subscription); moderation + PII stay server-side.
+    const { data, error } = await supabase
+      .from('users')
+      .select(
+        'id, email, email_verified, username, display_name, bio, avatar_url, avatar_color, banner_url, metadata, deletion_scheduled_for, is_expert, expert_title, expert_organization, is_verified_public_figure, allow_messages, dm_read_receipts_enabled, profile_visibility, show_activity, show_on_leaderboard, created_at, onboarding_completed_at'
+      )
+      .eq('id', userId)
+      .maybeSingle();
     if (error) {
       pushToast({ message: error.message, variant: 'danger' });
       setLoadingUser(false);
@@ -3665,7 +3705,7 @@ function BillingBundle({
 
   const [loading, setLoading] = useState(true);
   const [userBilling, setUserBilling] = useState<Pick<
-    UserRow,
+    Tables<'users'>,
     | 'plan_id'
     | 'plan_status'
     | 'frozen_at'
