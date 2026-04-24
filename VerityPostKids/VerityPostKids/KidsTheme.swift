@@ -88,12 +88,32 @@ extension Font {
 // MARK: Color(hex:) helper — kids-local copy so this target doesn't
 // depend on adult theme utilities.
 extension Color {
+    // K9: previous implementation returned black on any parse failure with
+    // no signal. If a DB-driven color or a developer typo leaked through,
+    // an invisible-on-dark or wrong-themed UI element appeared silently.
+    // Now: log the bad input + return a highly visible fuchsia sentinel
+    // so unparseable strings show up in dev instead of blending into a
+    // dark surface. Production fallback is still a concrete color (no
+    // crash, no blank view).
+    private static let hexParseFallback: Color = Color(
+        .sRGB,
+        red: 1.0,
+        green: 0.0,
+        blue: 0.8,
+        opacity: 1.0
+    )
+
     init(hex: String) {
-        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        let cleaned = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
         var int: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&int)
+        let scanned = Scanner(string: cleaned).scanHexInt64(&int)
+        guard scanned, [3, 6, 8].contains(cleaned.count) else {
+            print("[KidsTheme] Color(hex:) could not parse \(hex.debugDescription); using fallback")
+            self = Self.hexParseFallback
+            return
+        }
         let a, r, g, b: UInt64
-        switch hex.count {
+        switch cleaned.count {
         case 3: // RGB (12-bit)
             (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
         case 6: // RGB (24-bit)
@@ -101,7 +121,11 @@ extension Color {
         case 8: // ARGB (32-bit)
             (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
         default:
-            (a, r, g, b) = (255, 0, 0, 0)
+            // Unreachable — guarded above — but the compiler requires
+            // exhaustive coverage.
+            print("[KidsTheme] Color(hex:) unreachable default for \(hex.debugDescription); using fallback")
+            self = Self.hexParseFallback
+            return
         }
         self.init(
             .sRGB,
