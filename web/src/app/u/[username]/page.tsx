@@ -8,10 +8,17 @@ import Avatar from '@/components/Avatar';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import FollowButton from '@/components/FollowButton';
 import VerifiedBadge from '@/components/VerifiedBadge';
+import UnderConstruction from '@/components/UnderConstruction';
 import { useToast } from '@/components/Toast';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import { getScoreTiers, tierFor, type ScoreTier } from '@/lib/scoreTiers';
 import type { Tables } from '@/types/database-helpers';
+
+// Kill-switched while public profile is being polished. Owner flips
+// PUBLIC_PROFILE_ENABLED back to true to restore the real UI; all
+// state, queries, and component logic below are preserved intact for
+// one-line revert. See /profile/[id] for the matching gate.
+const PUBLIC_PROFILE_ENABLED = false;
 
 // D28 + D32 / Pass 17 — public profile by username.
 // Permission swap:
@@ -91,6 +98,10 @@ const C = {
 } as const;
 
 export default function ProfilePage() {
+  if (!PUBLIC_PROFILE_ENABLED) {
+    return <UnderConstruction surface="public profiles" />;
+  }
+  /* eslint-disable react-hooks/rules-of-hooks -- kill-switched; hooks below are dead until PUBLIC_PROFILE_ENABLED flips */
   const params = useParams<{ username: string }>();
   const username = params?.username;
   const supabase = useMemo(() => createClient(), []);
