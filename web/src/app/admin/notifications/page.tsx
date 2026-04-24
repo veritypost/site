@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent, type FocusEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/client';
 import Page, { PageHeader } from '@/components/admin/Page';
@@ -105,19 +105,29 @@ function NotificationsInner() {
       if (!user) { router.push('/'); return; }
       const { data: profile } = await supabase.from('users').select('id').eq('id', user.id).single();
       const { data: userRoles } = await supabase.from('user_roles').select('roles(name)').eq('user_id', user.id);
-      const roleNames = (userRoles || []).map((r: any) => r.roles?.name).filter(Boolean);
+      const roleNames = (
+        (userRoles || []) as Array<{ roles: { name: string | null } | null }>
+      )
+        .map((r) => r.roles?.name)
+        .filter(Boolean);
       if (!profile || (!roleNames.includes('owner') && !roleNames.includes('admin'))) { router.push('/'); return; }
 
       const { data: settingsData } = await supabase.from('settings').select('*');
-      const settingsMap: Record<string, any> = {};
-      (settingsData || []).forEach((s: any) => { settingsMap[s.key] = s.value; });
+      const settingsMap: Record<string, unknown> = {};
+      ((settingsData || []) as Array<{ key: string; value: unknown }>).forEach((s) => {
+        settingsMap[s.key] = s.value;
+      });
       const loadedConfig = { ...DEFAULT_TOGGLE_STATE };
       const loadedNums = { ...DEFAULT_NUMS };
       Object.keys(DEFAULT_TOGGLE_STATE).forEach((k) => {
         if (settingsMap[k] !== undefined) loadedConfig[k] = settingsMap[k] === 'true' || settingsMap[k] === true;
       });
       Object.keys(DEFAULT_NUMS).forEach((k) => {
-        if (settingsMap[k] !== undefined) loadedNums[k] = parseInt(settingsMap[k]) || DEFAULT_NUMS[k];
+        const raw = settingsMap[k];
+        if (raw !== undefined) {
+          const parsed = parseInt(typeof raw === 'string' ? raw : String(raw));
+          loadedNums[k] = parsed || DEFAULT_NUMS[k];
+        }
       });
       setConfig(loadedConfig);
       setNums(loadedNums);
@@ -127,7 +137,7 @@ function NotificationsInner() {
         .select('*, users!fk_notifications_user_id(username)')
         .order('created_at', { ascending: false })
         .limit(100);
-      setNotifications((notifs || []) as any);
+      setNotifications((notifs || []) as Notification[]);
       setLoading(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -207,7 +217,7 @@ function NotificationsInner() {
         .select('*, users!fk_notifications_user_id(username)')
         .order('created_at', { ascending: false })
         .limit(100);
-      setNotifications((notifs || []) as any);
+      setNotifications((notifs || []) as Notification[]);
     } finally { setCompSending(false); }
   };
 
@@ -325,7 +335,7 @@ function NotificationsInner() {
           <PageSection title="Send notification" boxed>
             <div style={{ display: 'grid', gap: S[3] }}>
               <div style={{ display: 'flex', gap: S[2], flexWrap: 'wrap' }}>
-                <Select value={compRecipient} onChange={(e) => setCompRecipient(e.target.value as any)} block={false} style={{ minWidth: 140 }}>
+                <Select value={compRecipient} onChange={(e) => setCompRecipient(e.target.value as 'all' | 'specific')} block={false} style={{ minWidth: 140 }}>
                   <option value="all">All users</option>
                   <option value="specific">Specific user</option>
                 </Select>
@@ -431,8 +441,8 @@ function ConfigGroup({
                   <NumberInput
                     block={false} style={{ width: 70 }}
                     value={nums[item.num]}
-                    onChange={(e: any) => setNums((prev) => ({ ...prev, [item.num as string]: parseInt(e.target.value) || 0 }))}
-                    onBlur={(e: any) => onNum(item.num as string, e.target.value)}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => setNums((prev) => ({ ...prev, [item.num as string]: parseInt(e.target.value) || 0 }))}
+                    onBlur={(e: FocusEvent<HTMLInputElement>) => onNum(item.num as string, e.target.value)}
                   />
                   {item.unit && <span style={{ fontSize: F.xs, color: C.muted }}>{item.unit}</span>}
                 </div>
@@ -463,8 +473,8 @@ function LabeledNum({ label, value, onBlur, onChange, unit }: {
           block={false}
           style={{ width: 90 }}
           value={value}
-          onChange={(e: any) => onChange(parseFloat(e.target.value) || 0)}
-          onBlur={(e: any) => onBlur(parseFloat(e.target.value) || 0)}
+          onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(parseFloat(e.target.value) || 0)}
+          onBlur={(e: FocusEvent<HTMLInputElement>) => onBlur(parseFloat(e.target.value) || 0)}
         />
         {unit && <span style={{ fontSize: F.sm, color: C.muted }}>{unit}</span>}
       </div>

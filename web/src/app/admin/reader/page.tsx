@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent, type FocusEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { ADMIN_ROLES } from '@/lib/roles';
 import { createClient } from '../../../lib/supabase/client';
@@ -102,17 +102,21 @@ function ReaderInner() {
       if (!user) { router.push('/'); return; }
       const { data: profile } = await supabase.from('users').select('id').eq('id', user.id).single();
       const { data: userRoles } = await supabase.from('user_roles').select('roles(name)').eq('user_id', user.id);
-      const roleNames = (userRoles || []).map((r: any) => r.roles?.name).filter(Boolean);
-      if (!profile || !roleNames.some((r: string) => ADMIN_ROLES.has(r))) { router.push('/'); return; }
+      const roleNames = (
+        (userRoles || []) as Array<{ roles: { name: string | null } | null }>
+      )
+        .map((r) => r.roles?.name)
+        .filter((n): n is string => typeof n === 'string');
+      if (!profile || !roleNames.some((r) => ADMIN_ROLES.has(r))) { router.push('/'); return; }
 
       const { data: settingsRows } = await supabase.from('settings').select('key, value').like('key', 'reader_%');
       if (settingsRows) {
         const cfg: Record<string, boolean> = {};
         const n: Record<string, number> = {};
-        (settingsRows as any[]).forEach((row) => {
+        (settingsRows as Array<{ key: string; value: string | null }>).forEach((row) => {
           const k = row.key.replace('reader_config_', '').replace('reader_num_', '');
           if (row.key.startsWith('reader_config_')) cfg[k] = row.value === 'true';
-          if (row.key.startsWith('reader_num_')) n[k] = parseFloat(row.value) || 0;
+          if (row.key.startsWith('reader_num_')) n[k] = parseFloat(row.value || '') || 0;
         });
         if (Object.keys(cfg).length) setConfig((prev) => ({ ...prev, ...cfg }));
         if (Object.keys(n).length) setNums((prev) => ({ ...prev, ...n }));
@@ -267,8 +271,8 @@ function ConfigGroup({
                   <NumberInput
                     block={false} style={{ width: 70 }} step={item.step || 1}
                     value={nums[item.num]}
-                    onChange={(e: any) => setNums((prev) => ({ ...prev, [item.num as string]: parseFloat(e.target.value) || 0 }))}
-                    onBlur={(e: any) => onNum(item.num as string, e.target.value)}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => setNums((prev) => ({ ...prev, [item.num as string]: parseFloat(e.target.value) || 0 }))}
+                    onBlur={(e: FocusEvent<HTMLInputElement>) => onNum(item.num as string, e.target.value)}
                   />
                   {item.num2 && (
                     <>
@@ -276,8 +280,8 @@ function ConfigGroup({
                       <NumberInput
                         block={false} style={{ width: 70 }} step={item.step || 1}
                         value={nums[item.num2]}
-                        onChange={(e: any) => setNums((prev) => ({ ...prev, [item.num2 as string]: parseFloat(e.target.value) || 0 }))}
-                        onBlur={(e: any) => onNum(item.num2 as string, e.target.value)}
+                        onChange={(e: ChangeEvent<HTMLInputElement>) => setNums((prev) => ({ ...prev, [item.num2 as string]: parseFloat(e.target.value) || 0 }))}
+                        onBlur={(e: FocusEvent<HTMLInputElement>) => onNum(item.num2 as string, e.target.value)}
                       />
                     </>
                   )}
@@ -287,8 +291,8 @@ function ConfigGroup({
                       <NumberInput
                         block={false} style={{ width: 70 }} step={item.step || 1}
                         value={nums[item.num3]}
-                        onChange={(e: any) => setNums((prev) => ({ ...prev, [item.num3 as string]: parseFloat(e.target.value) || 0 }))}
-                        onBlur={(e: any) => onNum(item.num3 as string, e.target.value)}
+                        onChange={(e: ChangeEvent<HTMLInputElement>) => setNums((prev) => ({ ...prev, [item.num3 as string]: parseFloat(e.target.value) || 0 }))}
+                        onBlur={(e: FocusEvent<HTMLInputElement>) => onNum(item.num3 as string, e.target.value)}
                       />
                     </>
                   )}
