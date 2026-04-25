@@ -1,4 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
+import { config as loadEnv } from 'dotenv';
+import { resolve } from 'path';
+
+// Load env from web/.env.local so tests can read SUPABASE_SERVICE_ROLE_KEY
+// + NEXT_PUBLIC_SUPABASE_URL (used by createTestUser's fast admin path
+// and the global teardown that deletes vp-e2e-* users).
+loadEnv({ path: resolve(__dirname, '.env.local') });
 
 /**
  * Playwright config for Verity Post web E2E.

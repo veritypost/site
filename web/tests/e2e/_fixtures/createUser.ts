@@ -1,41 +1,68 @@
 /**
  * Per-test user creation. Each spec that needs an authenticated user
- * calls `createTestUser()` which:
- *   - generates a unique email (vp-e2e-<uuid>@example.com)
- *   - signs up via the live signup API (matches real user behaviour
- *     instead of bypassing via service-role insert; exercises the
- *     server-side validation + audit path)
- *   - returns { email, password, userId } for the spec to use
+ * calls `createTestUser()`.
  *
- * Cleanup: a global teardown hook (tests/e2e/_fixtures/cleanup.ts)
- * deletes vp-e2e-* users at the end of the run via the service-role
- * client. Per-test cleanup would race across parallel workers.
+ * Two paths:
+ *   1. Service-role (preferred) — when SUPABASE_SERVICE_ROLE_KEY is
+ *      present in the test env, create the auth.users row directly
+ *      via the admin API. Bypasses the rate-limited /api/auth/signup
+ *      route entirely + no email confirmation step. The
+ *      `handle_new_auth_user` trigger handles the public.users +
+ *      user_roles inserts.
+ *   2. API fallback — when no service key is present, post to
+ *      /api/auth/signup with a spoofed unique x-forwarded-for so the
+ *      per-IP rate limit doesn't fire across parallel workers. Slower
+ *      and rate-limit-bound; use only when you're testing without DB
+ *      access (rare).
  *
- * Requires SUPABASE_SERVICE_ROLE_KEY in the test environment for the
- * teardown step. The signup itself goes through the public API so no
- * service key is needed for the create path.
+ * Cleanup: tests/e2e/_fixtures/cleanup.ts deletes vp-e2e-* users at
+ * the end of the run via the same service-role admin API.
  */
 
 import { request } from '@playwright/test';
 import { randomUUID } from 'crypto';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 export interface TestUser {
   email: string;
   password: string;
 }
 
+let _admin: SupabaseClient | null = null;
+function getAdmin(): SupabaseClient | null {
+  if (_admin) return _admin;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  _admin = createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  return _admin;
+}
+
 export async function createTestUser(baseURL: string): Promise<TestUser> {
   const email = `vp-e2e-${randomUUID()}@example.com`;
   const password = 'TestPass1234!'; // satisfies the default password.* policy
 
-  // Spoof a unique x-forwarded-for per request so the per-IP rate
-  // limit (5 signups/hour at the route level) doesn't choke a parallel
-  // test run. The signup route's getClientIp() reads x-forwarded-for
-  // first; each unique IP lands in its own rate-limit bucket. Email
-  // also rate-limits, but we generate a UUID-based email per request
-  // so that bucket is also fresh per test.
-  const fakeIp = `10.${rand255()}.${rand255()}.${rand255()}`;
+  // Path 1 — service-role admin createUser. Skips rate limit + email
+  // confirmation. Trigger handles downstream rows.
+  const admin = getAdmin();
+  if (admin) {
+    const { error } = await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { full_name: 'E2E Test User' },
+    });
+    if (error) {
+      throw new Error(`createTestUser admin path failed: ${error.message}`);
+    }
+    return { email, password };
+  }
 
+  // Path 2 — fallback to the public signup API. Spoof unique IP so
+  // parallel workers don't share the per-IP rate-limit bucket.
+  const fakeIp = `10.${rand255()}.${rand255()}.${rand255()}`;
   const ctx = await request.newContext({
     baseURL,
     extraHTTPHeaders: { 'x-forwarded-for': fakeIp },
@@ -51,10 +78,12 @@ export async function createTestUser(baseURL: string): Promise<TestUser> {
   });
   if (!res.ok()) {
     const body = await res.text();
-    throw new Error(`createTestUser signup failed: ${res.status()} ${body.slice(0, 200)}`);
+    throw new Error(
+      `createTestUser API path failed: ${res.status()} ${body.slice(0, 200)} ` +
+        '(set SUPABASE_SERVICE_ROLE_KEY to use the faster admin path that bypasses rate limits)'
+    );
   }
   await ctx.dispose();
-
   return { email, password };
 }
 
