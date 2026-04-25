@@ -39,7 +39,29 @@ export function renderTemplate(tpl, variables = {}, opts = {}) {
   };
 }
 
-export async function sendEmail({ to, subject, html, text, fromName, fromEmail, replyTo }) {
+// Ext-LL2 — RFC 8058 one-click unsubscribe headers. Required for Gmail
+// bulk-sender compliance + meaningfully boosts deliverability with
+// every major mailbox provider. Caller passes a per-recipient unsub URL
+// where possible; otherwise we fall back to the email-prefs section of
+// settings (covers every legitimate user without per-template plumbing).
+function buildUnsubscribeHeaders(unsubUrl) {
+  if (!unsubUrl) return null;
+  return {
+    'List-Unsubscribe': `<${unsubUrl}>`,
+    'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+  };
+}
+
+export async function sendEmail({
+  to,
+  subject,
+  html,
+  text,
+  fromName,
+  fromEmail,
+  replyTo,
+  unsubscribeUrl,
+}) {
   const key = process.env.RESEND_API_KEY;
   if (!key) throw new Error('RESEND_API_KEY missing');
 
@@ -52,6 +74,11 @@ export async function sendEmail({ to, subject, html, text, fromName, fromEmail, 
     text: text || undefined,
   };
   if (replyTo) body.reply_to = replyTo;
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://veritypost.com';
+  const fallbackUnsub = `${siteUrl}/profile/settings#emails`;
+  const unsubHeaders = buildUnsubscribeHeaders(unsubscribeUrl || fallbackUnsub);
+  if (unsubHeaders) body.headers = unsubHeaders;
 
   const res = await fetch(RESEND_API, {
     method: 'POST',

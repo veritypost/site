@@ -42,6 +42,15 @@ Each item: status (open / shipped) + commit SHA when shipped.
 | AAA.6 | award_points cap-counting race | shipped — schema/168 adds `pg_advisory_xact_lock` keyed on (subject, action) |
 | KK.1 | feeds POST accepts any URL | shipped — URL parse + http(s)-only + private/loopback host reject |
 
+## Batch 32 — Email + push + scoring cluster (shipped)
+
+| ID | Title | Status |
+|---|---|---|
+| LL.2 | No `List-Unsubscribe` header | shipped — RFC 8058 one-click headers via `sendEmail`; per-recipient URL or fallback to settings#emails |
+| LL.3 | send-emails cron ignores quiet hours | shipped — quiet_hours_start/end loaded with prefs; deferred (not skipped) when current time falls inside |
+| X.5 | Logout doesn't invalidate push tokens | shipped — POST /api/auth/logout marks user_push_tokens.invalidated_at = now() before signOut |
+| AAA.4 | Recap pass not awarded points | shipped — schema/169 seeds `recap_pass` rule (6 pts) + rewires `submit_recap_attempt` to PERFORM `award_points` on >=60% pass |
+
 ## Owner-decision sub-bucket (added during Bucket 5 work)
 
 | ID | Title | Question |

@@ -78,7 +78,7 @@ async function runInner() {
     service.from('users').select('id, email, username, email_verified').in('id', userIds),
     service
       .from('alert_preferences')
-      .select('user_id, alert_type, channel_email, is_enabled')
+      .select('user_id, alert_type, channel_email, is_enabled, quiet_hours_start, quiet_hours_end')
       .in('user_id', userIds),
     service
       .from('email_templates')
@@ -147,6 +147,29 @@ async function runInner() {
         .eq('id', n.id);
       skipped++;
       continue;
+    }
+
+    // Ext-LL3 — quiet hours. The notifications table writer already
+    // suppresses push during quiet hours; the email cron didn't, so
+    // a "send_at midnight" preference still got an email at midnight.
+    // Defer instead of skip: leave email_sent=false so the next tick
+    // outside quiet hours picks it up. UTC clock here matches what
+    // alert_preferences stores; per-user TZ is a future enhancement.
+    if (pref && pref.quiet_hours_start && pref.quiet_hours_end) {
+      const now = new Date();
+      const nowH = now.getUTCHours() * 60 + now.getUTCMinutes();
+      const toMin = (t) => {
+        const [hh, mm] = String(t).split(':').map(Number);
+        return (hh || 0) * 60 + (mm || 0);
+      };
+      const startMin = toMin(pref.quiet_hours_start);
+      const endMin = toMin(pref.quiet_hours_end);
+      const inQuiet =
+        startMin < endMin ? nowH >= startMin && nowH < endMin : nowH >= startMin || nowH < endMin; // wraps midnight
+      if (inQuiet) {
+        skipped++;
+        continue;
+      }
     }
 
     const variables = {
