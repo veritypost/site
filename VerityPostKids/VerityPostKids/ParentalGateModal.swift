@@ -23,8 +23,13 @@ struct ParentalGateModal: View {
     let onSuccess: () -> Void
     let onCancel: () -> Void
 
-    @State private var n1: Int = Int.random(in: 4...15)
-    @State private var n2: Int = Int.random(in: 4...15)
+    // Ext-W9 — bumped from 4..15 + 4..15 (max 30, child-solvable) to
+    // 12..49 × 2..9. Two-digit times single-digit gives a problem
+    // ~typical ages 9+ can do but younger kids in the target band
+    // (5-8) struggle with. Apple's Kids Category guidance expects a
+    // gate "not easily completed by a child."
+    @State private var n1: Int = Int.random(in: 12...49)
+    @State private var n2: Int = Int.random(in: 2...9)
     @State private var answer: String = ""
     @State private var attempts: Int = 0
     @State private var lockRemaining: Int = 0
@@ -107,7 +112,7 @@ struct ParentalGateModal: View {
 
     private var challengeView: some View {
         VStack(spacing: 20) {
-            Text("What is \(n1) + \(n2)?")
+            Text("What is \(n1) × \(n2)?")
                 .font(.scaledSystem(size: 28, weight: .black, design: .rounded))
                 .foregroundStyle(K.text)
 
@@ -176,7 +181,7 @@ struct ParentalGateModal: View {
     // MARK: Logic
 
     private func checkAnswer() {
-        guard let value = Int(answer), value == n1 + n2 else {
+        guard let value = Int(answer), value == n1 * n2 else {
             attempts += 1
             answer = ""
             showError = true
@@ -193,8 +198,8 @@ struct ParentalGateModal: View {
     }
 
     private func newQuestion() {
-        n1 = Int.random(in: 4...15)
-        n2 = Int.random(in: 4...15)
+        n1 = Int.random(in: 12...49)
+        n2 = Int.random(in: 2...9)
     }
 
     private func beginLockout() {

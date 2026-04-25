@@ -73,6 +73,14 @@ Each item: status (open / shipped) + commit SHA when shipped.
 | KK.4 | Ingest ignores feeds.audience | **owner-decision** (unified-pool was deliberate) |
 | AA.3 | Server-side age verification | **owner-decision** (requires DOB collection UX) |
 
+## Batch 34 — Kids iOS polish (shipped)
+
+| ID | Title | Status |
+|---|---|---|
+| W.9 | Math challenge kid-solvable (4..15 + 4..15) | shipped — bumped to 12..49 × 2..9 (multiplication) |
+| W.16 | Family leaderboard returns single row under kid JWT | shipped — schema/172 adds `kid_family_leaderboard(kid_id)` SECDEF RPC; LeaderboardView swapped from PostgREST fallback to RPC call |
+| EE.9 | Splash duration not coupled to session-restore | **already correct** — splash gated on `auth.isLoading`, no fixed timer in current code |
+
 ## Owner-decision sub-bucket (added during Bucket 5 work)
 
 | ID | Title | Question |

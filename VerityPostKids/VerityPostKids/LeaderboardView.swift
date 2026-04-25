@@ -233,45 +233,29 @@ struct LeaderboardView: View {
     }
 
     private func loadFamily() async {
-        // Family leaderboard uses the /api/family/leaderboard endpoint
-        // (uses the family_members RPC internally, requires auth).
-        // For MVP: fallback to filtering kid_profiles by shared parent_user_id
-        // reachable through the paired kid's own row.
+        // Ext-W16 — uses the kid_family_leaderboard RPC (schema/172).
+        // Kid JWT hides siblings via the kid_profiles base SELECT
+        // policy, so the prior fallback path returned a single-row
+        // leaderboard even when siblings existed. The new RPC is
+        // SECURITY DEFINER and resolves siblings server-side.
         guard let kidId = auth.kid?.id else {
             entries = []
             return
         }
 
-        struct KidRow: Decodable {
+        struct FamilyRow: Decodable {
             let id: String
             let display_name: String?
             let verity_score: Int?
-            let parent_user_id: String
+            let is_self: Bool?
         }
 
         do {
-            // Fetch own row to learn parent_user_id
-            let ownRow: KidRow = try await client
-                .from("kid_profiles")
-                .select("id, display_name, verity_score, parent_user_id")
-                .eq("id", value: kidId)
-                .single()
+            let rows: [FamilyRow] = try await client
+                .rpc("kid_family_leaderboard", params: ["p_kid_profile_id": kidId])
                 .execute()
                 .value
 
-            // Fetch siblings (same parent_user_id). RLS will only return rows
-            // visible under current JWT — for kid JWT that's just ownRow, so
-            // family is effectively a single-kid "leaderboard" unless the
-            // backend exposes a family-scoped RPC.
-            let family: [KidRow] = try await client
-                .from("kid_profiles")
-                .select("id, display_name, verity_score, parent_user_id")
-                .eq("parent_user_id", value: ownRow.parent_user_id)
-                .order("verity_score", ascending: false)
-                .execute()
-                .value
-
-            let rows = family.isEmpty ? [ownRow] : family
             self.entries = rows.enumerated().map { i, r in
                 LeaderboardEntry(
                     id: r.id,
