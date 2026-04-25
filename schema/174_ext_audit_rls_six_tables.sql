@@ -69,19 +69,17 @@ CREATE POLICY expert_queue_items_delete ON public.expert_queue_items
 -- ============================================================================
 -- family_achievements
 -- ============================================================================
+-- This is the *catalog* of family-achievement DEFINITIONS (key, name,
+-- description, criteria) — not per-family progress. Per-family progress
+-- lives on family_achievement_progress and has family_owner_id; this
+-- table doesn't. Posture: read-public, write admin-or-above.
 DROP POLICY IF EXISTS family_achievements_select ON public.family_achievements;
 DROP POLICY IF EXISTS family_achievements_modify ON public.family_achievements;
 
 CREATE POLICY family_achievements_select ON public.family_achievements
   FOR SELECT
-  USING (
-    family_owner_id = auth.uid()
-    OR public.is_admin_or_above()
-  );
+  USING (true);
 
--- Inserts/updates/deletes flow through SECURITY DEFINER RPCs (the
--- recompute_family_achievements cron + admin admin tooling); block
--- direct mutations from authenticated users.
 CREATE POLICY family_achievements_modify ON public.family_achievements
   FOR ALL
   USING (public.is_admin_or_above())
