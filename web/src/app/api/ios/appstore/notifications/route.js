@@ -46,10 +46,34 @@ const IGNORED_TYPES = new Set([
   'SUBSCRIPTION_EXTENDED',
 ]);
 
+// Ext-WW1 — Stripe enforces a 1 MiB cap on its webhook payloads; the
+// iOS S2S equivalents had none. A signedPayload (JWS) for App Store
+// notifications is realistically ~4 KB; an attacker (or malformed
+// upstream) sending 50 MB would force the JSON parser through the
+// allocation. 256 KiB is comfortably above legit payloads and a hard
+// chokepoint for abuse.
+const MAX_BODY_BYTES = 256 * 1024;
+
 export async function POST(request) {
+  const lenHeader = request.headers.get('content-length');
+  const declared = lenHeader ? parseInt(lenHeader, 10) : NaN;
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
+    return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
+  }
+  // Read as text first so we can hard-cap even when content-length is
+  // missing (chunked transfers don't always set it).
+  let raw;
+  try {
+    raw = await request.text();
+  } catch {
+    return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
+  }
+  if (raw.length > MAX_BODY_BYTES) {
+    return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
+  }
   let body;
   try {
-    body = await request.json();
+    body = JSON.parse(raw);
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }

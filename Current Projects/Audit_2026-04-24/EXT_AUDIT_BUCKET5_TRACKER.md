@@ -33,6 +33,15 @@ Each item: status (open / shipped) + commit SHA when shipped.
 | JJ.2 | PermissionGate keyboard inaccessible | shipped — `onKeyDown` for Enter/Space + `aria-label` |
 | JJ.1 | User ConfirmDialog no focus trap | shipped — focus capture/restore + Tab cycle + initial focus on Cancel |
 
+## Batch 31 — Security/policy cluster (shipped)
+
+| ID | Title | Status |
+|---|---|---|
+| Y.1 | events/batch missing rate limit | shipped — 60 batches/min/IP |
+| WW.1 | iOS webhooks no payload size cap | shipped — 256 KiB cap on appstore/notifications + subscriptions/sync (Stripe parity at 1 MiB) |
+| AAA.6 | award_points cap-counting race | shipped — schema/168 adds `pg_advisory_xact_lock` keyed on (subject, action) |
+| KK.1 | feeds POST accepts any URL | shipped — URL parse + http(s)-only + private/loopback host reject |
+
 ## Owner-decision sub-bucket (added during Bucket 5 work)
 
 | ID | Title | Question |

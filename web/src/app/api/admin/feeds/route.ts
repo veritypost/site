@@ -42,6 +42,37 @@ export async function POST(request: Request) {
   const url = typeof body.url === 'string' ? body.url.trim() : '';
   if (!name || !url) return NextResponse.json({ error: 'name and url required' }, { status: 400 });
 
+  // Ext-KK1 — URL safety. Prior code accepted any string. Tighten:
+  //   - parseable as URL
+  //   - http(s) only (no file://, javascript:, data:, etc.)
+  //   - host not in private/loopback ranges (defense against the
+  //     ingest worker scraping internal services if an admin
+  //     account is compromised)
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return NextResponse.json({ error: 'url must be a valid URL' }, { status: 400 });
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return NextResponse.json({ error: 'url must use http or https' }, { status: 400 });
+  }
+  const host = parsed.hostname.toLowerCase();
+  const isPrivate =
+    host === 'localhost' ||
+    host === '0.0.0.0' ||
+    host.endsWith('.local') ||
+    host.endsWith('.internal') ||
+    /^127\./.test(host) ||
+    /^10\./.test(host) ||
+    /^192\.168\./.test(host) ||
+    /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host) ||
+    /^169\.254\./.test(host) ||
+    host === '::1';
+  if (isPrivate) {
+    return NextResponse.json({ error: 'url host must be a public hostname' }, { status: 400 });
+  }
+
   const rawAudience = typeof body.audience === 'string' ? body.audience : 'adult';
   const audience: 'adult' | 'kid' = rawAudience === 'kid' ? 'kid' : 'adult';
   const row = {

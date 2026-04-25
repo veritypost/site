@@ -58,9 +58,26 @@ export async function POST(request) {
   }
   const userId = authData.user.id;
 
+  // Ext-WW1 — payload size cap (256 KiB). Realistic StoreKit2 sync
+  // payloads are sub-10 KB; anything larger is malformed or hostile.
+  const MAX_BODY_BYTES = 256 * 1024;
+  const lenHeader = request.headers.get('content-length');
+  const declared = lenHeader ? parseInt(lenHeader, 10) : NaN;
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
+    return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
+  }
+  let raw;
+  try {
+    raw = await request.text();
+  } catch {
+    return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
+  }
+  if (raw.length > MAX_BODY_BYTES) {
+    return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
+  }
   let body;
   try {
-    body = await request.json();
+    body = JSON.parse(raw);
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }

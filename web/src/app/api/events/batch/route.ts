@@ -28,6 +28,7 @@ import { NextResponse } from 'next/server';
 import { createHash } from 'crypto';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { isBotUserAgent } from '@/lib/botDetect';
+import { checkRateLimit } from '@/lib/rateLimit';
 import type { BatchResponseBody } from '@/lib/events/types';
 
 export const runtime = 'nodejs';
@@ -180,6 +181,27 @@ function sanitize(
 }
 
 export async function POST(request: Request) {
+  // Ext-Y1 — rate-limit per IP. The events endpoint is anon-allowed by
+  // design (bot detection + hashing handle abuse), but an unbounded
+  // ingest path is still a bandwidth + storage amplifier. 60 batches
+  // (= up to 3000 events) per minute per IP is roomy for legit clients
+  // and chokes a flood. Service client kept inside this function so
+  // the check doesn't add cost when the route is short-circuited later.
+  const ip = getClientIp(request);
+  const rlSvc = createServiceClient();
+  const rate = await checkRateLimit(rlSvc, {
+    key: `events.batch:${ip}`,
+    policyKey: 'events_batch',
+    max: 60,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
+
   let body: unknown;
   try {
     body = await request.json();
@@ -211,7 +233,6 @@ export async function POST(request: Request) {
   }
 
   const ua = request.headers.get('user-agent');
-  const ip = getClientIp(request);
   const isBot = isBotUserAgent(ua);
 
   // Resolve the session user authoritatively. Anon callers legitimately
