@@ -59,6 +59,13 @@ final class PairingClient {
     private let kidNameKey = "vp.kids.pair.kid_name"
     private let expiresKey = "vp.kids.pair.expires_at"
     private let deviceKey = "vp.kids.pair.device_id"
+    // Ext-W.1 — install-scoped UUID stored alongside the keychain token.
+    // Keychain survives app uninstall; UserDefaults does not. On every
+    // token read we compare the device UUID stored in the keychain with
+    // the current UserDefaults UUID; mismatch → uninstall happened
+    // between writes → previous kid's session would otherwise leak to
+    // a sibling on a shared iPad. Mismatch invalidates and clears.
+    private let installIdKeychainKey = "vp.kids.pair.install_id"
 
     /// Device identifier — stable per install. Sent with the pair request
     /// so the server can audit which physical device redeemed a code.
@@ -283,9 +290,21 @@ final class PairingClient {
         add[kSecValueData as String] = data
         add[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         SecItemAdd(add as CFDictionary, nil)
+        // Ext-W.1 — write the current install UUID into a paired keychain
+        // entry. Read-side compares it with UserDefaults; mismatch ==
+        // uninstall happened between writes.
+        keychainWriteInstallId(deviceId)
     }
 
     private func keychainReadToken() -> String? {
+        // Ext-W.1 — install freshness check. If the keychain holds a
+        // token from a prior install (UserDefaults wiped, keychain
+        // persisted), refuse it and clear so the next launch routes
+        // back to PairCodeView.
+        if let storedInstallId = keychainReadInstallId(), storedInstallId != deviceId {
+            keychainDeleteToken()
+            return nil
+        }
         let query: [String: Any] = [
             kSecClass as String:       kSecClassGenericPassword,
             kSecAttrAccount as String: tokenKey,
@@ -304,6 +323,41 @@ final class PairingClient {
             kSecAttrAccount as String: tokenKey,
         ]
         SecItemDelete(query as CFDictionary)
+        // Ext-W.1 — clear the paired install id too, so a future token
+        // write starts from a clean state.
+        let installQuery: [String: Any] = [
+            kSecClass as String:       kSecClassGenericPassword,
+            kSecAttrAccount as String: installIdKeychainKey,
+        ]
+        SecItemDelete(installQuery as CFDictionary)
+    }
+
+    // Ext-W.1 — install-id helpers. Write/read alongside the token so
+    // the freshness check is atomic with token presence.
+    private func keychainWriteInstallId(_ installId: String) {
+        let data = Data(installId.utf8)
+        let query: [String: Any] = [
+            kSecClass as String:       kSecClassGenericPassword,
+            kSecAttrAccount as String: installIdKeychainKey,
+        ]
+        SecItemDelete(query as CFDictionary)
+        var add = query
+        add[kSecValueData as String] = data
+        add[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        SecItemAdd(add as CFDictionary, nil)
+    }
+
+    private func keychainReadInstallId() -> String? {
+        let query: [String: Any] = [
+            kSecClass as String:       kSecClassGenericPassword,
+            kSecAttrAccount as String: installIdKeychainKey,
+            kSecReturnData as String:  true,
+            kSecMatchLimit as String:  kSecMatchLimitOne,
+        ]
+        var out: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &out)
+        guard status == errSecSuccess, let data = out as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
     }
 }
 

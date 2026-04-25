@@ -30,5 +30,27 @@ export async function GET(request) {
   });
   if (error)
     return safeErrorResponse(NextResponse, error, { route: 'ads.serve', fallbackStatus: 400 });
-  return NextResponse.json({ ad_unit: data || null });
+
+  // Ext-BB.3 — serve-time URL safety guard. Admin-side validation
+  // (JJ.7) blocks new inserts, but a row pre-dating that constraint
+  // or mutated via direct SQL could still carry an unsafe scheme.
+  // Null out the URL fields when they fail the http(s)-only check;
+  // the client-side render in Ad.jsx already tolerates null URLs
+  // (it just won't render the link/image), so this fails closed
+  // without a code change there.
+  const isSafeAdUrl = (u) => {
+    if (!u || typeof u !== 'string') return true; // nullable column — leave as-is
+    try {
+      const parsed = new URL(u);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  };
+  let safeUnit = data || null;
+  if (safeUnit && typeof safeUnit === 'object') {
+    if (!isSafeAdUrl(safeUnit.creative_url)) safeUnit = { ...safeUnit, creative_url: null };
+    if (!isSafeAdUrl(safeUnit.click_url)) safeUnit = { ...safeUnit, click_url: null };
+  }
+  return NextResponse.json({ ad_unit: safeUnit });
 }
