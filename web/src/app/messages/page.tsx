@@ -784,7 +784,8 @@ function MessagesPageInner() {
   void btnSolid; // currently unused in TSX shell — retained for parity
 
   return (
-    <div style={{ minHeight: '100vh', background: '#fff' }}>
+    // Ext-NN1 — main landmark for screen readers.
+    <main style={{ minHeight: '100vh', background: '#fff' }}>
       {showDmPaywall && (
         <div
           style={{
@@ -1604,6 +1605,6 @@ function MessagesPageInner() {
           </div>
         </div>
       )}
-    </div>
+    </main>
   );
 }

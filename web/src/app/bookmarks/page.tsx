@@ -313,7 +313,8 @@ export default function BookmarksPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#fff', padding: '20px 16px 80px' }}>
+    // Ext-NN1 — main landmark for screen readers.
+    <main style={{ minHeight: '100vh', background: '#fff', padding: '20px 16px 80px' }}>
       <div style={{ maxWidth: 900, margin: '0 auto' }}>
         <div
           style={{
@@ -655,7 +656,7 @@ export default function BookmarksPage() {
         onConfirm={confirmDeleteCollection}
         onClose={() => !deleteBusy && setPendingDelete(null)}
       />
-    </div>
+    </main>
   );
 }
 

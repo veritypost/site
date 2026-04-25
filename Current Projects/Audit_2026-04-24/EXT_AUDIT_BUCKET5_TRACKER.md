@@ -24,6 +24,15 @@ Each item: status (open / shipped) + commit SHA when shipped.
 | CC.7 | `approve_expert_answer` doesn't notify asker | shipped — schema/167 adds `create_notification` for the asker |
 | E.2 | Kids PIN MAX_ATTEMPTS hardcoded | shipped — DB settings rows + cached helper read; constants are fallbacks |
 
+## Batch 30 — A11y cluster (shipped)
+
+| ID | Title | Status |
+|---|---|---|
+| NN.1 | Pages missing `<main>` | shipped — wrapped browse, leaderboard, bookmarks, notifications, messages |
+| NN.3 | Browse category cards mouse-only | shipped — added `role="button"`, `tabIndex={0}`, `onKeyDown` (Enter/Space), `aria-expanded`. Kept `<div>` because card content includes `<a>` which can't nest inside `<button>`. |
+| JJ.2 | PermissionGate keyboard inaccessible | shipped — `onKeyDown` for Enter/Space + `aria-label` |
+| JJ.1 | User ConfirmDialog no focus trap | shipped — focus capture/restore + Tab cycle + initial focus on Cancel |
+
 ## Owner-decision sub-bucket (added during Bucket 5 work)
 
 | ID | Title | Question |

@@ -225,7 +225,8 @@ export default function NotificationsInbox() {
   };
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px 80px' }}>
+    // Ext-NN1 — main landmark for screen readers.
+    <main style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px 80px' }}>
       <div
         style={{
           display: 'flex',
@@ -373,6 +374,6 @@ export default function NotificationsInbox() {
           </a>
         ))
       )}
-    </div>
+    </main>
   );
 }

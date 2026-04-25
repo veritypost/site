@@ -2,7 +2,7 @@
 // @feature-verified shared_components 2026-04-18
 'use client';
 
-import { useEffect, ReactNode } from 'react';
+import { useEffect, useRef, ReactNode } from 'react';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -27,13 +27,51 @@ export default function ConfirmDialog({
   onConfirm,
   onClose,
 }: ConfirmDialogProps) {
+  // Ext-JJ1 — focus trap mirroring the admin variant. On open, capture
+  // the previously-focused element + send focus into the dialog; on
+  // close, restore. Tab/Shift+Tab cycle within the dialog.
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const previouslyFocused = useRef<HTMLElement | null>(null);
+
   useEffect(() => {
     if (!open) return;
+    previouslyFocused.current = (document.activeElement as HTMLElement | null) ?? null;
+    // Defer one tick so the dialog is in the DOM before query.
+    queueMicrotask(() => {
+      const root = dialogRef.current;
+      if (!root) return;
+      const cancelBtn = root.querySelector<HTMLButtonElement>('button[data-confirm-cancel]');
+      cancelBtn?.focus();
+    });
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose?.();
+      if (e.key === 'Escape') {
+        onClose?.();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const root = dialogRef.current;
+      if (!root) return;
+      const focusable = Array.from(
+        root.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter((el) => !el.hasAttribute('data-focus-trap'));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      previouslyFocused.current?.focus?.();
+    };
   }, [open, onClose]);
 
   if (!open) return null;
@@ -58,6 +96,7 @@ export default function ConfirmDialog({
       }}
     >
       <div
+        ref={dialogRef}
         style={{
           background: '#ffffff',
           borderRadius: 14,
@@ -86,6 +125,7 @@ export default function ConfirmDialog({
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button
             type="button"
+            data-confirm-cancel
             onClick={onClose}
             disabled={busy}
             style={{

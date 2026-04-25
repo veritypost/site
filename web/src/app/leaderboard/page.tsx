@@ -316,7 +316,8 @@ export default function LeaderboardPage() {
   const topStreak = users[0]?.streak_current || 0;
 
   return (
-    <div className="vp-dark">
+    // Ext-NN1 — main landmark for screen readers.
+    <main className="vp-dark">
       <div style={{ maxWidth: 800, margin: '0 auto', padding: '20px 16px 80px' }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 20px', letterSpacing: '-0.02em' }}>
           Most Informed
@@ -810,7 +811,7 @@ export default function LeaderboardPage() {
               )}
         </div>
       </div>
-    </div>
+    </main>
   );
 }
 

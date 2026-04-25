@@ -124,6 +124,16 @@ export function PermissionGateInline({ permission, section, children }: Permissi
     <>
       <span
         onClick={() => setModalOpen(true)}
+        // Ext-JJ2 — was role="button" + tabIndex without onKeyDown; AT
+        // users could focus the element but Enter/Space did nothing.
+        // Wire the same activation as the click handler.
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setModalOpen(true);
+          }
+        }}
+        aria-label="Locked — view requirements"
         style={{ opacity: 0.5, cursor: 'pointer', pointerEvents: 'auto' }}
         role="button"
         tabIndex={0}

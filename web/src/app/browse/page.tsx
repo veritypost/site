@@ -187,7 +187,10 @@ export default function BrowsePage() {
   };
 
   return (
-    <div style={shell}>
+    // Ext-NN1 — wrap top-level page content in <main> so screen readers
+    // reach a "main" landmark on browse. Skip-links in layout.tsx target
+    // the first <main>; without it, AT users land in the nav forever.
+    <main style={shell}>
       {/* Header */}
       <div
         style={{
@@ -378,9 +381,23 @@ export default function BrowsePage() {
                 }}
               >
                 {filtered.map((cat) => (
+                  // Ext-NN3 — keyboard-accessible without changing the tag
+                  // (the expanded card embeds <a> story links, so a real
+                  // <button> would be invalid HTML). role + tabIndex +
+                  // Enter/Space handler give screen readers and keyboard
+                  // users the same affordance as the click.
                   <div
                     key={cat.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={expandedCat === cat.id}
                     onClick={() => setExpandedCat(expandedCat === cat.id ? null : cat.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setExpandedCat(expandedCat === cat.id ? null : cat.id);
+                      }
+                    }}
                     style={{
                       background: expandedCat === cat.id ? cat.color : PALETTE.card,
                       border: `1.5px solid ${expandedCat === cat.id ? cat.accent : PALETTE.border}`,
@@ -515,6 +532,6 @@ export default function BrowsePage() {
           </>
         )}
       </div>
-    </div>
+    </main>
   );
 }
