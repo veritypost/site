@@ -28,7 +28,18 @@ export async function createTestUser(baseURL: string): Promise<TestUser> {
   const email = `vp-e2e-${randomUUID()}@example.com`;
   const password = 'TestPass1234!'; // satisfies the default password.* policy
 
-  const ctx = await request.newContext({ baseURL });
+  // Spoof a unique x-forwarded-for per request so the per-IP rate
+  // limit (5 signups/hour at the route level) doesn't choke a parallel
+  // test run. The signup route's getClientIp() reads x-forwarded-for
+  // first; each unique IP lands in its own rate-limit bucket. Email
+  // also rate-limits, but we generate a UUID-based email per request
+  // so that bucket is also fresh per test.
+  const fakeIp = `10.${rand255()}.${rand255()}.${rand255()}`;
+
+  const ctx = await request.newContext({
+    baseURL,
+    extraHTTPHeaders: { 'x-forwarded-for': fakeIp },
+  });
   const res = await ctx.post('/api/auth/signup', {
     data: {
       email,
@@ -45,6 +56,10 @@ export async function createTestUser(baseURL: string): Promise<TestUser> {
   await ctx.dispose();
 
   return { email, password };
+}
+
+function rand255(): number {
+  return Math.floor(Math.random() * 255);
 }
 
 /**
