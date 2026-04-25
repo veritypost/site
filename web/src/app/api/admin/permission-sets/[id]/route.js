@@ -109,7 +109,8 @@ export async function DELETE(_request, { params }) {
     .select('id, is_system, key')
     .eq('id', id)
     .maybeSingle();
-  if (lookupErr) return NextResponse.json({ error: lookupErr.message }, { status: 500 });
+  if (lookupErr)
+    return safeErrorResponse(NextResponse, lookupErr, { route: 'admin.permission-sets:lookup' });
   if (!existing) return NextResponse.json({ error: 'permission_set not found' }, { status: 404 });
   if (existing.is_system) {
     return NextResponse.json({ error: 'Cannot delete a system set' }, { status: 400 });

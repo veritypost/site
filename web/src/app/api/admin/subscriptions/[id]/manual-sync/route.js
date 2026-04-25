@@ -5,6 +5,7 @@ import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { recordAdminAction, requireAdminOutranks } from '@/lib/adminMutation';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // POST /api/admin/subscriptions/[id]/manual-sync
 //
@@ -87,7 +88,7 @@ export async function POST(request, { params }) {
     .select('id, user_id, plan_id, status, metadata')
     .eq('id', subId)
     .maybeSingle();
-  if (subErr) return NextResponse.json({ error: subErr.message }, { status: 500 });
+  if (subErr) return safeErrorResponse(NextResponse, subErr, { route: 'admin.manual-sync:sub' });
   if (!sub) return NextResponse.json({ error: 'subscription not found' }, { status: 404 });
 
   // F-035-style actor rank check — admin can't downgrade a higher-ranked
@@ -107,7 +108,8 @@ export async function POST(request, { params }) {
       .select('id')
       .eq('tier', 'free')
       .maybeSingle();
-    if (freeErr) return NextResponse.json({ error: freeErr.message }, { status: 500 });
+    if (freeErr)
+      return safeErrorResponse(NextResponse, freeErr, { route: 'admin.manual-sync:free' });
     if (!freePlan) return NextResponse.json({ error: 'free plan row missing' }, { status: 500 });
 
     // 2) Flip the subscription to cancelled. B10: dropped the
@@ -129,7 +131,8 @@ export async function POST(request, { params }) {
         cancelled_at: new Date().toISOString(),
       })
       .eq('id', subId);
-    if (subUpdErr) return NextResponse.json({ error: subUpdErr.message }, { status: 500 });
+    if (subUpdErr)
+      return safeErrorResponse(NextResponse, subUpdErr, { route: 'admin.manual-sync:sub-update' });
 
     // 3) Sync users.plan_id → free so the permission resolver re-binds
     //    the user to the free set on next compute_effective_perms.
@@ -141,7 +144,10 @@ export async function POST(request, { params }) {
         plan_grace_period_ends_at: null,
       })
       .eq('id', sub.user_id);
-    if (userUpdErr) return NextResponse.json({ error: userUpdErr.message }, { status: 500 });
+    if (userUpdErr)
+      return safeErrorResponse(NextResponse, userUpdErr, {
+        route: 'admin.manual-sync:user-update',
+      });
   } else if (action === 'resume') {
     // 1) Flip subscription back to active. B10: dropped
     //    `pending_stripe_sync` — same reasoning as the downgrade branch.
@@ -153,7 +159,8 @@ export async function POST(request, { params }) {
       .from('subscriptions')
       .update({ status: 'active', metadata: nextMetadata })
       .eq('id', subId);
-    if (subUpdErr) return NextResponse.json({ error: subUpdErr.message }, { status: 500 });
+    if (subUpdErr)
+      return safeErrorResponse(NextResponse, subUpdErr, { route: 'admin.manual-sync:sub-update' });
 
     // 2) Re-sync users.plan_id to the subscription's plan, clear grace.
     if (sub.plan_id) {
@@ -165,7 +172,10 @@ export async function POST(request, { params }) {
           plan_grace_period_ends_at: null,
         })
         .eq('id', sub.user_id);
-      if (userUpdErr) return NextResponse.json({ error: userUpdErr.message }, { status: 500 });
+      if (userUpdErr)
+        return safeErrorResponse(NextResponse, userUpdErr, {
+          route: 'admin.manual-sync:user-update',
+        });
     }
   }
 

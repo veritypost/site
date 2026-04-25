@@ -5,6 +5,7 @@ import { requirePermission } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { recordAdminAction, requireAdminOutranks } from '@/lib/adminMutation';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // PATCH /api/admin/users/[id]/role-set  { role_name }
 //
@@ -79,19 +80,23 @@ export async function PATCH(request, { params }) {
     .select('id')
     .eq('name', role_name)
     .maybeSingle();
-  if (roleErr) return NextResponse.json({ error: roleErr.message }, { status: 500 });
+  // Audit fix: was returning raw error.message to client (RLS policy
+  // names + constraint names were leaking). Route everything through
+  // safeErrorResponse so 23503/23505 etc. map to the right 4xx codes
+  // and the raw text stays in server logs only.
+  if (roleErr) return safeErrorResponse(NextResponse, roleErr, { route: 'admin.role-set:lookup' });
   if (!roleRow) return NextResponse.json({ error: 'Role not found' }, { status: 404 });
 
   // Replace: drop existing user_roles rows, then insert the single new row.
   const { error: delErr } = await service.from('user_roles').delete().eq('user_id', targetId);
-  if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
+  if (delErr) return safeErrorResponse(NextResponse, delErr, { route: 'admin.role-set:delete' });
 
   const { error: insErr } = await service.from('user_roles').insert({
     user_id: targetId,
     role_id: roleRow.id,
     assigned_by: actor.id,
   });
-  if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
+  if (insErr) return safeErrorResponse(NextResponse, insErr, { route: 'admin.role-set:insert' });
 
   // Audit + perms bump.
   await recordAdminAction({

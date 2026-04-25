@@ -3,6 +3,7 @@
 import { createClient, createClientFromToken } from '@/lib/supabase/server';
 import { requireAuth } from '@/lib/auth';
 import { NextResponse } from 'next/server';
+import { safeErrorResponse } from '@/lib/apiErrors';
 
 // Round 7 follow-up — iOS (SettingsView, ProfileView) POSTs here with a
 // Bearer token; without bearer-bound client the create_support_ticket
@@ -42,7 +43,7 @@ export async function POST(request) {
       p_subject: subject,
       p_body: description,
     });
-    if (rpcErr) return NextResponse.json({ error: rpcErr.message }, { status: 500 });
+    if (rpcErr) return safeErrorResponse(NextResponse, rpcErr, { route: 'support.create' });
 
     return NextResponse.json({ ticket });
   } catch (err) {
