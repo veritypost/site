@@ -93,12 +93,17 @@ struct KidQuizEngineView: View {
 
             Button { onDone(nil) } label: {
                 Image(systemName: "xmark")
-                    .font(.scaledSystem(size: 14, weight: .heavy))
+                    .font(.scaledSystem(size: 16, weight: .heavy))
                     .foregroundStyle(K.text)
-                    .frame(width: 36, height: 36)
+                    // Bumped from 36 -> 44 to meet HIG/WCAG 44pt min touch
+                    // target. Kid hands miss small targets more often than
+                    // adult hands; the 8pt difference is the entire reason
+                    // the audit flagged this.
+                    .frame(width: 44, height: 44)
                     .background(.thinMaterial)
                     .clipShape(Circle())
                     .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
+                    .accessibilityLabel("Close quiz")
             }
             .buttonStyle(.plain)
             .padding(.leading, 20)

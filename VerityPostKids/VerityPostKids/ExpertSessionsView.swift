@@ -42,6 +42,9 @@ struct ExpertSessionsView: View {
                                 card(s)
                             }
                             .buttonStyle(.plain)
+                            // Expand hit area so taps anywhere on the
+                            // card register, not only on the text/icon.
+                            .contentShape(Rectangle())
                         }
                     }
                 }

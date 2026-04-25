@@ -354,8 +354,11 @@ export default function BookmarksPage() {
         </div>
 
         {atCap && (
-          <Banner tone="warn" title="You’ve hit the free bookmark cap.">
-            Unlimited bookmarks, collections, notes, and export are available on paid plans.{' '}
+          // Title above already shows "X of Y" when at-cap; banner used
+          // to repeat "You've hit the free bookmark cap" — dropped that
+          // redundant headline, banner is purely the upgrade CTA now.
+          <Banner tone="warn" title="Upgrade for unlimited bookmarks">
+            Paid plans add unlimited bookmarks, collections, notes, and export.{' '}
             <a href="/profile/settings#billing" style={{ color: '#111', fontWeight: 600 }}>
               View plans →
             </a>

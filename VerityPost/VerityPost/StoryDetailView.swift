@@ -856,7 +856,7 @@ struct StoryDetailView: View {
                 Button {
                     Task { await startQuiz() }
                 } label: {
-                    Text(quizStage == .loading ? "Loading…" : "Take the quiz")
+                    Text(quizStage == .loading ? "Starting quiz…" : "Take the quiz")
                         .font(.system(.subheadline, design: .default, weight: .bold))
                         .foregroundColor(.white)
                         .padding(.horizontal, 20)

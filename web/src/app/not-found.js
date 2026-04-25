@@ -42,14 +42,22 @@ export default function NotFound() {
           maxWidth: 480,
         }}
       >
-        {/* Single CTA back to today's front page. The previous "Search"
-            button bounced anon visitors to /login (which is in
-            PROTECTED_PREFIXES post-2026-04-23 anon gate) — recovery was
-            the opposite of recovery. Authed users can reach search from
-            the main nav; anon shouldn't be sent into a gated surface
-            from a 404. */}
+        {/* Two anon-safe recovery CTAs. Avoid /search (gated for anon).
+            Home + Browse cover the two paths a stranded visitor wants:
+            "what's new today" and "what topics exist on this site." */}
         <a href="/" style={{ ...linkBase, background: '#111111', color: '#ffffff' }}>
           Today&rsquo;s front page
+        </a>
+        <a
+          href="/browse"
+          style={{
+            ...linkBase,
+            background: '#ffffff',
+            color: '#111111',
+            border: '1px solid #111111',
+          }}
+        >
+          Browse categories
         </a>
       </div>
     </div>

@@ -75,6 +75,10 @@ struct SignupView: View {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .foregroundColor(VP.danger)
                                 .font(.footnote)
+                                // Decorative — error text already conveys
+                                // the meaning, so VoiceOver shouldn't read
+                                // "exclamation mark triangle fill" too.
+                                .accessibilityHidden(true)
                             Text(err)
                                 .font(.system(.footnote, design: .default, weight: .medium))
                                 .foregroundColor(VP.danger)

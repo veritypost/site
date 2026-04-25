@@ -164,9 +164,16 @@ function LoginPageInner() {
             locked_until?: string;
           };
           if (body?.locked && body?.locked_until) {
-            setError(
-              `Too many failed attempts. Try again after ${new Date(body.locked_until).toLocaleTimeString()}.`
+            // Audit fix: absolute clock time ("Try again after 3:45 PM")
+            // confused users in different timezones and wasn't actionable.
+            // Show a relative countdown ("Try again in 12 minutes") that
+            // works the same anywhere in the world.
+            const minsLeft = Math.max(
+              1,
+              Math.ceil((new Date(body.locked_until).getTime() - Date.now()) / 60_000)
             );
+            const minLabel = minsLeft === 1 ? 'minute' : 'minutes';
+            setError(`Too many failed attempts. Try again in ${minsLeft} ${minLabel}.`);
             setLoading(false);
             return;
           }

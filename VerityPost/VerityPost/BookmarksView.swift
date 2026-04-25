@@ -168,7 +168,7 @@ struct BookmarksView: View {
                     } label: {
                         Text("Remove")
                             .font(.system(.caption, design: .default, weight: .semibold))
-                            .foregroundColor(Color(hex: "dc2626"))
+                            .foregroundColor(VP.danger)
                     }
                     .buttonStyle(.plain)
                 }
