@@ -18,12 +18,16 @@
 --      branch) won't double-award.
 
 INSERT INTO public.score_rules (
-  action, points, max_per_day, max_per_article, cooldown_seconds,
-  applies_to_kids, is_active, description
+  action, display_name, description,
+  points, max_per_day, max_per_article, cooldown_seconds,
+  applies_to_kids, is_active
 )
 VALUES (
-  'recap_pass', 6, 1, NULL, NULL,
-  false, true, 'Awarded once per weekly recap quiz when the user passes (>=60%).'
+  'recap_pass',
+  'Weekly recap pass',
+  'Awarded once per weekly recap quiz when the user passes (>=60%).',
+  6, 1, NULL, NULL,
+  false, true
 )
 ON CONFLICT (action) DO NOTHING;
 
