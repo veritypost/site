@@ -35,7 +35,11 @@ const sectionCache = new Map(); // section -> { rows, fetchedAt, version }
 let allPermsCache = null; // Map<permission_key, row> — null means "never loaded"
 let _allPermsFetchedAt = 0;
 let allPermsInflight = null;
-let versionState = { user_version: 0, global_version: 0, checkedAt: 0 };
+// Ext-C3 — sentinel `-1` so the first DB version (always >= 0) compares
+// non-equal and triggers refresh. The previous `0` initial would have
+// matched a brand-new user's actual version 0 and skipped the first
+// refresh — theoretical edge but real per the audit.
+let versionState = { user_version: -1, global_version: -1, checkedAt: 0 };
 let inflight = new Map(); // section -> Promise (dedupe concurrent fetches)
 
 // --------- Cache control ---------
@@ -45,7 +49,8 @@ export function invalidate() {
   allPermsCache = null;
   _allPermsFetchedAt = 0;
   allPermsInflight = null;
-  versionState = { user_version: 0, global_version: 0, checkedAt: 0 };
+  // Ext-C3 — same sentinel reset; see initializer comment above.
+  versionState = { user_version: -1, global_version: -1, checkedAt: 0 };
 }
 
 // --------- Version check ---------

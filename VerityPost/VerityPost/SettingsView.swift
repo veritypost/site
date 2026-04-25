@@ -1857,14 +1857,17 @@ struct SubscriptionSettingsView: View {
 
             SettingsSectionHeader(title: "Web billing", tone: .normal)
             SettingsCard {
-                if let url = URL(string: "https://veritypost.com/profile/settings/billing") {
-                    SettingsRowExternal(title: "Open web billing",
-                                        url: url,
-                                        tone: .accent,
-                                        showDivider: false)
-                }
+                // Ext-J4 — derive from SupabaseManager.siteURL instead of
+                // hardcoding production. Preview/staging builds open the
+                // matching environment's billing surface.
+                let billingURL = SupabaseManager.shared.siteURL
+                    .appendingPathComponent("profile/settings/billing")
+                SettingsRowExternal(title: "Open web billing",
+                                    url: billingURL,
+                                    tone: .accent,
+                                    showDivider: false)
             }
-            SettingsNote(text: "If you purchased your plan on the web, manage it at veritypost.com/profile/settings/billing.")
+            SettingsNote(text: "If you purchased your plan on the web, manage it from your account on the web.")
         }
         .sheet(isPresented: $showSubscription) { SubscriptionView().environmentObject(auth) }
         .task(id: perms.changeToken) {
