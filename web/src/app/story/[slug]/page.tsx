@@ -843,9 +843,19 @@ export default function StoryPage() {
     return (
       <div
         className="vp-dark"
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '60vh',
+        }}
       >
-        <div style={{ fontSize: 15, color: 'var(--dim)' }}>Loading...</div>
+        {/* Aria-live so screen readers hear the load state, plus a
+            slightly longer message so the user has visible signal that
+            something IS happening (vs a blank page). */}
+        <div role="status" aria-live="polite" style={{ fontSize: 15, color: 'var(--dim)' }}>
+          Loading article…
+        </div>
       </div>
     );
   }
