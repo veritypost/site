@@ -155,13 +155,19 @@ export async function POST(request) {
         return NextResponse.json({ error: 'Signup failed. Please try again.' }, { status: 500 });
       }
 
-      await service.from('audit_log').insert({
-        actor_id: userId,
-        action: 'auth:signup',
-        target_type: 'user',
-        target_id: userId,
-        metadata: { method: 'email', ip },
-      });
+      // Ext-D2 — wrap audit insert so a transient DB failure doesn't
+      // fail the signup post-rollback. Best-effort + log.
+      try {
+        await service.from('audit_log').insert({
+          actor_id: userId,
+          action: 'auth:signup',
+          target_type: 'user',
+          target_id: userId,
+          metadata: { method: 'email', ip },
+        });
+      } catch (auditErr) {
+        console.error('[auth.signup] audit_log insert failed:', auditErr);
+      }
     }
 
     const needsEmailConfirmation = !authData.session || !authData.user?.email_confirmed_at;

@@ -66,6 +66,25 @@ export async function POST(request) {
       { status: 400 }
     );
   }
+
+  // Ext-JJ7 — server-side URL validation for ad creative/click. Ad.jsx
+  // already filters at render-time (scheme allowlist), but validating
+  // at insert-time prevents the bad data from landing in the DB.
+  function isSafeAdUrl(u) {
+    if (!u || typeof u !== 'string') return true; // nullable column
+    try {
+      const parsed = new URL(u);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }
+  if (!isSafeAdUrl(b.creative_url)) {
+    return NextResponse.json({ error: 'creative_url must be http(s)' }, { status: 400 });
+  }
+  if (!isSafeAdUrl(b.click_url)) {
+    return NextResponse.json({ error: 'click_url must be http(s)' }, { status: 400 });
+  }
   const { data, error } = await service
     .from('ad_units')
     .insert({

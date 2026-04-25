@@ -87,5 +87,21 @@ export async function POST(request) {
   if (error) {
     return safeErrorResponse(NextResponse, error, { route: 'billing.cancel', fallbackStatus: 400 });
   }
+
+  // Ext-Q2 — audit-log self-cancel. record_admin_action is for admin-on-target;
+  // for self-actions we insert directly into audit_log via the service client.
+  // Best-effort: don't fail the request if audit insert fails.
+  try {
+    await service.from('audit_log').insert({
+      actor_id: user.id,
+      action: 'billing:cancel_self',
+      target_type: 'subscription',
+      target_id: user.id,
+      metadata: { reason },
+    });
+  } catch (auditErr) {
+    console.error('[billing.cancel] audit_log insert failed:', auditErr);
+  }
+
   return NextResponse.json(data);
 }

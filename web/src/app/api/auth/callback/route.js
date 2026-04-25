@@ -125,13 +125,19 @@ export async function GET(request) {
         });
       }
 
-      await service.from('audit_log').insert({
-        actor_id: user.id,
-        action: 'auth:signup',
-        target_type: 'user',
-        target_id: user.id,
-        metadata: { method: 'oauth', provider },
-      });
+      // Ext-D2 — wrap audit insert so a transient DB failure can't fail
+      // the OAuth callback. Best-effort + log.
+      try {
+        await service.from('audit_log').insert({
+          actor_id: user.id,
+          action: 'auth:signup',
+          target_type: 'user',
+          target_id: user.id,
+          metadata: { method: 'oauth', provider },
+        });
+      } catch (auditErr) {
+        console.error('[auth.callback] audit_log insert failed:', auditErr);
+      }
 
       // Y2 / scoring: first OAuth session counts as today's login event.
       // Idempotent per local-day; failure must not block redirect.

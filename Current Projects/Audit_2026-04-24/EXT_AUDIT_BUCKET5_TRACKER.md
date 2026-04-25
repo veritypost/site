@@ -51,6 +51,28 @@ Each item: status (open / shipped) + commit SHA when shipped.
 | X.5 | Logout doesn't invalidate push tokens | shipped — POST /api/auth/logout marks user_push_tokens.invalidated_at = now() before signOut |
 | AAA.4 | Recap pass not awarded points | shipped — schema/169 seeds `recap_pass` rule (6 pts) + rewires `submit_recap_attempt` to PERFORM `award_points` on >=60% pass |
 
+## Batch 33 — Mega-batch: swallowed audits + billing audit + RLS + cleanup crons + misc (shipped)
+
+| ID | Title | Status |
+|---|---|---|
+| D.1 | Stripe webhook swallows create_notification | shipped — 6 sites: silent catch → tagged console.error |
+| D.2 | auth routes swallow audit_log | shipped — callback/login/signup audit_log inserts wrapped in try/catch + logged |
+| D.3 | B18 webhook_handler_failed audit | already correct (logs on failure) |
+| Q.2 | billing routes missing audit_log | shipped — cancel/change-plan/resubscribe each insert into audit_log post-RPC |
+| O.7 | TTS button under 44pt touch target | shipped — padding 12x14 + minHeight 44 on `btn` and `btnGhost` styles |
+| JJ.7 | Ad URL DB-level validation | shipped — POST /api/admin/ad-units validates http(s) on creative_url + click_url |
+| CC.2 | claim_queue_item no TTL | shipped — schema/170 adds `release_stale_expert_claims(hours)` for cron use |
+| CCC.2 | user_roles no UNIQUE(user_id, role_id) | shipped — schema/170 dedups + adds constraint |
+| CCC.5 | rate_limit_events unbounded | shipped — schema/170 `cleanup_rate_limit_events(days)` + new cron route /api/cron/rate-limit-cleanup |
+| GG.2 | quiz_attempts SELECT no kid-JWT branch | shipped — schema/171 adds `quiz_attempts_select_kid_jwt` policy |
+| F.2 | Mentions soft-warn doesn't block submit | **intentional per in-code comment — closed without code change** |
+| F.3 | v2_live banner | **deferred — UI design pass** |
+| K.1 | Admin gate idiom harmonize | **deferred — 30+ file sweep** |
+| L.3 | Permission-key drift naming sweep | **deferred — needs cross-cutting rename plan** |
+| M.3 reset-revoke server-side | client-side already handles via `signOut({ scope: 'others' })` post-update — closed |
+| KK.4 | Ingest ignores feeds.audience | **owner-decision** (unified-pool was deliberate) |
+| AA.3 | Server-side age verification | **owner-decision** (requires DOB collection UX) |
+
 ## Owner-decision sub-bucket (added during Bucket 5 work)
 
 | ID | Title | Question |

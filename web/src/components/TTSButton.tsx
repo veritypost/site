@@ -99,7 +99,9 @@ export default function TTSButton({ text, title = 'Listen' }: TTSButtonProps) {
 }
 
 const btn: CSSProperties = {
-  padding: '5px 12px',
+  // Ext-O7 — 44pt minimum touch target per WCAG 2.5.5 + Apple HIG.
+  padding: '12px 14px',
+  minHeight: 44,
   borderRadius: 8,
   border: 'none',
   background: '#111',
@@ -109,7 +111,9 @@ const btn: CSSProperties = {
   cursor: 'pointer',
 };
 const btnGhost: CSSProperties = {
-  padding: '5px 12px',
+  // Ext-O7 — 44pt minimum touch target per WCAG 2.5.5 + Apple HIG.
+  padding: '12px 14px',
+  minHeight: 44,
   borderRadius: 8,
   border: '1px solid #e5e5e5',
   background: 'transparent',

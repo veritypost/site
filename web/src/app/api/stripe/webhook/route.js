@@ -550,8 +550,11 @@ async function handleChargeRefunded(service, charge) {
         p_priority: 'high',
         p_metadata: { charge_id: charge.id, stripe_customer_id: customerId },
       });
-    } catch {
-      /* swallow — freeze is the source of truth, notification is observability */
+    } catch (err) {
+      // Ext-D1 — log instead of silent swallow. Freeze is the source
+      // of truth; the notification is observability and best-effort,
+      // but a sustained failure pattern wants to be visible somewhere.
+      console.error('[stripe.webhook] create_notification (refund) failed:', err);
     }
   }
 }
@@ -604,8 +607,8 @@ async function handleChargeDispute(service, dispute) {
         p_priority: 'high',
         p_metadata: { dispute_id: dispute.id },
       });
-    } catch {
-      /* notification RPC best-effort */
+    } catch (err) {
+      console.error('[stripe.webhook] create_notification (dispute) failed:', err);
     }
   }
 }
@@ -678,8 +681,8 @@ async function handleDisputeClosed(service, dispute) {
         p_priority: 'high',
         p_metadata: { dispute_id: dispute.id, source: 'dispute_won' },
       });
-    } catch {
-      /* notification best-effort */
+    } catch (err) {
+      console.error('[stripe.webhook] create_notification failed:', err);
     }
   }
 }
@@ -761,8 +764,8 @@ async function handleRefundUpdated(service, refund) {
         p_priority: 'high',
         p_metadata: { refund_id: refund.id, source: 'refund_reversed' },
       });
-    } catch {
-      /* notification best-effort — unfreeze is source of truth */
+    } catch (err) {
+      console.error('[stripe.webhook] create_notification (unfreeze) failed:', err);
     }
   }
 }
@@ -789,8 +792,8 @@ async function handlePaymentFailed(service, invoice) {
       p_priority: 'high',
       p_metadata: { invoice_id: invoice.id, stripe_customer_id: invoice.customer },
     });
-  } catch {
-    /* swallow — webhook ack takes precedence */
+  } catch (err) {
+    console.error('[stripe.webhook] payment_failed notification failed:', err);
   }
   return invoice.id;
 }
@@ -897,8 +900,8 @@ async function handleInvoiceUpcoming(service, invoice) {
         currency: invoice.currency,
       },
     });
-  } catch {
-    /* notification RPC best-effort — webhook ack takes precedence */
+  } catch (err) {
+    console.error('[stripe.webhook] payment_succeeded notification failed:', err);
   }
 }
 

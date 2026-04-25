@@ -62,13 +62,19 @@ export async function POST(_request) {
         amount: 1,
       });
 
-      await service.from('audit_log').insert({
-        actor_id: userId,
-        action: 'auth:login',
-        target_type: 'user',
-        target_id: userId,
-        metadata: { method: 'email', ip },
-      });
+      // Ext-D2 — wrap audit insert so a transient DB failure doesn't
+      // fail the login. Best-effort + log.
+      try {
+        await service.from('audit_log').insert({
+          actor_id: userId,
+          action: 'auth:login',
+          target_type: 'user',
+          target_id: userId,
+          metadata: { method: 'email', ip },
+        });
+      } catch (auditErr) {
+        console.error('[auth.login] audit_log insert failed:', auditErr);
+      }
 
       // D40: silent welcome-back — if the account is still inside the 30-day
       // deletion grace window, clear the timer. RPC is idempotent (no-op when

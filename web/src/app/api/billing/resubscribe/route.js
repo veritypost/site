@@ -101,5 +101,19 @@ export async function POST(request) {
       fallbackStatus: 400,
     });
   }
+
+  // Ext-Q2 — audit-log self-resubscribe.
+  try {
+    await service.from('audit_log').insert({
+      actor_id: user.id,
+      action: 'billing:resubscribe_self',
+      target_type: 'subscription',
+      target_id: user.id,
+      metadata: { plan_name: planName, plan_id: plan.id, tier: plan.tier },
+    });
+  } catch (auditErr) {
+    console.error('[billing.resubscribe] audit_log insert failed:', auditErr);
+  }
+
   return NextResponse.json(data);
 }

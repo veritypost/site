@@ -117,5 +117,19 @@ export async function POST(request) {
       fallbackStatus: 400,
     });
   }
+
+  // Ext-Q2 — audit-log self-change-plan.
+  try {
+    await service.from('audit_log').insert({
+      actor_id: user.id,
+      action: 'billing:change_plan_self',
+      target_type: 'subscription',
+      target_id: user.id,
+      metadata: { new_plan_name: planName, new_plan_id: plan.id, tier: plan.tier },
+    });
+  } catch (auditErr) {
+    console.error('[billing.change_plan] audit_log insert failed:', auditErr);
+  }
+
   return NextResponse.json(data);
 }
