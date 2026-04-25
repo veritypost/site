@@ -5,9 +5,13 @@ import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { verifyPinForRow, buildPbkdf2Credential } from '@/lib/kidPin';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { getSettings, getNumber } from '@/lib/settings';
 
-const MAX_ATTEMPTS = 3;
-const LOCKOUT_SECONDS = 60;
+// Ext-E2 — fallbacks. When the DB settings rows are absent, these
+// constants are used. If/when the settings rows land, the cached
+// helper picks them up without code change.
+const MAX_ATTEMPTS_FALLBACK = 3;
+const LOCKOUT_SECONDS_FALLBACK = 60;
 
 export async function POST(request) {
   let user;
@@ -49,6 +53,16 @@ export async function POST(request) {
     }
 
     const service = createServiceClient();
+
+    // Ext-E2 — DB-tunable PIN lockout. Falls back to constants if the
+    // settings rows haven't been seeded.
+    const settings = await getSettings(service);
+    const MAX_ATTEMPTS = getNumber(settings, 'kids.pin.max_attempts', MAX_ATTEMPTS_FALLBACK);
+    const LOCKOUT_SECONDS = getNumber(
+      settings,
+      'kids.pin.lockout_seconds',
+      LOCKOUT_SECONDS_FALLBACK
+    );
 
     const { data: profile, error } = await service
       .from('kid_profiles')

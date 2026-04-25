@@ -16,11 +16,20 @@ Each item: status (open / shipped) + commit SHA when shipped.
 | W.8 | Streak milestone missing day-3 | shipped — case 3 added with copy |
 | K.5 | `pipeline/costs/page.tsx:164` `.range(0, 9999)` | shipped — capped to `.limit(1000)` |
 
+## Batch 29 — shipped
+
+| ID | Title | Status |
+|---|---|---|
+| CC.1 | `toggle_follow` ignores blocked_users | shipped — schema/167 adds bidirectional block-relationship check |
+| CC.7 | `approve_expert_answer` doesn't notify asker | shipped — schema/167 adds `create_notification` for the asker |
+| E.2 | Kids PIN MAX_ATTEMPTS hardcoded | shipped — DB settings rows + cached helper read; constants are fallbacks |
+
 ## Owner-decision sub-bucket (added during Bucket 5 work)
 
 | ID | Title | Question |
 |---|---|---|
 | W.5 | iOS pair-code length | 8-slot fixed grid (current) vs flexible 6-16 input field. Server today produces 8-char codes; aligning to server range needs UI redesign. |
+| M.8 | Password rules to DB | Multi-file SSR/API delivery for client-side rules; needs design pass before extracting (signup form, settings, reset-password all read these). |
 
 ## Future batches (queued)
 
