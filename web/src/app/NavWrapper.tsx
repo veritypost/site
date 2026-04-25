@@ -28,7 +28,13 @@ type ProfileRow = Pick<
   | 'plan_grace_period_ends_at'
   | 'deletion_scheduled_for'
   | 'created_at'
->;
+> & {
+  // Ext-B3 — joined `plans.tier` so deriveTier reads the canonical tier
+  // string instead of substring-matching the plan_id UUID. Inner-join
+  // semantics aren't needed (free users have null plan_id), so this is
+  // an optional left join.
+  plans?: { tier: string | null } | null;
+};
 
 interface AuthContextValue {
   loggedIn: boolean;
@@ -58,14 +64,15 @@ export const useAuth = () => useContext(AuthContext);
 function deriveTier(user: ProfileRow | null): string {
   if (!user) return 'anon';
   if (!user.email_verified) return 'anon';
-  // plan_id is a FK to plans.id. Tier string lives on plans.tier in the
-  // DB, but we don't need a join here — the paid plans have predictable
-  // id values that include the tier. Anything else maps to free_verified.
-  const raw = String(user.plan_id || '').toLowerCase();
-  if (raw.includes('family_xl')) return 'verity_family_xl';
-  if (raw.includes('family')) return 'verity_family';
-  if (raw.includes('pro')) return 'verity_pro';
-  if (raw.includes('verity')) return 'verity';
+  // Ext-B3 — read tier from the joined plans row instead of substring
+  // matching the plan_id UUID. The previous heuristic could misfire if
+  // a plan_id literal ever contained an unrelated substring, and added
+  // a refactor barrier whenever a tier changed name.
+  const tier = user.plans?.tier || null;
+  if (tier === 'verity_family_xl') return 'verity_family_xl';
+  if (tier === 'verity_family') return 'verity_family';
+  if (tier === 'verity_pro') return 'verity_pro';
+  if (tier === 'verity') return 'verity';
   return 'free_verified';
 }
 
@@ -163,7 +170,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
       const { data: profile } = await supabase
         .from('users')
         .select(
-          'id, username, avatar_url, avatar_color, verity_score, plan_id, plan_status, email_verified, streak_current, is_banned, is_muted, muted_until, locked_until, frozen_at, plan_grace_period_ends_at, deletion_scheduled_for, created_at'
+          'id, username, avatar_url, avatar_color, verity_score, plan_id, plan_status, email_verified, streak_current, is_banned, is_muted, muted_until, locked_until, frozen_at, plan_grace_period_ends_at, deletion_scheduled_for, created_at, plans!fk_users_plan_id(tier)'
         )
         .eq('id', authUser.id)
         .maybeSingle<ProfileRow>();

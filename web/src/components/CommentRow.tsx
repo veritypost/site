@@ -22,6 +22,14 @@ type CommentUser = {
 
 type Mention = { user_id?: string; username: string };
 
+// Ext-E4 — mirrors the server-side `comment_max_depth` setting
+// (schema/033 sets it to 2; the post_comment RPC reads `_setting_int(
+// 'comment_max_depth', 3)` and rejects v_depth > max). Hoisting here
+// so the literal is named + traceable. If the DB setting changes,
+// update this constant in the same change. Future: fetch from a
+// `/api/settings/public` shim instead of mirroring.
+const COMMENT_MAX_DEPTH = 2;
+
 export type EnrichedComment = CommentRowDb & {
   users?: CommentUser;
   _your_vote?: 'upvote' | 'downvote' | null | undefined;
@@ -373,7 +381,7 @@ export default function CommentRow({
                 </button>
               )}
 
-              {canReply && commentDepth < 2 && (
+              {canReply && commentDepth < COMMENT_MAX_DEPTH && (
                 <button
                   onClick={() => setReplyOpen((v) => !v)}
                   style={{

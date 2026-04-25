@@ -156,12 +156,17 @@ function PipelineCostsPageInner() {
             'pipeline.per_run_cost_usd_cap',
             'pipeline.daily_cost_soft_alert_pct',
           ]),
+        // Ext-K5 — was `.range(0, 9999)`; an unbounded select with
+        // an arbitrary cap risks both perf cliff and silently dropping
+        // the tail. Cap to a realistic visible window (1000 rows ≈ days
+        // of pipeline traffic at current cadence). For larger ranges
+        // we'd need real cursor pagination — out of scope here.
         supabase
           .from('pipeline_costs')
           .select('id, cost_usd, model, input_tokens, output_tokens, total_tokens, created_at')
           .gte('created_at', cutoffIso)
           .order('created_at', { ascending: false })
-          .range(0, 9999),
+          .limit(1000),
         supabase
           .from('pipeline_runs')
           .select('id, total_cost_usd, pipeline_type, audience, status, model, created_at')

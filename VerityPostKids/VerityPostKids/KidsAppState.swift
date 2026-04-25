@@ -47,7 +47,13 @@ final class KidsAppState: ObservableObject {
     }
 
     var milestoneForCurrentStreak: StreakScene.Milestone? {
+        // Ext-W8 — added day 3. CLAUDE.md owner-doc cites 3/7/14/30 as the
+        // intended milestone set; only 7/14/30 were wired. Day-3 is the
+        // first stretch where the kid has actually built a streak (not
+        // just two days back-to-back), so it's the strongest early-loop
+        // reinforcement signal.
         switch streakDays {
+        case 3:  return .init(headline: "Three days in a row.", subhead: "That's a streak.")
         case 7:  return .init(headline: "You've read news for seven days straight.", subhead: "That's becoming a real habit.")
         case 14: return .init(headline: "Two weeks in a row.", subhead: "You're taking news seriously.")
         case 30: return .init(headline: "A month of news.", subhead: "Not many people do this.")

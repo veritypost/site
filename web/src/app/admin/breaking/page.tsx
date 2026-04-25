@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/client';
+import { ADMIN_ROLES } from '@/lib/roles';
 import Page, { PageHeader } from '@/components/admin/Page';
 import PageSection from '@/components/admin/PageSection';
 import Button from '@/components/admin/Button';
@@ -51,7 +52,9 @@ function BreakingInner() {
       )
         .map((r) => r.roles?.name?.toLowerCase())
         .filter((n): n is string => typeof n === 'string');
-      if (!profile || !roleNames.some((r) => r === 'owner' || r === 'admin')) { router.push('/'); return; }
+      // Ext-K3 — derive admin gate from ADMIN_ROLES instead of hardcoded
+      // ['owner','admin']. Single source of truth in lib/roles.
+      if (!profile || !roleNames.some((r) => ADMIN_ROLES.has(r))) { router.push('/'); return; }
 
       const { data, error: histError } = await supabase
         .from('articles')

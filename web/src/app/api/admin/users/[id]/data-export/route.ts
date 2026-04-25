@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
-import { permissionError, recordAdminAction } from '@/lib/adminMutation';
+import { permissionError, recordAdminAction, requireAdminOutranks } from '@/lib/adminMutation';
 
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
   const targetId = params?.id;
@@ -30,6 +30,14 @@ export async function POST(_request: Request, { params }: { params: { id: string
       { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
     );
   }
+
+  // Ext-L1 — guard against admins exporting data of higher-ranked users.
+  // Self-export is a no-op safe-pass via require_outranks's actor==target
+  // short-circuit, but covering the path keeps the surface consistent
+  // with the rest of admin-mutation routes.
+  const rankErr = await requireAdminOutranks(targetId, actor.id as string);
+  if (rankErr) return rankErr;
+
   const { error } = await service.from('data_requests').insert({
     user_id: targetId,
     type: 'export',
