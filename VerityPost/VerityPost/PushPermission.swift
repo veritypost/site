@@ -81,6 +81,12 @@ final class PushPermission: ObservableObject {
         if granted {
             UIApplication.shared.registerForRemoteNotifications()
         }
+        // Ext-Y.4 — emit the prompt-result event so we can measure
+        // opt-in rate against the web equivalent.
+        EventsClient.shared.track(
+            event: "push_prompt_result",
+            payload: ["granted": granted]
+        )
         await refresh()
         return status
     }

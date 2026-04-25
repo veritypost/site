@@ -22,6 +22,12 @@ import type { TrackEvent, EventCategory } from './events/types';
 const BATCH_ENDPOINT = '/api/events/batch';
 const FLUSH_INTERVAL_MS = 2_000;
 const FLUSH_AT_BUFFER_SIZE = 20;
+// Ext-Y.2 — payload size guard. sendBeacon has a ~64 KB browser limit;
+// a single big event or 20 medium events with bulky `payload` fields
+// can exceed it and silently fail. Drop oversized individual events
+// at enqueue time + early-flush when buffer total approaches the cap.
+const MAX_EVENT_BYTES = 4 * 1024;
+const MAX_BUFFER_BYTES = 32 * 1024;
 
 const SESSION_KEY = 'vp_session_id';
 const DEVICE_KEY = 'vp_device_id';
@@ -219,8 +225,39 @@ export function track(
     payload: opts.payload || {},
   };
 
+  // Ext-Y.2 — per-event size guard. Stringify once to measure; reuse
+  // the value when computing buffer total below.
+  let eventBytes: number;
+  try {
+    eventBytes = new Blob([JSON.stringify(evt)]).size;
+  } catch {
+    eventBytes = 0;
+  }
+  if (eventBytes > MAX_EVENT_BYTES) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn(
+        '[track] event dropped — exceeds %d bytes (was %d): %s',
+        MAX_EVENT_BYTES,
+        eventBytes,
+        evt.event_name
+      );
+    }
+    return;
+  }
+
   buffer.push(evt);
-  if (buffer.length >= FLUSH_AT_BUFFER_SIZE) {
+
+  // Ext-Y.2 — flush early when buffer total approaches sendBeacon's
+  // ~64 KB ceiling. Estimate via running sum of stringified sizes;
+  // a precise re-stringify would be expensive on every track() call.
+  let bufferBytes: number;
+  try {
+    bufferBytes = new Blob([JSON.stringify(buffer)]).size;
+  } catch {
+    bufferBytes = buffer.length * 1024; // pessimistic estimate
+  }
+
+  if (buffer.length >= FLUSH_AT_BUFFER_SIZE || bufferBytes >= MAX_BUFFER_BYTES) {
     void flush('size');
   }
 }

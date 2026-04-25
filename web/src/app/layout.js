@@ -10,6 +10,7 @@ import ObservabilityInit from '../components/ObservabilityInit';
 import { PermissionsProvider } from '../components/PermissionsProvider';
 import GAListener from '../components/GAListener';
 import { getSiteUrl } from '../lib/siteUrl';
+import { JsonLd, organizationAndWebSite } from '../components/JsonLd';
 
 // GA4 measurement ID. Set via NEXT_PUBLIC_GA_MEASUREMENT_ID in Vercel env;
 // fallback literal is the Verity Post production property so the tag ships
@@ -118,6 +119,12 @@ export default function RootLayout({ children }) {
             'var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         }}
       >
+        {/* Ext-SS.2 — Organization + WebSite JSON-LD on every page.
+            Required for Google's News carousel + sitelinks; site-wide
+            constants so injection at the layout root is the right call. */}
+        {organizationAndWebSite(getSiteUrl()).map((schema, i) => (
+          <JsonLd key={i} data={schema} />
+        ))}
         {/* DA-050 — skip-to-main link. First focusable element; visible
             only when focused so keyboard users can bypass nav + banner +
             category pills straight to article content. */}

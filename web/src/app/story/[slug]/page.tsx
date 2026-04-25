@@ -12,6 +12,7 @@ import CommentThread from '../../../components/CommentThread';
 import TTSButton from '../../../components/TTSButton';
 import Ad from '../../../components/Ad';
 import Interstitial from '../../../components/Interstitial';
+import { JsonLd, newsArticle } from '../../../components/JsonLd';
 import { bumpArticleViewCount } from '../../../lib/session';
 import { useFocusTrap } from '../../../lib/useFocusTrap';
 import { useTrack } from '@/lib/useTrack';
@@ -1016,8 +1017,25 @@ export default function StoryPage() {
   const showMobileTimeline = !isDesktop && activeTab === 'Timeline';
   const showArticleBody = isDesktop || activeTab === 'Article';
 
+  // Ext-SS.2 — NewsArticle JSON-LD. Site URL pulled from window.location
+  // origin so preview/staging emits matching schema URLs. Only emit when
+  // the story has loaded; the SEO crawler reads the rendered HTML, so a
+  // null branch during load is fine (no crawler will hit a loading state).
+  const siteOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+  const storyJsonLd = story
+    ? newsArticle({
+        headline: story.title || '',
+        url: `${siteOrigin}/story/${story.slug || ''}`,
+        datePublished: story.published_at,
+        dateModified: story.updated_at || story.published_at,
+        description: story.excerpt || null,
+        siteUrl: siteOrigin,
+      })
+    : null;
+
   return (
     <div className="vp-dark">
+      {storyJsonLd && <JsonLd data={storyJsonLd} />}
       {/* Reading-progress ribbon. Fixed at the very top of the viewport, 2px
           tall, fills with scroll. `transform: scaleX` keeps the paint cheap
           (compositor-only update). The motion-media query collapses the
