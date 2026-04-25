@@ -33,7 +33,7 @@ DROP POLICY IF EXISTS expert_queue_items_delete ON public.expert_queue_items;
 CREATE POLICY expert_queue_items_select ON public.expert_queue_items
   FOR SELECT
   USING (
-    asker_user_id = auth.uid()
+    asking_user_id = auth.uid()
     OR claimed_by = auth.uid()
     OR public.is_admin_or_above()
   );
@@ -42,7 +42,7 @@ CREATE POLICY expert_queue_items_select ON public.expert_queue_items
 CREATE POLICY expert_queue_items_insert ON public.expert_queue_items
   FOR INSERT
   WITH CHECK (
-    asker_user_id = auth.uid()
+    asking_user_id = auth.uid()
     AND public.has_verified_email()
     AND NOT public.is_banned()
   );
