@@ -273,31 +273,9 @@ export async function middleware(request) {
   // Exempts: /welcome itself, /preview, /api/*, /admin/* (still 404s for
   // non-staff via its own layout), /_next/*, and standard public files.
   if (process.env.NEXT_PUBLIC_SITE_MODE === 'coming_soon') {
-    // Hard-block account-creation paths even with the bypass cookie —
-    // owner asked that no one (including staff browsing remotely) can
-    // accidentally let public signups land while we're in coming-soon.
-    // /api/auth/login + reset stay reachable so existing-account flows
-    // work; only signup is closed.
-    if (
-      pathname === '/signup' ||
-      pathname === '/api/auth/signup' ||
-      pathname === '/signup/expert' ||
-      pathname === '/signup/pick-username'
-    ) {
-      const dest = request.nextUrl.clone();
-      dest.pathname = '/welcome';
-      dest.search = '';
-      const redirect = NextResponse.redirect(dest, { status: 307 });
-      redirect.headers.set('x-request-id', requestId);
-      setCspHeader(redirect, csp, cspStrictReport);
-      redirect.headers.set('X-Robots-Tag', 'noindex, nofollow');
-      return redirect;
-    }
-
     const allowed =
       pathname === '/welcome' ||
       pathname === '/preview' ||
-      pathname === '/preview-as-admin' ||
       pathname.startsWith('/api/') ||
       pathname.startsWith('/admin') ||
       pathname.startsWith('/ideas') ||
