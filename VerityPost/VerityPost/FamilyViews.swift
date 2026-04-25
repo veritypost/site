@@ -40,13 +40,18 @@ struct FamilyDashboardView: View {
     // disable Add Kid + show upgrade CTA when the plan limit is reached.
     // Mirrors the server-side `trg_enforce_max_kids` trigger so the user
     // never has to round-trip a 400 to discover they're at cap.
-    // Source of truth is plans.metadata->>'max_kids' in Supabase.
+    //
+    // Ext-J.4 — values fetched from /api/family/config on view mount.
+    // The hardcoded fallbacks below match what was here pre-extraction
+    // so the UI keeps working if the config call fails / first render
+    // races the fetch.
+    @State private var familyConfigMaxKids: [String: Int] = [
+        "verity_family": 2,
+        "verity_family_xl": 4,
+    ]
     private func maxKids(for tier: String?) -> Int {
-        switch tier {
-        case "verity_family":    return 2
-        case "verity_family_xl": return 4
-        default:                 return 0
-        }
+        guard let t = tier, let n = familyConfigMaxKids[t] else { return 0 }
+        return n
     }
 
     // Sheet / dialog state
@@ -386,8 +391,18 @@ struct FamilyDashboardView: View {
         do {
             // M17 — route through API; server enforces parent-view permission
             // + is_active filter so the schema contract lives in one place.
-            let rows = try await KidsAPI.listKids()
-            await MainActor.run { kids = rows; loading = false }
+            // Ext-J.4 — fetch family config alongside kids list. Failure on
+            // either path leaves the hardcoded fallbacks in place; UI keeps
+            // working offline.
+            async let kidsTask = KidsAPI.listKids()
+            async let configTask = KidsAPI.fetchFamilyConfig()
+            let rows = try await kidsTask
+            let cfg = try? await configTask
+            await MainActor.run {
+                kids = rows
+                if let maxKids = cfg?.maxKids { familyConfigMaxKids = maxKids }
+                loading = false
+            }
         } catch {
             await MainActor.run { loading = false }
         }
@@ -749,6 +764,25 @@ enum KidsAPI {
             return (true, decoded?.id, nil)
         }
         return (false, nil, decodeError(from: data) ?? "Could not add kid (HTTP \(status)).")
+    }
+
+    /// Ext-J.4 — fetch DB-driven family config (max_kids per tier) so
+    /// FamilyDashboardView doesn't hardcode plan limits in iOS source.
+    /// coppaConsentVersion + readingLevels stay as iOS constants because
+    /// they're contractual / enum-typed and shouldn't drift via DB toggle.
+    struct FamilyConfig {
+        let maxKids: [String: Int]
+    }
+    static func fetchFamilyConfig() async throws -> FamilyConfig? {
+        var req = URLRequest(url: endpoint("api/family/config"))
+        req.httpMethod = "GET"
+        req.setValue("Bearer \(try await bearer())", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: req)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard status == 200 else { return nil }
+        struct Resp: Decodable { let max_kids: [String: Int]? }
+        let decoded = try? JSONDecoder().decode(Resp.self, from: data)
+        return FamilyConfig(maxKids: decoded?.max_kids ?? [:])
     }
 
     /// M17 — list kids via the API (mirrors web /api/kids GET) instead of

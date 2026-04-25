@@ -62,14 +62,21 @@ struct KidsAppRoot: View {
         // — this covers that path. refreshIfNeeded is a no-op when the
         // token has more than 24h left.
         .onChange(of: scenePhase) { _, phase in
-            guard phase == .active, auth.kid != nil else { return }
+            guard phase == .active, let kid = auth.kid else { return }
             Task {
                 await PairingClient.shared.refreshIfNeeded()
                 // If refresh cleared state (401 from server), drop KidsAuth
                 // so the UI returns to PairCodeView.
                 if PairingClient.shared.hasCredentials == false {
                     auth.kid = nil
+                    return
                 }
+                // Ext-W.6 — also reload kid app-state when returning to
+                // foreground. Token refresh handled JWT freshness; this
+                // covers streak / categories / score that may have been
+                // updated server-side while backgrounded (e.g., a sibling
+                // on another paired device, or admin moderation).
+                await state.load(forKidId: kid.id, kidName: kid.name)
             }
         }
     }

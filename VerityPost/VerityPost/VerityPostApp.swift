@@ -20,9 +20,15 @@ struct VerityPostApp: App {
                 // (Stripe on web while iOS backgrounded, or switching
                 // devices mid-session) otherwise leave the local app
                 // with stale `purchasedProductIDs` until a manual restore.
+                // Ext-J.4 — also refresh PermissionService. An admin
+                // role grant or plan change made on web while the iOS
+                // app was backgrounded otherwise stays stale until the
+                // user enters a perm-gated view that explicitly fires
+                // refreshIfStale itself.
                 .onChange(of: scenePhase) {
                     if scenePhase == .active {
                         Task { await StoreManager.shared.checkEntitlements() }
+                        Task { await PermissionService.shared.refreshIfStale() }
                     }
                 }
         }
