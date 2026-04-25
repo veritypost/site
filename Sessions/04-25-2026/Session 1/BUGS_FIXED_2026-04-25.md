@@ -73,6 +73,24 @@ Each entry: **`[FIXED|OPEN|WONTFIX] <one-line title>`** then:
 
 ---
 
+### [POLISH] iOS adult — UI audit HIGH items shipped
+
+- BookmarksView Remove button used ad-hoc `Color(hex: "dc2626")` → now uses `VP.danger` design token
+- StoryDetailView quiz button: "Loading…" → "Starting quiz…" (clearer intent)
+- SignupView error icon: added `.accessibilityHidden(true)` so VoiceOver doesn't read "exclamation mark triangle fill" alongside the error text
+- AlertsView empty/denied/manage hero icons: `.accessibilityHidden(true)` on the bell glyphs (decorative, paired text reads the meaning)
+
+### [POLISH] iOS kids — UI audit HIGH items shipped
+
+- KidQuizEngineView close X button: 36→44pt frame (WCAG/HIG min touch target). Added `accessibilityLabel("Close quiz")`.
+- ExpertSessionsView: `.contentShape(Rectangle())` on each session card so taps register anywhere on the card, not just on text/icons.
+
+### [POLISH] Web — UI audit MEDIUM items shipped
+
+- `/bookmarks` at-cap UI: title already says "X of Y", banner used to repeat the same headline. Banner now leads with the upgrade CTA only.
+- `/login` lockout copy: "Try again after 3:45 PM" (timezone-confusing absolute clock) → "Try again in N minutes" (relative, works anywhere).
+- `/not-found` 404: added second anon-safe CTA ("Browse categories"). Old single-CTA was a dead-end for visitors who weren't sure what's on the site.
+
 ## Pending audits — bugs may surface from these
 
 - 31 untested admin flows (out of 51 mapped) — reports/appeals/feature flag/category/sponsor/access/data-request remaining
