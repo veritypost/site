@@ -39,6 +39,30 @@ export function validatePasswordServer(pw) {
   return null;
 }
 
+// Ext-M8 — DB-aware variant reading password.* settings rows (schema/173).
+// Caller passes a service client; settings cache means this is effectively
+// free on the hot path. Falls back to constants if settings unreachable.
+export async function validatePasswordServerWithSettings(pw, supabase) {
+  if (typeof pw !== 'string') return 'Password is required';
+  try {
+    const { getSettings, getNumber, isEnabled } = await import('./settings');
+    const settings = await getSettings(supabase);
+    const minLen = getNumber(settings, 'password.min_length', PASSWORD_MIN_LENGTH);
+    const reqUpper = isEnabled(settings, 'password.require_upper', true);
+    const reqNumber = isEnabled(settings, 'password.require_number', true);
+    const reqSpecial = isEnabled(settings, 'password.require_special', false);
+    if (pw.length < minLen) return `Password must be at least ${minLen} characters`;
+    if (reqUpper && !/[A-Z]/.test(pw)) return 'Password must include an uppercase letter';
+    if (reqNumber && !/[0-9]/.test(pw)) return 'Password must include a number';
+    if (reqSpecial && !/[^A-Za-z0-9]/.test(pw)) {
+      return 'Password must include a special character';
+    }
+    return null;
+  } catch {
+    return validatePasswordServer(pw);
+  }
+}
+
 function passwordFailureMessage(id) {
   switch (id) {
     case 'len':

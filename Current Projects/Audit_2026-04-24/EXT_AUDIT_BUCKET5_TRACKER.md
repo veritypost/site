@@ -81,6 +81,25 @@ Each item: status (open / shipped) + commit SHA when shipped.
 | W.16 | Family leaderboard returns single row under kid JWT | shipped — schema/172 adds `kid_family_leaderboard(kid_id)` SECDEF RPC; LeaderboardView swapped from PostgREST fallback to RPC call |
 | EE.9 | Splash duration not coupled to session-restore | **already correct** — splash gated on `auth.isLoading`, no fixed timer in current code |
 
+## Batch 35 — 8 owner-locked decisions + Apple BBB.* unblock (shipped)
+
+| ID | Title | Status |
+|---|---|---|
+| GG.1 | follows_select OR true | shipped — schema/173 drops `OR true`, leaves follower/followee/admin |
+| T.3 | persist_generated_article exists in prod | already verified by owner SQL (1 row); closed |
+| AA.1 | Strip invite gate | shipped — /api/access-request returns 410; admin/access tab restricted to `codes` only; access_codes management retained for promo use |
+| KK.4 | Unified ingest pool | closed — owner deliberate, in-code comment retained |
+| C.26 | 14-table RLS classification | **draft** at `Audit_2026-04-24/C26_RLS_CLASSIFICATION_DRAFT.md` — owner pastes SQL result + greenlights; migration 174 ships next |
+| W.5 | 8-slot pair-code coupling guard | shipped — `SERVER_PAIR_CODE_LENGTH` constant + `assertServerCodeLengthMatches()` in `PairCodeView.onAppear` |
+| M.8 | Password rules to DB | shipped — schema/173 seeds 4 settings rows + new `validatePasswordServerWithSettings(pw, supabase)` helper + new `/api/settings/password-policy` GET endpoint |
+| AA.3 | Combined 13+ / Terms checkbox | already shipped — single `agreed` checkbox at signup line 668 with "13 or older + Terms + Privacy" copy |
+| BBB.2 | VerityPostKids.entitlements | shipped — file created with aps-environment + associated-domains. **Owner: link this file in Xcode project Build Settings → Code Signing Entitlements during the console walkthrough.** |
+| BBB.3 | onOpenURL handler in VerityPostKidsApp | shipped — stub handler logs in DEBUG, ignores production payloads (kid surface accepts no real deep-links by design) |
+| BBB.4 | Adult entitlements aps-environment + associated-domains | shipped — added to VerityPost.entitlements |
+| BBB.5 | Adult Info.plist LSApplicationCategoryType | shipped — `public.app-category.news` |
+| BBB.6 | PrivacyInfo.xcprivacy declares Analytics with no SDK | shipped — adult plist purpose narrowed to AppFunctionality only (no third-party analytics SDK in build); kids plist already correct |
+| BBB.8 | AppIcon sized variants | **owner action — Xcode work**: open AppIcon.appiconset, drag in iPhone Notification 20pt 2x/3x, Settings 29pt 2x/3x, Spotlight 40pt 2x/3x, App Icon 60pt 2x/3x. The 1024x1024 marketing icon stays. Asset catalog edits don't round-trip through git well; doing this in Xcode preserves the JSON. |
+
 ## Owner-decision sub-bucket (added during Bucket 5 work)
 
 | ID | Title | Question |

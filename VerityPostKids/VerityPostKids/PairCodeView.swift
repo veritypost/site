@@ -23,8 +23,27 @@ struct PairCodeView: View {
     @State private var showHelpGate: Bool = false
     @FocusState private var focused: Bool
 
+    // Ext-W5 — 8-slot grid is intentional (owner decision 2026-04-25).
+    // Server's `redeem_kid_pair_code` accepts 6..16 chars but the
+    // current generator produces exactly 8 (schema/095 line 106). If
+    // the server-side generator ever changes length, this assertion
+    // will fire on debug runs as a coupling alert. Production builds
+    // skip the assert and would silently refuse a non-8-char code,
+    // which is the safer failure mode (better to fail closed than
+    // accept a length we can't render).
     private let codeLength = 8
     private let cooldownWindow = 60
+
+    /// Coupling guard. Surfaces in debug if the server's pair-code
+    /// length drifts from this UI's slot count. See ext-audit W.5.
+    fileprivate static let SERVER_PAIR_CODE_LENGTH = 8
+    private func assertServerCodeLengthMatches() {
+        assert(
+            codeLength == Self.SERVER_PAIR_CODE_LENGTH,
+            "Pair code UI slot count (\(codeLength)) drifted from server generator " +
+            "(\(Self.SERVER_PAIR_CODE_LENGTH)). Update both."
+        )
+    }
 
     private var isLockedOut: Bool { cooldownSeconds > 0 }
 
@@ -117,7 +136,10 @@ struct PairCodeView: View {
             }
             .padding(.horizontal, 28)
         }
-        .onAppear { focused = true }
+        .onAppear {
+            focused = true
+            assertServerCodeLengthMatches()
+        }
         .parentalGate(isPresented: $showHelpGate) {
             // After grown-up passes the math check, open the mail composer.
             if let url = URL(string: "mailto:support@veritypost.com?subject=Kids%20app%20pair%20code%20help") {

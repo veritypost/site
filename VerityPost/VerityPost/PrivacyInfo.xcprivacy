@@ -67,8 +67,14 @@
             <false/>
             <key>NSPrivacyCollectedDataTypePurposes</key>
             <array>
+                <!-- Ext-BBB6 — was [AppFunctionality, Analytics] but no
+                     third-party analytics SDK is bundled. The app posts
+                     interaction events to our own /api/events/batch
+                     endpoint, which is AppFunctionality (recommendations,
+                     reading-history, scoring), not third-party Analytics.
+                     Apple flags Analytics-purpose claims without an SDK
+                     manifest entry. Switched to AppFunctionality only. -->
                 <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
-                <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
             </array>
         </dict>
     </array>

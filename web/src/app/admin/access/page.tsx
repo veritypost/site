@@ -69,6 +69,10 @@ export default function AccessAdmin() {
 
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
+  // Ext-AA1 — invite-gate stripped (owner decision 2026-04-25). The
+  // `requests` tab is hidden because /api/access-request now returns
+  // 410 and signup is open. Code paths + state for `requests` stay so
+  // re-enabling is one line if the policy ever flips back to invite-only.
   const [tab, setTab] = useState<'codes' | 'requests'>('codes');
   const [codes, setCodes] = useState<AccessCode[]>([]);
   const [requests, setRequests] = useState<AccessRequest[]>([]);
@@ -426,7 +430,8 @@ export default function AccessAdmin() {
       <Toolbar
         left={
           <div style={{ display: 'flex', gap: S[1] }}>
-            {(['codes', 'requests'] as const).map((t) => {
+            {/* Ext-AA1 — only the 'codes' tab renders while signup is open. */}
+            {(['codes'] as const).map((t) => {
               const active = tab === t;
               const label = t === 'codes' ? 'Access codes' : 'Requests';
               return (
