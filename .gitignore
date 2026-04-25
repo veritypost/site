@@ -113,6 +113,7 @@ supabase/.branches/
 playwright-report/
 test-results/
 .nyc_output/
+web/tests/e2e/.auth/
 
 # --- Misc ------------------------------------------------------------------
 *.pem

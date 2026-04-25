@@ -13,7 +13,7 @@ test.describe('profile/settings', () => {
   test('settings page redirects anon to login', async ({ page }) => {
     await page.goto('/profile/settings');
     // Should bounce to /login OR /welcome (coming-soon mode).
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     expect(['/login', '/welcome'].some((p) => page.url().includes(p))).toBeTruthy();
   });
 

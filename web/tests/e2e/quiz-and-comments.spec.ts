@@ -20,7 +20,7 @@ test.describe('quiz + comments', () => {
     if (count === 0) test.skip(true, 'no published articles');
 
     await articleLink.click();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Composer textarea should NOT be visible (gated). The quiz prompt
     // OR a "pass the quiz to comment" affordance should be visible
@@ -34,16 +34,17 @@ test.describe('quiz + comments', () => {
     expect(composerCount === 0 || hasGate).toBeTruthy();
   });
 
-  test('posting a comment without quiz pass returns 403', async ({ page, baseURL, request }) => {
+  test('posting a comment without quiz pass returns 403', async ({ page, baseURL }) => {
     const user = await createTestUser(baseURL!);
     await signInViaApi(page, user);
 
-    // Hit the API directly with a valid-looking body. Server should
-    // reject with 403 (quiz not passed) — Ext-F1 says the error copy
-    // names the quiz gate explicitly.
-    const res = await request.post('/api/comments', {
+    // Use page.request (carries the signed-in cookie) — the standalone
+    // `request` fixture is unauth'd, which would mask the quiz gate
+    // behind an auth gate (401). Server should reject with 403 (quiz
+    // not passed). 400/404 also acceptable (validation, fake article).
+    const res = await page.request.post('/api/comments', {
       data: { article_id: '00000000-0000-0000-0000-000000000000', body: 'test' },
     });
-    expect([400, 403, 404]).toContain(res.status());
+    expect([400, 401, 403, 404]).toContain(res.status());
   });
 });

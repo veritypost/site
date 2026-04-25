@@ -6,9 +6,15 @@ import { test, expect } from '@playwright/test';
  */
 
 test.describe('API health + public endpoints', () => {
-  test('GET /api/health returns 200', async ({ request }) => {
+  test('GET /api/health responds with structured body', async ({ request }) => {
     const res = await request.get('/api/health');
-    expect(res.ok()).toBeTruthy();
+    // 200 when DB ping succeeds, 503 when it doesn't. Either way the
+    // route should respond with a structured { ok, checks } body, not
+    // crash with a 500.
+    expect([200, 503]).toContain(res.status());
+    const body = await res.json();
+    expect(typeof body.ok).toBe('boolean');
+    expect(body.checks).toBeTruthy();
   });
 
   test('POST /api/csp-report accepts violation reports', async ({ request }) => {

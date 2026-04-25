@@ -256,79 +256,94 @@ export default function BrowsePage() {
                   Latest
                 </h2>
               </div>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                  gap: 12,
-                }}
-              >
-                {featured.map((story) => (
-                  <a
-                    key={story.id}
-                    href={`/story/${story.slug}`}
-                    style={{
-                      background: PALETTE.card,
-                      border: `1px solid ${PALETTE.border}`,
-                      borderRadius: 12,
-                      overflow: 'hidden',
-                      cursor: 'pointer',
-                      textDecoration: 'none',
-                      color: 'inherit',
-                    }}
-                  >
-                    <div
+              {featured.length === 0 ? (
+                <div
+                  style={{
+                    textAlign: 'center',
+                    padding: '32px 12px',
+                    border: `1px dashed ${PALETTE.border}`,
+                    borderRadius: 12,
+                    color: PALETTE.dim,
+                    fontSize: 14,
+                  }}
+                >
+                  No new stories yet today. Check back later.
+                </div>
+              ) : (
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                    gap: 12,
+                  }}
+                >
+                  {featured.map((story) => (
+                    <a
+                      key={story.id}
+                      href={`/story/${story.slug}`}
                       style={{
-                        height: 80,
-                        background: story.color,
-                        opacity: 0.85,
-                        display: 'flex',
-                        alignItems: 'flex-end',
-                        padding: '0 12px 8px',
+                        background: PALETTE.card,
+                        border: `1px solid ${PALETTE.border}`,
+                        borderRadius: 12,
+                        overflow: 'hidden',
+                        cursor: 'pointer',
+                        textDecoration: 'none',
+                        color: 'inherit',
                       }}
                     >
-                      <span
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 700,
-                          color: 'rgba(0,0,0,0.5)',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.04em',
-                        }}
-                      >
-                        {story.category}
-                      </span>
-                    </div>
-                    <div style={{ padding: '10px 12px' }}>
-                      <p
-                        style={{
-                          margin: '0 0 6px',
-                          fontWeight: 700,
-                          fontSize: 13,
-                          lineHeight: 1.4,
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                        }}
-                      >
-                        {story.headline}
-                      </p>
                       <div
                         style={{
+                          height: 80,
+                          background: story.color,
+                          opacity: 0.85,
                           display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
+                          alignItems: 'flex-end',
+                          padding: '0 12px 8px',
                         }}
                       >
-                        <span style={{ fontSize: 11, color: PALETTE.dim }}>
-                          {story.category} · {story.timeAgo}
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: 'rgba(0,0,0,0.5)',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.04em',
+                          }}
+                        >
+                          {story.category}
                         </span>
                       </div>
-                    </div>
-                  </a>
-                ))}
-              </div>
+                      <div style={{ padding: '10px 12px' }}>
+                        <p
+                          style={{
+                            margin: '0 0 6px',
+                            fontWeight: 700,
+                            fontSize: 13,
+                            lineHeight: 1.4,
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          {story.headline}
+                        </p>
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                          }}
+                        >
+                          <span style={{ fontSize: 11, color: PALETTE.dim }}>
+                            {story.category} · {story.timeAgo}
+                          </span>
+                        </div>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Categories Grid */}

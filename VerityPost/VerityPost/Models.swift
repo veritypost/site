@@ -166,7 +166,7 @@ struct Story: Codable, Identifiable, Hashable {
 
 // MARK: - Category / Subcategory
 
-struct VPCategory: Codable, Identifiable {
+struct VPCategory: Codable, Identifiable, Hashable {
     let id: String
     var name: String
     var slug: String?

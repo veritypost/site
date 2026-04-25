@@ -86,3 +86,16 @@ targets:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
         Release:
           SWIFT_COMPILATION_MODE: wholemodule
+
+  VerityPostUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: VerityPostUITests
+    dependencies:
+      - target: VerityPost
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.veritypost.app.uitests
+        TEST_TARGET_NAME: VerityPost

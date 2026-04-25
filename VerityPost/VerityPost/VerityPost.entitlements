@@ -6,13 +6,5 @@
 	<array>
 		<string>Default</string>
 	</array>
-	<key>aps-environment</key>
-	<string>development</string>
-	<key>com.apple.developer.associated-domains</key>
-	<array>
-		<string>applinks:veritypost.com</string>
-		<string>applinks:www.veritypost.com</string>
-		<string>webcredentials:veritypost.com</string>
-	</array>
 </dict>
 </plist>

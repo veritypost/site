@@ -27,7 +27,24 @@ When `E2E_BASE_URL` is set, Playwright skips the auto-spawn and runs against the
 
 If `NEXT_PUBLIC_SITE_MODE=coming_soon` is set on the target environment, the home page redirects to `/welcome`. The `anon-golden-path.spec.ts` suite detects this and asserts the holding card renders cleanly instead of failing.
 
-To bypass for a specific run, set `PREVIEW_BYPASS_TOKEN` in the test environment AND in `web/.env.local`, then visit `/preview?token=<token>` once before navigating elsewhere. (Add the bypass-cookie helper in `_fixtures/` if you start needing this routinely.)
+`globalSetup` automatically drops the `vp_preview=ok` bypass cookie into a shared `storageState` (`tests/e2e/.auth/preview.json`) when `PREVIEW_BYPASS_TOKEN` is set. Every test context loads with that cookie, so navigation tests don't have to special-case coming-soon mode. Tests that explicitly assert the coming-soon redirect (like `coming-soon-mode.spec.ts:home redirects to /welcome`) soft-skip when the bypass is in effect.
+
+## Supabase keys are mandatory
+
+Every spec that creates a user (most of the suite) needs `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in `web/.env.local` AND they must be for the same project. If they're for different projects:
+
+- `globalSetup` logs `[e2e setup] Supabase admin probe failed: Invalid API key`
+- The dev server's rate-limit RPC also can't reach Supabase, so it fails closed and signup returns 429 even from a fresh IP
+- `createTestUser` surfaces a clear diagnostic; the affected tests fail with that message
+
+Fix it by:
+
+1. Open the Supabase dashboard for the project the URL points at
+2. Settings → API → copy the `service_role` key (not the anon key)
+3. Paste into `web/.env.local` as `SUPABASE_SERVICE_ROLE_KEY=...`
+4. Restart `npm run dev` so the new key loads
+
+Tests that don't touch the DB (CSP/headers, `/api/csp-report`, `/welcome`, `/preview`, error pages) keep passing regardless.
 
 ## Per-test users
 

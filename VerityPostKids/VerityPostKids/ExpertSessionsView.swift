@@ -16,6 +16,10 @@ struct ExpertSessionsView: View {
     // Matches the ProfileView Unpair gate behavior.
     @State private var parentGatePassed: Bool = false
     @State private var showParentGate: Bool = false
+    // Tap-to-expand sheet (regression fix for owner-reported "list I
+    // can't click on"). Cards previously rendered as static VStacks with
+    // no tap handler; tapping now opens a full-detail sheet.
+    @State private var selectedSession: KidExpertSession? = nil
 
     private var client: SupabaseClient { SupabaseKidsClient.shared.client }
 
@@ -32,7 +36,12 @@ struct ExpertSessionsView: View {
                 } else {
                     VStack(spacing: 10) {
                         ForEach(sessions) { s in
-                            card(s)
+                            Button {
+                                selectedSession = s
+                            } label: {
+                                card(s)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
@@ -74,6 +83,46 @@ struct ExpertSessionsView: View {
             parentGatePassed = true
             Task { await load() }
         }
+        .sheet(item: $selectedSession) { s in
+            sessionDetailSheet(s)
+        }
+    }
+
+    private func sessionDetailSheet(_ s: KidExpertSession) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 6) {
+                    Image(systemName: "dot.radiowaves.left.and.right")
+                        .font(.scaledSystem(size: 12, weight: .bold))
+                        .foregroundStyle(statusColor(s.status))
+                    Text((s.status ?? "").uppercased())
+                        .font(.scaledSystem(size: 11, weight: .black, design: .rounded))
+                        .kerning(1)
+                        .foregroundStyle(statusColor(s.status))
+                }
+                Text(s.title ?? "Session")
+                    .font(.scaledSystem(size: 24, weight: .heavy, design: .rounded))
+                    .foregroundStyle(K.text)
+                if let desc = s.description, !desc.isEmpty {
+                    Text(desc)
+                        .font(.scaledSystem(size: 15, weight: .medium, design: .rounded))
+                        .foregroundStyle(K.text)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                HStack(spacing: 14) {
+                    if let scheduled = s.scheduledAt {
+                        metaLabel(icon: "calendar", text: formatted(scheduled))
+                    }
+                    if let mins = s.durationMinutes {
+                        metaLabel(icon: "clock", text: "\(mins) min")
+                    }
+                }
+                Spacer(minLength: 12)
+            }
+            .padding(20)
+        }
+        .background(K.bg.ignoresSafeArea())
+        .presentationDetents([.medium, .large])
     }
 
     private var parentGatePlaceholder: some View {

@@ -37,6 +37,10 @@ targets:
           UIApplicationSupportsMultipleScenes: false
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+        # App Store warns if orientations are restricted without
+        # UIRequiresFullScreen. Kids is portrait-only by product
+        # decision (focus on reading, no rotation handling needed).
+        UIRequiresFullScreen: true
         CFBundleURLTypes:
           - CFBundleURLName: com.veritypost.kids
             CFBundleURLSchemes:
@@ -64,3 +68,17 @@ targets:
         SUPABASE_URL: "https://fyiwulqphgmoqullmrfn.supabase.co"
         SUPABASE_KEY: "sb_publishable_cghQhP7iWFHIPAWnhsH3tw_COmnxYJG"
         VP_SITE_URL: "https://veritypost.com"
+
+  VerityPostKidsUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: VerityPostKidsUITests
+    dependencies:
+      - target: VerityPostKids
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.veritypost.kids.uitests
+        TEST_TARGET_NAME: VerityPostKids
+        GENERATE_INFOPLIST_FILE: YES

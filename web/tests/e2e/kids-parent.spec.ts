@@ -13,7 +13,7 @@ test.describe('kids parent surface', () => {
     const user = await createTestUser(baseURL!);
     await signInViaApi(page, user);
     await page.goto('/kids');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     if (page.url().endsWith('/welcome')) test.skip(true, 'coming-soon mode');
     // Middleware redirects /kids to /profile/kids for authed users.
     expect(page.url()).toContain('/profile/kids');
@@ -21,7 +21,7 @@ test.describe('kids parent surface', () => {
 
   test('/kids redirects anon to /kids-app marketing', async ({ page }) => {
     await page.goto('/kids');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     if (page.url().endsWith('/welcome')) test.skip(true, 'coming-soon mode');
     expect(page.url()).toMatch(/\/(kids-app|login|welcome)/);
   });

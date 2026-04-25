@@ -1,0 +1,387 @@
+# Review of "review external audit" — BS detection pass
+
+**Method**: Dispatched 6 parallel verification agents against the file:line anchors in the audit. Each claim checked against current code. Verdict column: **REAL** (claim matches code), **BS** (claim contradicts code), **STALE** (claim was true but has shipped), **PARTIAL** (partially true, mis-stated), **UNVERIFIED** (not spot-checked this pass).
+
+**Date**: 2026-04-24. Branch tip the audit cites: `ed4944e`. Current tip: `e27a00c`.
+
+---
+
+## TL;DR
+
+Most of the audit stands up. Of ~120 load-bearing claims I spot-checked, **~85% REAL**, **~5% BS**, **~10% PARTIAL/STALE**. The generator is technically competent; where it errs, it errs by overclaiming severity ("Critical" on posture decisions) and by fabricating a handful of specific claims without reading far enough. The file:line anchors are mostly accurate.
+
+**The "critical" tier is mixed**: some are genuinely ship-blocking (GG.1 follows `OR true`, BBB.2 kids entitlements, T.3 persist_generated_article rollback risk), others are posture opinions framed as critical (PP.1–PP.4 performance, RR.3 iOS observability, UU.1 TS strict).
+
+**Biggest BS flags** (stop here if you only read one section):
+- **K.2** claims six admin pages have NO client-side permission gate. **All six do.** Verified directly.
+- **RR.1** claims ~3 of 216 API routes emit to Sentry. **Agent found 100 with Sentry/safeErrorResponse integration.** Audit dramatically undercounted.
+- **BBB.1** (labeled CRITICAL) claims VerityPostKids has no Info.plist. **The file exists** at `VerityPostKids/VerityPostKids/Info.plist`. Partial — the *contents* may still be missing Kids-Category keys, but the "file doesn't exist" framing is wrong.
+- **BB.2** — `log_ad_impression` RPC is not in schema/110 at all. Audit invented the function or it was never written. Either way, the budget-cap-enforcement claim needs re-framing.
+- **FF.2** — cites `comment_reports` table; actual table is `reports`. Drift in the audit itself.
+
+---
+
+## Section-by-section ledger
+
+### A. Partial gating — HIGH SIGNAL, mostly REAL
+
+| # | Verdict | Note |
+|---|---|---|
+| A1 | **REAL** | 12 routes gated; 173 mutation routes total (audit said 163). Either way, ~7% coverage. |
+| A2 | **REAL** | Client gate = global perm; server requires email_verified + mute + per-article quiz. Matches owner-reported comments symptom. |
+| A3 | **REAL** | `lib/featureFlags.js:12` `TTL_MS = 10_000`, per-process Map, comment acknowledges pub/sub gap. |
+
+### B. Dual source of truth — REAL
+
+| # | Verdict | Note |
+|---|---|---|
+| B1 | **REAL** | Both tables exist at the cited lines. |
+| B2 | **REAL** | Tier list duplicated in 5 places as claimed. |
+| B3 | **REAL** | `NavWrapper.tsx:65-67` uses `raw.includes('family'/'pro')` substring matching. |
+
+### C. Cache drift
+
+| # | Verdict | Note |
+|---|---|---|
+| C2 | **REAL** | `handleCancel` (3934-3951) has no `invalidate()` / `refreshAllPermissions()`. Upgrade path does via useEffect on `?success=1`. |
+
+### D. Swallowed RPC
+
+| # | Verdict | Note |
+|---|---|---|
+| D1 | **REAL** | Stripe webhook lines 540-554, 594-609, 752-766, 872-890 all have `try { create_notification } catch { /* swallow */ }`. Explicit comment: "freeze is the source of truth, notification is observability". Intentional but fragile. |
+
+### E. Hardcoded config
+
+| # | Verdict | Note |
+|---|---|---|
+| E4 | **REAL** | Server default depth 3, client shows reply button only at `commentDepth < 2`. Real drift. |
+
+### F. UX dead ends
+
+| # | Verdict | Note |
+|---|---|---|
+| F1 | **REAL** | `api/comments/route.js:59-61` returns generic "Could not post comment" on any RPC failure. |
+| F2 | **REAL** | `CommentComposer.tsx:96-101` sets error toast but submit continues (setBusy(true) is outside the if). |
+
+### I. Cross-surface UI parity
+
+Not spot-verified — descriptive claims, not actionable. Treat as informational.
+
+### J. Profile surface
+
+| # | Verdict | Note |
+|---|---|---|
+| J.4 iOS perms refresh | **REAL** | `VerityPostApp.swift:23-26` refreshes StoreKit but not PermissionService on .active. |
+| J.4 iOS billing dual-rail | **REAL** | Web billing URL hardcoded at `SettingsView.swift:1860`. |
+| J.4 FamilyViews hardcoded | **REAL** | maxKids/readingLevels/coppaConsentVersion all hardcoded. |
+
+### K. Admin UI
+
+| # | Verdict | Note |
+|---|---|---|
+| K.1 | **REAL** | 4 different gate idioms genuinely in use. |
+| K.2 | **BS** | Audit claims 6 pages have NO client-side gate. **All 6 have gates** (role-name checks). Idiom differs from `hasPermission()` but gates exist. |
+| K.3 | **REAL** | `breaking/page.tsx:50` hardcodes `'owner' || 'admin'` check. |
+| K.5 | **REAL** | `.range(0, 9999)` at `pipeline/costs/page.tsx:164`. |
+| K.6 | **REAL** | `breaking/page.tsx:57` exposes `histError.message` raw. |
+
+### L. Admin API
+
+| # | Verdict | Note |
+|---|---|---|
+| L.1 | **REAL** | `/api/admin/users/[id]/data-export/route.ts` has zero `require_outranks` calls. |
+| L.3 | **REAL** | Permission-key drift is real (articles.edit.any vs articles.patch, multiple features suffixes). |
+| L.4 | **REAL** | achievements/route.ts:50 echoes user input in error: `No achievement named "${name}"`. |
+
+### M. Auth
+
+| # | Verdict | Note |
+|---|---|---|
+| M.2 | **REAL** | `api/auth/email-change/route.js` has zero `audit_log` writes. Real compliance gap. |
+| M.3 logout scope | **REAL** | `api/auth/logout/route.js:9` calls `signOut()` without `{ scope: 'others' }`. |
+| M.3 reset revoke | **REAL** | `/api/auth/reset-password/route.js` has no post-reset signOut. |
+| M.8 | **REAL** | `lib/password.js` lines 10-20 hardcode 8 chars / upper / digit. |
+
+### O. Reader / story
+
+| # | Verdict | Note |
+|---|---|---|
+| O.1 | **REAL** | `story/[slug]/page.tsx:630` catch fail-opens. Code comment documents this as intentional ("fail-open so reader doesn't see upgrade panel") — so it's a deliberate UX tradeoff, not a bug. |
+| O.2 | **REAL** | TTS / quiz flags set once on mount, never re-checked. |
+| O.3 | **REAL** | `ArticleQuiz.tsx:72` stage is local React state only. |
+| O.4 | **REAL** | All 4 LAUNCH_HIDE flags confirmed at cited lines. `{false && ...}` wrappers at 1156, 1526, 1546. Browse filters dead at 226-231 (comment acknowledges it). |
+| O.6 | **REAL** | `browse/page.tsx:115-120` `.limit(500)` client-side, no pagination. |
+| O.7 | **REAL** | TTSButton padding 5x12, quiz 12x14, both under 44pt. |
+
+### P. Messages
+
+Not spot-verified beyond section-F overlap. Audit's own verdict is "clean bill of health."
+
+### Q. Billing + promo
+
+| # | Verdict | Note |
+|---|---|---|
+| Q.1 | **PARTIAL** | 4 of 6 user-facing billing routes have NO rate limit (cancel/change-plan/resubscribe/promo-redeem). 2 do (stripe/checkout, stripe/portal). Audit's framing is accurate. |
+| Q.2 | **REAL** | No audit_log writes in cancel/change-plan/resubscribe. |
+| Q.3 | **REAL** | is_active + is_visible filter confirmed on all 3 routes. |
+
+### S. Cron
+
+| # | Verdict | Note |
+|---|---|---|
+| S.1 | **REAL** | `send-emails` has no atomic claim; `claim_email_batch` RPC does not exist; `send-push` uses `claim_push_batch` via schema/159. |
+| S.2 | **REAL** | Skip-branch row update swallows error. |
+| S.3 | **REAL** | Code comments drift from vercel.json schedules on at least 4 cron routes. Inconvenience, not a bug (vercel.json is authoritative). Some of this should already be closed by C25 from the recent fix list. |
+
+### T. Schema drift
+
+| # | Verdict | Note |
+|---|---|---|
+| T.1 | **REAL** | reset_and_rebuild_v2.sql has no `CREATE TABLE events` or `CREATE TABLE ai_prompt_presets`. DR broken. |
+| T.2 | **REAL** | Migration number gaps confirmed exactly (007, 008, 052, 092, 093, 100 missing). |
+| T.3 | **REAL and the biggest real risk** | schema/118 creates `persist_generated_article`, schema/119 drops it, `persist-article.ts:139` still calls it. **Needs MCP verification of prod state before anything else.** |
+
+### U. Pipeline
+
+| # | Verdict | Note |
+|---|---|---|
+| U.4 | **REAL** | No robots.txt check in scrape-article.ts. |
+| U.6 | **REAL** | pipeline-cleanup resets state but doesn't DELETE orphan discovery_items. |
+
+### W. Kids iOS
+
+| # | Verdict | Note |
+|---|---|---|
+| W.1 | **REAL** | `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` confirmed, no install-scoped freshness check. Keychain-persists-across-uninstall is a real COPPA-edge on shared iPads. |
+| W.2 | **REAL** | 7-day TTL at `api/kids/pair/route.js:24`. |
+| W.5 | **REAL** | iOS fixes length at 8, server accepts 6-16. |
+| W.6 | **PARTIAL** | `.task(id: auth.kid?.id)` does reload state on kid change; scenePhase.active refreshes JWT only. The "no foreground refresh" framing is correct for parent-initiated changes during an active kid session. |
+| W.7 | **REAL** | ParentalGateModal has zero callers in VerityPostKids source. **Apple Kids Category review risk if surfaces change.** |
+| W.8 | **REAL** | Milestone switch has 7, 14, 30 only — no `case 3`. Owner-documented milestones per CLAUDE.md imply 3/7/14/30. Feature bug. |
+| W.9 | **REAL** | Math challenge is kid-solvable (addition, 4-15). |
+| W.12 | **REAL** | 0.6 hardcoded in KidQuizEngineView.swift:337. |
+| W.16 | **REAL** | Family leaderboard fallback returns only kid's own row. |
+
+### X. Data lifecycle
+
+| # | Verdict | Note |
+|---|---|---|
+| X.1 | **REAL** | No UNIQUE constraint on bookmarks, no dedup in route. |
+| X.5 | **REAL** | Logout doesn't invalidate push tokens. |
+| X.7 | **REAL** | Data-export files persist after 7-day URL expires. |
+| X.8 | **REAL** | `export_user_data()` RPC missing subscriptions, sessions, alert_preferences, push_receipts, billing_events, audit_log. |
+| X.12 | **REAL** | Account delete immediate branch has no password re-confirm. |
+
+### Y. Events / analytics
+
+| # | Verdict | Note |
+|---|---|---|
+| Y.1 | **REAL** | `/api/events/batch/route.ts` has no checkRateLimit. |
+| Y.2 | **REAL** | `track.ts` payload unconstrained. |
+| Y.4 | **REAL** | Zero event emission in VerityPost/*.swift. |
+| Y.11 | **STALE** | Audit said schema/108 "may not be applied in prod". **Schema exists at schema/108_events_pipeline.sql; `events:` appears in `src/types/database.ts` 7 times, so types were regenerated — which only happens after apply.** Audit's worry was reasonable but stale. |
+
+### AA. Onboarding
+
+| # | Verdict | Note |
+|---|---|---|
+| AA.1 | **REAL** | signup + callback don't check access_codes. Invite gate is unenforced — but launch hide state makes this expected, not a bug, if the product plan is "open signup post-launch." Verify intent before "fixing." |
+| AA.3 | **REAL** | Age gate is a client checkbox, server only checks the boolean. |
+
+### BB. Ads
+
+| # | Verdict | Note |
+|---|---|---|
+| BB.1 | **PARTIAL/BS** | Audit claims `serve_ad` gates on `plan_id` + `stripe_customer_id`. Agent found `serve_ad()` gates on `_user_tier_or_anon(p_user_id)` against placement tier lists — not `stripe_customer_id`. Kids flag is indirectly blocked only if a kid account resolves to a tier that's in `hidden_for_tiers`. The COPPA concern is real (no defense-in-depth), but the mechanism the audit described is wrong. |
+| BB.2 | **BS / STALE** | **`log_ad_impression` RPC is not in schema/110.** Either the audit hallucinated the function or it lives elsewhere. The claim as written is not verifiable. Real question: does any code enforce campaign budget caps? That needs its own check. |
+| BB.3 | **PARTIAL** | Client-side URL allowlist exists at `Ad.jsx:86-90`. Server-side validation gap on admin POST is a real concern; the TODO at `Ad.jsx:84` (`TODO(item-7-followup)`) acknowledges it. |
+
+### CC. Social graph
+
+| # | Verdict | Note |
+|---|---|---|
+| CC.1 | **REAL** | `toggle_follow` doesn't consult `blocked_users`. |
+| CC.2 | **REAL** | `claim_queue_item` uses FOR UPDATE but no TTL / cron. |
+| CC.7 | **REAL** | `approve_expert_answer` updates comment status but doesn't create_notification. Real core-loop break. |
+
+### EE. Adult iOS
+
+| # | Verdict | Note |
+|---|---|---|
+| EE.1 | **REAL** | SupabaseManager singleton can race with views accessing `.shared` before auth bootstrap. |
+| EE.9 | **REAL** | ContentView splash is fixed (~500ms), not coupled to session-restore. |
+
+### FF. Moderation
+
+| # | Verdict | Note |
+|---|---|---|
+| FF.2 | **BS (table name drift)** | Audit cites `comment_reports` table. Actual table is `reports`. Claim needs restating. No UNIQUE constraint is still worth verifying on the correct table name. |
+| FF.1, FF.4, FF.5 | **UNVERIFIED** | Not spot-checked this pass. |
+
+### GG. RLS
+
+| # | Verdict | Note |
+|---|---|---|
+| GG.1 | **REAL — TOP PRIORITY** | `schema/reset_and_rebuild_v2.sql:3829`: `follows_select` literally ends `OR true`. **The entire follow graph is readable by anon and every user.** If unintentional, that's a P0 ship-blocker. If intentional (social transparency), document + drop the per-user clauses. |
+| GG.2 | **REAL** | `quiz_attempts` base policy has no kid-JWT branch; INSERT was patched in 132 but SELECT wasn't. Kids likely can't read own history. |
+| GG.3 | **REAL** | permission_set_perms / role_permission_sets / plan_permission_sets all `USING (true)`. Architecture leak; low severity unless probing attacks materialize. |
+
+### II. Storage
+
+| # | Verdict | Note |
+|---|---|---|
+| II.1, II.2, II.4 | **UNVERIFIED** | Not spot-checked this pass. Conceptually plausible. |
+
+### JJ. Components
+
+| # | Verdict | Note |
+|---|---|---|
+| JJ.1 | **REAL** | User ConfirmDialog has no focus trap; admin version does. |
+| JJ.2 | **REAL** | `PermissionGate.tsx:128-129` span+tabIndex with no onKeyDown — keyboard inaccessible. |
+| JJ.7 | **REAL** | `Ad.jsx:84` has `TODO(item-7-followup)` for DB-level URL validation. |
+
+### KK. Feeds
+
+| # | Verdict | Note |
+|---|---|---|
+| KK.1 | **REAL** | `POST /api/admin/feeds` accepts any URL; `created_by` not populated. |
+| KK.4 | **REAL** | Ingest ignores `feeds.audience` — kid-safety defense-in-depth gap. |
+
+### LL. Email
+
+| # | Verdict | Note |
+|---|---|---|
+| LL.1 | **REAL** | No suppression/bounce tables, no Resend bounce webhook. |
+| LL.2 | **REAL** | No `List-Unsubscribe` header in lib/email.js. |
+| LL.3 | **REAL** | `_is_in_quiet_hours()` exists; send-emails cron doesn't call it. |
+
+### NN. Accessibility
+
+| # | Verdict | Note |
+|---|---|---|
+| NN.1 | **REAL** | Six pages missing `<main>` confirmed. |
+| NN.3 | **REAL** | Browse category cards are mouse-only `<div>` + onClick. |
+
+### OO. CSP
+
+| # | Verdict | Note |
+|---|---|---|
+| OO.1 | **REAL** | Middleware sends `Content-Security-Policy-Report-Only`, not enforcing. Inline comment documents why (Next prerender + nonce conflict). |
+| OO.2 | **REAL** | `'unsafe-inline'` in `style-src` at middleware line 94. |
+
+### PP. Performance
+
+| # | Verdict | Note |
+|---|---|---|
+| PP.1 | **REAL** | LOC counts exact (5174 / 1714 / 2349). Severity "Critical" is the audit's framing — pre-launch this is posture, not a blocker. |
+| PP.2 | **PARTIAL** | 158 `'use client'`, not 112. Zero `'use server'` confirmed. Audit undercounted client directives. |
+| PP.3 | **REAL** | No virtualization anywhere. |
+| PP.4 | **REAL** | Zero `loading="lazy"`. |
+| PP.5 | **REAL** | No `next/image` imports. |
+| PP.7 | **PARTIAL** | 99 `select('*')` queries, not "20+". Audit undercounted. |
+
+### RR. Observability
+
+| # | Verdict | Note |
+|---|---|---|
+| RR.1 | **BS (severity)** | Audit claims ~3 of 216 API routes emit to Sentry. Agent found Sentry.captureException / safeErrorResponse present in 100 files. The claim's specific count is wrong. Real question: what % of *catch blocks* bridge to Sentry vs just console.error? That's more nuanced. |
+| RR.2 | **REAL** | No `sentry.server.config.js` or `sentry.edge.config.js`. |
+| RR.3 | **REAL** | No iOS crash reporter. Per project memory: Sentry deferred until monetization — severity "Critical" disagrees with project stance. |
+| RR.10 | **REAL** | Zero test files. Per project stance, tests are a later concern. |
+
+### SS. SEO
+
+| # | Verdict | Note |
+|---|---|---|
+| SS.1 | **REAL** | No i18n library. Per product stance, English-only. Informational. |
+| SS.2 | **REAL** | No JSON-LD anywhere. Genuine SEO miss. |
+| SS.3 | **REAL** | GA4 unconditional; inline TODO acknowledges CMP gap. |
+| SS.4 | **REAL** | `sitemap.js:70` `.limit(5000)` hard cap. |
+
+### UU. Infrastructure
+
+| # | Verdict | Note |
+|---|---|---|
+| UU.1 | **REAL** | `tsconfig.json:7` strict: false. |
+| UU.2 | **REAL** | No test script, no `.github/workflows/`. |
+| UU.3 | **REAL** | No eslint-plugin-jsx-a11y. |
+| UU.4 | **REAL** | No engines field. |
+| UU.5 | **REAL** | Lint-staged doesn't run tsc. |
+| UU.11 | **REAL** | No memory/maxDuration overrides in vercel.json (beyond recently-shipped C25 cron pins). |
+
+### WW. Webhooks
+
+| # | Verdict | Note |
+|---|---|---|
+| WW.1 | **REAL** | iOS webhooks have no payload size cap; Stripe does (1 MiB). Consistency gap real. |
+
+### YY. Newsroom / support / access
+
+| # | Verdict | Note |
+|---|---|---|
+| YY.A1 | **REAL** | Newsroom page has no realtime subscribe. |
+| YY.B1 | **REAL** | Support reply sends don't audit; only close does. |
+| YY.C1 | **REAL** | Access-request admin page has status badge only, no approve/reject buttons. Combined with AA.1 — invite workflow is unwired end-to-end. |
+
+### AAA. Settings / flags / scoring
+
+| # | Verdict | Note |
+|---|---|---|
+| AAA.1 | **REAL** | `_setting_int` hardcoded fallbacks are everywhere. |
+| AAA.2 | **REAL** | streaks settings rows not seeded, admin UI reads `streak_%`. |
+| AAA.3 | **REAL** | Only `v2_live` read from feature_flags. |
+| AAA.4 | **REAL** | Recap score not wired to award_points. |
+| AAA.6 | **REAL** | award_points UPDATEs without FOR UPDATE — race risk. |
+| AAA.9 | **BS / STALE** | Audit said settings PATCH has no rate limit. **Agent found `checkRateLimit` at line 59-70.** Already wired. |
+
+### BBB. iOS compliance
+
+| # | Verdict | Note |
+|---|---|---|
+| BBB.1 | **STALE (labeled CRITICAL)** | Audit claimed VerityPostKids/Info.plist doesn't exist. **The file exists.** Its *contents* may still be missing Kids-Category keys (UIRequiresKidsCategory, LSApplicationCategoryType) — worth checking — but the "file missing" framing is wrong. Severity needs to be re-derived from actual plist contents. |
+| BBB.2 | **REAL** | No VerityPostKids.entitlements file. No entitlements block in project.yml. Real Kids-Category review risk once push/SIWA/Universal Links are needed. |
+| BBB.3 | **REAL** | VerityPostKidsApp.swift is 10 lines, no onOpenURL handler. |
+| BBB.4 | **REAL** | Adult entitlements only declare applesignin. Missing aps-environment + associated-domains. Tied to the Apple-pending block in CLAUDE.md. |
+| BBB.5 | **REAL** | Adult Info.plist has no LSApplicationCategoryType. |
+| BBB.6 | **REAL** | PrivacyInfo.xcprivacy declares Analytics with no SDK. App Store review risk. |
+| BBB.8 | **REAL** | Both AppIcon.appiconset files declare only universal 1024x1024. App Store submission will fail on missing iPhone/iPad variants. |
+
+### CCC. Triggers / roles / rate_limits
+
+| # | Verdict | Note |
+|---|---|---|
+| CCC.1 | **UNVERIFIED** | RPC definition not located in grep; lateral-role claim not conclusively verified. |
+| CCC.2 | **REAL** | No UNIQUE(user_id, role_id) constraint. |
+| CCC.3 | **REAL** | 156 policyKey occurrences; only ~7 seeded rate_limits rows. Admin-UI tuning is effectively a no-op for 90%+ of policies. |
+| CCC.5 | **REAL** | No cleanup cron for `rate_limit_events`. |
+
+---
+
+## Where to actually look first
+
+Ordered by real-signal + fit with project priorities (launch readiness, COPPA, core UX):
+
+1. **GG.1** — `follows_select OR true`. Verify intent via MCP; if unintentional, drop the `OR true` and test.
+2. **T.3** — Verify via MCP whether `persist_generated_article` exists in prod. If 119 was applied, pipeline is broken right now.
+3. **A2 + F1** — Client/server gate drift on comments + generic error copy. Matches owner's reported symptom exactly.
+4. **BBB.1 contents check + BBB.2 + BBB.8** — Apple block is already flagged in CLAUDE.md; these are the concrete work items for the day the developer account lands.
+5. **C2, L1, M.2, M.3** — Small surgical fixes: cancel-path refresh, data-export require_outranks, email-change audit, logout scope. All trivial.
+6. **W.7 + W.8** — ParentalGateModal caller audit + day-3 streak milestone. Kids app quality.
+7. **Q.1 + Q.2** — Billing routes need rate limits + audit_log. Low-effort, meaningful guard.
+8. **S.1** — `send-emails` needs `claim_email_batch` equivalent to what `send-push` got.
+9. **CC.7** — approve_expert_answer should notify. Core loop.
+10. **AA.1 + YY.C1** — Decide invite-gate product intent; wire it or strip the UI.
+
+## Where to ignore the audit
+
+- **"Critical" on PP.1–PP.4 + RR.1/RR.3 + UU.1/UU.2** — posture concerns the audit re-framed as urgent. Per project memory + product stance, these are deferred. Don't let them shape your sprint.
+- **SS.1 (i18n)** — English-only is the product stance, not a bug.
+- **K.2** — audit was wrong; all six pages have gates.
+- **AAA.9** — rate limit already exists; stale finding.
+- **Y.11** — schema/108 is applied; worry is stale.
+- **BB.2** — claim references a function that isn't in the cited schema; don't chase it until you find the real code path.
+
+## Meta observation
+
+The document was generated by an agent working in a sandbox (`/root/.claude/plans/`, `/home/user/site/`), not on your filesystem. The execution-plan footer at the end is pure agent-boilerplate, not yours. Treat the artifact as "what a thorough outsider would say after two days in your code" — useful as a second read, not as your backlog.

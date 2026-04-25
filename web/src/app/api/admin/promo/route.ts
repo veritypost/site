@@ -74,6 +74,12 @@ export async function POST(request: Request) {
   const { data, error } = await service.from('promo_codes').insert(row).select('*').single();
   if (error || !data) {
     console.error('[admin.promo.create]', error?.message);
+    // Postgres 23505 = unique_violation. Surface the conflict to the
+    // admin UI as a 409 instead of a generic 500 so the form can show
+    // a "code already exists" message and not a "Server Error" toast.
+    if (error?.code === '23505') {
+      return NextResponse.json({ error: 'A promo with that code already exists' }, { status: 409 });
+    }
     return NextResponse.json({ error: 'Could not create promo' }, { status: 500 });
   }
 

@@ -15,7 +15,7 @@ import { createTestUser, signInViaApi } from './_fixtures/createUser';
 test.describe('admin gate', () => {
   test('/admin returns notFound for anon', async ({ page }) => {
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     if (page.url().endsWith('/welcome')) test.skip(true, 'coming-soon mode');
     // notFound() in the layout returns Next's 404 page; the URL stays
     // at /admin but the body is the 404 surface.
@@ -27,7 +27,7 @@ test.describe('admin gate', () => {
     const user = await createTestUser(baseURL!);
     await signInViaApi(page, user);
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     if (page.url().endsWith('/welcome')) test.skip(true, 'coming-soon mode');
     const bodyText = await page.locator('body').innerText();
     expect(bodyText).toMatch(/404|not found/i);

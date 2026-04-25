@@ -8,9 +8,10 @@ import { createTestUser, signInViaApi } from './_fixtures/createUser';
  */
 
 test.describe('follows', () => {
-  test('GET /api/follows requires auth', async ({ request }) => {
+  test('GET /api/follows does not leak data', async ({ request }) => {
+    // POST-only route; GET → 405 alongside 401/403/404 are all acceptable.
     const res = await request.get('/api/follows');
-    expect([401, 403, 404]).toContain(res.status());
+    expect([401, 403, 404, 405]).toContain(res.status());
   });
 
   test('POST /api/follows from free user gets paid-tier rejection', async ({

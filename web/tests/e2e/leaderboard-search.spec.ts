@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('leaderboard', () => {
   test('leaderboard requires auth', async ({ page }) => {
     await page.goto('/leaderboard');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     if (page.url().endsWith('/welcome')) test.skip(true, 'coming-soon mode');
     // /leaderboard is in PROTECTED_PREFIXES per middleware.js
     expect(['/login', '/leaderboard'].some((p) => page.url().includes(p))).toBeTruthy();

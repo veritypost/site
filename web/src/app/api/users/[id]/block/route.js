@@ -77,6 +77,12 @@ export async function POST(request, { params }) {
   });
   if (error) {
     console.error('[users-block:POST]', error);
+    // 23503 = foreign_key_violation. The target user doesn't exist;
+    // surface as 404 so the iOS/web client can show "user not found"
+    // instead of a generic "Server Error" toast.
+    if (error.code === '23503') {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
     return NextResponse.json({ error: 'Could not block user' }, { status: 500 });
   }
   return NextResponse.json({ blocked: true });

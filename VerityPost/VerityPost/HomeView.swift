@@ -556,11 +556,21 @@ private struct BrowseLanding: View {
                         .frame(maxWidth: .infinity)
                 } else {
                     ForEach(categories) { cat in
-                        Text(cat.displayName)
-                            .font(.system(size: 18, weight: .medium, design: .serif))
-                            .foregroundColor(VP.text)
+                        NavigationLink(value: cat) {
+                            HStack {
+                                Text(cat.displayName)
+                                    .font(.system(size: 18, weight: .medium, design: .serif))
+                                    .foregroundColor(VP.text)
+                                Spacer(minLength: 8)
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(VP.dim)
+                            }
                             .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
                             .padding(.vertical, 14)
+                        }
+                        .buttonStyle(.plain)
 
                         Rectangle()
                             .fill(VP.rule)
@@ -574,6 +584,9 @@ private struct BrowseLanding: View {
         .background(VP.bg.ignoresSafeArea())
         .navigationTitle("Browse")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(for: VPCategory.self) { cat in
+            CategoryDetailView(category: cat)
+        }
         .task { await load() }
     }
 
@@ -589,6 +602,110 @@ private struct BrowseLanding: View {
             loading = false
         } catch {
             Log.d("Browse load failed: \(error)")
+            loading = false
+        }
+    }
+}
+
+// MARK: - CategoryDetailView
+//
+// Lists published articles in a single category. Reuses the same row
+// shape as the home feed so tapping a story still navigates into
+// StoryDetailView. Covers the gap reported by the owner: tapping a
+// row in BrowseLanding previously did nothing because the rows were
+// static Text, not Buttons / NavigationLinks.
+private struct CategoryDetailView: View {
+    let category: VPCategory
+
+    @State private var stories: [Story] = []
+    @State private var loading = true
+    @State private var loadFailed = false
+    private let client = SupabaseManager.shared.client
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(category.displayName)
+                    .font(.system(size: 32, weight: .bold, design: .serif))
+                    .tracking(-0.4)
+                    .foregroundColor(VP.text)
+                    .padding(.top, 24)
+                    .padding(.bottom, 16)
+
+                if loading {
+                    Text("Loading…")
+                        .font(.system(size: 14, design: .serif))
+                        .italic()
+                        .foregroundColor(VP.dim)
+                        .padding(.vertical, 48)
+                        .frame(maxWidth: .infinity)
+                } else if loadFailed {
+                    Text("Couldn't load stories. Pull to retry.")
+                        .font(.system(size: 14, design: .serif))
+                        .italic()
+                        .foregroundColor(VP.dim)
+                        .padding(.vertical, 48)
+                        .frame(maxWidth: .infinity)
+                } else if stories.isEmpty {
+                    Text("No stories in this category yet.")
+                        .font(.system(size: 14, design: .serif))
+                        .italic()
+                        .foregroundColor(VP.dim)
+                        .padding(.vertical, 48)
+                        .frame(maxWidth: .infinity)
+                } else {
+                    ForEach(stories) { story in
+                        NavigationLink(value: story) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(story.title ?? "Untitled")
+                                    .font(.system(size: 20, weight: .semibold, design: .serif))
+                                    .foregroundColor(VP.text)
+                                    .multilineTextAlignment(.leading)
+                                if let excerpt = story.excerpt, !excerpt.isEmpty {
+                                    Text(excerpt)
+                                        .font(.system(size: 15, design: .serif))
+                                        .foregroundColor(VP.dim)
+                                        .lineLimit(3)
+                                        .multilineTextAlignment(.leading)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 16)
+                        }
+                        .buttonStyle(.plain)
+
+                        Rectangle().fill(VP.rule).frame(height: 1)
+                    }
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 80)
+        }
+        .background(VP.bg.ignoresSafeArea())
+        .navigationTitle(category.displayName)
+        .navigationBarTitleDisplayMode(.inline)
+        .refreshable { await load() }
+        .task { await load() }
+    }
+
+    private func load() async {
+        loading = true
+        loadFailed = false
+        do {
+            let s: [Story] = try await client.from("articles")
+                .select()
+                .eq("category_id", value: category.id)
+                .eq("status", value: "published")
+                .eq("visibility", value: "public")
+                .order("published_at", ascending: false)
+                .limit(50)
+                .execute()
+                .value
+            stories = s
+            loading = false
+        } catch {
+            Log.d("CategoryDetailView load failed: \(error)")
+            loadFailed = true
             loading = false
         }
     }

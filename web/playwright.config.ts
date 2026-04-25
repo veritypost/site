@@ -29,6 +29,7 @@ loadEnv({ path: resolve(__dirname, '.env.local') });
  */
 export default defineConfig({
   testDir: './tests/e2e',
+  globalSetup: require.resolve('./tests/e2e/_fixtures/setup'),
   globalTeardown: require.resolve('./tests/e2e/_fixtures/cleanup'),
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
@@ -43,6 +44,9 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
+    // Loaded from globalSetup — pre-drops the vp_preview=ok cookie so
+    // coming-soon mode doesn't redirect every navigation to /welcome.
+    storageState: './tests/e2e/.auth/preview.json',
     // Mirror the user's locale + timezone so date/time formatting in
     // tests matches what a real user sees.
     locale: 'en-US',

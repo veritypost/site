@@ -13,8 +13,17 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { cleanupSeed } from './seed';
 
 export default async function globalTeardown() {
+  // Drop seeded article + quiz + pair code first; the seed users
+  // themselves stay (they're stable and other DB rows reference them).
+  try {
+    await cleanupSeed();
+  } catch (err) {
+    console.warn('[e2e cleanup] cleanupSeed failed:', (err as Error).message);
+  }
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) {
@@ -33,7 +42,11 @@ export default async function globalTeardown() {
     const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
     if (error || !data?.users || data.users.length === 0) break;
     for (const u of data.users) {
-      if (u.email?.startsWith('vp-e2e-')) {
+      // vp-e2e-*@example.com — throwaway test users (createTestUser).
+      // vp-e2e-seed-*@veritypost.test — stable seed users; keep them
+      // so the next run can re-find them by id and not orphan the
+      // public.users rows that reference them via FK.
+      if (u.email?.startsWith('vp-e2e-') && u.email.endsWith('@example.com')) {
         const { error: delErr } = await admin.auth.admin.deleteUser(u.id);
         if (!delErr) deletedCount++;
       }

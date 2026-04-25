@@ -21,7 +21,7 @@ test.describe('static pages', () => {
     test(`${path} loads`, async ({ page }) => {
       await page.goto(path);
       // Coming-soon may redirect; that's still a < 500 response.
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
       expect(page.url()).toBeTruthy();
       // Some pages might not have h1; just confirm the body has SOME
       // visible text content > 100 chars.
