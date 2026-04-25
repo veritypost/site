@@ -91,6 +91,14 @@ Each entry: **`[FIXED|OPEN|WONTFIX] <one-line title>`** then:
 - `/login` lockout copy: "Try again after 3:45 PM" (timezone-confusing absolute clock) → "Try again in N minutes" (relative, works anywhere).
 - `/not-found` 404: added second anon-safe CTA ("Browse categories"). Old single-CTA was a dead-end for visitors who weren't sure what's on the site.
 
+### [FIXED] Web — 8 routes leaked raw `error.message` to clients
+
+- **Where**: `web/src/app/api/admin/users/[id]/role-set/route.js` (3 spots), `web/src/app/api/admin/permission-sets/[id]/route.js` (1), `web/src/app/api/admin/subscriptions/[id]/manual-sync/route.js` (6 — wait, `subErr`/`freeErr`/`subUpdErr`×3/`userUpdErr`×2 = 6 total), `web/src/app/api/support/route.js` (1)
+- **Symptom**: Routes returned `NextResponse.json({ error: someErr.message }, { status: 500 })`. The raw `.message` from Supabase / Postgres includes constraint names, RLS policy names, table/column names — info-leak class.
+- **Root cause**: 8 hand-rolled error responses bypassed the existing `safeErrorResponse(NextResponse, err, ...)` helper in `web/src/lib/apiErrors.js`. The helper already maps 23505 → 409, 23503 → 400, P0001 → 422 with safe passthrough, etc.
+- **Fix**: Routed all 8 leaks through `safeErrorResponse`. Errors now return generic client copy with the right status code; raw shape stays in `console.error` for server-side debugging.
+- **Regression test**: `admin-deep.spec.ts` and `admin-deep-batch2.spec.ts` already exercise these routes with fake IDs (which trigger the FK/lookup error paths). Confirmed no `< 500` regressions after the sweep.
+
 ## Pending audits — bugs may surface from these
 
 - 31 untested admin flows (out of 51 mapped) — reports/appeals/feature flag/category/sponsor/access/data-request remaining
