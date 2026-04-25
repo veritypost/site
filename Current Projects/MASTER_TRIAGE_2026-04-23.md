@@ -193,6 +193,34 @@ Notation: **[N/4]** = how many of the 4 unified round-2 agents corroborated. Rou
 
 ---
 
+## ROUND 4 ADDITIONS — bug-hunt 2026-04-25
+
+Owner-reported + audit-surfaced + test-surfaced items closed in the 2026-04-25 bug-hunt session. Detail: `Sessions/04-25-2026/Session 1/BUGS_FIXED_2026-04-25.md`. Session log: `Sessions/04-25-2026/Session 1/SESSION_LOG_2026-04-25.md`. Commits 9e1bb7b → 433b31f.
+
+| # | File:Line | Bug |
+|---|-----------|-----|
+| BH1 | `VerityPost/VerityPost/HomeView.swift:558-568` BrowseLanding | Owner-reported: "I see a list of categories and I can't click it." Each row was static `Text(cat.displayName)` with no Button/NavigationLink/onTapGesture wrapper. | **SHIPPED 2026-04-25 · 94034d8** — wrap rows in NavigationLink → new CategoryDetailView; add Hashable to VPCategory; XCUITest regression guard `test_browseCategoriesAreInteractive`. |
+| BH2 | `VerityPostKids/VerityPostKids/ExpertSessionsView.swift:34-36` | Same class as BH1 in kids app: session cards rendered as static VStacks, no tap handler. | **SHIPPED 2026-04-25 · 83e38c0** — wrap cards in Button → sheet detail; `.contentShape(Rectangle())` for tap-anywhere. |
+| BH3 | `web/src/app/api/admin/promo/route.ts:75-83` | Admin promo-create returned 500 on duplicate code (Postgres 23505 leaking through). | **SHIPPED 2026-04-25 · 94034d8** — map 23505 → 409 with friendly "code already exists" message. Regression test added in `admin-deep.spec.ts`. |
+| BH4 | `web/src/app/api/users/[id]/block/route.js:73-87` | Blocking a user whose ID doesn't exist returned generic 500 instead of 404. Postgres 23503 (FK violation) leaking. | **SHIPPED 2026-04-25 · 94034d8** — explicit `error.code === '23503'` → 404 `{ error: 'User not found' }`. |
+| BH5 | `web/src/app/browse/page.tsx:259-331` "Latest" section | When zero published articles, the section header "Latest" rendered with an empty grid below it. No empty-state copy. | **SHIPPED 2026-04-25 · 83e38c0** — `featured.length === 0` branch renders dashed-border "No new stories yet today" card. |
+| BH6 | `VerityPostKids/project.yml` | Kids app portrait-locks via `UISupportedInterfaceOrientations` but missed `UIRequiresFullScreen=true`. Triggers App Store warning at archive (would be a submission rejection signal). | **SHIPPED 2026-04-25 · 94034d8** — added `UIRequiresFullScreen: true`. xcodebuild archive now warning-free. |
+| BH7 | `schema/114_f7_foundation.sql:77-87` (ai_models + 3 sibling F7 tables) | Admin "Generate" button in /admin/newsroom did nothing on click. PipelineRunPicker can't load `ai_models`; PostgREST returned 401 "permission denied" because the table had RLS but no `GRANT SELECT TO authenticated, service_role`. Picker has 0 models → button stays disabled → click no-op. Same gap on `ai_prompt_overrides`, `kid_articles`, `kid_sources`. | **SHIPPED 2026-04-25 · schema/177 (owner-applied) + 94034d8** — `GRANT SELECT ON public.{ai_models,ai_prompt_overrides,kid_articles,kid_sources} TO authenticated, service_role`. PostgREST schema cache reloaded via `NOTIFY pgrst, 'reload schema'`. Probe verified: 4 seeded models now visible. |
+| BH8 | `web/src/app/api/admin/users/[id]/role-set/route.js` (3 spots) + `permission-sets/[id]` (1) + `subscriptions/[id]/manual-sync` (6) + `support/route.js` (1) | 8 routes returned `NextResponse.json({ error: someErr.message }, { status: 500 })` — leaks Postgres constraint names, RLS policy names, table/column names to clients. Info-leak class. | **SHIPPED 2026-04-25 · 29f7a22** — routed all 8 leaks through existing `safeErrorResponse(NextResponse, err, ...)` helper from `web/src/lib/apiErrors.js`. Maps 23505→409, 23503→400, P0001→422 passthrough, etc. |
+
+**UI polish shipped (audit findings, secondary):**
+- iOS adult: BookmarksView Remove → `VP.danger` token; StoryDetailView "Loading…" → "Starting quiz…"; SignupView + AlertsView decorative icons → `accessibilityHidden(true)`
+- iOS kids: KidQuizEngineView close X 36→44pt + accessibilityLabel; ExpertSessionsView card `.contentShape(Rectangle())`
+- Web: `/bookmarks` at-cap UI dedup (banner = upgrade CTA only); `/login` lockout copy → relative minutes (timezone-safe); `/not-found` 404 added "Browse categories" anon-safe CTA; `/story/[slug]` Loading state → `aria-live="polite"` + "Loading article…" + center-aligned
+
+**Test infrastructure landed:**
+- `web/tests/e2e/_fixtures/seed.ts` — deterministic seeding for 10 roles + cross-cutting state (subscriptions, audit_log, reports, expert app, achievement, follows, notifications, bookmarks, kid streak, comments, pair code, article + quiz)
+- 8 new deep specs: admin-deep (24), admin-deep-batch2 (40), profile-settings-deep (16), kids-deep (17), expert-deep (13), social-deep (16), seeded-reader-flow (5), seeded-roles (18)
+- iOS XCUITest targets via XcodeGen: VerityPostUITests (5 tests), VerityPostKidsUITests (4 tests)
+- Suite total: **468 passed / 14 failed (known flakes) / 14 skipped (intentional)** on chromium + mobile-chromium
+
+---
+
 ## TIER 4 — Quality (HIGH/MEDIUM, ~150 items, batched separately)
 
 Aggregate themes (counts approximate):

@@ -2,8 +2,9 @@
 
 What the product IS. Not what's left.
 
-- Active work → **`Current Projects/FIX_SESSION_1.md`**.
+- Active work → **`Current Projects/MASTER_TRIAGE_2026-04-23.md`** (FIX_SESSION_1.md retired; absorbed there).
 - How to work in this codebase → **`CLAUDE.md`** at repo root.
+- Most recent session → **`Sessions/04-25-2026/Session 1/SESSION_LOG_2026-04-25.md`** (bug-hunt + UI polish; 11 commits, 8 bugs closed, schema/177).
 
 ## One-line summary
 
@@ -86,3 +87,11 @@ Rate-limited 429 responses include `Retry-After: <windowSec>`.
 ## Test accounts
 
 After superadmin removal (TODO #1): **19 test + 30 community + 2 kids** (Emma, Liam under `test_family`). Seeds in `test-data/accounts.json`. Manual SQL is the canonical seed path; `scripts/seed-test-accounts.js` was retired (file already absent on disk; verified 2026-04-23).
+
+## E2E test infrastructure (added 2026-04-25)
+
+- **Web:** Playwright suite at `web/tests/e2e/` — 480+ tests across chromium + mobile-chromium projects. 468 passing, 14 known flakes (mobile auth-form races + 2 dismiss-cluster RPC mismatches), 14 intentional skips.
+- **iOS:** XCUITest targets at `VerityPost/VerityPostUITests/` + `VerityPostKids/VerityPostKidsUITests/`. Wired via XcodeGen `project.yml`. 5 + 4 = 9 smoke tests, all green. Both apps `xcodebuild archive` clean.
+- **Seed harness:** `web/tests/e2e/_fixtures/seed.ts` deterministically populates 10 roles (owner / admin / editor / moderator / expert / journalist / free / verity / verity_pro / parent) + cross-cutting state (subscriptions, audit_log, reports, expert app, achievements, follows, notifications, bookmarks, kid streak, comments, pair code, article + quiz). Stable IDs across runs; `vp-e2e-seed-*@veritypost.test` emails (excluded from cleanup).
+- **Deep specs:** admin-deep (24), admin-deep-batch2 (40), profile-settings-deep (16), kids-deep (17), expert-deep (13), social-deep (16), seeded-reader-flow (5), seeded-roles (18).
+- **Run locally:** `cd web && E2E_BASE_URL=http://localhost:3000 npm run test:e2e` (reuses existing dev server on `:3000`). iOS: `xcodebuild test -scheme VerityPost -destination 'platform=iOS Simulator,name=iPhone 17'`.
