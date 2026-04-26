@@ -2348,8 +2348,11 @@ function PasswordCard({
     }
     const { error: upErr } = await supabase.auth.updateUser({ password: next });
     if (upErr) {
+      // T-013 — Supabase Auth messages can include policy detail or stack
+      // substrings. Log for debugging; show a fixed string to the user.
+      console.error('[settings.password.update]', upErr.message);
       setBusy(false);
-      pushToast({ message: upErr.message, variant: 'danger' });
+      pushToast({ message: 'Password could not be updated. Try again.', variant: 'danger' });
       return;
     }
     // Sign out every other session — a stolen cookie stops working
