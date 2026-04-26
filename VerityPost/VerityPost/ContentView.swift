@@ -134,14 +134,14 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Main Tab View — standard SwiftUI TabView (spec: 5 tabs)
+// MARK: - Main Tab View — 5-tab layout: Home, Find, Notifications, Most Informed, Profile
 
 struct MainTabView: View {
     @EnvironmentObject var auth: AuthViewModel
     @State private var selectedTab: Tab = .home
     @State private var showLogin = false
 
-    enum Tab: Hashable { case home, notifications, leaderboard, profile }
+    enum Tab: Hashable { case home, find, notifications, leaderboard, profile }
 
     private var isLoggedIn: Bool { auth.currentUser != nil }
 
@@ -161,8 +161,8 @@ struct MainTabView: View {
 
     // MARK: - Adult tab bar
     //
-    // Mirrors the web app exactly (site/src/app/NavWrapper.js): 4 tabs,
-    // text-only (no icons), bottom-fixed, translucent white with a blur.
+    // 5 tabs: Home, Find, Notifications, Most Informed, Profile.
+    // Text-only (no icons), bottom-fixed, translucent white with a blur.
     // Active tab renders in accent color, bold. Notifications shows a red
     // dot when unreadCount > 0.
 
@@ -170,6 +170,7 @@ struct MainTabView: View {
         ZStack {
             switch selectedTab {
             case .home: NavigationStack { HomeView() }
+            case .find: NavigationStack { FindView() }.environmentObject(auth)
             case .notifications:
                 NavigationStack {
                     if isLoggedIn {
@@ -261,6 +262,7 @@ struct TextTabBar: View {
     private var items: [Item] {
         [
             Item(id: .home, label: "Home"),
+            Item(id: .find, label: "Find"),
             Item(id: .notifications, label: "Notifications"),
             Item(id: .leaderboard, label: "Most Informed"),
             Item(id: .profile, label: isLoggedIn ? "Profile" : "Sign in"),

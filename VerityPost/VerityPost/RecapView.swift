@@ -4,9 +4,165 @@ import Supabase
 // @migrated-to-permissions 2026-04-18
 // @feature-verified recap 2026-04-18
 
-// RecapListView removed Round 8 (dead code cleanup) — no importers.
-// Live surfaces: `RecapSummary` (model) and `RecapQuizView` (quiz screen),
-// both still used by the recap flow invoked from other entry points.
+// RecapListView re-added T-115. Hub view fetches /api/recap and navigates to RecapQuizView.
+
+// MARK: - Recap list (hub)
+
+struct RecapListView: View {
+    @EnvironmentObject var auth: AuthViewModel
+    private let client = SupabaseManager.shared.client
+
+    @State private var recaps: [RecapSummary] = []
+    @State private var loading = true
+    @State private var errorText: String?
+    @State private var isPaid = true
+
+    var body: some View {
+        Group {
+            if loading {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 60)
+            } else if let err = errorText {
+                VStack(spacing: 8) {
+                    Text("Couldn\u{2019}t load recaps")
+                        .font(.system(.callout, design: .default, weight: .semibold))
+                        .foregroundColor(VP.text)
+                    Text(err)
+                        .font(.footnote)
+                        .foregroundColor(VP.dim)
+                    Button("Try again") { Task { await load() } }
+                        .font(.system(.footnote, design: .default, weight: .medium))
+                        .foregroundColor(VP.accent)
+                        .padding(.top, 4)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 60)
+            } else if !isPaid {
+                UpgradePromptInline(
+                    feature: "Weekly Recaps",
+                    detail: "Review what you read each week and catch up on missed stories. Available on paid plans."
+                )
+            } else if recaps.isEmpty {
+                VStack(spacing: 8) {
+                    Text("No recaps yet")
+                        .font(.system(.callout, design: .default, weight: .semibold))
+                        .foregroundColor(VP.text)
+                    Text("Recaps appear at the end of each week.")
+                        .font(.footnote)
+                        .foregroundColor(VP.dim)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 60)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(recaps) { recap in
+                            NavigationLink {
+                                RecapQuizView(recapId: recap.id, title: recap.title)
+                                    .environmentObject(auth)
+                            } label: {
+                                recapRow(recap)
+                            }
+                            .buttonStyle(.plain)
+                            Divider()
+                                .background(VP.border)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                }
+            }
+        }
+        .navigationTitle("Weekly Recaps")
+        .navigationBarTitleDisplayMode(.inline)
+        .background(VP.bg)
+        .task { await load() }
+    }
+
+    private func recapRow(_ recap: RecapSummary) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(recap.title)
+                    .font(.system(.subheadline, design: .default, weight: .semibold))
+                    .foregroundColor(VP.text)
+                    .multilineTextAlignment(.leading)
+                if let range = recap.dateRange {
+                    Text(range)
+                        .font(.system(.caption, design: .default, weight: .regular))
+                        .foregroundColor(VP.dim)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            // Completion badge — shows score/total when attempt exists
+            if let attempt = recap.myAttempt, let score = attempt.score, let total = attempt.totalQuestions {
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("\(score)/\(total)")
+                        .font(.system(.subheadline, design: .default, weight: .bold))
+                        .foregroundColor(VP.accent)
+                    Text("Done")
+                        .font(.system(.caption2, design: .default, weight: .medium))
+                        .foregroundColor(VP.dim)
+                }
+            } else {
+                Text("Start")
+                    .font(.system(.caption, design: .default, weight: .semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(VP.accent)
+                    .cornerRadius(6)
+            }
+        }
+        .padding(.vertical, 14)
+    }
+
+    // MARK: - Data
+
+    private func load() async {
+        loading = true
+        errorText = nil
+        let site = SupabaseManager.shared.siteURL
+        guard let url = URL(string: "/api/recap", relativeTo: site) else {
+            await MainActor.run {
+                errorText = "Configuration error."
+                loading = false
+            }
+            return
+        }
+        do {
+            var req = URLRequest(url: url)
+            if let session = try? await client.auth.session {
+                req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+            }
+            let (data, resp) = try await URLSession.shared.data(for: req)
+            guard let http = resp as? HTTPURLResponse, http.statusCode == 200 else {
+                await MainActor.run {
+                    errorText = "Server error."
+                    loading = false
+                }
+                return
+            }
+            struct ListResponse: Decodable {
+                let recaps: [RecapSummary]
+                let paid: Bool?
+            }
+            let decoded = try JSONDecoder().decode(ListResponse.self, from: data)
+            await MainActor.run {
+                recaps = decoded.recaps
+                isPaid = decoded.paid ?? true
+                loading = false
+            }
+        } catch {
+            await MainActor.run {
+                errorText = "Network issue."
+                loading = false
+            }
+        }
+    }
+}
+
+// MARK: - Recap summary model
 
 struct RecapSummary: Codable, Identifiable {
     // Matches the weekly_recap_quizzes row shape returned by /api/recap.
