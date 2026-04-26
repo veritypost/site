@@ -260,4 +260,19 @@ test.describe('admin-deep — pipeline', () => {
     });
     expect(res.status()).toBeLessThan(500);
   });
+
+  // Regression guard: the route imports `@/lib/pipeline/render-body`,
+  // which previously pulled `isomorphic-dompurify` -> `jsdom` ->
+  // `html-encoding-sniffer` -> ESM-only `@exodus/bytes`. Vercel's Node
+  // runtime crashed at module load with ERR_REQUIRE_ESM, returning a
+  // bare 500 with no body — invisible to handler-level error handling.
+  // A schema-failure 400 here proves the module loaded; a 5xx means
+  // a transitive dep regressed back into an ESM/CJS interop break.
+  test('pipeline generate route loads without ERR_REQUIRE_ESM', async ({ page }) => {
+    await signInAsSeededUser(page, seed!.users.admin, seed!.password);
+    const res = await page.request.post('/api/admin/pipeline/generate', {
+      data: {},
+    });
+    expect(res.status()).toBeLessThan(500);
+  });
 });

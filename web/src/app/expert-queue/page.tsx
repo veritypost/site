@@ -8,7 +8,14 @@ import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/perm
 import type { Tables } from '@/types/database-helpers';
 import { formatDate, formatDateTime } from '@/lib/dates';
 import { marked } from 'marked';
-import DOMPurify from 'isomorphic-dompurify';
+// dompurify is browser-only. During SSR (Next.js renders 'use client'
+// modules on the server for the initial HTML payload) it returns input
+// uncleaned because no `window` is present. The preview JSX path that
+// calls sanitize is gated by `loading=false`, which is unreachable
+// during SSR — so this is safe today. The typeof-window guard at the
+// call site is a defense-in-depth backstop in case that loading-state
+// ordering ever changes.
+import DOMPurify from 'dompurify';
 
 // D33: Expert Queue. Experts see pending questions in their categories
 // (or directed at them), claim/decline/answer, and flip between the
@@ -415,10 +422,15 @@ export default function ExpertQueuePage() {
                   ) : (
                     <div
                       dangerouslySetInnerHTML={{
-                        __html: DOMPurify.sanitize(
-                          marked.parse(answerDraft[it.id] || '', { async: false }) as string,
-                          { USE_PROFILES: { html: true } }
-                        ),
+                        __html:
+                          typeof window === 'undefined'
+                            ? ''
+                            : DOMPurify.sanitize(
+                                marked.parse(answerDraft[it.id] || '', {
+                                  async: false,
+                                }) as string,
+                                { USE_PROFILES: { html: true } }
+                              ),
                       }}
                       style={{
                         minHeight: 72,
