@@ -15,6 +15,7 @@ struct ExpertQueueView: View {
     @EnvironmentObject var auth: AuthViewModel
     @StateObject private var perms = PermissionStore.shared
     private let client = SupabaseManager.shared.client
+    private static let iso8601Fmt = ISO8601DateFormatter()
 
     enum QueueTab: String, CaseIterable, Identifiable {
         case pending = "Pending"
@@ -139,6 +140,11 @@ struct ExpertQueueView: View {
                 .font(.subheadline)
                 .foregroundColor(VP.text)
                 .lineLimit(5)
+            if let asker = item.askerUsername {
+                Text("Asked by \(asker)")
+                    .font(.caption)
+                    .foregroundColor(VP.dim)
+            }
             if let ctx = item.articleTitle {
                 Text("On: \(ctx)")
                     .font(.caption)
@@ -271,9 +277,19 @@ struct ExpertQueueView: View {
                 let comments: CommentRef?
                 let answer: AnswerRef?
                 let articles: ArticleRef?
+                let asker: AskerRef?
+                let category: CategoryRef?
                 struct CommentRef: Decodable { let body: String? }
                 struct AnswerRef: Decodable { let id: String?; let status: String? }
                 struct ArticleRef: Decodable { let title: String? }
+                struct AskerRef: Decodable {
+                    let username: String?
+                    let verity_score: Int?
+                }
+                struct CategoryRef: Decodable {
+                    let id: String?
+                    let name: String?
+                }
             }
             struct Resp: Decodable { let items: [Row] }
 
@@ -305,7 +321,6 @@ struct ExpertQueueView: View {
 
             let resp = try JSONDecoder().decode(Resp.self, from: data)
             let mapped: [ExpertQueueItem] = resp.items.map { r in
-                let dateFmt = ISO8601DateFormatter()
                 // The API returns answer comment id/status (not body). The
                 // previous direct-table read surfaced the body; keep the
                 // field populated with a placeholder so existing UI that
@@ -316,10 +331,11 @@ struct ExpertQueueView: View {
                     question: r.comments?.body ?? "",
                     status: r.status,
                     answer: answerBody,
-                    category: nil,
+                    category: r.category?.name,
                     articleId: r.article_id,
                     articleTitle: r.articles?.title,
-                    createdAt: r.created_at.flatMap { dateFmt.date(from: $0) }
+                    createdAt: r.created_at.flatMap { ExpertQueueView.iso8601Fmt.date(from: $0) },
+                    askerUsername: r.asker?.username
                 )
             }
             await MainActor.run {
@@ -370,12 +386,14 @@ struct ExpertQueueItem: Codable, Identifiable {
     var articleId: String?
     var articleTitle: String?
     var createdAt: Date?
+    var askerUsername: String?
 
     enum CodingKeys: String, CodingKey {
         case id, question, status, answer, category
         case articleId = "article_id"
         case articleTitle = "article_title"
         case createdAt = "created_at"
+        case askerUsername = "asker_username"
     }
 }
 
@@ -386,6 +404,7 @@ private struct AnswerComposerSheet: View {
     var onSubmit: (String) -> Void
     @Environment(\.dismiss) var dismiss
     @State private var answerText: String = ""
+    @State private var composerTab = 0
 
     var body: some View {
         NavigationStack {
@@ -395,10 +414,29 @@ private struct AnswerComposerSheet: View {
                     .foregroundColor(VP.text)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                TextEditor(text: $answerText)
+                Picker("", selection: $composerTab) {
+                    Text("Edit").tag(0)
+                    Text("Preview").tag(1)
+                }
+                .pickerStyle(.segmented)
+
+                if composerTab == 0 {
+                    TextEditor(text: $answerText)
+                        .frame(minHeight: 200)
+                        .padding(10)
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border))
+                } else {
+                    ScrollView {
+                        let attributed = try? AttributedString(markdown: answerText)
+                        Text(attributed ?? AttributedString(answerText))
+                            .font(.system(.body))
+                            .foregroundColor(VP.text)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                     .frame(minHeight: 200)
                     .padding(10)
                     .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border))
+                }
 
                 Spacer()
             }

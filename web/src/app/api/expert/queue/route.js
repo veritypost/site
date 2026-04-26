@@ -39,7 +39,7 @@ export async function GET(request) {
   let q = service
     .from('expert_queue_items')
     .select(
-      '*, comments!fk_expert_queue_items_comment_id(id, body, created_at, users!fk_comments_user_id(username, avatar_color)), answer:comments!fk_expert_queue_items_answer_comment_id(id, status), articles(title, slug)'
+      '*, comments!fk_expert_queue_items_comment_id(id, body, created_at, users!fk_comments_user_id(username, avatar_color)), answer:comments!fk_expert_queue_items_answer_comment_id(id, status), articles(title, slug), asker:users!fk_expert_queue_items_asking_user_id(username, verity_score), category:categories!fk_expert_queue_items_target_category_id(id, name)'
     )
     .eq('status', status)
     .order('created_at', { ascending: false });

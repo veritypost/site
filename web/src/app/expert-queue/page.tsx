@@ -6,6 +6,9 @@ import { useState, useEffect, CSSProperties } from 'react';
 import { createClient } from '../../lib/supabase/client';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import type { Tables } from '@/types/database-helpers';
+import { formatDate, formatDateTime } from '@/lib/dates';
+import { marked } from 'marked';
+import DOMPurify from 'isomorphic-dompurify';
 
 // D33: Expert Queue. Experts see pending questions in their categories
 // (or directed at them), claim/decline/answer, and flip between the
@@ -42,6 +45,8 @@ interface QueueItem {
   created_at: string;
   answered_at: string | null;
   answer: { status: string | null } | null;
+  asker?: { username: string; verity_score: number } | null;
+  category?: { id: string; name: string } | null;
 }
 
 interface BackChannelMessage {
@@ -83,6 +88,7 @@ export default function ExpertQueuePage() {
   const [backMessages, setBackMessages] = useState<BackChannelMessage[]>([]);
   const [backDraft, setBackDraft] = useState<string>('');
   const [answerDraft, setAnswerDraft] = useState<Record<string, string>>({});
+  const [answerTab, setAnswerTab] = useState<Record<string, 'edit' | 'preview'>>({});
   const [error, setError] = useState<string>('');
   const [flash, setFlash] = useState<string>('');
 
@@ -311,17 +317,36 @@ export default function ExpertQueuePage() {
                 marginBottom: 10,
               }}
             >
+              {it.category?.name && (
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: C.dim,
+                    fontWeight: 700,
+                    letterSpacing: 1,
+                    textTransform: 'uppercase',
+                    marginBottom: 2,
+                  }}
+                >
+                  {it.category.name}
+                </div>
+              )}
               <div style={{ fontSize: 11, color: C.dim, marginBottom: 4 }}>
                 {it.target_type === 'expert' ? 'Directed at you' : 'Category question'}
                 {it.articles?.title ? ` · ${it.articles.title}` : ''}
                 {' · '}
-                {new Date(it.created_at).toLocaleDateString()}
+                {formatDate(it.created_at)}
               </div>
               <div
-                style={{ fontSize: 14, color: C.text, marginBottom: 10, wordBreak: 'break-word' }}
+                style={{ fontSize: 14, color: C.text, marginBottom: 4, wordBreak: 'break-word' }}
               >
                 {it.comments?.body}
               </div>
+              {it.asker?.username && (
+                <div style={{ fontSize: 11, color: C.dim, marginBottom: 6 }}>
+                  Asked by {it.asker.username}
+                </div>
+              )}
 
               {tab === 'pending' && (
                 <div style={{ display: 'flex', gap: 6 }}>
@@ -335,25 +360,78 @@ export default function ExpertQueuePage() {
               )}
               {tab === 'claimed' && (
                 <div>
-                  <textarea
-                    value={answerDraft[it.id] || ''}
-                    onChange={(e) =>
-                      setAnswerDraft((prev) => ({ ...prev, [it.id]: e.target.value }))
-                    }
-                    rows={3}
-                    placeholder="Your answer…"
+                  <div
                     style={{
-                      width: '100%',
-                      padding: 8,
-                      borderRadius: 8,
-                      border: `1px solid ${C.border}`,
-                      fontSize: 13,
-                      outline: 'none',
-                      fontFamily: 'inherit',
+                      display: 'flex',
+                      gap: 0,
                       marginBottom: 8,
-                      boxSizing: 'border-box',
+                      borderRadius: 8,
+                      overflow: 'hidden',
+                      border: `1px solid ${C.border}`,
+                      width: 'fit-content',
                     }}
-                  />
+                  >
+                    {(['edit', 'preview'] as const).map((t) => {
+                      const active = (answerTab[it.id] ?? 'edit') === t;
+                      return (
+                        <button
+                          key={t}
+                          onClick={() => setAnswerTab((prev) => ({ ...prev, [it.id]: t }))}
+                          style={{
+                            padding: '5px 14px',
+                            border: 'none',
+                            background: active ? C.accent : 'transparent',
+                            color: active ? '#fff' : C.dim,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {t === 'edit' ? 'Edit' : 'Preview'}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {(answerTab[it.id] ?? 'edit') === 'edit' ? (
+                    <textarea
+                      value={answerDraft[it.id] || ''}
+                      onChange={(e) =>
+                        setAnswerDraft((prev) => ({ ...prev, [it.id]: e.target.value }))
+                      }
+                      rows={3}
+                      placeholder="Your answer… (markdown supported)"
+                      style={{
+                        width: '100%',
+                        padding: 8,
+                        borderRadius: 8,
+                        border: `1px solid ${C.border}`,
+                        fontSize: 13,
+                        outline: 'none',
+                        fontFamily: 'inherit',
+                        marginBottom: 8,
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  ) : (
+                    <div
+                      dangerouslySetInnerHTML={{
+                        __html: DOMPurify.sanitize(
+                          marked.parse(answerDraft[it.id] || '', { async: false }) as string,
+                          { USE_PROFILES: { html: true } }
+                        ),
+                      }}
+                      style={{
+                        minHeight: 72,
+                        padding: 8,
+                        borderRadius: 8,
+                        border: `1px solid ${C.border}`,
+                        fontSize: 13,
+                        marginBottom: 8,
+                        wordBreak: 'break-word',
+                        color: (answerDraft[it.id] || '').trim() ? C.text : C.dim,
+                      }}
+                    />
+                  )}
                   <button
                     onClick={() => handleAnswer(it.id)}
                     disabled={!(answerDraft[it.id] || '').trim()}
@@ -374,9 +452,7 @@ export default function ExpertQueuePage() {
                     flexWrap: 'wrap',
                   }}
                 >
-                  <span>
-                    Answered {it.answered_at ? new Date(it.answered_at).toLocaleString() : ''}
-                  </span>
+                  <span>Answered {formatDateTime(it.answered_at)}</span>
                   {it.answer?.status === 'pending_review' && (
                     <span
                       style={{
@@ -453,7 +529,7 @@ export default function ExpertQueuePage() {
               backMessages.map((m) => (
                 <div key={m.id} style={{ padding: '8px 0', borderBottom: `1px solid ${C.border}` }}>
                   <div style={{ fontSize: 11, color: C.dim, marginBottom: 2 }}>
-                    {m.users?.username || 'user'} · {new Date(m.created_at).toLocaleString()}
+                    {m.users?.username || 'user'} · {formatDateTime(m.created_at)}
                   </div>
                   <div style={{ fontSize: 13, wordBreak: 'break-word' }}>{m.body}</div>
                 </div>
