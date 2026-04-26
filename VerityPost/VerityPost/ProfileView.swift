@@ -939,10 +939,40 @@ struct ProfileView: View {
     private func tabContent(_ user: VPUser) -> some View {
         switch tab {
         case .overview:   overviewTab(user)
-        case .activity:   activityTab
-        case .categories: categoriesTab
-        case .milestones: milestonesTab(user)
+        case .activity:   if canViewActivity { activityTab } else { lockedTabView() }
+        case .categories: if canViewCategories { categoriesTab } else { lockedTabView() }
+        case .milestones: if canViewAchievements { milestonesTab(user) } else { lockedTabView() }
         }
+    }
+
+    // OwnersAudit Profile Task 2 — single locked-tab view for permission-gated
+    // tabs. Mirrors web's `LockedTab` but with the iOS subscription sheet wired
+    // through `showSubscription` (the same flow used elsewhere in this view).
+    @ViewBuilder
+    private func lockedTabView() -> some View {
+        VStack(spacing: 14) {
+            Spacer().frame(height: 40)
+            Text("This tab is part of paid plans.")
+                .font(.subheadline)
+                .foregroundColor(VP.dim)
+                .multilineTextAlignment(.center)
+            Button {
+                showSubscription = true
+            } label: {
+                Text("View plans")
+                    .font(.system(.subheadline, design: .default, weight: .semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 22)
+                    .padding(.vertical, 10)
+                    .frame(minHeight: 44)
+                    .background(VP.accent)
+                    .cornerRadius(10)
+            }
+            .buttonStyle(.plain)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 24)
     }
 
     // MARK: - Overview tab (bio + profile card + my-stuff list)
@@ -1145,7 +1175,10 @@ struct ProfileView: View {
             .padding(.bottom, 12)
 
             if !activityLoaded {
-                ProgressView().padding(.top, 40)
+                VStack(spacing: 8) {
+                    ForEach(0..<6, id: \.self) { _ in compactSkeletonRow() }
+                }
+                .padding(.horizontal, 16)
             } else {
                 let filtered = filteredActivityItems()
                 if filtered.isEmpty {
@@ -1241,7 +1274,15 @@ struct ProfileView: View {
     private var categoriesTab: some View {
         VStack(spacing: 10) {
             if !categoriesLoaded {
-                ProgressView().padding(.top, 40)
+                VStack(spacing: 8) {
+                    ForEach(0..<4, id: \.self) { _ in
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(VP.streakTrack)
+                            .frame(height: 48)
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border))
+                    }
+                }
+                .padding(.horizontal, 16)
             } else if categories.isEmpty {
                 emptyState(
                     title: "No categories yet",
@@ -1693,11 +1734,13 @@ struct ProfileView: View {
     private func loadTabData() {
         guard let userId = auth.currentUser?.id else { return }
         switch tab {
-        case .activity where !activityLoaded: Task { await loadActivity(userId: userId) }
-        case .categories where !categoriesLoaded: Task { await loadCategories(userId: userId) }
+        case .activity where !activityLoaded && canViewActivity:
+            Task { await loadActivity(userId: userId) }
+        case .categories where !categoriesLoaded && canViewCategories:
+            Task { await loadCategories(userId: userId) }
         default: break
         }
-        if tab == .milestones && !achievementsLoaded {
+        if tab == .milestones && !achievementsLoaded && canViewAchievements {
             Task { await loadAchievements(userId: userId) }
         }
     }

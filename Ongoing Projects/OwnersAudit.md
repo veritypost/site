@@ -1013,7 +1013,7 @@ Line 106: toolbar button label is `"Read All"` — Title Case, different from we
 
 ---
 
-### Profile Task 1 — LockedTab shows "Verify email" CTA even when email is already verified
+### Profile Task 1 — LockedTab shows "Verify email" CTA even when email is already verified ✓ DONE
 
 **File:** `web/src/app/profile/page.tsx:1700–1714`
 **Source:** Direct code review — logic bug
@@ -1067,11 +1067,11 @@ function LockedTab({ name, emailVerified }: { name: string; emailVerified: boole
 
 Pass `emailVerified={!!user.email_verified}` at each `<LockedTab>` callsite (lines 502, 515, 528).
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (`emailVerified` prop branches on the actual lock reason; verified-but-plan-locked users now get "View plans" CTA → `/profile/settings#billing` (pre-T-073 anchor per Note C); unverified users still get the verify CTA)
 
 ---
 
-### Profile Task 2 — iOS has no locked state for permission-gated tabs
+### Profile Task 2 — iOS has no locked state for permission-gated tabs ✓ DONE
 
 **File:** `VerityPost/VerityPost/ProfileView.swift:957–966`
 **Source:** Direct code review — web/iOS parity gap
@@ -1127,7 +1127,7 @@ private func lockedTabView(reason: String) -> some View {
 
 Also skip the data fetch in `loadTabData()` when the corresponding `canView*` flag is false.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (`tabContent` switch branches gate each tab on `canView*` → `lockedTabView()` fallback; new private `lockedTabView()` mirrors web `LockedTab` plan branch with `showSubscription` sheet; `loadTabData()` now also gates each fetch on the corresponding perm flag so locked tabs skip the network round-trip)
 
 ---
 
@@ -1270,11 +1270,23 @@ canViewAchievements = await PermissionService.shared.has("profile.achievements")
 
 Also verify live DB state before and after: `SELECT p.key, COUNT(psp.id) FROM permissions p LEFT JOIN permission_set_perms psp ON psp.permission_id = p.id WHERE p.key IN ('profile.activity','profile.categories','profile.achievements','profile.activity.view.own','profile.score.view.own.categories','profile.achievements.view.own') GROUP BY p.key;`
 
-**Status:** Pending execution — verify DB state first
+**Status:** Blocked on owner DB decision (2026-04-26). MCP-verified actual bindings:
+- `profile.activity` → 8 plan sets (admin/editor/expert/family/free/moderator/owner/pro) ✓
+- `profile.achievements` → same 8 sets ✓
+- `profile.categories` → bound only to **anon** (1 set) ✗ — middleware-protected page, anon can't reach it, so nobody on web sees the Categories tab today
+- iOS keys `profile.activity.view.own` and `profile.achievements.view.own` are bound to the same 8 sets (effectively equivalent to short-form, but redundant)
+- iOS key `profile.score.view.own.categories` → bound to admin/free/owner only (3 sets)
+
+CLAUDE.md memory says short-form is canonical, but the DB binding for `profile.categories` doesn't match the canonical pattern. Three options surfaced for owner:
+(a) Bind `profile.categories` to the same 8 sets as `profile.activity` + remove anon binding; switch iOS to canonical short-form keys. Restores Categories tab on web for all logged-in users + cross-platform parity.
+(b) Switch iOS to short-form keys without DB change. Would break iOS Categories for free users (loses the admin+free+owner bindings).
+(c) Switch web to long-form keys (matches iOS). Inconsistent with CLAUDE.md canonical guidance.
+
+Recommendation: (a). Holding pending owner approval since DB rebinding is meaningful behavior change.
 
 ---
 
-### Profile Task 6 — Expert queue has no entry point from web profile hub
+### Profile Task 6 — Expert queue has no entry point from web profile hub ✓ DONE
 
 **Files:** `web/src/app/profile/page.tsx:594–608`, `VerityPost/VerityPost/ProfileView.swift:688–694, 1040–1044`
 **Source:** Direct code review — role parity gap
@@ -1310,11 +1322,11 @@ An expert who opens their web profile has no visible path from the profile hub t
 )}
 ```
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (`expertQueue` perm added to `perms` state + `OverviewTab` props; QuickLink rendered in "My stuff" section between Bookmarks and Family)
 
 ---
 
-### Profile Task 7 — Web Quick Stats shows Followers/Following without permission gate
+### Profile Task 7 — Web Quick Stats shows Followers/Following without permission gate ✓ DONE
 
 **Files:** `web/src/app/profile/page.tsx:622–628`
 **Source:** Direct code review — iOS parity gap
@@ -1349,7 +1361,7 @@ const stats = [
 ];
 ```
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (`followersView` + `followingView` perms threaded through `perms` state and `OverviewTab` props; stats array spreads conditional entries)
 
 ---
 
@@ -1376,7 +1388,7 @@ Label change from "Take a quiz" to "Find an article" — more honest about the a
 
 ---
 
-### Profile Task 9 — iOS activity and categories tabs use spinner, not skeleton loader
+### Profile Task 9 — iOS activity and categories tabs use spinner, not skeleton loader ✓ DONE
 
 **Files:** `VerityPost/VerityPost/ProfileView.swift:1167–1168, 1263–1264`
 **Source:** Direct code review — in-app loading state inconsistency
@@ -1422,7 +1434,7 @@ if !categoriesLoaded {
 }
 ```
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (activity tab uses 6 `compactSkeletonRow()` placeholders; categories tab uses 4 rounded-rect placeholders matching the loaded category card height)
 
 ---
 

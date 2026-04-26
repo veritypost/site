@@ -7,6 +7,47 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-26 (Group 2 — Profile Tasks 1, 2, 6, 7, 9)
+
+### Profile — branch LockedTab on actual lock reason
+
+**Task 1 — emailVerified-aware LockedTab**
+- **What** — Added `emailVerified` prop to `LockedTab`. When false, retains the existing "Verify email" CTA → `/verify-email`. When true, shows "This tab is part of paid plans." with "View plans" CTA → `/profile/settings#billing`. Three callsites in `tab` switch (Activity / Categories / Milestones) updated to pass `emailVerified={!!user.email_verified}`. Verified-but-plan-locked users no longer get sent to a dead-end on the verify page that just confirms their email is already verified.
+- **Files** — `web/src/app/profile/page.tsx`
+- **Why** — OwnersAudit Profile Task 1. URL is the pre-T-073 anchor per Note C — same pattern as the other 4 settings-anchor sites that update at T-073 deploy.
+
+### Profile — iOS locked-tab parity
+
+**Task 2 — gate iOS Activity / Categories / Milestones with lockedTabView**
+- **What** — `tabContent(_:)` switch branches now check `canViewActivity` / `canViewCategories` / `canViewAchievements` before dispatching to the content view. When the perm is false, `lockedTabView()` renders: "This tab is part of paid plans." + "View plans" button → `showSubscription = true` (existing sheet wired at line 210). `loadTabData()` was also gated — locked tabs no longer trigger an unnecessary network round-trip on tab switch. Mirrors web `LockedTab` pattern with iOS subscription sheet wiring.
+- **Files** — `VerityPost/VerityPost/ProfileView.swift`
+- **Why** — OwnersAudit Profile Task 2. Previously a free user on iOS saw the Activity tab content load to "No activity yet" with no signal that the tab was perm-gated; now they see the explicit lock state and a path to upgrade.
+
+### Profile — expert queue + follower stat parity
+
+**Task 6 — expert queue surfacing on web**
+- **What** — Added `expertQueue` perm to the `perms` state (`hasPermission('expert.queue.view')`); threaded into `OverviewTab` props. New `QuickLink` rendered inside the "My stuff" section: `/expert-queue` → "Expert queue" / "Questions waiting for your answer". Section visibility expanded to include `expertQueue` so experts who lack messages/bookmarks/family but have expert queue access still see the section.
+- **Files** — `web/src/app/profile/page.tsx`
+- **Why** — OwnersAudit Profile Task 6. iOS already surfaces the queue from two spots; web had zero entry point from the profile hub.
+
+**Task 7 — Followers/Following stats now permission-gated on web**
+- **What** — Added `followersView` (`profile.followers.view.own`) + `followingView` (`profile.following.view.own`) to `perms` and `OverviewTab` props. Stats array uses conditional spread (`...(followersView ? […] : [])`) so the count only renders when the perm is held. Matches iOS `socialRow()` gating.
+- **Files** — `web/src/app/profile/page.tsx`
+- **Why** — OwnersAudit Profile Task 7. Cross-platform consistency.
+
+### Profile — iOS skeleton swaps
+
+**Task 9 — Activity + Categories tabs use skeletons, not spinners**
+- **What** — Replaced `ProgressView().padding(.top, 40)` in both Activity (line 1177) and Categories (line 1273) tabs with skeleton rows. Activity: `VStack` of 6 `compactSkeletonRow()` placeholders (the same helper already used in the overview activity preview). Categories: `VStack` of 4 `RoundedRectangle` placeholders sized to match the loaded category-card height (48pt) with the same `VP.streakTrack` fill + `VP.border` overlay as the overview shimmer. No more visual discontinuity between the smooth skeleton in overview and a bare spinner in the full tab.
+- **Files** — `VerityPost/VerityPost/ProfileView.swift`
+- **Why** — OwnersAudit Profile Task 9.
+
+### Profile Task 5 — DEFERRED (DB binding decision required)
+
+`profile.categories` is bound to `anon` only (1 set) — `verified_base` no longer carries it. iOS uses `profile.score.view.own.categories` which is bound to admin/free/owner (3 sets). Switching iOS to canonical short-form would break free-user iOS Categories without a DB migration. Three options surfaced in OwnersAudit Profile Task 5; recommendation is option (a): bind `profile.categories` to the same 8 plan sets as `profile.activity` + `profile.achievements`, drop the anon binding, then switch iOS. Holding pending owner approval — DB rebinding is meaningful behavior change.
+
+---
+
 ## 2026-04-26 (Group 1 — Story tabs cross-platform)
 
 ### Story Tasks 18 + 19 — 3-column tab header on mobile web + iOS adult

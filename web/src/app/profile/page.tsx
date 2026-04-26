@@ -157,6 +157,9 @@ function ProfilePageInner() {
     messagesInbox: false,
     bookmarksList: false,
     family: false,
+    expertQueue: false,
+    followersView: false,
+    followingView: false,
   });
 
   // Tab-specific state
@@ -235,6 +238,9 @@ function ProfilePageInner() {
         messagesInbox: hasPermission('messages.inbox.view'),
         bookmarksList: hasPermission('bookmarks.list.view'),
         family: hasPermission('settings.family.view'),
+        expertQueue: hasPermission('expert.queue.view'),
+        followersView: hasPermission('profile.followers.view.own'),
+        followingView: hasPermission('profile.following.view.own'),
       });
     }
 
@@ -487,6 +493,9 @@ function ProfilePageInner() {
           messagesInbox={perms.messagesInbox}
           bookmarksList={perms.bookmarksList}
           family={perms.family}
+          expertQueue={perms.expertQueue}
+          followersView={perms.followersView}
+          followingView={perms.followingView}
         />
       )}
       {tab === 'activity' &&
@@ -500,7 +509,7 @@ function ProfilePageInner() {
             setFilter={setActivityFilter}
           />
         ) : (
-          <LockedTab name="Activity" />
+          <LockedTab name="Activity" emailVerified={!!user.email_verified} />
         ))}
       {tab === 'categories' &&
         (perms.categories ? (
@@ -513,7 +522,7 @@ function ProfilePageInner() {
             setSelected={setSelectedCategory}
           />
         ) : (
-          <LockedTab name="Categories" />
+          <LockedTab name="Categories" emailVerified={!!user.email_verified} />
         ))}
       {tab === 'milestones' &&
         (perms.milestones ? (
@@ -526,7 +535,7 @@ function ProfilePageInner() {
             verityScore={user.verity_score}
           />
         ) : (
-          <LockedTab name="Milestones" />
+          <LockedTab name="Milestones" emailVerified={!!user.email_verified} />
         ))}
     </Page>
   );
@@ -600,6 +609,9 @@ function OverviewTab({
   messagesInbox,
   bookmarksList,
   family,
+  expertQueue,
+  followersView,
+  followingView,
 }: {
   user: UserRow;
   tierInfo: ScoreTier | null;
@@ -608,6 +620,9 @@ function OverviewTab({
   messagesInbox: boolean;
   bookmarksList: boolean;
   family: boolean;
+  expertQueue: boolean;
+  followersView: boolean;
+  followingView: boolean;
 }) {
   const score = user.verity_score || 0;
   const tierColor = tierInfo?.color_hex || ADMIN_C.muted;
@@ -620,12 +635,19 @@ function OverviewTab({
     ? new Date(user.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
     : '';
 
+  // Followers/Following are gated to match iOS parity (see Profile Task 7).
+  // The user is viewing their own profile so the risk is low, but the
+  // permission still drives whether the count surfaces in the header strip.
   const stats: Array<{ label: string; value: string | number }> = [
     { label: 'Articles read', value: (user.articles_read_count ?? 0).toLocaleString() },
     { label: 'Quizzes passed', value: (user.quizzes_completed_count ?? 0).toLocaleString() },
     { label: 'Comments', value: (user.comment_count ?? 0).toLocaleString() },
-    { label: 'Followers', value: (user.followers_count ?? 0).toLocaleString() },
-    { label: 'Following', value: (user.following_count ?? 0).toLocaleString() },
+    ...(followersView
+      ? [{ label: 'Followers', value: (user.followers_count ?? 0).toLocaleString() }]
+      : []),
+    ...(followingView
+      ? [{ label: 'Following', value: (user.following_count ?? 0).toLocaleString() }]
+      : []),
   ];
 
   // Role badges — surface expert / educator / journalist / public-figure
@@ -752,7 +774,7 @@ function OverviewTab({
             - settings.family.view (paid family plans)
           Y5-#6: Family tile added; the /profile/family dashboard was
           previously only linked from /profile/kids. */}
-      {(messagesInbox || bookmarksList || family) && (
+      {(messagesInbox || bookmarksList || family || expertQueue) && (
         <PageSection title="My stuff">
           <div
             style={{
@@ -770,6 +792,13 @@ function OverviewTab({
             )}
             {bookmarksList && (
               <QuickLink href="/bookmarks" label="Bookmarks" description="Articles you've saved" />
+            )}
+            {expertQueue && (
+              <QuickLink
+                href="/expert-queue"
+                label="Expert queue"
+                description="Questions waiting for your answer"
+              />
             )}
             {family && (
               <QuickLink
@@ -1683,15 +1712,40 @@ function MilestonesTab({
 // ===============================================================
 // Locked placeholder for tabs the viewer lacks permission to see
 // ===============================================================
-function LockedTab({ name }: { name: string }) {
+// LockedTab branches on the actual reason this tab is locked. Email-unverified
+// users get a verify CTA; verified users (who lack the perm because their plan
+// doesn't include it) get a plans CTA. Sending a verified user to /verify-email
+// dead-ends them — the page just confirms their email is already verified.
+// `/profile/settings#billing` is the pre-T-073 anchor; T-073 deploy must update
+// to `/profile/settings/billing` (tracked alongside Story Task 6, Bookmarks
+// Task 4, Messages Task 8, Notifications Task 5, Search Note A).
+function LockedTab({ name, emailVerified }: { name: string; emailVerified: boolean }) {
+  if (!emailVerified) {
+    return (
+      <PageSection>
+        <EmptyState
+          title={`${name} is unavailable`}
+          description="Confirm your email to unlock this tab."
+          cta={
+            <Button variant="primary" onClick={() => window.location.assign('/verify-email')}>
+              Verify email
+            </Button>
+          }
+        />
+      </PageSection>
+    );
+  }
   return (
     <PageSection>
       <EmptyState
         title={`${name} is unavailable`}
-        description="Verify your email or upgrade your plan to unlock this tab."
+        description="This tab is part of paid plans."
         cta={
-          <Button variant="primary" onClick={() => window.location.assign('/verify-email')}>
-            Verify email
+          <Button
+            variant="primary"
+            onClick={() => window.location.assign('/profile/settings#billing')}
+          >
+            View plans
           </Button>
         }
       />
