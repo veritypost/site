@@ -34,6 +34,14 @@ export async function POST(request) {
         { status: 400 }
       );
     }
+    if (description && description.length > 1000) {
+      console.error('[reports] input_too_long', {
+        field: 'description',
+        length: description.length,
+        userId: user.id,
+      });
+      return NextResponse.json({ error: 'Input too long' }, { status: 400 });
+    }
 
     const { data: report, error: insertError } = await supabase
       .from('reports')

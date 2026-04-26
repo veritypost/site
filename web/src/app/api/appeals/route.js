@@ -41,6 +41,14 @@ export async function POST(request) {
   const { warning_id, text } = await request.json().catch(() => ({}));
   if (!warning_id || !text)
     return NextResponse.json({ error: 'warning_id and text required' }, { status: 400 });
+  if (text.length > 2000) {
+    console.error('[appeals] input_too_long', {
+      field: 'text',
+      length: text.length,
+      userId: user.id,
+    });
+    return NextResponse.json({ error: 'Input too long' }, { status: 400 });
+  }
   const { error } = await service.rpc('submit_appeal', {
     p_user_id: user.id,
     p_warning_id: warning_id,

@@ -24,6 +24,14 @@ export async function POST(request, { params }) {
 
   const { body } = await request.json().catch(() => ({}));
   if (!body) return NextResponse.json({ error: 'body required' }, { status: 400 });
+  if (body.length > 10000) {
+    console.error('[expert.queue.id.answer] input_too_long', {
+      field: 'body',
+      length: body.length,
+      userId: user.id,
+    });
+    return NextResponse.json({ error: 'Input too long' }, { status: 400 });
+  }
 
   const service = createServiceClient();
   const { data, error } = await service.rpc('post_expert_answer', {

@@ -48,6 +48,14 @@ export async function POST(request) {
       { status: 400 }
     );
   }
+  if (body.length > 1000) {
+    console.error('[expert.ask] input_too_long', {
+      field: 'body',
+      length: body.length,
+      userId: user.id,
+    });
+    return NextResponse.json({ error: 'Input too long' }, { status: 400 });
+  }
   const { data, error } = await service.rpc('ask_expert', {
     p_user_id: user.id,
     p_article_id: article_id,

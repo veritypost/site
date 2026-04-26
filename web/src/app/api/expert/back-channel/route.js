@@ -81,6 +81,14 @@ export async function POST(request) {
     .catch(() => ({}));
   if (!category_id || !body)
     return NextResponse.json({ error: 'category_id and body required' }, { status: 400 });
+  if (body.length > 2000) {
+    console.error('[expert.back_channel] input_too_long', {
+      field: 'body',
+      length: body.length,
+      userId: user.id,
+    });
+    return NextResponse.json({ error: 'Input too long' }, { status: 400 });
+  }
 
   const { data, error } = await service.rpc('post_back_channel_message', {
     p_user_id: user.id,

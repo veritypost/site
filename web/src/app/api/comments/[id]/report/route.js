@@ -44,6 +44,14 @@ export async function POST(request, { params }) {
 
   const { reason, description } = await request.json().catch(() => ({}));
   if (!reason) return NextResponse.json({ error: 'reason required' }, { status: 400 });
+  if (description && description.length > 1000) {
+    console.error('[comments.id.report] input_too_long', {
+      field: 'description',
+      length: description.length,
+      userId: user.id,
+    });
+    return NextResponse.json({ error: 'Input too long' }, { status: 400 });
+  }
 
   const { data, error } = await service
     .from('reports')
