@@ -1,3 +1,5 @@
+<!-- ARCHIVED: This document is read-only historical record. Do not modify or act on its contents as active tasks. -->
+<!-- Completed: 2026-04-26 -->
 # v1 → v2 migration — page & code map per phase
 
 Which files / pages / directories each phase touches. Use this as a work checklist, not a spec.

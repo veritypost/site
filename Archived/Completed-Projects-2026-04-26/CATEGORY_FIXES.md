@@ -1,3 +1,5 @@
+<!-- ARCHIVED: This document is read-only historical record. Do not modify or act on its contents as active tasks. -->
+<!-- Completed: 2026-04-26 -->
 # Verity Post — Bug Hunt Fix Log
 
 Running log of every fix applied during the 10-category bug hunt pass.

@@ -1,3 +1,5 @@
+<!-- ARCHIVED: This document is read-only historical record. Do not modify or act on its contents as active tasks. -->
+<!-- Completed: 2026-04-26 -->
 # Final Wiring + Self-Review Pass
 
 Started 2026-04-15.
