@@ -169,9 +169,10 @@ struct KidQuizEngineView: View {
             // when fewer than 10 questions exist. Kids gets a lower floor
             // (5) since there's no free/paid attempt-pool variation, but
             // we still refuse to grade a 2-question quiz as a real pass.
+            // questions = [] sends the body into emptyState so the quiz
+            // flow never reads startedAt — leave it at its default.
             guard rows.count >= 5 else {
                 self.questions = []
-                self.startedAt = nil
                 return
             }
             self.questions = rows
