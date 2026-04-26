@@ -94,7 +94,16 @@ struct KidsAppRoot: View {
         .fullScreenCover(item: $activeSheet, onDismiss: handleDismiss) { sheet in
             ZStack(alignment: .topLeading) {
                 sceneBody(sheet)
-                closeChrome
+                // OwnersAudit Kids Task 1 — `ArticleListView` already has its
+                // own `ToolbarItem` xmark in its NavigationStack toolbar; the
+                // overlay button stacks on top of it on Dynamic Island devices
+                // (~59pt safe-area). Skip the overlay only for that scene; the
+                // streak/badge scenes still need it because they have no toolbar.
+                if case .articles = sheet {
+                    EmptyView()
+                } else {
+                    closeChrome
+                }
             }
             .id(sceneKey)
         }

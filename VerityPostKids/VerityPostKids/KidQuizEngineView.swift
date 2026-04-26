@@ -83,6 +83,11 @@ struct KidQuizEngineView: View {
                 ProgressView()
             } else if blockedNotKidsSafe {
                 notKidsSafeState
+            } else if loadError != nil {
+                // OwnersAudit Kids Task 3 — distinguish a network failure
+                // from a genuinely-missing quiz. emptyState says "No quiz yet"
+                // which is a lie when the real cause is connectivity.
+                errorState
             } else if questions.isEmpty {
                 emptyState
             } else if showResult {
@@ -117,6 +122,9 @@ struct KidQuizEngineView: View {
 
     private func loadQuestions() async {
         loading = true
+        // Reset transient flags so retry from errorState clears stale state.
+        loadError = nil
+        blockedNotKidsSafe = false
         defer { loading = false }
 
         // Defense-in-depth: pre-flight verify the article is kids-safe.
@@ -450,40 +458,99 @@ struct KidQuizEngineView: View {
 
     private var resultView: some View {
         let r = currentResult
+        // OwnersAudit Kids Task 12 — threshold needs to be visible alongside
+        // the score so a kid who fails knows how close they came.
+        let threshold = max(1, Int(ceil(Double(r.total) * 0.6)))
         return VStack(spacing: 20) {
             Spacer()
-            ZStack {
-                Circle()
-                    .fill(r.passed ? K.teal.opacity(0.15) : K.coral.opacity(0.15))
-                    .frame(width: 120, height: 120)
-                Image(systemName: r.passed ? "checkmark.seal.fill" : "arrow.counterclockwise.circle.fill")
-                    .font(.scaledSystem(size: 60, weight: .bold))
-                    .foregroundStyle(r.passed ? K.teal : K.coral)
+            // OwnersAudit Kids Task 2 — while the server verdict is still in
+            // flight, hold the result reveal. The local fallback can disagree
+            // with the server (write failure → server count differs); the
+            // brief wait is normal anticipation, not punishing.
+            if verdictPending {
+                ProgressView()
+                Text("Checking your score…")
+                    .font(.scaledSystem(size: 14, weight: .semibold, design: .rounded))
+                    .foregroundStyle(K.dim)
+            } else {
+                ZStack {
+                    Circle()
+                        .fill(r.passed ? K.teal.opacity(0.15) : K.coral.opacity(0.15))
+                        .frame(width: 120, height: 120)
+                    Image(systemName: r.passed ? "checkmark.seal.fill" : "arrow.counterclockwise.circle.fill")
+                        .font(.scaledSystem(size: 60, weight: .bold))
+                        .foregroundStyle(r.passed ? K.teal : K.coral)
+                }
+
+                Text(r.passed ? "Great job!" : "Give it another go?")
+                    .font(.scaledSystem(size: 28, weight: .black, design: .rounded))
+                    .foregroundStyle(K.text)
+
+                // OwnersAudit Kids Task 12 — show threshold so a kid sees how
+                // many they needed, not just how many they got.
+                Text(r.passed
+                     ? "You got \(r.correctCount) of \(r.total) right."
+                     : "You got \(r.correctCount) of \(r.total). You need \(threshold) to pass.")
+                    .font(.scaledSystem(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundStyle(K.dim)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 16)
+
+                // OwnersAudit Kids Task 10 — connect outcome to something
+                // concrete so the quiz reads as participation context, not
+                // a school test.
+                Text(r.passed
+                     ? "Your streak just got longer."
+                     : "Read it again and try when you're ready.")
+                    .font(.scaledSystem(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(K.dim)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 16)
             }
-
-            Text(r.passed ? "Great job!" : "Give it another go?")
-                .font(.scaledSystem(size: 28, weight: .black, design: .rounded))
-                .foregroundStyle(K.text)
-
-            Text("You got \(r.correctCount) of \(r.total) right.")
-                .font(.scaledSystem(size: 15, weight: .semibold, design: .rounded))
-                .foregroundStyle(K.dim)
 
             Spacer()
 
-            Button { onDone(r) } label: {
-                Text("Done")
-                    .font(.scaledSystem(size: 16, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity, minHeight: 54)
-                    .background(K.teal)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .shadow(color: K.teal.opacity(0.3), radius: 12, y: 4)
+            if !verdictPending {
+                Button { onDone(r) } label: {
+                    Text("Done")
+                        .font(.scaledSystem(size: 16, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, minHeight: 54)
+                        .background(K.teal)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .shadow(color: K.teal.opacity(0.3), radius: 12, y: 4)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
         .padding(.horizontal, 24)
         .padding(.bottom, 40)
+    }
+
+    // OwnersAudit Kids Task 3 — network-failure error state with retry. Mirrors
+    // LeaderboardView/ExpertSessionsView error patterns; 44pt touch target.
+    private var errorState: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "wifi.slash")
+                .font(.scaledSystem(size: 36, weight: .bold))
+                .foregroundStyle(K.dim)
+            Text("Couldn't load the quiz right now.")
+                .font(.scaledSystem(size: 15, weight: .semibold, design: .rounded))
+                .foregroundStyle(K.dim)
+                .multilineTextAlignment(.center)
+            Button { Task { await loadQuestions() } } label: {
+                Text("Try again")
+                    .font(.scaledSystem(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 22)
+                    .padding(.vertical, 12)
+                    .frame(minHeight: 44)
+                    .background(K.teal)
+                    .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(40)
     }
 
     private var emptyState: some View {

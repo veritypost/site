@@ -28,6 +28,29 @@ struct ArticleListView: View {
                 VStack(spacing: 14) {
                     if loading && articles.isEmpty {
                         ProgressView().padding(.top, 60)
+                    } else if loadError != nil {
+                        // OwnersAudit Kids Task 4 — distinguish a network
+                        // failure from a genuinely-empty category. The old
+                        // path showed both emptyState ("No articles in this
+                        // category yet") AND the error caption underneath,
+                        // which contradicted itself.
+                        VStack(spacing: 14) {
+                            Text("Couldn't load articles right now.")
+                                .font(.system(.subheadline, design: .rounded, weight: .medium))
+                                .foregroundStyle(K.dim)
+                                .multilineTextAlignment(.center)
+                            Button { Task { await load() } } label: {
+                                Text("Try again")
+                                    .font(.system(.subheadline, design: .rounded, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .frame(maxWidth: 180, minHeight: 44)
+                                    .background(K.teal)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 50)
                     } else if articles.isEmpty {
                         emptyState
                     } else {
@@ -37,11 +60,6 @@ struct ArticleListView: View {
                             }
                             .buttonStyle(.plain)
                         }
-                    }
-                    if let loadError {
-                        Text(loadError)
-                            .font(.system(.caption, design: .rounded))
-                            .foregroundStyle(K.coralDark)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -153,6 +171,7 @@ struct ArticleListView: View {
 
     private func load() async {
         loading = true
+        loadError = nil
         defer { loading = false }
 
         // K3: resolve categorySlug → category_id first, then filter articles.
