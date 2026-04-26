@@ -32,9 +32,9 @@ End-state isn't "shipped." End-state is the cleanest codebase you can hand to an
 
 Launch-ready on all three surfaces: web, adult iOS, kids iOS. Every task, every fix, every refactor is in service of that. Measure progress against ship, not against ceremony.
 
-**Current Apple block**: the owner does not yet have an Apple Developer account. That gates *publishing* both iOS apps (App Store Connect products, APNs `.p8` auth key, Universal Links via `apple-app-site-association`, TestFlight). It does **not** gate development — xcodebuild works locally, both iOS apps must stay green, code + pair flow + IAP wiring stay production-ready so the moment the developer account is active, the only outstanding steps are the Apple Console ones.
+**Apple Console walkthrough pending**: the owner has an Apple Developer account. Outstanding steps (bundle ID finalization, entitlements, AppIcon PNGs, Universal Links via `apple-app-site-association`, IAP product IDs, CFBundleVersion, TestFlight) are documented and deferred to a dedicated Apple Console session at the owner's signal. Both iOS apps must stay xcodebuild-green in the meantime. Don't block other work waiting for Apple; don't forget the Apple path is pending either.
 
-Treat every Apple-dependent item (the Apple-block entries in `Current Projects/MASTER_TRIAGE_2026-04-23.md` and any new ones) as "ready to execute the hour the dev account lands" — specs are documented, code paths are complete, fallback URLs are wired. Don't block other work waiting for Apple; don't forget the Apple path is pending either.
+Treat every Apple-dependent item (the Apple-block entries in `Ongoing Projects/Current/MASTER_TRIAGE_2026-04-23.md` and any new ones) as "ready to execute the hour the owner opens the Apple Console session."
 
 Web launch has no equivalent block — it ships when the P0 list closes.
 
@@ -66,17 +66,16 @@ Three apps, one DB. All connected via Supabase (`fyiwulqphgmoqullmrfn`).
 ## What you always know (re-read every session)
 
 - `Reference/STATUS.md` — live state narrative: what exists, what's locked, what's shipped
-- `Current Projects/MASTER_TRIAGE_2026-04-23.md` — canonical audit tracker (absorbed the retired `FIX_SESSION_1.md` + `TASKS.md` + `proposedideas/07-owner-next-actions.md`). Per-item `SHIPPED <date>` blocks replace the old `DONE.md` append-a-line workflow
-- `Current Projects/Audit_2026-04-24/` — the 2026-04-24 multi-wave audit artifacts (master fix list, owner actions, questionable items, Round 2 lens reports, per-group reconciliations). Treat these as read-only artifacts of the audit; new work items go into MASTER_TRIAGE.
-- `Current Projects/Audit_2026-04-24/OWNER_TODO_2026-04-24.md` — current owner-side punch list (Vercel URL typo, ex-dev removal, pg_cron, Apple Dev enrollment, Stripe audit, migration-state SQL paste).
-- `DONE.md` — retired; ship status is tracked inline in `Current Projects/MASTER_TRIAGE_2026-04-23.md` via per-item `SHIPPED <date>` blocks plus the Session folder's `COMPLETED_TASKS_<YYYY-MM-DD>.md`
-- Most recent session log: `Sessions/<MM-DD-YYYY>/Session <N>/SESSION_LOG_<YYYY-MM-DD>.md`. Sort `Sessions/` by mtime to find the latest.
+- `Ongoing Projects/Current/MASTER_TRIAGE_2026-04-23.md` — canonical audit tracker (absorbed the retired `FIX_SESSION_1.md` + `TASKS.md` + `proposedideas/07-owner-next-actions.md`). Per-item `SHIPPED <date>` blocks replace the old `DONE.md` append-a-line workflow
+- `Archived/Audit_2026-04-24/` — the 2026-04-24 multi-wave audit artifacts (master fix list, owner actions, questionable items, Round 2 lens reports, per-group reconciliations). Read-only; new work items go into MASTER_TRIAGE.
+- `Ongoing Projects/Current/Audit-Final/OwnerQuestions.md` — 109-question owner decision tracker synthesized from AuditV1 + AuditV2; all questions resolved, 24 tasks created.
+- `DONE.md` — retired; ship status is tracked inline in `Ongoing Projects/Current/MASTER_TRIAGE_2026-04-23.md` via per-item `SHIPPED <date>` blocks plus the Session folder's `COMPLETED_TASKS_<YYYY-MM-DD>.md`
+- Most recent session log: `Workbench/Sessions/<MM-DD-YYYY>/Session <N>/SESSION_LOG_<YYYY-MM-DD>.md`. Sort `Workbench/Sessions/` by mtime to find the latest.
 
 ## The repo
 
 ```
 /
-├── STATUS.md → Reference/STATUS.md  (symlink)
 ├── CLAUDE.md → Reference/CLAUDE.md  (symlink; edit the target)
 ├── .git-blame-ignore-revs  autofix-sweep SHAs ignored in blame (FIX_SESSION_1 #20)
 │
@@ -160,7 +159,10 @@ Three apps, one DB. All connected via Supabase (`fyiwulqphgmoqullmrfn`).
 ├── scripts/
 │   └── import-permissions.js     rebuilds permission matrix from xlsx → Supabase
 │
-├── Reference/ Current Projects/ Future Projects/ Unconfirmed Projects/ Completed Projects/ Sessions/ Archived/ supabase/ scripts/
+├── Reference/              STATUS.md, CLAUDE.md, docs
+├── Ongoing Projects/       Current/, Future/, Pre-Launch/, Post-Launch/
+├── Workbench/              Sessions/<MM-DD-YYYY>/Session <N>/, AGENTS.md, currentschema.sql
+├── Archived/               historical audit artifacts, completed projects, F-spec docs
 ```
 
 ## The machinery (stay fluent in these)
@@ -196,7 +198,7 @@ Key RPCs: `require_outranks`, `caller_can_assign_role`, `compute_effective_perms
 
 ## DB is the default, always
 
-If a Supabase table has the data, code reads from it. Before you hardcode any config-looking value, query the DB first. This is the single most-violated rule in this codebase — a large fraction of outstanding items in `Current Projects/MASTER_TRIAGE_2026-04-23.md` boil down to "there's a hardcoded copy of data that already lives in a table."
+If a Supabase table has the data, code reads from it. Before you hardcode any config-looking value, query the DB first. This is the single most-violated rule in this codebase — a large fraction of outstanding items in `Ongoing Projects/Current/MASTER_TRIAGE_2026-04-23.md` boil down to "there's a hardcoded copy of data that already lives in a table."
 
 When you introduce a new config-like value, the default is a DB table + a 60s-cached helper — not a constant in a lib file.
 
@@ -209,7 +211,7 @@ When you introduce a new config-like value, the default is a DB table + a 60s-ca
 **The rule**: xlsx and DB must stay 1:1 at all times.
 
 - If you edit the xlsx → run `--apply` in the same session to land the change.
-- If you mutate a permission row directly in SQL (e.g. `UPDATE permissions SET requires_verified=true WHERE key='...'`) → update the xlsx the same session, or open a reconcile item in `Current Projects/MASTER_TRIAGE_2026-04-23.md`. Otherwise the next `--apply` will undo your edit.
+- If you mutate a permission row directly in SQL (e.g. `UPDATE permissions SET requires_verified=true WHERE key='...'`) → update the xlsx the same session, or open a reconcile item in `Ongoing Projects/Current/MASTER_TRIAGE_2026-04-23.md`. Otherwise the next `--apply` will undo your edit.
 - Before any perm-related work, verify the two are in sync. If they aren't, reconcile before making new changes.
 
 There's no second xlsx. `permissions_matrix.xlsx` was deleted 2026-04-20. `permissions.xlsx` is the only canonical source.
@@ -224,7 +226,7 @@ There's no second xlsx. `permissions_matrix.xlsx` was deleted 2026-04-20. `permi
 
 ## Brand / UX rules
 
-- **No emojis in adult surfaces.** Ever. Adult web, adult iOS, admin pages, error messages, toasts, email bodies, commit messages for adult code, OG meta text — all plain text. Also no emojis in the dev docs (`Reference/STATUS.md`, `Current Projects/MASTER_TRIAGE_2026-04-23.md`, `Reference/CLAUDE.md`, session logs) — keep the voice consistent throughout. The **Kids iOS app** is the only surface where emojis are intentional (playful — children). If you see one leak into an adult surface, it's a defect — log it.
+- **No emojis in adult surfaces.** Ever. Adult web, adult iOS, admin pages, error messages, toasts, email bodies, commit messages for adult code, OG meta text — all plain text. Also no emojis in the dev docs (`Reference/STATUS.md`, `Ongoing Projects/Current/MASTER_TRIAGE_2026-04-23.md`, `Reference/CLAUDE.md`, session logs) — keep the voice consistent throughout. The **Kids iOS app** is the only surface where emojis are intentional (playful — children). If you see one leak into an adult surface, it's a defect — log it.
 - **Paid tier names are canonical**: `verity`, `verity_pro`, `verity_family`, `verity_family_xl`. Display labels map from DB — never ad-hoc short forms like "Pro+" in copy.
 - **Dates are ISO in code, human-readable in UI.** No inventing formats.
 
@@ -236,11 +238,11 @@ There's no second xlsx. `permissions_matrix.xlsx` was deleted 2026-04-20. `permi
 
 ## How work enters
 
-- Owner drops a bug in conversation ("got a 404 at X") → you ADD an item to `Current Projects/MASTER_TRIAGE_2026-04-23.md` with the next free item number. No permission ask.
+- Owner drops a bug in conversation ("got a 404 at X") → you ADD an item to `Ongoing Projects/Current/MASTER_TRIAGE_2026-04-23.md` with the next free item number. No permission ask.
 - Owner names a task → classify risk, execute.
 - You find something while working → log it as a new item so it doesn't get lost.
 
-Before claiming a new bug, grep `Current Projects/MASTER_TRIAGE_2026-04-23.md` for `SHIPPED` blocks by file:line. If it's logged, the fix shipped — surface the entry and move on. Only re-raise with evidence of regression.
+Before claiming a new bug, grep `Ongoing Projects/Current/MASTER_TRIAGE_2026-04-23.md` for `SHIPPED` blocks by file:line. If it's logged, the fix shipped — surface the entry and move on. Only re-raise with evidence of regression.
 
 ## Risk tiers
 
@@ -256,7 +258,7 @@ Don't over-ceremony the small stuff. Don't under-rigor the big stuff.
 When a fix ships:
 1. Typecheck green. Build green if iOS touched. DB verified if touched.
 2. Commit `<area>(#<item>): <short title>`.
-3. Add a `SHIPPED <YYYY-MM-DD>` block to the item in `Current Projects/MASTER_TRIAGE_2026-04-23.md` (date + commit SHA + files touched).
+3. Add a `SHIPPED <YYYY-MM-DD>` block to the item in `Ongoing Projects/Current/MASTER_TRIAGE_2026-04-23.md` (date + commit SHA + files touched).
 4. Append a line to the current session folder's `COMPLETED_TASKS_<YYYY-MM-DD>.md`.
 
 Either it has a SHIPPED block or it's still open. No third state.
@@ -264,7 +266,7 @@ Either it has a SHIPPED block or it's still open. No third state.
 ## What not to do
 
 - No recap back to the owner — they know the product, don't narrate it
-- No pre-planning work you won't ship this sprint — `Current Projects/MASTER_TRIAGE_2026-04-23.md` is live state
+- No pre-planning work you won't ship this sprint — `Ongoing Projects/Current/MASTER_TRIAGE_2026-04-23.md` is live state
 - No re-flagging SHIPPED items without proving regression
 - No committing without acceptance criteria met
 - No silent scope expansion — pause and name it if the task grew
@@ -273,4 +275,4 @@ Either it has a SHIPPED block or it's still open. No third state.
 
 ## Start
 
-Stay current: read `Reference/STATUS.md`, top of `Current Projects/MASTER_TRIAGE_2026-04-23.md`, the `lib/` layer, `middleware.js`. Then say "Ready." Wait for direction.
+Stay current: read `Reference/STATUS.md`, top of `Ongoing Projects/Current/MASTER_TRIAGE_2026-04-23.md`, the `lib/` layer, `middleware.js`. Then say "Ready." Wait for direction.
