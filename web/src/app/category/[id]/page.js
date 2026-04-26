@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/client';
+import { formatDate } from '../../../lib/dates';
 
 const SORT_OPTIONS = ['Latest', 'Trending'];
 
@@ -425,7 +426,7 @@ export default function CategoryPage() {
                       {category.name}
                     </span>
                     <span style={{ fontSize: 11, color: '#666666' }}>
-                      {story.published_at ? new Date(story.published_at).toLocaleDateString() : ''}
+                      {formatDate(story.published_at)}
                     </span>
                   </div>
                   <p

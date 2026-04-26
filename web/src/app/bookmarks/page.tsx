@@ -4,8 +4,11 @@
 import { useState, useEffect, CSSProperties, ReactNode } from 'react';
 import { createClient } from '../../lib/supabase/client';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import EmptyState from '@/components/EmptyState';
+import LockedFeatureCTA from '@/components/LockedFeatureCTA';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import { getPlanLimitValue } from '@/lib/plans';
+import { formatDate } from '@/lib/dates';
 import type { Tables } from '@/types/database-helpers';
 
 // T-016: bookmark cap is now DB-driven via plan_features.bookmarks
@@ -90,6 +93,15 @@ export default function BookmarksPage() {
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
 
   const atCap = !canUnlimited && items.length >= bookmarkCap;
+  // T-088: show a proactive cap counter when a free user is at or above 50% of their cap.
+  // Tone escalates: neutral (50–69%), amber (70–89% i.e. >= cap-3), danger (>= cap-1 i.e. 9/10).
+  const nearCap = !canUnlimited && items.length >= Math.floor(bookmarkCap * 0.5);
+  const capCounterTone: 'neutral' | 'amber' | 'danger' =
+    items.length >= bookmarkCap - 1
+      ? 'danger'
+      : items.length >= bookmarkCap - 3
+        ? 'amber'
+        : 'neutral';
 
   async function load() {
     setLoading(true);
@@ -337,6 +349,25 @@ export default function BookmarksPage() {
                 ? items.length
                 : `${items.length} of ${bookmarkCap}`}
           </h1>
+          {/* T-088: proactive cap counter — appears at 50%+ for free users.
+              Neutral gray at 5+, amber at 7+, red at 9+. Separate from the
+              full-cap banner below; provides urgency color without blocking UI. */}
+          {nearCap && (
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color:
+                  capCounterTone === 'danger'
+                    ? '#dc2626'
+                    : capCounterTone === 'amber'
+                      ? '#b45309'
+                      : '#666',
+              }}
+            >
+              {items.length} / {bookmarkCap} bookmarks
+            </span>
+          )}
           {(canExport || canCollections) && (
             <div style={{ display: 'flex', gap: 8 }}>
               {canExport && (
@@ -354,15 +385,14 @@ export default function BookmarksPage() {
         </div>
 
         {atCap && (
-          // Title above already shows "X of Y" when at-cap; banner used
-          // to repeat "You've hit the free bookmark cap" — dropped that
-          // redundant headline, banner is purely the upgrade CTA now.
-          <Banner tone="warn" title="Upgrade for unlimited bookmarks">
-            Paid plans add unlimited bookmarks, collections, notes, and export.{' '}
-            <a href="/profile/settings#billing" style={{ color: '#111', fontWeight: 600 }}>
-              View plans →
-            </a>
-          </Banner>
+          // T-044: replaced Banner with LockedFeatureCTA inline strip.
+          // The title above already shows "X of Y" when at-cap; the strip
+          // carries the upgrade nudge without repeating the count.
+          <LockedFeatureCTA
+            gateType="plan"
+            lockMessage="Paid plans add unlimited bookmarks, collections, notes, and export."
+            style={{ marginBottom: 12 }}
+          />
         )}
         {error && (
           <Banner tone="danger" title="Problem">
@@ -483,7 +513,7 @@ export default function BookmarksPage() {
                     </span>
                   )}
                   <span style={{ fontSize: 12, color: '#666' }}>
-                    Saved {b.created_at ? new Date(b.created_at).toLocaleDateString() : ''}
+                    Saved {formatDate(b.created_at)}
                   </span>
                 </div>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -593,30 +623,12 @@ export default function BookmarksPage() {
             </div>
           ))}
           {filtered.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '60px 20px', color: '#666' }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: '#111', marginBottom: 6 }}>
-                No bookmarks yet
-              </div>
-              <div style={{ fontSize: 13, lineHeight: 1.5, maxWidth: 360, margin: '0 auto' }}>
-                Save articles here. Tap the bookmark icon on any story to come back later.
-              </div>
-              <a
-                href="/browse"
-                style={{
-                  display: 'inline-block',
-                  padding: '10px 20px',
-                  background: '#111',
-                  color: '#fff',
-                  borderRadius: 10,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  textDecoration: 'none',
-                  marginTop: 12,
-                }}
-              >
-                Browse articles
-              </a>
-            </div>
+            // T-041: replaced inline empty-state div with shared EmptyState component.
+            <EmptyState
+              headline="No bookmarks yet"
+              body="Save articles here. Tap the bookmark icon on any story to come back later."
+              cta={{ label: 'Browse articles', href: '/browse' }}
+            />
           )}
           {/* Load more — keyset cursor on created_at desc. Only shown
               when the last fetch returned a full page (hasMore). Hidden

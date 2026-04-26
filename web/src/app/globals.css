@@ -133,3 +133,22 @@
 .kid-celebrate-rise {
   animation: kidCelebrateRise 220ms ease-out both;
 }
+
+/* Skeleton shimmer — T-042. The reduced-motion rule at the top of this
+   file collapses animation-duration to 0.01ms, so the shimmer degrades
+   to a static grey block for users who prefer reduced motion. */
+@keyframes vpShimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+.vp-skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: vpShimmer 1.6s ease-in-out infinite;
+  border-radius: 4px;
+  display: block;
+}

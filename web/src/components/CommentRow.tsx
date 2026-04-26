@@ -22,14 +22,6 @@ type CommentUser = {
 
 type Mention = { user_id?: string; username: string };
 
-// Ext-E4 — mirrors the server-side `comment_max_depth` setting
-// (schema/033 sets it to 2; the post_comment RPC reads `_setting_int(
-// 'comment_max_depth', 3)` and rejects v_depth > max). Hoisting here
-// so the literal is named + traceable. If the DB setting changes,
-// update this constant in the same change. Future: fetch from a
-// `/api/settings/public` shim instead of mirroring.
-const COMMENT_MAX_DEPTH = 2;
-
 export type EnrichedComment = CommentRowDb & {
   users?: CommentUser;
   _your_vote?: 'upvote' | 'downvote' | null | undefined;
@@ -126,6 +118,7 @@ export default function CommentRow({
   const [menuOpen, setMenuOpen] = useState<boolean>(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [busy, setBusy] = useState<string>('');
+  const [commentMaxDepth, setCommentMaxDepth] = useState<number>(2);
 
   const canReply = hasPermission('comments.reply');
   const canUpvote = hasPermission('comments.upvote');
@@ -149,6 +142,19 @@ export default function CommentRow({
       document.removeEventListener('touchstart', onDocDown);
     };
   }, [menuOpen]);
+
+  useEffect(() => {
+    fetch('/api/settings/public')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data && typeof data.comment_max_depth === 'number') {
+          setCommentMaxDepth(data.comment_max_depth);
+        }
+      })
+      .catch(() => {
+        // Keep default (2) on network error.
+      });
+  }, []);
 
   const isOwner = !!currentUserId && comment.user_id === currentUserId;
   const isDeleted = comment.status === 'deleted' || !!comment.deleted_at;
@@ -381,7 +387,7 @@ export default function CommentRow({
                 </button>
               )}
 
-              {canReply && commentDepth < COMMENT_MAX_DEPTH && (
+              {canReply && commentDepth < commentMaxDepth && (
                 <button
                   onClick={() => setReplyOpen((v) => !v)}
                   style={{
