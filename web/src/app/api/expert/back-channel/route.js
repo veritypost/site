@@ -30,7 +30,9 @@ export async function GET(request) {
   const service = createServiceClient();
   let q = service
     .from('expert_discussions')
-    .select('*, users(id, username, avatar_color)')
+    .select(
+      'id, category_id, user_id, parent_id, source_comment_id, body, created_at, status, users(id, username, avatar_color)'
+    )
     .eq('category_id', category_id)
     .eq('status', 'visible')
     .order('created_at', { ascending: true });

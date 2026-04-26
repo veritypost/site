@@ -30,7 +30,7 @@ export async function GET(request) {
   const { data, error } = await service
     .from('kid_expert_sessions')
     .select(
-      '*, users!fk_kid_expert_sessions_expert_id(username, display_name, expert_title), categories(name)'
+      'id, title, description, session_type, scheduled_at, duration_minutes, status, max_questions, category_id, is_active, created_at, updated_at, users!fk_kid_expert_sessions_expert_id(username), categories(name)'
     )
     .eq('status', status)
     .eq('is_active', true)

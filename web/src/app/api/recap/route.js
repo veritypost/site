@@ -27,7 +27,9 @@ export async function GET(request) {
 
   let q = service
     .from('weekly_recap_quizzes')
-    .select('*, categories(name)')
+    .select(
+      'id, category_id, title, week_start, week_end, description, article_ids, is_active, created_at, categories(name)'
+    )
     .eq('is_active', true)
     .gte('week_end', weekStartStr)
     .order('week_start', { ascending: false });
