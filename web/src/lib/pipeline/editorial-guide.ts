@@ -702,7 +702,17 @@ RULES:
 OUTPUT FORMAT:
 {
   "questions": [
-    { "question_text": "...", "options": ["...", "...", "...", "..."], "correct_index": 0, "section_hint": "opening paragraph" }
+    {
+      "question_text": "...",
+      "options": [
+        { "text": "..." },
+        { "text": "..." },
+        { "text": "..." },
+        { "text": "..." }
+      ],
+      "correct_index": 0,
+      "section_hint": "opening paragraph"
+    }
   ]
 }`;
 
@@ -992,12 +1002,19 @@ RULES:
 - Keep language simple — no jargon in questions or answers
 - Make it feel like a game, not a test
 
-OUTPUT JSON array:
-[
-  {
-    "question": "...",
-    "options": ["A", "B", "C", "D"],
-    "correct_answer": 0,
-    "section_hint": "..."
-  }
-]`;
+OUTPUT JSON:
+{
+  "questions": [
+    {
+      "question_text": "...",
+      "options": [
+        { "text": "A" },
+        { "text": "B" },
+        { "text": "C" },
+        { "text": "D" }
+      ],
+      "correct_answer": 0,
+      "section_hint": "..."
+    }
+  ]
+}`;
