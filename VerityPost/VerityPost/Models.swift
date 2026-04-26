@@ -177,12 +177,14 @@ struct VPCategory: Codable, Identifiable, Hashable {
     /// nil parent_id. Anything with a parent_id is actually a subcategory.
     var categoryId: String?
     var isKidsSafe: Bool?
+    var colorHex: String?
 
     enum CodingKeys: String, CodingKey {
         case id, name, slug, type, visible
         case displayOrder = "sort_order"
         case categoryId = "parent_id"
         case isKidsSafe = "is_kids_safe"
+        case colorHex = "color_hex"
     }
 
     /// Display name with any "Kids" / "(kids)" marker stripped. Categories

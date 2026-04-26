@@ -42,7 +42,7 @@ type HomeStory = Pick<
   hero_pick_for_date: string | null;
 };
 
-type CategoryRow = Pick<Tables<'categories'>, 'id' | 'name' | 'slug'>;
+type CategoryRow = Pick<Tables<'categories'>, 'id' | 'name' | 'slug' | 'color_hex'>;
 
 // The home is wall-free by design — the registration-wall gate fires
 // inside `web/src/app/story/[slug]/page.tsx` per article view, not on
@@ -101,6 +101,35 @@ function timeShort(dateIso: string | null): string {
     month: 'short',
     day: 'numeric',
   }).format(d);
+}
+
+// Category accent palette. color_hex in DB is null for all live rows (2026-04-26);
+// this map provides a per-slug fallback until editorial populates the column.
+// Keys are category slugs; values are dark editorial background hex colors.
+const CATEGORY_PALETTE: Record<string, string> = {
+  politics: '#1e3a5f',
+  congress: '#1e3a5f',
+  space: '#1a1a2e',
+  science: '#0f3d2e',
+  ai: '#1a1a2e',
+  markets: '#1b2a1b',
+  'personal-finance': '#1b2a1b',
+  jobs: '#1b2a1b',
+  weather: '#1a3050',
+  'public-health': '#3d1a1a',
+  nfl: '#1a2a3d',
+  movies: '#2a1a2a',
+  asia: '#2a1a1a',
+  animals: '#1a2a1a',
+  'kids-science': '#0f3d2e',
+  'kids-animals': '#1a2a1a',
+};
+const HERO_DEFAULT_BG = '#1a1a1a'; // dark editorial fallback for uncategorized hero
+
+function heroBg(category: CategoryRow | undefined): string {
+  if (category?.color_hex) return category.color_hex;
+  if (category?.slug && CATEGORY_PALETTE[category.slug]) return CATEGORY_PALETTE[category.slug];
+  return HERO_DEFAULT_BG;
 }
 
 // ============================================================================
@@ -170,7 +199,7 @@ export default function HomePage() {
           .limit(1),
         supabase
           .from('categories')
-          .select('id, name, slug')
+          .select('id, name, slug, color_hex')
           .eq('is_active', true)
           .order('sort_order', {
             ascending: true,
@@ -451,47 +480,86 @@ function MetaLine({ story }: { story: HomeStory }) {
 }
 
 function Hero({ story, category }: { story: HomeStory; category: CategoryRow | undefined }) {
+  const bg = heroBg(category);
   return (
-    <article style={{ marginBottom: 8 }}>
+    <article style={{ marginBottom: 32 }}>
       <Link
         href={`/story/${story.slug}`}
-        style={{
-          textDecoration: 'none',
-          color: 'inherit',
-          display: 'block',
-        }}
+        style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
       >
-        <div style={{ marginBottom: 14 }}>
-          <Eyebrow category={category} />
-        </div>
-        <h2
+        {/* Full-bleed band — escapes the 720px column using the standard
+            viewport-breakout technique for centered constrained layouts.
+            position:relative + left:50% + marginLeft:-50vw + width:100vw. */}
+        <div
           style={{
-            fontFamily: serifStack,
-            fontSize: 36,
-            fontWeight: 700,
-            lineHeight: 1.12,
-            letterSpacing: '-0.015em',
-            margin: 0,
-            color: C.text,
+            background: bg,
+            position: 'relative',
+            left: '50%',
+            right: '50%',
+            marginLeft: '-50vw',
+            marginRight: '-50vw',
+            width: '100vw',
+            padding: '48px 0 40px',
           }}
         >
-          {story.title}
-        </h2>
-        {story.excerpt && (
-          <p
-            style={{
-              fontFamily: serifStack,
-              fontSize: 19,
-              lineHeight: 1.45,
-              color: C.soft,
-              margin: '18px 0 0',
-              fontWeight: 400,
-            }}
-          >
-            {story.excerpt}
-          </p>
-        )}
-        <MetaLine story={story} />
+          {/* Inner column mirrors the 720px reading column */}
+          <div style={{ maxWidth: 720, margin: '0 auto', padding: '0 20px' }}>
+            {category && (
+              <div style={{ marginBottom: 16 }}>
+                <span
+                  style={{
+                    fontFamily: serifStack,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    letterSpacing: '0.12em',
+                    textTransform: 'uppercase' as const,
+                    color: 'rgba(255,255,255,0.65)',
+                  }}
+                >
+                  {category.name}
+                </span>
+              </div>
+            )}
+            <h2
+              style={{
+                fontFamily: serifStack,
+                fontSize: 40,
+                fontWeight: 700,
+                lineHeight: 1.1,
+                letterSpacing: '-0.02em',
+                margin: 0,
+                color: '#ffffff',
+              }}
+            >
+              {story.title}
+            </h2>
+            {story.excerpt && (
+              <p
+                style={{
+                  fontFamily: serifStack,
+                  fontSize: 19,
+                  lineHeight: 1.45,
+                  color: 'rgba(255,255,255,0.80)',
+                  margin: '16px 0 0',
+                  fontWeight: 400,
+                }}
+              >
+                {story.excerpt}
+              </p>
+            )}
+            <p
+              style={{
+                margin: '20px 0 0',
+                fontSize: 13,
+                color: 'rgba(255,255,255,0.55)',
+                fontWeight: 500,
+                letterSpacing: '0.01em',
+              }}
+            >
+              {timeShort(story.published_at)}
+            </p>
+          </div>
+        </div>
       </Link>
     </article>
   );

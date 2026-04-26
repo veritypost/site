@@ -67,6 +67,36 @@ struct HomeView: View {
 
     @State private var today: EditorialToday = HomeView.computeToday()
 
+    // Category accent palette — mirrors web/src/app/page.tsx CATEGORY_PALETTE.
+    // color_hex in DB is null for all live rows (2026-04-26); slug-based fallback
+    // until editorial populates the column.
+    private static let categoryPalette: [String: Color] = [
+        "politics":          Color(hex: "1e3a5f"),
+        "congress":          Color(hex: "1e3a5f"),
+        "space":             Color(hex: "1a1a2e"),
+        "science":           Color(hex: "0f3d2e"),
+        "ai":                Color(hex: "1a1a2e"),
+        "markets":           Color(hex: "1b2a1b"),
+        "personal-finance":  Color(hex: "1b2a1b"),
+        "jobs":              Color(hex: "1b2a1b"),
+        "weather":           Color(hex: "1a3050"),
+        "public-health":     Color(hex: "3d1a1a"),
+        "nfl":               Color(hex: "1a2a3d"),
+        "movies":            Color(hex: "2a1a2a"),
+        "asia":              Color(hex: "2a1a1a"),
+        "animals":           Color(hex: "1a2a1a"),
+        "kids-science":      Color(hex: "0f3d2e"),
+        "kids-animals":      Color(hex: "1a2a1a"),
+    ]
+
+    private func heroBg(for story: Story) -> Color {
+        if let cat = categories.first(where: { $0.id == story.categoryId }) {
+            if let hex = cat.colorHex, !hex.isEmpty { return Color(hex: hex) }
+            if let slug = cat.slug, let c = HomeView.categoryPalette[slug] { return c }
+        }
+        return Color(hex: "1a1a1a")
+    }
+
     var body: some View {
         ZStack {
             ScrollView {
@@ -99,7 +129,6 @@ struct HomeView: View {
                     } else {
                         if let hero = stories.first {
                             heroBlock(hero)
-                                .padding(.horizontal, 20)
                         }
 
                         let supporting = Array(stories.dropFirst().prefix(7))
@@ -180,33 +209,39 @@ struct HomeView: View {
 
     @ViewBuilder
     private func heroBlock(_ story: Story) -> some View {
+        let bg = heroBg(for: story)
         NavigationLink(value: story) {
             VStack(alignment: .leading, spacing: 0) {
                 if let cat = categoryName(for: story.categoryId) {
-                    eyebrow(cat)
-                        .padding(.bottom, 12)
+                    Text(cat.uppercased())
+                        .font(.system(size: 11, weight: .semibold, design: .serif))
+                        .tracking(1.4)
+                        .foregroundColor(.white.opacity(0.65))
+                        .padding(.bottom, 14)
                 }
-
                 Text(story.title ?? "Untitled")
                     .font(.system(size: 32, weight: .bold, design: .serif))
                     .tracking(-0.4)
                     .lineSpacing(2)
-                    .foregroundColor(VP.text)
+                    .foregroundColor(.white)
                     .fixedSize(horizontal: false, vertical: true)
-
                 if let excerpt = story.excerpt, !excerpt.isEmpty {
                     Text(excerpt)
                         .font(.system(size: 18, weight: .regular, design: .serif))
                         .lineSpacing(4)
-                        .foregroundColor(VP.soft)
+                        .foregroundColor(.white.opacity(0.80))
                         .fixedSize(horizontal: false, vertical: true)
-                        .padding(.top, 16)
+                        .padding(.top, 14)
                 }
-
-                metaLine(for: story)
-                    .padding(.top, 12)
+                Text(timeShort(story.publishedAt))
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white.opacity(0.55))
+                    .padding(.top, 10)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 40)
+            .background(bg.ignoresSafeArea(edges: .horizontal))
         }
         .buttonStyle(.plain)
     }
