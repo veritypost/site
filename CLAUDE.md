@@ -90,10 +90,10 @@ Three apps, one DB. All connected via Supabase (`fyiwulqphgmoqullmrfn`).
 │       ├── middleware.js         auth + CORS + CSP + /kids/* redirect + public-path gate
 │       ├── app/
 │       │   ├── layout.js         metadata, fonts, PermissionsProvider mount
-│       │   ├── page.tsx          home feed (FALLBACK_CATEGORIES hardcode still there — tracked in MASTER_TRIAGE_2026-04-23.md)
+│       │   ├── page.tsx          home feed
 │       │   ├── story/[slug]/     article reader, quiz-gated comments
 │       │   ├── profile/
-│       │   │   ├── settings/     the 3800-line settings page — giant, careful edits
+│       │   │   ├── settings/     the ~5,300-line settings page — giant, careful edits
 │       │   │   └── kids/         parent-side kid management
 │       │   ├── admin/            highest blast radius — every change runs the 6-agent ship pattern
 │       │   ├── login/ signup/ verify-email/ welcome/ forgot-password/ reset-password/
