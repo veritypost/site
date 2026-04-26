@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
 
 export async function POST(_request, { params }) {
@@ -21,6 +22,20 @@ export async function POST(_request, { params }) {
   }
 
   const service = createServiceClient();
+
+  const rate = await checkRateLimit(service, {
+    key: `expert-claim:${user.id}`,
+    policyKey: 'expert-claim',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Claiming too quickly. Wait a moment and try again.' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
+
   const { error } = await service.rpc('claim_queue_item', {
     p_user_id: user.id,
     p_queue_item_id: params.id,

@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
 
 // GET  /api/expert/back-channel?category_id=...&source_comment_id=... — read messages
@@ -60,13 +61,27 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
 
+  const service = createServiceClient();
+
+  const rate = await checkRateLimit(service, {
+    key: `expert-back:${user.id}`,
+    policyKey: 'expert-back',
+    max: 20,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Posting too quickly. Wait a moment and try again.' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
+
   const { category_id, body, source_comment_id, parent_id, title } = await request
     .json()
     .catch(() => ({}));
   if (!category_id || !body)
     return NextResponse.json({ error: 'category_id and body required' }, { status: 400 });
 
-  const service = createServiceClient();
   const { data, error } = await service.rpc('post_back_channel_message', {
     p_user_id: user.id,
     p_category_id: category_id,

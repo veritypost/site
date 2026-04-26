@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { v2LiveGuard } from '@/lib/featureFlags';
 import { safeErrorResponse } from '@/lib/apiErrors';
 
@@ -25,6 +26,21 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
 
+  const service = createServiceClient();
+
+  const rate = await checkRateLimit(service, {
+    key: `expert-ask:${user.id}`,
+    policyKey: 'expert-ask',
+    max: 5,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Asking too quickly. Wait a moment and try again.' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
+
   const { article_id, body, target_type, target_id } = await request.json().catch(() => ({}));
   if (!article_id || !body || !target_type || !target_id) {
     return NextResponse.json(
@@ -32,8 +48,6 @@ export async function POST(request) {
       { status: 400 }
     );
   }
-
-  const service = createServiceClient();
   const { data, error } = await service.rpc('ask_expert', {
     p_user_id: user.id,
     p_article_id: article_id,
