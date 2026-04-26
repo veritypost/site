@@ -50,11 +50,7 @@ POST-LAUNCH items, Apple-console-blocked items, and SHIPPED items are excluded. 
 
 21. **Delete `BadgeUnlockScene.swift`, `QuizPassScene.swift`, and strip `biasedSpotted` param** (T-005, OwnerQ Task 11) — both scenes are unreachable dead code; remove files, strip the parameter from `completeQuiz`, remove the badge branch and the `extension BadgeUnlockScene: Identifiable`. Affects: `VerityPostKids/VerityPostKids/BadgeUnlockScene.swift`, `QuizPassScene.swift`, `KidsAppState.swift`, `KidsAppRoot.swift`.
 
-22. **Remove iOS expert insights dead `#if false` block** (T-021) — find and delete. Affects: `VerityPost/VerityPost/` (expert insights file with `#if false`).
-
-23. **Remove iOS `appAwardPoints` dead function** (T-022) — find and delete unused function. Affects: `VerityPost/VerityPost/` (wherever `appAwardPoints` is defined).
-
-24. **Delete `VerityPost/VerityPost/REVIEW.md`** (T-008, OwnerQ Task 16) — stale UI/UX audit from 2026-04-19 that ships inside the app bundle. Affects: `VerityPost/VerityPost/REVIEW.md`.
+22. **Delete `VerityPost/VerityPost/REVIEW.md`** (T-008, OwnerQ Task 16) — stale UI/UX audit from 2026-04-19 that ships inside the app bundle. Affects: `VerityPost/VerityPost/REVIEW.md`.
 
 ---
 
@@ -62,11 +58,9 @@ POST-LAUNCH items, Apple-console-blocked items, and SHIPPED items are excluded. 
 
 25. **Fix iOS signup `users.upsert` race with auth trigger** (T-031) — make the sequence safe against the DB trigger that fires on auth user creation; prevent orphan auth rows and null usernames. Affects: `VerityPost/VerityPost/AuthViewModel.swift`.
 
-26. **Cache `DateFormatter` instances in iOS views** (T-025) — move from per-render instantiation to a shared static. Affects: iOS views using `DateFormatter`.
+26. **Audit `ParentalGateModal` call sites for missing COPPA gates** (T-120) — verify the gate fires on every external link, payment prompt, and mailto; confirm nothing is missing beyond the known 4 callers. Affects: `VerityPostKids/VerityPostKids/` — all external link, payment, and mailto surfaces.
 
-27. **Audit `ParentalGateModal` call sites for missing COPPA gates** (T-120) — verify the gate fires on every external link, payment prompt, and mailto; confirm nothing is missing beyond the known 4 callers. Affects: `VerityPostKids/VerityPostKids/` — all external link, payment, and mailto surfaces.
-
-28. **Add illustration support to kid reader** (T-119) — pull `articles.illustration_url` when present; UI-only change; no schema add yet (column does not currently exist — this task is blocked until the column is added). Affects: `VerityPostKids/VerityPostKids/KidReaderView.swift`.
+27. **Add illustration support to kid reader** (T-119) — pull `articles.illustration_url` when present; UI-only change; no schema add yet (column does not currently exist — this task is blocked until the column is added). Affects: `VerityPostKids/VerityPostKids/KidReaderView.swift`.
 
 ---
 
@@ -99,12 +93,14 @@ POST-LAUNCH items, Apple-console-blocked items, and SHIPPED items are excluded. 
 39. **Build `Skeleton` component** (T-042) — card/line/avatar variants; replaces every spinner; shape matches content. Affects: new `web/src/components/Skeleton.tsx`, iOS `.redacted(reason: .placeholder)`.
 
 40. **Unify Toast component across all adult mutations** (T-043) — wire success (4s) / error (8s with action) / info (4s) variants to every mutation path that currently produces no toast. Affects: all web mutation call sites, iOS mutation paths.
+SHIPPED 2026-04-26 · 9ec6eac — messages/page.tsx sendMessage + blockOtherUser + submitReport wired to global Toast; local actionToast state + inline banner removed.
 
 41. **Build `LockedFeatureCTA` component** (T-044) — replaces `LockModal.tsx` blocking pattern; inline faded surface with upsell beneath; `gateType` prop: `plan` / `role` / `verification`. Affects: new `web/src/components/LockedFeatureCTA.tsx`, iOS equivalent.
 
 42. **Classify all `hasPermission()` call sites with `gateType`** (T-045) — prerequisite for T-067 swap; ~50 sites across web and iOS must each be classified as plan / role / verification before the LockModal replacement. Affects: ~50 call sites across `web/src/` and `VerityPost/`.
 
 43. **Implement natural-language date format helpers** (T-046) — "Friday afternoon" not "Apr 25, 2026 14:32"; ISO stays in code and admin tables only. Affects: new `web/src/lib/dates.ts`, iOS date utilities.
+SHIPPED 2026-04-26 · 9ec6eac — created web/src/lib/dates.ts (formatDate, formatDateTime, timeAgo); extracted timeAgo from CommentRow.tsx; swept 16 raw toLocaleDateString/toLocaleString call sites across 11 non-admin pages.
 
 ---
 
@@ -190,17 +186,11 @@ SHIPPED 2026-04-26. Web: position:fixed bottom bar (zIndex 100) renders when myR
 
 89. **Show free user inbox faded with `LockedFeatureCTA`** (T-102) — instead of the blocking LockModal, free users see the inbox shape faded with `gateType="plan"`. Affects: `web/src/app/messages/page.tsx`, `MessagesView.swift`.
 
-90. **Group notifications by today / this week / older** (T-103). Affects: `web/src/app/notifications/page.tsx`, `AlertsView.swift`.
+90. **Replace notification titles with inline message previews** (T-104). Affects: notification list web and iOS.
 
-91. **Replace notification titles with inline message previews** (T-104). Affects: notification list web and iOS.
+91. **Move notification Manage to `/notifications/manage` route** (T-106) — notifications is consumption, Manage is configuration. Affects: `web/src/app/notifications/page.tsx` and routing.
 
-92. **Add swipe-to-mark-read and swipe-to-archive on mobile** (T-105). Affects: notifications list iOS and mobile web.
-
-93. **Move notification Manage to `/notifications/manage` route** (T-106) — notifications is consumption, Manage is configuration. Affects: `web/src/app/notifications/page.tsx` and routing.
-
-94. **Delay push permission prompt until first quiz pass** (T-107). Affects: iOS push permission flow and web push prompt.
-
-95. **Auto-advance to next question on expert submit** (T-111). Affects: expert queue web and iOS.
+92. **Auto-advance to next question on expert submit** (T-111). Affects: expert queue web and iOS.
 
 96. **Add vacation mode toggle to expert queue header** (T-112). Affects: expert queue web and iOS.
 
