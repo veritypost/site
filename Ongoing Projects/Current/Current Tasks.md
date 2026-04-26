@@ -26,7 +26,7 @@ POST-LAUNCH items, Apple-console-blocked items, and SHIPPED items are excluded. 
 
 12. **Add rate limits to expert claim, ask, and back-channel routes** (T-016) — SHIPPED 2026-04-26. `checkRateLimit` added to all three routes: ask (5/60s), claim (30/60s), back-channel POST (20/60s). Service client moved above body parse per CLAUDE.md mandate. Migration `schema/183_seed_expert_rate_limit_policies.sql` seeds three `rate_limits` DB rows (apply via Supabase dashboard). Routes fall back to code defaults until migration is applied. Commit: 1e9863f.
 
-14. **Add rate limit to quiz start and comment PATCH routes** (T-017) — add `checkRateLimit` to both handlers. Affects: `web/src/app/api/quiz/start/route.js`, `web/src/app/api/comments/[id]/route.js` PATCH handler.
+14. **Add rate limit to quiz start and comment PATCH routes** (T-017) — SHIPPED 2026-04-26. `checkRateLimit` added to `quiz/start` POST (article-scoped key `quiz-start:{userId}:{articleId}`, 3/600s) and `comments/[id]` PATCH (user-scoped key `comment-edit:{userId}`, 5/60s). Migration `schema/184_seed_quiz_comment_edit_rate_limit_policies.sql` seeds both `rate_limits` rows (owner applies via Supabase dashboard). DELETE handler untouched. tsc clean. Commit: 4040fd6.
 
 15. **Add input length caps on all unbounded text inputs** (T-014) — enforce `maxLength` at API layer on support form, expert/ask, expert/back-channel, expert/queue answer, recap submit, appeals, reports, comment report. Affects: the six named API routes.
 

@@ -74,7 +74,14 @@ None found. Live code matches expectations.
 [filled only if vote is split]
 
 ## Implementation Progress
-[filled by background agents during execution]
+- Migration 184 written: `schema/184_seed_quiz_comment_edit_rate_limit_policies.sql`
+- `web/src/app/api/quiz/start/route.js`: added `checkRateLimit` import + rate limit block after `createServiceClient()`, before `start_quiz_attempt` RPC
+- `web/src/app/api/comments/[id]/route.js`: added `checkRateLimit` import + rate limit block in PATCH handler only after `createServiceClient()`, before body parse + RPC; DELETE handler untouched
+- `tsc --noEmit`: clean
+- pre-commit hooks (lint-staged + prettier): clean
 
 ## Completed
-[SHIPPED block written here when done]
+SHIPPED 2026-04-26
+Commit: 4040fd6
+Files: web/src/app/api/quiz/start/route.js, web/src/app/api/comments/[id]/route.js, schema/184_seed_quiz_comment_edit_rate_limit_policies.sql
+DB action pending: owner applies migration 184 via Supabase dashboard. Routes fall back to code defaults (same values) until applied.
