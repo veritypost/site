@@ -245,6 +245,16 @@ Aggregate themes (counts approximate):
 
 ---
 
+---
+
+## Design system tasks shipped
+
+| Task | Description | Status |
+|------|-------------|--------|
+| T-045 | Classify all `hasPermission()` call sites with gateType (hard / soft / invisible) — prerequisite for T-067 LockModal swap | **SHIPPED 2026-04-26** — `Ongoing Projects/Current/hasPermission-classification.md`. 104 executable call sites classified: 15 HARD, 6 SOFT, 83 INVISIBLE. 41 sites flagged for inline-CTA wiring, 46 keep-invisible, 12 keep-hard-redirect, 5 keep-modal. |
+
+---
+
 ## Source files
 
 - `/private/tmp/claude-501/-Users-veritypost-Desktop-verity-post/cac30464-d918-4b28-bccd-54b4bf063dcf/tasks/a12eb7b6b3437712f.output` — settings exhaustive
