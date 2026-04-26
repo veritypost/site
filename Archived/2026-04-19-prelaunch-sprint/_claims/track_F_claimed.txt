@@ -1,5 +1,0 @@
-site/src/components/Avatar.js
-site/src/components/FollowButton.jsx
-site/src/components/VerifiedBadge.js
-site/src/components/kids/Badge.jsx
-site/src/components/kids/StreakRibbon.jsx

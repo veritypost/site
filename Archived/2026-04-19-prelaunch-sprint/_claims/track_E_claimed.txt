@@ -1,4 +1,0 @@
-site/src/components/Ad.jsx
-site/src/components/Interstitial.jsx
-site/src/components/LockModal.jsx
-site/src/components/RecapCard.jsx
