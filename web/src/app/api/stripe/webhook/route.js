@@ -486,8 +486,7 @@ async function handleSubscriptionUpdated(service, sub) {
 
 // DA-160 / DA-165 — a successful refund from Stripe Dashboard or Stripe
 // Portal was silently ignored. Policy: treat a full refund as plan
-// revocation (freeze the user); partial refunds log only. This is a
-// conservative default; admins can escalate partial refunds manually.
+// revocation. Partial refunds log only; admins can escalate manually.
 //
 // B11 — the prior `Boolean(charge.refunded) || amount === amount_refunded`
 // fallback misclassified partial refunds as full when Stripe's webhook
@@ -498,20 +497,21 @@ async function handleSubscriptionUpdated(service, sub) {
 // `charge.refunded` is false, freezing a user mid-partial-refund). Use
 // the boolean alone.
 //
-// B11 also adds an in-app notification on freeze — prior code silently
-// locked users out of paid features. Matches the handlePaymentFailed
-// notification pattern below. Best-effort.
+// T-011 — auto-freeze gate. Whether a full refund immediately freezes the
+// user is now controlled by the `billing.refund_auto_freeze` settings row
+// (default 'false' after migration 179). When false, the webhook logs
+// `billing:refund_full_pending_review` and notifies the user that their
+// account is under review — no freeze fires until an admin manually calls
+// /api/admin/billing/freeze. When true, the prior immediate-freeze
+// behavior is preserved.
 //
-// Deferred (separate items):
-//   - charge.refund.updated (status='reversed') handler + billing_unfreeze
-//     RPC. Stripe DOES fire this and we currently leave reversed-refund
-//     users frozen forever.
-//   - charge.dispute.closed handler. Won-disputes leave the user frozen
-//     if a refund had also fired; today admin must manually unfreeze.
-//   - Apple-side REFUND parity — touched independently. Multi-provider
-//     sync (iOS subscriptions/sync re-validates Apple receipts on launch)
-//     can undo any state change unless both sides agree, which is a
-//     bigger architectural fix.
+// Unfreeze paths (charge.refund.updated status='reversed' and
+// charge.dispute.closed status='won') are handled by handleRefundUpdated
+// and handleDisputeClosed below — both call billing_unfreeze (schema/158).
+//
+// Apple-side REFUND parity is a separate multi-provider concern; iOS
+// subscriptions/sync re-validates Apple receipts on launch and can
+// undo state changes unless both sides agree.
 async function handleChargeRefunded(service, charge) {
   const customerId = charge.customer;
   if (!customerId) return;
@@ -520,9 +520,27 @@ async function handleChargeRefunded(service, charge) {
 
   const fullyRefunded = charge.refunded === true;
 
+  // T-011: read the auto-freeze gate. Missing row → default false (admin-review
+  // path). The migration inserts the row with value='false' so this fallback
+  // only fires on un-migrated environments.
+  const { data: settingRow } = await service
+    .from('settings')
+    .select('value')
+    .eq('key', 'billing.refund_auto_freeze')
+    .maybeSingle();
+  const autoFreeze = settingRow?.value === 'true';
+
+  // Determine audit action before writing: pending-review path gets a
+  // distinct action so admin queries can filter without touching freeze path.
+  const auditAction = fullyRefunded
+    ? autoFreeze
+      ? 'billing:refund_full'
+      : 'billing:refund_full_pending_review'
+    : 'billing:refund_partial';
+
   await service.from('audit_log').insert({
     actor_id: userRow.id,
-    action: fullyRefunded ? 'billing:refund_full' : 'billing:refund_partial',
+    action: auditAction,
     target_type: 'user',
     target_id: userRow.id,
     metadata: {
@@ -531,12 +549,19 @@ async function handleChargeRefunded(service, charge) {
       amount: charge.amount,
       amount_refunded: charge.amount_refunded,
       currency: charge.currency,
+      auto_freeze: autoFreeze,
     },
   });
 
-  if (fullyRefunded && !userRow.frozen_at) {
+  if (!fullyRefunded || userRow.frozen_at) {
+    // Partial refund or already frozen — nothing further to do.
+    return;
+  }
+
+  if (autoFreeze) {
+    // Immediate-freeze path (billing.refund_auto_freeze = 'true').
     await service.rpc('billing_freeze_profile', { p_user_id: userRow.id });
-    // B11: tell the user. Best-effort; webhook ack takes precedence.
+    // Tell the user their paid features are paused. Best-effort.
     try {
       await service.rpc('create_notification', {
         p_user_id: userRow.id,
@@ -551,10 +576,37 @@ async function handleChargeRefunded(service, charge) {
         p_metadata: { charge_id: charge.id, stripe_customer_id: customerId },
       });
     } catch (err) {
-      // Ext-D1 — log instead of silent swallow. Freeze is the source
-      // of truth; the notification is observability and best-effort,
-      // but a sustained failure pattern wants to be visible somewhere.
-      console.error('[stripe.webhook] create_notification (refund) failed:', err);
+      console.error('[stripe.webhook] create_notification (refund freeze) failed:', err);
+    }
+  } else {
+    // T-011: admin-review path (billing.refund_auto_freeze = 'false').
+    // No freeze fired. Log server-side so ops surfaces see it; admin
+    // uses /api/admin/billing/freeze to freeze after reviewing.
+    console.warn('[stripe.webhook] full refund pending admin review — no auto-freeze', {
+      user_id: userRow.id,
+      charge_id: charge.id,
+    });
+    // Notify the user that the refund is being reviewed, without saying
+    // their account is frozen (it is not yet).
+    try {
+      await service.rpc('create_notification', {
+        p_user_id: userRow.id,
+        p_type: 'billing_alert',
+        p_title: 'Refund received — subscription under review',
+        p_body:
+          'We received a refund on your subscription and are reviewing your account. Contact support if you have questions.',
+        p_action_url: '/profile/settings/billing',
+        p_action_type: 'billing',
+        p_action_id: null,
+        p_priority: 'high',
+        p_metadata: {
+          charge_id: charge.id,
+          stripe_customer_id: customerId,
+          pending_review: true,
+        },
+      });
+    } catch (err) {
+      console.error('[stripe.webhook] create_notification (refund pending review) failed:', err);
     }
   }
 }
