@@ -8,11 +8,11 @@ POST-LAUNCH items, Apple-console-blocked items, and SHIPPED items are excluded. 
 
 ## Tier 2 — Security / correctness
 
-5. **Remove dead `superadmin` role references from 8 RPCs and 12 policies** (T-004, Q16) — write a migration stripping `superadmin` from `IN (...)` clauses in all affected routine bodies and policies. Affects: `schema/014`, `016`, `026`, `167`, `174` (new migration needed).
+5. **Remove dead `superadmin` role references from 8 RPCs and 12 policies** (T-004, Q16) — SHIPPED 2026-04-26. Migration `schema/180_strip_superadmin_references.sql` written. Strips `superadmin` from `IN (...)` clauses in 8 RPCs (`_user_is_moderator`, `approve_expert_answer`, `approve_expert_application`, `expert_can_see_back_channel`, `grant_role`, `mark_probation_complete`, `reject_expert_application`, `revoke_role`) and 2 RLS policies (`weekly_recap_questions_modify`, `weekly_recap_quizzes_modify`). DB confirms 2 policies with superadmin (task estimate of 12 counted per-file expression hits, not distinct live policy objects). Owner applies via Supabase dashboard. Post-apply: both verification queries in migration comments should return 0 rows.
 
-6. **Fix `import-permissions.js` calling non-existent `bump_global_perms_version` RPC** (Q17) — create the missing RPC or wire to the correct existing one (`bump_user_perms_version`/`perms_global_version` write). Affects: `scripts/import-permissions.js`.
+6. **Fix `import-permissions.js` calling non-existent `bump_global_perms_version` RPC** (Q17) — SHIPPED 2026-04-26. Wrong RPC name (`bump_global_perms_version` → `bump_perms_global_version`), corrupt version=999 fallback, and unconditional double-bump removed; replaced with single correct RPC call that throws on error. Commit: ed83cfd.
 
-7. **Fix messages/conversations brittle error-string status mapping** (T-012) — replace `error.message.includes(...)` pattern with stable `[CODE]` prefix checks already landed on the RPC side. Affects: `web/src/app/api/messages/route.js`, `web/src/app/api/conversations/route.js`.
+7. **Fix messages/conversations brittle error-string status mapping** (T-012) — SHIPPED 2026-04-26. Removed 4 `msg.includes(...)` fallbacks from `messages/route.js` and 4 from `conversations/route.js`; simplified `isSelf` to `code === 'SELF_CONV'`. Schema/150 [CODE] prefix path is now the sole error-classification branch. Commit: 78f8f22.
 
 8. **Fix `KidsAppState.completeQuiz` mutating local state before server confirmation** (Q33) — sequence the local state update so it only fires after the server call succeeds. Affects: `VerityPostKids/VerityPostKids/KidsAppState.swift:187-200`.
 
