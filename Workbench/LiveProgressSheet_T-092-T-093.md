@@ -35,7 +35,19 @@ None found.
 [filled only if vote is split]
 
 ## Implementation Progress
-[filled by background agents during execution]
+- rankAccentColor() helper added at module scope in page.tsx
+- LeaderRow isPodium prop added (interface + destructuring default)
+- Both LeaderRow call sites updated (anon top-3 + me top-3) to pass rankAccentColor(i+1) + isPodium
+- T-093 sticky bar added before </main> in page.tsx — position:fixed, zIndex:100, inner centering div
+- podiumColor(for:) helper added to LeaderboardView.swift MARK: Components
+- leaderboardRow rank badge foregroundColor updated from VP.accent to podiumColor(for: idx)
+- leaderboardRow vertical padding updated to idx < 3 ? 14 : 12
+- .safeAreaInset(edge: .bottom) added to ScrollView — conditional on user having rank in list
+- ISO8601DateFormatter promoted to file-scope leaderboardISO8601, two call sites updated
 
 ## Completed
-[SHIPPED block written here when done]
+SHIPPED 2026-04-26
+Commit: a300edc
+Files: web/src/app/leaderboard/page.tsx, VerityPost/VerityPost/LeaderboardView.swift
+tsc: clean (no new errors)
+xcodebuild: Swift compiled clean (pre-existing possibleChanges resource errors unrelated)

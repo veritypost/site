@@ -140,8 +140,6 @@ POST-LAUNCH items, Apple-console-blocked items, and SHIPPED items are excluded. 
 
 ## Tier 12 — Surface rebuilds (PRELAUNCH Phases 1–6)
 
-61. **Rebuild home hero with full-bleed treatment** (T-059) — image bleeds to viewport/screen edges; title overlays bottom-left in serif display type; human date format ("Friday, April 25" not "04/25/26"). Affects: `web/src/app/page.tsx`, `VerityPost/VerityPost/HomeView.swift`.
-
 62. **Add clean stop indicator to home page** (T-060) — small dated mark or thin rule after the last article signaling "that's today's brief"; page ends, not infinite scroll. Affects: `web/src/app/page.tsx`, `VerityPost/VerityPost/HomeView.swift`.
 
 63. **Make story reader full-bleed with collapsing chrome** (T-061) — no persistent chrome; top bar collapses on scroll to a 1px progress line. Affects: `web/src/app/story/[slug]/page.tsx`, `VerityPost/VerityPost/StoryDetailView.swift`.
@@ -169,8 +167,10 @@ POST-LAUNCH items, Apple-console-blocked items, and SHIPPED items are excluded. 
 78. **Show bookmark notes inline on cover cards** (T-091) — small italic preview if a note exists. Affects: bookmarks page web and iOS.
 
 79. **Style top 3 leaderboard entries with podium treatment** (T-092) — larger cards, tier accent color, score visible for ranks 1-3. Affects: `web/src/app/leaderboard/page.tsx`, `LeaderboardView.swift`.
+SHIPPED 2026-04-26. rankAccentColor() on web, podiumColor(for:) on iOS; isPodium prop adds 2px extra vpad to rows 1-3. Commit: a300edc.
 
 80. **Make user rank sticky at bottom of leaderboard while scrolling** (T-093) — sticky footer showing the viewer's own rank. Affects: leaderboard web and iOS.
+SHIPPED 2026-04-26. Web: position:fixed bottom bar (zIndex 100) renders when myRank != null. iOS: .safeAreaInset(edge:.bottom) above tab bar, conditional on user being in the loaded list. Commit: a300edc.
 
 81. **Convert leaderboard category dropdown to horizontal tab strip** (T-094). Affects: leaderboard web and iOS.
 
