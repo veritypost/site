@@ -5,6 +5,7 @@ import { useState, useEffect, CSSProperties } from 'react';
 import { useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
+import { formatDate } from '@/lib/dates';
 import type { Tables } from '@/types/database-helpers';
 
 // D36 / Pass 17 — recap player. Gate parity:
@@ -169,8 +170,7 @@ export default function RecapPlayer() {
       </a>
       <h1 style={{ fontSize: 22, fontWeight: 800, margin: '6px 0 4px' }}>{recap.title}</h1>
       <div style={{ fontSize: 12, color: C.dim, marginBottom: 20 }}>
-        Week of {new Date(recap.week_start).toLocaleDateString()} ·{' '}
-        {recap.categories?.name || 'All categories'}
+        Week of {formatDate(recap.week_start)} · {recap.categories?.name || 'All categories'}
       </div>
 
       {error && <div style={{ fontSize: 12, color: C.danger, marginBottom: 10 }}>{error}</div>}

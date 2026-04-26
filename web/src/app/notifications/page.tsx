@@ -5,6 +5,7 @@ import { useState, useEffect, CSSProperties } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import type { Tables } from '@/types/database-helpers';
+import { formatDateTime } from '@/lib/dates';
 
 // Notifications inbox. Listing + mark-read traffic runs through
 // /api/notifications which mirrors the permission check server-side. The
@@ -367,7 +368,7 @@ export default function NotificationsInbox() {
               </span>
               <span style={{ fontSize: 14, fontWeight: 600 }}>{n.title}</span>
               <span style={{ marginLeft: 'auto', fontSize: 11, color: C.dim }}>
-                {n.created_at ? new Date(n.created_at).toLocaleString() : ''}
+                {formatDateTime(n.created_at)}
               </span>
             </div>
             {n.body && <div style={{ fontSize: 13, color: C.text, marginTop: 4 }}>{n.body}</div>}

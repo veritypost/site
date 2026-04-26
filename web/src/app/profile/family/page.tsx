@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '../../../lib/supabase/client';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
+import { formatDate } from '@/lib/dates';
 
 const C = {
   card: '#f7f7f7',
@@ -199,8 +200,7 @@ export default function FamilyDashboard() {
       {canViewReport && (
         <>
           <h2 style={{ fontSize: 15, fontWeight: 700, margin: '12px 0 8px' }}>
-            This week (
-            {report?.week_ending ? new Date(report.week_ending).toLocaleDateString() : ''})
+            This week ({formatDate(report?.week_ending)})
           </h2>
           <div
             style={{
@@ -275,7 +275,7 @@ export default function FamilyDashboard() {
                     <div style={{ flex: 1, fontSize: 12, color: C.dim }}>{a.description}</div>
                     {earned ? (
                       <span style={{ fontSize: 11, color: C.success, fontWeight: 700 }}>
-                        Earned {a.earned_at ? new Date(a.earned_at).toLocaleDateString() : ''}
+                        Earned {formatDate(a.earned_at)}
                       </span>
                     ) : (
                       <span style={{ fontSize: 11, color: C.dim }}>In progress</span>

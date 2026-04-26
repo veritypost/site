@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '../../lib/supabase/client';
 import type { Tables } from '@/types/database-helpers';
+import { formatDateTime } from '@/lib/dates';
 
 // Blueprint §10 — users can appeal any warning / mute / ban.
 // The warning row carries the appeal fields; moderators resolve via
@@ -172,9 +173,7 @@ export default function AppealPage() {
                   <div style={{ fontSize: 14, fontWeight: 700 }}>
                     {ACTION_LABEL[w.action_taken] || w.action_taken}
                   </div>
-                  <div style={{ fontSize: 11, color: '#666' }}>
-                    {new Date(w.created_at).toLocaleString()}
-                  </div>
+                  <div style={{ fontSize: 11, color: '#666' }}>{formatDateTime(w.created_at)}</div>
                 </div>
                 {status && (
                   <span

@@ -6,6 +6,7 @@ import { createClient } from '../../lib/supabase/client';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import { usePageViewTrack } from '@/lib/useTrack';
 import type { Tables } from '@/types/database-helpers';
+import { formatDate } from '@/lib/dates';
 
 // D26: basic keyword search for everyone; advanced filters (date, category,
 // subcategory, source) at Verity+. The server ignores filters from free
@@ -262,7 +263,7 @@ export default function SearchPage() {
             <div style={{ fontSize: 11, color: '#666' }}>
               {a.categories?.name}
               {a.categories?.name && a.published_at ? ' · ' : ''}
-              {a.published_at ? new Date(a.published_at).toLocaleDateString() : ''}
+              {formatDate(a.published_at)}
             </div>
           </a>
         ))}

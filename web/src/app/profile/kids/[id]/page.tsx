@@ -9,6 +9,7 @@ import PairDeviceButton from '@/components/kids/PairDeviceButton';
 import OpenKidsAppButton from '@/components/kids/OpenKidsAppButton';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import type { Tables } from '@/types/database-helpers';
+import { formatDate, formatDateTime } from '@/lib/dates';
 
 const C = {
   card: '#f7f7f7',
@@ -73,7 +74,7 @@ function timeAgo(iso: string | null | undefined): string {
   if (m < 60) return `${m}m ago`;
   if (h < 24) return `${h}h ago`;
   if (d < 30) return `${d}d ago`;
-  return new Date(iso).toLocaleDateString();
+  return formatDate(iso);
 }
 
 export default function KidDashboardPage() {
@@ -529,7 +530,7 @@ export default function KidDashboardPage() {
                   <div style={{ fontSize: 13, fontWeight: 700 }}>{s.title}</div>
                   <div style={{ fontSize: 11, color: C.dim }}>
                     {s.categories?.name ? `${s.categories.name} \u00b7 ` : ''}
-                    {new Date(s.scheduled_at).toLocaleString()}
+                    {formatDateTime(s.scheduled_at)}
                   </div>
                 </div>
                 <span style={{ fontSize: 11, color: C.dim }}>In the Kids app</span>
@@ -560,7 +561,7 @@ export default function KidDashboardPage() {
                 <span style={{ color: a.correct >= 3 ? C.success : C.danger, fontWeight: 700 }}>
                   {a.correct}/5
                 </span>
-                <span style={{ color: C.dim }}>{new Date(a.at).toLocaleDateString()}</span>
+                <span style={{ color: C.dim }}>{formatDate(a.at)}</span>
               </div>
             ))}
           </div>

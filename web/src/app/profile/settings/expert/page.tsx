@@ -6,6 +6,7 @@ import { useState, useEffect, type CSSProperties, type ReactNode } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { hasPermission, refreshAllPermissions } from '@/lib/permissions';
 import type { Database } from '@/types/database';
+import { formatDate } from '@/lib/dates';
 
 type UserRow = Pick<
   Database['public']['Tables']['users']['Row'],
@@ -242,15 +243,15 @@ export default function ExpertSettings() {
 
       {application && application.status === 'pending' && (
         <StatusCard tone="warn" title="Application pending review">
-          Submitted {new Date(application.created_at).toLocaleDateString()}. Editors are scoring
-          your 3 sample responses.
+          Submitted {formatDate(application.created_at)}. Editors are scoring your 3 sample
+          responses.
         </StatusCard>
       )}
       {application && application.status === 'approved' && (
         <StatusCard tone="success" title={`Approved - ${application.application_type}`}>
           Probation {application.probation_completed ? 'complete' : 'in progress'}
           {!application.probation_completed && application.probation_ends_at
-            ? ` - ends ${new Date(application.probation_ends_at).toLocaleDateString()}`
+            ? ` - ends ${formatDate(application.probation_ends_at)}`
             : ''}
           .
           {!application.probation_completed &&

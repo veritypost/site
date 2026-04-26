@@ -3,6 +3,7 @@
 'use client';
 import { useEffect, useState, CSSProperties } from 'react';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
+import { formatDate } from '@/lib/dates';
 import type { Tables } from '@/types/database-helpers';
 
 // D36 / Pass 17 — weekly recap list. Permission swap:
@@ -122,8 +123,7 @@ export default function RecapListPage() {
             >
               <div style={{ fontSize: 15, fontWeight: 700 }}>{r.title}</div>
               <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>
-                {r.categories?.name || 'All categories'} · Week of{' '}
-                {new Date(r.week_start).toLocaleDateString()}
+                {r.categories?.name || 'All categories'} · Week of {formatDate(r.week_start)}
                 {done &&
                   r.my_attempt &&
                   ` · Completed ${r.my_attempt.score}/${r.my_attempt.total_questions}`}

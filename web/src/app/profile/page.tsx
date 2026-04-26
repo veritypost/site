@@ -35,6 +35,7 @@ import { createClient } from '@/lib/supabase/client';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import { getScoreTiers, tierFor, nextTier, type ScoreTier } from '@/lib/scoreTiers';
 import type { Tables } from '@/types/database-helpers';
+import { formatDate } from '@/lib/dates';
 
 // ---------------------------------------------------------------
 // Tab model + URL sync
@@ -732,8 +733,7 @@ function OverviewTab({
               lineHeight: 1.4,
             }}
           >
-            Score frozen on {new Date(user.frozen_at).toLocaleDateString()}. Resubscribe to resume
-            tracking progress.
+            Score frozen on {formatDate(user.frozen_at)}. Resubscribe to resume tracking progress.
           </div>
         )}
 
