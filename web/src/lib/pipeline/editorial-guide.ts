@@ -898,27 +898,18 @@ OUTPUT FORMAT
 {
   "events": [
     {
-      "date": "Jun 2023",
-      "text": "Supreme Court strikes down race-conscious college admissions",
-      "summary": "The Court ruled 6-3 that Harvard and UNC admissions programs violated the Equal Protection Clause, ending decades of race-conscious college admissions nationwide.",
-      "is_current": false,
-      "is_future": false,
-      "vp_slug": null
+      "event_date": "Jun 2023",
+      "event_label": "Supreme Court strikes down race-conscious college admissions",
+      "event_body": "The Court ruled 6-3 that Harvard and UNC admissions programs violated the Equal Protection Clause, ending decades of race-conscious college admissions nationwide."
     },
     {
-      "date": "Apr 5, 2026",
-      "text": "Federal judge blocks admissions data mandate in 17 states",
-      "summary": "A federal judge in Boston issued a preliminary injunction blocking the Department of Education from requiring universities to collect racial demographic data on applicants.",
-      "is_current": true,
-      "is_future": false,
-      "vp_slug": null
+      "event_date": "Apr 5, 2026",
+      "event_label": "Federal judge blocks admissions data mandate in 17 states",
+      "event_body": "A federal judge in Boston issued a preliminary injunction blocking the Department of Education from requiring universities to collect racial demographic data on applicants."
     },
     {
-      "date": "Apr 20, 2026",
-      "text": "Government response to injunction due",
-      "is_current": false,
-      "is_future": true,
-      "vp_slug": null
+      "event_date": "Apr 20, 2026",
+      "event_label": "Government response to injunction due"
     }
   ]
 }`;
@@ -987,7 +978,7 @@ RULES:
 OUTPUT JSON:
 {
   "events": [
-    {"date": "Mon YYYY or Mon DD, YYYY", "text": "Max 10 words, kid-friendly language", "summary": "1-2 sentences explaining what happened in kid-friendly terms. 20-40 words."}
+    {"event_date": "Mon YYYY or Mon DD, YYYY", "event_label": "Max 10 words, kid-friendly language", "event_body": "1-2 sentences explaining what happened in kid-friendly terms. 20-40 words."}
   ]
 }`;
 
