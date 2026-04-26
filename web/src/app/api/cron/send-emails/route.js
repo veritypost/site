@@ -20,8 +20,8 @@ export const maxDuration = 60;
 
 const TYPE_TO_TEMPLATE = {
   breaking_news: 'breaking_news_alert',
-  weekly_reading_report: 'weekly_reading_report',
-  weekly_family_report: 'weekly_family_report',
+  comment_reply: 'comment_reply',
+  expert_answer_posted: 'expert_answer_posted',
   kid_trial_day6: 'kid_trial_day6',
   kid_trial_expired: 'kid_trial_expired',
   data_export_ready: 'data_export_ready',

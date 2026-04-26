@@ -241,7 +241,6 @@ type AlertType =
   | 'reply_to_me'
   | 'mention'
   | 'expert_answered_me'
-  | 'weekly_reading_report'
   | 'kid_trial_ending'
   | 'appeal_outcome';
 
@@ -256,7 +255,6 @@ const ALERT_ROWS: { key: AlertType; label: string; desc: string }[] = [
     label: 'Expert answered me',
     desc: 'An expert replied to your Ask.',
   },
-  { key: 'weekly_reading_report', label: 'Weekly reading report', desc: 'Your week in review.' },
   { key: 'kid_trial_ending', label: 'Kid trial ending', desc: 'Day-6 + expiry notices.' },
   { key: 'appeal_outcome', label: 'Appeal outcome', desc: 'Moderator decisions on your appeals.' },
 ];
@@ -3840,6 +3838,7 @@ function BillingBundle({
   const [busy, setBusy] = useState<string>('');
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [promoCode, setPromoCode] = useState('');
+  const [showPromoInput, setShowPromoInput] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -4605,41 +4604,56 @@ function BillingBundle({
       )}
 
       {showPromo && (
-        <Card
-          id="promo"
-          title="Promo codes"
-          highlight={highlightPromo}
-          description="Have a code? Redeem it here."
-        >
-          <div
-            style={{
-              display: 'flex',
-              gap: S[2],
-              maxWidth: isMobile ? '100%' : 420,
-              width: '100%',
-              flexWrap: 'wrap',
-              flexDirection: isMobile ? 'column' : 'row',
-              alignItems: isMobile ? 'stretch' : 'center',
-            }}
-          >
-            <TextInput
-              placeholder="ENTER CODE"
-              value={promoCode}
+        <Card id="promo" title="Promo codes" highlight={highlightPromo}>
+          {!showPromoInput ? (
+            <button
+              type="button"
               disabled={!canPromo}
-              onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                setPromoCode(e.target.value.toUpperCase())
-              }
-              style={{ fontFamily: 'monospace', letterSpacing: 1, width: '100%' }}
-            />
-            <Button
-              variant="primary"
-              disabled={!canPromo || !promoCode.trim()}
-              loading={busy === 'promo'}
-              onClick={handlePromo}
+              onClick={() => setShowPromoInput(true)}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                cursor: canPromo ? 'pointer' : 'not-allowed',
+                fontSize: F.sm,
+                color: canPromo ? C.accent : C.dim,
+                textDecoration: 'underline',
+                textUnderlineOffset: 2,
+              }}
             >
-              Apply
-            </Button>
-          </div>
+              Have a promo code?
+            </button>
+          ) : (
+            <div
+              style={{
+                display: 'flex',
+                gap: S[2],
+                maxWidth: isMobile ? '100%' : 420,
+                width: '100%',
+                flexWrap: 'wrap',
+                flexDirection: isMobile ? 'column' : 'row',
+                alignItems: isMobile ? 'stretch' : 'center',
+              }}
+            >
+              <TextInput
+                placeholder="ENTER CODE"
+                value={promoCode}
+                disabled={!canPromo}
+                onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                  setPromoCode(e.target.value.toUpperCase())
+                }
+                style={{ fontFamily: 'monospace', letterSpacing: 1, width: '100%' }}
+              />
+              <Button
+                variant="primary"
+                disabled={!canPromo || !promoCode.trim()}
+                loading={busy === 'promo'}
+                onClick={handlePromo}
+              >
+                Apply
+              </Button>
+            </div>
+          )}
         </Card>
       )}
     </>

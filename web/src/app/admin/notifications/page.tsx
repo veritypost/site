@@ -41,8 +41,6 @@ const COALESCING_CONFIG: ConfigItem[] = [
 const EMAIL_CONFIG: ConfigItem[] = [
   { k: 'email_onboarding', l: 'Onboarding sequence', desc: 'Email series for new signups', num: 'onboard_emails', unit: 'emails' },
   { k: 'email_reengagement', l: 'Re-engagement emails', desc: 'Win back inactive users after N days', num: 'reengage_day', unit: 'days' },
-  { k: 'email_weekly_reading_report', l: 'Weekly reading report', desc: 'Per-user stats: reads, quizzes, score, streak' },
-  { k: 'email_weekly_family_report', l: 'Weekly family report', desc: 'Family-tier aggregate email' },
   { k: 'email_breaking', l: 'Breaking news email', desc: 'Email in addition to push for breaking articles' },
   { k: 'email_achievement', l: 'Achievement emails', desc: 'Email summary of achievements earned' },
 ];
@@ -67,7 +65,6 @@ const DEFAULT_TOGGLE_STATE: Record<string, boolean> = {
   coalesce_enabled: true, coalesce_upvotes: true,
   coalesce_replies: true, coalesce_achievements: false,
   email_onboarding: true, email_reengagement: true,
-  email_weekly_reading_report: true, email_weekly_family_report: true,
   email_breaking: false, email_achievement: false,
 };
 

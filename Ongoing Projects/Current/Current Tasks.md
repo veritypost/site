@@ -262,10 +262,6 @@ POST-LAUNCH items, Apple-console-blocked items, and SHIPPED items are excluded. 
 
 ## Tier 14 — Notification templates
 
-122. **Add `comment_reply` notification template** (T-134) — new `email_templates` row, add to `TYPE_TO_TEMPLATE` in send-emails and send-push crons, wire producer in comment-create path. Affects: `email_templates` table, `web/src/app/api/cron/send-emails/route.js`, `send-push/route.js`, comment creation route.
-
-123. **Add `expert_answer_posted` notification template** (T-135) — same pattern as T-134; fires when expert posts on a thread the user follows. Affects: `email_templates` table, send-emails and send-push crons, expert answer route.
-
 124. **Add `streak_jeopardy` push notification** (T-136) — push at hour 22 if today's reading log is empty. **Blocked on item 111** (streak grid must exist for the notification to reference). Affects: `web/src/app/api/cron/send-push/route.js`.
 
 ---
