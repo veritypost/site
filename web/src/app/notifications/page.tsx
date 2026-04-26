@@ -4,6 +4,7 @@
 import { useState, useEffect, CSSProperties } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
+import { useToast } from '@/components/Toast';
 import type { Tables } from '@/types/database-helpers';
 import { formatDateTime } from '@/lib/dates';
 
@@ -59,6 +60,7 @@ const C = {
 } as const;
 
 export default function NotificationsInbox() {
+  const toast = useToast();
   const [loading, setLoading] = useState<boolean>(true);
   const [items, setItems] = useState<NotificationRow[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
@@ -134,12 +136,23 @@ export default function NotificationsInbox() {
     load();
   }
   async function markOne(id: string) {
-    await fetch('/api/notifications', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids: [id], mark: 'read' }),
-    });
+    // Capture pre-mutation state for rollback.
+    const prevItems = items;
     setItems((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
+    try {
+      const res = await fetch('/api/notifications', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [id], mark: 'read' }),
+      });
+      if (!res.ok) {
+        setItems(prevItems);
+        toast.error('Could not mark notification as read. Try again.');
+      }
+    } catch {
+      setItems(prevItems);
+      toast.error('Network error. Could not mark notification as read.');
+    }
   }
 
   if (!permsReady || loading) {

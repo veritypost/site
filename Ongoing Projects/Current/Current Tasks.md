@@ -64,7 +64,7 @@ POST-LAUNCH items, Apple-console-blocked items, and SHIPPED items are excluded. 
 
 ## Tier 7 — Web UI / React correctness
 
-29. **Fix optimistic-update rollback races across four components** (T-018) — on server failure, revert to pre-mutation state; currently the UI desyncs with no rollback. Affects: alerts toggle, `WatchlistButton`, `FollowButton`, `BlockButton`, `CommentRow.tsx`.
+29. **Fix optimistic-update rollback races across four components** (T-018) — SHIPPED 2026-04-26. Only `notifications/page.tsx markOne` had a genuine optimistic-without-rollback. Other named components (`FollowButton`, `BlockButton`/`/u/[username]`, `CommentRow` voting, `ExpertWatchlistCard`, `AlertsCard`) already had rollback or were not optimistic. Fixed: capture `prevItems` before the optimistic `setItems`, restore on non-ok response or network error, show `toast.error` on failure.
 
 30. **Fix `PermissionsProvider` over-firing** (T-029) — filter `onAuthStateChange` events to exclude unnecessary triggers; add `visibilityState` gate to the 60-second poll. Affects: `web/src/` PermissionsProvider component.
 
