@@ -186,13 +186,21 @@ struct KidsAppRoot: View {
     // answers) — the authoritative total lives in quiz_attempts; this local
     // delta only drives the in-memory score animation.
     //
-    // K4: when result.writeFailures > 0, one or more reading_log / quiz_attempts
-    // writes didn't persist. We still mark the local pass so UI state stays in
-    // sync with the kid's actions, but we SKIP the celebration scenes — the
-    // kid shouldn't see "Day 8!" for a streak the DB trigger never fired. The
-    // next app launch resyncs streakDays from kid_profiles.streak_current.
+    // Q33: local state (verityScore, quizzesPassed, streakDays) must not mutate
+    // unless the server confirmed the attempt persisted. Guard on writeFailures
+    // before calling completeQuiz so a network failure doesn't leave in-memory
+    // state ahead of what the DB actually recorded. The next state.load() on
+    // foreground or launch resyncs from kid_profiles.streak_current.
     private func handleQuizComplete(_ result: KidQuizResult) {
         let scoreDelta = result.correctCount * 10
+
+        guard result.writeFailures == 0 else {
+            print("[KidsAppRoot] quiz completion had \(result.writeFailures) persistence failure(s); skipping state update and celebration scenes")
+            sceneQueue = []
+            activeSheet = nil
+            return
+        }
+
         let outcome = state.completeQuiz(
             passed: result.passed,
             score: scoreDelta,
@@ -200,19 +208,15 @@ struct KidsAppRoot: View {
         )
 
         var queue: [ActiveSheet] = []
-        if result.writeFailures == 0 {
-            if outcome.newStreak != outcome.previousStreak {
-                queue.append(.streak(
-                    previous: outcome.previousStreak,
-                    current: outcome.newStreak,
-                    milestone: outcome.milestone
-                ))
-            }
-            if let badge = outcome.badge {
-                queue.append(.badge(badge))
-            }
-        } else {
-            print("[KidsAppRoot] quiz completion had \(result.writeFailures) persistence failure(s); suppressing celebration scenes")
+        if outcome.newStreak != outcome.previousStreak {
+            queue.append(.streak(
+                previous: outcome.previousStreak,
+                current: outcome.newStreak,
+                milestone: outcome.milestone
+            ))
+        }
+        if let badge = outcome.badge {
+            queue.append(.badge(badge))
         }
         sceneQueue = queue
 
