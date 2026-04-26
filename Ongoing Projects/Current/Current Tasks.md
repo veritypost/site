@@ -122,22 +122,6 @@ POST-LAUNCH items, Apple-console-blocked items, and SHIPPED items are excluded. 
 
 ---
 
-## Tier 10 — Weekly digest removal (PRELAUNCH §6.1)
-
-49. **Soft-delete `weekly_reading_report` email template** (T-128) — set `is_active=false` on the DB row. Affects: `email_templates` DB table.
-
-50. **Soft-delete `weekly_family_report` email template** (T-129) — set `is_active=false` on the DB row. Affects: `email_templates` DB table.
-
-51. **Remove weekly digests from `send-emails` cron** (T-130) — remove both `weekly_reading_report` and `weekly_family_report` entries from `TYPE_TO_TEMPLATE`. Affects: `web/src/app/api/cron/send-emails/route.js:23-24`.
-
-52. **Remove weekly digest toggles from admin notifications page** (T-131) — remove `email_weekly_reading_report` and `email_weekly_family_report` toggles and their default-true entries. Affects: `web/src/app/admin/notifications/page.tsx:44-45,70`.
-
-53. **Remove weekly digest preference keys from user settings** (T-132) — remove `weekly_reading_report` and `weekly_family_report` keys and labels. Affects: `web/src/app/profile/settings/page.tsx:244,259`.
-
-54. **Remove weekly digest notification row producers** (T-133) — grep `web/src` for `weekly_reading_report|weekly_family_report` and remove any code inserting matching notification rows. Affects: any server code producing those notification types.
-
----
-
 ## Tier 11 — Settings split (PRELAUNCH Phase 3 — HIGH RISK, run pre-flight first)
 
 55. **Flip 11 settings sub-routes from redirect shims to real destinations** (T-073) — each sub-route becomes the real page; the unified `/profile/settings` page becomes a sidebar/landing or redirects out. Run full pre-flight in `PRELAUNCH_UI_CHANGE.md` Part 10 before starting. Affects: `web/src/app/profile/settings/{alerts,billing,blocked,data,emails,expert,feed,login-activity,password,profile,supervisor}/page.tsx`.
@@ -176,11 +160,7 @@ POST-LAUNCH items, Apple-console-blocked items, and SHIPPED items are excluded. 
 
 72. **Add family plan visualization to billing** (T-082) — two parent silhouettes + N kid silhouettes captioned "Verity Family: 2 adults + 2 kids." Affects: billing page web and iOS.
 
-73. **Replace promo code field with "Have a code?" link** (T-083) — visible promo field replaced with a small link that expands the field on tap. Affects: billing page web and iOS.
-
 74. **Convert bookmarks to cover-card grid** (T-087) — article thumbnails, title, source, date saved; replace current list view. Affects: `web/src/app/bookmarks/page.tsx`, `VerityPost/VerityPost/BookmarksView.swift`.
-
-75. **Add proactive bookmark cap counter** (T-088) — visible from save #1 ("1 of 10 saved"); escalates at 7 and 9; `LockedFeatureCTA` with `gateType="plan"` on the upgrade half. Affects: bookmarks page web and iOS.
 
 76. **Add bookmark collections as folders** (T-089) — paid feature; first article's image becomes folder cover; gated to Verity tier and above. Affects: bookmarks page web and iOS.
 

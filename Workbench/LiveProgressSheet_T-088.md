@@ -72,4 +72,10 @@ tsc: PASS
 xcodebuild: Pre-existing failure (missing possibleChanges/*.html bundle resources — not introduced by T-088, confirmed via git stash test). No Swift compiler errors.
 
 ## Completed
-[SHIPPED block written here when done]
+Status: SHIPPED
+Commit: 7083ecc
+Review fixes: none
+Files touched:
+  - web/src/app/bookmarks/page.tsx (nearCap + capCounterTone derived values; nearCap-gated span in header)
+  - VerityPost/VerityPost/BookmarksView.swift (nearCap + capToneColor computed props; VStack headerRow with conditional caption2 line)
+Completed: 2026-04-26 11:55
