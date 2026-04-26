@@ -123,10 +123,28 @@ Also profile/page.tsx has date (not numeric) toLocaleDateString calls:
 N/A
 
 ## Implementation Progress
-[ ] Create web/src/lib/dates.ts
-[ ] Update CommentRow.tsx — replace timeAgo with import
-[ ] Update messages/page.tsx — add useToast, replace actionToast + add send toast
-[ ] Sweep 15+ toLocaleDateString/toLocaleString call sites
+[x] Create web/src/lib/dates.ts
+[x] Update CommentRow.tsx — replace timeAgo with import
+[x] Update messages/page.tsx — add useToast, replace actionToast + add send toast
+[x] Sweep 16 toLocaleDateString/toLocaleString call sites across 11 pages
 
 ## Completed
-[TBD — SHIPPED block written when done]
+SHIPPED 2026-04-26 · 9ec6eac
+
+Files touched:
+- web/src/lib/dates.ts (new)
+- web/src/components/CommentRow.tsx
+- web/src/app/messages/page.tsx
+- web/src/app/appeal/page.tsx
+- web/src/app/bookmarks/page.tsx
+- web/src/app/category/[id]/page.js
+- web/src/app/expert-queue/page.tsx
+- web/src/app/notifications/page.tsx
+- web/src/app/profile/family/page.tsx
+- web/src/app/profile/kids/[id]/page.tsx
+- web/src/app/profile/page.tsx
+- web/src/app/profile/settings/expert/page.tsx
+- web/src/app/recap/[id]/page.tsx
+- web/src/app/recap/page.tsx
+- web/src/app/search/page.tsx
+- Workbench/LiveProgressSheet_T-043-T-046.md

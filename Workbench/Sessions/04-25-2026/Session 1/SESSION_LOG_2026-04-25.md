@@ -103,6 +103,11 @@ Both via XcodeGen-managed test targets.
 
 3. Going-remote bypass workflow (`/preview-as-admin`) was reverted — confirmed too multi-step. Owner uses `/preview?token=PROD_BYPASS_TOKEN` from any device to drop the bypass cookie.
 
+## 2026-04-26 additions (same session folder, no new folder created yet)
+
+T-115 SHIPPED 577ef36 — RecapListView re-added to VerityPost/VerityPost/RecapView.swift. Hub fetches /api/recap, renders recaps with date range + completion badge, navigates to RecapQuizView.
+T-117 SHIPPED 577ef36 — FindView.swift created (229 lines). Find tab wired into ContentView.swift Tab enum + adultTabView switch + TextTabBar. Adult iOS Swift compilation clean; VerityPostKids BUILD SUCCEEDED.
+
 ## Posture
 
 Launch readiness today: same 70% as morning, with notably higher confidence in the deep paths (admin/profile/kids/expert/social all have route-level smoke). UI quality moved from "professional but inconsistent" toward "polished" on the surfaces I touched. The biggest remaining gaps are still time-bound, not effort-bound: real users in TestFlight + staging for ~5 days, AdSense approval calendar, Apple Console walkthrough.

@@ -82,7 +82,21 @@ Risks:
 [not needed]
 
 ## Implementation Progress
-[filled during execution]
+Status: SHIPPED
+tsc: PASS (clean, no errors)
+xcodebuild: N/A (web-only changes)
+
+Changes made:
+- schema/185_deactivate_weekly_email_templates.sql: created — UPDATE email_templates SET is_active=false for 2 weekly keys
+- schema/186_add_comment_reply_expert_answer_templates.sql: created — INSERT comment_reply + expert_answer_posted rows
+- web/src/app/api/cron/send-emails/route.js: TYPE_TO_TEMPLATE updated (removed weekly_reading_report + weekly_family_report, added comment_reply + expert_answer_posted)
+- web/src/app/admin/notifications/page.tsx: EMAIL_CONFIG trimmed (2 weekly entries removed); DEFAULT_TOGGLE_STATE trimmed (2 weekly keys removed)
+- web/src/app/profile/settings/page.tsx: AlertType union drops weekly_reading_report; ALERT_ROWS drops weekly row; showPromoInput state added; promo Card collapses behind link
+
+Note: MCP is in read-only mode — schema/185 and schema/186 are written to disk and must be applied by the owner via Supabase dashboard.
 
 ## Completed
-[SHIPPED block written here when done]
+SHIPPED 2026-04-26
+Commit: 49fa900
+Files: schema/185, schema/186, send-emails/route.js, admin/notifications/page.tsx, profile/settings/page.tsx, Current Tasks.md
+Review fixes: none — all changes matched plan exactly; tsc clean pre-commit; lint-staged ran prettier on the 3 web files
