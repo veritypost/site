@@ -3,6 +3,7 @@
 'use client';
 
 import { useState, useEffect, CSSProperties, FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/client';
 
 // Expert application form. No role/plan gates — anyone can apply; the
@@ -50,6 +51,7 @@ interface SampleResponse {
 }
 
 export default function ExpertSignupPage() {
+  const router = useRouter();
   const [step, setStep] = useState<1 | 2>(1);
   const [focused, setFocused] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState<boolean>(false);
@@ -247,7 +249,7 @@ export default function ExpertSignupPage() {
           <button
             type="button"
             onClick={() => {
-              window.location.href = '/';
+              router.replace('/');
             }}
             style={{
               width: '100%',

@@ -3,6 +3,7 @@
 'use client';
 
 import { useState, useEffect, useRef, CSSProperties, FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/client';
 import { resolveNext } from '@/lib/authRedirect';
 
@@ -64,6 +65,7 @@ function autoHandle(): string {
 }
 
 export default function PickUsernamePage() {
+  const router = useRouter();
   const [username, setUsername] = useState<string>('');
   const [focused, setFocused] = useState<boolean>(false);
   const [checking, setChecking] = useState<boolean>(false);
@@ -93,7 +95,7 @@ export default function PickUsernamePage() {
           }>();
         // If they already have a username, skip straight to /welcome.
         if (me?.username) {
-          window.location.href = `/welcome${readValidatedNext()}`;
+          router.replace(`/welcome${readValidatedNext()}`);
           return;
         }
         setSuggestions(buildSuggestions(me?.email || user.email, me?.display_name));
@@ -187,7 +189,7 @@ export default function PickUsernamePage() {
     try {
       const ok = await persistUsername(username);
       if (ok) {
-        window.location.href = `/welcome${readValidatedNext()}`;
+        router.replace(`/welcome${readValidatedNext()}`);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save username. Please try again.');
@@ -206,7 +208,7 @@ export default function PickUsernamePage() {
       try {
         const ok = await persistUsername(candidate);
         if (ok) {
-          window.location.href = `/welcome${readValidatedNext()}`;
+          router.replace(`/welcome${readValidatedNext()}`);
           return;
         }
       } catch (err) {

@@ -3,6 +3,7 @@
 'use client';
 
 import { useState, useEffect, CSSProperties } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '../../lib/supabase/client';
 import { resolveNext } from '../../lib/authRedirect';
 
@@ -46,6 +47,7 @@ function maskEmail(e: string): string {
 }
 
 export default function VerifyEmailPage() {
+  const router = useRouter();
   const [status, setStatus] = useState<Status>('loading');
   const [userEmail, setUserEmail] = useState<string>('');
   const [usernameMissing, setUsernameMissing] = useState<boolean>(false);
@@ -186,7 +188,7 @@ export default function VerifyEmailPage() {
         : '';
     const safe = resolveNext(raw, null);
     const nextQs = safe ? `?next=${encodeURIComponent(safe)}` : '';
-    window.location.href = (usernameMissing ? '/signup/pick-username' : '/welcome') + nextQs;
+    router.replace((usernameMissing ? '/signup/pick-username' : '/welcome') + nextQs);
   };
 
   const shell: CSSProperties = {

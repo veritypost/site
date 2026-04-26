@@ -20,6 +20,7 @@ export default function robots() {
           '/notifications',
           '/preview',
           '/profile/settings',
+          '/profile/settings/',
           '/reset-password',
           '/verify-email',
           '/welcome',
