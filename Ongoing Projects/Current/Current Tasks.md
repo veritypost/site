@@ -28,7 +28,7 @@ POST-LAUNCH items, Apple-console-blocked items, and SHIPPED items are excluded. 
 
 14. **Add rate limit to quiz start and comment PATCH routes** (T-017) — SHIPPED 2026-04-26. `checkRateLimit` added to `quiz/start` POST (article-scoped key `quiz-start:{userId}:{articleId}`, 3/600s) and `comments/[id]` PATCH (user-scoped key `comment-edit:{userId}`, 5/60s). Migration `schema/184_seed_quiz_comment_edit_rate_limit_policies.sql` seeds both `rate_limits` rows (owner applies via Supabase dashboard). DELETE handler untouched. tsc clean. Commit: 4040fd6.
 
-15. **Add input length caps on all unbounded text inputs** (T-014) — enforce `maxLength` at API layer on support form, expert/ask, expert/back-channel, expert/queue answer, recap submit, appeals, reports, comment report. Affects: the six named API routes.
+15. **Add input length caps on all unbounded text inputs** (T-014) — SHIPPED 2026-04-26. Hard-reject (400) added to: expert/ask body >1000, expert/back-channel body >2000, expert/queue/[id]/answer body >10000 (COPPA), appeals text >2000, reports description >1000, comment report description >1000. Optional fields use `description &&` guard. Each violation logged server-side. tsc clean. Commit: 16f86dd.
 
 16. **Strip remaining raw `error.message` leaks from settings and other surfaces** (T-013) — grep `.message` in toast/error handlers across web; route each through `safeErrorResponse` or equivalent. Affects: `web/src/app/profile/settings/page.tsx`, remaining admin and API surfaces not swept in the 2026-04-24 session.
 
