@@ -20,7 +20,7 @@
 //
 // Exposes:
 //   getCapabilities(section)   — section cache (legacy path)
-//   hasPermission(key)         — boolean; prefers the full cache, falls back to sections
+//   hasPermission(key)         — boolean; fail-closed; returns false until allPermsCache loaded
 //   getCapability(key)         — section-cache row for `key` if present, else null
 //   getPermission(key)         — full-cache row for `key` { granted, granted_via, source_detail, deny_mode, lock_message }
 //   refreshAllPermissions()    — fetch compute_effective_perms into the full cache
@@ -168,19 +168,15 @@ export async function getCapabilities(section) {
 }
 
 // --------- Lookup helpers ---------
-// Prefer the full-perms cache (Wave 1 path). Falls back to any section cache
-// entries that may have been populated by the legacy path so existing callers
-// keep working until Wave 2 migrates them.
+// Full-perms cache path (compute_effective_perms). Returns false when cache
+// has not loaded yet (allPermsCache null) — fail-closed by design. Callers
+// must await refreshAllPermissions() before reading this function.
 export function hasPermission(key) {
   if (allPermsCache) {
     const row = allPermsCache.get(key);
     if (row) return !!row.granted;
     // Cache loaded but key not present — treat as deny (NOT_IN_RESOLVED_SET).
     return false;
-  }
-  for (const { rows } of sectionCache.values()) {
-    const row = rows.find((r) => r.permission_key === key);
-    if (row) return !!row.granted;
   }
   return false;
 }
