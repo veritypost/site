@@ -21,7 +21,7 @@ ALTER TABLE public.feed_clusters
   DROP COLUMN IF EXISTS audience;
 
 DELETE FROM public.permissions WHERE key IN (
-  'pipeline.manage_clusters',
-  'pipeline.manage_presets',
-  'pipeline.manage_categories'
+  'admin.pipeline.clusters.manage',
+  'admin.pipeline.presets.manage',
+  'admin.pipeline.categories.manage'
 );

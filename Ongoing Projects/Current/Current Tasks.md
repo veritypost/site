@@ -6,19 +6,9 @@ POST-LAUNCH items, Apple-console-blocked items, and SHIPPED items are excluded. 
 
 ---
 
-## Tier 1 — Critical billing / IAP bugs
-
-1. **Fix auto-freeze on ambiguous charge refund — no grace window or admin approval gate** (T-011, MASTER_TRIAGE B11) — add a grace period or an admin-approval step before freezing on apparent full refund. Affects: `web/src/app/api/stripe/webhook/route.js:392-419`.
-
----
-
 ## Tier 2 — Security / correctness
 
-2. **Fix Apple appstore webhook missing `bump_user_perms_version` on `DID_CHANGE_RENEWAL_STATUS`** (T-001) — add the perms-version bump call to this specific case, consistent with every other billing mutation. Affects: `web/src/app/api/ios/appstore/notifications/route.js`.
-
-3. **Reconstruct missing DR schema sources for migrations 092, 093, 100** (T-003, Q14) — recover `require_outranks` and `caller_can_assign_role` RPC bodies from pg_proc and write them into `schema/` files and `reset_and_rebuild_v2.sql`. Affects: `schema/` directory.
-
-4. **Fix schema/127 perm-key naming rollback mismatch** (T-167, Q15) — write a new migration (schema/179 or next number) that corrects the wrong key names introduced by migration 127; cross-check against `permissions.xlsx`. Affects: `schema/` directory (new migration).
+2. **Reconstruct missing DR schema sources for migrations 092, 093, 100** (T-003, Q14) — SHIPPED 2026-04-26. `schema/092_rls_lockdown_2026_04_19.sql`, `schema/092b_rls_lockdown_followup_2026_04_19.sql`, and `schema/093_rpc_actor_lockdown_2026_04_19.sql` written from live DB statements (queried via supabase_migrations). Migration 100 already covered by `Archived/100_backfill_admin_rank_rpcs_2026_04_19.sql`. `reset_and_rebuild_v2.sql` not modified per owner instruction.
 
 5. **Remove dead `superadmin` role references from 8 RPCs and 12 policies** (T-004, Q16) — write a migration stripping `superadmin` from `IN (...)` clauses in all affected routine bodies and policies. Affects: `schema/014`, `016`, `026`, `167`, `174` (new migration needed).
 
