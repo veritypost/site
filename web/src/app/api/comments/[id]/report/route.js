@@ -5,6 +5,7 @@ import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { v2LiveGuard } from '@/lib/featureFlags';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 // POST /api/comments/[id]/report
 // Body: { reason, description? }
@@ -26,10 +27,24 @@ export async function POST(request, { params }) {
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
 
+  const service = createServiceClient();
+
+  const rate = await checkRateLimit(service, {
+    key: `comment_report:user:${user.id}`,
+    policyKey: 'comment_report',
+    max: 10,
+    windowSec: 3600,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 3600) } }
+    );
+  }
+
   const { reason, description } = await request.json().catch(() => ({}));
   if (!reason) return NextResponse.json({ error: 'reason required' }, { status: 400 });
 
-  const service = createServiceClient();
   const { data, error } = await service
     .from('reports')
     .insert({

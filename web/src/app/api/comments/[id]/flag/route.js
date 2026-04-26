@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 // POST /api/comments/[id]/flag — D22 supervisor fast-lane.
 // Body: { category_id, reason, description? }
@@ -22,12 +23,26 @@ export async function POST(request, { params }) {
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
 
+  const service = createServiceClient();
+
+  const rate = await checkRateLimit(service, {
+    key: `comment_flag:user:${user.id}`,
+    policyKey: 'comment_flag',
+    max: 20,
+    windowSec: 3600,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 3600) } }
+    );
+  }
+
   const { category_id, reason, description } = await request.json().catch(() => ({}));
   if (!category_id || !reason) {
     return NextResponse.json({ error: 'category_id and reason required' }, { status: 400 });
   }
 
-  const service = createServiceClient();
   const { data, error } = await service.rpc('supervisor_flag_comment', {
     p_user_id: user.id,
     p_comment_id: params.id,

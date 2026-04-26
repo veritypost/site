@@ -6,6 +6,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { v2LiveGuard } from '@/lib/featureFlags';
 import { safeErrorResponse } from '@/lib/apiErrors';
 import { scoreReceiveUpvote } from '@/lib/scoring';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 // POST /api/comments/[id]/vote
 // Body: { type: 'upvote' | 'downvote' | 'clear' }
@@ -45,6 +46,19 @@ export async function POST(request, { params }) {
   }
 
   const service = createServiceClient();
+
+  const rate = await checkRateLimit(service, {
+    key: `comment_vote:user:${user.id}`,
+    policyKey: 'comment_vote',
+    max: 30,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
 
   // Y2 / scoring: capture the prior vote + the comment author so we can
   // award `receive_upvote` to the author when the actor flips into an
