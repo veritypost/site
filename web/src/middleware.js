@@ -13,17 +13,18 @@ import { createServerClient } from '@supabase/ssr';
 // (app/admin/layout.tsx) handles its own auth + role check and returns
 // a 404 for anon or non-staff callers. Putting /admin here would redirect
 // anon to /login?next=/admin, disclosing that /admin is a real surface.
-// Anon access model (owner directive 2026-04-24, supersedes 2026-04-23):
-// anon visitors can see the home page, story pages, auth flow, legal +
-// marketing surfaces, plus every sitemap-published surface (/browse,
-// /category, /card, /search) and the /u profile shell (which carries
-// its own launch kill-switch). Surfaces that only exist as per-user
-// private state (profile settings, messages, bookmarks, notifications,
-// billing, appeal, expert queue) remain sign-in-gated because they
-// have nothing to render for anon. /leaderboard + /recap stay protected
-// pending a separate anon-safety sweep. Block surfaces are NOT 404s —
-// they redirect to /login?next=<path> so the value is preserved for
-// the post-login bounce.
+// Anon access model (owner directive 2026-04-26, supersedes 2026-04-24):
+// the bottom nav now shows the same 4 slots to anon and signed-in users
+// (Home / Notifications / Most Informed / Profile-or-Sign-up). The two
+// surfaces that fed the new anon slots — /notifications and /leaderboard
+// — own their own anon empty state (inline Sign-up CTAs) instead of being
+// middleware-bounced to /login, so a tap on the nav lands on the page
+// itself with a contextual signup pitch instead of a generic auth wall.
+// Surfaces that only exist as per-user private state (profile settings,
+// messages, bookmarks, billing, appeal, expert queue, recap) remain
+// sign-in-gated because they have nothing to render for anon. Block
+// surfaces are NOT 404s — they redirect to /login?next=<path> so the
+// value is preserved for the post-login bounce.
 //
 // To unhide a surface to anon: remove its prefix here, no other change
 // needed (matches the launch-hide pattern documented in CLAUDE.md).
@@ -31,8 +32,6 @@ const PROTECTED_PREFIXES = [
   '/profile',
   '/messages',
   '/bookmarks',
-  '/notifications',
-  '/leaderboard',
   '/recap',
   '/expert-queue',
   '/billing',

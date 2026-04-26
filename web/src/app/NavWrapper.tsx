@@ -96,13 +96,13 @@ function daysSince(iso: string | null | undefined): number | null {
 //   Fully public:                        TOP=true, NAV=true,  FOOT=true
 //   Dark mode (hide everything):         TOP=false, NAV=false, FOOT=false
 // ============================================================
-const SHOW_TOP_BAR = true; // "verity post" wordmark + search icon
+const SHOW_TOP_BAR = true; // "verity post" wordmark
 // Y5-#3 — bottom nav re-enabled. Without it, signed-in users had no
-// persistent path between Home / Notifications / Leaderboard / Profile —
+// persistent path between Home / Notifications / Most Informed / Profile —
 // every navigation required a manual URL or a footer round-trip. The
 // per-route gate below still suppresses it on home, story, auth, admin,
 // and ideas pages so reading + auth + chrome-owning surfaces stay clean.
-const SHOW_BOTTOM_NAV = true; // Home / Notifications / Leaderboard / Profile
+const SHOW_BOTTOM_NAV = true; // Home / Notifications / Most Informed / Profile
 const SHOW_FOOTER = true; // Help / Contact / Privacy / Terms / etc.
 
 // Auth / onboarding routes that run fullscreen without any global chrome.
@@ -143,11 +143,6 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState<boolean>(false);
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [canSeeAdmin, setCanSeeAdmin] = useState<boolean>(false);
-  // R13-T4 (Crew 7): `search.basic` gates the search icon in the top
-  // bar. Hydrated alongside `admin.dashboard.view` in the same profile
-  // load path so the top bar branches correctly on first paint after
-  // auth resolves.
-  const [canSearch, setCanSearch] = useState<boolean>(false);
 
   useEffect(() => {
     setMounted(true);
@@ -164,7 +159,6 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
           setLoggedIn(false);
           setAuthLoaded(true);
           setCanSeeAdmin(false);
-          setCanSearch(false);
         }
         return;
       }
@@ -184,7 +178,6 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
         setLoggedIn(true);
         setAuthLoaded(true);
         setCanSeeAdmin(hasPermission('admin.dashboard.view'));
-        setCanSearch(hasPermission('search.basic'));
       }
     }
 
@@ -225,16 +218,12 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
   }, [loggedIn]);
 
   // Chrome visibility gates. Three surfaces, three rules:
-  //   showTopBar  — "verity post" wordmark + search icon. Shown on home
-  //                 AND on all standard content pages. Hidden on auth,
-  //                 admin, ideas preview, and story reader.
-  //   showNav     — bottom nav bar. Hidden on home FOR ANON only — the
-  //                 anon home is meant to read like a publication, not a
-  //                 product (no sign-up push). Logged-in users get the
-  //                 nav on home so they can reach Notifications / Most
-  //                 Informed / Profile from the most-visited surface
-  //                 (was a strand-on-home defect flagged by audit
-  //                 2026-04-23).
+  //   showTopBar  — "verity post" wordmark only. Shown on home AND on all
+  //                 standard content pages. Hidden on auth, admin, ideas
+  //                 preview, and story reader.
+  //   showNav     — bottom nav bar. Same 4 slots for anon and signed-in;
+  //                 anon's Profile slot flips to "Sign up". Hidden on
+  //                 fully-bare surfaces and on the story reader.
   //   showFooter  — Help/Contact/Privacy strip. Follows showTopBar so
   //                 the legal + support links are reachable wherever
   //                 the brand is visible, including home.
@@ -246,8 +235,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
   // the wordmark to return home; bottom nav and footer stay off there to
   // keep the reading viewport clean.
   const showTopBar = mounted && SHOW_TOP_BAR && !fullyBare;
-  const showNav =
-    mounted && SHOW_BOTTOM_NAV && !fullyBare && !isStory(path) && !(path === '/' && !loggedIn);
+  const showNav = mounted && SHOW_BOTTOM_NAV && !fullyBare && !isStory(path);
   const showFooter = mounted && SHOW_FOOTER && !fullyBare && !isStory(path);
   const onAdminPage = mounted && isAdmin(path);
   // UJ-200 (Pass 17): banner is strictly admin+ territory. Editor and
@@ -271,11 +259,11 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
     accent: 'var(--accent)',
   } as const;
 
-  // Anon = articles only (owner directive 2026-04-23). Anonymous visitors
-  // see Home + the Sign in link; the rest of the nav appears once they
-  // sign in. The protected surfaces themselves are gated in middleware.js
-  // (PROTECTED_PREFIXES) — these nav-item conditionals just keep the chrome
-  // honest so anon doesn't see links that immediately bounce to /login.
+  // Bottom nav shows the same 4 slots for anon and signed-in users. The
+  // Profile slot flips to "Sign up" → /signup for anon (better engagement
+  // than /login as a CTA — anon traffic skews new-user). Notifications +
+  // Most Informed render their own anon empty state with inline Sign-up
+  // CTAs; middleware no longer bounces those routes for anon.
   const navItems: NavItem[] = loggedIn
     ? [
         { label: 'Home', href: '/' },
@@ -285,7 +273,9 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
       ]
     : [
         { label: 'Home', href: '/' },
-        { label: 'Sign in', href: '/login' },
+        { label: 'Notifications', href: '/notifications' },
+        { label: 'Most Informed', href: '/leaderboard' },
+        { label: 'Sign up', href: '/signup' },
       ];
 
   const navStyle: CSSProperties = {
@@ -419,13 +409,10 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
       </div>
 
       {showTopBar && (
-        // R13-T3 — fixed top bar with "Verity Post" logo on the left.
-        // Safe-area-inset-top padding keeps the brand below iPhone notches.
-        //
-        // R13-T4 (Crew 7): right side branches by user state.
-        //   Signed-in + has search.basic → magnifying-glass icon → /search
-        //   Anon                         → subtle "Sign in" text → /login
-        //   Otherwise                    → nothing
+        // Fixed top bar — wordmark only. The search entry point lives on
+        // the Home feed (magnifying glass), not in the global chrome, so
+        // it's only present where the user is actively browsing rather
+        // than on every surface.
         <header style={topBarStyle}>
           <a
             href={topBarHomeHref}
@@ -441,47 +428,6 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
           >
             verity post
           </a>
-          {/* Round D H-14 — search icon ungated from home-only. The former
-              `path === '/'` clause was a layout leftover from when `/` had
-              its own sticky search row; once the entry point moved into
-              this global top bar, restricting it to `/` left verified
-              users on `/story/<slug>`, `/browse`, `/category/*` without
-              a quick path back into search. Permission-level gating
-              (`search.basic`) already decides who can search; path-level
-              gating added nothing beyond friction. */}
-          {loggedIn && canSearch && (
-            <a
-              href="/search"
-              aria-label="Search"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minWidth: 44,
-                minHeight: 44,
-                // Pull into the 16px edge gutter so the visual centre of
-                // the icon aligns with the page's right margin.
-                marginRight: -8,
-                color: C.dim,
-                textDecoration: 'none',
-              }}
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-            </a>
-          )}
         </header>
       )}
 

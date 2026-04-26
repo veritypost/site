@@ -157,6 +157,11 @@ export default function HomePage() {
 
   const [canBreakingBanner, setCanBreakingBanner] = useState<boolean>(false);
   const [canBreakingBannerPaid, setCanBreakingBannerPaid] = useState<boolean>(false);
+  // Search affordance — magnifier on the home masthead, gated by
+  // `search.basic`. The icon used to live in the global top bar; it was
+  // moved here so the search entry point is contextual to the home feed
+  // rather than persistent on every surface (owner directive 2026-04-26).
+  const [canSearch, setCanSearch] = useState<boolean>(false);
 
   // Permission hydrate.
   useEffect(() => {
@@ -167,6 +172,7 @@ export default function HomePage() {
       if (cancelled) return;
       setCanBreakingBanner(hasPermission('home.breaking_banner.view'));
       setCanBreakingBannerPaid(hasPermission('home.breaking_banner.view.paid'));
+      setCanSearch(hasPermission('search.basic'));
     })();
     return () => {
       cancelled = true;
@@ -275,6 +281,46 @@ export default function HomePage() {
           padding: '32px 20px 64px',
         }}
       >
+        {loggedIn && canSearch && (
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              marginBottom: -8,
+            }}
+          >
+            <Link
+              href="/search"
+              aria-label="Search"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minWidth: 44,
+                minHeight: 44,
+                marginRight: -8,
+                color: C.dim,
+                textDecoration: 'none',
+              }}
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+            </Link>
+          </div>
+        )}
+
         <Masthead humanDate={today.humanDate} />
 
         {loading && <FrontPageSkeleton />}

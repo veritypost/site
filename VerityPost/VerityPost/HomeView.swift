@@ -33,6 +33,11 @@ struct HomeView: View {
 
     @State private var canViewBreakingBanner: Bool = false
     @State private var canViewBreakingBannerPaid: Bool = false
+    // Search affordance — magnifier above the masthead, gated by
+    // `search.basic`. The icon used to live in the global tab-bar/top-bar
+    // chrome; it was relocated to the home feed so the search entry point
+    // is contextual rather than persistent on every surface.
+    @State private var canSearch: Bool = false
 
     private static let editorialTimeZone = TimeZone(identifier: "America/New_York") ?? .current
 
@@ -136,6 +141,24 @@ struct HomeView: View {
                         .accessibilityLabel("Breaking news: \(breaking.title ?? "Breaking news")")
                     }
 
+                    if canSearch {
+                        HStack {
+                            Spacer()
+                            NavigationLink {
+                                FindView().environmentObject(auth)
+                            } label: {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 18, weight: .regular))
+                                    .foregroundColor(VP.dim)
+                                    .frame(width: 44, height: 44)
+                                    .contentShape(Rectangle())
+                            }
+                            .accessibilityLabel("Search")
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.horizontal, 12)
+                    }
+
                     masthead
 
                     if loading {
@@ -191,6 +214,7 @@ struct HomeView: View {
         .task(id: perms.changeToken) {
             canViewBreakingBanner = await PermissionService.shared.has("home.breaking_banner.view")
             canViewBreakingBannerPaid = await PermissionService.shared.has("home.breaking_banner.view.paid")
+            canSearch = await PermissionService.shared.has("search.basic")
         }
     }
 
@@ -664,9 +688,9 @@ private struct BrowseLanding: View {
 // row in BrowseLanding previously did nothing because the rows were
 // static Text, not Buttons / NavigationLinks.
 //
-// Internal (not private) so BrowseView.swift's "View all {cat} articles"
-// link can push the same destination — single source of truth for the
-// per-category feed across both surfaces.
+// Internal (not private) so any per-category list affordance — currently
+// HomeView's category sections — can push the same destination as the
+// single source of truth for the per-category feed.
 struct CategoryDetailView: View {
     let category: VPCategory
 

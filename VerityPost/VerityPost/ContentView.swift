@@ -134,16 +134,20 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Main Tab View — 5-tab layout: Home, Find, Browse, Notifications, Profile
+// MARK: - Main Tab View — 4-tab layout: Home, Notifications, Most Informed, Profile
 
 struct MainTabView: View {
     @EnvironmentObject var auth: AuthViewModel
     @State private var selectedTab: Tab = .home
     @State private var showLogin = false
 
-    // IA shift 2026-04-26 (owner-locked): replaced "Most Informed" (leaderboard)
-    // with "Browse" tab. LeaderboardView relocated to a Profile QuickLink.
-    enum Tab: Hashable { case home, find, browse, notifications, profile }
+    // IA 2026-04-26 (owner-locked, second pass): bottom bar always shows
+    // the same 4 slots — Home / Notifications / Most Informed / Profile —
+    // for both anon and signed-in users. The Profile slot's label flips
+    // to "Sign up" for anon (better engagement than "Log in"; matches web
+    // parity). The earlier Browse + Find tabs were folded back into the
+    // Home feed (search via a magnifier on Home). Browse view deleted.
+    enum Tab: Hashable { case home, notifications, mostInformed, profile }
 
     private var isLoggedIn: Bool { auth.currentUser != nil }
 
@@ -163,17 +167,19 @@ struct MainTabView: View {
 
     // MARK: - Adult tab bar
     //
-    // 5 tabs: Home, Find, Browse, Notifications, Profile.
+    // 4 tabs: Home, Notifications, Most Informed, Profile.
     // Text-only (no icons), bottom-fixed, translucent white with a blur.
     // Active tab renders in accent color, bold. Notifications shows a red
-    // dot when unreadCount > 0.
+    // dot when unreadCount > 0. Anon users see the same 4 slots; the
+    // Profile slot flips to "Sign up" via the SignInGate destination.
+    // LeaderboardView already handles its own anon empty state (top 3 +
+    // sign-up overlay), so it's reachable directly without a SignInGate
+    // wrap.
 
     private var adultTabView: some View {
         ZStack {
             switch selectedTab {
             case .home: NavigationStack { HomeView() }
-            case .find: NavigationStack { FindView() }.environmentObject(auth)
-            case .browse: NavigationStack { BrowseView() }.environmentObject(auth)
             case .notifications:
                 NavigationStack {
                     if isLoggedIn {
@@ -181,18 +187,20 @@ struct MainTabView: View {
                     } else {
                         SignInGate(
                             feature: "Notifications",
-                            detail: "Sign in to get breaking news alerts and reply notifications."
+                            detail: "Sign up to get breaking news alerts and reply notifications."
                         )
                     }
                 }
+            case .mostInformed:
+                NavigationStack { LeaderboardView() }.environmentObject(auth)
             case .profile:
                 NavigationStack {
                     if isLoggedIn {
                         ProfileView()
                     } else {
                         SignInGate(
-                            feature: "Your profile",
-                            detail: "Create an account to track your reading, earn points, and save articles."
+                            feature: "Create your account",
+                            detail: "Sign up to track your reading, earn points, and save articles."
                         )
                     }
                 }
@@ -208,9 +216,9 @@ struct MainTabView: View {
             if nowLoggedIn && showLogin {
                 showLogin = false
                 selectedTab = .profile
-            } else if !nowLoggedIn && selectedTab == .profile {
-                selectedTab = .home
             }
+            // Anon users keep the Profile tab visible (relabelled "Sign up");
+            // no auto-redirect to .home on logout.
         }
     }
 
@@ -255,6 +263,11 @@ struct TextTabBar: View {
     @Binding var selected: MainTabView.Tab
     let isLoggedIn: Bool
     @State private var unreadCount: Int = 0
+    // 60s notification poll matches NavWrapper's web parity: GET
+    // /api/notifications?unread=1&limit=1 returns `unread_count` which
+    // drives the red dot on the Notifications tab. Anon users skip the
+    // poll (no session cookie, the API would 401).
+    @State private var unreadTimer: Timer?
 
     private struct Item: Identifiable {
         let id: MainTabView.Tab
@@ -264,10 +277,9 @@ struct TextTabBar: View {
     private var items: [Item] {
         [
             Item(id: .home, label: "Home"),
-            Item(id: .find, label: "Find"),
-            Item(id: .browse, label: "Browse"),
             Item(id: .notifications, label: "Notifications"),
-            Item(id: .profile, label: isLoggedIn ? "Profile" : "Sign in"),
+            Item(id: .mostInformed, label: "Most Informed"),
+            Item(id: .profile, label: isLoggedIn ? "Profile" : "Sign up"),
         ]
     }
 
@@ -301,6 +313,51 @@ struct TextTabBar: View {
                 .background(.ultraThinMaterial)
                 .overlay(Rectangle().fill(VP.border).frame(height: 1), alignment: .top)
         )
+        .onAppear { startUnreadPoll() }
+        .onDisappear { stopUnreadPoll() }
+        .onChange(of: isLoggedIn) { _, _ in
+            unreadCount = 0
+            startUnreadPoll()
+        }
+    }
+
+    private func startUnreadPoll() {
+        stopUnreadPoll()
+        guard isLoggedIn else { return }
+        Task { await pollUnreadOnce() }
+        unreadTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
+            Task { await pollUnreadOnce() }
+        }
+    }
+
+    private func stopUnreadPoll() {
+        unreadTimer?.invalidate()
+        unreadTimer = nil
+    }
+
+    private func pollUnreadOnce() async {
+        guard isLoggedIn else { return }
+        guard let session = try? await SupabaseManager.shared.client.auth.session else { return }
+        var url = SupabaseManager.shared.siteURL.appendingPathComponent("api/notifications")
+        if var comps = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            comps.queryItems = [URLQueryItem(name: "unread", value: "1"),
+                                URLQueryItem(name: "limit", value: "1")]
+            if let u = comps.url { url = u }
+        }
+        var req = URLRequest(url: url)
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        do {
+            let (data, response) = try await URLSession.shared.data(for: req)
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return }
+            struct Body: Decodable { let unread_count: Int? }
+            let body = (try? JSONDecoder().decode(Body.self, from: data)) ?? Body(unread_count: nil)
+            let count = body.unread_count ?? 0
+            await MainActor.run { unreadCount = count }
+        } catch {
+            // Silent — the dot just stays at its last value rather than
+            // flickering on transient network errors.
+        }
     }
 }
 

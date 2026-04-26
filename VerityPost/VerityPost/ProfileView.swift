@@ -1034,11 +1034,10 @@ struct ProfileView: View {
                 }
             }
 
-            // My stuff — quick-link list. Leaderboards always shown (public
-            // view, no perm gate); the rest are perm-gated. This is the sole
-            // iOS entry point to LeaderboardView post-IA-shift (the bottom-bar
-            // "Most Informed" tab was replaced by Browse 2026-04-26). Mirrors
-            // web profile/page.tsx "My stuff" PageSection.
+            // My stuff — quick-link list. All entries are perm-gated. The
+            // earlier "Leaderboards" QuickLink was removed once the
+            // "Most Informed" tab returned to the bottom bar (2026-04-26
+            // second-pass IA revert) — the tab is the canonical entry now.
             VStack(alignment: .leading, spacing: 10) {
                 sectionTitle("My stuff")
                 VStack(spacing: 8) {
@@ -1062,9 +1061,6 @@ struct ProfileView: View {
                                   description: "Questions from readers",
                                   destination: AnyView(ExpertQueueView().environmentObject(auth)))
                     }
-                    quickLink(label: "Leaderboards",
-                              description: "See where you rank by topic and overall",
-                              destination: AnyView(LeaderboardView().environmentObject(auth)))
                 }
             }
 
