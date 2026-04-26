@@ -226,15 +226,15 @@ SHIPPED 2026-04-26. Web: position:fixed bottom bar (zIndex 100) renders when myR
 
 116. **Rebuild newsroom cluster UI — Kids and Adult horizontal cards per cluster** (OwnerQ Task 2) — replace flat single-row layout with two per-cluster cards; delete `GenerationModal.tsx`; route Generate directly to story-manager pages. Open layout/Both-button items need owner direction before coding. Affects: `web/src/app/admin/newsroom/page.tsx`, `web/src/components/admin/GenerationModal.tsx`.
 
-117. **Delete F7 `articles/[id]/review` and `articles/[id]/edit` pages** (OwnerQ Task 4) — blocked on Task 2 (newsroom rebuild must route Generate to story-manager first). **Blocked on item 117.** Affects: `web/src/app/admin/articles/[id]/review/page.tsx`, `web/src/app/admin/articles/[id]/edit/page.tsx`.
+117. **Delete F7 `articles/[id]/review` and `articles/[id]/edit` pages** (OwnerQ Task 4) — SHIPPED 2026-04-26. Both pages deleted; 6 callers (newsroom x2, GenerationModal x2, stories x2) updated to route to story-manager with ?article=<id> param. Commit: 3b0821e.
 
 118. **Share chrome between admin moderation queue and expert queue** (T-124) — 4 tabs, claim/resolve, action history inline. Affects: `/admin/moderation/page.tsx` and expert queue admin view.
 
-119. **Build admin permissions live resolver** (T-125) — "If I grant this permission to this user, here's what changes for them" preview before save. Affects: `/admin/permissions/page.tsx`.
+119. **Build admin permissions live resolver** (T-125) — SHIPPED 2026-04-26. Simulate mode added to admin/users/[id]/permissions/page.tsx — toggle shows client-side projection of what perms would flip if a selected key/set were granted. Commit: 3b0821e.
 
-120. **Build admin user dossier** (T-126) — history, perms, plan, kids, devices, comments, reports against, reports by in one scroll. Affects: `/admin/users/[id]/page.tsx`.
+120. **Build admin user dossier** (T-126) — SHIPPED 2026-04-26. admin/users/[id]/page.tsx created (510 lines) — user header, stats, kid profiles, push tokens, admin action log, warnings log. Linked from permissions page. Commit: 3b0821e.
 
-121. **Add preview-before-save to admin settings page** (T-127) — any value that affects user UX shows a preview of the impact. Affects: `/admin/settings/page.tsx`.
+121. **Add preview-before-save to admin settings page** (T-127) — SHIPPED 2026-04-26. Save button opens confirm modal showing stored vs draft value before PATCH fires. Commit: 3b0821e.
 
 ---
 
