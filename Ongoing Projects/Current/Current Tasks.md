@@ -276,10 +276,6 @@ SHIPPED 2026-04-26. Web: position:fixed bottom bar (zIndex 100) renders when myR
 
 132. **Add error states to all surfaces** (T-140) — every data load failure has an actionable error state after item 39 ships. **Blocked on item 39.** Affects: all pages/views web and iOS.
 
-133. **Consolidate web overlay z-indexes** (T-026) — define a z-index scale in tokens; apply across the 7+ divergent sites. Affects: web CSS across 7+ components.
-
-134. **Centralize inline keyframe definitions** (T-027) — extract 7 identical `@keyframes` blocks from separate components into a shared CSS location. Affects: 7 web animation components.
-
 135. **Migrate `.js` and `.jsx` files in `web/src/` to TypeScript** (T-028) — 50-100+ files violating the CLAUDE.md no-new-js rule; batch migrate with per-file tsc verification. Affects: `web/src/` broadly.
 
 ---
