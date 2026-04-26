@@ -277,6 +277,16 @@ export async function POST(request) {
       case 'DID_CHANGE_RENEWAL_STATUS': {
         const autoRenewOn = renewal?.autoRenewStatus === 1;
         await service.from('subscriptions').update({ auto_renew: autoRenewOn }).eq('id', sub.id);
+        // B1 tail — bump perms cache consistent with every other billing mutation.
+        // This case writes subscriptions directly (no billing RPC), so the version
+        // bump that migration 148 wires into billing_freeze_profile / billing_change_plan
+        // / billing_resubscribe does not fire here. Add it explicitly.
+        const { error: bumpErr } = await service.rpc('bump_user_perms_version', {
+          p_user_id: userId,
+        });
+        if (bumpErr) {
+          console.error('[ios.appstore.notif.renewal_status.bump_err]', bumpErr.message);
+        }
         break;
       }
 
