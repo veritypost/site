@@ -134,14 +134,16 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Main Tab View — 5-tab layout: Home, Find, Notifications, Most Informed, Profile
+// MARK: - Main Tab View — 5-tab layout: Home, Find, Browse, Notifications, Profile
 
 struct MainTabView: View {
     @EnvironmentObject var auth: AuthViewModel
     @State private var selectedTab: Tab = .home
     @State private var showLogin = false
 
-    enum Tab: Hashable { case home, find, notifications, leaderboard, profile }
+    // IA shift 2026-04-26 (owner-locked): replaced "Most Informed" (leaderboard)
+    // with "Browse" tab. LeaderboardView relocated to a Profile QuickLink.
+    enum Tab: Hashable { case home, find, browse, notifications, profile }
 
     private var isLoggedIn: Bool { auth.currentUser != nil }
 
@@ -161,7 +163,7 @@ struct MainTabView: View {
 
     // MARK: - Adult tab bar
     //
-    // 5 tabs: Home, Find, Notifications, Most Informed, Profile.
+    // 5 tabs: Home, Find, Browse, Notifications, Profile.
     // Text-only (no icons), bottom-fixed, translucent white with a blur.
     // Active tab renders in accent color, bold. Notifications shows a red
     // dot when unreadCount > 0.
@@ -171,6 +173,7 @@ struct MainTabView: View {
             switch selectedTab {
             case .home: NavigationStack { HomeView() }
             case .find: NavigationStack { FindView() }.environmentObject(auth)
+            case .browse: NavigationStack { BrowseView() }.environmentObject(auth)
             case .notifications:
                 NavigationStack {
                     if isLoggedIn {
@@ -182,7 +185,6 @@ struct MainTabView: View {
                         )
                     }
                 }
-            case .leaderboard: NavigationStack { LeaderboardView() }
             case .profile:
                 NavigationStack {
                     if isLoggedIn {
@@ -263,8 +265,8 @@ struct TextTabBar: View {
         [
             Item(id: .home, label: "Home"),
             Item(id: .find, label: "Find"),
+            Item(id: .browse, label: "Browse"),
             Item(id: .notifications, label: "Notifications"),
-            Item(id: .leaderboard, label: "Most Informed"),
             Item(id: .profile, label: isLoggedIn ? "Profile" : "Sign in"),
         ]
     }

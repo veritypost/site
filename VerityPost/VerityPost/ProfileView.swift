@@ -1034,32 +1034,37 @@ struct ProfileView: View {
                 }
             }
 
-            // My stuff — quick-link list
-            if permsLoaded && (canViewMessages || canViewBookmarks || canViewFamily || canViewExpertQueue) {
-                VStack(alignment: .leading, spacing: 10) {
-                    sectionTitle("My stuff")
-                    VStack(spacing: 8) {
-                        if canViewMessages {
-                            quickLink(label: "Messages",
-                                      description: "Your direct conversations",
-                                      destination: AnyView(MessagesView().environmentObject(auth)))
-                        }
-                        if canViewBookmarks {
-                            quickLink(label: "Bookmarks",
-                                      description: "Articles you've saved",
-                                      destination: AnyView(BookmarksView().environmentObject(auth)))
-                        }
-                        if canViewFamily {
-                            quickLink(label: "Kids",
-                                      description: "Manage your family plan and kid profiles",
-                                      destination: AnyView(FamilyDashboardView().environmentObject(auth)))
-                        }
-                        if canViewExpertQueue {
-                            quickLink(label: "Expert Queue",
-                                      description: "Questions from readers",
-                                      destination: AnyView(ExpertQueueView().environmentObject(auth)))
-                        }
+            // My stuff — quick-link list. Leaderboards always shown (public
+            // view, no perm gate); the rest are perm-gated. This is the sole
+            // iOS entry point to LeaderboardView post-IA-shift (the bottom-bar
+            // "Most Informed" tab was replaced by Browse 2026-04-26). Mirrors
+            // web profile/page.tsx "My stuff" PageSection.
+            VStack(alignment: .leading, spacing: 10) {
+                sectionTitle("My stuff")
+                VStack(spacing: 8) {
+                    if canViewMessages {
+                        quickLink(label: "Messages",
+                                  description: "Your direct conversations",
+                                  destination: AnyView(MessagesView().environmentObject(auth)))
                     }
+                    if canViewBookmarks {
+                        quickLink(label: "Bookmarks",
+                                  description: "Articles you've saved",
+                                  destination: AnyView(BookmarksView().environmentObject(auth)))
+                    }
+                    if canViewFamily {
+                        quickLink(label: "Kids",
+                                  description: "Manage your family plan and kid profiles",
+                                  destination: AnyView(FamilyDashboardView().environmentObject(auth)))
+                    }
+                    if canViewExpertQueue {
+                        quickLink(label: "Expert Queue",
+                                  description: "Questions from readers",
+                                  destination: AnyView(ExpertQueueView().environmentObject(auth)))
+                    }
+                    quickLink(label: "Leaderboards",
+                              description: "See where you rank by topic and overall",
+                              destination: AnyView(LeaderboardView().environmentObject(auth)))
                 }
             }
 

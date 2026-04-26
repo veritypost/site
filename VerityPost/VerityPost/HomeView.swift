@@ -663,7 +663,11 @@ private struct BrowseLanding: View {
 // StoryDetailView. Covers the gap reported by the owner: tapping a
 // row in BrowseLanding previously did nothing because the rows were
 // static Text, not Buttons / NavigationLinks.
-private struct CategoryDetailView: View {
+//
+// Internal (not private) so BrowseView.swift's "View all {cat} articles"
+// link can push the same destination — single source of truth for the
+// per-category feed across both surfaces.
+struct CategoryDetailView: View {
     let category: VPCategory
 
     @State private var stories: [Story] = []

@@ -2011,7 +2011,7 @@ Verify `Story.categoryName` field name against `Models.swift` before implementin
 
 ---
 
-### Search Task 6 — iOS has no Browse equivalent — users cannot explore by topic ✓ PREPPED (separate session)
+### Search Task 6 — iOS has no Browse equivalent — users cannot explore by topic ✓ DONE
 
 **File:** `VerityPost/VerityPost/FindView.swift`, `VerityPost/VerityPost/` (no BrowseView.swift exists)
 **Source:** Gap analysis — discovery surface
@@ -2030,7 +2030,7 @@ Add a Browse tab to the iOS adult app — a `BrowseView.swift` that mirrors the 
 
 Tab order: Home | Find | **Browse** | Messages | Profile (or replace one of the lower-traffic tabs if 5 is the ceiling). Owner decision on tab order — do not adjust autonomously.
 
-**Status:** Owner-locked decision 2026-04-26 — replace "Most Informed" with "Browse" (final order: Home / Find / Browse / Notifications / Profile). Leaderboard relocates to a Profile QuickLink (web side prepped this session, iOS QuickLink lands with the BrowseView session). Full session prep doc with prompt + spec + acceptance criteria written to `Ongoing Projects/Sessions-Pending/BrowseView_iOS_Session_Prep.md`. The new view is ~200 lines of fresh SwiftUI; bundling with the bottom-bar swap means one coherent IA push to TestFlight, not three half-states. **Explicitly out of scope per owner: any leaderboard/rank-changed nudge on Home — owner directive "don't gamify too much" 2026-04-26.**
+**Status:** Shipped 2026-04-26. `BrowseView.swift` built (featured "Latest" row + tap-to-expand category cards + skeleton loading + "Couldn't load content" / 44pt Retry error state); two parallel direct Supabase queries (categories `not('slug','like','kids-%')` order name + articles `status='published'` order published_at desc limit 500). `MainTabView.Tab` enum + switch + `TextTabBar.items` swapped — `.leaderboard` → `.browse`, position 3 (final order: Home / Find / Browse / Notifications / Profile). `CategoryDetailView` promoted from `private` to internal so the "View all {cat} articles" link reuses it. iOS Profile QuickLink (`label: "Leaderboards", description: "See where you rank by topic and overall"`) added to `OverviewTab` "My stuff" — always-on, mirrors web. xcodebuild succeeds (only pre-existing unrelated warnings). Session prep doc retired. **DB migration not yet applied** — see CHANGELOG entry "DB migration: profile.categories canonical binding" + `Ongoing Projects/migrations/2026-04-26_profile_categories_canonical_binding.sql`; owner must run via SQL editor (MCP is read-only). **Explicitly out of scope per owner: any leaderboard/rank-changed nudge on Home — owner directive "don't gamify too much" 2026-04-26.**
 
 ---
 

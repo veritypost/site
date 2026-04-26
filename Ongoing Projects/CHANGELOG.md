@@ -656,3 +656,35 @@ This is one coherent IA migration spanning three artifacts:
 - **What** — Changed `PERIOD_LABELS` from `['This Week', 'This Month', 'All Time']` to `['This week', 'This month', 'All time']`. Updated `WINDOW_DAYS` object keys to match. Updated all four string comparisons/references in `page.tsx`. Updated Swift enum `rawValue` strings to match.
 - **Files** — `web/src/lib/leaderboardPeriod.ts`, `web/src/app/leaderboard/page.tsx`, `VerityPost/VerityPost/LeaderboardPeriod.swift`
 - **Why** — OwnersAudit Leaderboard Task 4. Product standard is sentence case for all UI labels.
+
+### iOS Browse tab + bottom-bar IA shift — OwnersAudit Search Task 6
+
+**New `BrowseView.swift` (adult iOS) — mirrors web /browse**
+- **What** — ~340 lines of fresh SwiftUI: featured "Latest" horizontal row (3 most-recent published articles) + `LazyVStack` of category cards. Tap-to-expand reveals the 3 latest in-category articles as `NavigationLink`s pushing `StoryDetailView`; bottom of expanded card has a 44pt "View all {cat} articles" button pushing `CategoryDetailView` (the existing per-category feed view, promoted from `private` in `HomeView.swift` so it can be reused). Skeleton loading state with `vp-pulse`-style opacity animation; distinct error state ("Couldn't load content" + 44pt Retry — not a silent empty). Two parallel direct Supabase queries via `SupabaseManager.shared.client` (no new API endpoint): categories (`not('slug','like','kids-%')`, `order(name)`) + articles (`status='published'`, `order published_at desc`, `limit 500`). Kids categories filtered out exactly per web — closes the gap with the in-home `BrowseLanding` view (which lets kids categories leak in).
+- **Files** — `VerityPost/VerityPost/BrowseView.swift` (new), `VerityPost/VerityPost.xcodeproj/project.pbxproj` (file added to target — PBXBuildFile, PBXFileReference, group + Sources phase membership)
+- **Why** — OwnersAudit Search Task 6. Topic-first discovery on iOS; web has had this for months.
+
+**Bottom-bar swap: `.leaderboard` → `.browse`**
+- **What** — `MainTabView.Tab` enum: `case home, find, browse, notifications, profile` (was `home, find, notifications, leaderboard, profile`). `adultTabView` switch: `.browse` arm pushes `NavigationStack { BrowseView() }.environmentObject(auth)`; `.leaderboard` arm removed. `TextTabBar.items`: Browse inserted at position 3, "Most Informed" entry deleted. Section header comment updated. No stray `.leaderboard` enum references remain in the iOS target.
+- **Files** — `VerityPost/VerityPost/ContentView.swift`
+- **Why** — OwnersAudit Search Task 6 IA decision (owner-locked 2026-04-26): replace "Most Informed" with Browse; relocate Leaderboard to a Profile QuickLink.
+
+**`CategoryDetailView` promoted from `private` to internal**
+- **What** — Dropped `private` on `struct CategoryDetailView` so `BrowseView.swift` can push it as the "View all {cat} articles" destination. Single source of truth for the per-category feed across Home BrowseLanding and the new Browse tab. Kept the existing comment block; appended a note explaining the promotion.
+- **Files** — `VerityPost/VerityPost/HomeView.swift`
+- **Why** — Reuse vs. duplicating ~100 lines of identical query + row layout.
+
+**Profile QuickLink: Leaderboards (iOS) — entry point post-IA-shift**
+- **What** — Added `quickLink(label: "Leaderboards", description: "See where you rank by topic and overall", destination: AnyView(LeaderboardView().environmentObject(auth)))` to the `OverviewTab` "My stuff" list. Always-on (LeaderboardView is public; no perm gate). Section render condition simplified — was `permsLoaded && (canViewMessages || canViewBookmarks || canViewFamily || canViewExpertQueue)`, now unconditional, since Leaderboards is always present and the perm-gated rows already handle their own conditional render. Mirrors the web `web/src/app/profile/page.tsx` "My stuff" PageSection (Leaderboards QuickLink shipped there in commit 07febf5).
+- **Files** — `VerityPost/VerityPost/ProfileView.swift`
+- **Why** — Replaces the bottom-bar entry point that the tab swap removes. Web parity.
+
+**DB migration: `profile.categories` canonical binding** — _NOT YET APPLIED_
+- **What** — Owner action required: run `Ongoing Projects/migrations/2026-04-26_profile_categories_canonical_binding.sql` via Supabase SQL editor (MCP refused both `execute_sql` writes and `apply_migration` — the project link is currently in read-only mode), then `UPDATE users SET perms_version = perms_version + 1;` to invalidate the 60s perms cache. The migration brings `profile.categories` into line with the other two short-form profile permissions (binds it to the 8 canonical plan sets and removes the no-op anon binding). Until applied, free-plan users on the latest iOS build will not see the Profile → Categories tab — the iOS short-form perm-key swap from commit 07febf5 already shipped against a binding that doesn't exist yet for them.
+- **Files** — `Ongoing Projects/migrations/2026-04-26_profile_categories_canonical_binding.sql` (no source code change in this entry — flagged here so the apply step is tracked alongside the iOS push)
+- **Why** — OwnersAudit Profile Task 5 — completes the canonical short-form swap end-to-end; without this DB step the iOS swap in commit 07febf5 silently breaks Categories-tab visibility for any plan that isn't in the current `profile.categories` binding (which is anon-only — i.e., everyone is broken, not just one plan).
+
+**Session prep doc retired**
+- **What** — Deleted `Ongoing Projects/Sessions-Pending/BrowseView_iOS_Session_Prep.md` — work shipped in this entry; the prep doc is now historical and lives in `git log` (commit message + this CHANGELOG entry).
+- **Files** — `Ongoing Projects/Sessions-Pending/BrowseView_iOS_Session_Prep.md` (deleted)
+- **Why** — Sessions-Pending is by definition for unstarted prep; finished sessions don't sit there.
