@@ -37,6 +37,7 @@ struct MessagesView: View {
     // Compose / search
     @State private var showSearch = false
     @State private var showSubscription = false
+    @State private var showLogin = false
     @State private var searchQuery = ""
     @State private var searchResults: [SearchUser] = []
     @State private var roleFilter = "all"
@@ -84,8 +85,29 @@ struct MessagesView: View {
                     Text("Sign in to message")
                         .font(.system(.title3, design: .default, weight: .bold))
                         .foregroundColor(VP.text)
+                    Text("Message experts, journalists, and other readers.")
+                        .font(.subheadline)
+                        .foregroundColor(VP.dim)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
+                    Button {
+                        showLogin = true
+                    } label: {
+                        Text("Sign in")
+                            .font(.system(.subheadline, design: .default, weight: .semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 28)
+                            .padding(.vertical, 12)
+                            .frame(minHeight: 44)
+                            .background(VP.accent)
+                            .cornerRadius(10)
+                    }
+                    .padding(.top, 8)
                 }
-                .padding(.top, 120)
+                .padding(.top, 80)
+                .sheet(isPresented: $showLogin) {
+                    LoginView().environmentObject(auth)
+                }
             } else if !hasDmAccess {
                 // Lock screen
                 VStack(spacing: 12) {
@@ -237,7 +259,7 @@ struct MessagesView: View {
                     Text("No messages yet")
                         .font(.system(.subheadline, design: .default, weight: .semibold))
                         .foregroundColor(VP.text)
-                    Text("Start a conversation with another user.")
+                    Text("Message an expert, author, or another reader to get started.")
                         .font(.caption)
                         .foregroundColor(VP.dim)
                     Button {
@@ -347,6 +369,7 @@ struct MessagesView: View {
                                     .background(roleFilter == r ? VP.text : VP.card)
                                     .foregroundColor(roleFilter == r ? .white : VP.dim)
                                     .cornerRadius(12)
+                                    .frame(minHeight: 36)
                             }
                             .buttonStyle(.plain)
                         }

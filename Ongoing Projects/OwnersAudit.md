@@ -706,7 +706,7 @@ Items from UI_IMPROVEMENTS.md that no longer apply:
 
 ---
 
-### Messages Task 1 — Loading state is text/spinner, not skeleton
+### Messages Task 1 — Loading state is text/spinner, not skeleton ✓ DONE
 
 **Files:** `web/src/app/messages/page.tsx:709–723,1294–1298`, `VerityPost/VerityPost/MessagesView.swift:221`
 **Source:** UI_IMPROVEMENTS.md, Feature section
@@ -717,11 +717,11 @@ Web full-page load renders `'Loading...'` text centered in a full viewport div (
 **Proposed fix:**
 Web conversation list: skeleton rows matching the avatar circle + name + preview shape, repeated 3–4 times. Web thread: skeleton message bubbles alternating left/right alignment. iOS: same `ProgressView` is acceptable on iOS as system-native loading indicator — no change needed there.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (`vp-pulse` keyframe injected once in primary `<main>` return so it's available for both list and thread skeletons)
 
 ---
 
-### Messages Task 2 — Web search modal missing backdrop-click dismiss
+### Messages Task 2 — Web search modal missing backdrop-click dismiss ✓ DONE
 
 **File:** `web/src/app/messages/page.tsx:1443–1607`
 **Source:** Direct code review
@@ -732,11 +732,11 @@ The "New message" search modal has a full-screen fixed backdrop (`position: fixe
 **Proposed fix:**
 Add `onClick={() => { setShowSearch(false); setSearchQuery(''); setSearchResults([]); setRoleFilter('all'); }}` to the outer backdrop div, with `onClick={(e) => e.stopPropagation()}` on the inner modal card to prevent bubbling. Matches the report dialog pattern on line 1196/1204.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
-### Messages Task 3 — iOS "Sign in to message" is a dead end
+### Messages Task 3 — iOS "Sign in to message" is a dead end ✓ DONE
 
 **File:** `VerityPost/VerityPost/MessagesView.swift:68–75`
 **Source:** Direct code review
@@ -747,11 +747,11 @@ Lines 68–75: when a logged-out user opens Messages, they see `Text("Sign in to
 **Proposed fix:**
 Replace the bare text with a proper unauthenticated state: the message text plus a "Sign in" button that triggers the auth flow (navigate to `LoginView`). Mirror the pattern used by the DM paywall lock screen (lines 76–101) which already has a proper button + action.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (`.sheet(isPresented: $showLogin)` attached to inner VStack, not outer Group, to avoid SwiftUI single-sheet-per-view constraint)
 
 ---
 
-### Messages Task 4 — Touch targets below minimum across web Messages
+### Messages Task 4 — Touch targets below minimum across web Messages ✓ DONE
 
 **File:** `web/src/app/messages/page.tsx`
 **Source:** UI_IMPROVEMENTS.md, Top 20 #8 [4/4 Critical]
@@ -769,11 +769,11 @@ Five elements fail the 44px minimum:
 - "..." overflow: add `minHeight: 44, padding: '10px'`
 - Role filter pills: add `minHeight: 36, padding: '6px 12px'` — secondary filter pills, 36px acceptable
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
-### Messages Task 5 — iOS role filter pills fail touch target
+### Messages Task 5 — iOS role filter pills fail touch target ✓ DONE
 
 **File:** `VerityPost/VerityPost/MessagesView.swift:333`
 **Source:** UI_IMPROVEMENTS.md, Top 20 #8
@@ -784,11 +784,11 @@ Search sheet role filter pills: `.padding(.horizontal, 10).padding(.vertical, 5)
 **Proposed fix:**
 Add `.frame(minHeight: 36)` to each filter pill button. Secondary filter, 36pt acceptable.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
-### Messages Task 6 — "New Message" modal title is Title Case
+### Messages Task 6 — "New Message" modal title is Title Case ✓ DONE
 
 **File:** `web/src/app/messages/page.tsx:1485`
 **Source:** UI_IMPROVEMENTS.md, Copy audit
@@ -799,11 +799,11 @@ Line 1485: `'New Message'` — Title Case. Product standard is sentence case thr
 **Proposed fix:**
 `'New message'`
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
-### Messages Task 7 — "Please try again" in block and report error copy
+### Messages Task 7 — "Please try again" in block and report error copy ✓ DONE
 
 **Files:** `web/src/app/messages/page.tsx:638–641,685`
 **Source:** UI_IMPROVEMENTS.md, Copy audit — global sweep
@@ -819,7 +819,7 @@ Line 638: `'Couldn't unblock. Try again.'`
 Line 641: `'Couldn't block. Try again.'`
 Line 685: `'Couldn't send report. Try again.'`
 
-**Status:** Pending execution (coordinate with global "Please" sweep)
+**Status:** Done 2026-04-26
 
 ---
 
@@ -835,7 +835,7 @@ Line 828: `href="/profile/settings#billing"` — same T-073 dependency as Story 
 
 ---
 
-### Messages Task 9 — iOS empty conversation list copy is weaker than web
+### Messages Task 9 — iOS empty conversation list copy is weaker than web ✓ DONE
 
 **File:** `VerityPost/VerityPost/MessagesView.swift:227`
 **Source:** Direct code review — parity gap
@@ -846,11 +846,11 @@ Line 227: `"Start a conversation with another user."` — generic. Web reads "Me
 **Proposed fix:**
 `"Message an expert, author, or another reader to get started."` — matches web copy, surfaces the feature's value.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
-### Messages Task 10 — Kids ExpertSessionsView decorative icons missing accessibilityHidden
+### Messages Task 10 — Kids ExpertSessionsView decorative icons missing accessibilityHidden ✓ DONE
 
 **File:** `VerityPostKids/VerityPostKids/ExpertSessionsView.swift`
 **Source:** UI_IMPROVEMENTS.md, iOS section — accessibility pattern
@@ -867,7 +867,7 @@ VoiceOver reads all of these aloud as icon names, creating redundant announcemen
 **Proposed fix:**
 Add `.accessibilityHidden(true)` to each. One modifier per call, zero visual change.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (4 standalone Images + `metaLabel` helper Image; covers all calendar/clock call sites via the shared function)
 
 ---
 

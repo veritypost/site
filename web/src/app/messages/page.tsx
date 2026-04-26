@@ -639,11 +639,7 @@ function MessagesPageInner() {
       });
       if (!res.ok) {
         console.error('[messages] block mutation failed', res.status);
-        toast.error(
-          isBlocked
-            ? 'Could not unblock this user. Please try again.'
-            : 'Could not block this user. Please try again.'
-        );
+        toast.error(isBlocked ? "Couldn't unblock. Try again." : "Couldn't block. Try again.");
       } else {
         setBlockedUserIds((prev) => {
           const next = new Set(prev);
@@ -684,7 +680,7 @@ function MessagesPageInner() {
       });
       if (!res.ok) {
         console.error('[messages] report user failed', res.status);
-        toast.error('Could not submit report. Please try again.');
+        toast.error("Couldn't send report. Try again.");
       } else {
         toast.success('Thanks — report received.');
       }
@@ -709,16 +705,62 @@ function MessagesPageInner() {
 
   if (loading) {
     return (
-      <div
-        style={{
-          minHeight: '100vh',
-          background: '#fff',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <div style={{ fontSize: 14, color: '#666' }}>Loading...</div>
+      <div style={{ minHeight: '100vh', background: '#fff' }}>
+        <div style={{ padding: '16px 16px 10px', borderBottom: '1px solid #e5e5e5' }}>
+          <div
+            style={{
+              height: 28,
+              width: 120,
+              borderRadius: 6,
+              background: '#f0f0f0',
+              animation: 'vp-pulse 1.2s ease-in-out infinite',
+            }}
+          />
+        </div>
+        {[0, 1, 2, 3].map((i) => (
+          <div
+            key={i}
+            style={{
+              display: 'flex',
+              gap: 12,
+              padding: '14px 16px',
+              borderBottom: '1px solid #f0f0f0',
+              alignItems: 'center',
+            }}
+          >
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: '50%',
+                background: '#f0f0f0',
+                flexShrink: 0,
+                animation: `vp-pulse 1.2s ease-in-out ${i * 0.15}s infinite`,
+              }}
+            />
+            <div style={{ flex: 1 }}>
+              <div
+                style={{
+                  height: 14,
+                  width: '55%',
+                  borderRadius: 4,
+                  background: '#f0f0f0',
+                  marginBottom: 6,
+                  animation: `vp-pulse 1.2s ease-in-out ${i * 0.15}s infinite`,
+                }}
+              />
+              <div
+                style={{
+                  height: 12,
+                  width: '80%',
+                  borderRadius: 4,
+                  background: '#f0f0f0',
+                  animation: `vp-pulse 1.2s ease-in-out ${i * 0.15}s infinite`,
+                }}
+              />
+            </div>
+          </div>
+        ))}
       </div>
     );
   }
@@ -787,6 +829,7 @@ function MessagesPageInner() {
   return (
     // Ext-NN1 — main landmark for screen readers.
     <main style={{ minHeight: '100vh', background: '#fff' }}>
+      <style>{`@keyframes vp-pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
       {showDmPaywall && (
         <div
           style={{
@@ -901,6 +944,7 @@ function MessagesPageInner() {
                   fontSize: 12,
                   fontWeight: 600,
                   color: '#111',
+                  minHeight: 44,
                 }}
               >
                 New
@@ -1048,6 +1092,7 @@ function MessagesPageInner() {
                   color: '#111',
                   padding: 0,
                   fontWeight: 600,
+                  minHeight: 44,
                 }}
               >
                 ← Back
@@ -1084,7 +1129,7 @@ function MessagesPageInner() {
                     aria-expanded={showConvoMenu}
                     aria-label="Conversation actions"
                     style={{
-                      padding: '4px 10px',
+                      padding: '10px',
                       borderRadius: 8,
                       border: '1px solid #e5e5e5',
                       background: '#fff',
@@ -1093,6 +1138,7 @@ function MessagesPageInner() {
                       color: '#111',
                       cursor: 'pointer',
                       lineHeight: 1,
+                      minHeight: 44,
                     }}
                   >
                     ...
@@ -1278,8 +1324,24 @@ function MessagesPageInner() {
             }}
           >
             {msgsLoading && (
-              <div style={{ textAlign: 'center', color: '#999', fontSize: 13, padding: 20 }}>
-                Loading...
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '16px' }}>
+                {[false, true, false, true, false].map((isOwn, i) => (
+                  <div
+                    key={i}
+                    style={{ display: 'flex', justifyContent: isOwn ? 'flex-end' : 'flex-start' }}
+                  >
+                    <div
+                      style={{
+                        height: 38,
+                        width: `${isOwn ? 45 : 60}%`,
+                        maxWidth: 280,
+                        borderRadius: 14,
+                        background: '#f0f0f0',
+                        animation: `vp-pulse 1.2s ease-in-out ${i * 0.12}s infinite`,
+                      }}
+                    />
+                  </div>
+                ))}
               </div>
             )}
             {!msgsLoading && messages.length === 0 && selected && (
@@ -1428,6 +1490,12 @@ function MessagesPageInner() {
       {/* New message search modal */}
       {showSearch && (
         <div
+          onClick={() => {
+            setShowSearch(false);
+            setSearchQuery('');
+            setSearchResults([]);
+            setRoleFilter('all');
+          }}
           style={{
             position: 'fixed',
             inset: 0,
@@ -1443,6 +1511,7 @@ function MessagesPageInner() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="messages-new-title"
+            onClick={(e) => e.stopPropagation()}
             style={{
               width: '100%',
               maxWidth: 400,
@@ -1468,7 +1537,7 @@ function MessagesPageInner() {
                   id="messages-new-title"
                   style={{ fontSize: 16, fontWeight: 700, color: '#111' }}
                 >
-                  New Message
+                  New message
                 </span>
                 <button
                   onClick={() => {
@@ -1484,6 +1553,7 @@ function MessagesPageInner() {
                     color: '#111',
                     cursor: 'pointer',
                     fontWeight: 600,
+                    minHeight: 44,
                   }}
                 >
                   Cancel
@@ -1523,7 +1593,7 @@ function MessagesPageInner() {
                     key={r}
                     onClick={() => setRoleFilter(r)}
                     style={{
-                      padding: '4px 10px',
+                      padding: '6px 10px',
                       borderRadius: 12,
                       border: 'none',
                       fontSize: 11,
@@ -1533,6 +1603,7 @@ function MessagesPageInner() {
                       cursor: 'pointer',
                       whiteSpace: 'nowrap',
                       textTransform: 'capitalize',
+                      minHeight: 36,
                     }}
                   >
                     {r === 'all' ? 'All Users' : r + 's'}

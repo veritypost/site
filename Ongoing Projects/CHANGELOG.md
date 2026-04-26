@@ -43,6 +43,57 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-26 (messages)
+
+### Messages — OwnersAudit Tasks 1–7, 9–10
+
+**Loading skeletons**
+- **What** — Replaced `'Loading...'` full-viewport div with a 4-row conversation list skeleton (header bar + avatar circle + name/preview bars, staggered `vp-pulse` animation). Replaced `{msgsLoading && 'Loading...'}` in the thread pane with 5 alternating left/right bubble skeletons. `vp-pulse` keyframe injected once in the primary `<main>` return so it persists for both skeleton contexts.
+- **Files** — `web/src/app/messages/page.tsx`
+- **Why** — OwnersAudit Messages Task 1.
+
+**Search modal backdrop dismiss**
+- **What** — Added `onClick` to outer backdrop div to reset `showSearch`, `searchQuery`, `searchResults`, `roleFilter`. Added `onClick={(e) => e.stopPropagation()}` to inner `role="dialog"` div. Matches the report dialog pattern already in the same file.
+- **Files** — `web/src/app/messages/page.tsx`
+- **Why** — OwnersAudit Messages Task 2.
+
+**iOS "Sign in to message" → sign-in button**
+- **What** — Replaced bare `Text("Sign in to message")` with a full unauthenticated state: title + descriptor copy + "Sign in" button presenting `LoginView` as a sheet. `@State private var showLogin = false` added; `.sheet(isPresented: $showLogin)` attached to the inner `VStack` (not the outer `Group`) to avoid SwiftUI's single-sheet-per-view constraint.
+- **Files** — `VerityPost/VerityPost/MessagesView.swift`
+- **Why** — OwnersAudit Messages Task 3.
+
+**Touch targets — web**
+- **What** — Added `minHeight: 44` to "New" compose button, "← Back" button, "Cancel" in search modal. Changed "..." overflow button from `padding: '4px 10px'` to `padding: '10px'` + `minHeight: 44`. Changed role filter pills from `padding: '4px 10px'` to `padding: '6px 10px'` + `minHeight: 36`.
+- **Files** — `web/src/app/messages/page.tsx`
+- **Why** — OwnersAudit Messages Task 4.
+
+**Touch targets — iOS role filter pills**
+- **What** — Added `.frame(minHeight: 36)` to role filter pill label block in the search sheet.
+- **Files** — `VerityPost/VerityPost/MessagesView.swift`
+- **Why** — OwnersAudit Messages Task 5.
+
+**Sentence case**
+- **What** — Search modal title `New Message` → `New message`.
+- **Files** — `web/src/app/messages/page.tsx`
+- **Why** — OwnersAudit Messages Task 6.
+
+**"Please try again" copy**
+- **What** — `'Could not unblock this user. Please try again.'` → `"Couldn't unblock. Try again."`; `'Could not block this user. Please try again.'` → `"Couldn't block. Try again."`; `'Could not submit report. Please try again.'` → `"Couldn't send report. Try again."`.
+- **Files** — `web/src/app/messages/page.tsx`
+- **Why** — OwnersAudit Messages Task 7.
+
+**iOS empty state copy**
+- **What** — `"Start a conversation with another user."` → `"Message an expert, author, or another reader to get started."`.
+- **Files** — `VerityPost/VerityPost/MessagesView.swift`
+- **Why** — OwnersAudit Messages Task 9.
+
+**Kids ExpertSessionsView accessibility**
+- **What** — Added `.accessibilityHidden(true)` to 4 standalone decorative `Image` calls (lines 98, 133, 178, 195) and to `Image(systemName: icon)` inside the `metaLabel` helper (fixes all 4 calendar/clock call sites at once).
+- **Files** — `VerityPostKids/VerityPostKids/ExpertSessionsView.swift`
+- **Why** — OwnersAudit Messages Task 10.
+
+---
+
 ## 2026-04-26 (auth)
 
 ### Auth — OwnersAudit Tasks 1–5
