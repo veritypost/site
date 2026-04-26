@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/client';
 import { formatDate } from '../../../lib/dates';
+import { Z } from '../../../lib/zIndex';
 
 const SORT_OPTIONS = ['Latest', 'Trending'];
 
@@ -261,7 +262,7 @@ export default function CategoryPage() {
             fontWeight: 600,
             padding: '10px 16px',
             borderRadius: 10,
-            zIndex: 9999,
+            zIndex: Z.CRITICAL,
             boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
           }}
         >

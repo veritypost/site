@@ -228,7 +228,6 @@ export default function ResetPasswordPage() {
   if (success) {
     return cardShell(
       <>
-        <style>{`@keyframes vpPulse{0%,100%{opacity:0.3;transform:scale(0.8)}50%{opacity:1;transform:scale(1)}}`}</style>
         <div style={{ textAlign: 'center' }}>
           <div
             style={{
@@ -534,7 +533,6 @@ export default function ResetPasswordPage() {
           )}
           {loading ? 'Updating…' : 'Update password'}
         </button>
-        <style>{`@keyframes vpSpin{to{transform:rotate(360deg)}}`}</style>
       </form>
 
       <div style={{ textAlign: 'center', marginTop: '18px' }}>

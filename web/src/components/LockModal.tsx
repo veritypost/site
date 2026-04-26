@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { usePermissionsContext } from './PermissionsProvider';
 import { LOCK_REASON } from '../lib/permissionKeys';
 import { useFocusTrap } from '../lib/useFocusTrap';
+import { Z } from '@/lib/zIndex';
 
 type Capability = {
   lock_reason?: string | null;
@@ -93,7 +94,7 @@ export default function LockModal({ open, onClose, capability }: LockModalProps)
   const backdropStyle: CSSProperties = {
     position: 'fixed',
     inset: 0,
-    zIndex: 1000,
+    zIndex: Z.OVERLAY,
     background: 'rgba(0,0,0,0.55)',
     display: 'flex',
     alignItems: 'center',

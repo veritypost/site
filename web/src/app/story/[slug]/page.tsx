@@ -19,6 +19,7 @@ import { useTrack } from '@/lib/useTrack';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import { getPlanLimitValue } from '@/lib/plans';
 import type { Tables } from '@/types/database-helpers';
+import { Z } from '@/lib/zIndex';
 
 // ------- Local shape helpers -------
 // `articles` is joined with a slim `categories` projection; Row plus the nested
@@ -1124,7 +1125,7 @@ export default function StoryPage() {
             position: 'fixed',
             inset: 0,
             background: 'rgba(17,17,17,0.92)',
-            zIndex: 9999,
+            zIndex: Z.CRITICAL,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -1667,7 +1668,7 @@ export default function StoryPage() {
             position: 'fixed',
             inset: 0,
             background: 'rgba(17,17,17,0.85)',
-            zIndex: 9999,
+            zIndex: Z.CRITICAL,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',

@@ -10,6 +10,7 @@ import {
   useState,
   ReactNode,
 } from 'react';
+import { Z } from '@/lib/zIndex';
 
 type ToastTone = 'info' | 'success' | 'error';
 
@@ -95,7 +96,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           display: 'flex',
           flexDirection: 'column',
           gap: 8,
-          zIndex: 9999,
+          zIndex: Z.TOAST,
           pointerEvents: 'none',
           maxWidth: 'calc(100% - 32px)',
         }}

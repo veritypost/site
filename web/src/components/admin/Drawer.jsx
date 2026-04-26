@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { ADMIN_C, F, S } from '../../lib/adminPalette';
 import { useFocusTrap } from '../../lib/useFocusTrap';
+import { Z } from '../../lib/zIndex';
 
 const WIDTHS = { sm: 360, md: 480, lg: 720 };
 
@@ -69,7 +70,7 @@ export default function Drawer({
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 10000,
+        zIndex: Z.CRITICAL,
         background: 'rgba(17,17,17,0.45)',
         animation: 'vp-admin-fade 140ms ease-out',
       }}

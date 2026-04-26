@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { ADMIN_C, F, S } from '../../lib/adminPalette';
 import { useFocusTrap } from '../../lib/useFocusTrap';
 import Button from './Button';
+import { Z } from '../../lib/zIndex';
 
 /**
  * Single-step destructive confirm. Imperative API: call `confirm(...)`
@@ -62,7 +63,7 @@ export default function ConfirmDialog({
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 10001,
+        zIndex: Z.CRITICAL,
         background: 'rgba(17,17,17,0.55)',
         display: 'flex',
         alignItems: 'center',

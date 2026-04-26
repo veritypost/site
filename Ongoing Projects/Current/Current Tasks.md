@@ -200,19 +200,11 @@ SHIPPED 2026-04-26. Web: position:fixed bottom bar (zIndex 100) renders when myR
 
 94. **Delay push permission prompt until first quiz pass** (T-107). Affects: iOS push permission flow and web push prompt.
 
-95. **Show asker context on expert queue cards** (T-108) — verity score and tier badge on each question card. Affects: expert queue web and iOS.
+95. **Auto-advance to next question on expert submit** (T-111). Affects: expert queue web and iOS.
 
-96. **Build inline answer composer with markdown preview for web** (T-109). Affects: expert queue web answer form.
+96. **Add vacation mode toggle to expert queue header** (T-112). Affects: expert queue web and iOS.
 
-97. **Build sheet-based answer composer with live preview for iOS** (T-110). Affects: `ExpertQueueView.swift` or expert answer sheet.
-
-98. **Auto-advance to next question on expert submit** (T-111). Affects: expert queue web and iOS.
-
-99. **Add vacation mode toggle to expert queue header** (T-112). Affects: expert queue web and iOS.
-
-100. **Add unread count badge to expert queue back-channel tab** (T-113). Affects: expert queue tab navigation web and iOS.
-
-101. **Show per-question category in expert queue** (T-114) — for experts in multiple categories. Affects: expert queue question cards web and iOS.
+97. **Add unread count badge to expert queue back-channel tab** (T-113). Affects: expert queue tab navigation web and iOS.
 
 103. **Make recap detail story-format with source preamble** (T-116) — each question includes "this question came from this article" context. Affects: recap detail web and iOS.
 

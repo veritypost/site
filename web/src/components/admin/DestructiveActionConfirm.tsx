@@ -4,6 +4,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { createClient } from '../../lib/supabase/client';
+import { Z } from '@/lib/zIndex';
 
 interface DestructiveActionConfirmProps {
   open: boolean;
@@ -99,7 +100,7 @@ export default function DestructiveActionConfirm({
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 9999,
+        zIndex: Z.CRITICAL,
         background: 'rgba(17, 17, 17, 0.85)',
         display: 'flex',
         alignItems: 'center',

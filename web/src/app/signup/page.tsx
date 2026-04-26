@@ -757,10 +757,8 @@ function Spinner({ color }: { color: string }) {
         border: `2px solid ${color}`,
         borderTopColor: 'transparent',
         borderRadius: '50%',
-        animation: 'vp-spin 0.7s linear infinite',
+        animation: 'vpSpin 0.7s linear infinite',
       }}
-    >
-      <style>{`@keyframes vp-spin { to { transform: rotate(360deg); } }`}</style>
-    </span>
+    ></span>
   );
 }

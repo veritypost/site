@@ -4,6 +4,7 @@
 import { useEffect, useRef, CSSProperties } from 'react';
 import Ad from './Ad';
 import { useFocusTrap } from '../lib/useFocusTrap';
+import { Z } from '@/lib/zIndex';
 
 type InterstitialVariant = 'signup' | 'ad';
 
@@ -42,7 +43,7 @@ export default function Interstitial({
   const backdropStyle: CSSProperties = {
     position: 'fixed',
     inset: 0,
-    zIndex: 9998,
+    zIndex: Z.CRITICAL,
     background: 'rgba(17,17,17,0.85)',
     display: 'flex',
     alignItems: 'center',

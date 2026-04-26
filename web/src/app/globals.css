@@ -103,6 +103,28 @@
   }
 }
 
+/* Shared spinner — used by auth pages (login, signup, forgot-password,
+   reset-password). Inline <style> copies removed in T-027. */
+@keyframes vpSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Shared pulse — used by reset-password success state. Inline <style>
+   copy removed in T-027. */
+@keyframes vpPulse {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 /* Kid-mode celebration motion. The baseline reduced-motion rule at
    the top of this file collapses all animation to near-instant, so
    these rules respect OS preferences automatically. */

@@ -8,6 +8,7 @@ import { createClient } from '../lib/supabase/client';
 import AccountStateBanner from '../components/AccountStateBanner';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '../lib/permissions';
 import type { Tables } from '@/types/database-helpers';
+import { Z } from '@/lib/zIndex';
 
 type ProfileRow = Pick<
   Tables<'users'>,
@@ -292,7 +293,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
     bottom: 0,
     left: 0,
     right: 0,
-    zIndex: 9999,
+    zIndex: Z.CRITICAL,
     background: 'rgba(255,255,255,0.97)',
     backdropFilter: 'blur(12px)',
     borderTop: `1px solid ${C.border}`,
@@ -322,7 +323,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
     top: 0,
     left: 0,
     right: 0,
-    zIndex: 9999,
+    zIndex: Z.CRITICAL,
     background: 'rgba(255,255,255,0.97)',
     backdropFilter: 'blur(12px)',
     borderBottom: `1px solid ${C.border}`,
@@ -542,7 +543,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
             bottom: showNav ? 56 : 0,
             left: 0,
             right: 0,
-            zIndex: 10000,
+            zIndex: Z.CRITICAL,
             background: '#111',
             padding: '8px 16px',
             display: 'flex',

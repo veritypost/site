@@ -565,7 +565,6 @@ function LoginPageInner() {
             )}
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
-          <style>{`@keyframes vpSpin{to{transform:rotate(360deg)}}`}</style>
         </form>
 
         <p style={{ textAlign: 'center', fontSize: '13px', color: C.dim, margin: 0 }}>

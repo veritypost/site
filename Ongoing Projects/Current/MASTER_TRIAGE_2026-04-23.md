@@ -252,6 +252,10 @@ Aggregate themes (counts approximate):
 | Task | Description | Status |
 |------|-------------|--------|
 | T-045 | Classify all `hasPermission()` call sites with gateType (hard / soft / invisible) — prerequisite for T-067 LockModal swap | **SHIPPED 2026-04-26** — `Ongoing Projects/Current/hasPermission-classification.md`. 104 executable call sites classified: 15 HARD, 6 SOFT, 83 INVISIBLE. 41 sites flagged for inline-CTA wiring, 46 keep-invisible, 12 keep-hard-redirect, 5 keep-modal. |
+| T-108 | Show asker context on expert queue cards (verity score + username) | **SHIPPED 2026-04-26** — commit 75866af. API JOIN on `users!fk_expert_queue_items_asking_user_id`; web card shows dim "Asked by username" below question body; iOS itemRow shows asker caption. |
+| T-109 | Inline markdown preview for web answer composer | **SHIPPED 2026-04-26** — commit 75866af. Raw textarea replaced with Edit/Preview two-tab composer using `marked` + DOMPurify; `dangerouslySetInnerHTML` with sanitized output. |
+| T-110 | Sheet-based answer composer with live preview for iOS | **SHIPPED 2026-04-26** — commit 75866af. `AnswerComposerSheet` updated with segmented Picker (Edit/Preview) and `AttributedString(markdown:)` preview tab. |
+| T-114 | Per-question category display on expert queue cards | **SHIPPED 2026-04-26** — commit 75866af. API JOIN on `categories!fk_expert_queue_items_target_category_id`; iOS `ExpertQueueItem.category` populated from response; web card shows dim uppercase category label above target_type line. T-025 scope: `ISO8601DateFormatter` promoted to `private static let`. |
 
 ---
 

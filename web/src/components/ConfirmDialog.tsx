@@ -3,6 +3,7 @@
 'use client';
 
 import { useEffect, useRef, ReactNode } from 'react';
+import { Z } from '@/lib/zIndex';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -84,7 +85,7 @@ export default function ConfirmDialog({
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 10000,
+        zIndex: Z.CRITICAL,
         background: 'rgba(0,0,0,0.45)',
         display: 'flex',
         alignItems: 'center',

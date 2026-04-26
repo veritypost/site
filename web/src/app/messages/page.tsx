@@ -6,8 +6,10 @@ import { useSearchParams } from 'next/navigation';
 import { createClient } from '../../lib/supabase/client';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import { useFocusTrap } from '../../lib/useFocusTrap';
+import { useToast } from '@/components/Toast';
 import type { Tables } from '@/types/database-helpers';
 import type { User } from '@supabase/supabase-js';
+import { Z } from '@/lib/zIndex';
 
 // Messages / DM page. Permission swap:
 //   • The former PermissionGate + PERM.PROFILE_MESSAGES / SECTIONS.PROFILE
@@ -139,6 +141,8 @@ function MessagesPageInner() {
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [searching, setSearching] = useState<boolean>(false);
 
+  const toast = useToast();
+
   // R13-C5 Fix 2: conversation overflow menu for block / report actions.
   // Routes: POST /api/users/[id]/block (block), DELETE (unblock) per the
   // Apple Guideline 1.2 split. POST /api/reports (body { targetType,
@@ -146,7 +150,6 @@ function MessagesPageInner() {
   const [showConvoMenu, setShowConvoMenu] = useState<boolean>(false);
   const [showReportDialog, setShowReportDialog] = useState<boolean>(false);
   const [reportReason, setReportReason] = useState<string>('');
-  const [actionToast, setActionToast] = useState<string>('');
   const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set());
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -493,8 +496,10 @@ function MessagesPageInner() {
     if (!res.ok) {
       // Soft error — restore the draft so the user can edit or retry.
       setInput(body);
+      toast.error('Message failed to send. Try again.');
       return;
     }
+    toast.success('Message sent.');
     const data = (payload as { message?: MessageRow }).message;
 
     if (data) {
@@ -622,8 +627,7 @@ function MessagesPageInner() {
     const other = convo?.conversation_participants?.find((p) => p.user_id !== currentUser?.id);
     const otherId = other?.user_id;
     if (!otherId) {
-      setActionToast('Could not find the other participant.');
-      setTimeout(() => setActionToast(''), 3000);
+      toast.error('Could not find the other participant.');
       return;
     }
     const isBlocked = blockedUserIds.has(otherId);
@@ -635,7 +639,7 @@ function MessagesPageInner() {
       });
       if (!res.ok) {
         console.error('[messages] block mutation failed', res.status);
-        setActionToast(
+        toast.error(
           isBlocked
             ? 'Could not unblock this user. Please try again.'
             : 'Could not block this user. Please try again.'
@@ -647,14 +651,13 @@ function MessagesPageInner() {
           else next.add(otherId);
           return next;
         });
-        setActionToast(isBlocked ? 'User unblocked.' : 'User blocked.');
+        toast.success(isBlocked ? 'User unblocked.' : 'User blocked.');
       }
     } catch (e) {
       console.error('[messages] block mutation', e);
-      setActionToast('Network error. Try again.');
+      toast.error('Network error. Try again.');
     }
     setShowConvoMenu(false);
-    setTimeout(() => setActionToast(''), 3500);
   };
 
   // R13-C5 Fix 2 — Submit a report against the other participant using the
@@ -666,8 +669,7 @@ function MessagesPageInner() {
     const other = convo?.conversation_participants?.find((p) => p.user_id !== currentUser?.id);
     const otherId = other?.user_id;
     if (!otherId) {
-      setActionToast('Could not find the other participant.');
-      setTimeout(() => setActionToast(''), 3000);
+      toast.error('Could not find the other participant.');
       return;
     }
     try {
@@ -682,18 +684,17 @@ function MessagesPageInner() {
       });
       if (!res.ok) {
         console.error('[messages] report user failed', res.status);
-        setActionToast('Could not submit report. Please try again.');
+        toast.error('Could not submit report. Please try again.');
       } else {
-        setActionToast('Thanks — report received.');
+        toast.success('Thanks — report received.');
       }
     } catch (e) {
       console.error('[messages] report user', e);
-      setActionToast('Network error. Try again.');
+      toast.error('Network error. Try again.');
     }
     setShowReportDialog(false);
     setReportReason('');
     setShowConvoMenu(false);
-    setTimeout(() => setActionToast(''), 3500);
   };
 
   const formatTime = (d: string | null | undefined): string => {
@@ -792,7 +793,7 @@ function MessagesPageInner() {
             position: 'fixed',
             inset: 0,
             background: 'rgba(17,17,17,0.92)',
-            zIndex: 9999,
+            zIndex: Z.CRITICAL,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -1166,27 +1167,12 @@ function MessagesPageInner() {
             )}
           </div>
 
-          {actionToast && (
-            <div
-              role="status"
-              style={{
-                padding: '8px 14px',
-                fontSize: 12,
-                color: '#111',
-                background: '#f7f7f7',
-                borderBottom: '1px solid #e5e5e5',
-              }}
-            >
-              {actionToast}
-            </div>
-          )}
-
           {showReportDialog && (
             <div
               style={{
                 position: 'fixed',
                 inset: 0,
-                zIndex: 10001,
+                zIndex: Z.CRITICAL,
                 background: 'rgba(0,0,0,0.4)',
                 display: 'flex',
                 alignItems: 'center',
@@ -1445,7 +1431,7 @@ function MessagesPageInner() {
           style={{
             position: 'fixed',
             inset: 0,
-            zIndex: 10000,
+            zIndex: Z.CRITICAL,
             background: 'rgba(0,0,0,0.4)',
             display: 'flex',
             alignItems: 'center',

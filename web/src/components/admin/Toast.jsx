@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useState } from 'react';
 import { ADMIN_C, F, S } from '../../lib/adminPalette';
+import { Z } from '../../lib/zIndex';
 
 // Admin toast system. Separate from the user-facing toast at
 // site/src/components/Toast.js — that one is for in-app users and has
@@ -76,7 +77,7 @@ export function ToastProvider({ children, position = 'bottom' }) {
           display: 'flex',
           flexDirection: position === 'top' ? 'column-reverse' : 'column',
           gap: S[2],
-          zIndex: 10002,
+          zIndex: Z.TOAST,
           pointerEvents: 'none',
           maxWidth: 'calc(100% - 32px)',
           width: 'min(420px, 100%)',

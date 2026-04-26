@@ -271,7 +271,6 @@ export default function ForgotPasswordPage() {
                 )}
                 {loading ? 'Sending…' : 'Send reset link'}
               </button>
-              <style>{`@keyframes vpSpin{to{transform:rotate(360deg)}}`}</style>
             </form>
           </>
         ) : (

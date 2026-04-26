@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { ADMIN_C, F, S } from '../../lib/adminPalette';
 import { useFocusTrap } from '../../lib/useFocusTrap';
+import { Z } from '../../lib/zIndex';
 
 const WIDTHS = { sm: 420, md: 560, lg: 760 };
 
@@ -75,7 +76,7 @@ export default function Modal({
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 10000,
+        zIndex: Z.CRITICAL,
         background: 'rgba(17,17,17,0.52)',
         display: 'flex',
         alignItems: 'flex-start',
