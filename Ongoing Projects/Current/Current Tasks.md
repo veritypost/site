@@ -334,14 +334,6 @@ POST-LAUNCH items, Apple-console-blocked items, and SHIPPED items are excluded. 
 
 139. **Strip kid illustration requirement from `PRELAUNCH_UI_CHANGE.md` §3.13** (OwnerQ Task 6) — `articles.illustration_url` column doesn't exist; remove the column-add requirement from the doc. Affects: `Archived/Ongoing Projects/Pre-Launch/PRELAUNCH_UI_CHANGE.md:225,386`.
 
-140. **Fix `localhost:3333` stale port references** (OwnerQ Task 22) — canonical dev port is 3000; update parity docs. Affects: `Reference/parity/Shared.md`, `Web-Only.md`, `iOS-Only.md`.
-
 141. **Patch dead-path references in `Sessions/` logs** (OwnerQ Task 15) — update `site/`, `01-Schema/`, `proposedideas/`, `05-Working/`, `docs/`, etc. references to current paths. Affects: session log files under `Workbench/Sessions/`.
-
-142. **Add historical-archive banners to `Completed Projects/` docs** (ARCHIVED_COMPLETED §4.1) — prepend a short banner to each `Completed Projects/*.md` noting it is a historical record and pointing to `Ongoing Projects/Current/MASTER_TRIAGE_2026-04-23.md` for live status. Affects: all files under `Archived/Completed Projects/`.
-
-143. **Create `Completed Projects/README.md` index** (ARCHIVED_COMPLETED §4.2) — single-page pointer explaining the folder is read-only historical record and directing readers to the canonical trackers. Affects: `Archived/Completed Projects/README.md` (new file).
-
-144. **Add root-level archive index** (ARCHIVED_COMPLETED §4.3) — create or extend a top-level index (e.g. `Archived/README.md`) listing what each sub-folder contains and when it was archived. Affects: `Archived/README.md` (new or extended file).
 
 145. **Move stale retired docs into `Archived/_obsolete-readonly/`** (ARCHIVED_COMPLETED §4.4) — identify the most outdated retired docs (e.g. superseded design specs, replaced reference docs) and relocate them one level deeper to prevent confusion. Affects: files under `Archived/` (owner to designate candidates before execution).

@@ -32,8 +32,29 @@ Web-Only.md had 79 occurrences vs planner estimate of 43 — replace_all handles
 N/A
 
 ## Implementation Progress
-Status: QUEUED
-Queued at: 2026-04-26
+2026-04-26 — Changed Reference/parity/Shared.md — replaced all 22 occurrences of localhost:3333 with localhost:3000
+2026-04-26 — Changed Reference/parity/Web-Only.md — replaced all 79 occurrences of localhost:3333 with localhost:3000
+2026-04-26 — Changed Archived/Completed-Projects-2026-04-26/CATEGORY_FIXES.md — prepended 2-line archive banner
+2026-04-26 — Changed Archived/Completed-Projects-2026-04-26/FINAL_WIRING_LOG.md — prepended 2-line archive banner
+2026-04-26 — Changed Archived/Completed-Projects-2026-04-26/MIGRATION_PAGE_MAP.md — prepended 2-line archive banner
+2026-04-26 — Created Archived/Completed-Projects-2026-04-26/README.md — new file describing folder contents
+2026-04-26 — Created Archived/README.md — new file with 20-subdirectory top-level index
+Verification: grep -rn "3333" Reference/parity/ → CLEAN (0 results)
+Status: IMPLEMENTATION COMPLETE
+tsc: N/A (docs only)
+xcodebuild: N/A (docs only)
 
 ## Completed
-[SHIPPED block written here when done]
+
+SHIPPED 2026-04-26
+Commit: 972ef0a
+Files touched:
+  - Reference/parity/Shared.md (22 :3333 → :3000)
+  - Reference/parity/Web-Only.md (79 :3333 → :3000)
+  - Archived/Completed-Projects-2026-04-26/CATEGORY_FIXES.md (archive banner)
+  - Archived/Completed-Projects-2026-04-26/FINAL_WIRING_LOG.md (archive banner)
+  - Archived/Completed-Projects-2026-04-26/MIGRATION_PAGE_MAP.md (archive banner)
+  - Archived/Completed-Projects-2026-04-26/README.md (created)
+  - Archived/README.md (created)
+Items removed from Current Tasks.md: items 140, 142, 143, 144 (OwnerQ Task 22, §4.1, §4.2, §4.3)
+Review fixes: none
