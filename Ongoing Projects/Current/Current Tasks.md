@@ -56,8 +56,6 @@ POST-LAUNCH items, Apple-console-blocked items, and SHIPPED items are excluded. 
 
 ## Tier 6 — iOS bugs
 
-25. **Fix iOS signup `users.upsert` race with auth trigger** (T-031) — make the sequence safe against the DB trigger that fires on auth user creation; prevent orphan auth rows and null usernames. Affects: `VerityPost/VerityPost/AuthViewModel.swift`.
-
 26. **Audit `ParentalGateModal` call sites for missing COPPA gates** (T-120) — verify the gate fires on every external link, payment prompt, and mailto; confirm nothing is missing beyond the known 4 callers. Affects: `VerityPostKids/VerityPostKids/` — all external link, payment, and mailto surfaces.
 
 27. **Add illustration support to kid reader** (T-119) — pull `articles.illustration_url` when present; UI-only change; no schema add yet (column does not currently exist — this task is blocked until the column is added). Affects: `VerityPostKids/VerityPostKids/KidReaderView.swift`.

@@ -280,29 +280,56 @@ final class AuthViewModel: ObservableObject {
             let result = try await client.auth.signUp(email: email, password: password)
             let userId = result.user.id.uuidString
 
-            // Insert user row. v2 schema: users.plan_id is FK to plans
-            // (defaults to free server-side); users has no `role` column —
-            // roles live in the `user_roles` junction — and no bare `streak`
-            // column (streak_current/_best/_freeze_remaining exist instead,
-            // all defaulted server-side).
-            struct UserUpsert: Encodable {
-                let id: String
-                let email: String
-                let username: String
-            }
-
-            // C17 — wrap the upsert in a do/catch so we can roll back the
-            // auth.users row server-side if the public.users upsert fails.
-            // Without this, a transient RLS / network hiccup on the upsert
-            // left an orphan auth row the user couldn't log back into and
-            // couldn't re-signup around (users.email UNIQUE would collide
-            // on retry). The server-side rollback endpoint requires the
-            // user's fresh bearer token + userId and is the only
-            // service-role path iOS has for deleting an auth row.
+            // T-031: Set username via update_own_profile RPC instead of a
+            // direct upsert on public.users.
+            //
+            // The on_auth_user_created trigger fires synchronously inside the
+            // auth.signUp transaction, inserting the public.users row with
+            // id/email/plan_id/locale (but not username). The old upsert
+            // raced against that trigger: if the network or Postgres
+            // replication delayed the trigger commit, the client INSERT could
+            // land first; when the trigger then ran it would silently skip the
+            // row (ON CONFLICT DO NOTHING), leaving username NULL. The upsert
+            // also wrote `email` back — a field the trigger already owns —
+            // which was redundant and tripped RLS in edge cases.
+            //
+            // update_own_profile is the established write contract for
+            // user-owned profile fields (mirrors web pick-username page).
+            // It does a targeted UPDATE, not an INSERT, so it is immune to the
+            // trigger race and only touches the column we actually own.
+            //
+            // Retry up to 3 times with 300ms backoff: on the vanishingly rare
+            // path where the trigger's transaction hasn't fully committed
+            // before the RPC fires (P0002 "user row not found"), a brief
+            // wait resolves it without surfacing an error to the user.
+            //
+            // C17 — rollback the auth.users row on any unrecoverable failure
+            // so a retry signup doesn't collide on users.email UNIQUE.
             do {
-                try await client.from("users")
-                    .upsert(UserUpsert(id: userId, email: email, username: normalized), onConflict: "id")
-                    .execute()
+                struct ProfilePatch: Encodable { let username: String }
+                struct RPCArgs: Encodable { let p_fields: ProfilePatch }
+                var lastError: Error?
+                for attempt in 1...3 {
+                    do {
+                        try await client.rpc(
+                            "update_own_profile",
+                            params: RPCArgs(p_fields: ProfilePatch(username: normalized))
+                        ).execute()
+                        lastError = nil
+                        break
+                    } catch {
+                        lastError = error
+                        let msg = error.localizedDescription.lowercased()
+                        // P0002: trigger hasn't committed the row yet — wait and retry.
+                        guard msg.contains("p0002") || msg.contains("not found") else { break }
+                        if attempt < 3 {
+                            try? await Task.sleep(nanoseconds: UInt64(attempt) * 300_000_000)
+                        }
+                    }
+                }
+                if let err = lastError {
+                    throw err
+                }
             } catch {
                 await attemptSignupRollback(userId: userId)
                 authError = Self.friendlyAuthError(error)
