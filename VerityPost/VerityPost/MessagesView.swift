@@ -10,17 +10,19 @@ struct MessagesView: View {
     private let client = SupabaseManager.shared.client
 
     // MARK: - Formatters (static to avoid per-message allocation)
-    private static let msgISO: ISO8601DateFormatter = {
+    // fileprivate so DMThreadView (also in this file) can reuse them
+    // without re-allocating its own per-call formatters.
+    fileprivate static let msgISO: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return f
     }()
-    private static let msgISOFallback: ISO8601DateFormatter = {
+    fileprivate static let msgISOFallback: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime]
         return f
     }()
-    private static let nowISO = ISO8601DateFormatter()
+    fileprivate static let nowISO = ISO8601DateFormatter()
 
     @State private var conversations: [DMConversation] = []
     @State private var loading = true

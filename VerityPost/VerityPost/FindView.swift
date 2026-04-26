@@ -186,9 +186,10 @@ struct FindView: View {
             errorText = nil
         }
         let site = SupabaseManager.shared.siteURL
-        var components = URLComponents(string: "/api/search", resolvingAgainstBaseURL: true)
+        let searchURL = site.appendingPathComponent("api/search")
+        var components = URLComponents(url: searchURL, resolvingAgainstBaseURL: false)
         components?.queryItems = [URLQueryItem(name: "q", value: q)]
-        guard let url = components?.url.flatMap({ URL(string: $0.absoluteString, relativeTo: site) }) else {
+        guard let url = components?.url else {
             await MainActor.run {
                 errorText = "Configuration error."
                 loading = false
