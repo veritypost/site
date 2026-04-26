@@ -197,7 +197,7 @@ Each Task is prompt-ready: CURRENT / TARGET / CHANGES laid out so a coding sessi
 | Task 10 | Make adult quiz unlock threshold DB-driven — add `settings` row, parameterize both RPCs in `schema/012` | Spec-ready |
 | Task 11 | Delete bias-spotting dead code from kids app — `BadgeUnlockScene.swift`, `QuizPassScene.swift`, and all call sites | Spec-ready |
 | Task 12 | Move `VerityPost/VerityPost/possibleChanges/` outside the app source tree so it doesn't ship in the bundle | Future Projects |
-| Task 13 | Delete `99.Organized Folder/Proposed Tree` from repo | Spec-ready |
+| Task 13 | ~~Delete `99.Organized Folder/Proposed Tree` from repo~~ **CLOSED — folder never existed in repo. Nothing to do.** | Done |
 | Task 14 | Fix 6 stale facts in `Reference/CLAUDE.md` | Spec-ready |
 | Task 15 | Patch dead-path references in `Sessions/` logs (`site/`, `01-Schema/`, `proposedideas/`, etc.) → current paths | Spec-ready |
 | Task 16 | Delete `VerityPost/VerityPost/REVIEW.md` | Spec-ready |
