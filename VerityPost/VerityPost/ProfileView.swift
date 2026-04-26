@@ -188,9 +188,16 @@ struct ProfileView: View {
         .task(id: perms.changeToken) {
             canShareProfileCard = await PermissionService.shared.has("profile.card.share_link")
             canViewCard = await PermissionService.shared.has("profile.card.view")
-            canViewActivity = await PermissionService.shared.has("profile.activity.view.own")
-            canViewCategories = await PermissionService.shared.has("profile.score.view.own.categories")
-            canViewAchievements = await PermissionService.shared.has("profile.achievements.view.own")
+            // OwnersAudit Profile Task 5 — switched to canonical short-form
+            // keys (per CLAUDE.md). Web has always used these; iOS was on the
+            // long-form variants which were a migration-142 artifact the 143
+            // rollback was supposed to clean up. Cross-platform parity.
+            // Requires the `profile.categories` DB binding migration to ship
+            // FIRST — see Ongoing Projects/migrations/
+            // 2026-04-26_profile_categories_canonical_binding.sql.
+            canViewActivity = await PermissionService.shared.has("profile.activity")
+            canViewCategories = await PermissionService.shared.has("profile.categories")
+            canViewAchievements = await PermissionService.shared.has("profile.achievements")
             canViewBookmarks = await PermissionService.shared.has("bookmarks.list.view")
             canViewMessages = await PermissionService.shared.has("messages.inbox.view")
             canViewExpertQueue = await PermissionService.shared.has("expert.queue.view")

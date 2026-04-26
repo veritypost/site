@@ -7,6 +7,97 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-26 (IA shift bundle — Profile Task 5 + Search Task 6 prep) — _pending push to git + DB apply_
+
+This is one coherent IA migration spanning three artifacts:
+1. A DB migration (written, not applied yet)
+2. iOS perm-key swap to canonical short-form (in-source)
+3. Leaderboard relocated into Profile on web (in-source)
+4. Full session prep doc for the new iOS Browse tab + bottom-bar swap
+
+### DB migration written (not applied)
+
+- **File** — `Ongoing Projects/migrations/2026-04-26_profile_categories_canonical_binding.sql`
+- **What it does** — Binds `profile.categories` to the same 8 plan sets that already carry `profile.activity` and `profile.achievements` (admin/editor/expert/family/free/moderator/owner/pro); removes the `anon` binding.
+- **Why** — MCP-verified live state showed `profile.categories` was bound only to `anon`. The `/profile` route is middleware-protected from anon, so the binding has been a no-op for everyone — nobody on web sees the Categories tab today, and the drift was never noticed because the tab just disappears quietly. iOS used an orphan key (`profile.score.view.own.categories`, bound to admin/free/owner — 3 sets only) which was a migration-142 leftover the 143 rollback was supposed to clean up. Net effect after apply: web Categories tab returns for every logged-in plan; iOS code change (next bullet) makes both surfaces query the same canonical key; orphan key becomes deletable in a follow-up. Migration is wrapped in `BEGIN/COMMIT`, idempotent on re-apply, with rollback statement and verification query in the file header.
+- **Apply order** — (1) run migration, (2) bump `users.perms_version` so live perms cache invalidates, (3) push the iOS code so iOS reads the canonical key the moment the DB has it. Doing them out of order leaves a brief stale-perm window.
+
+### iOS perm-key short-form swap (in-source, not committed)
+
+- **What** — `ProfileView.swift:191-193` switched from long-form (`profile.activity.view.own`, `profile.score.view.own.categories`, `profile.achievements.view.own`) to canonical short-form (`profile.activity`, `profile.categories`, `profile.achievements`). Comment in source explicitly references the migration file so the dependency is traceable.
+- **Files** — `VerityPost/VerityPost/ProfileView.swift`
+- **Why** — Per CLAUDE.md canonical guidance ("short-form is canonical, .view.own variants are a rolled-back migration artifact"). Web has always used short-form; iOS being on the long-form variants was the source of the cross-platform Categories-tab divergence. Once the DB binding migration above lands, this single 3-line swap restores full parity — same DB row, same login, same tab visibility on both surfaces.
+
+### Leaderboard relocated into Profile on web (in-source, not committed)
+
+- **What** — Added `<QuickLink href="/leaderboard" label="Leaderboards" description="See where you rank by topic and overall" />` to the `OverviewTab` "My stuff" section in `web/src/app/profile/page.tsx`. Removed the section's conditional wrapper so it always renders — Leaderboards is a default-on entry, the other links are perm-gated additions.
+- **Files** — `web/src/app/profile/page.tsx`
+- **Why** — Pre-positioning the entry point on the web side. When the iOS bottom-bar swap ships (separate session — replaces "Most Informed" with "Browse"), the same QuickLink pattern lands on iOS, and Leaderboard's permanent home becomes Profile on both surfaces. Description copy is plain factual ("See where you rank by topic and overall") — no rank teaser, no streak boast. Per owner directive 2026-04-26: "don't gamify whatever you're too much." The leaderboard surface still exists; what changes is its placement signals it's a check-in stat page, not a primary destination users should optimize for.
+
+### iOS Browse tab + bottom-bar swap — session prep written, not implemented
+
+- **File** — `Ongoing Projects/Sessions-Pending/BrowseView_iOS_Session_Prep.md`
+- **What's in it** — Full prompt, files-to-read list, build spec for `BrowseView.swift` (~200 lines mirroring `web/src/app/browse/page.tsx`), tab swap plan for `ContentView.swift` (`MainTabView.Tab` + `TextTabBar.items`), iOS Profile QuickLink note (must land with this session so the Leaderboard entry is never absent during the cutover), DB migration coordination order, acceptance criteria, explicit out-of-scope list (no Home rank-changed nudge per owner directive, no 6-tab bar, no new API endpoint, no keyboard shortcuts).
+- **Why a separate session** — `BrowseView.swift` is a fresh view file at ~200 lines. Bundling it with the bottom-bar swap and the iOS Profile QuickLink + the DB migration coordination makes one coherent TestFlight push instead of multiple half-states where Browse is in the bar but Leaderboard hasn't been relocated yet, or where the perm migration has applied but the iOS code hasn't shipped.
+
+---
+
+## 2026-04-26 (Group 8 — Settings Task 4 + 1/2/6 deferred) — _pending push to git_
+
+### Settings Task 4 — sanitize raw Supabase Auth error in password card
+
+- **What** — `pushToast({ message: upErr.message, variant: 'danger' })` → log the raw message via `console.error('[settings.password.update]', upErr.message)` and toast a fixed `"Password could not be updated. Try again."`
+- **Files** — `web/src/app/profile/settings/page.tsx`
+- **Why** — Supabase Auth's `updateUser` error string can contain policy detail (`"Password should be different from the old password"`) or stack-trace fragments on edge errors. The path is also reachable after the user already passed the per-user-rate-limited `/api/auth/verify-password` check, so any remaining failure here is most often a Supabase Auth backend issue — not something the user can act on with the raw message. Fixed string keeps the user oriented; the real detail goes to the JS console for debugging.
+
+### Settings Tasks 1, 2, 6 — deferred (not pending push, not yet done)
+
+- **Task 1 (web MFA card)** — full TOTP enrollment + verify + unenroll is a feature build, not audit cleanup; needs its own design pass on enrollment and recovery UX
+- **Task 2 (iOS TTS toggle)** — adding the row is small but verifying iOS reads the same `users.metadata.tts_per_article` shape that web writes + having the TTS player honor the toggle deserves a QA pass alongside, not a one-line drop-in
+- **Task 6 (DM read receipts placement)** — extracting a `PrivacyPrefsCard` from `ProfileCard` touches the user-row PATCH path; T-073 settings split is going to reshuffle anchors anyway, so this re-anchoring is much cheaper to land inside that deploy window than as a one-off now
+
+---
+
+## 2026-04-26 (Group 6 — Kids surface UX polish) — _pending push to git_
+
+### Kids Task 1 — kill the duplicate close button on ArticleListView
+
+- **What** — `KidsAppRoot.fullScreenCover` now branches on the active sheet. For `.articles`, it renders only the scene body (no `closeChrome` overlay). For `.streak` / `.badge`, the overlay still renders because those scenes have no toolbar of their own.
+- **Files** — `VerityPostKids/VerityPostKids/KidsAppRoot.swift`
+- **Why** — `ArticleListView` is a `NavigationStack` and already paints its own `xmark` button via `ToolbarItem(.topBarLeading)`. The blanket `closeChrome` overlay was sitting at the same screen coordinates on Dynamic Island devices (~59pt safe-area top), giving the kid two visually overlapping circles to tap. Both worked, so it's a polish bug not a functional one — but a kid app showing two close buttons looks broken to a parent doing the App Store walkthrough.
+
+### Kids Task 2 — hold the result reveal until server verdict resolves
+
+- **What** — `resultView` branches on `verdictPending`. While true, shows `ProgressView()` + "Checking your score…" caption and hides the Done button. Once the RPC returns and `verdictPending` flips false, the existing pass/fail layout renders.
+- **Files** — `VerityPostKids/VerityPostKids/KidQuizEngineView.swift`
+- **Why** — Local `correctCount` and the server `get_kid_quiz_verdict` RPC can disagree: a write failure mid-quiz drops a row from the server count, so a kid who locally tallies 4/5 might get a server verdict of 2/5. Without the spinner, the view first showed "Great job!" and then silently flipped to "Give it another go?" 2–5 seconds later. Disorienting at the exact moment a kid is parsing whether they passed. The 1–3 second wait is anticipation, not punishment — quizzes always have a result-reveal beat.
+
+### Kids Task 3 — distinguish a network failure from a missing quiz (KidQuizEngineView)
+
+- **What** — Body now branches `loadError != nil → errorState` before `questions.isEmpty → emptyState`. New `errorState` view: `wifi.slash` icon + "Couldn't load the quiz right now." + 44pt "Try again" button calling `loadQuestions()`. `loadQuestions()` resets `loadError` and `blockedNotKidsSafe` on entry so the retry path clears stale state.
+- **Files** — `VerityPostKids/VerityPostKids/KidQuizEngineView.swift`
+- **Why** — When the Supabase fetch failed, `loadError` was set but never rendered; the body fell through to `questions.isEmpty` which displayed "No quiz yet for this article." A kid who lost wifi for two seconds got told their favorite article didn't have a quiz, with no path to retry beyond closing the cover and re-opening. The empty-state copy is correct for the *real* missing-quiz case (Kids Task 11's pool-size guard fires it legitimately) — the fix is to not lie about which case is happening.
+
+### Kids Task 4 — same fix for ArticleListView
+
+- **What** — `loadError != nil` branch now precedes `articles.isEmpty`, with its own retry view. Trailing red `loadError` caption removed (it was rendering *under* the contradicting empty state). `load()` resets `loadError` on entry.
+- **Files** — `VerityPostKids/VerityPostKids/ArticleListView.swift`
+- **Why** — Same divergence pattern as Task 3. With the trailing caption, a kid saw both "No articles in this category yet" AND "Couldn't load articles" simultaneously — two answers to the same question. Now they see one clear state with a path forward.
+
+### Kids Task 10 — connect quiz outcome to something concrete
+
+- **What** — Below the score line, resultView now shows pass: "Your streak just got longer." / fail: "Read it again and try when you're ready."
+- **Files** — `VerityPostKids/VerityPostKids/KidQuizEngineView.swift`
+- **Why** — Without context, the result screen reads as a school test — pass/fail score, no consequence, no participation framing. Adult surfaces have explicit civic framing ("BEFORE YOU DISCUSS" / "the conversation opens") that gives the quiz weight. Kids needed parallel framing so the mechanic feels like a thing you participate in, not a thing being done to you. Streak is the kid surface's strongest motivational signal — wiring the pass result back to it costs one line and earns the most.
+
+### Kids Task 12 — show the pass threshold in the result line
+
+- **What** — Pass: "You got X of N right." Fail: "You got X of N. You need Y to pass." `Y` is computed from current question count using the same `max(1, ceil(N × 0.6))` formula the local-fallback logic already uses.
+- **Files** — `VerityPostKids/VerityPostKids/KidQuizEngineView.swift`
+- **Why** — A kid who failed had no way to tell how close they came. "You got 2 of 5 right" + "Give it another go?" leaves the bar invisible — they could have missed by 4 or by 1. Adult web/iOS surfaces state "3 of 5 to pass" up front on the idle card; kids was the only surface where the threshold was a hidden constant. Fail copy now is the natural place to surface it because that's when it's actionable.
+
+---
+
 ## 2026-04-26 (Groups 5 + 7 — Static + Browse polish)
 
 ### Static Task 5 — How-it-works Step 4 copy

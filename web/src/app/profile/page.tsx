@@ -774,42 +774,46 @@ function OverviewTab({
             - settings.family.view (paid family plans)
           Y5-#6: Family tile added; the /profile/family dashboard was
           previously only linked from /profile/kids. */}
-      {(messagesInbox || bookmarksList || family || expertQueue) && (
-        <PageSection title="My stuff">
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-              gap: S[3],
-            }}
-          >
-            {messagesInbox && (
-              <QuickLink
-                href="/messages"
-                label="Messages"
-                description="Your direct conversations"
-              />
-            )}
-            {bookmarksList && (
-              <QuickLink href="/bookmarks" label="Bookmarks" description="Articles you've saved" />
-            )}
-            {expertQueue && (
-              <QuickLink
-                href="/expert-queue"
-                label="Expert queue"
-                description="Questions waiting for your answer"
-              />
-            )}
-            {family && (
-              <QuickLink
-                href="/profile/family"
-                label="Family"
-                description="Manage your family plan and seats"
-              />
-            )}
-          </div>
-        </PageSection>
-      )}
+      <PageSection title="My stuff">
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+            gap: S[3],
+          }}
+        >
+          {messagesInbox && (
+            <QuickLink href="/messages" label="Messages" description="Your direct conversations" />
+          )}
+          {bookmarksList && (
+            <QuickLink href="/bookmarks" label="Bookmarks" description="Articles you've saved" />
+          )}
+          {expertQueue && (
+            <QuickLink
+              href="/expert-queue"
+              label="Expert queue"
+              description="Questions waiting for your answer"
+            />
+          )}
+          {family && (
+            <QuickLink
+              href="/profile/family"
+              label="Family"
+              description="Manage your family plan and seats"
+            />
+          )}
+          {/* Leaderboards — always shown. Pre-IA-shift this duplicates the
+              "Most Informed" tab in the bottom nav; once that tab is replaced
+              by Browse (see Sessions-Pending/BrowseView_iOS_Session_Prep.md),
+              this becomes the sole entry point. Plain factual description —
+              no rank, no streak boast. */}
+          <QuickLink
+            href="/leaderboard"
+            label="Leaderboards"
+            description="See where you rank by topic and overall"
+          />
+        </div>
+      </PageSection>
 
       {/* Shareable profile card preview */}
       <PageSection

@@ -1227,7 +1227,7 @@ When implementing Task 1, use the pre-T-073 URL and add a T-073 update note alon
 
 ---
 
-### Profile Task 5 — iOS checks wrong permission keys for Activity, Categories, Milestones tabs
+### Profile Task 5 — iOS checks wrong permission keys for Activity, Categories, Milestones tabs ✓ PREPPED (pending DB apply + push)
 
 **Files:** `VerityPost/VerityPost/ProfileView.swift:200–202`
 **Source:** Direct code review — cross-platform perm key drift
@@ -1270,7 +1270,7 @@ canViewAchievements = await PermissionService.shared.has("profile.achievements")
 
 Also verify live DB state before and after: `SELECT p.key, COUNT(psp.id) FROM permissions p LEFT JOIN permission_set_perms psp ON psp.permission_id = p.id WHERE p.key IN ('profile.activity','profile.categories','profile.achievements','profile.activity.view.own','profile.score.view.own.categories','profile.achievements.view.own') GROUP BY p.key;`
 
-**Status:** Blocked on owner DB decision (2026-04-26). MCP-verified actual bindings:
+**Status:** Owner approved option (a) 2026-04-26. Migration written to `Ongoing Projects/migrations/2026-04-26_profile_categories_canonical_binding.sql` (not yet applied — owner to apply alongside the iOS code push). iOS code already updated to short-form keys at `ProfileView.swift:191-193`. Apply order: (1) run migration, (2) bump `users.perms_version`, (3) push iOS build. Prior MCP-verified state below kept for reference:
 - `profile.activity` → 8 plan sets (admin/editor/expert/family/free/moderator/owner/pro) ✓
 - `profile.achievements` → same 8 sets ✓
 - `profile.categories` → bound only to **anon** (1 set) ✗ — middleware-protected page, anon can't reach it, so nobody on web sees the Categories tab today
@@ -1569,7 +1569,7 @@ Add a new `MFACard` component that:
 
 Wire the new card into the Account section renderer alongside `PasswordCard`.
 
-**Status:** Pending execution
+**Status:** Deferred — full TOTP enrollment flow (QR generation, factor verify, unenroll confirm) is a real feature build, not an audit cleanup. Belongs in a dedicated session with its own design pass on the enrollment + recovery UX.
 
 ---
 
@@ -1609,7 +1609,7 @@ if canViewTTSSetting {
 
 `canViewTTSSetting = await PermissionService.shared.has("settings.a11y.tts_per_article")`
 
-**Status:** Pending execution
+**Status:** Deferred — small in size but adds a new settings row, requires testing that iOS reads the same `users.metadata.tts_per_article` shape that web writes, and the TTS player itself needs to honor the toggle. Belongs alongside a TTS QA pass rather than as a one-line drop-in.
 
 ---
 
@@ -1638,7 +1638,7 @@ The `/api/auth/verify-password/route.js` endpoint exists and implements: `requir
 
 ---
 
-### Settings Task 4 — `upErr.message` raw Supabase error in password card
+### Settings Task 4 — `upErr.message` raw Supabase error in password card ✓ DONE
 
 **File:** `web/src/app/profile/settings/page.tsx:2351`
 **Source:** Pre-Launch Tasks T-013 (raw error.message sweep)
@@ -1657,7 +1657,7 @@ if (upErr) {
 }
 ```
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (raw `upErr.message` was being toasted directly to users on Supabase Auth `updateUser` failure — that string can include policy detail like "Password should be different from the old password" or stack-trace fragments on edge errors. Fix: log via `console.error('[settings.password.update]', upErr.message)` and toast a fixed string `"Password could not be updated. Try again."`)
 
 ---
 
@@ -1695,7 +1695,7 @@ Update `SECTIONS` to add a `privacy-prefs` subsection:
 { id: 'privacy-prefs', label: 'Privacy preferences', keywords: 'activity leaderboard messages dm read receipts' },
 ```
 
-**Status:** Pending execution
+**Status:** Deferred to T-073 deploy window — extracting a `PrivacyPrefsCard` from `ProfileCard` is a real refactor that touches the user-row PATCH path. T-073 is going to reshuffle settings sub-routes anyway (T-076/077/078/079/080 all bundle there), so re-anchoring this card is much cheaper inside that deploy than as a one-off now. Marking alongside the other T-073 items in this audit.
 
 ---
 
@@ -2011,7 +2011,7 @@ Verify `Story.categoryName` field name against `Models.swift` before implementin
 
 ---
 
-### Search Task 6 — iOS has no Browse equivalent — users cannot explore by topic
+### Search Task 6 — iOS has no Browse equivalent — users cannot explore by topic ✓ PREPPED (separate session)
 
 **File:** `VerityPost/VerityPost/FindView.swift`, `VerityPost/VerityPost/` (no BrowseView.swift exists)
 **Source:** Gap analysis — discovery surface
@@ -2030,7 +2030,7 @@ Add a Browse tab to the iOS adult app — a `BrowseView.swift` that mirrors the 
 
 Tab order: Home | Find | **Browse** | Messages | Profile (or replace one of the lower-traffic tabs if 5 is the ceiling). Owner decision on tab order — do not adjust autonomously.
 
-**Status:** Pending execution — owner to confirm tab placement before implementation
+**Status:** Owner-locked decision 2026-04-26 — replace "Most Informed" with "Browse" (final order: Home / Find / Browse / Notifications / Profile). Leaderboard relocates to a Profile QuickLink (web side prepped this session, iOS QuickLink lands with the BrowseView session). Full session prep doc with prompt + spec + acceptance criteria written to `Ongoing Projects/Sessions-Pending/BrowseView_iOS_Session_Prep.md`. The new view is ~200 lines of fresh SwiftUI; bundling with the bottom-bar swap means one coherent IA push to TestFlight, not three half-states. **Explicitly out of scope per owner: any leaderboard/rank-changed nudge on Home — owner directive "don't gamify too much" 2026-04-26.**
 
 ---
 
@@ -2253,7 +2253,7 @@ Line 94: "Press inquiries" links to `support@veritypost.com` — same address as
 
 ---
 
-### Kids Task 1 — `closeChrome` button duplicates ArticleListView's own toolbar close button
+### Kids Task 1 — `closeChrome` button duplicates ArticleListView's own toolbar close button ✓ DONE
 
 **File:** `VerityPostKids/VerityPostKids/KidsAppRoot.swift:94–101, 235–249`
 **Source:** Direct code review — UI duplication
@@ -2277,11 +2277,11 @@ ZStack(alignment: .topLeading) {
 
 `ArticleListView` already has a correctly styled close button; `closeChrome` is only needed for scenes that don't have their own.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (`fullScreenCover`'s ZStack now renders `EmptyView()` for `.articles` and `closeChrome` for everything else)
 
 ---
 
-### Kids Task 2 — Quiz `resultView` shows immediately with local verdict while server result is still pending
+### Kids Task 2 — Quiz `resultView` shows immediately with local verdict while server result is still pending ✓ DONE
 
 **File:** `VerityPostKids/VerityPostKids/KidQuizEngineView.swift:442–478`
 **Source:** Direct code review — UX correctness
@@ -2319,11 +2319,11 @@ private var resultView: some View {
 
 Pending duration is typically 1–3 seconds; kids expect a moment of anticipation on a result screen. The wait is not punishing — it's appropriate for a quiz reveal.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (resultView branches on `verdictPending` — shows ProgressView + "Checking your score…" until server verdict resolves; Done button hidden during pending so the kid can't tap through the local fallback before the server confirms)
 
 ---
 
-### Kids Task 3 — Quiz load error renders wrong empty state copy
+### Kids Task 3 — Quiz load error renders wrong empty state copy ✓ DONE
 
 **File:** `VerityPostKids/VerityPostKids/KidQuizEngineView.swift:162–165, 480–502`
 **Source:** Direct code review — copy accuracy
@@ -2372,11 +2372,11 @@ private var errorState: some View {
 }
 ```
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (body branches `loadError != nil → errorState` before `questions.isEmpty → emptyState`; new `errorState` view with `wifi.slash` icon, "Couldn't load the quiz right now.", and 44pt "Try again" button calling `loadQuestions()`. `loadQuestions` resets `loadError` and `blockedNotKidsSafe` on entry so retry clears stale state.)
 
 ---
 
-### Kids Task 4 — ArticleListView: error message appears below emptyState instead of replacing it
+### Kids Task 4 — ArticleListView: error message appears below emptyState instead of replacing it ✓ DONE
 
 **File:** `VerityPostKids/VerityPostKids/ArticleListView.swift:29–45`
 **Source:** Direct code review — error handling
@@ -2417,7 +2417,7 @@ if loading && articles.isEmpty {
 // Remove the trailing loadError Text — error is now handled in its own branch
 ```
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (`loadError` branch comes before `articles.isEmpty`; error state has 44pt "Try again" calling `load()`; trailing red caption removed; `load()` resets `loadError` on entry)
 
 ---
 
@@ -2544,7 +2544,7 @@ The reveal UX stays intact; it just waits for the server rather than reading cli
 
 ---
 
-### Kids Task 10 — Quiz has no framing for why it matters to the kid
+### Kids Task 10 — Quiz has no framing for why it matters to the kid ✓ DONE
 
 **File:** `VerityPostKids/VerityPostKids/KidQuizEngineView.swift:442–478`
 **Source:** Panel review — Trust Auditor, The Parent
@@ -2555,7 +2555,7 @@ The result view shows "Great job!" or "Give it another go?" with no connection t
 **Proposed fix:**
 Add one line to the result view connecting the outcome to something concrete. On pass: below "Great job!" — "Your streak just got longer." On fail with attempts remaining: "You need 3 right — give it another go!" On fail after all attempts: "Read it again and try when you're ready." Even a single sentence of framing converts the result from evaluation to context.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (added below the score line: pass → "Your streak just got longer." / fail → "Read it again and try when you're ready." Kids quiz has no attempts-remaining tracking today; the simpler two-line framing is what fits the current data model — extending to "1 attempt remaining" copy can land alongside the Group 9 server-graded rewrite when verdict carries `attempts_remaining`.)
 
 ---
 
@@ -2581,7 +2581,7 @@ guard questions.count >= 5 else {
 
 ---
 
-### Kids Task 12 — Pass threshold not shown to kids; adult surfaces state it explicitly on both platforms
+### Kids Task 12 — Pass threshold not shown to kids; adult surfaces state it explicitly on both platforms ✓ DONE
 
 **Files:** `VerityPostKids/VerityPostKids/KidQuizEngineView.swift:442–478`, `VerityPost/VerityPost/StoryDetailView.swift:860–861`, `web/src/app/story/[slug]/page.tsx:1031`
 **Source:** Panel review — Seam Inspector, The Parent, Trust Auditor
@@ -2595,7 +2595,7 @@ Extend the result view copy with threshold context:
 
 `passThreshold` is available from the local fallback logic (`max(1, Int(ceil(Double(total) * 0.6)))`). Use it in the copy rather than leaving the bar implicit.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (`threshold` computed from current `total` using the same `0.6 ceiling` formula; resultView now shows pass: "You got X of N right." / fail: "You got X of N. You need Y to pass." Adult web/iOS already state the threshold up front; kids was the only surface that hid the bar.)
 
 ---
 
