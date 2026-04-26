@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 // PATCH /api/comments/[id] — owner edit.
 export async function PATCH(request, { params }) {
@@ -22,10 +23,24 @@ export async function PATCH(request, { params }) {
   }
 
   const { id } = params;
+  const service = createServiceClient();
+
+  const rate = await checkRateLimit(service, {
+    key: `comment-edit:${user.id}`,
+    policyKey: 'comment-edit',
+    max: 5,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
+
   const { body } = await request.json().catch(() => ({}));
   if (!body) return NextResponse.json({ error: 'body required' }, { status: 400 });
 
-  const service = createServiceClient();
   const { error } = await service.rpc('edit_comment', {
     p_user_id: user.id,
     p_comment_id: id,

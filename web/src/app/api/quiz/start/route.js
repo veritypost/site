@@ -6,6 +6,7 @@ import { assertKidOwnership } from '@/lib/kids';
 import { createServiceClient } from '@/lib/supabase/server';
 import { v2LiveGuard } from '@/lib/featureFlags';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 export async function POST(request) {
   const blocked = await v2LiveGuard();
@@ -37,6 +38,20 @@ export async function POST(request) {
   }
 
   const service = createServiceClient();
+
+  const rate = await checkRateLimit(service, {
+    key: `quiz-start:${user.id}:${article_id}`,
+    policyKey: 'quiz-start',
+    max: 3,
+    windowSec: 600,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many quiz attempts. Wait a moment and try again.' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 600) } }
+    );
+  }
+
   const { data, error } = await service.rpc('start_quiz_attempt', {
     p_user_id: user.id,
     p_article_id: article_id,
