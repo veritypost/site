@@ -301,22 +301,10 @@ async function main() {
   console.log(`  inserted ${ppsRows.length} plan→set links`);
 
   // 6. Bump perms_global_version
-  await supa.rpc('bump_global_perms_version').catch(async () => {
-    // RPC may not exist; fall back to direct UPDATE
-    await supa.from('perms_global_version').update({
-      version: 999,  // signal
-      bumped_at: new Date().toISOString(),
-    }).eq('id', 1);
-  });
-  // Safer direct bump
+  const { error: bumpErr } = await supa.rpc('bump_perms_global_version');
+  if (bumpErr) throw new Error(`bump_perms_global_version: ${bumpErr.message}`);
   const { data: gv } = await supa.from('perms_global_version').select('version').eq('id', 1).single();
-  if (gv) {
-    await supa.from('perms_global_version').update({
-      version: gv.version + 1,
-      bumped_at: new Date().toISOString(),
-    }).eq('id', 1);
-    console.log(`  perms_global_version: ${gv.version} → ${gv.version + 1}`);
-  }
+  console.log(`  perms_global_version bumped → ${gv?.version ?? 'unknown'}`);
 
   console.log('\n=== DONE ===');
 }

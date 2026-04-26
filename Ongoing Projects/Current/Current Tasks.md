@@ -8,8 +8,6 @@ POST-LAUNCH items, Apple-console-blocked items, and SHIPPED items are excluded. 
 
 ## Tier 2 — Security / correctness
 
-2. **Reconstruct missing DR schema sources for migrations 092, 093, 100** (T-003, Q14) — SHIPPED 2026-04-26. `schema/092_rls_lockdown_2026_04_19.sql`, `schema/092b_rls_lockdown_followup_2026_04_19.sql`, and `schema/093_rpc_actor_lockdown_2026_04_19.sql` written from live DB statements (queried via supabase_migrations). Migration 100 already covered by `Archived/100_backfill_admin_rank_rpcs_2026_04_19.sql`. `reset_and_rebuild_v2.sql` not modified per owner instruction.
-
 5. **Remove dead `superadmin` role references from 8 RPCs and 12 policies** (T-004, Q16) — write a migration stripping `superadmin` from `IN (...)` clauses in all affected routine bodies and policies. Affects: `schema/014`, `016`, `026`, `167`, `174` (new migration needed).
 
 6. **Fix `import-permissions.js` calling non-existent `bump_global_perms_version` RPC** (Q17) — create the missing RPC or wire to the correct existing one (`bump_user_perms_version`/`perms_global_version` write). Affects: `scripts/import-permissions.js`.
