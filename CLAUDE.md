@@ -76,7 +76,7 @@ Three apps, one DB. All connected via Supabase (`fyiwulqphgmoqullmrfn`).
 
 ```
 /
-├── CLAUDE.md → Reference/CLAUDE.md  (symlink; edit the target)
+├── CLAUDE.md                 project instructions for Claude Code (edit at root)
 ├── .git-blame-ignore-revs  autofix-sweep SHAs ignored in blame (FIX_SESSION_1 #20)
 │
 ├── web/                  Next.js app router (see web/package.json) — adult web + all API
@@ -226,7 +226,7 @@ There's no second xlsx. `permissions_matrix.xlsx` was deleted 2026-04-20. `permi
 
 ## Brand / UX rules
 
-- **No emojis in adult surfaces.** Ever. Adult web, adult iOS, admin pages, error messages, toasts, email bodies, commit messages for adult code, OG meta text — all plain text. Also no emojis in the dev docs (`Reference/STATUS.md`, `Ongoing Projects/Current/MASTER_TRIAGE_2026-04-23.md`, `Reference/CLAUDE.md`, session logs) — keep the voice consistent throughout. The **Kids iOS app** is the only surface where emojis are intentional (playful — children). If you see one leak into an adult surface, it's a defect — log it.
+- **No emojis in adult surfaces.** Ever. Adult web, adult iOS, admin pages, error messages, toasts, email bodies, commit messages for adult code, OG meta text — all plain text. Also no emojis in the dev docs (`Reference/STATUS.md`, `Ongoing Projects/Current/MASTER_TRIAGE_2026-04-23.md`, `CLAUDE.md`, session logs) — keep the voice consistent throughout. The **Kids iOS app** is the only surface where emojis are intentional (playful — children). If you see one leak into an adult surface, it's a defect — log it.
 - **Paid tier names are canonical**: `verity`, `verity_pro`, `verity_family`, `verity_family_xl`. Display labels map from DB — never ad-hoc short forms like "Pro+" in copy.
 - **Dates are ISO in code, human-readable in UI.** No inventing formats.
 
