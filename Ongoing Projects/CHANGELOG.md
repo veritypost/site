@@ -43,6 +43,42 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-26 (notifications)
+
+### Notifications — OwnersAudit Tasks 1–4, 6–7
+
+**Bell SVG replaces [!] icon**
+- **What** — Replaced `[!]` monospace text in the anon-state 64px circle with an SVG bell (Feather icon path). Removed `fontSize`, `fontWeight`, `fontFamily` from the container; kept `color: C.accent` so the SVG inherits the accent colour via `stroke="currentColor"`.
+- **Files** — `web/src/app/notifications/page.tsx`
+- **Why** — OwnersAudit Notifications Task 1. `[!]` reads as "error"; bell is the universal notification icon.
+
+**Type badge labels**
+- **What** — Added `TYPE_LABELS: Record<string, string>` mapping `BREAKING_NEWS → 'Breaking news'`, `COMMENT_REPLY → 'Reply'`, `MENTION → '@mention'`, `EXPERT_ANSWER → 'Expert answer'`. Badge now renders `TYPE_LABELS[n.type] ?? n.type` (unknown types fall back to raw string). iOS: added `private func typeLabel(_ type: String) -> String` as a member of `AlertsView`; replaced `Text(type.uppercased())` with `Text(typeLabel(type))`.
+- **Files** — `web/src/app/notifications/page.tsx`, `VerityPost/VerityPost/AlertsView.swift`
+- **Why** — OwnersAudit Notifications Task 2. Raw DB enum values (`COMMENT_REPLY`) were visible to users.
+
+**null action_url scroll-to-top fix**
+- **What** — Kept `href={n.action_url || '#'}` for keyboard focus. Added `onClick={(e) => { if (!n.action_url) e.preventDefault(); markOne(n.id); }}` — when there's no URL, `preventDefault` stops the `#` scroll while `markOne` still fires.
+- **Files** — `web/src/app/notifications/page.tsx`
+- **Why** — OwnersAudit Notifications Task 3. Using `href={n.action_url ?? undefined}` was rejected: `<a>` without href loses keyboard focus and is unreliable on iOS Safari tap.
+
+**Touch targets**
+- **What** — Added `minHeight: 36` to `pillBase` (filter pills), "Mark all read" button, and "Preferences" `<a>`. Preferences also gets `display: 'flex', alignItems: 'center'` so `minHeight` applies to the inline element.
+- **Files** — `web/src/app/notifications/page.tsx`
+- **Why** — OwnersAudit Notifications Task 4.
+
+**Error copy**
+- **What** — `` `Couldn't load notifications (${res.status}).` `` → `"Couldn't load notifications. Try again."` — status code removed from user-facing string.
+- **Files** — `web/src/app/notifications/page.tsx`
+- **Why** — OwnersAudit Notifications Task 6.
+
+**iOS "Mark all read" label**
+- **What** — `Button("Read All")` → `Button("Mark all read")` in the toolbar. Matches web label, sentence case.
+- **Files** — `VerityPost/VerityPost/AlertsView.swift`
+- **Why** — OwnersAudit Notifications Task 7.
+
+---
+
 ## 2026-04-26 (messages)
 
 ### Messages — OwnersAudit Tasks 1–7, 9–10

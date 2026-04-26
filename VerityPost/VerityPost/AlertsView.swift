@@ -103,7 +103,7 @@ struct AlertsView: View {
         .toolbar {
             if activeSection == "Alerts" && canMarkAllRead {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Read All") {
+                    Button("Mark all read") {
                         Task { await markAllRead() }
                     }
                     .font(.system(.footnote, design: .default, weight: .medium))
@@ -549,11 +549,21 @@ struct AlertsView: View {
     /// Notification card — matches site/src/app/notifications/page.js exactly.
     /// Read: #f7f7f7 bg, 1pt border. Unread: white bg, 1pt accent border.
     /// Type badge (uppercase 10pt 700) + title (14pt 600) + relative time.
+    private func typeLabel(_ type: String) -> String {
+        switch type {
+        case "BREAKING_NEWS": return "Breaking news"
+        case "COMMENT_REPLY": return "Reply"
+        case "MENTION": return "@mention"
+        case "EXPERT_ANSWER": return "Expert answer"
+        default: return type
+        }
+    }
+
     private func notificationRow(_ notif: VPNotification) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 if let type = notif.type, !type.isEmpty {
-                    Text(type.uppercased())
+                    Text(typeLabel(type))
                         .font(.system(.caption2, design: .default, weight: .bold))
                         .foregroundColor(VP.dim)
                         .padding(.horizontal, 8)

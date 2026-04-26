@@ -82,7 +82,7 @@ export default function NotificationsInbox() {
       const res = await fetch(url);
       if (!res.ok) {
         const data = await res.json().catch(() => ({}) as { error?: string });
-        setError(data?.error || `Couldn\u2019t load notifications (${res.status}).`);
+        setError(data?.error || 'Couldn\u2019t load notifications. Try again.');
         setItems([]);
       } else {
         const data = (await res.json().catch(() => ({}))) as { notifications?: NotificationRow[] };
@@ -197,13 +197,23 @@ export default function NotificationsInbox() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: 28,
-            fontWeight: 700,
             color: C.accent,
-            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
           }}
         >
-          [!]
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+          </svg>
         </div>
         <h1 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 10px' }}>
           Keep track of what matters
@@ -254,6 +264,13 @@ export default function NotificationsInbox() {
     );
   }
 
+  const TYPE_LABELS: Record<string, string> = {
+    BREAKING_NEWS: 'Breaking news',
+    COMMENT_REPLY: 'Reply',
+    MENTION: '@mention',
+    EXPERT_ANSWER: 'Expert answer',
+  };
+
   const pillBase: CSSProperties = {
     padding: '5px 12px',
     borderRadius: 999,
@@ -261,6 +278,7 @@ export default function NotificationsInbox() {
     fontSize: 12,
     fontWeight: 600,
     cursor: 'pointer',
+    minHeight: 36,
   };
 
   return (
@@ -290,6 +308,9 @@ export default function NotificationsInbox() {
               fontWeight: 600,
               color: C.text,
               textDecoration: 'none',
+              minHeight: 36,
+              display: 'flex',
+              alignItems: 'center',
             }}
           >
             Preferences
@@ -304,6 +325,7 @@ export default function NotificationsInbox() {
               fontSize: 12,
               fontWeight: 600,
               cursor: 'pointer',
+              minHeight: 36,
             }}
           >
             Mark all read
@@ -395,7 +417,10 @@ export default function NotificationsInbox() {
               <a
                 key={n.id}
                 href={n.action_url || '#'}
-                onClick={() => markOne(n.id)}
+                onClick={(e) => {
+                  if (!n.action_url) e.preventDefault();
+                  markOne(n.id);
+                }}
                 style={{
                   display: 'block',
                   background: n.is_read ? C.card : '#fff',
@@ -419,7 +444,7 @@ export default function NotificationsInbox() {
                       textTransform: 'uppercase',
                     }}
                   >
-                    {n.type as NotificationType}
+                    {TYPE_LABELS[n.type as string] ?? n.type}
                   </span>
                   <span style={{ fontSize: 14, fontWeight: 600 }}>{n.title}</span>
                   <span style={{ marginLeft: 'auto', fontSize: 11, color: C.dim }}>

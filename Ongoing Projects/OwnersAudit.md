@@ -884,7 +884,7 @@ Items from UI_IMPROVEMENTS.md that no longer apply:
 
 ---
 
-### Notifications Task 1 — `[!]` monospace icon reads as error, not notification
+### Notifications Task 1 — `[!]` monospace icon reads as error, not notification ✓ DONE
 
 **File:** `web/src/app/notifications/page.tsx:163–167`
 **Source:** UI_IMPROVEMENTS.md, Social section [2/4]
@@ -895,19 +895,11 @@ The anon empty state uses a `[!]` character in a monospace font as the notificat
 **Proposed fix:**
 Replace the `[!]` div with a simple SVG bell icon — same 64px circle container, same `aria-hidden="true"`, just a bell path inside. No other changes to the state.
 
-```svg
-<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-     strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-  <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-</svg>
-```
-
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
-### Notifications Task 2 — Badge renders raw DB enum
+### Notifications Task 2 — Badge renders raw DB enum ✓ DONE
 
 **Files:** `web/src/app/notifications/page.tsx:366`, `VerityPost/VerityPost/AlertsView.swift:508`
 **Source:** UI_IMPROVEMENTS.md, Social section [2/4]
@@ -931,11 +923,11 @@ const typeLabel = TYPE_LABELS[n.type as string] ?? n.type;
 
 iOS: same mapping in a `typeLabel(_ type: String) -> String` helper. Unknown types fall back to the raw value capitalized so nothing breaks if a new type is added.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (`typeLabel` as private member of AlertsView, not file-scope)
 
 ---
 
-### Notifications Task 3 — null action_url causes scroll-to-top on click
+### Notifications Task 3 — null action_url causes scroll-to-top on click ✓ DONE
 
 **File:** `web/src/app/notifications/page.tsx:341`
 **Source:** UI_IMPROVEMENTS.md, Social section [1/4]
@@ -946,11 +938,11 @@ Line 341: `href={n.action_url || '#'}` — when `action_url` is null, the link r
 **Proposed fix:**
 When `action_url` is null, render a `<div>` with an `onClick` instead of an `<a>`. Or use `href={n.action_url ?? undefined}` and conditionally suppress the `href` attribute so no navigation occurs. Either way: mark read on click, no scroll jump.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (kept `href="#"` fallback; added `e.preventDefault()` when `!n.action_url` — preserves keyboard focus while stopping scroll)
 
 ---
 
-### Notifications Task 4 — Touch targets below minimum on filter row and actions
+### Notifications Task 4 — Touch targets below minimum on filter row and actions ✓ DONE
 
 **File:** `web/src/app/notifications/page.tsx:218–271`
 **Source:** UI_IMPROVEMENTS.md, Top 20 #8 [4/4 Critical]
@@ -964,7 +956,7 @@ Three elements fail the 44px minimum:
 **Proposed fix:**
 Add `minHeight: 36` to all three. Secondary controls, 36px acceptable.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (Preferences `<a>` also gets `display: 'flex', alignItems: 'center'` so minHeight takes effect on inline element)
 
 ---
 
@@ -980,7 +972,7 @@ Line 244: `href="/profile/settings#alerts"` — same T-073 dependency as Story T
 
 ---
 
-### Notifications Task 6 — Error message surfaces HTTP status code
+### Notifications Task 6 — Error message surfaces HTTP status code ✓ DONE
 
 **File:** `web/src/app/notifications/page.tsx:57`
 **Source:** Pre-Launch Tasks T-013
@@ -991,11 +983,11 @@ Line 57: `` `Couldn’t load notifications (${res.status}).` `` — the HTTP sta
 **Proposed fix:**
 Drop the status interpolation: `'Couldn\'t load notifications. Try again.'` Log the status server-side where it belongs.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
-### Notifications Task 7 — iOS "Read All" label doesn't match web
+### Notifications Task 7 — iOS "Read All" label doesn't match web ✓ DONE
 
 **File:** `VerityPost/VerityPost/AlertsView.swift:106`
 **Source:** Direct code review — parity gap
@@ -1006,7 +998,7 @@ Line 106: toolbar button label is `"Read All"` — Title Case, different from we
 **Proposed fix:**
 `"Mark all read"` — matches web label, sentence case. iOS toolbar truncates long labels gracefully if needed.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
