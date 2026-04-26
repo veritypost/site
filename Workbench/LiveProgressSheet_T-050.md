@@ -33,10 +33,18 @@ None found.
 N/A
 
 ## Implementation Progress
-- [ ] Run `cd web && npx next build 2>&1`
-- [ ] Extract route size table from output
-- [ ] Write web/bundle-size-baseline.txt with header + data
-- [ ] Commit
+- [x] Run `cd web && SENTRY_DISABLE_WEBPACK_PLUGIN=1 npx next build 2>&1` — SUCCESS (212 pages)
+- [x] Extract route size table from output
+- [x] Write web/bundle-size-baseline.txt with header + data
+- [x] Commit e147426
 
 ## Completed
-[SHIPPED block will be written here when done]
+
+SHIPPED 2026-04-26
+Commit: e147426
+Files: web/bundle-size-baseline.txt (new), Workbench/LiveProgressSheet_T-050.md (new)
+Result: 212 routes, First Load JS shared 258 kB, Middleware 141 kB.
+Heaviest user pages: /profile/settings 352 kB, /story/[slug] 349 kB.
+Build note: Normal `npx next build` fails at "Collecting page data" due to @sentry/nextjs
+8.40.0 + Next.js 14.2.35 chunk-path conflict. SENTRY_DISABLE_WEBPACK_PLUGIN=1 used for
+measurement. Not a regression — Vercel cloud builds are unaffected. Documented in baseline file.

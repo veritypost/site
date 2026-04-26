@@ -40,9 +40,9 @@ POST-LAUNCH items, Apple-console-blocked items, and SHIPPED items are excluded. 
 
 18. **Narrow iOS ProfileView user column selection** (T-020) — replace `select("*, plans(tier)")` with an explicit field list. Affects: `VerityPost/VerityPost/ProfileView.swift`.
 
-19. **Make adult quiz pass threshold DB-driven** (T-006, OwnerQ Task 10) — add a `settings` row `quiz.min_pass_score=3`, update `user_passed_article_quiz()` and `submit_quiz_attempt()` in `schema/012` to read it instead of hardcoding `>= 3`. Affects: `schema/012_phase4_quiz_helpers.sql:85,322` (new migration needed).
+19. **Make adult quiz pass threshold DB-driven** (T-006, OwnerQ Task 10) — SHIPPED 2026-04-26. schema/187 seeds quiz_pass_threshold=3; user_passed_article_quiz and submit_quiz_attempt re-emitted using _setting_int. Owner must apply schema/187 via Supabase dashboard. Commits: b776352, 33bd455.
 
-20. **Make `CommentRow.tsx` `COMMENT_MAX_DEPTH` read from `settings` table** (Q39) — currently hardcoded to `2`; the `settings` table has the row. Affects: `web/src/components/CommentRow.tsx:31`.
+20. **Make `CommentRow.tsx` `COMMENT_MAX_DEPTH` read from `settings` table** (Q39) — SHIPPED 2026-04-26. COMMENT_MAX_DEPTH constant removed; /api/settings/public endpoint created; CommentRow fetches on mount. Commits: b776352, 33bd455.
 
 ---
 
@@ -214,11 +214,7 @@ POST-LAUNCH items, Apple-console-blocked items, and SHIPPED items are excluded. 
 
 101. **Show per-question category in expert queue** (T-114) — for experts in multiple categories. Affects: expert queue question cards web and iOS.
 
-102. **Build recap hub on iOS** (T-115) — vertical list of past recaps with score and date. Affects: `VerityPost/VerityPost/RecapView.swift`.
-
 103. **Make recap detail story-format with source preamble** (T-116) — each question includes "this question came from this article" context. Affects: recap detail web and iOS.
-
-104. **Build iOS Find tab with Search and Browse segments** (T-117) — new top-level tab replacing the absence of either on iOS. Affects: new `VerityPost/VerityPost/FindView.swift`.
 
 105. **Make kids home "today's adventure" with single CTA** (T-118) — one primary CTA, today's article; below: yesterday's badges, this week's streak. Affects: `VerityPostKids/VerityPostKids/KidsAppRoot.swift` or home tab.
 
@@ -270,7 +266,7 @@ POST-LAUNCH items, Apple-console-blocked items, and SHIPPED items are excluded. 
 
 125. **Wire visual regression baseline into CI** (T-049) — set up Playwright `toHaveScreenshot` calls for top 10 surfaces × 5 iOS sizes + 4 web viewports; fail PRs on diff outside tolerance. Affects: `web/tests/` and CI pipeline.
 
-126. **Measure and record bundle-size baseline** (T-050) — capture `npm run build` output before PRELAUNCH UI work starts; establish regression reference point. Affects: `web/` build output.
+126. **Measure and record bundle-size baseline** (T-050) — SHIPPED 2026-04-26. Commit e147426. 212 routes, First Load JS shared 258 kB, Middleware 141 kB. Heaviest: /profile/settings 352 kB, /story/[slug] 349 kB. Normal build fails locally due to @sentry/nextjs 8.40.0 + Next.js 14.2.35 chunk-path conflict (Vercel unaffected); used SENTRY_DISABLE_WEBPACK_PLUGIN=1 for measurement. Full data in `web/bundle-size-baseline.txt`.
 
 127. **Create `apple-app-site-association` file** (T-047) — file does not exist; Universal Links are non-functional. Must ship in the same commit as item 129. Covers `/story/*`, `/profile/*`, `/leaderboard/*`, `/search*`, `/bookmarks*`, `/messages*`, `/notifications*`. Affects: `web/public/.well-known/apple-app-site-association` (new file).
 
