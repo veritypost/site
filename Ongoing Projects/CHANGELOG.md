@@ -7,6 +7,30 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-26 (Groups 5 + 7 — Static + Browse polish)
+
+### Static Task 5 — How-it-works Step 4 copy
+
+- **What** — Step 4 description: "Build your Verity Score by reading thoroughly, acing quizzes, contributing quality discussions, and verifying sources. Higher scores unlock expert features and community recognition." → "Build your Verity Score by reading thoroughly, acing quizzes, and contributing quality discussions. Higher scores earn community recognition and let you apply for expert and journalist roles." Owner-approved tweak: "open the door to applying" → "let you apply" — active, fewer hops.
+- **Files** — `web/src/app/how-it-works/page.tsx`
+- **Why** — OwnersAudit Static Task 5. Old copy was a false promise (experts apply + are vetted, not score-gated) — worst possible place for inaccuracy on the page that sells the trust mechanism.
+
+### Browse Task 4 — Error state with retry
+
+- **What** — `fetchData` lifted from inline `useEffect` to a `useCallback` so the retry button can call it directly. Added `loadFailed` state. On Supabase error in either parallel query, console-logs the message, clears state, and sets `loadFailed = true`. Render branches `loading → BrowseSkeleton`, `loadFailed → error pane`, else content. Error pane: "Couldn't load content" / "Check your connection and try again." / 44pt "Retry" button. Distinct from the "No categories match" empty state so the two failure modes don't conflate.
+- **Files** — `web/src/app/browse/page.tsx`
+- **Why** — OwnersAudit Browse Task 4. Without an error branch, RLS / network / 5xx errors silently rendered as empty layout.
+
+### Browse Task 7 — Pre-search topic chips: deferred (Browse half)
+
+- The Browse page already shows the entire active-category grid as its "pre-search" state, so adding chips above the input would duplicate. The Search and iOS FindView pieces of this task remain pending and will land in Group 4 (iOS Browse tab + Search/Find chip parity).
+
+### Browse Task 8 — VP_PALETTE extract: deferred (low priority)
+
+- Same scope as Home Task 3 ("Deferred to global token sweep"). One-file extraction leaves drift; needs to land as one global pass.
+
+---
+
 ## 2026-04-26 (Group 3 — Kids Mgmt Tasks 1, 2, 3, 4)
 
 ### Kid PIN label clarified

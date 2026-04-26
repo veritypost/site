@@ -1796,7 +1796,7 @@ if (loading) return <div>Loading...</div>;
 
 ---
 
-### Browse Task 4 — No error state when `fetchData()` fails
+### Browse Task 4 — No error state when `fetchData()` fails ✓ DONE
 
 **File:** `web/src/app/browse/page.tsx`
 **Source:** Direct code review — error handling
@@ -1815,7 +1815,7 @@ Add an `error` state. If `fetchData()` throws or returns a Supabase error, set `
 </div>
 ```
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (`fetchData` lifted to `useCallback`; added `loadFailed` state; on Supabase error sets state and renders an error pane with "Couldn't load content" + "Retry" button hitting 44pt — distinct from the empty-categories empty state so the two failure modes don't conflate)
 
 ---
 
@@ -1872,7 +1872,7 @@ Chip design:
 
 This converts the empty state from a blank prompt into an active discovery surface.
 
-**Status:** Pending execution
+**Status:** Deferred for Browse — the page already shows the entire active-category grid as its "pre-search" state, so adding chips above the input would duplicate. The Search and FindView (iOS) parts of this task remain pending and will land alongside the iOS Browse tab work in Group 4.
 
 ---
 
@@ -1887,7 +1887,7 @@ Browse defines `const PALETTE = { bg: '#ffffff', card: '#f7f7f7', ... }` inline 
 **Proposed fix:**
 Export a `VP_PALETTE` (or similar) from a shared `web/src/lib/theme.ts` covering the non-admin public surface colors. Browse, Search, and any other public page imports from there. This is low-urgency (no breakage today) but should land before any color-system work to avoid a double-touch.
 
-**Status:** Pending execution (low priority — no breakage)
+**Status:** Deferred — same scope as Home Task 3 ("Deferred to global token sweep"). Doing one file leaves drift; this is a 20+ file global pass that needs to land together.
 
 ---
 
@@ -2145,7 +2145,7 @@ import Link from 'next/link';
 
 ---
 
-### Static Task 5 — How-it-works: Step 4 copy says scores unlock expert features — they don't
+### Static Task 5 — How-it-works: Step 4 copy says scores unlock expert features — they don't ✓ DONE
 
 **File:** `web/src/app/how-it-works/page.tsx:33–40`
 **Source:** Direct code review — copy accuracy
@@ -2159,7 +2159,7 @@ Step 4 description: "Build your Verity Score by reading thoroughly, acing quizze
 Change Step 4 description to:
 "Build your Verity Score by reading thoroughly, acing quizzes, and contributing quality discussions. Higher scores earn community recognition and open the door to applying for expert and journalist roles."
 
-**Status:** Pending execution — owner should confirm the expert path description is accurate before implementation
+**Status:** Done 2026-04-26 (owner-approved 2026-04-26 with one tweak: "open the door to applying" → "let you apply"; final copy: "Build your Verity Score by reading thoroughly, acing quizzes, and contributing quality discussions. Higher scores earn community recognition and let you apply for expert and journalist roles.")
 
 ---
 

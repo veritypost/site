@@ -1,7 +1,7 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified shared_pages 2026-04-18
 'use client';
-import { useState, useEffect, CSSProperties } from 'react';
+import { useState, useEffect, useCallback, CSSProperties } from 'react';
 import Link from 'next/link';
 import { createClient } from '../../lib/supabase/client';
 import { usePageViewTrack } from '@/lib/useTrack';
@@ -98,83 +98,92 @@ export default function BrowsePage() {
   const [featured, setFeatured] = useState<FeaturedCard[]>([]);
   const [categories, setCategories] = useState<EnrichedCategory[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadFailed, setLoadFailed] = useState<boolean>(false);
 
-  useEffect(() => {
+  const fetchData = useCallback(async () => {
     const supabase = createClient();
+    setLoading(true);
+    setLoadFailed(false);
 
-    async function fetchData() {
-      setLoading(true);
-
-      // Fetch categories. Pass 17 / UJ-507: adult /browse filters out
-      // any `kids-*` slug so kid-only categories don't leak into the
-      // adult catalogue.
-      const { data: cats } = await supabase
+    // Fetch categories. Pass 17 / UJ-507: adult /browse filters out
+    // any `kids-*` slug so kid-only categories don't leak into the
+    // adult catalogue.
+    const [catsRes, storiesRes] = await Promise.all([
+      supabase
         .from('categories')
         .select('id, name, slug')
         .not('slug', 'like', 'kids-%')
-        .order('name');
-
+        .order('name'),
       // Fetch recent published stories (cap to prevent unbounded load).
-      const { data: stories } = await supabase
+      supabase
         .from('articles')
         .select('id, title, slug, category_id, published_at')
         .eq('status', 'published')
         .order('published_at', { ascending: false })
-        .limit(500);
+        .limit(500),
+    ]);
 
-      const storyList = (stories as ArticleRow[] | null) || [];
-      const catList = (cats as CategoryRow[] | null) || [];
-
-      // Build a map of category id → category
-      const catById: Record<string, CategoryRow> = {};
-      catList.forEach((c) => {
-        catById[c.id] = c;
-      });
-
-      // Bucket stories by category once (O(n)) instead of O(n*m) per-category filter.
-      const storiesByCat: Record<string, ArticleRow[]> = {};
-      storyList.forEach((s) => {
-        if (!s.category_id) return;
-        if (!storiesByCat[s.category_id]) storiesByCat[s.category_id] = [];
-        storiesByCat[s.category_id].push(s);
-      });
-
-      // Build categories with count + trending titles
-      const enrichedCats: EnrichedCategory[] = catList.map((cat) => {
-        const catStories = storiesByCat[cat.id] || [];
-        const style = (cat.slug ? CAT_STYLE[cat.slug] : null) || DEFAULT_STYLE;
-        return {
-          ...cat,
-          ...style,
-          count: catStories.length,
-          trending: catStories.slice(0, 3).map((s) => ({ title: s.title, slug: s.slug })),
-        };
-      });
-
-      // Build featured: 3 most recent published stories across all categories
-      const featuredStories: FeaturedCard[] = storyList.slice(0, 3).map((s, i) => {
-        const cat = s.category_id ? catById[s.category_id] : undefined;
-        const style = cat
-          ? (cat.slug ? CAT_STYLE[cat.slug] : null) || DEFAULT_STYLE
-          : DEFAULT_STYLE;
-        return {
-          id: s.id,
-          headline: s.title,
-          slug: s.slug || '',
-          category: cat ? cat.name : 'News',
-          color: FEATURED_COLORS[i % FEATURED_COLORS.length],
-          icon: style.icon,
-          timeAgo: timeAgo(s.published_at),
-        };
-      });
-
-      setCategories(enrichedCats);
-      setFeatured(featuredStories);
+    if (catsRes.error || storiesRes.error) {
+      console.error('[browse.fetch]', catsRes.error?.message || storiesRes.error?.message);
+      setCategories([]);
+      setFeatured([]);
+      setLoadFailed(true);
       setLoading(false);
+      return;
     }
 
-    fetchData();
+    const storyList = (storiesRes.data as ArticleRow[] | null) || [];
+    const catList = (catsRes.data as CategoryRow[] | null) || [];
+
+    // Build a map of category id → category
+    const catById: Record<string, CategoryRow> = {};
+    catList.forEach((c) => {
+      catById[c.id] = c;
+    });
+
+    // Bucket stories by category once (O(n)) instead of O(n*m) per-category filter.
+    const storiesByCat: Record<string, ArticleRow[]> = {};
+    storyList.forEach((s) => {
+      if (!s.category_id) return;
+      if (!storiesByCat[s.category_id]) storiesByCat[s.category_id] = [];
+      storiesByCat[s.category_id].push(s);
+    });
+
+    // Build categories with count + trending titles
+    const enrichedCats: EnrichedCategory[] = catList.map((cat) => {
+      const catStories = storiesByCat[cat.id] || [];
+      const style = (cat.slug ? CAT_STYLE[cat.slug] : null) || DEFAULT_STYLE;
+      return {
+        ...cat,
+        ...style,
+        count: catStories.length,
+        trending: catStories.slice(0, 3).map((s) => ({ title: s.title, slug: s.slug })),
+      };
+    });
+
+    // Build featured: 3 most recent published stories across all categories
+    const featuredStories: FeaturedCard[] = storyList.slice(0, 3).map((s, i) => {
+      const cat = s.category_id ? catById[s.category_id] : undefined;
+      const style = cat ? (cat.slug ? CAT_STYLE[cat.slug] : null) || DEFAULT_STYLE : DEFAULT_STYLE;
+      return {
+        id: s.id,
+        headline: s.title,
+        slug: s.slug || '',
+        category: cat ? cat.name : 'News',
+        color: FEATURED_COLORS[i % FEATURED_COLORS.length],
+        icon: style.icon,
+        timeAgo: timeAgo(s.published_at),
+      };
+    });
+
+    setCategories(enrichedCats);
+    setFeatured(featuredStories);
+    setLoading(false);
   }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const filtered = categories.filter(
     (c) => !search || (c.name || '').toLowerCase().includes(search.toLowerCase())
@@ -241,6 +250,31 @@ export default function BrowsePage() {
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '20px 16px 40px' }}>
         {loading ? (
           <BrowseSkeleton />
+        ) : loadFailed ? (
+          <div style={{ textAlign: 'center', padding: '60px 16px' }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: PALETTE.text, marginBottom: 6 }}>
+              Couldn&rsquo;t load content
+            </div>
+            <div style={{ fontSize: 13, color: PALETTE.dim, marginBottom: 14, lineHeight: 1.5 }}>
+              Check your connection and try again.
+            </div>
+            <button
+              onClick={fetchData}
+              style={{
+                padding: '10px 18px',
+                minHeight: 44,
+                background: PALETTE.accent,
+                color: '#fff',
+                border: 'none',
+                borderRadius: 8,
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Retry
+            </button>
+          </div>
         ) : (
           <>
             {/* Trending Now */}

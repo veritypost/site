@@ -36,7 +36,7 @@ export default function HowItWorksPage() {
       number: '4',
       title: 'Earn',
       description:
-        'Build your Verity Score by reading thoroughly, acing quizzes, contributing quality discussions, and verifying sources. Higher scores unlock expert features and community recognition.',
+        'Build your Verity Score by reading thoroughly, acing quizzes, and contributing quality discussions. Higher scores earn community recognition and let you apply for expert and journalist roles.',
       color: '#f472b6',
     },
   ];
