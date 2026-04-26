@@ -85,7 +85,17 @@ None. All three routes confirmed to have zero rate limiting. DB confirmed to hav
 Not needed — unanimous.
 
 ## Implementation Progress
-[filled during execution]
+- Intake: all three routes read fully, rateLimit.js read, comments/route.js pattern read, DB queried — zero expert rows confirmed.
+- Migration 183 written: `schema/183_seed_expert_rate_limit_policies.sql` (expert-ask/claim/back rows, ON CONFLICT DO NOTHING).
+- claim/route.js: added `checkRateLimit` import + rate limit block after `createServiceClient()`. No reorder needed (no body parse).
+- ask/route.js: added import, moved `createServiceClient()` above body parse, inserted rate limit block between them.
+- back-channel/route.js: added import, moved `createServiceClient()` above body parse in POST handler only, inserted rate limit block. GET handler untouched.
+- tsc: clean (no output).
+- Migration: MCP read-only; file written for owner to apply via Supabase dashboard.
 
 ## Completed
-[SHIPPED block written here when done]
+
+SHIPPED 2026-04-26
+Commit: 1e9863f
+Files: web/src/app/api/expert/ask/route.js, web/src/app/api/expert/back-channel/route.js, web/src/app/api/expert/queue/[id]/claim/route.js, schema/183_seed_expert_rate_limit_policies.sql
+DB migration pending: schema/183_seed_expert_rate_limit_policies.sql — apply via Supabase dashboard.

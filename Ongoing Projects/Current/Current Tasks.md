@@ -14,11 +14,9 @@ POST-LAUNCH items, Apple-console-blocked items, and SHIPPED items are excluded. 
 
 7. **Fix messages/conversations brittle error-string status mapping** (T-012) — SHIPPED 2026-04-26. Removed 4 `msg.includes(...)` fallbacks from `messages/route.js` and 4 from `conversations/route.js`; simplified `isSelf` to `code === 'SELF_CONV'`. Schema/150 [CODE] prefix path is now the sole error-classification branch. Commit: 78f8f22.
 
-8. **Fix `KidsAppState.completeQuiz` mutating local state before server confirmation** (Q33) — sequence the local state update so it only fires after the server call succeeds. Affects: `VerityPostKids/VerityPostKids/KidsAppState.swift:187-200`.
+8. **Rename `hasPermissionServer` to `hasPermissionViaRpc` in permissions.js and its one importer** (OwnerQ Task 20) — SHIPPED 2026-04-26. Renamed export in `permissions.js:207`, updated named import and call site in `rlsErrorHandler.js:18,62`. Note: a separate `hasPermissionServer` in `auth.js` (uses `compute_effective_perms`, 5 API-route callers) is unrelated and intentionally untouched. tsc clean. Commit: f8c6328.
 
-9. **Rename `hasPermissionServer` to `hasPermissionViaRpc` in permissions.js and its one importer** (OwnerQ Task 20) — purely a name-clarity fix, no behavior change. Affects: `web/src/lib/permissions.js`, `web/src/lib/rlsErrorHandler.js`.
-
-10. **Make `hasPermission` fail-closed when `allPermsCache` is null — remove section-cache fallthrough** (OwnerQ Task 21) — 3-line change eliminating the initial-load window where stale section cache is read. Affects: `web/src/lib/permissions.js:181-185`.
+10. **Make `hasPermission` fail-closed when `allPermsCache` is null — remove section-cache fallthrough** (OwnerQ Task 21) — SHIPPED 2026-04-26. Removed for-loop (lines 181-184) that iterated sectionCache when allPermsCache was null. hasPermission now returns false immediately on null cache — fail-closed. Updated stale comments at line 23 and lines 171-173. tsc clean. Commit: d5a6647.
 
 11. **Migrate all admin pages from hardcoded role literals / role-set checks to `hasPermission` gating** (OwnerQ Task 19) — Phase 1: 6 hardcoded pages (`access`, `analytics`, `feeds`, `notifications`, `subscriptions`, `system`); Phase 2: ~38 role-set pages. Affects: `web/src/app/admin/` (all page-level gate code).
 
@@ -26,9 +24,7 @@ POST-LAUNCH items, Apple-console-blocked items, and SHIPPED items are excluded. 
 
 ## Tier 3 — Rate limits, input caps, injection hardening
 
-12. **Add rate limits to comment vote, flag, and report routes** (T-015) — add `checkRateLimit` calls following the established route convention. Affects: `web/src/app/api/comments/[id]/vote/route.js`, `/flag/route.js`, `/report/route.js`.
-
-13. **Add rate limits to expert claim, ask, and back-channel routes** (T-016) — no rate limiting exists on any of these three endpoints. Affects: `web/src/app/api/expert/claim/route.js`, `/ask/route.js`, `/back-channel/route.js`.
+12. **Add rate limits to expert claim, ask, and back-channel routes** (T-016) — SHIPPED 2026-04-26. `checkRateLimit` added to all three routes: ask (5/60s), claim (30/60s), back-channel POST (20/60s). Service client moved above body parse per CLAUDE.md mandate. Migration `schema/183_seed_expert_rate_limit_policies.sql` seeds three `rate_limits` DB rows (apply via Supabase dashboard). Routes fall back to code defaults until migration is applied. Commit: 1e9863f.
 
 14. **Add rate limit to quiz start and comment PATCH routes** (T-017) — add `checkRateLimit` to both handlers. Affects: `web/src/app/api/quiz/start/route.js`, `web/src/app/api/comments/[id]/route.js` PATCH handler.
 
