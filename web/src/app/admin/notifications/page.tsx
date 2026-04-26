@@ -164,7 +164,7 @@ function NotificationsInner() {
     const err = await saveSetting(k, next);
     if (err) {
       setConfig((p) => ({ ...p, [k]: prev }));
-      push({ message: `Save failed: ${err.message}`, variant: 'danger' });
+      push({ message: 'Could not save setting. Please try again.', variant: 'danger' });
     }
   };
 
@@ -175,7 +175,7 @@ function NotificationsInner() {
     const err = await saveSetting(k, val);
     if (err) {
       setNums((p) => ({ ...p, [k]: prev }));
-      push({ message: `Save failed: ${err.message}`, variant: 'danger' });
+      push({ message: 'Could not save setting. Please try again.', variant: 'danger' });
     }
   };
 

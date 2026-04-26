@@ -163,7 +163,7 @@ export default function UserPermissionsPage() {
       .select('id, username, email, is_banned, is_muted, is_shadow_banned, is_verified_public_figure, plan_status, plans(name), user_roles!fk_user_roles_user_id(roles(name))')
       .eq('id', userId)
       .maybeSingle();
-    if (error) { setUserLoadError(error.message); return; }
+    if (error) { setUserLoadError('load_error'); return; }
     if (!data) { setUserLoadError('not_found'); return; }
     setTargetUser(data as unknown as TargetUser);
   }, [userId, supabase]);
@@ -184,7 +184,7 @@ export default function UserPermissionsPage() {
     setPermsError(null);
     const { data, error } = await supabase.rpc('compute_effective_perms', { p_user_id: userId });
     if (error) {
-      setPermsError(error.message);
+      setPermsError('Could not load effective permissions. Please try again.');
       setEffectivePerms([]);
     } else {
       setEffectivePerms((data || []) as EffectivePermRow[]);
@@ -364,6 +364,24 @@ export default function UserPermissionsPage() {
         <EmptyState
           title="Not found"
           description={<span>No user matches <code>{userId}</code>. It may have been deleted.</span>}
+          cta={<Link href="/admin/users"><Button variant="primary">Back to users</Button></Link>}
+        />
+      </Page>
+    );
+  }
+
+  if (userLoadError === 'load_error') {
+    return (
+      <Page>
+        <PageHeader
+          title="Could not load user"
+          subtitle="An error occurred loading this user profile."
+          backHref="/admin/users"
+          backLabel="Users"
+        />
+        <EmptyState
+          title="Load failed"
+          description="Could not load user data. Please try again."
           cta={<Link href="/admin/users"><Button variant="primary">Back to users</Button></Link>}
         />
       </Page>

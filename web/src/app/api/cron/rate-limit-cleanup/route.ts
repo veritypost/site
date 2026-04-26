@@ -47,7 +47,7 @@ async function run(request: Request) {
   if (errMsg) {
     console.error('[cron.rate-limit-cleanup] cleanup_rate_limit_events failed:', errMsg);
     await logCronHeartbeat(CRON_NAME, 'error', { error: errMsg });
-    return NextResponse.json({ ok: false, deleted: 0, error: errMsg });
+    return NextResponse.json({ ok: false, deleted: 0, error: 'Cleanup failed' });
   }
 
   await logCronHeartbeat(CRON_NAME, 'ok', { deleted });

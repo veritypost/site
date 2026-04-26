@@ -20,10 +20,16 @@ export async function GET(req) {
   try {
     const service = createServiceClient();
     const { error } = await service.from('settings').select('key').limit(1);
-    out.checks.db = error ? `err: ${error.message}` : 'ok';
-    if (error) out.ok = false;
+    if (error) {
+      console.error('[health] db ping failed:', error);
+      out.checks.db = 'db_error';
+      out.ok = false;
+    } else {
+      out.checks.db = 'ok';
+    }
   } catch (err) {
-    out.checks.db = `err: ${err.message}`;
+    console.error('[health] db ping threw:', err);
+    out.checks.db = 'db_error';
     out.ok = false;
   }
 

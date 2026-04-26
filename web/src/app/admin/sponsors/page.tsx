@@ -269,7 +269,7 @@ function SponsorsInner() {
         onClose={() => setDestructive(null)}
         onConfirm={async ({ reason }: { reason?: string }) => {
           try { await destructive?.run?.({ reason }); setDestructive(null); }
-          catch (err) { push({ message: (err instanceof Error && err.message) || 'Action failed', variant: 'danger' }); setDestructive(null); }
+          catch { push({ message: 'Action failed. Please try again.', variant: 'danger' }); setDestructive(null); }
         }}
       />
     </Page>

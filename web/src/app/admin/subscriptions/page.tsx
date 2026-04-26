@@ -286,12 +286,15 @@ function SubscriptionsInner() {
         body: JSON.stringify({ user_id: lookupResult.id }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || 'Freeze failed');
+      if (!res.ok) {
+        setLookupError('Could not freeze account. Please try again.');
+        return;
+      }
       setCancelFlash(`Frozen. Score held at ${data.frozen_verity_score}.`);
       push({ message: 'Profile frozen', variant: 'success' });
       await lookupUser();
-    } catch (err) {
-      setLookupError(err instanceof Error ? err.message : 'Freeze failed');
+    } catch {
+      setLookupError('Could not freeze account. Please try again.');
     } finally { setCancelBusy(''); }
   };
 
@@ -300,13 +303,16 @@ function SubscriptionsInner() {
     try {
       const res = await fetch('/api/admin/billing/sweep-grace', { method: 'POST' });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || 'Sweep failed');
+      if (!res.ok) {
+        setSweepInfo('Sweep failed. Please try again.');
+        push({ message: 'Sweep failed. Please try again.', variant: 'danger' });
+        return;
+      }
       setSweepInfo(`Sweep complete — froze ${data.frozen_count} profile(s).`);
       push({ message: 'Grace sweep complete', variant: 'success' });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Sweep failed';
-      setSweepInfo(`Error: ${msg}`);
-      push({ message: msg, variant: 'danger' });
+    } catch {
+      setSweepInfo('Sweep failed. Please try again.');
+      push({ message: 'Sweep failed. Please try again.', variant: 'danger' });
     } finally { setCancelBusy(''); }
   };
 
@@ -733,7 +739,7 @@ function SubscriptionsInner() {
         onClose={() => setDestructive(null)}
         onConfirm={async ({ reason }: { reason?: string }) => {
           try { await destructive?.run?.({ reason }); setDestructive(null); }
-          catch (err) { setLookupError((err instanceof Error && err.message) || 'Action failed'); setDestructive(null); }
+          catch { setLookupError('Action failed. Please try again.'); setDestructive(null); }
         }}
       />
 

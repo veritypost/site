@@ -99,7 +99,7 @@ function StoriesAdminInner() {
       ]);
 
       if (storiesRes.error) {
-        toast.push({ message: `Failed to load articles: ${storiesRes.error.message}`, variant: 'danger' });
+        toast.push({ message: 'Could not load articles. Please try again.', variant: 'danger' });
       } else {
         setStories((storiesRes.data as unknown as ArticleRow[]) || []);
       }

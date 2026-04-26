@@ -586,7 +586,7 @@ function SettingsInner(): ReactElement {
       .eq('id', userId)
       .maybeSingle();
     if (error) {
-      pushToast({ message: error.message, variant: 'danger' });
+      pushToast({ message: 'Could not load your profile. Please try again.', variant: 'danger' });
       setLoadingUser(false);
       return;
     }
@@ -1536,7 +1536,7 @@ function ProfileCard({
     const { error } = await supabase.rpc('update_own_profile', { p_fields: patch });
     setSaving(false);
     if (error) {
-      pushToast({ message: error.message, variant: 'danger' });
+      pushToast({ message: 'Could not save profile. Please try again.', variant: 'danger' });
       return;
     }
     pushToast({ message: 'Profile saved', variant: 'success' });
@@ -1598,7 +1598,7 @@ function ProfileCard({
       if (error) {
         const msg = /bucket.*not.*found/i.test(error.message)
           ? 'Avatar upload is not configured yet — contact admin.'
-          : error.message;
+          : 'Avatar upload failed. Please try again.';
         pushToast({ message: msg, variant: 'danger' });
         return;
       }
@@ -1622,7 +1622,7 @@ function ProfileCard({
       if (error) {
         const msg = /bucket.*not.*found/i.test(error.message)
           ? 'Banner upload is not configured yet — contact admin.'
-          : error.message;
+          : 'Banner upload failed. Please try again.';
         pushToast({ message: msg, variant: 'danger' });
         return;
       }
@@ -2169,7 +2169,10 @@ function EmailsCard({
     });
     setSavingNotif(false);
     if (error) {
-      pushToast({ message: error.message, variant: 'danger' });
+      pushToast({
+        message: 'Could not save notification settings. Please try again.',
+        variant: 'danger',
+      });
       return;
     }
     pushToast({ message: 'Email notifications saved.', variant: 'success' });
@@ -2505,7 +2508,8 @@ function LoginActivityCard({
         .order('started_at', { ascending: false })
         .limit(20);
       if (!alive) return;
-      if (error) pushToast({ message: error.message, variant: 'danger' });
+      if (error)
+        pushToast({ message: 'Could not load sessions. Please try again.', variant: 'danger' });
       setRows((data as SessionRow[] | null) || []);
       setLoading(false);
     })();
@@ -2519,7 +2523,11 @@ function LoginActivityCard({
     const { error } = await supabase.auth.signOut({ scope: 'others' });
     setBusyAll(false);
     setConfirmAll(false);
-    if (error) pushToast({ message: error.message, variant: 'danger' });
+    if (error)
+      pushToast({
+        message: 'Could not sign out of other sessions. Please try again.',
+        variant: 'danger',
+      });
     else pushToast({ message: 'Signed out of every other session.', variant: 'success' });
   };
 
@@ -2758,7 +2766,10 @@ function FeedCard({
     });
     setSaving(false);
     if (error) {
-      pushToast({ message: error.message, variant: 'danger' });
+      pushToast({
+        message: 'Could not save feed preferences. Please try again.',
+        variant: 'danger',
+      });
       return;
     }
     pushToast({ message: 'Feed preferences saved.', variant: 'success' });
@@ -3222,7 +3233,10 @@ function AccessibilityCard({
     });
     setSaving(false);
     if (error) {
-      pushToast({ message: error.message, variant: 'danger' });
+      pushToast({
+        message: 'Could not save accessibility settings. Please try again.',
+        variant: 'danger',
+      });
       return;
     }
     pushToast({ message: 'Accessibility saved.', variant: 'success' });
@@ -3311,7 +3325,8 @@ function BlockedCard({
       )
       .eq('blocker_id', userId)
       .order('created_at', { ascending: false });
-    if (error) pushToast({ message: error.message, variant: 'danger' });
+    if (error)
+      pushToast({ message: 'Could not load blocked users. Please try again.', variant: 'danger' });
     setRows((data as unknown as BlockedRow[] | null) || []);
     setLoading(false);
   }, [supabase, userId, pushToast]);
@@ -3431,7 +3446,8 @@ function DataExportCard({
       .select('id, type, status, created_at, completed_at, download_url, deadline_at')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
-    if (error) pushToast({ message: error.message, variant: 'danger' });
+    if (error)
+      pushToast({ message: 'Could not load data requests. Please try again.', variant: 'danger' });
     setRequests((data as DataRequestRow[] | null) || []);
     setLoading(false);
   }, [supabase, userId, pushToast]);
@@ -3908,11 +3924,13 @@ function BillingBundle({
         body: JSON.stringify({ plan_name: planName }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || 'Checkout failed');
+      if (!res.ok) {
+        pushToast({ message: 'Checkout failed. Please try again.', variant: 'danger' });
+        return;
+      }
       if (data?.url) window.location.href = data.url;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Checkout failed';
-      pushToast({ message: msg, variant: 'danger' });
+    } catch {
+      pushToast({ message: 'Checkout failed. Please try again.', variant: 'danger' });
     } finally {
       setBusy('');
     }
@@ -4003,7 +4021,14 @@ function BillingBundle({
     try {
       const res = await fetch('/api/billing/cancel', { method: 'POST' });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || 'Cancel failed');
+      if (!res.ok) {
+        pushToast({
+          message: 'Could not cancel subscription. Please try again.',
+          variant: 'danger',
+        });
+        return;
+      }
+      void data;
       pushToast({
         message: 'Subscription cancelled. 7-day grace period started.',
         variant: 'success',
@@ -4013,9 +4038,8 @@ function BillingBundle({
       // so paid affordances disappear in-place instead of staying stale until
       // next nav.
       await refreshAllPermissions();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Cancel failed';
-      pushToast({ message: msg, variant: 'danger' });
+    } catch {
+      pushToast({ message: 'Could not cancel subscription. Please try again.', variant: 'danger' });
     } finally {
       setBusy('');
     }
@@ -4696,7 +4720,7 @@ function ExpertProfileCard({
     });
     setSaving(false);
     if (error) {
-      pushToast({ message: error.message, variant: 'danger' });
+      pushToast({ message: 'Could not save expert profile. Please try again.', variant: 'danger' });
       return;
     }
     pushToast({ message: 'Expert profile saved.', variant: 'success' });
@@ -4851,7 +4875,10 @@ function ExpertVacationCard({
     });
     setBusy(false);
     if (error) {
-      pushToast({ message: error.message, variant: 'danger' });
+      pushToast({
+        message: 'Could not update vacation mode. Please try again.',
+        variant: 'danger',
+      });
       return;
     }
     pushToast({
@@ -4965,7 +4992,7 @@ function ExpertWatchlistCard({
     });
     if (error) {
       setCats(prev);
-      pushToast({ message: error.message, variant: 'danger' });
+      pushToast({ message: 'Could not update watchlist. Please try again.', variant: 'danger' });
     } else {
       pushToast({ message: 'Watchlist updated.', variant: 'success' });
       // H8 — refresh perms cache (watchlist categories feed expert-area gates)
@@ -5212,7 +5239,11 @@ function SignOutEverywhereCard({
     const { error } = await supabase.auth.signOut({ scope: 'others' });
     setBusy(false);
     setOpen(false);
-    if (error) pushToast({ message: error.message, variant: 'danger' });
+    if (error)
+      pushToast({
+        message: 'Could not sign out of other sessions. Please try again.',
+        variant: 'danger',
+      });
     else pushToast({ message: 'Signed out of every other session.', variant: 'success' });
   };
 
