@@ -102,4 +102,25 @@ Not needed — unanimous.
 [filled during execution]
 
 ## Completed
-[SHIPPED block written here when done]
+
+SHIPPED 2026-04-26
+
+Components created:
+- `web/src/components/EmptyState.tsx` — new (props: icon?, headline, body, cta?)
+- `web/src/components/Skeleton.tsx` — new (props: width, height, className?)
+- `web/src/components/LockedFeatureCTA.tsx` — new (props: gateType, lockMessage?, onClose?, style)
+- `web/src/app/globals.css` — added @keyframes vpShimmer + .vp-skeleton class
+
+Wire-ins:
+- `web/src/app/category/[id]/page.js` — stories.length === 0 block replaced with EmptyState
+- `web/src/components/CommentThread.tsx` — both !permsLoaded/loading divs replaced with 3 Skeleton rows
+- `web/src/app/bookmarks/page.tsx` — at-cap Banner replaced with LockedFeatureCTA; filtered.length === 0 block replaced with EmptyState
+
+Commits:
+- b776352 — EmptyState, Skeleton, LockedFeatureCTA + bookmarks + category wire-ins (bundled with T-006/Q39 parallel work)
+- e147426 — CommentThread Skeleton wire-in (bundled with T-050)
+
+Notes:
+- Parallel agents committed the new components and most wire-ins in b776352 (T-006 commit) and e147426 (T-050 commit) while this pipeline was running. All changes verified present at HEAD.
+- tsc clean for all three components and wire-in files. One unrelated CommentRow.tsx conflict (timeAgo import from T-046 agent, not our work) is open.
+- T-044 LockedFeatureCTA kept LockModal intact — both coexist. LockModal for hard gates, LockedFeatureCTA for inline soft nudges.
