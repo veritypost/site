@@ -17,6 +17,8 @@ import { useFocusTrap } from '../lib/useFocusTrap';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import { MOD_ROLES } from '@/lib/roles';
 import type { Database } from '@/types/database';
+import { Z } from '@/lib/zIndex';
+import Skeleton from './Skeleton';
 
 type CommentDb = Database['public']['Tables']['comments']['Row'];
 
@@ -483,23 +485,40 @@ export default function CommentThread({
     }
   }
 
-  if (!permsLoaded) {
+  if (!permsLoaded || loading) {
+    // T-042: Skeleton loading rows replace the "Loading discussion…" text.
+    // Three comment-shaped rows: avatar circle + 2-3 text lines each.
+    // Shimmer animation defined in globals.css (.vp-skeleton / vpShimmer).
     return (
-      <div style={{ color: 'var(--dim, #666)', fontSize: 13, padding: 12 }}>
-        Loading discussion&hellip;
+      <div style={{ padding: '12px 0', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <Skeleton width={32} height={32} style={{ borderRadius: '50%', flexShrink: 0 }} />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <Skeleton width="55%" height={13} />
+            <Skeleton width="85%" height={13} />
+            <Skeleton width="70%" height={13} />
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <Skeleton width={32} height={32} style={{ borderRadius: '50%', flexShrink: 0 }} />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <Skeleton width="40%" height={13} />
+            <Skeleton width="75%" height={13} />
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <Skeleton width={32} height={32} style={{ borderRadius: '50%', flexShrink: 0 }} />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <Skeleton width="60%" height={13} />
+            <Skeleton width="90%" height={13} />
+            <Skeleton width="50%" height={13} />
+          </div>
+        </div>
       </div>
     );
   }
 
   if (!canViewSection) return null;
-
-  if (loading) {
-    return (
-      <div style={{ color: 'var(--dim, #666)', fontSize: 13, padding: 12 }}>
-        Loading discussion&hellip;
-      </div>
-    );
-  }
 
   const visible = comments.filter((c) => !blockedIds.has(c.user_id));
   const tops = visible.filter((c) => !c.parent_id);
@@ -903,7 +922,7 @@ const overlayStyle: CSSProperties = {
   position: 'fixed',
   inset: 0,
   background: 'rgba(17,17,17,0.85)',
-  zIndex: 9999,
+  zIndex: Z.CRITICAL,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',

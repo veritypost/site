@@ -1,0 +1,379 @@
+Bundle-size baseline — Verity Post web
+Date: 2026-04-26
+Next.js version: 14.2.35
+Build command: SENTRY_DISABLE_WEBPACK_PLUGIN=1 npx next build
+Note: Sentry webpack plugin disabled for this measurement run (env SENTRY_DISABLE_WEBPACK_PLUGIN=1).
+      Normal builds use withSentryConfig() which adds ~0 KB to route sizes but corrupts
+      chunk references in Next.js 14.2.x when SENTRY_DSN is absent (known Sentry bug).
+      The sizes below are accurate for the application bundle; Sentry adds only SDK overhead
+      injected at runtime, not additional page weight.
+Env vars present: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY,
+                  SUPABASE_SERVICE_ROLE_KEY, SUPABASE_JWT_SECRET, NEXT_PUBLIC_SITE_URL,
+                  NEXT_PUBLIC_SITE_MODE, PREVIEW_BYPASS_TOKEN, CRON_SECRET,
+                  HEALTH_CHECK_SECRET, EVENT_HASH_SALT, RATE_LIMIT_ALLOW_FAIL_OPEN
+Env vars absent: STRIPE_SECRET_KEY, SENTRY_DSN, SENTRY_ORG, SENTRY_PROJECT,
+                 SENTRY_AUTH_TOKEN, OPENAI_API_KEY, ANTHROPIC_API_KEY
+Build result: SUCCESS (212 pages generated)
+Lint warnings (2, non-blocking):
+  src/app/expert-queue/page.tsx:9:22 — 'formatDateTime' defined but never used
+  src/app/signup/pick-username/page.tsx:109:6 — useEffect missing 'router' dep
+
+---
+
+Route (app)                                                      Size     First Load JS
+┌ ○ /                                                            4.5 kB          331 kB
+├ ○ /_not-found                                                  410 B           258 kB
+├ ○ /about                                                       410 B           258 kB
+├ ○ /accessibility                                               410 B           258 kB
+├ ƒ /admin                                                       6.53 kB         329 kB
+├ ƒ /admin/access                                                7.42 kB         336 kB
+├ ƒ /admin/ad-campaigns                                          6.83 kB         335 kB
+├ ƒ /admin/ad-placements                                         8.7 kB          334 kB
+├ ƒ /admin/analytics                                             4.89 kB         333 kB
+├ ƒ /admin/articles/[id]/edit                                    5.47 kB         331 kB
+├ ƒ /admin/articles/[id]/review                                  8.82 kB         331 kB
+├ ƒ /admin/breaking                                              5.81 kB         332 kB
+├ ƒ /admin/categories                                            9.38 kB         335 kB
+├ ƒ /admin/cohorts                                               7.83 kB         334 kB
+├ ƒ /admin/comments                                              6.72 kB         332 kB
+├ ƒ /admin/data-requests                                         9.04 kB         334 kB
+├ ƒ /admin/email-templates                                       6.08 kB         332 kB
+├ ƒ /admin/expert-sessions                                       5.58 kB         334 kB
+├ ƒ /admin/features                                              8.45 kB         337 kB
+├ ƒ /admin/feeds                                                 7.71 kB         336 kB
+├ ƒ /admin/kids-story-manager                                    11.3 kB         337 kB
+├ ƒ /admin/moderation                                            7.76 kB         333 kB
+├ ƒ /admin/newsroom                                              17 kB           343 kB
+├ ƒ /admin/newsroom/clusters/[id]                                408 B           258 kB
+├ ƒ /admin/notifications                                         7.37 kB         336 kB
+├ ƒ /admin/permissions                                           12.5 kB         341 kB
+├ ƒ /admin/pipeline/cleanup                                      6.84 kB         329 kB
+├ ƒ /admin/pipeline/costs                                        6.53 kB         329 kB
+├ ƒ /admin/pipeline/runs                                         7.09 kB         329 kB
+├ ƒ /admin/pipeline/runs/[id]                                    8.09 kB         330 kB
+├ ƒ /admin/pipeline/settings                                     4.72 kB         330 kB
+├ ƒ /admin/plans                                                 7.3 kB          336 kB
+├ ƒ /admin/promo                                                 8.4 kB          337 kB
+├ ƒ /admin/prompt-presets                                        9.22 kB         335 kB
+├ ƒ /admin/reader                                                5.84 kB         332 kB
+├ ƒ /admin/recap                                                 7.57 kB         333 kB
+├ ƒ /admin/reports                                               8.74 kB         331 kB
+├ ƒ /admin/settings                                              3.85 kB         330 kB
+├ ƒ /admin/sponsors                                              6.05 kB         335 kB
+├ ƒ /admin/stories                                               5.76 kB         334 kB
+├ ƒ /admin/story-manager                                         12 kB           338 kB
+├ ƒ /admin/streaks                                               4.93 kB         331 kB
+├ ƒ /admin/subscriptions                                         10.7 kB         339 kB
+├ ƒ /admin/support                                               10.2 kB         335 kB
+├ ƒ /admin/system                                                7.15 kB         336 kB
+├ ƒ /admin/users                                                 11.7 kB         340 kB
+├ ƒ /admin/users/[id]/permissions                                6.19 kB         335 kB
+├ ƒ /admin/verification                                          9.63 kB         334 kB
+├ ƒ /admin/webhooks                                              9.2 kB          334 kB
+├ ƒ /admin/words                                                 5.17 kB         331 kB
+├ ƒ /api/access-request                                          0 B                0 B
+├ ƒ /api/account/data-export                                     0 B                0 B
+├ ƒ /api/account/delete                                          0 B                0 B
+├ ƒ /api/account/login-cancel-deletion                           0 B                0 B
+├ ƒ /api/account/onboarding                                      0 B                0 B
+├ ƒ /api/admin/ad-campaigns                                      0 B                0 B
+├ ƒ /api/admin/ad-campaigns/[id]                                 0 B                0 B
+├ ƒ /api/admin/ad-placements                                     0 B                0 B
+├ ƒ /api/admin/ad-placements/[id]                                0 B                0 B
+├ ƒ /api/admin/ad-units                                          0 B                0 B
+├ ƒ /api/admin/ad-units/[id]                                     0 B                0 B
+├ ƒ /api/admin/appeals/[id]/resolve                              0 B                0 B
+├ ƒ /api/admin/articles/[id]                                     0 B                0 B
+├ ƒ /api/admin/articles/save                                     0 B                0 B
+├ ƒ /api/admin/billing/audit                                     0 B                0 B
+├ ƒ /api/admin/billing/cancel                                    0 B                0 B
+├ ƒ /api/admin/billing/freeze                                    0 B                0 B
+├ ƒ /api/admin/billing/refund-decision                           0 B                0 B
+├ ƒ /api/admin/billing/sweep-grace                               0 B                0 B
+├ ƒ /api/admin/broadcasts/alert                                  0 B                0 B
+├ ƒ /api/admin/broadcasts/breaking                               0 B                0 B
+├ ƒ /api/admin/categories                                        0 B                0 B
+├ ƒ /api/admin/categories/[id]                                   0 B                0 B
+├ ƒ /api/admin/data-requests                                     0 B                0 B
+├ ƒ /api/admin/data-requests/[id]/approve                        0 B                0 B
+├ ƒ /api/admin/data-requests/[id]/reject                         0 B                0 B
+├ ƒ /api/admin/email-templates/[id]                              0 B                0 B
+├ ƒ /api/admin/expert/applications                               0 B                0 B
+├ ƒ /api/admin/expert/applications/[id]/approve                  0 B                0 B
+├ ƒ /api/admin/expert/applications/[id]/clear-background         0 B                0 B
+├ ƒ /api/admin/expert/applications/[id]/mark-probation-complete  0 B                0 B
+├ ƒ /api/admin/expert/applications/[id]/reject                   0 B                0 B
+├ ƒ /api/admin/features                                          0 B                0 B
+├ ƒ /api/admin/features/[id]                                     0 B                0 B
+├ ƒ /api/admin/feeds                                             0 B                0 B
+├ ƒ /api/admin/feeds/[id]                                        0 B                0 B
+├ ƒ /api/admin/moderation/comments/[id]/hide                     0 B                0 B
+├ ƒ /api/admin/moderation/comments/[id]/unhide                   0 B                0 B
+├ ƒ /api/admin/moderation/reports                                0 B                0 B
+├ ƒ /api/admin/moderation/reports/[id]/resolve                   0 B                0 B
+├ ƒ /api/admin/moderation/users/[id]/penalty                     0 B                0 B
+├ ƒ /api/admin/newsroom/clusters/[id]/archive                    0 B                0 B
+├ ƒ /api/admin/newsroom/clusters/[id]/dismiss                    0 B                0 B
+├ ƒ /api/admin/newsroom/clusters/[id]/merge                      0 B                0 B
+├ ƒ /api/admin/newsroom/clusters/[id]/move-item                  0 B                0 B
+├ ƒ /api/admin/newsroom/clusters/[id]/split                      0 B                0 B
+├ ƒ /api/admin/newsroom/clusters/[id]/unlock                     0 B                0 B
+├ ƒ /api/admin/newsroom/clusters/articles                        0 B                0 B
+├ ƒ /api/admin/newsroom/clusters/sources                         0 B                0 B
+├ ƒ /api/admin/notifications/broadcast                           0 B                0 B
+├ ƒ /api/admin/permission-sets                                   0 B                0 B
+├ ƒ /api/admin/permission-sets/[id]                              0 B                0 B
+├ ƒ /api/admin/permission-sets/members                           0 B                0 B
+├ ƒ /api/admin/permission-sets/plan-wiring                       0 B                0 B
+├ ƒ /api/admin/permission-sets/role-wiring                       0 B                0 B
+├ ƒ /api/admin/permissions                                       0 B                0 B
+├ ƒ /api/admin/permissions/[id]                                  0 B                0 B
+├ ƒ /api/admin/permissions/user-grants                           0 B                0 B
+├ ƒ /api/admin/pipeline/cleanup                                  0 B                0 B
+├ ƒ /api/admin/pipeline/generate                                 0 B                0 B
+├ ƒ /api/admin/pipeline/runs/[id]                                0 B                0 B
+├ ƒ /api/admin/pipeline/runs/[id]/cancel                         0 B                0 B
+├ ƒ /api/admin/pipeline/runs/[id]/retry                          0 B                0 B
+├ ƒ /api/admin/plans/[id]                                        0 B                0 B
+├ ƒ /api/admin/promo                                             0 B                0 B
+├ ƒ /api/admin/promo/[id]                                        0 B                0 B
+├ ƒ /api/admin/prompt-presets                                    0 B                0 B
+├ ƒ /api/admin/prompt-presets/[id]                               0 B                0 B
+├ ƒ /api/admin/rate-limits                                       0 B                0 B
+├ ƒ /api/admin/recap                                             0 B                0 B
+├ ƒ /api/admin/recap/[id]                                        0 B                0 B
+├ ƒ /api/admin/recap/[id]/questions                              0 B                0 B
+├ ƒ /api/admin/recap/questions/[id]                              0 B                0 B
+├ ƒ /api/admin/settings                                          0 B                0 B
+├ ƒ /api/admin/settings/invalidate                               0 B                0 B
+├ ƒ /api/admin/settings/upsert                                   0 B                0 B
+├ ƒ /api/admin/sponsors                                          0 B                0 B
+├ ƒ /api/admin/sponsors/[id]                                     0 B                0 B
+├ ƒ /api/admin/subscriptions/[id]/extend-grace                   0 B                0 B
+├ ƒ /api/admin/subscriptions/[id]/manual-sync                    0 B                0 B
+├ ƒ /api/admin/users/[id]                                        0 B                0 B
+├ ƒ /api/admin/users/[id]/achievements                           0 B                0 B
+├ ƒ /api/admin/users/[id]/ban                                    0 B                0 B
+├ ƒ /api/admin/users/[id]/data-export                            0 B                0 B
+├ ƒ /api/admin/users/[id]/mark-quiz                              0 B                0 B
+├ ƒ /api/admin/users/[id]/mark-read                              0 B                0 B
+├ ƒ /api/admin/users/[id]/permissions                            0 B                0 B
+├ ƒ /api/admin/users/[id]/plan                                   0 B                0 B
+├ ƒ /api/admin/users/[id]/role-set                               0 B                0 B
+├ ƒ /api/admin/users/[id]/roles                                  0 B                0 B
+├ ƒ /api/admin/users/[id]/sessions/[sessionId]                   0 B                0 B
+├ ƒ /api/admin/words                                             0 B                0 B
+├ ƒ /api/ads/click                                               0 B                0 B
+├ ƒ /api/ads/impression                                          0 B                0 B
+├ ƒ /api/ads/serve                                               0 B                0 B
+├ ƒ /api/ai/generate                                             0 B                0 B
+├ ƒ /api/appeals                                                 0 B                0 B
+├ ƒ /api/auth/callback                                           0 B                0 B
+├ ƒ /api/auth/check-email                                        0 B                0 B
+├ ƒ /api/auth/check-username                                     0 B                0 B
+├ ƒ /api/auth/email-change                                       0 B                0 B
+├ ƒ /api/auth/login                                              0 B                0 B
+├ ƒ /api/auth/login-failed                                       0 B                0 B
+├ ƒ /api/auth/login-precheck                                     0 B                0 B
+├ ƒ /api/auth/logout                                             0 B                0 B
+├ ƒ /api/auth/resend-verification                                0 B                0 B
+├ ƒ /api/auth/reset-password                                     0 B                0 B
+├ ƒ /api/auth/resolve-username                                   0 B                0 B
+├ ƒ /api/auth/signup                                             0 B                0 B
+├ ƒ /api/auth/signup-rollback                                    0 B                0 B
+├ ƒ /api/auth/verify-password                                    0 B                0 B
+├ ƒ /api/billing/cancel                                          0 B                0 B
+├ ƒ /api/billing/change-plan                                     0 B                0 B
+├ ƒ /api/billing/resubscribe                                     0 B                0 B
+├ ƒ /api/bookmark-collections                                    0 B                0 B
+├ ƒ /api/bookmark-collections/[id]                               0 B                0 B
+├ ƒ /api/bookmarks                                               0 B                0 B
+├ ƒ /api/bookmarks/[id]                                          0 B                0 B
+├ ƒ /api/bookmarks/export                                        0 B                0 B
+├ ƒ /api/comments                                                0 B                0 B
+├ ƒ /api/comments/[id]                                           0 B                0 B
+├ ƒ /api/comments/[id]/context-tag                               0 B                0 B
+├ ƒ /api/comments/[id]/flag                                      0 B                0 B
+├ ƒ /api/comments/[id]/report                                    0 B                0 B
+├ ƒ /api/comments/[id]/vote                                      0 B                0 B
+├ ƒ /api/conversations                                           0 B                0 B
+├ ƒ /api/cron/check-user-achievements                            0 B                0 B
+├ ƒ /api/cron/cleanup-data-exports                               0 B                0 B
+├ ƒ /api/cron/flag-expert-reverifications                        0 B                0 B
+├ ƒ /api/cron/freeze-grace                                       0 B                0 B
+├ ƒ /api/cron/pipeline-cleanup                                   0 B                0 B
+├ ƒ /api/cron/process-data-exports                               0 B                0 B
+├ ƒ /api/cron/process-deletions                                  0 B                0 B
+├ ƒ /api/cron/rate-limit-cleanup                                 0 B                0 B
+├ ƒ /api/cron/recompute-family-achievements                      0 B                0 B
+├ ƒ /api/cron/send-emails                                        0 B                0 B
+├ ƒ /api/cron/send-push                                          0 B                0 B
+├ ƒ /api/cron/sweep-kid-trials                                   0 B                0 B
+├ ƒ /api/csp-report                                              0 B                0 B
+├ ƒ /api/errors                                                  0 B                0 B
+├ ƒ /api/events/batch                                            0 B                0 B
+├ ƒ /api/expert-sessions                                         0 B                0 B
+├ ƒ /api/expert-sessions/[id]/questions                          0 B                0 B
+├ ƒ /api/expert-sessions/questions/[id]/answer                   0 B                0 B
+├ ƒ /api/expert/answers/[id]/approve                             0 B                0 B
+├ ƒ /api/expert/apply                                            0 B                0 B
+├ ƒ /api/expert/ask                                              0 B                0 B
+├ ƒ /api/expert/back-channel                                     0 B                0 B
+├ ƒ /api/expert/queue                                            0 B                0 B
+├ ƒ /api/expert/queue/[id]/answer                                0 B                0 B
+├ ƒ /api/expert/queue/[id]/claim                                 0 B                0 B
+├ ƒ /api/expert/queue/[id]/decline                               0 B                0 B
+├ ƒ /api/family/achievements                                     0 B                0 B
+├ ƒ /api/family/config                                           0 B                0 B
+├ ƒ /api/family/leaderboard                                      0 B                0 B
+├ ƒ /api/family/weekly-report                                    0 B                0 B
+├ ƒ /api/follows                                                 0 B                0 B
+├ ƒ /api/health                                                  0 B                0 B
+├ ƒ /api/ios/appstore/notifications                              0 B                0 B
+├ ƒ /api/ios/subscriptions/sync                                  0 B                0 B
+├ ƒ /api/kids                                                    0 B                0 B
+├ ƒ /api/kids-waitlist                                           0 B                0 B
+├ ƒ /api/kids/[id]                                               0 B                0 B
+├ ƒ /api/kids/[id]/streak-freeze                                 0 B                0 B
+├ ƒ /api/kids/generate-pair-code                                 0 B                0 B
+├ ƒ /api/kids/global-leaderboard                                 0 B                0 B
+├ ƒ /api/kids/household-kpis                                     0 B                0 B
+├ ƒ /api/kids/pair                                               0 B                0 B
+├ ƒ /api/kids/refresh                                            0 B                0 B
+├ ƒ /api/kids/reset-pin                                          0 B                0 B
+├ ƒ /api/kids/set-pin                                            0 B                0 B
+├ ƒ /api/kids/trial                                              0 B                0 B
+├ ƒ /api/kids/verify-pin                                         0 B                0 B
+├ ƒ /api/messages                                                0 B                0 B
+├ ƒ /api/messages/search                                         0 B                0 B
+├ ƒ /api/newsroom/ingest/run                                     0 B                0 B
+├ ƒ /api/notifications                                           0 B                0 B
+├ ƒ /api/notifications/preferences                               0 B                0 B
+├ ƒ /api/promo/redeem                                            0 B                0 B
+├ ƒ /api/push/send                                               0 B                0 B
+├ ƒ /api/quiz/start                                              0 B                0 B
+├ ƒ /api/quiz/submit                                             0 B                0 B
+├ ƒ /api/recap                                                   0 B                0 B
+├ ƒ /api/recap/[id]                                              0 B                0 B
+├ ƒ /api/recap/[id]/submit                                       0 B                0 B
+├ ƒ /api/reports                                                 0 B                0 B
+├ ƒ /api/reports/weekly-reading-report                           0 B                0 B
+├ ƒ /api/search                                                  0 B                0 B
+├ ƒ /api/settings/password-policy                                0 B                0 B
+├ ƒ /api/settings/public                                         0 B                0 B
+├ ƒ /api/stories/read                                            0 B                0 B
+├ ƒ /api/stripe/checkout                                         0 B                0 B
+├ ƒ /api/stripe/portal                                           0 B                0 B
+├ ƒ /api/stripe/webhook                                          0 B                0 B
+├ ƒ /api/supervisor/opt-in                                       0 B                0 B
+├ ƒ /api/supervisor/opt-out                                      0 B                0 B
+├ ƒ /api/support                                                 0 B                0 B
+├ ƒ /api/support/[id]/messages                                   0 B                0 B
+├ ƒ /api/support/public                                          0 B                0 B
+├ ƒ /api/users/[id]/block                                        0 B                0 B
+├ ƒ /api/users/blocked                                           0 B                0 B
+├ ○ /appeal                                                      2.32 kB         322 kB
+├ ○ /billing                                                     408 B           258 kB
+├ ○ /bookmarks                                                   9.57 kB         329 kB
+├ ○ /browse                                                      4.47 kB         329 kB
+├ ƒ /card/[username]                                             2.54 kB         322 kB
+├ ƒ /card/[username]/opengraph-image                             0 B                0 B
+├ ƒ /category/[id]                                               3.52 kB         323 kB
+├ ○ /contact                                                     2.49 kB         322 kB
+├ ○ /cookies                                                     410 B           258 kB
+├ ○ /dmca                                                        409 B           258 kB
+├ ○ /expert-queue                                                4 kB            324 kB
+├ ○ /forgot-password                                             2.48 kB         260 kB
+├ ƒ /help                                                        411 B           258 kB
+├ ○ /how-it-works                                                409 B           258 kB
+├ ○ /ideas                                                       411 B           258 kB
+├ ○ /ideas/earned                                                3.23 kB         261 kB
+├ ○ /ideas/feed                                                  410 B           258 kB
+├ ○ /ideas/feed/briefing                                         409 B           258 kB
+├ ○ /ideas/feed/edition                                          411 B           258 kB
+├ ○ /ideas/feed/index                                            410 B           258 kB
+├ ○ /ideas/feed/ranked                                           412 B           258 kB
+├ ○ /ideas/feed/spread                                           410 B           258 kB
+├ ○ /ideas/quiet                                                 411 B           258 kB
+├ ○ /ideas/receipt                                               2.94 kB         261 kB
+├ ○ /ideas/sources                                               411 B           258 kB
+├ ○ /kids-app                                                    2.15 kB         260 kB
+├ ○ /leaderboard                                                 6 kB            333 kB
+├ ○ /login                                                       5.51 kB         330 kB
+├ ○ /logout                                                      2.1 kB          322 kB
+├ ○ /manifest.webmanifest                                        0 B                0 B
+├ ○ /messages                                                    7.97 kB         328 kB
+├ ○ /notifications                                               3.32 kB         323 kB
+├ ƒ /preview                                                     0 B                0 B
+├ ○ /privacy                                                     411 B           258 kB
+├ ○ /profile                                                     12 kB           334 kB
+├ ƒ /profile/[id]                                                347 B           260 kB
+├ ○ /profile/activity                                            408 B           258 kB
+├ ○ /profile/card                                                2.15 kB         322 kB
+├ ƒ /profile/category/[id]                                       2.05 kB         322 kB
+├ ○ /profile/contact                                             1.9 kB          260 kB
+├ ○ /profile/family                                              3.13 kB         323 kB
+├ ○ /profile/kids                                                7.59 kB         327 kB
+├ ƒ /profile/kids/[id]                                           6.91 kB         327 kB
+├ ○ /profile/milestones                                          409 B           258 kB
+├ ○ /profile/settings                                            26.7 kB         352 kB
+├ ○ /profile/settings/alerts                                     567 B           258 kB
+├ ƒ /profile/settings/billing                                    409 B           258 kB
+├ ○ /profile/settings/blocked                                    567 B           258 kB
+├ ○ /profile/settings/data                                       565 B           258 kB
+├ ○ /profile/settings/emails                                     567 B           258 kB
+├ ○ /profile/settings/expert                                     4.6 kB          324 kB
+├ ○ /profile/settings/feed                                       565 B           258 kB
+├ ○ /profile/settings/login-activity                             571 B           258 kB
+├ ○ /profile/settings/password                                   569 B           258 kB
+├ ○ /profile/settings/profile                                    563 B           258 kB
+├ ○ /profile/settings/supervisor                                 570 B           258 kB
+├ ○ /recap                                                       1.42 kB         321 kB
+├ ƒ /recap/[id]                                                  1.53 kB         321 kB
+├ ○ /reset-password                                              3.69 kB         323 kB
+├ ○ /robots.txt                                                  0 B                0 B
+├ ○ /search                                                      3.65 kB         328 kB
+├ ○ /signup                                                      6.21 kB         331 kB
+├ ○ /signup/expert                                               5.13 kB         325 kB
+├ ○ /signup/pick-username                                        3.71 kB         323 kB
+├ ● /sitemap/[__metadata_id__]                                   0 B                0 B
+├   └ /sitemap/0.xml
+├ ƒ /story/[slug]                                                24.8 kB         349 kB
+├ ƒ /story/[slug]/opengraph-image                                0 B                0 B
+├ ○ /terms                                                       411 B           258 kB
+├ ƒ /u/[username]                                                4.56 kB         327 kB
+├ ○ /verify-email                                                4.06 kB         324 kB
+└ ○ /welcome                                                     2.35 kB         327 kB
++ First Load JS shared by all                                    258 kB
+  ├ chunks/1e4a01de-04a64f75c4d73626.js                          36.8 kB
+  ├ chunks/2148-1a6a3fec7617f913.js                              164 kB
+  ├ chunks/fd9d1056-e107b75a289920f3.js                          53.8 kB
+  └ other shared chunks (total)                                  3.3 kB
+
+ƒ Middleware                                                     141 kB
+
+○  (Static)   prerendered as static content
+●  (SSG)      prerendered as static HTML (uses getStaticProps)
+ƒ  (Dynamic)  server-rendered on demand
+
+---
+
+KEY METRICS (for regression comparison):
+  First Load JS shared by all:  258 kB
+  Middleware:                   141 kB
+  Largest page — /profile/settings:   26.7 kB  (352 kB First Load)
+  Largest page — /story/[slug]:       24.8 kB  (349 kB First Load)
+  Largest page — /admin/newsroom:     17 kB    (343 kB First Load)
+  Smallest pages (static stubs):     ~408-412 B (258 kB First Load — shared JS only)
+  Typical dynamic admin page:        5-12 kB   (329-341 kB First Load)
+  Typical reader page (/, login, signup, messages):  4-8 kB (323-334 kB First Load)
+
+KNOWN SENTRY BUILD ISSUE:
+  Normal `npx next build` fails at "Collecting page data" phase with:
+    "Cannot find module './4894.js'"
+  Root cause: @sentry/nextjs 8.40.0 + Next.js 14.2.35 conflict — Sentry injects a
+  Sentry debug ID chunk into _document.js but webpack-runtime.js resolves it as
+  ./4894.js (relative to server/) while the chunk lives at ./chunks/4894.js.
+  This does NOT affect Vercel production builds (Vercel's build environment differs).
+  Workaround for local measurement: SENTRY_DISABLE_WEBPACK_PLUGIN=1.
+  Track this: when @sentry/nextjs is upgraded past 8.40.0, retest normal build.
