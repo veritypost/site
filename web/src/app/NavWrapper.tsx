@@ -143,6 +143,10 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState<boolean>(false);
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [canSeeAdmin, setCanSeeAdmin] = useState<boolean>(false);
+  // `search.basic` gates the magnifying-glass icon in the top bar. The
+  // icon sits next to the wordmark — single discoverable entry point to
+  // /search across every surface where the global chrome shows.
+  const [canSearch, setCanSearch] = useState<boolean>(false);
 
   useEffect(() => {
     setMounted(true);
@@ -159,6 +163,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
           setLoggedIn(false);
           setAuthLoaded(true);
           setCanSeeAdmin(false);
+          setCanSearch(false);
         }
         return;
       }
@@ -178,6 +183,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
         setLoggedIn(true);
         setAuthLoaded(true);
         setCanSeeAdmin(hasPermission('admin.dashboard.view'));
+        setCanSearch(hasPermission('search.basic'));
       }
     }
 
@@ -409,10 +415,10 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
       </div>
 
       {showTopBar && (
-        // Fixed top bar — wordmark only. The search entry point lives on
-        // the Home feed (magnifying glass), not in the global chrome, so
-        // it's only present where the user is actively browsing rather
-        // than on every surface.
+        // Fixed top bar — "verity post" wordmark on the left, magnifier
+        // on the right when the viewer has search.basic. The icon lives
+        // alongside the brand so the search entry point is part of the
+        // global chrome rather than a per-surface affordance.
         <header style={topBarStyle}>
           <a
             href={topBarHomeHref}
@@ -428,6 +434,37 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
           >
             verity post
           </a>
+          {loggedIn && canSearch && (
+            <a
+              href="/search"
+              aria-label="Search"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minWidth: 44,
+                minHeight: 44,
+                marginRight: -8,
+                color: C.dim,
+                textDecoration: 'none',
+              }}
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+            </a>
+          )}
         </header>
       )}
 

@@ -122,84 +122,64 @@ struct HomeView: View {
 
     var body: some View {
         ZStack {
-            ScrollView {
-                VStack(spacing: 0) {
-                    // Breaking strip — narrow, above masthead. Renders only
-                    // when an active breaking-flagged article exists today
-                    // AND the viewer has the permission. Mirrors the
-                    // dedicated `is_breaking=true` query the web home runs
-                    // (separate from the 8-slot front page so a breaking
-                    // story always surfaces even if the editor didn't flag
-                    // it as today's hero). Per spec: rate-limited, Senior
-                    // Editor only.
-                    if canViewBreakingBanner, let breaking = breakingStory {
-                        NavigationLink(value: breaking) {
-                            breakingStrip(for: breaking)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel("Breaking news: \(breaking.title ?? "Breaking news")")
-                    }
-
-                    if canSearch {
-                        HStack {
-                            Spacer()
-                            NavigationLink {
-                                FindView().environmentObject(auth)
-                            } label: {
-                                Image(systemName: "magnifyingglass")
-                                    .font(.system(size: 18, weight: .regular))
-                                    .foregroundColor(VP.dim)
-                                    .frame(width: 44, height: 44)
-                                    .contentShape(Rectangle())
+            VStack(spacing: 0) {
+                topBar
+                ScrollView {
+                    VStack(spacing: 0) {
+                        // Breaking strip — narrow, top of feed. Renders only
+                        // when an active breaking-flagged article exists today
+                        // AND the viewer has the permission. Mirrors the
+                        // dedicated `is_breaking=true` query the web home
+                        // runs.
+                        if canViewBreakingBanner, let breaking = breakingStory {
+                            NavigationLink(value: breaking) {
+                                breakingStrip(for: breaking)
                             }
-                            .accessibilityLabel("Search")
                             .buttonStyle(.plain)
-                        }
-                        .padding(.horizontal, 12)
-                    }
-
-                    masthead
-
-                    if loading {
-                        loadingState
-                    } else if let err = loadError {
-                        errorState(err)
-                    } else if stories.isEmpty {
-                        emptyDayState
-                    } else {
-                        if let hero = stories.first {
-                            heroBlock(hero)
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel("Breaking news: \(breaking.title ?? "Breaking news")")
                         }
 
-                        let supporting = Array(stories.dropFirst().prefix(7))
-                        if !supporting.isEmpty {
-                            VStack(spacing: 0) {
-                                ForEach(Array(supporting.enumerated()), id: \.element.id) { idx, story in
-                                    if idx > 0 {
-                                        hairline.padding(.horizontal, 20)
-                                    }
-                                    NavigationLink(value: story) {
-                                        supportingCard(story)
-                                            .padding(.horizontal, 20)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
+                        if loading {
+                            loadingState
+                        } else if let err = loadError {
+                            errorState(err)
+                        } else if stories.isEmpty {
+                            EmptyView()
+                        } else {
+                            if let hero = stories.first {
+                                heroBlock(hero)
                             }
-                            .padding(.top, 40)
-                        }
 
-                        endOfFrontPage
+                            let supporting = Array(stories.dropFirst().prefix(7))
+                            if !supporting.isEmpty {
+                                VStack(spacing: 0) {
+                                    ForEach(Array(supporting.enumerated()), id: \.element.id) { idx, story in
+                                        if idx > 0 {
+                                            hairline.padding(.horizontal, 20)
+                                        }
+                                        NavigationLink(value: story) {
+                                            supportingCard(story)
+                                                .padding(.horizontal, 20)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                                .padding(.top, 40)
+                            }
+
+                            endOfFrontPage
+                        }
                     }
+                    .navigationDestination(for: Story.self) { story in
+                        StoryDetailView(story: story)
+                            .onAppear { trackArticleView(articleId: story.id) }
+                    }
+                    .padding(.bottom, 80)
                 }
-                .navigationDestination(for: Story.self) { story in
-                    StoryDetailView(story: story)
-                        .onAppear { trackArticleView(articleId: story.id) }
-                }
-                .padding(.bottom, 80)
+                .refreshable { await loadData() }
             }
             .background(VP.bg.ignoresSafeArea())
-            .refreshable { await loadData() }
 
             if showRegistrationWall {
                 registrationWallOverlay
@@ -218,33 +198,44 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Masthead
+    // MARK: - Top bar (brand + search)
+    //
+    // Mirrors ProfileView.topBar shape so the brand chrome reads the same
+    // across the app. Wordmark on the left, magnifier on the right when
+    // the viewer has `search.basic` (logged-in only — anon's PermissionStore
+    // returns false for everything). Pushes FindView via NavigationLink so
+    // the search experience inherits the tab's navigation stack.
 
-    private var masthead: some View {
-        VStack(spacing: 14) {
-            Text("Verity")
-                .font(.system(size: 44, weight: .bold, design: .serif))
-                .tracking(-0.6)
+    private var topBar: some View {
+        HStack(spacing: 0) {
+            Text("verity post")
+                .font(.system(size: 15, weight: .heavy))
+                .tracking(-0.15)
                 .foregroundColor(VP.text)
-
-            Text(today.humanDate)
-                .font(.system(size: 16, weight: .medium, design: .serif))
-                .foregroundColor(VP.soft)
-
-            Text("Today’s stories, chosen by an editor.")
-                .font(.system(size: 13, weight: .regular, design: .serif))
-                .italic()
-                .foregroundColor(VP.dim)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+            Spacer()
+            if canSearch {
+                NavigationLink {
+                    FindView().environmentObject(auth)
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 18, weight: .regular))
+                        .foregroundColor(VP.dim)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel("Search")
+                .buttonStyle(.plain)
+            }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 32)
-        .padding(.bottom, 28)
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(VP.bg)
         .overlay(
-            Rectangle().fill(VP.rule).frame(height: 1),
+            Rectangle().fill(VP.border).frame(height: 1),
             alignment: .bottom
         )
-        .padding(.bottom, 48)
     }
 
     // MARK: - Hero / Supporting
@@ -380,27 +371,6 @@ struct HomeView: View {
             .foregroundColor(VP.dim)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 64)
-    }
-
-    private var emptyDayState: some View {
-        VStack(spacing: 20) {
-            Text("No new stories yet today.")
-                .font(.system(size: 16, weight: .regular, design: .serif))
-                .italic()
-                .foregroundColor(VP.dim)
-
-            NavigationLink {
-                BrowseLanding()
-            } label: {
-                Text("Browse all categories →")
-                    .font(.system(size: 15, weight: .medium, design: .serif))
-                    .foregroundColor(VP.accent)
-                    .underline(true, color: VP.accent)
-            }
-            .buttonStyle(.plain)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 80)
     }
 
     private func errorState(_ message: String) -> some View {

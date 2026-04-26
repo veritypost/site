@@ -157,11 +157,6 @@ export default function HomePage() {
 
   const [canBreakingBanner, setCanBreakingBanner] = useState<boolean>(false);
   const [canBreakingBannerPaid, setCanBreakingBannerPaid] = useState<boolean>(false);
-  // Search affordance — magnifier on the home masthead, gated by
-  // `search.basic`. The icon used to live in the global top bar; it was
-  // moved here so the search entry point is contextual to the home feed
-  // rather than persistent on every surface (owner directive 2026-04-26).
-  const [canSearch, setCanSearch] = useState<boolean>(false);
 
   // Permission hydrate.
   useEffect(() => {
@@ -172,7 +167,6 @@ export default function HomePage() {
       if (cancelled) return;
       setCanBreakingBanner(hasPermission('home.breaking_banner.view'));
       setCanBreakingBannerPaid(hasPermission('home.breaking_banner.view.paid'));
-      setCanSearch(hasPermission('search.basic'));
     })();
     return () => {
       cancelled = true;
@@ -281,53 +275,9 @@ export default function HomePage() {
           padding: '32px 20px 64px',
         }}
       >
-        {loggedIn && canSearch && (
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-              marginBottom: -8,
-            }}
-          >
-            <Link
-              href="/search"
-              aria-label="Search"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minWidth: 44,
-                minHeight: 44,
-                marginRight: -8,
-                color: C.dim,
-                textDecoration: 'none',
-              }}
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-            </Link>
-          </div>
-        )}
-
-        <Masthead humanDate={today.humanDate} />
-
         {loading && <FrontPageSkeleton />}
 
         {!loading && loadFailed && <FetchFailed onRetry={() => setReloadKey((k) => k + 1)} />}
-
-        {!loading && !loadFailed && !hero && <EmptyDay loggedIn={loggedIn} />}
 
         {!loading && hero && (
           <Hero
@@ -361,56 +311,6 @@ export default function HomePage() {
 // ============================================================================
 
 const serifStack = "Georgia, 'Times New Roman', 'Source Serif 4', serif";
-
-function Masthead({ humanDate }: { humanDate: string }) {
-  return (
-    <header
-      style={{
-        textAlign: 'center',
-        marginBottom: 56,
-        paddingBottom: 28,
-        borderBottom: `1px solid ${C.rule}`,
-      }}
-    >
-      <h1
-        style={{
-          fontFamily: serifStack,
-          fontSize: 40,
-          fontWeight: 700,
-          letterSpacing: '-0.02em',
-          margin: 0,
-          color: C.text,
-          lineHeight: 1,
-        }}
-      >
-        Verity
-      </h1>
-      <p
-        style={{
-          fontFamily: serifStack,
-          fontSize: 16,
-          fontWeight: 500,
-          color: C.soft,
-          margin: '14px 0 0',
-          letterSpacing: '0.01em',
-        }}
-      >
-        {humanDate}
-      </p>
-      <p
-        style={{
-          fontFamily: serifStack,
-          fontStyle: 'italic',
-          fontSize: 13,
-          color: C.dim,
-          margin: '8px 0 0',
-        }}
-      >
-        Today&rsquo;s stories, chosen by an editor.
-      </p>
-    </header>
-  );
-}
 
 function BreakingStrip({ story, showMeta }: { story: HomeStory; showMeta: boolean }) {
   return (
@@ -857,47 +757,6 @@ function FrontPageSkeleton() {
         ))}
       </section>
     </div>
-  );
-}
-
-function EmptyDay({ loggedIn }: { loggedIn: boolean }) {
-  return (
-    <section
-      aria-label="No articles today"
-      style={{
-        textAlign: 'center',
-        padding: '64px 0',
-      }}
-    >
-      <p
-        style={{
-          fontFamily: serifStack,
-          fontStyle: 'italic',
-          fontSize: 16,
-          color: C.dim,
-          margin: 0,
-        }}
-      >
-        No new stories yet today.
-      </p>
-      {loggedIn ? (
-        <p style={{ margin: '20px 0 0' }}>
-          <Link
-            href="/browse"
-            style={{
-              fontFamily: serifStack,
-              fontSize: 15,
-              color: C.accent,
-              textDecoration: 'underline',
-              textUnderlineOffset: 4,
-              fontWeight: 500,
-            }}
-          >
-            Browse all categories &rarr;
-          </Link>
-        </p>
-      ) : null}
-    </section>
   );
 }
 
