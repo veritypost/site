@@ -40,6 +40,10 @@ import PostgREST
 // subcategory pill row rather than render an affordance that does nothing.
 // Tracked for Wave 2 pickup.
 
+// T-025 — cached ISO8601 formatter; promoted from per-call inline init.
+// ISO8601DateFormatter is expensive; two call sites in this file share it.
+private let leaderboardISO8601 = ISO8601DateFormatter()
+
 struct LeaderboardView: View {
     @EnvironmentObject var auth: AuthViewModel
     @ObservedObject private var permStore = PermissionStore.shared
@@ -251,7 +255,33 @@ struct LeaderboardView: View {
                     .padding(.horizontal, 20)
                 }
 
-                Spacer().frame(height: 100)
+                Spacer().frame(height: 20)
+            }
+        }
+        // T-093 — sticky rank bar above tab bar + home indicator.
+        // safeAreaInset reserves space so the list content scrolls clear of
+        // the bar; only renders when the user is ranked in the loaded list.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let me = auth.currentUser,
+               let rankIdx = users.firstIndex(where: { $0.id == me.id }) {
+                let rank = rankIdx + 1
+                HStack {
+                    AvatarView(user: me, size: 22)
+                    Text("Your rank")
+                        .font(.system(.footnote, design: .default, weight: .semibold))
+                        .foregroundColor(VP.text)
+                    Spacer()
+                    Text("#\(rank)")
+                        .font(.system(.subheadline, design: .default, weight: .bold))
+                        .foregroundColor(podiumColor(for: rankIdx))
+                    Text("\(me.verityScore ?? 0)")
+                        .font(.system(.subheadline, design: .default, weight: .bold))
+                        .foregroundColor(VP.accent)
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 10)
+                .background(VP.card)
+                .overlay(Rectangle().fill(VP.border).frame(height: 1), alignment: .top)
             }
         }
         .background(VP.bg.ignoresSafeArea())
@@ -272,6 +302,17 @@ struct LeaderboardView: View {
     }
 
     // MARK: - Components
+
+    /// T-092 — gold / silver / bronze for top-3 ranks; VP.dim for the rest.
+    /// `idx` is 0-based (0 = rank 1).
+    private func podiumColor(for idx: Int) -> Color {
+        switch idx {
+        case 0: return Color(hex: "B8860B") // dark gold
+        case 1: return Color(hex: "6B7280") // silver-gray
+        case 2: return Color(hex: "92400E") // bronze-brown
+        default: return VP.dim
+        }
+    }
 
     private func yourRankCard(me: VPUser) -> some View {
         let rank = users.firstIndex(where: { $0.id == me.id }).map { $0 + 1 }
@@ -332,9 +373,10 @@ struct LeaderboardView: View {
                 }
             } label: {
                 HStack(spacing: 12) {
+                    // T-092 — podium color for ranks 1-3 (idx 0-2).
                     Text("\(idx + 1)")
                         .font(.system(.subheadline, design: .default, weight: .bold))
-                        .foregroundColor(idx < 3 ? VP.accent : VP.dim)
+                        .foregroundColor(podiumColor(for: idx))
                         .frame(width: 28, alignment: .trailing)
                     AvatarView(user: user, size: 40)
                     VStack(alignment: .leading, spacing: 2) {
@@ -373,7 +415,8 @@ struct LeaderboardView: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+                // T-092 — slightly taller rows for podium positions.
+                .padding(.vertical, idx < 3 ? 14 : 12)
                 .background(isExpanded ? VP.card : VP.bg)
                 .contentShape(Rectangle())
             }
@@ -516,7 +559,7 @@ struct LeaderboardView: View {
         do {
             // Rolling 30-day window for "new" users, ranked by verity_score.
             let since = Date().addingTimeInterval(-30 * 86400)
-            let sinceStr = ISO8601DateFormatter().string(from: since)
+            let sinceStr = leaderboardISO8601.string(from: since)
             let data: [VPUser] = try await usersQueryBase()
                 .gte("created_at", value: sinceStr)
                 .order("verity_score", ascending: false)
@@ -539,7 +582,7 @@ struct LeaderboardView: View {
         // are `.thisWeek` / `.thisMonth`, so the guard is belt-and-
         // suspenders against future call-site drift.
         guard let since = period.since() else { return }
-        let sinceStr = ISO8601DateFormatter().string(from: since)
+        let sinceStr = leaderboardISO8601.string(from: since)
 
         struct CountsRow: Decodable { let user_id: String; let reads_count: Int }
         struct RpcArgs: Encodable { let p_since: String; let p_limit: Int }

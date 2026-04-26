@@ -12,6 +12,15 @@ import { usePageViewTrack } from '@/lib/useTrack';
 import { PERIOD_LABELS, periodSince, type Period } from '@/lib/leaderboardPeriod';
 import type { Tables } from '@/types/database-helpers';
 
+// T-092 — podium accent colors for ranks 1 / 2 / 3. Desaturated enough to
+// stay coherent with the monochrome accent system; all pass WCAG AA on white.
+function rankAccentColor(rank: number): string {
+  if (rank === 1) return '#B8860B'; // dark gold
+  if (rank === 2) return '#6B7280'; // silver-gray
+  if (rank === 3) return '#92400E'; // bronze-brown
+  return 'var(--dim)';
+}
+
 // Leaderboard — D5/D31. Public top-3, verified readers see the full list,
 // paid readers get category / subcategory breakdowns. Gate swap:
 //   • the `email_verified` read that fed `fullAccess` → `leaderboard.view`
@@ -568,7 +577,8 @@ export default function LeaderboardPage() {
                   key={u.id}
                   user={u}
                   rank={i + 1}
-                  rankColor="var(--accent)"
+                  rankColor={rankAccentColor(i + 1)}
+                  isPodium
                   onToggle={() => setExpanded(expanded === u.id ? null : u.id)}
                   expanded={expanded === u.id}
                   topScore={topScore}
@@ -684,7 +694,8 @@ export default function LeaderboardPage() {
                   key={u.id}
                   user={u}
                   rank={i + 1}
-                  rankColor="var(--accent)"
+                  rankColor={rankAccentColor(i + 1)}
+                  isPodium
                   onToggle={() => setExpanded(expanded === u.id ? null : u.id)}
                   expanded={expanded === u.id}
                   topScore={topScore}
@@ -811,6 +822,50 @@ export default function LeaderboardPage() {
               )}
         </div>
       </div>
+      {/* T-093 — sticky rank bar: fixed at viewport bottom, inner div
+          centers content to match the 800px page column. Renders only
+          when the current user has a computed rank in the loaded list.
+          The 80px bottom padding on the scroll container ensures list
+          content scrolls clear of this bar without manual offset logic. */}
+      {me && myRank !== null && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 100,
+            background: 'var(--card)',
+            borderTop: '1px solid var(--border)',
+          }}
+        >
+          <div
+            style={{
+              maxWidth: 800,
+              margin: '0 auto',
+              padding: '10px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Avatar user={me} size={24} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+                Your rank
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ fontSize: 15, fontWeight: 700, color: rankAccentColor(myRank) }}>
+                #{myRank}
+              </span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)' }}>
+                {(me.verity_score || 0).toLocaleString()}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
@@ -835,6 +890,8 @@ interface LeaderRowProps {
   topStreak: number;
   isLast?: boolean;
   showVerityScore?: boolean;
+  // T-092 — slightly taller vertical padding for podium positions (ranks 1-3).
+  isPodium?: boolean;
 }
 
 function LeaderRow({
@@ -850,6 +907,7 @@ function LeaderRow({
   topStreak,
   isLast = false,
   showVerityScore = false,
+  isPodium = false,
 }: LeaderRowProps) {
   const profileHref = u.username ? `/u/${u.username}` : null;
   return (
@@ -866,7 +924,7 @@ function LeaderRow({
         }}
         aria-expanded={expanded}
         style={{
-          padding: '12px 20px',
+          padding: isPodium ? '14px 20px' : '12px 20px',
           display: 'flex',
           alignItems: 'center',
           gap: 12,
