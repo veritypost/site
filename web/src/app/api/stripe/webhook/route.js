@@ -453,6 +453,15 @@ async function handleSubscriptionUpdated(service, sub) {
             plan_status: 'active',
           })
           .eq('id', userRow.id);
+        // B1 tail: direct write bypasses the RPC, so bump explicitly.
+        // billing_uncancel_subscription bumps internally (migration 189);
+        // this fallback path skips the RPC so must bump at the call-site.
+        const { error: bumpErr } = await service.rpc('bump_user_perms_version', {
+          p_user_id: userRow.id,
+        });
+        if (bumpErr) {
+          console.error('[stripe.webhook.uncancel_fallback.bump_err]', bumpErr.message);
+        }
         await service.from('audit_log').insert({
           actor_id: userRow.id,
           action: 'billing:uncancel_fallback',
