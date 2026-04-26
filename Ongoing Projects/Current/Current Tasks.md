@@ -144,7 +144,7 @@ SHIPPED 2026-04-26 · 9ec6eac — created web/src/lib/dates.ts (formatDate, form
 
 65. **Make quiz unfold inline in story reader** (T-063) — at ~50% scroll: ribbon whispers quiz availability; at ~95%: ribbon expands into quiz panel. No modal, no nav change. Affects: `web/src/app/story/[slug]/page.tsx`, `StoryDetailView.swift`.
 
-66. **Add comprehension badge and score-tier color to comment avatars** (T-065) — avatar ring colored by commenter's verity score tier; comprehension badge on avatar. Affects: `web/src/components/CommentRow.tsx`, iOS comment views.
+66. ~~**Add comprehension badge and score-tier color to comment avatars** (T-065)~~ — SKIP: owner decision 2026-04-26: no score/tier rings on avatars anywhere. Avatars are plain circles filled with user-chosen avatar_color only.
 
 69. **Remove curation-attribution language from all user-facing surfaces** (T-121) — no "Why we picked these," "hand-curated by," or any language naming or alluding to story selectors. Affects: home page, marketing pages, any UI copy referencing curation.
 
@@ -174,7 +174,7 @@ SHIPPED 2026-04-26. Web: position:fixed bottom bar (zIndex 100) renders when myR
 
 83. **Add public profile drawer tap from leaderboard names** (T-096) — tap a name to see public profile without leaving leaderboard. Affects: leaderboard web and iOS.
 
-84. **Add verity-score-colored avatar rings to messages** (T-097). Affects: `web/src/app/messages/page.tsx`, `MessagesView.swift`.
+84. ~~**Add verity-score-colored avatar rings to messages** (T-097)~~ — SKIP: owner decision 2026-04-26: no score/tier rings on avatars anywhere. Avatars are plain circles filled with user-chosen avatar_color only.
 
 85. **Add comprehension badges to message thread contacts** (T-098) — badge for contacts who passed the same quiz as the viewer. Affects: messages web and iOS.
 

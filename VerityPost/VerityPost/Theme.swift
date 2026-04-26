@@ -85,10 +85,11 @@ extension Color {
     }
 }
 
-// MARK: - Avatar (outer ring + optional inner fill + up to 3 chars)
-// Matches site's Avatar component. When users.avatar jsonb is populated it will
-// provide outer/inner/initials; until then we fall back to avatar_color +
-// first letter of username. No credibility signaling.
+// MARK: - Avatar (plain circle fill + up to 3 chars)
+// Matches site's Avatar component. Plain circle filled with avatar_color (outer).
+// No ring, no border, no score/tier-derived color. When users.avatar jsonb is
+// populated it provides outer/initials; until then we fall back to avatar_color +
+// first letter of username.
 
 struct AvatarView: View {
     let outer: Color
@@ -127,13 +128,12 @@ struct AvatarView: View {
 
     private var resolvedTextColor: Color {
         if let t = textColor { return t }
-        return inner == .clear ? outer : VP.text
+        return .white
     }
 
     var body: some View {
         ZStack {
-            Circle().fill(inner)
-            Circle().strokeBorder(outer, lineWidth: 2)
+            Circle().fill(outer)
             Text(initials)
                 // Avatar initials sized relative to the avatar frame (not Dynamic
                 // Type) so the letter always fits inside the circle. Caller sizes
