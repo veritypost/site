@@ -10,9 +10,9 @@ import Foundation
 // 7-day window.
 
 enum LeaderboardPeriod: String, CaseIterable, Identifiable {
-    case thisWeek = "This Week"
-    case thisMonth = "This Month"
-    case allTime = "All Time"
+    case thisWeek = "This week"
+    case thisMonth = "This month"
+    case allTime = "All time"
 
     var id: String { rawValue }
 

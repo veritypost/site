@@ -5,7 +5,6 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { createClient } from '../../lib/supabase/client';
 import Avatar from '../../components/Avatar';
-import StatRow from '../../components/StatRow';
 import VerifiedBadge from '../../components/VerifiedBadge';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import { usePageViewTrack } from '@/lib/useTrack';
@@ -32,7 +31,7 @@ function rankAccentColor(rank: number): string {
 //     paid gate — the top-3 + full-list split is about verification, not
 //     plan.
 
-const TABS = ['Top Verifiers', 'Top Readers', 'Rising Stars', 'Weekly'] as const;
+const TABS = ['Top Verifiers', 'Top Readers', 'Rising Stars'] as const;
 type TabKey = (typeof TABS)[number];
 
 // Period model lives in `@/lib/leaderboardPeriod` so web + iOS share
@@ -112,7 +111,7 @@ export default function LeaderboardPage() {
   usePageViewTrack('leaderboard');
 
   const [activeTab, setActiveTab] = useState<TabKey>('Top Verifiers');
-  const [period, setPeriod] = useState<PeriodKey>('All Time');
+  const [period, setPeriod] = useState<PeriodKey>('All time');
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [subcats, setSubcats] = useState<SubcatRow[]>([]);
   const [activeCat, setActiveCat] = useState<string | null>(null);
@@ -120,7 +119,6 @@ export default function LeaderboardPage() {
 
   const [users, setUsers] = useState<LeaderUser[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [expanded, setExpanded] = useState<string | null>(null);
   const [me, setMe] = useState<MeRow | null>(null);
   const [myRank, setMyRank] = useState<number | null>(null);
   // Permission-driven flags (replace former `email_verified` + plan_status
@@ -199,15 +197,13 @@ export default function LeaderboardPage() {
       // Weekly tab is always a 7-day rolling window regardless of `period`
       // (the picker is hidden on Weekly; only Top Verifiers exposes it).
       let periodCutoff: string | null = null;
-      if (activeTab === 'Weekly') {
-        periodCutoff = periodSince('This Week')!.toISOString();
-      } else if (activeTab === 'Top Verifiers' && period !== 'All Time') {
+      if (activeTab === 'Top Verifiers' && period !== 'All time') {
         const cutoff = periodSince(period);
         periodCutoff = cutoff ? cutoff.toISOString() : null;
       }
 
       if (activeTab === 'Rising Stars') {
-        const thirty = periodSince('This Month')!;
+        const thirty = periodSince('This month')!;
         const { data } = await supabase
           .from('users')
           .select(
@@ -318,11 +314,6 @@ export default function LeaderboardPage() {
   // Permission-driven: replaces the former `plan_status === 'active' &&
   // plans.tier in (verity, verity_pro, verity_family, verity_family_xl)`
   // derivation for category drill-down.
-  const topScore = users[0]?.displayScore || 0;
-  const topReads = users[0]?.articles_read_count || 0;
-  const topQuizzes = users[0]?.quizzes_completed_count || 0;
-  const topComments = users[0]?.comment_count || 0;
-  const topStreak = users[0]?.streak_current || 0;
 
   return (
     // Ext-NN1 — main landmark for screen readers.
@@ -412,7 +403,7 @@ export default function LeaderboardPage() {
         {/* Period filter — non-"All Time" windows only show to verified. */}
         {me && activeTab === 'Top Verifiers' && !activeCat && (
           <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>
-            {PERIODS.filter((p) => fullAccess || p === 'All Time').map((p) => (
+            {PERIODS.filter((p) => fullAccess || p === 'All time').map((p) => (
               <button
                 key={p}
                 onClick={() => setPeriod(p)}
@@ -424,6 +415,7 @@ export default function LeaderboardPage() {
                   color: period === p ? 'var(--bg)' : 'var(--dim)',
                   fontSize: 11,
                   fontWeight: 500,
+                  minHeight: 36,
                   cursor: 'pointer',
                   fontFamily: 'var(--font-sans)',
                 }}
@@ -579,13 +571,7 @@ export default function LeaderboardPage() {
                   rank={i + 1}
                   rankColor={rankAccentColor(i + 1)}
                   isPodium
-                  onToggle={() => setExpanded(expanded === u.id ? null : u.id)}
-                  expanded={expanded === u.id}
-                  topScore={topScore}
-                  topReads={topReads}
-                  topQuizzes={topQuizzes}
-                  topComments={topComments}
-                  topStreak={topStreak}
+                  streak={u.streak_current || 0}
                   isLast={i === Math.min(2, users.length - 1) && users.length <= 3}
                 />
               ))}
@@ -696,13 +682,7 @@ export default function LeaderboardPage() {
                   rank={i + 1}
                   rankColor={rankAccentColor(i + 1)}
                   isPodium
-                  onToggle={() => setExpanded(expanded === u.id ? null : u.id)}
-                  expanded={expanded === u.id}
-                  topScore={topScore}
-                  topReads={topReads}
-                  topQuizzes={topQuizzes}
-                  topComments={topComments}
-                  topStreak={topStreak}
+                  streak={u.streak_current || 0}
                 />
               ))}
 
@@ -716,13 +696,7 @@ export default function LeaderboardPage() {
                     user={u}
                     rank={i + 4}
                     rankColor="var(--dim)"
-                    onToggle={() => setExpanded(expanded === u.id ? null : u.id)}
-                    expanded={expanded === u.id}
-                    topScore={topScore}
-                    topReads={topReads}
-                    topQuizzes={topQuizzes}
-                    topComments={topComments}
-                    topStreak={topStreak}
+                    streak={u.streak_current || 0}
                     isLast={i === users.length - 4 - 1}
                     showVerityScore
                   />
@@ -871,26 +845,16 @@ export default function LeaderboardPage() {
 }
 
 // ===============================================================
-// Row primitive — replaces three near-identical inline blocks.
-// `onToggle` flips the expanded drawer; the username sits inside a
-// real <Link> with stopPropagation so a tap on the name navigates to
-// /u/<username> (matches the iOS pattern: tap username = go to profile)
-// while a tap anywhere else on the row still toggles stats.
+// Row primitive. Username is a real <Link> to /u/<username>.
+// T-092 — podium rows (ranks 1-3) get slightly more vertical padding.
 // ===============================================================
 interface LeaderRowProps {
   user: LeaderUser;
   rank: number;
   rankColor: string;
-  onToggle: () => void;
-  expanded: boolean;
-  topScore: number;
-  topReads: number;
-  topQuizzes: number;
-  topComments: number;
-  topStreak: number;
+  streak: number;
   isLast?: boolean;
   showVerityScore?: boolean;
-  // T-092 — slightly taller vertical padding for podium positions (ranks 1-3).
   isPodium?: boolean;
 }
 
@@ -898,126 +862,71 @@ function LeaderRow({
   user: u,
   rank,
   rankColor,
-  onToggle,
-  expanded,
-  topScore,
-  topReads,
-  topQuizzes,
-  topComments,
-  topStreak,
+  streak,
   isLast = false,
   showVerityScore = false,
   isPodium = false,
 }: LeaderRowProps) {
   const profileHref = u.username ? `/u/${u.username}` : null;
   return (
-    <div>
-      <div
-        onClick={onToggle}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            onToggle();
-          }
-        }}
-        aria-expanded={expanded}
+    <div
+      style={{
+        padding: isPodium ? '14px 20px' : '12px 20px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        borderBottom: isLast ? 'none' : '1px solid var(--rule)',
+      }}
+    >
+      <span
         style={{
-          padding: isPodium ? '14px 20px' : '12px 20px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          borderBottom: isLast ? 'none' : '1px solid var(--rule)',
-          cursor: 'pointer',
-          background: expanded ? 'var(--card)' : 'transparent',
+          fontSize: 14,
+          fontWeight: 700,
+          color: rankColor,
+          width: 28,
+          textAlign: 'right',
         }}
       >
-        <span
-          style={{
-            fontSize: 14,
-            fontWeight: 700,
-            color: rankColor,
-            width: 28,
-            textAlign: 'right',
-          }}
-        >
-          {rank}
-        </span>
-        <Avatar user={u} size={40} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              fontSize: 14,
-              fontWeight: 600,
-              color: 'var(--text-primary)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
-          >
-            {profileHref ? (
-              <Link
-                href={profileHref}
-                onClick={(e) => e.stopPropagation()}
-                style={{
-                  color: 'var(--text-primary)',
-                  textDecoration: 'none',
-                  fontWeight: 600,
-                }}
-              >
-                {u.username}
-              </Link>
-            ) : (
-              u.username
-            )}
-            <VerifiedBadge user={u} />
-          </div>
-          {showVerityScore && (
-            <div style={{ fontSize: 11, color: 'var(--dim)' }}>
-              {(u.verity_score || 0).toLocaleString()} verity
-            </div>
-          )}
-        </div>
-        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent)' }}>
-          {(u.displayScore || 0).toLocaleString()}
-        </div>
-      </div>
-      {expanded && (
+        {rank}
+      </span>
+      <Avatar user={u} size={40} />
+      <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
-            padding: '8px 16px 16px 16px',
-            background: 'var(--card)',
-            borderBottom: '1px solid var(--rule)',
+            fontSize: 14,
+            fontWeight: 600,
+            color: 'var(--text-primary)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
           }}
         >
-          <StatRow label="Score" value={u.displayScore || 0} total={topScore} />
-          <StatRow label="Articles Read" value={u.articles_read_count || 0} total={topReads} />
-          <StatRow
-            label="Quizzes Passed"
-            value={u.quizzes_completed_count || 0}
-            total={topQuizzes}
-          />
-          <StatRow label="Comments" value={u.comment_count || 0} total={topComments} />
-          <StatRow label="Streak" value={u.streak_current || 0} total={topStreak} />
-          {profileHref && (
-            <div style={{ marginTop: 10, textAlign: 'right' }}>
-              <Link
-                href={profileHref}
-                onClick={(e) => e.stopPropagation()}
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: 'var(--accent)',
-                  textDecoration: 'none',
-                }}
-              >
-                View profile →
-              </Link>
-            </div>
+          {profileHref ? (
+            <Link
+              href={profileHref}
+              style={{
+                color: 'var(--text-primary)',
+                textDecoration: 'none',
+                fontWeight: 600,
+              }}
+            >
+              {u.username}
+            </Link>
+          ) : (
+            u.username
           )}
+          <VerifiedBadge user={u} />
         </div>
-      )}
+        {showVerityScore && (
+          <div style={{ fontSize: 11, color: 'var(--dim)' }}>
+            {(u.verity_score || 0).toLocaleString()} verity
+          </div>
+        )}
+        {streak > 0 && <div style={{ fontSize: 11, color: 'var(--dim)' }}>{streak} day streak</div>}
+      </div>
+      <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent)' }}>
+        {(u.displayScore || 0).toLocaleString()}
+      </div>
     </div>
   );
 }
