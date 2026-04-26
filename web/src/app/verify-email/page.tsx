@@ -119,7 +119,7 @@ export default function VerifyEmailPage() {
       }
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || 'Failed to resend email. Please try again.');
+        throw new Error(body.error || "Couldn't send the email. Try again in a moment.");
       }
 
       setCooldown(60);
@@ -134,7 +134,9 @@ export default function VerifyEmailPage() {
         });
       }, 1000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to resend email. Please try again.');
+      setError(
+        err instanceof Error ? err.message : "Couldn't send the email. Try again in a moment."
+      );
       setResending(false);
     }
   };
@@ -162,7 +164,9 @@ export default function VerifyEmailPage() {
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         setError(
-          typeof body?.error === 'string' ? body.error : 'Failed to update email. Please try again.'
+          typeof body?.error === 'string'
+            ? body.error
+            : "Couldn't update email. Try again in a moment."
         );
         return;
       }
@@ -170,7 +174,9 @@ export default function VerifyEmailPage() {
       setChangeEmail(false);
       setNewEmail('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update email. Please try again.');
+      setError(
+        err instanceof Error ? err.message : "Couldn't update email. Try again in a moment."
+      );
     } finally {
       setUpdateLoading(false);
     }

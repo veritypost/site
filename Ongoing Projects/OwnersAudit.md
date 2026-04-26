@@ -502,7 +502,7 @@ Items from UI_IMPROVEMENTS.md that no longer apply:
 
 ---
 
-### Auth Task 1 — "Invalid credentials" is cold, accusatory error copy
+### Auth Task 1 — "Invalid credentials" is cold, accusatory error copy ✓ DONE
 
 **File:** `web/src/app/login/page.tsx:220`
 **Source:** UI_IMPROVEMENTS.md, Top 20 #7 [3/4 Critical], Copy audit table
@@ -513,11 +513,11 @@ Items from UI_IMPROVEMENTS.md that no longer apply:
 **Proposed fix:**
 `'That email or password is incorrect. Check the spelling or reset your password.'` One string, one line.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
-### Auth Task 2 — "Please try again" copy in auth error paths
+### Auth Task 2 — "Please try again" copy in auth error paths ✓ DONE
 
 **Files:** `web/src/app/login/page.tsx:251`, `web/src/app/verify-email/page.tsx:120,135`
 **Source:** UI_IMPROVEMENTS.md, Copy audit — global sweep
@@ -531,11 +531,11 @@ Both use "Please" + passive voice. Product standard: no "Please", active voice, 
 Login line 251: `'Network error — check your connection and try again.'`
 Verify-email lines 120 + 135: `'Couldn't send the email. Try again in a moment.'`
 
-**Status:** Pending execution (coordinate with global "Please" sweep)
+**Status:** Done 2026-04-26
 
 ---
 
-### Auth Task 3 — Triple header on every auth card
+### Auth Task 3 — Triple header on every auth card ✓ DONE
 
 **Files:** `web/src/app/login/page.tsx:283–301`, `web/src/app/signup/page.tsx:293–326`, `web/src/app/forgot-password/page.tsx`, `web/src/app/reset-password/page.tsx`
 **Source:** UI_IMPROVEMENTS.md, Auth cluster [3/4], Top 20 #11 [4/4]
@@ -550,11 +550,11 @@ Keep the wordmark. Tighten or drop the subhead per card:
 - Forgot-password: drop the subhead. The form label is the instruction.
 - Reset-password: drop the subhead.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
-### Auth Task 4 — iOS "Forgot password?" button fails 44pt touch target
+### Auth Task 4 — iOS "Forgot password?" button fails 44pt touch target ✓ DONE
 
 **File:** `VerityPost/VerityPost/LoginView.swift:160`
 **Source:** UI_IMPROVEMENTS.md, Top 20 #9 [3/4 Critical], iOS section
@@ -565,11 +565,11 @@ Keep the wordmark. Tighten or drop the subhead per card:
 **Proposed fix:**
 Add `.frame(minWidth: 44, minHeight: 44)` and `.contentShape(Rectangle())` to extend the tap region beyond the text glyph bounds.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
-### Auth Task 5 — iOS login error has no VoiceOver announcement
+### Auth Task 5 — iOS login error has no VoiceOver announcement ✓ DONE
 
 **File:** `VerityPost/VerityPost/LoginView.swift:167–174`
 **Source:** UI_IMPROVEMENTS.md, iOS section [1/4]
@@ -580,7 +580,7 @@ Add `.frame(minWidth: 44, minHeight: 44)` and `.contentShape(Rectangle())` to ex
 **Proposed fix:**
 Trigger a VoiceOver announcement when the error changes: `.onChange(of: auth.authError) { if let msg = $0 { UIAccessibility.post(notification: .announcement, argument: msg) } }`. Same fix applies to `SignupView` — same pattern.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (iOS 17 two-parameter form `{ _, newValue in }`; applied to both `auth.authError` and `localError` in SignupView; `.onChange` attached to NavigationStack level, not the conditionally rendered error Text)
 
 ---
 

@@ -172,21 +172,11 @@ export default function ForgotPasswordPage() {
                 fontSize: '26px',
                 fontWeight: 700,
                 color: C.text,
-                margin: '0 0 6px 0',
+                margin: '0 0 24px 0',
               }}
             >
               Reset your password.
             </h1>
-            <p
-              style={{
-                fontSize: '14px',
-                color: C.dim,
-                margin: '0 0 24px 0',
-                lineHeight: 1.6,
-              }}
-            >
-              Enter your email and we&apos;ll send a link to set a new password.
-            </p>
 
             <form
               onSubmit={handleSubmit}

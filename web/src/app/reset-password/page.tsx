@@ -109,7 +109,7 @@ export default function ResetPasswordPage() {
       setSuccess(true);
     } catch (err) {
       const msg =
-        err instanceof Error ? err.message : 'Failed to update password. Please try again.';
+        err instanceof Error ? err.message : "Couldn't update password. Try again in a moment.";
       setError(msg);
     } finally {
       setLoading(false);
@@ -279,12 +279,9 @@ export default function ResetPasswordPage() {
 
   return cardShell(
     <>
-      <h1 style={{ fontSize: '26px', fontWeight: 700, color: C.text, margin: '0 0 6px 0' }}>
+      <h1 style={{ fontSize: '26px', fontWeight: 700, color: C.text, margin: '0 0 24px 0' }}>
         Set a new password.
       </h1>
-      <p style={{ fontSize: '14px', color: C.dim, margin: '0 0 24px 0' }}>
-        Pick something strong — you won&apos;t need the old one anymore.
-      </p>
 
       {error && (
         <div

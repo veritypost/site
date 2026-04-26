@@ -136,13 +136,17 @@ function LoginPageInner() {
           return;
         }
         if (!res.ok) {
-          setError('Invalid credentials');
+          setError(
+            'That email or password is incorrect. Check the spelling or reset your password.'
+          );
           setLoading(false);
           return;
         }
         const body = (await res.json().catch(() => ({}))) as { email?: string };
         if (!body?.email) {
-          setError('Invalid credentials');
+          setError(
+            'That email or password is incorrect. Check the spelling or reset your password.'
+          );
           setLoading(false);
           return;
         }
@@ -217,7 +221,7 @@ function LoginPageInner() {
             body: JSON.stringify({ email, password }),
           });
         } catch {}
-        setError('Invalid credentials');
+        setError('That email or password is incorrect. Check the spelling or reset your password.');
         setLoading(false);
         return;
       }
@@ -248,7 +252,7 @@ function LoginPageInner() {
       }
       window.location.href = nextUrl;
     } catch {
-      setError('Network error. Please try again.');
+      setError('Network error — check your connection and try again.');
       setLoading(false);
     }
   };
@@ -293,12 +297,9 @@ function LoginPageInner() {
           </div>
         </a>
 
-        <h1 style={{ fontSize: '26px', fontWeight: 700, color: C.text, margin: '0 0 6px 0' }}>
+        <h1 style={{ fontSize: '26px', fontWeight: 700, color: C.text, margin: '0 0 24px 0' }}>
           Welcome back.
         </h1>
-        <p style={{ fontSize: '14px', color: C.dim, margin: '0 0 24px 0' }}>
-          Sign in to your account to keep reading.
-        </p>
 
         {notice && (
           <div

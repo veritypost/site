@@ -160,6 +160,8 @@ struct LoginView: View {
                         Button("Forgot password?") { showForgot = true }
                             .font(.footnote)
                             .foregroundColor(VP.accent)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .padding(.bottom, 22)
 
@@ -216,6 +218,11 @@ struct LoginView: View {
             }
         }
         .preferredColorScheme(.light)
+        .onChange(of: auth.authError) { _, newValue in
+            if let msg = newValue {
+                UIAccessibility.post(notification: .announcement, argument: msg)
+            }
+        }
     }
 
     private var canSubmit: Bool {

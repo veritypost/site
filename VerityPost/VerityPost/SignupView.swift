@@ -199,6 +199,16 @@ struct SignupView: View {
             }
         }
         .preferredColorScheme(.light)
+        .onChange(of: auth.authError) { _, newValue in
+            if let msg = newValue {
+                UIAccessibility.post(notification: .announcement, argument: msg)
+            }
+        }
+        .onChange(of: localError) { _, newValue in
+            if let msg = newValue {
+                UIAccessibility.post(notification: .announcement, argument: msg)
+            }
+        }
     }
 
     @ViewBuilder
