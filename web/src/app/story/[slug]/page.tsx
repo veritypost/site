@@ -353,6 +353,11 @@ export default function StoryPage() {
   // the start, so this stays false and the thread renders instantly.
   const [justRevealedThisSession, setJustRevealedThisSession] = useState<boolean>(false);
   const [quizPoolSize, setQuizPoolSize] = useState<number>(0);
+  // T-066: anon free-read pill. Count bumped on each article open (localStorage);
+  // limit from settings.free_article_limit (DB-driven, fallback 5). Both stay 0/5
+  // for authed users — the pill only renders for anon.
+  const [anonViewCount, setAnonViewCount] = useState<number>(0);
+  const [freeReadLimit, setFreeReadLimit] = useState<number>(5);
 
   const [activeTab, setActiveTab] = useState<'Article' | 'Timeline' | 'Discussion'>('Article');
   const [isDesktop, setIsDesktop] = useState<boolean>(true);
@@ -487,9 +492,14 @@ export default function StoryPage() {
           // The registration wall (harder block) kicks in at the configured
           // free_article_limit.
           const views = bumpArticleViewCount();
+          // T-066: read the limit once here; reuse for both the pill and the
+          // regwall check so they reflect the same DB-driven threshold.
+          const freeLimit = getNumber(allSettings, 'free_article_limit', 5);
+          setAnonViewCount(views);
+          setFreeReadLimit(freeLimit);
           if (views >= 2 && !LAUNCH_HIDE_ANON_INTERSTITIAL) setShowAnonInterstitial(true);
           if (isEnabled(allSettings, 'registration_wall', false)) {
-            const limit = getNumber(allSettings, 'free_article_limit', 5);
+            const limit = freeLimit;
             // R13-C5 Fix 5 — honor per-session dismissal so a user who
             // clicked Close once isn't re-blocked on every subsequent
             // article load in the same browser tab.
@@ -653,6 +663,22 @@ export default function StoryPage() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [story?.id, quizPoolSize, trackEvent]);
+
+  // T-064: ref for the quiz + discussion wrapper so we can scroll to it on
+  // desktop after a quiz pass. On mobile the tab bar is kill-switched, so we
+  // reveal discussion by switching activeTab instead of scrolling.
+  const discussionRef = useRef<HTMLDivElement | null>(null);
+
+  // T-064: react to quiz pass. justRevealedThisSession only goes false→true once
+  // per session, so this effect fires at most once per page load.
+  useEffect(() => {
+    if (!justRevealedThisSession) return;
+    if (isDesktop) {
+      discussionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      setActiveTab('Discussion');
+    }
+  }, [justRevealedThisSession, isDesktop]);
 
   // Mark reading complete only after a genuine engagement signal:
   // 30s dwell OR scroll >=80% of the viewport height past the start.
@@ -1221,6 +1247,30 @@ export default function StoryPage() {
             {/* Article body — on desktop always; on mobile only when Article tab is active */}
             {showArticleBody && (
               <div className="tab-article">
+                {/* T-066: anon free-read pill. Proactive signal so the paywall
+                    does not arrive cold. Renders once the anon path has run
+                    (anonViewCount > 0). Count is capped at freeReadLimit so
+                    it never reads "6 of 5". NOT gated by LAUNCH_HIDE_ANON_INTERSTITIAL
+                    — the interstitial and the pill are independent features. */}
+                {!currentUser && anonViewCount > 0 && (
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      marginBottom: 12,
+                      padding: '4px 10px',
+                      borderRadius: 20,
+                      background: 'var(--card)',
+                      border: '1px solid var(--border)',
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: 'var(--dim)',
+                      fontFamily: 'var(--font-sans)',
+                    }}
+                  >
+                    {Math.min(anonViewCount, freeReadLimit)} of {freeReadLimit} free reads
+                  </div>
+                )}
                 {/* Sources-above-headline trust signal: visible only when the
                   article cites 2+ outlets. Ordering relies on the sources
                   query ORDER BY sort_order so truncation is deterministic.
@@ -1603,7 +1653,7 @@ export default function StoryPage() {
             from the launch-hide era was removed in the 2026-04-23 quiz
             gate ship — top nav + the home page already cover navigation. */}
         {(isDesktop || showMobileDiscussion) && (
-          <div style={{ marginTop: isDesktop ? 48 : 0 }}>
+          <div ref={discussionRef} style={{ marginTop: isDesktop ? 48 : 0 }}>
             {quizNode}
             {discussionSection}
           </div>
