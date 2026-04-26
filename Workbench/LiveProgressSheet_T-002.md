@@ -44,7 +44,21 @@ Format: Agent name | File:line | Expected | Actual | Impact
 [filled only if vote is split]
 
 ## Implementation Progress
-[filled by background agents during execution]
+- Migration file written: schema/178_fix_cleanup_rate_limit_events_col.sql
+- MCP apply_migration returned read-only error (project in read-only mode)
+- Migration must be applied manually via Supabase dashboard SQL editor
+- Current Tasks.md: item 2 removed, items 3-146 renumbered to 2-145 (145 total)
+- Committed: 5760819
 
 ## Completed
-[SHIPPED block written here when done]
+SHIPPED 2026-04-26
+Commit: 5760819
+Files: schema/178_fix_cleanup_rate_limit_events_col.sql, Ongoing Projects/Current/Current Tasks.md, Workbench/LiveProgressSheet_T-002.md
+
+MANUAL STEP REQUIRED: Apply schema/178_fix_cleanup_rate_limit_events_col.sql via Supabase dashboard SQL editor (MCP is in read-only mode for this project). The migration is a single CREATE OR REPLACE FUNCTION — safe to apply at any time.
+
+Post-apply verification:
+  SELECT pg_get_functiondef(oid) FROM pg_proc WHERE proname = 'cleanup_rate_limit_events';
+  -- confirm body contains "created_at" not "occurred_at"
+  SELECT public.cleanup_rate_limit_events(7);
+  -- returns count of rows deleted (expect >0 given 8,574 accumulated rows)
