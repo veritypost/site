@@ -15,7 +15,7 @@
 // <LockModal> listens for (see PermissionsProvider below).
 // ============================================================
 
-import { hasPermissionServer } from './permissions';
+import { hasPermissionViaRpc } from './permissions';
 
 const EVENT_NAME = 'vp.rls_locked';
 
@@ -59,7 +59,7 @@ export async function withLockOnRls(callFn, { permission, section, scope } = {})
     // Ask the server for the real reason to populate the modal.
     let lock_reason = 'not_granted';
     if (permission) {
-      const granted = await hasPermissionServer(permission);
+      const granted = await hasPermissionViaRpc(permission);
       if (!granted) lock_reason = 'not_granted';
     }
     dispatchLocked({ permission, section, scope, error: res.error, lock_reason });

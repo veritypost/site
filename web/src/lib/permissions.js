@@ -204,7 +204,7 @@ export function getCapability(key) {
 
 // Single-permission server-side check (for RLS-mirroring UI logic
 // where you don't have the section cached).
-export async function hasPermissionServer(key) {
+export async function hasPermissionViaRpc(key) {
   const supabase = createClient();
   const args = { p_key: key };
   const { data, error } = await supabase.rpc('has_permission', args);
