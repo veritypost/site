@@ -294,7 +294,7 @@ struct StoryDetailView: View {
             Button("See paid plans") { showSubscription = true }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("Free accounts can save up to 10 bookmarks. Unlimited bookmarks and collections are available on paid plans.")
+            Text("You\u{2019}ve hit the bookmark limit for free accounts. Upgrade to save unlimited bookmarks.")
         }
         .sheet(isPresented: $showSubscription) { SubscriptionView().environmentObject(auth) }
         .sheet(isPresented: $showPushPrompt) {

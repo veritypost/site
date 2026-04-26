@@ -110,6 +110,7 @@ struct KidReaderView: View {
                     Image(systemName: "newspaper.fill")
                         .font(.system(.largeTitle, weight: .bold))
                         .foregroundStyle(categoryColor)
+                        .accessibilityHidden(true)
                 )
 
             Text(article.title ?? "Untitled")
@@ -121,6 +122,7 @@ struct KidReaderView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "clock")
                         .font(.system(.caption, weight: .bold))
+                        .accessibilityHidden(true)
                     Text("\(mins) min read")
                         .font(.system(.caption, design: .rounded, weight: .semibold))
                 }
@@ -159,6 +161,7 @@ struct KidReaderView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "questionmark.circle.fill")
                         .font(.system(.body, weight: .bold))
+                        .accessibilityHidden(true)
                     Text("Take the quiz")
                         .font(.system(.body, design: .rounded, weight: .bold))
                 }

@@ -180,7 +180,7 @@ Items from UI_IMPROVEMENTS.md that no longer apply:
 
 ---
 
-### Story Task 1 — Loading state is text, not skeleton
+### Story Task 1 — Loading state is text, not skeleton ✓ DONE
 
 **Files:** `web/src/app/story/[slug]/page.tsx:line ~early return`, `VerityPost/VerityPost/StoryDetailView.swift`
 **Source:** UI_IMPROVEMENTS.md, Reading section [1/4]
@@ -191,11 +191,11 @@ Web loading state is `<div role="status" aria-live="polite">Loading article…</
 **Proposed fix:**
 Web: replace the text loading div with a skeleton — one large block (36px serif headline shape) + a deck line + byline line + 4–5 body paragraph bars. Reuse the same `Skeleton` component proposed for the home page (Home Task 1). iOS: replace the spinner with a `VStack` of `RoundedRectangle` shimmer views matching headline + body shape.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (web only — iOS ProgressView is system-native and acceptable per audit scope)
 
 ---
 
-### Story Task 2 — 404 is a dead end
+### Story Task 2 — 404 is a dead end ✓ DONE
 
 **File:** `web/src/app/story/[slug]/page.tsx`
 **Source:** UI_IMPROVEMENTS.md, Reading section [2/4]
@@ -206,11 +206,11 @@ When an article is not found, the page renders `"Article not found."` with no he
 **Proposed fix:**
 Replace with a proper 404 state: headline "Article not found", one line of context ("This story may have been removed or the link may be broken."), and two CTAs — "Go to home" (`/`) and "Browse stories" (`/browse`). Match the visual weight of the article layout so it doesn't feel like a crash.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
-### Story Task 3 — Report button fails touch target
+### Story Task 3 — Report button fails touch target ✓ DONE
 
 **File:** `web/src/app/story/[slug]/page.tsx:line ~1640` (report button inside comments section)
 **Source:** UI_IMPROVEMENTS.md, Top 20 #8 [4/4 Critical]
@@ -221,11 +221,11 @@ The report button on comments is `fontSize: 11` with no `minHeight` and no meani
 **Proposed fix:**
 Add `minHeight: 36, paddingTop: 6, paddingBottom: 6` to the report button. 36px is acceptable for an inline secondary action. Matches the approach taken for period pills (Leaderboard Task 3).
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
-### Story Task 4 — Report categories are Title Case
+### Story Task 4 — Report categories are Title Case ✓ DONE
 
 **File:** `web/src/app/story/[slug]/page.tsx:83–89`
 **Source:** UI_IMPROVEMENTS.md, Browse section [3/4]
@@ -236,11 +236,11 @@ Add `minHeight: 36, paddingTop: 6, paddingBottom: 6` to the report button. 36px 
 **Proposed fix:**
 Change to: `'Hate speech'`, `'Misinformation'`, `'Off topic'`, `'Spam'`, `'Other'`. One object literal, five values.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 ('Hate speech', 'Off topic' fixed; others were already sentence case; current code has 6 categories — Impersonation also already correct)
 
 ---
 
-### Story Task 5 — Regwall missing backdrop-click dismiss
+### Story Task 5 — Regwall missing backdrop-click dismiss ✓ DONE
 
 **File:** `web/src/app/story/[slug]/page.tsx` (regwall/LockModal component)
 **Source:** UI_IMPROVEMENTS.md, Reading section [3/4]
@@ -251,7 +251,7 @@ The regwall modal closes on Escape and has an explicit close button with `aria-l
 **Proposed fix:**
 Add an `onClick` handler to the backdrop overlay div that calls the same close function as the Escape key handler. The focus trap stays intact — clicking outside just triggers dismiss, same as Escape. One line.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (added `onClick={dismissRegWall}` to backdrop; `onClick={(e) => e.stopPropagation()}` to inner dialog div to prevent bubbling)
 
 ---
 
@@ -269,7 +269,7 @@ Two places in the story page link to `/profile/settings#billing`: the paywall up
 
 ---
 
-### Story Task 7 — Bookmark success is silent
+### Story Task 7 — Bookmark success is silent ✓ DONE
 
 **File:** `web/src/app/story/[slug]/page.tsx:~770–810`
 **Source:** UI_IMPROVEMENTS.md, Reading section [4/4]
@@ -280,11 +280,11 @@ When a user saves or removes a bookmark, the icon state updates but there is no 
 **Proposed fix:**
 On successful bookmark add: show toast "Saved to bookmarks". On successful bookmark remove: show toast "Removed from bookmarks". Both use the existing toast infrastructure. Failures already have copy (covered in Task 8).
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
-### Story Task 8 — Bookmark error copy uses "Please" and passive voice
+### Story Task 8 — Bookmark error copy uses "Please" and passive voice ✓ DONE
 
 **File:** `web/src/app/story/[slug]/page.tsx:783,805`
 **Source:** UI_IMPROVEMENTS.md, Top 20 #15 [2/4]
@@ -298,11 +298,11 @@ Product voice standard: no "Please", no passive constructions. These are the onl
 Line 783: `'Bookmark not removed — try again.'`
 Line 805: `'Bookmark not saved — try again.'`
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
-### Story Task 9 — No quiz teaser for anon readers
+### Story Task 9 — No quiz teaser for anon readers ✓ DONE
 
 **File:** `web/src/app/story/[slug]/page.tsx`
 **Source:** UI_IMPROVEMENTS.md, Reading section [2/4] + direct code review
@@ -315,11 +315,11 @@ Anon readers see the full article, then hit the regwall when they reach comments
 **Proposed fix:**
 Render a small inline callout above the article body for anon users and logged-in users who haven't passed the quiz. Copy: "Pass the quiz at the end to unlock comments." One conditional, one line of UI. No paywall, no lock icon — just context.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (renders when `quizPoolSize >= 10 && !userPassedQuiz`; gated on quiz availability so articles with no quiz don't show it)
 
 ---
 
-### Story Task 10 — iOS bookmark alert hardcodes "10" and uses generic copy
+### Story Task 10 — iOS bookmark alert hardcodes "10" and uses generic copy ✓ DONE
 
 **File:** `VerityPost/VerityPost/StoryDetailView.swift:270`
 **Source:** Direct code review
@@ -330,11 +330,11 @@ Line 270: `"Free accounts can save up to 10 bookmarks."` — hardcodes the limit
 **Proposed fix:**
 Either drive the number from the API response (the bookmark endpoint already knows the cap from DB) or make the copy limit-agnostic: "You've hit the bookmark limit for free accounts." Then append the action: "Upgrade to save unlimited bookmarks." Two sentences, no hardcoded number, clear path forward.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (limit-agnostic copy: "You've hit the bookmark limit for free accounts. Upgrade to save unlimited bookmarks.")
 
 ---
 
-### Story Task 11 — Kids iOS decorative icons missing accessibilityHidden
+### Story Task 11 — Kids iOS decorative icons missing accessibilityHidden ✓ DONE
 
 **File:** `VerityPostKids/VerityPostKids/KidReaderView.swift`
 **Source:** UI_IMPROVEMENTS.md, iOS section [2/4]
@@ -345,11 +345,11 @@ Either drive the number from the API response (the bookmark endpoint already kno
 **Proposed fix:**
 Add `.accessibilityHidden(true)` to both `Image` calls. One modifier each, zero behavior change for sighted users.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
-### Story Task 12 — Silent pool-size gate: articles under 10 questions show locked discussion with no quiz
+### Story Task 12 — Silent pool-size gate: articles under 10 questions show locked discussion with no quiz ✓ DONE
 
 **File:** `web/src/app/story/[slug]/page.tsx:912`
 **Source:** Panel review — Trust Auditor, Seam Inspector
@@ -360,11 +360,11 @@ Add `.accessibilityHidden(true)` to both `Image` calls. One modifier each, zero 
 **Proposed fix:**
 When `quizPoolSize < 10`, suppress the discussion lock panel entirely — don't show a locked discussion for an unquizzable article. Alternatively, render a placeholder in the quiz block position: "The quiz for this article isn't ready yet — check back later." Either the quiz and discussion both appear or neither does.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (added `quizPoolSize < 10 ? null` branch to discussionSection ternary — suppresses lock panel when no quiz exists)
 
 ---
 
-### Story Task 13 — Web quiz pass has no ceremony; iOS and kids both mark the moment
+### Story Task 13 — Web quiz pass has no ceremony; iOS and kids both mark the moment ✓ DONE
 
 **Files:** `web/src/app/story/[slug]/page.tsx:920–922`, `VerityPost/VerityPost/StoryDetailView.swift:248–251`
 **Source:** Panel review — Trust Auditor
@@ -375,7 +375,7 @@ On pass, `setUserPassedQuiz(true)` triggers a mechanical scroll into the discuss
 **Proposed fix:**
 On pass, briefly show an affirmative state inside the quiz result card before the auto-scroll. One line — "You're in." — for 1.5 seconds, then scroll. A `setTimeout` + state flag achieves it with no animation library. This is the minimum change that creates an earned-access moment.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (added `justPassedCeremony` state; onPass shows "You're in." for 1500ms before triggering scroll via `setJustRevealedThisSession(true)`)
 
 ---
 
@@ -394,7 +394,7 @@ Remove the attempt count from the idle card. After a failed attempt, show "1 att
 
 ---
 
-### Story Task 15 — Web discussion lock copy uses obstacle framing; iOS uses earned-access framing
+### Story Task 15 — Web discussion lock copy uses obstacle framing; iOS uses earned-access framing ✓ DONE
 
 **Files:** `web/src/app/story/[slug]/page.tsx:1028–1034`, `VerityPost/VerityPost/StoryDetailView.swift:887`
 **Source:** Panel review — Trust Auditor
@@ -412,11 +412,11 @@ Replace web lines 1028–1034:
 
 Match iOS copy exactly.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
-### Story Task 16 — Anon quiz CTA leads with signup, buries the quiz concept
+### Story Task 16 — Anon quiz CTA leads with signup, buries the quiz concept ✓ DONE
 
 **File:** `web/src/app/story/[slug]/page.tsx:937–973`
 **Source:** Panel review — Trust Auditor
@@ -432,11 +432,11 @@ Invert the hierarchy — lead with the mechanic, then the call to act:
 
 The sign-up button stays; the framing flips to put the differentiator first.
 
-**Status:** Pending execution (coordinate with Story Task 9)
+**Status:** Done 2026-04-26 (CTA button also renamed from "Sign up" to "Create free account")
 
 ---
 
-### Story Task 17 — Regwall drops the article URL when redirecting to signup
+### Story Task 17 — Regwall drops the article URL when redirecting to signup ✓ DONE
 
 **File:** `web/src/app/story/[slug]/page.tsx:1186–1201`
 **Source:** Panel review — Seam Inspector
@@ -450,7 +450,7 @@ href={`/signup?next=${encodeURIComponent(window.location.pathname)}`}
 ```
 One parameter. Mirror the pattern already used by the quiz CTA at line 926.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (used `story.slug` directly — cleaner and avoids window.location dependency)
 
 ---
 

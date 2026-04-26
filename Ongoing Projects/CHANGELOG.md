@@ -43,6 +43,87 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-26 (story)
+
+### Story — OwnersAudit Tasks 1–5, 7–13, 15–17
+
+**Loading skeleton**
+- **What** — Replaced plain `'Loading…'` spinner with a skeleton layout: title bar (32px / 80% width), subtitle bar (18px / 55%), and 5 body bars (14px, varying widths). Bars use `var(--rule)` background + `vp-pulse` keyframe animation. Wrapper matches the loaded-state `maxWidth: 720` and padding so there's no layout jump.
+- **Files** — `web/src/app/story/[slug]/page.tsx`
+- **Why** — OwnersAudit Story Task 1.
+
+**404 panel**
+- **What** — Replaced raw `'Story not found'` text with a centered panel: "Article not found" h1, context copy, and two CTAs ("Go to home" + "Browse stories").
+- **Files** — `web/src/app/story/[slug]/page.tsx`
+- **Why** — OwnersAudit Story Task 2.
+
+**Quiz teaser before article body**
+- **What** — Added a one-line teaser `"Pass the quiz at the end to unlock comments."` above the article body when `quizPoolSize >= 10 && !userPassedQuiz`. Uses `fontSize: 12, color: 'var(--dim)'`. Hidden after the user has passed.
+- **Files** — `web/src/app/story/[slug]/page.tsx`
+- **Why** — OwnersAudit Story Task 3.
+
+**Quiz pass ceremony**
+- **What** — Added `justPassedCeremony` state. `onPass` sets it true; after 1500 ms it clears the flag and triggers `setJustRevealedThisSession(true)` (auto-scroll). While `justPassedCeremony` is true, renders `"You're in."` centered above the newly revealed comment thread.
+- **Files** — `web/src/app/story/[slug]/page.tsx`
+- **Why** — OwnersAudit Story Task 4.
+
+**Pool-size gate on discussion section**
+- **What** — Added `quizPoolSize < 10 ? null` branch at the top of the `discussionSection` ternary (before the `userPassedQuiz` branch) so articles with fewer than 10 quiz questions show no discussion panel at all.
+- **Files** — `web/src/app/story/[slug]/page.tsx`
+- **Why** — OwnersAudit Story Task 5.
+
+**Discussion lock copy**
+- **What** — `"Discussion is locked until you pass the quiz above."` → `"Pass the quiz to join the discussion."`. Rubric copy: `"You need 3 out of 5 correct…"` → `"5 questions about what you just read. Get 3 right and the conversation opens."`.
+- **Files** — `web/src/app/story/[slug]/page.tsx`
+- **Why** — OwnersAudit Story Task 7.
+
+**Anon quiz CTA**
+- **What** — Replaced placeholder anon-quiz block with: header `"Every article has a comprehension quiz."`, body `"Pass it and the discussion opens — your comment shows you actually read the story."`, CTA `"Create free account"`.
+- **Files** — `web/src/app/story/[slug]/page.tsx`
+- **Why** — OwnersAudit Story Task 8.
+
+**Bookmark toast feedback**
+- **What** — Added `show('Saved to bookmarks')` / `show('Removed from bookmarks')` calls on successful `toggleBookmark`. Error copy updated: `"Bookmark not removed — try again."` / `"Bookmark not saved — try again."`.
+- **Files** — `web/src/app/story/[slug]/page.tsx`
+- **Why** — OwnersAudit Story Task 9.
+
+**Regwall backdrop dismiss**
+- **What** — Added `onClick={dismissRegWall}` to the backdrop div; added `onClick={(e) => e.stopPropagation()}` to the inner dialog so clicks inside don't bubble to the backdrop.
+- **Files** — `web/src/app/story/[slug]/page.tsx`
+- **Why** — OwnersAudit Story Task 10.
+
+**Regwall signup `?next=` param**
+- **What** — Changed signup href from `/signup` to `/signup?next=${encodeURIComponent('/story/' + story.slug)}` so the user lands back on the article after account creation.
+- **Files** — `web/src/app/story/[slug]/page.tsx`
+- **Why** — OwnersAudit Story Task 11.
+
+**Report button touch target**
+- **What** — Added `minHeight: 36, paddingTop: 6, paddingBottom: 6` to the inline report button style.
+- **Files** — `web/src/app/story/[slug]/page.tsx`
+- **Why** — OwnersAudit Story Task 12.
+
+**Report category sentence case**
+- **What** — `'Hate Speech'` → `'Hate speech'`; `'Off Topic'` → `'Off topic'` in `REPORT_CATEGORIES`.
+- **Files** — `web/src/app/story/[slug]/page.tsx`
+- **Why** — OwnersAudit Story Task 13.
+
+**iOS bookmark limit copy**
+- **What** — `"Free accounts can save up to 10 bookmarks. Unlimited bookmarks and collections are available on paid plans."` → `"You've hit the bookmark limit for free accounts. Upgrade to save unlimited bookmarks."` in `StoryDetailView`.
+- **Files** — `VerityPost/VerityPost/StoryDetailView.swift`
+- **Why** — OwnersAudit Story Task 15.
+
+**Kids article header accessibility**
+- **What** — Added `.accessibilityHidden(true)` to `Image(systemName: "newspaper.fill")` in the article header and `Image(systemName: "clock")` in the reading-time row so VoiceOver skips purely decorative icons.
+- **Files** — `VerityPostKids/VerityPostKids/KidReaderView.swift`
+- **Why** — OwnersAudit Story Task 16.
+
+**Kids "Take the quiz" button accessibility**
+- **What** — Added `.accessibilityHidden(true)` to `Image(systemName: "questionmark.circle.fill")` inside the `takeQuizButton` label so VoiceOver reads only the button text, not the redundant icon name.
+- **Files** — `VerityPostKids/VerityPostKids/KidReaderView.swift`
+- **Why** — OwnersAudit Story Task 17.
+
+---
+
 ## 2026-04-26
 
 ### Leaderboard — OwnersAudit Tasks 1, 2, 3, 4

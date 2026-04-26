@@ -16,6 +16,7 @@ import { JsonLd, newsArticle } from '../../../components/JsonLd';
 import { bumpArticleViewCount } from '../../../lib/session';
 import { useFocusTrap } from '../../../lib/useFocusTrap';
 import { useTrack } from '@/lib/useTrack';
+import { useToast } from '../../../components/Toast';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import { getPlanLimitValue } from '@/lib/plans';
 import type { Tables } from '@/types/database-helpers';
@@ -84,8 +85,8 @@ const REPORT_CATEGORIES: ReportCategory[] = [
   { value: 'harassment', label: 'Harassment' },
   { value: 'misinformation', label: 'Misinformation' },
   { value: 'spam', label: 'Spam' },
-  { value: 'hate_speech', label: 'Hate Speech' },
-  { value: 'off_topic', label: 'Off Topic' },
+  { value: 'hate_speech', label: 'Hate speech' },
+  { value: 'off_topic', label: 'Off topic' },
   { value: 'impersonation', label: 'Impersonation' },
 ];
 
@@ -306,6 +307,7 @@ export default function StoryPage() {
   // one instance for the component's lifetime.
   const supabase = useMemo(() => createClient(), []);
   const trackEvent = useTrack();
+  const { show } = useToast();
 
   const [story, setStory] = useState<ArticleRow | null>(null);
   const [timeline, setTimeline] = useState<TimelineRow[]>([]);
@@ -353,6 +355,7 @@ export default function StoryPage() {
   // who already passed previously enters with userPassedQuiz=true from
   // the start, so this stays false and the thread renders instantly.
   const [justRevealedThisSession, setJustRevealedThisSession] = useState<boolean>(false);
+  const [justPassedCeremony, setJustPassedCeremony] = useState<boolean>(false);
   const [quizPoolSize, setQuizPoolSize] = useState<number>(0);
   // T-066: anon free-read pill. Count bumped on each article open (localStorage);
   // limit from settings.free_article_limit (DB-driven, fallback 5). Both stay 0/5
@@ -806,8 +809,9 @@ export default function StoryPage() {
       if (res.ok) {
         setBookmarked(false);
         setBookmarkId(null);
+        show('Removed from bookmarks');
       } else {
-        setBookmarkError('Could not remove bookmark. Please try again.');
+        setBookmarkError('Bookmark not removed — try again.');
       }
     } else {
       // Route enforces D13 cap via the bookmark_cap trigger.
@@ -820,6 +824,7 @@ export default function StoryPage() {
       if (res.ok && data?.id) {
         setBookmarked(true);
         setBookmarkId(data.id);
+        show('Saved to bookmarks');
       } else if (res.status === 422 && data?.error) {
         // 422 = trigger-raised cap message (`enforce_bookmark_cap` →
         // P0001 → safeErrorResponse passthrough). Carries actual copy
@@ -828,7 +833,7 @@ export default function StoryPage() {
         // upgrade, not just that "something failed".
         setBookmarkError(data.error);
       } else {
-        setBookmarkError('Could not save bookmark. Please try again.');
+        setBookmarkError('Bookmark not saved — try again.');
       }
     }
   };
@@ -868,20 +873,52 @@ export default function StoryPage() {
 
   if (loading) {
     return (
-      <div
-        className="vp-dark"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          minHeight: '60vh',
-        }}
-      >
-        {/* Aria-live so screen readers hear the load state, plus a
-            slightly longer message so the user has visible signal that
-            something IS happening (vs a blank page). */}
-        <div role="status" aria-live="polite" style={{ fontSize: 15, color: 'var(--dim)' }}>
-          Loading article…
+      <div className="vp-dark" style={{ maxWidth: 720, margin: '0 auto', padding: '40px 16px' }}>
+        <style>{`
+          @keyframes vp-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+          }
+        `}</style>
+        <div
+          role="status"
+          aria-live="polite"
+          style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+        >
+          <div
+            style={{
+              height: 32,
+              borderRadius: 6,
+              background: 'var(--rule)',
+              width: '80%',
+              animation: 'vp-pulse 1.4s ease-in-out infinite',
+            }}
+          />
+          <div
+            style={{
+              height: 18,
+              borderRadius: 4,
+              background: 'var(--rule)',
+              width: '55%',
+              animation: 'vp-pulse 1.4s ease-in-out infinite',
+              animationDelay: '0.1s',
+            }}
+          />
+          <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <div
+                key={n}
+                style={{
+                  height: 14,
+                  borderRadius: 4,
+                  background: 'var(--rule)',
+                  width: n === 5 ? '65%' : '100%',
+                  animation: 'vp-pulse 1.4s ease-in-out infinite',
+                  animationDelay: `${n * 0.07}s`,
+                }}
+              />
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -890,9 +927,55 @@ export default function StoryPage() {
     return (
       <div
         className="vp-dark"
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '60vh',
+          padding: '40px 16px',
+        }}
       >
-        <div style={{ fontSize: 15, color: 'var(--dim)' }}>Article not found.</div>
+        <div style={{ maxWidth: 480, textAlign: 'center' }}>
+          <div
+            style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}
+          >
+            Article not found
+          </div>
+          <div style={{ fontSize: 14, color: 'var(--dim)', lineHeight: 1.5, marginBottom: 24 }}>
+            This story may have been removed or the link may be broken.
+          </div>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <a
+              href="/"
+              style={{
+                padding: '10px 18px',
+                borderRadius: 10,
+                background: 'var(--accent)',
+                color: '#fff',
+                fontSize: 13,
+                fontWeight: 600,
+                textDecoration: 'none',
+              }}
+            >
+              Go to home
+            </a>
+            <a
+              href="/browse"
+              style={{
+                padding: '10px 18px',
+                borderRadius: 10,
+                border: '1px solid var(--border)',
+                background: 'transparent',
+                color: 'var(--text-primary)',
+                fontSize: 13,
+                fontWeight: 600,
+                textDecoration: 'none',
+              }}
+            >
+              Browse stories
+            </a>
+          </div>
+        </div>
       </div>
     );
   }
@@ -918,7 +1001,11 @@ export default function StoryPage() {
           userTier={userTier}
           onPass={() => {
             setUserPassedQuiz(true);
-            setJustRevealedThisSession(true);
+            setJustPassedCeremony(true);
+            setTimeout(() => {
+              setJustPassedCeremony(false);
+              setJustRevealedThisSession(true);
+            }, 1500);
           }}
         />
       );
@@ -937,11 +1024,10 @@ export default function StoryPage() {
           <div
             style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}
           >
-            Take the quiz to join the discussion
+            Every article has a comprehension quiz.
           </div>
           <div style={{ fontSize: 13, color: 'var(--dim)', lineHeight: 1.5, marginBottom: 14 }}>
-            Comments on every article are gated by a short comprehension quiz. Sign up to take this
-            one and unlock the conversation.
+            Pass it and the discussion opens — your comment shows you actually read the story.
           </div>
           <a
             href={signupHref}
@@ -956,7 +1042,7 @@ export default function StoryPage() {
               textDecoration: 'none',
             }}
           >
-            Sign up
+            Create free account
           </a>
           <div style={{ marginTop: 10 }}>
             <a
@@ -1020,16 +1106,16 @@ export default function StoryPage() {
       currentUserTier={userTier}
       justRevealed={justRevealedThisSession}
     />
-  ) : currentUser && currentUser.email_confirmed_at ? (
+  ) : quizPoolSize < 10 ? null : currentUser && currentUser.email_confirmed_at ? (
     // Pass 17 / UJ-1102: verified users who haven't passed the quiz see
     // an informational panel instead of silence. D6 still holds — actual
     // comment content stays hidden; only the gating copy is shown.
     <div style={lockPanelStyle}>
       <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
-        Discussion is locked until you pass the quiz above.
+        Pass the quiz to join the discussion.
       </div>
       <div style={{ fontSize: 13, color: 'var(--dim)', lineHeight: 1.5 }}>
-        You need 3 out of 5 correct to join the comment thread for this article.
+        5 questions about what you just read. Get 3 right and the conversation opens.
       </div>
     </div>
   ) : (
@@ -1121,6 +1207,7 @@ export default function StoryPage() {
       {/* Registration wall */}
       {showRegWall && !regWallDismissed && (
         <div
+          onClick={dismissRegWall}
           style={{
             position: 'fixed',
             inset: 0,
@@ -1137,6 +1224,7 @@ export default function StoryPage() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="regwall-title"
+            onClick={(e) => e.stopPropagation()}
             style={{
               background: 'var(--card)',
               border: '1px solid var(--border)',
@@ -1183,7 +1271,7 @@ export default function StoryPage() {
               Free, and takes 30 seconds.
             </div>
             <a
-              href="/signup"
+              href={`/signup?next=${encodeURIComponent('/story/' + story.slug)}`}
               style={{
                 display: 'inline-block',
                 padding: '12px 32px',
@@ -1479,6 +1567,14 @@ export default function StoryPage() {
                     </div>
                   )}
 
+                {quizPoolSize >= 10 && !userPassedQuiz && (
+                  <div
+                    style={{ fontSize: 12, color: 'var(--dim)', marginBottom: 16, lineHeight: 1.4 }}
+                  >
+                    Pass the quiz at the end to unlock comments.
+                  </div>
+                )}
+
                 {canViewBody ? (
                   <article>
                     {bodyParagraphs.map((p, i) => (
@@ -1591,6 +1687,9 @@ export default function StoryPage() {
                       fontSize: 11,
                       cursor: 'pointer',
                       fontFamily: 'var(--font-sans)',
+                      minHeight: 36,
+                      paddingTop: 6,
+                      paddingBottom: 6,
                     }}
                   >
                     Report this article
@@ -1655,6 +1754,19 @@ export default function StoryPage() {
             gate ship — top nav + the home page already cover navigation. */}
         {(isDesktop || showMobileDiscussion) && (
           <div ref={discussionRef} style={{ marginTop: isDesktop ? 48 : 0 }}>
+            {justPassedCeremony && (
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: '12px 0 8px',
+                  fontSize: 15,
+                  fontWeight: 700,
+                  color: 'var(--accent)',
+                }}
+              >
+                You&rsquo;re in.
+              </div>
+            )}
             {quizNode}
             {discussionSection}
           </div>
