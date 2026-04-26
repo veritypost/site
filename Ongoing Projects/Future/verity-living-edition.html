@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verity — The Living Edition</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --serif:'Playfair Display',Georgia,serif;
+    --sans:'Inter',-apple-system,sans-serif;
+    --mono:'JetBrains Mono',monospace;
+    --ink:#0a0a0a;--paper:#faf9f7;--warm:#f3efe9;
+    --dim:#6b6b6b;--muted:#999;--rule:#d4d0cb;
+    --green:#2d6a4f;--green-light:#40916c;
+    --gold:#b8860b;--dark:#111;
+  }
+  html{background:var(--paper)}
+  body{font-family:var(--sans);color:var(--ink);overflow-x:hidden;-webkit-font-smoothing:antialiased}
+
+  /* ========== MASTHEAD ========== */
+  .masthead{
+    position:sticky;top:0;z-index:200;
+    padding:14px 40px;
+    display:flex;justify-content:space-between;align-items:center;
+    background:rgba(250,249,247,0.95);
+    backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+    border-bottom:1px solid var(--rule);
+  }
+  .mast-left{display:flex;align-items:baseline;gap:20px}
+  .mast-logo{font-family:var(--serif);font-size:24px;font-weight:900;letter-spacing:-0.5px}
+  .mast-date{font-size:11px;font-weight:500;color:var(--dim);letter-spacing:0.8px;text-transform:uppercase}
+  .mast-editor{font-size:11px;color:var(--muted)}
+
+  /* ========== LENS SWITCHER ========== */
+  .lens-bar{
+    display:flex;gap:4px;
+    background:#eae6e0;border-radius:8px;padding:3px;
+  }
+  .lens-btn{
+    padding:7px 16px;border-radius:6px;border:none;
+    font-family:var(--sans);font-size:11px;font-weight:600;
+    letter-spacing:0.8px;text-transform:uppercase;
+    background:transparent;color:var(--dim);cursor:pointer;
+    transition:all 0.25s;
+  }
+  .lens-btn.active{background:white;color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,0.08)}
+  .lens-btn:hover:not(.active){color:var(--ink)}
+
+  /* ========== THE CANVAS — EDITORIAL COMPOSITION ========== */
+  .canvas{
+    display:grid;
+    grid-template-columns:1.1fr 0.9fr;
+    grid-template-rows:auto;
+    min-height:calc(100vh - 60px);
+    gap:0;
+  }
+
+  /* ========== STORY CARD BASE ========== */
+  .story{
+    position:relative;padding:clamp(28px,4vw,56px);
+    border-bottom:1px solid var(--rule);
+    cursor:pointer;overflow:hidden;
+    transition:background 0.35s;
+  }
+  .story:hover{background:var(--warm)}
+
+  /* Category strip — left edge color bar */
+  .story::before{
+    content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+    background:var(--cat-color,transparent);
+    transform:scaleY(0);transform-origin:top;
+    transition:transform 0.4s cubic-bezier(0.22,1,0.36,1);
+  }
+  .story:hover::before{transform:scaleY(1)}
+
+  .story-eyebrow{
+    font-size:10px;font-weight:600;letter-spacing:2.5px;
+    text-transform:uppercase;color:var(--dim);margin-bottom:16px;
+    display:flex;align-items:center;gap:12px;
+  }
+  .story-headline{
+    font-family:var(--serif);font-weight:900;
+    line-height:1.08;letter-spacing:-1px;margin-bottom:16px;
+    transition:letter-spacing 0.3s;
+  }
+  .story:hover .story-headline{letter-spacing:-0.5px}
+  .story-summary{
+    font-family:var(--serif);line-height:1.6;color:#444;margin-bottom:20px;
+  }
+
+  /* ========== STORY SIZES ========== */
+  .story--hero{
+    grid-row:span 2;
+    display:flex;flex-direction:column;justify-content:center;
+    border-right:1px solid var(--rule);
+  }
+  .story--hero .story-headline{font-size:clamp(32px,5vw,64px);letter-spacing:-2px}
+  .story--hero .story-summary{font-size:clamp(17px,1.8vw,22px);max-width:600px}
+
+  .story--major .story-headline{font-size:clamp(24px,3vw,38px)}
+  .story--major .story-summary{font-size:clamp(15px,1.4vw,17px);max-width:520px}
+
+  .story--standard .story-headline{font-size:clamp(20px,2.2vw,28px)}
+  .story--standard .story-summary{font-size:14px;max-width:480px}
+
+  /* ========== LIVING PULSE — conversation indicators ========== */
+  .pulse-row{
+    display:flex;gap:20px;align-items:center;margin-bottom:20px;
+    font-family:var(--mono);font-size:11px;color:var(--dim);
+  }
+  .pulse-item{display:flex;align-items:center;gap:7px}
+  .pulse-dot{
+    width:7px;height:7px;border-radius:50%;
+    background:var(--green-light);
+    animation:breathe 2.8s ease-in-out infinite;
+  }
+  .pulse-dot--hot{
+    background:var(--green);
+    animation:breathe 1.6s ease-in-out infinite;
+    box-shadow:0 0 6px rgba(45,106,79,0.4);
+  }
+  .pulse-dot--warm{background:var(--gold);animation:breathe 3.2s ease-in-out infinite}
+
+  @keyframes breathe{
+    0%,100%{opacity:1;transform:scale(1)}
+    50%{opacity:0.45;transform:scale(0.8)}
+  }
+
+  /* ========== LAYERS — shown/hidden by lens ========== */
+  .layer{
+    max-height:0;overflow:hidden;opacity:0;
+    transition:max-height 0.5s cubic-bezier(0.25,0.46,0.45,0.94),opacity 0.4s,margin 0.4s;
+    margin-top:0;
+  }
+  .layer.visible{max-height:500px;opacity:1;margin-top:20px}
+
+  /* --- CONVERSATION LAYER --- */
+  .conv-layer{border-top:1px solid var(--rule);padding-top:16px}
+  .conv-snippet{
+    display:flex;gap:12px;align-items:flex-start;
+    margin-bottom:12px;
+  }
+  .conv-avatar{
+    width:28px;height:28px;border-radius:50%;
+    background:#ddd;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    font-size:11px;font-weight:700;color:#888;
+  }
+  .conv-text{
+    font-family:var(--serif);font-size:14px;font-style:italic;
+    line-height:1.5;color:#555;flex:1;
+  }
+  .conv-meta{
+    font-family:var(--mono);font-size:10px;color:var(--green-light);
+    margin-top:4px;display:flex;align-items:center;gap:5px;
+  }
+  .conv-meta svg{width:12px;height:12px}
+  .conv-more{
+    font-family:var(--sans);font-size:11px;color:var(--dim);
+    border:1px solid var(--rule);border-radius:4px;
+    padding:6px 12px;display:inline-block;margin-top:4px;
+    transition:all 0.2s;
+  }
+  .conv-more:hover{border-color:var(--ink);color:var(--ink)}
+
+  /* --- TIMELINE LAYER --- */
+  .tl-layer{border-top:1px solid var(--rule);padding-top:16px}
+  .tl-event{
+    display:flex;gap:12px;align-items:flex-start;
+    margin-bottom:10px;position:relative;
+    padding-left:20px;
+  }
+  .tl-event::before{
+    content:'';position:absolute;left:5px;top:8px;
+    width:8px;height:8px;border-radius:50%;background:var(--ink);
+  }
+  .tl-event::after{
+    content:'';position:absolute;left:8px;top:18px;bottom:-10px;
+    width:1px;background:var(--rule);
+  }
+  .tl-event:last-child::after{display:none}
+  .tl-event.future::before{background:transparent;border:2px solid var(--dim)}
+  .tl-date{
+    font-family:var(--mono);font-size:10px;color:var(--dim);
+    min-width:70px;padding-top:2px;
+  }
+  .tl-desc{font-family:var(--sans);font-size:13px;color:#444;line-height:1.4}
+
+  /* --- QUIZ LAYER --- */
+  .quiz-layer{
+    background:var(--dark);border-radius:10px;padding:24px 28px;
+    color:#e8e4df;
+  }
+  .quiz-layer-label{
+    font-size:10px;font-weight:600;letter-spacing:2px;
+    text-transform:uppercase;color:var(--green-light);margin-bottom:12px;
+  }
+  .quiz-layer-q{
+    font-family:var(--serif);font-size:clamp(16px,1.6vw,20px);
+    font-style:italic;line-height:1.45;color:#d4d0cb;margin-bottom:16px;
+  }
+  .quiz-layer-options{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .quiz-opt{
+    padding:12px 16px;border:1px solid #333;border-radius:6px;
+    font-size:12px;color:#999;cursor:pointer;transition:all 0.2s;
+    font-family:var(--sans);
+  }
+  .quiz-opt:hover{border-color:var(--green-light);color:#ddd;background:rgba(45,106,79,0.1)}
+  .quiz-layer-foot{
+    margin-top:14px;font-size:11px;color:var(--muted);
+    display:flex;align-items:center;gap:6px;
+  }
+  .quiz-layer-foot strong{color:var(--green-light);font-weight:600}
+
+  /* --- DEFECTION LAYER --- */
+  .def-layer{display:flex;gap:8px;flex-wrap:wrap}
+  .def-chip{
+    font-size:12px;padding:6px 14px;
+    border:1px solid var(--rule);border-radius:4px;
+    color:var(--dim);transition:all 0.2s;
+    display:flex;gap:6px;align-items:center;
+  }
+  .def-chip:hover{border-color:var(--ink);color:var(--ink)}
+  .def-chip .outlet{font-weight:600;color:var(--ink)}
+
+  /* ========== FULL-WIDTH SECTIONS ========== */
+  .full-width{grid-column:1/-1}
+
+  /* ========== CONVERSATION BILLBOARD ========== */
+  .conv-billboard{
+    grid-column:1/-1;
+    background:var(--dark);color:#e8e4df;
+    padding:clamp(48px,8vw,100px) clamp(40px,6vw,120px);
+    display:flex;flex-direction:column;align-items:center;
+    text-align:center;position:relative;
+    border-bottom:1px solid #222;
+  }
+  .conv-bill-badge{
+    font-size:10px;font-weight:600;letter-spacing:3px;
+    text-transform:uppercase;color:var(--green-light);
+    margin-bottom:32px;display:flex;align-items:center;gap:8px;
+  }
+  .conv-bill-quote{
+    font-family:var(--serif);font-style:italic;
+    font-size:clamp(22px,3.8vw,46px);line-height:1.28;
+    max-width:780px;margin-bottom:28px;color:#f0ece6;letter-spacing:-0.5px;
+  }
+  .conv-bill-attr{font-size:12px;color:var(--muted);margin-bottom:6px}
+  .conv-bill-passed{
+    font-family:var(--mono);font-size:11px;color:var(--green-light);
+    display:flex;align-items:center;gap:6px;justify-content:center;
+  }
+  .conv-bill-passed svg{width:14px;height:14px}
+  .conv-bill-cta{
+    margin-top:32px;font-family:var(--sans);font-size:13px;
+    color:#666;border-top:1px solid #2a2a2a;padding-top:24px;
+    cursor:pointer;transition:color 0.2s;
+  }
+  .conv-bill-cta:hover{color:#ccc}
+
+  /* ========== TRIO ROW ========== */
+  .trio{
+    grid-column:1/-1;
+    display:grid;grid-template-columns:repeat(3,1fr);
+    border-bottom:1px solid var(--rule);
+  }
+  .trio .story{border-right:1px solid var(--rule);border-bottom:none}
+  .trio .story:last-child{border-right:none}
+
+  /* ========== DEFECTION STRIP ========== */
+  .defection-strip{
+    grid-column:1/-1;
+    padding:32px clamp(24px,4vw,56px);
+    border-bottom:1px solid var(--rule);
+    display:flex;align-items:center;gap:20px;
+    background:var(--paper);
+  }
+  .defection-strip-label{
+    font-size:10px;font-weight:600;letter-spacing:2px;
+    text-transform:uppercase;color:var(--muted);white-space:nowrap;
+  }
+  .defection-strip-chips{display:flex;gap:8px;flex-wrap:wrap}
+
+  /* ========== THE BOTTOM ========== */
+  .bottom{
+    grid-column:1/-1;
+    padding:72px 40px 100px;
+    text-align:center;
+  }
+  .bottom-rule{width:48px;height:2px;background:var(--ink);margin:0 auto 24px}
+  .bottom-text{font-family:var(--serif);font-size:18px;margin-bottom:6px}
+  .bottom-sub{font-size:12px;color:var(--muted);margin-bottom:20px}
+  .bottom-links{display:flex;gap:20px;justify-content:center}
+  .bottom-link{
+    font-size:12px;color:var(--dim);text-decoration:none;
+    border-bottom:1px solid var(--rule);padding-bottom:2px;
+    transition:all 0.2s;
+  }
+  .bottom-link:hover{color:var(--ink);border-color:var(--ink)}
+
+  /* ========== RESPONSIVE ========== */
+  @media(max-width:900px){
+    .canvas{grid-template-columns:1fr}
+    .story--hero{grid-row:span 1;border-right:none}
+    .trio{grid-template-columns:1fr}
+    .trio .story{border-right:none;border-bottom:1px solid var(--rule)}
+    .trio .story:last-child{border-bottom:none}
+    .quiz-layer-options{grid-template-columns:1fr}
+    .lens-bar{overflow-x:auto}
+    .masthead{padding:12px 20px}
+    .mast-editor{display:none}
+  }
+  @media(prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important}
+    .layer.visible{max-height:none}
+  }
+</style>
+</head>
+<body>
+
+<!-- MASTHEAD -->
+<header class="masthead">
+  <div class="mast-left">
+    <div class="mast-logo">Verity</div>
+    <div class="mast-date">Tuesday, April 22, 2026</div>
+    <div class="mast-editor">Curated by Elena Martinez</div>
+  </div>
+  <div class="lens-bar" id="lensBar">
+    <button class="lens-btn active" data-lens="read">Read</button>
+    <button class="lens-btn" data-lens="discuss">Discuss</button>
+    <button class="lens-btn" data-lens="timeline">Timeline</button>
+    <button class="lens-btn" data-lens="quiz">Quiz</button>
+  </div>
+</header>
+
+<!-- THE CANVAS -->
+<main class="canvas" id="canvas">
+
+  <!-- ===== HERO (SLOT 0) ===== -->
+  <article class="story story--hero" style="--cat-color:#1a5276">
+    <div class="story-eyebrow">
+      Trade · U.S.–China
+      <span class="pulse-item"><span class="pulse-dot pulse-dot--hot"></span></span>
+    </div>
+    <h1 class="story-headline">Treasury Suspends Enforcement of 145% China Tariff for 90 Days</h1>
+    <p class="story-summary">The Treasury Department announced a 90-day suspension of enforcement actions on the 145% tariff applied to Chinese imports since March 2, citing ongoing bilateral negotiations in Geneva. The pause does not reduce the tariff rate and expires July 19. Beijing's Ministry of Commerce called the move "insufficient but noted."</p>
+    <div class="pulse-row">
+      <div class="pulse-item"><span class="pulse-dot pulse-dot--hot"></span> 42 verified readers discussing</div>
+      <div class="pulse-item"><span class="pulse-dot--warm pulse-dot"></span> 7-event timeline</div>
+    </div>
+
+    <!-- CONVERSATION LAYER -->
+    <div class="layer conv-layer" data-layer="discuss">
+      <div class="conv-snippet">
+        <div class="conv-avatar">MR</div>
+        <div>
+          <div class="conv-text">"The 90-day window is exactly what the Geneva track needed. The question is whether Treasury burned political capital internally to get it — because Commerce wanted escalation, not a pause."</div>
+          <div class="conv-meta">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+            Passed · 5 of 5
+          </div>
+        </div>
+      </div>
+      <div class="conv-snippet">
+        <div class="conv-avatar">KL</div>
+        <div>
+          <div class="conv-text">"Worth noting: the enforcement suspension doesn't cover goods already in customs processing. That's roughly $2.3B in limbo right now."</div>
+          <div class="conv-meta">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+            Passed · 4 of 5
+          </div>
+        </div>
+      </div>
+      <div class="conv-more">38 more verified comments →</div>
+    </div>
+
+    <!-- TIMELINE LAYER -->
+    <div class="layer tl-layer" data-layer="timeline">
+      <div class="tl-event"><div class="tl-date">Jan 20</div><div class="tl-desc">Executive order initiates tariff review on Chinese imports</div></div>
+      <div class="tl-event"><div class="tl-date">Feb 4</div><div class="tl-desc">USTR raises rate from 25% to 60% on electronics and components</div></div>
+      <div class="tl-event"><div class="tl-date">Mar 2</div><div class="tl-desc">Tariff rate reaches 145% after retaliatory escalation cycle</div></div>
+      <div class="tl-event"><div class="tl-date">Mar 12</div><div class="tl-desc">Geneva bilateral negotiations begin between Tai and Liu He</div></div>
+      <div class="tl-event"><div class="tl-date">Apr 9</div><div class="tl-desc">Treasury Secretary signals willingness to pause enforcement</div></div>
+      <div class="tl-event"><div class="tl-date">Apr 21</div><div class="tl-desc">Treasury announces 90-day enforcement suspension</div></div>
+      <div class="tl-event future"><div class="tl-date">Jul 19</div><div class="tl-desc">Suspension expires unless extended</div></div>
+    </div>
+
+    <!-- QUIZ LAYER -->
+    <div class="layer quiz-layer" data-layer="quiz">
+      <div class="quiz-layer-label">Pass to comment</div>
+      <div class="quiz-layer-q">"What is the legal status of the 145% tariff rate during the 90-day suspension period?"</div>
+      <div class="quiz-layer-options">
+        <div class="quiz-opt">A. Reduced to 0% for the suspension period</div>
+        <div class="quiz-opt">B. Rate remains at 145%, enforcement actions paused</div>
+        <div class="quiz-opt">C. Reclassified as a provisional duty pending review</div>
+        <div class="quiz-opt">D. Suspended by executive order, requires Congressional renewal</div>
+      </div>
+      <div class="quiz-layer-foot"><strong>42 readers</strong> passed this quiz and joined the conversation</div>
+    </div>
+
+    <!-- DEFECTION LAYER (always subtle) -->
+    <div class="layer def-layer" data-layer="read" style="max-height:none;opacity:1;margin-top:16px">
+      <div class="def-chip"><span class="outlet">AP</span></div>
+      <div class="def-chip"><span class="outlet">Reuters</span></div>
+      <div class="def-chip"><span class="outlet">FT</span></div>
+      <div class="def-chip">Treasury IG Report (PDF)</div>
+    </div>
+  </article>
+
+  <!-- ===== SLOT 1 ===== -->
+  <article class="story story--major" style="--cat-color:#7b241c">
+    <div class="story-eyebrow">
+      Technology · Antitrust
+      <span class="pulse-item"><span class="pulse-dot"></span></span>
+    </div>
+    <h2 class="story-headline">Judge Orders Google to Divest Chrome Browser Within 14 Months</h2>
+    <p class="story-summary">U.S. District Judge Amit Mehta ruled that Google must sell the Chrome browser by June 2027, the most aggressive structural remedy in a U.S. antitrust case since the AT&T breakup of 1984. Google confirmed it will appeal.</p>
+    <div class="pulse-row">
+      <div class="pulse-item"><span class="pulse-dot"></span> 28 discussing</div>
+      <div class="pulse-item"><span class="pulse-dot--warm pulse-dot"></span> 5 events</div>
+    </div>
+
+    <div class="layer conv-layer" data-layer="discuss">
+      <div class="conv-snippet">
+        <div class="conv-avatar">AW</div>
+        <div>
+          <div class="conv-text">"The 14-month timeline is practically impossible for a clean divestiture. This ruling is designed to be appealed — Mehta knows the structural remedy is the opening bid."</div>
+          <div class="conv-meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Passed · 4 of 5</div>
+        </div>
+      </div>
+      <div class="conv-more">26 more verified comments →</div>
+    </div>
+
+    <div class="layer tl-layer" data-layer="timeline">
+      <div class="tl-event"><div class="tl-date">Aug 2024</div><div class="tl-desc">Judge Mehta rules Google maintains illegal search monopoly</div></div>
+      <div class="tl-event"><div class="tl-date">Oct 2025</div><div class="tl-desc">DOJ files proposed remedies including Chrome divestiture</div></div>
+      <div class="tl-event"><div class="tl-date">Jan 2026</div><div class="tl-desc">Remedies hearing concludes after 3 weeks of testimony</div></div>
+      <div class="tl-event"><div class="tl-date">Apr 2026</div><div class="tl-desc">Judge orders Chrome divestiture within 14 months</div></div>
+      <div class="tl-event future"><div class="tl-date">Jun 2027</div><div class="tl-desc">Divestiture deadline</div></div>
+    </div>
+
+    <div class="layer quiz-layer" data-layer="quiz">
+      <div class="quiz-layer-label">Pass to comment</div>
+      <div class="quiz-layer-q">"What specific market share threshold did the court cite as evidence of monopoly maintenance?"</div>
+      <div class="quiz-layer-options">
+        <div class="quiz-opt">A. 65% of desktop search</div>
+        <div class="quiz-opt">B. 89.2% of general search queries</div>
+        <div class="quiz-opt">C. 74% of browser market share</div>
+        <div class="quiz-opt">D. 92% of mobile search</div>
+      </div>
+      <div class="quiz-layer-foot"><strong>28 readers</strong> passed and joined the conversation</div>
+    </div>
+  </article>
+
+  <!-- ===== SLOT 2 ===== -->
+  <article class="story story--major" style="--cat-color:#1e8449">
+    <div class="story-eyebrow">
+      Health · FDA
+      <span class="pulse-item"><span class="pulse-dot"></span></span>
+    </div>
+    <h2 class="story-headline">FDA Revokes Emergency Authorization for Two At-Home COVID Tests After False-Negative Data</h2>
+    <p class="story-summary">The Food and Drug Administration withdrew emergency use authorization for BioSign and QuickDetect rapid antigen tests on April 21, after post-market surveillance showed false-negative rates of 34% and 29% respectively against current circulating variants.</p>
+    <div class="pulse-row">
+      <div class="pulse-item"><span class="pulse-dot"></span> 15 discussing</div>
+    </div>
+
+    <div class="layer conv-layer" data-layer="discuss">
+      <div class="conv-snippet">
+        <div class="conv-avatar">SP</div>
+        <div>
+          <div class="conv-text">"The 34% false-negative rate on BioSign is alarming but the real question is how long the post-market signal existed before FDA acted. The VAERS-equivalent pathway for diagnostics is still too slow."</div>
+          <div class="conv-meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Passed · 3 of 5</div>
+        </div>
+      </div>
+      <div class="conv-more">13 more verified comments →</div>
+    </div>
+
+    <div class="layer tl-layer" data-layer="timeline">
+      <div class="tl-event"><div class="tl-date">Dec 2024</div><div class="tl-desc">BioSign and QuickDetect receive EUA for at-home use</div></div>
+      <div class="tl-event"><div class="tl-date">Feb 2026</div><div class="tl-desc">Independent lab data flags accuracy concerns against KP.3.1 variant</div></div>
+      <div class="tl-event"><div class="tl-date">Mar 2026</div><div class="tl-desc">FDA initiates post-market review of both tests</div></div>
+      <div class="tl-event"><div class="tl-date">Apr 21</div><div class="tl-desc">FDA revokes EUA for both tests</div></div>
+    </div>
+
+    <div class="layer quiz-layer" data-layer="quiz">
+      <div class="quiz-layer-label">Pass to comment</div>
+      <div class="quiz-layer-q">"Which surveillance mechanism first identified the accuracy problem — manufacturer self-reporting or independent lab testing?"</div>
+      <div class="quiz-layer-options">
+        <div class="quiz-opt">A. Manufacturer self-reporting</div>
+        <div class="quiz-opt">B. Independent lab testing</div>
+        <div class="quiz-opt">C. Patient adverse event reports</div>
+        <div class="quiz-opt">D. CDC genomic surveillance</div>
+      </div>
+      <div class="quiz-layer-foot"><strong>15 readers</strong> passed and joined the conversation</div>
+    </div>
+  </article>
+
+  <!-- ===== CONVERSATION BILLBOARD ===== -->
+  <div class="conv-billboard">
+    <div class="conv-bill-badge"><span class="pulse-dot pulse-dot--hot"></span> Live conversation</div>
+    <blockquote class="conv-bill-quote">"The 90-day window is exactly what the Geneva track needed. The question is whether Treasury burned political capital internally to get it — because Commerce wanted escalation, not a pause."</blockquote>
+    <div class="conv-bill-attr">— Reader in the tariff discussion</div>
+    <div class="conv-bill-passed">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+      Passed the quiz · 5 of 5
+    </div>
+    <div class="conv-bill-cta">Every reader here passed the quiz. Read the article and join →</div>
+  </div>
+
+  <!-- ===== TRIO (SLOTS 3–5) ===== -->
+  <div class="trio">
+    <article class="story story--standard" style="--cat-color:#6c3483">
+      <div class="story-eyebrow">Economy · Labor <span class="pulse-item"><span class="pulse-dot"></span></span></div>
+      <h2 class="story-headline">March Jobs Report Revised Down by 118,000 After State Data Corrections</h2>
+      <p class="story-summary">The Bureau of Labor Statistics revised its March nonfarm payrolls figure from 303,000 to 185,000, citing data-collection errors in California, Texas, and New York state agencies.</p>
+      <div class="pulse-row"><div class="pulse-item"><span class="pulse-dot"></span> 19 discussing</div></div>
+
+      <div class="layer conv-layer" data-layer="discuss">
+        <div class="conv-snippet">
+          <div class="conv-avatar">JT</div>
+          <div>
+            <div class="conv-text">"A 39% downward revision is not a rounding error. The state-level data pipeline for BLS has been fragile since the pandemic surge in UI claims broke the collection infrastructure."</div>
+            <div class="conv-meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Passed · 4 of 5</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="layer tl-layer" data-layer="timeline">
+        <div class="tl-event"><div class="tl-date">Apr 4</div><div class="tl-desc">BLS publishes initial March nonfarm payrolls: 303,000</div></div>
+        <div class="tl-event"><div class="tl-date">Apr 18</div><div class="tl-desc">State agencies submit corrected data</div></div>
+        <div class="tl-event"><div class="tl-date">Apr 21</div><div class="tl-desc">BLS issues revision: 185,000</div></div>
+      </div>
+
+      <div class="layer quiz-layer" data-layer="quiz">
+        <div class="quiz-layer-label">Pass to comment</div>
+        <div class="quiz-layer-q">"Which states were responsible for the data-collection errors?"</div>
+        <div class="quiz-layer-options">
+          <div class="quiz-opt">A. CA, TX, NY</div>
+          <div class="quiz-opt">B. FL, OH, PA</div>
+          <div class="quiz-opt">C. CA, FL, IL</div>
+          <div class="quiz-opt">D. TX, PA, GA</div>
+        </div>
+        <div class="quiz-layer-foot"><strong>19 readers</strong> passed</div>
+      </div>
+    </article>
+
+    <article class="story story--standard" style="--cat-color:#117864">
+      <div class="story-eyebrow">Climate · Policy <span class="pulse-item"><span class="pulse-dot"></span></span></div>
+      <h2 class="story-headline">EU Carbon Border Tax Collects €2.1B in First Quarter, 40% Above Forecast</h2>
+      <p class="story-summary">The European Union's Carbon Border Adjustment Mechanism generated €2.1 billion in its first full quarter of enforcement, 40% above the European Commission's initial projection of €1.5 billion.</p>
+      <div class="pulse-row"><div class="pulse-item"><span class="pulse-dot"></span> 11 discussing</div></div>
+
+      <div class="layer conv-layer" data-layer="discuss">
+        <div class="conv-snippet">
+          <div class="conv-avatar">EH</div>
+          <div>
+            <div class="conv-text">"The 40% overshoot means the compliance costs were priced in faster than expected. That's good for the mechanism's credibility but bad for the importers who assumed exemptions."</div>
+            <div class="conv-meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Passed · 5 of 5</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="layer quiz-layer" data-layer="quiz">
+        <div class="quiz-layer-label">Pass to comment</div>
+        <div class="quiz-layer-q">"What was the initial EU Commission forecast for CBAM Q1 revenue?"</div>
+        <div class="quiz-layer-options">
+          <div class="quiz-opt">A. €900 million</div>
+          <div class="quiz-opt">B. €1.5 billion</div>
+          <div class="quiz-opt">C. €2.1 billion</div>
+          <div class="quiz-opt">D. €3.0 billion</div>
+        </div>
+        <div class="quiz-layer-foot"><strong>11 readers</strong> passed</div>
+      </div>
+    </article>
+
+    <article class="story story--standard" style="--cat-color:#1a5276">
+      <div class="story-eyebrow">Science · Space <span class="pulse-item"><span class="pulse-dot pulse-dot--hot"></span></span></div>
+      <h2 class="story-headline">SpaceX Starship Completes First Uncrewed Lunar Orbit and Return</h2>
+      <p class="story-summary">SpaceX's Starship vehicle completed a full uncrewed lunar orbital mission on April 20, entering lunar orbit for 47 hours and returning to a controlled ocean splashdown in the Gulf of Mexico.</p>
+      <div class="pulse-row"><div class="pulse-item"><span class="pulse-dot pulse-dot--hot"></span> 34 discussing</div></div>
+
+      <div class="layer conv-layer" data-layer="discuss">
+        <div class="conv-snippet">
+          <div class="conv-avatar">RN</div>
+          <div>
+            <div class="conv-text">"47 hours in lunar orbit is the real headline here. The previous longest Starship flight was 90 minutes. They skipped medium-duration entirely and went straight to multi-day."</div>
+            <div class="conv-meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Passed · 5 of 5</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="layer quiz-layer" data-layer="quiz">
+        <div class="quiz-layer-label">Pass to comment</div>
+        <div class="quiz-layer-q">"How long did Starship spend in lunar orbit?"</div>
+        <div class="quiz-layer-options">
+          <div class="quiz-opt">A. 12 hours</div>
+          <div class="quiz-opt">B. 47 hours</div>
+          <div class="quiz-opt">C. 72 hours</div>
+          <div class="quiz-opt">D. 96 hours</div>
+        </div>
+        <div class="quiz-layer-foot"><strong>34 readers</strong> passed</div>
+      </div>
+    </article>
+  </div>
+
+  <!-- ===== REMAINING STORIES ===== -->
+  <article class="story story--major full-width" style="--cat-color:#7b241c;border-bottom:1px solid var(--rule)">
+    <div style="display:grid;grid-template-columns:1fr 1.2fr;gap:clamp(20px,4vw,60px);align-items:start">
+      <div>
+        <div class="story-eyebrow">Justice · Immigration <span class="pulse-item"><span class="pulse-dot"></span></span></div>
+        <h2 class="story-headline">Supreme Court Agrees to Hear Challenge to Expedited Deportation Flights</h2>
+        <div class="pulse-row"><div class="pulse-item"><span class="pulse-dot"></span> 23 discussing</div><div class="pulse-item"><span class="pulse-dot--warm pulse-dot"></span> 6 events</div></div>
+      </div>
+      <div>
+        <p class="story-summary">The Supreme Court granted certiorari in <em>Hernández-García v. DHS</em>, challenging the government's authority to conduct expedited deportation flights without individualized hearings. Oral arguments are scheduled for October 2026.</p>
+
+        <div class="layer conv-layer" data-layer="discuss">
+          <div class="conv-snippet">
+            <div class="conv-avatar">DM</div>
+            <div>
+              <div class="conv-text">"The cert grant is the news. SCOTUS could have let the circuit split stand. Taking it means at least four justices think the expedited-removal statute needs constitutional boundaries."</div>
+              <div class="conv-meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Passed · 4 of 5</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="layer quiz-layer" data-layer="quiz">
+          <div class="quiz-layer-label">Pass to comment</div>
+          <div class="quiz-layer-q">"What procedural step did the court take — and what does it signal?"</div>
+          <div class="quiz-layer-options">
+            <div class="quiz-opt">A. Denied cert, letting lower ruling stand</div>
+            <div class="quiz-opt">B. Granted cert, will hear oral arguments</div>
+            <div class="quiz-opt">C. Issued an emergency stay</div>
+            <div class="quiz-opt">D. Remanded to the circuit for rehearing</div>
+          </div>
+          <div class="quiz-layer-foot"><strong>23 readers</strong> passed</div>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <article class="story story--major full-width" style="--cat-color:#6c3483">
+    <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:clamp(20px,4vw,60px);align-items:start">
+      <div>
+        <div class="story-eyebrow">Finance · Banking <span class="pulse-item"><span class="pulse-dot"></span></span></div>
+        <h2 class="story-headline">FDIC Closes Signature Bridge Bank, Transfers Remaining Assets to NYCB</h2>
+        <p class="story-summary">The Federal Deposit Insurance Corporation completed the wind-down of Signature Bridge Bank on April 21, transferring $3.2 billion in remaining commercial real estate loans to New York Community Bancorp at a 22% discount to book value.</p>
+      </div>
+      <div>
+        <div class="pulse-row"><div class="pulse-item"><span class="pulse-dot"></span> 9 discussing</div></div>
+
+        <div class="layer conv-layer" data-layer="discuss">
+          <div class="conv-snippet">
+            <div class="conv-avatar">TC</div>
+            <div>
+              <div class="conv-text">"22% discount to book value is the FDIC admitting the CRE portfolio was overvalued on Signature's books. That's a $700M write-down the deposit insurance fund absorbs."</div>
+              <div class="conv-meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Passed · 3 of 5</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="layer quiz-layer" data-layer="quiz">
+          <div class="quiz-layer-label">Pass to comment</div>
+          <div class="quiz-layer-q">"At what discount to book value were the CRE loans transferred?"</div>
+          <div class="quiz-layer-options">
+            <div class="quiz-opt">A. 8%</div>
+            <div class="quiz-opt">B. 15%</div>
+            <div class="quiz-opt">C. 22%</div>
+            <div class="quiz-opt">D. 31%</div>
+          </div>
+          <div class="quiz-layer-foot"><strong>9 readers</strong> passed</div>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <!-- ===== DEFECTION STRIP ===== -->
+  <div class="defection-strip">
+    <div class="defection-strip-label">Today's stories — also covered by</div>
+    <div class="defection-strip-chips">
+      <div class="def-chip"><span class="outlet">AP</span> Tariff</div>
+      <div class="def-chip"><span class="outlet">Reuters</span> Tariff</div>
+      <div class="def-chip"><span class="outlet">FT</span> Tariff</div>
+      <div class="def-chip"><span class="outlet">The Verge</span> Chrome</div>
+      <div class="def-chip"><span class="outlet">Ars Technica</span> Chrome</div>
+      <div class="def-chip"><span class="outlet">STAT News</span> FDA</div>
+      <div class="def-chip"><span class="outlet">SCOTUSblog</span> Immigration</div>
+      <div class="def-chip">Treasury IG Report (PDF)</div>
+    </div>
+  </div>
+
+  <!-- ===== THE BOTTOM ===== -->
+  <section class="bottom">
+    <div class="bottom-rule"></div>
+    <div class="bottom-text">That's today's front page.</div>
+    <div class="bottom-sub">8 stories, chosen by Elena Martinez.</div>
+    <div class="bottom-links">
+      <a href="#" class="bottom-link">Yesterday's archive →</a>
+      <a href="#" class="bottom-link">Browse all recent articles →</a>
+    </div>
+  </section>
+
+</main>
+
+<script>
+  // ===== LENS SWITCHER =====
+  const lensBar = document.getElementById('lensBar');
+  const allLayers = document.querySelectorAll('.layer');
+  let currentLens = 'read';
+
+  lensBar.addEventListener('click', (e) => {
+    const btn = e.target.closest('.lens-btn');
+    if (!btn) return;
+    const lens = btn.dataset.lens;
+
+    // Toggle: clicking active lens returns to "read"
+    if (lens === currentLens && lens !== 'read') {
+      currentLens = 'read';
+    } else {
+      currentLens = lens;
+    }
+
+    // Update button states
+    lensBar.querySelectorAll('.lens-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.lens === currentLens);
+    });
+
+    // Show/hide layers
+    allLayers.forEach(layer => {
+      const layerType = layer.dataset.layer;
+      if (layerType === currentLens) {
+        layer.classList.add('visible');
+      } else if (layerType === 'read' && currentLens === 'read') {
+        // defection chips in read mode stay visible (inline style handles this)
+        layer.classList.remove('visible');
+      } else {
+        layer.classList.remove('visible');
+      }
+    });
+  });
+
+  // ===== QUIZ OPTION INTERACTION =====
+  document.querySelectorAll('.quiz-opt').forEach(opt => {
+    opt.addEventListener('click', function() {
+      const siblings = this.parentElement.querySelectorAll('.quiz-opt');
+      siblings.forEach(s => {
+        s.style.borderColor = '#333';
+        s.style.color = '#999';
+        s.style.background = 'transparent';
+      });
+      this.style.borderColor = 'var(--green-light)';
+      this.style.color = '#e8e4df';
+      this.style.background = 'rgba(45,106,79,0.15)';
+    });
+  });
+
+  // ===== STORY HOVER — category bar reveal =====
+  // (handled entirely by CSS :hover on .story::before)
+
+  // ===== KEYBOARD NAVIGATION =====
+  const stories = document.querySelectorAll('.story');
+  let focusIndex = -1;
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'j') {
+      focusIndex = Math.min(focusIndex + 1, stories.length - 1);
+      stories[focusIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+      stories[focusIndex].style.background = 'var(--warm)';
+      if (focusIndex > 0) stories[focusIndex - 1].style.background = '';
+    }
+    if (e.key === 'k') {
+      focusIndex = Math.max(focusIndex - 1, 0);
+      stories[focusIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+      stories[focusIndex].style.background = 'var(--warm)';
+      if (focusIndex < stories.length - 1) stories[focusIndex + 1].style.background = '';
+    }
+    // Lens shortcuts
+    if (e.key === '1') lensBar.querySelector('[data-lens="read"]').click();
+    if (e.key === '2') lensBar.querySelector('[data-lens="discuss"]').click();
+    if (e.key === '3') lensBar.querySelector('[data-lens="timeline"]').click();
+    if (e.key === '4') lensBar.querySelector('[data-lens="quiz"]').click();
+  });
+</script>
+
+</body>
+</html>
