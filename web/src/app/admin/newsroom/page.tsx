@@ -1915,10 +1915,10 @@ function ClusterRowItem({
             flex: '0 1 auto',
           }}
         >
-          {/* Generated badges + View links */}
+          {/* Generated badges + View links — open in story-manager */}
           {adultArticleId && (
             <Link
-              href={`/admin/articles/${adultArticleId}/review`}
+              href={`/admin/story-manager?article=${adultArticleId}`}
               style={{ textDecoration: 'none' }}
             >
               <Badge variant="success" size="sm">
@@ -1928,7 +1928,7 @@ function ClusterRowItem({
           )}
           {kidArticleId && (
             <Link
-              href={`/admin/articles/${kidArticleId}/review`}
+              href={`/admin/story-manager?article=${kidArticleId}`}
               style={{ textDecoration: 'none' }}
             >
               <Badge variant="info" size="sm">

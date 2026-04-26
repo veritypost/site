@@ -433,14 +433,14 @@ export default function GenerationModal({
     );
     if (allDone) {
       stopPolling();
-      // Single-lane completed runs: auto-redirect to the article review page
-      // (matches legacy behavior). Both-lane: stay on the success screen so
-      // the operator can pick which one to view.
+      // Single-lane completed runs: auto-redirect to story-manager.
+      // Both-lane: stay on the success screen so the operator can pick
+      // which one to view.
       if (lanes.length === 1) {
         const lane = lanes[0];
         if (lane.phase === 'completed' && lane.run?.article_id) {
           setTimeout(() => {
-            router.push(`/admin/articles/${lane.run!.article_id}/review`);
+            router.push(`/admin/story-manager?article=${lane.run!.article_id}`);
           }, 600);
         }
       }
@@ -812,7 +812,9 @@ export default function GenerationModal({
                 <Button
                   variant="primary"
                   size="sm"
-                  onClick={() => router.push(`/admin/articles/${lane.run!.article_id}/review`)}
+                  onClick={() =>
+                    router.push(`/admin/story-manager?article=${lane.run!.article_id}`)
+                  }
                   style={{ marginLeft: 'auto' }}
                 >
                   View {lane.audience === 'kid' ? 'kid' : 'adult'} article

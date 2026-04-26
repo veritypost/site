@@ -5,6 +5,10 @@
 // PATCH endpoint, which enforces is_sensitive gating + writes to
 // admin_audit_log. String values are serialized as JSON strings in the
 // DB; displayValue/serialize bridges that for the input layer.
+//
+// T-127: Save button now opens a confirm modal showing the current stored
+// value vs. the proposed draft before the PATCH fires. confirmPending holds
+// the Setting row awaiting confirmation; on modal confirm, save() is called.
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -18,6 +22,7 @@ import TextInput from '@/components/admin/TextInput';
 import Textarea from '@/components/admin/Textarea';
 import NumberInput from '@/components/admin/NumberInput';
 import Select from '@/components/admin/Select';
+import Modal from '@/components/admin/Modal';
 import Spinner from '@/components/admin/Spinner';
 import EmptyState from '@/components/admin/EmptyState';
 import { useToast } from '@/components/admin/Toast';
@@ -50,6 +55,9 @@ export default function SettingsAdminPage() {
   const [settings, setSettings] = useState<Setting[]>([]);
   const [drafts, setDrafts] = useState<DraftMap>({});
   const [busyKey, setBusyKey] = useState<string>('');
+
+  // T-127: confirm modal state — holds the Setting row pending user confirmation.
+  const [confirmPending, setConfirmPending] = useState<Setting | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -113,6 +121,18 @@ export default function SettingsAdminPage() {
     setSettings((prev) => prev.map((x) => x.key === s.key ? { ...x, value: payload } : x));
   }
 
+  // T-127: Instead of calling save() directly, open the confirm modal.
+  function requestSave(s: Setting) {
+    setConfirmPending(s);
+  }
+
+  async function confirmSave() {
+    if (!confirmPending) return;
+    const s = confirmPending;
+    setConfirmPending(null);
+    await save(s);
+  }
+
   if (loading) {
     return (
       <Page>
@@ -125,6 +145,12 @@ export default function SettingsAdminPage() {
   if (!authorized) return null;
 
   const categoryKeys = Object.keys(byCategory).sort();
+
+  // T-127: build confirm modal content from confirmPending
+  const confirmCurrentStored = confirmPending
+    ? displayValue(confirmPending.value, confirmPending.value_type)
+    : '';
+  const confirmProposed = confirmPending ? (drafts[confirmPending.key] ?? '') : '';
 
   return (
     <Page maxWidth={960}>
@@ -225,12 +251,13 @@ export default function SettingsAdminPage() {
                       )}
                     </div>
 
+                    {/* T-127: Save now opens confirm modal instead of firing immediately */}
                     <Button
                       size="sm"
                       variant={dirty ? 'primary' : 'secondary'}
                       loading={busyKey === s.key}
-                      disabled={!dirty}
-                      onClick={() => save(s)}
+                      disabled={!dirty || busyKey === s.key}
+                      onClick={() => requestSave(s)}
                     >
                       Save
                     </Button>
@@ -241,6 +268,97 @@ export default function SettingsAdminPage() {
           </PageSection>
         ))
       )}
+
+      {/* T-127: Confirm modal — shows current vs. proposed value before PATCH fires */}
+      <Modal
+        open={!!confirmPending}
+        onClose={() => { if (busyKey === '') setConfirmPending(null); }}
+        title="Confirm setting change"
+        width="sm"
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              disabled={busyKey !== ''}
+              onClick={() => setConfirmPending(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              loading={busyKey === (confirmPending?.key ?? '')}
+              onClick={confirmSave}
+            >
+              Save
+            </Button>
+          </>
+        }
+      >
+        {confirmPending && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: S[3] }}>
+            <div>
+              <div style={{ fontSize: F.xs, color: ADMIN_C.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: S[1] }}>
+                Key
+              </div>
+              <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: F.sm, color: ADMIN_C.white }}>
+                {confirmPending.key}
+              </div>
+              {confirmPending.description && (
+                <div style={{ fontSize: F.xs, color: ADMIN_C.dim, marginTop: S[1] }}>
+                  {confirmPending.description}
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: S[3] }}>
+              <div>
+                <div style={{ fontSize: F.xs, color: ADMIN_C.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: S[1] }}>
+                  Current value
+                </div>
+                <div
+                  style={{
+                    fontFamily: 'ui-monospace, monospace',
+                    fontSize: F.sm,
+                    color: ADMIN_C.dim,
+                    padding: `${S[2]}px ${S[2]}px`,
+                    background: ADMIN_C.card,
+                    borderRadius: 6,
+                    border: `1px solid ${ADMIN_C.divider}`,
+                    wordBreak: 'break-all',
+                    minHeight: 36,
+                  }}
+                >
+                  {confirmCurrentStored || <span style={{ color: ADMIN_C.muted, fontStyle: 'italic' }}>empty</span>}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: F.xs, color: ADMIN_C.accent, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: S[1] }}>
+                  New value
+                </div>
+                <div
+                  style={{
+                    fontFamily: 'ui-monospace, monospace',
+                    fontSize: F.sm,
+                    color: ADMIN_C.white,
+                    padding: `${S[2]}px ${S[2]}px`,
+                    background: ADMIN_C.card,
+                    borderRadius: 6,
+                    border: `1px solid ${ADMIN_C.accent}`,
+                    wordBreak: 'break-all',
+                    minHeight: 36,
+                  }}
+                >
+                  {confirmProposed || <span style={{ color: ADMIN_C.muted, fontStyle: 'italic' }}>empty</span>}
+                </div>
+              </div>
+            </div>
+
+            <p style={{ margin: 0, fontSize: F.xs, color: ADMIN_C.dim }}>
+              This change will be written to the audit log. Platform behavior may change immediately.
+            </p>
+          </div>
+        )}
+      </Modal>
     </Page>
   );
 }

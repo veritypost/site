@@ -14,6 +14,12 @@
 //
 // Rebuild of the JS original on top of DataTable + design system
 // primitives. Filter state still persists in sessionStorage per user.
+//
+// T-125: "Simulate grant" panel — admin selects a permission set from the
+// assignable list and clicks "Preview impact." The page fetches the set's
+// member permission keys from permission_set_perms, then overlays a
+// "would grant" column on every currently-denied row that belongs to the
+// selected set. No writes to DB — purely a client-side projection.
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
@@ -114,6 +120,11 @@ export default function UserPermissionsPage() {
   const [jumpBusy, setJumpBusy] = useState(false);
 
   const [busyKey, setBusyKey] = useState<string | null>(null);
+
+  // T-125: simulate grant state
+  const [simulateSetKey, setSimulateSetKey] = useState('');
+  const [simulateKeys, setSimulateKeys] = useState<Set<string>>(new Set());
+  const [simulateBusy, setSimulateBusy] = useState(false);
 
   // --- Auth gate ---------------------------------------------------------
   useEffect(() => {
@@ -340,6 +351,50 @@ export default function UserPermissionsPage() {
     setJumpResults((data || []) as Array<{ id: string; username: string | null; email: string | null }>);
   };
 
+  // T-125: fetch permission keys for the selected set, then overlay a
+  // "would grant" highlight on currently-denied rows in the table.
+  // permission_set_perms has (permission_set_id, permission_id). We
+  // join permission_sets to find the set, then look up each permission
+  // in effectivePerms to see if it is currently denied.
+  const runSimulate = async () => {
+    if (!simulateSetKey) return;
+    setSimulateBusy(true);
+    setSimulateKeys(new Set()); // clear previous
+    try {
+      // Find the set row by key to get its id.
+      const targetSet = allSets.find((s) => s.key === simulateSetKey);
+      if (!targetSet) {
+        toast.push({ message: `Set "${simulateSetKey}" not found in loaded sets.`, variant: 'warn' });
+        return;
+      }
+      // Fetch which permission_ids belong to this set.
+      const { data: setPerms, error } = await supabase
+        .from('permission_set_perms')
+        .select('permission_id, permissions(key)')
+        .eq('permission_set_id', targetSet.id);
+      if (error) {
+        toast.push({ message: 'Could not load set members.', variant: 'danger' });
+        return;
+      }
+      const keys = new Set<string>();
+      for (const sp of (setPerms || [])) {
+        const p = sp as unknown as { permission_id: string; permissions: { key: string } | null };
+        if (p.permissions?.key) keys.add(p.permissions.key);
+      }
+      setSimulateKeys(keys);
+      if (keys.size === 0) {
+        toast.push({ message: `Set "${simulateSetKey}" has no permission members.`, variant: 'info' });
+      }
+    } finally {
+      setSimulateBusy(false);
+    }
+  };
+
+  const clearSimulate = () => {
+    setSimulateSetKey('');
+    setSimulateKeys(new Set());
+  };
+
   // --- Render ------------------------------------------------------------
   if (authChecking) {
     return (
@@ -394,6 +449,9 @@ export default function UserPermissionsPage() {
   const grantedSetIds = new Set(userSets.map((us) => us.permission_set_id));
   const assignedSetRows = allSets.filter((s) => grantedSetIds.has(s.id));
   const assignableSets = allSets.filter((s) => s.is_active && !grantedSetIds.has(s.id));
+
+  // T-125: simulate column — only included when a simulation is active.
+  const simulateActive = simulateKeys.size > 0;
 
   const columns = [
     {
@@ -455,6 +513,29 @@ export default function UserPermissionsPage() {
         return <span style={{ color: ADMIN_C.dim, fontSize: F.xs }}>{detail || '—'}</span>;
       },
     },
+    // T-125: simulate column — present only when simulateActive is true.
+    ...(simulateActive ? [{
+      key: '_simulate',
+      header: 'Simulate',
+      sortable: false,
+      render: (r: EffectivePermRow) => {
+        const key = r.permission_key || r.key || '';
+        const via = r.granted_via || 'none';
+        const isDenied = via === 'none' || via === '';
+        const wouldGrant = isDenied && simulateKeys.has(key);
+        if (wouldGrant) {
+          return (
+            <Badge variant="success" size="xs">would grant</Badge>
+          );
+        }
+        if (!isDenied && simulateKeys.has(key)) {
+          return (
+            <Badge variant="neutral" size="xs">already granted</Badge>
+          );
+        }
+        return null;
+      },
+    }] : []),
     {
       key: '_actions',
       header: '',
@@ -493,9 +574,14 @@ export default function UserPermissionsPage() {
         backHref="/admin/users"
         backLabel="Users"
         actions={
-          <Link href={`/u/${targetUser?.username || userId}`} style={{ textDecoration: 'none' }}>
-            <Button variant="secondary">View profile</Button>
-          </Link>
+          <>
+            <Link href={`/admin/users/${userId}`} style={{ textDecoration: 'none' }}>
+              <Button variant="secondary">View dossier</Button>
+            </Link>
+            <Link href={`/u/${targetUser?.username || userId}`} style={{ textDecoration: 'none' }}>
+              <Button variant="secondary">View profile</Button>
+            </Link>
+          </>
         }
       />
 
@@ -574,6 +660,44 @@ export default function UserPermissionsPage() {
             Assign set
           </Button>
         </div>
+      </PageSection>
+
+      {/* T-125: Simulate grant panel — no writes, read-only preview */}
+      <PageSection
+        title="Simulate grant"
+        description="Preview which currently-denied permissions would become granted if a set were assigned. No changes are saved."
+      >
+        <div style={{ display: 'flex', gap: S[2], flexWrap: 'wrap', alignItems: 'center' }}>
+          <Select
+            value={simulateSetKey}
+            onChange={(e) => { setSimulateSetKey(e.target.value); setSimulateKeys(new Set()); }}
+            options={[
+              { value: '', label: 'Select a permission set to simulate…' },
+              ...allSets.filter((s) => s.is_active).map((s) => ({ value: s.key, label: `${s.key} — ${s.display_name}` })),
+            ]}
+            style={{ flex: '1 1 260px', minWidth: 220 }}
+            block={false}
+          />
+          <Button
+            variant="secondary"
+            disabled={!simulateSetKey || simulateBusy}
+            loading={simulateBusy}
+            onClick={runSimulate}
+          >
+            Preview impact
+          </Button>
+          {simulateActive && (
+            <Button variant="ghost" size="sm" onClick={clearSimulate}>
+              Clear
+            </Button>
+          )}
+        </div>
+        {simulateActive && (
+          <div style={{ marginTop: S[2], fontSize: F.sm, color: ADMIN_C.dim }}>
+            Showing impact of assigning <strong style={{ color: ADMIN_C.soft }}>{simulateSetKey}</strong> ({simulateKeys.size} permission{simulateKeys.size === 1 ? '' : 's'}).
+            Rows marked <Badge variant="success" size="xs">would grant</Badge> are currently denied and would become granted.
+          </div>
+        )}
       </PageSection>
 
       <Toolbar

@@ -227,20 +227,17 @@ function StoriesAdminInner() {
       width: 320,
       render: (row: ArticleRow) => (
         <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', gap: S[1], flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          {/* Y5-#7 — adult articles open the F7 review surface; kids
-              articles still go to the kids-story-manager (no review page
-              yet on the kids side). Quiz pool stays as a secondary
-              action so editors can still hand-tune the question bank. */}
+          {/* Adult and kids articles open in their respective story-manager. */}
           <Button
             size="sm"
             variant="secondary"
             onClick={() => router.push(
               row.is_kids_safe
                 ? `/admin/kids-story-manager?article=${row.id}`
-                : `/admin/articles/${row.id}/review`,
+                : `/admin/story-manager?article=${row.id}`,
             )}
           >
-            {row.is_kids_safe ? 'Edit' : 'Review'}
+            Edit
           </Button>
           <Button size="sm" variant="ghost" onClick={() => router.push(`/admin/story-manager?article=${row.id}`)}>Quiz pool</Button>
           {row.status === 'published' ? (
@@ -282,15 +279,10 @@ function StoriesAdminInner() {
           rowKey={(r: ArticleRow) => r.id}
           columns={columns}
           rows={filtered}
-          // Y5-#7 — row click opens the F7 review surface for adult
-          // articles (the canonical editorial landing for each story).
-          // Kids stories still open kids-story-manager since the review
-          // surface doesn't exist on that side yet. Quiz pool is a
-          // per-row secondary button above for editors who need it.
           onRowClick={(r: ArticleRow) => router.push(
             r.is_kids_safe
               ? `/admin/kids-story-manager?article=${r.id}`
-              : `/admin/articles/${r.id}/review`,
+              : `/admin/story-manager?article=${r.id}`,
           )}
           toolbar={
             <Toolbar
