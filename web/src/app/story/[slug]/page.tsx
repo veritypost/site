@@ -363,7 +363,7 @@ export default function StoryPage() {
   const [anonViewCount, setAnonViewCount] = useState<number>(0);
   const [freeReadLimit, setFreeReadLimit] = useState<number>(5);
 
-  const [activeTab, setActiveTab] = useState<'Article' | 'Timeline' | 'Discussion'>('Article');
+  const [activeTab, setActiveTab] = useState<'Story' | 'Timeline' | 'Discussion'>('Story');
   const [isDesktop, setIsDesktop] = useState<boolean>(true);
   const [bookmarkError, setBookmarkError] = useState<string>('');
 
@@ -669,8 +669,9 @@ export default function StoryPage() {
   }, [story?.id, quizPoolSize, trackEvent]);
 
   // T-064: ref for the quiz + discussion wrapper so we can scroll to it on
-  // desktop after a quiz pass. On mobile the tab bar is kill-switched, so we
-  // reveal discussion by switching activeTab instead of scrolling.
+  // desktop after a quiz pass. On mobile we switch activeTab to Discussion
+  // instead — the tab bar is now active and revealing the pane is the
+  // equivalent affordance.
   const discussionRef = useRef<HTMLDivElement | null>(null);
 
   // T-064: react to quiz pass. justRevealedThisSession only goes false→true once
@@ -1138,7 +1139,7 @@ export default function StoryPage() {
 
   const showMobileDiscussion = !isDesktop && activeTab === 'Discussion';
   const showMobileTimeline = !isDesktop && activeTab === 'Timeline';
-  const showArticleBody = isDesktop || activeTab === 'Article';
+  const showArticleBody = isDesktop || activeTab === 'Story';
 
   // Ext-SS.2 — NewsArticle JSON-LD. Site URL pulled from window.location
   // origin so preview/staging emits matching schema URLs. Only emit when
@@ -1289,12 +1290,12 @@ export default function StoryPage() {
         </div>
       )}
 
-      {/* Mobile tab bar — launch-phase hide. Timeline + Discussion
-          tabs are currently gated off below, so the bar would only
-          have "Article" on it. Hide the whole bar until the other
-          tabs come back online. Flip `false` → original condition
-          to unhide. */}
-      {false && !isDesktop && (
+      {/* Mobile tab bar — Story | Timeline | Discussion. Three columns
+          shown on every article on mobile. Permission-gated content
+          shows lock states inside each pane (see Timeline + Discussion
+          branches further down). Desktop renders all three inline so
+          the tab bar is mobile-only. */}
+      {!isDesktop && (
         <div
           style={{
             display: 'flex',
@@ -1305,7 +1306,7 @@ export default function StoryPage() {
             zIndex: 50,
           }}
         >
-          {(['Article', 'Timeline', 'Discussion'] as const).map((tab) => (
+          {(['Story', 'Timeline', 'Discussion'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -1698,8 +1699,11 @@ export default function StoryPage() {
               </div>
             )}
 
-            {/* Timeline (mobile) — launch-phase hide. */}
-            {false && showMobileTimeline && canViewTimeline && (
+            {/* Timeline (mobile) — visible whenever the Timeline tab is
+                active. When the viewer lacks the timeline permission a
+                short upgrade prompt renders in place of the events list
+                so the tab is never an empty pane. */}
+            {showMobileTimeline && (
               <div>
                 <div
                   style={{
@@ -1713,7 +1717,57 @@ export default function StoryPage() {
                 >
                   Timeline
                 </div>
-                <Timeline events={timeline} />
+                {canViewTimeline ? (
+                  <Timeline events={timeline} />
+                ) : (
+                  <div
+                    style={{
+                      border: '1px solid var(--border)',
+                      borderRadius: 12,
+                      padding: '20px 16px',
+                      background: 'var(--card)',
+                      textAlign: 'center',
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 600,
+                        color: 'var(--text-primary)',
+                        marginBottom: 6,
+                      }}
+                    >
+                      Timeline is part of paid plans.
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        color: 'var(--soft)',
+                        marginBottom: 12,
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      See how this story developed across the day with sourced events.
+                    </div>
+                    <a
+                      href="/profile/settings#billing"
+                      style={{
+                        display: 'inline-block',
+                        padding: '8px 16px',
+                        minHeight: 36,
+                        lineHeight: '20px',
+                        background: 'var(--accent)',
+                        color: '#fff',
+                        borderRadius: 8,
+                        fontSize: 13,
+                        fontWeight: 600,
+                        textDecoration: 'none',
+                      }}
+                    >
+                      View plans
+                    </a>
+                  </div>
+                )}
               </div>
             )}
           </div>

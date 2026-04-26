@@ -55,7 +55,7 @@ struct StoryDetailView: View {
     @State private var actionError: String? = nil
 
     // Tabs
-    enum StoryTab: String, CaseIterable { case story = "Article", timeline = "Timeline", discussion = "Discussion" }
+    enum StoryTab: String, CaseIterable { case story = "Story", timeline = "Timeline", discussion = "Discussion" }
     @State private var activeTab: StoryTab = .story
 
     // Quiz (D1/D6/D8/D41 — server-graded via /api/quiz/start + /api/quiz/submit).
@@ -100,6 +100,8 @@ struct StoryDetailView: View {
     @State private var bookmarkId: String? = nil
     @State private var showUpgradeAlert = false
     @State private var showSubscription = false
+    // OwnersAudit Story Task 18 — anon Discussion tab → LoginView sheet
+    @State private var showLogin = false
 
     // Expert Q&A
     @State private var expertAnswers: [(question: String, answer: String, expertName: String)] = []
@@ -217,16 +219,16 @@ struct StoryDetailView: View {
                                     }
                                 )
                         case .timeline:
-                            if canViewTimeline { timelineContent } else { EmptyView() }
+                            if canViewTimeline { timelineContent } else { timelineLockedPrompt }
                         case .discussion:
-                            // D6 / Bug 46: discussion is invisible to anonymous
-                            // users. If they somehow land here (e.g., state
-                            // carried over from a previous signed-in session),
-                            // render nothing instead of teasing the quiz player.
+                            // OwnersAudit Story Task 18: Discussion tab is now
+                            // visible to anonymous users so the product mechanic
+                            // (earn the discussion) is discoverable. Tap → auth
+                            // gate prompt; logged-in → real discussion content.
                             if auth.isLoggedIn {
                                 discussionContent
                             } else {
-                                EmptyView()
+                                anonDiscussionPrompt
                             }
                         }
                     }
@@ -402,13 +404,88 @@ struct StoryDetailView: View {
         .animation(.easeInOut(duration: 0.3), value: showStreakCelebration)
     }
 
-    // D6 / Bug 46: Discussion is invisible to anonymous users — not locked,
-    // not teased. This hides both the tab button and the content.
+    // OwnersAudit Story Task 18: Discussion tab is now always visible
+    // (anon, paid, free — same 3 tabs everywhere). Tab presence
+    // surfaces the product mechanic; per-pane gating handles auth state.
     private var visibleTabs: [StoryTab] {
-        StoryTab.allCases.filter { tab in
-            if tab == .discussion { return auth.isLoggedIn }
-            return true
+        StoryTab.allCases
+    }
+
+    // MARK: - Anon Discussion tab gate (Story Task 18)
+    @ViewBuilder private var anonDiscussionPrompt: some View {
+        VStack(spacing: 14) {
+            Text("Earn the discussion.")
+                .font(.system(.title3, design: .default, weight: .bold))
+                .foregroundColor(VP.text)
+            Text("Create a free account, pass the quiz, and join the conversation.")
+                .font(.subheadline)
+                .foregroundColor(VP.dim)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+            Button {
+                showLogin = true
+            } label: {
+                Text("Create free account")
+                    .font(.system(.subheadline, design: .default, weight: .semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 28)
+                    .padding(.vertical, 12)
+                    .frame(minHeight: 44)
+                    .background(VP.accent)
+                    .cornerRadius(10)
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 4)
+            Button {
+                showLogin = true
+            } label: {
+                Text("Already have an account? Sign in")
+                    .font(.footnote)
+                    .foregroundColor(VP.accent)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 60)
+        .padding(.horizontal, 16)
+        .sheet(isPresented: $showLogin) {
+            LoginView().environmentObject(auth)
+        }
+    }
+
+    // MARK: - Timeline locked (no permission)
+    @ViewBuilder private var timelineLockedPrompt: some View {
+        VStack(spacing: 12) {
+            Text("Timeline is part of paid plans.")
+                .font(.system(.subheadline, design: .default, weight: .semibold))
+                .foregroundColor(VP.text)
+            Text("See how this story developed across the day with sourced events.")
+                .font(.footnote)
+                .foregroundColor(VP.dim)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+            Button {
+                showSubscription = true
+            } label: {
+                Text("View plans")
+                    .font(.system(.subheadline, design: .default, weight: .semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 22)
+                    .padding(.vertical, 10)
+                    .frame(minHeight: 44)
+                    .background(VP.accent)
+                    .cornerRadius(10)
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 4)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 60)
+        .padding(.horizontal, 16)
     }
 
     // MARK: - Tab bar

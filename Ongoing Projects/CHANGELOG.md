@@ -7,6 +7,37 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-26 (Group 1 — Story tabs cross-platform)
+
+### Story Tasks 18 + 19 — 3-column tab header on mobile web + iOS adult
+
+**Mobile web tab bar enabled — Story | Timeline | Discussion**
+- **What** — Removed the `{false && !isDesktop && (…)}` kill-switch on the mobile tab bar; now renders whenever `!isDesktop`. Renamed the type union, state default, and string literal from `'Article'` to `'Story'` (matches the URL slug — `/story/[slug]`). Tab labels render `'Story', 'Timeline', 'Discussion'`. Updated the comment block above the bar to describe the live behavior + per-pane gating instead of "launch-phase hide". Updated the T-064 ref comment (line 672) — mobile no longer "kill-switched"; switching `activeTab` to `'Discussion'` is now the equivalent post-quiz-pass affordance.
+- **Files** — `web/src/app/story/[slug]/page.tsx`
+- **Why** — OwnersAudit Story Task 19. Owner-locked decision 2026-04-26: 3 columns on top of every article (mobile only — desktop remains single-column inline reading flow).
+
+**Mobile Timeline pane enabled with permission-gated fallback**
+- **What** — Removed the `{false && showMobileTimeline && canViewTimeline && (…)}` kill-switch on the Timeline mobile content. Now renders whenever `showMobileTimeline` is true. When `canViewTimeline` is true, the existing `<Timeline events={timeline} />` component shows. When false, an inline upgrade prompt renders ("Timeline is part of paid plans. See how this story developed across the day with sourced events. → View plans" linking to `/profile/settings#billing`). Same prompt visual weight as the discussion lock prompt — keeps the tab from ever being an empty pane.
+- **Files** — `web/src/app/story/[slug]/page.tsx`
+- **Why** — OwnersAudit Story Task 19 implication: enabling the tab without enabling the content would dead-end Timeline-locked viewers in an empty tab.
+
+**iOS tab `Article` → `Story`**
+- **What** — `enum StoryTab: String`: `case story = "Article"` → `case story = "Story"`. The enum's `rawValue` is the displayed tab label, so this single edit relabels iOS without any other plumbing change.
+- **Files** — `VerityPost/VerityPost/StoryDetailView.swift`
+- **Why** — OwnersAudit Story Task 19 + cross-platform parity (label string identical to web).
+
+**iOS Discussion tab visible to anonymous users + auth-gate prompt**
+- **What** — `visibleTabs` no longer filters by `auth.isLoggedIn`; returns `StoryTab.allCases`. The `.discussion` switch case branches on `auth.isLoggedIn` → `discussionContent` (existing) when logged in, or new `anonDiscussionPrompt` view when anon. Anon prompt: "Earn the discussion." headline + "Create a free account, pass the quiz, and join the conversation." body + "Create free account" primary button + "Already have an account? Sign in" secondary link. Both buttons present `LoginView` as a sheet via new `@State showLogin`. Mirrors the proven anon pattern from `MessagesView.swift:84-110`. Both buttons hit the 44pt touch target floor (`.frame(minHeight: 44)` + `.contentShape(Rectangle())` on the secondary link to extend the tap region beyond the text glyph).
+- **Files** — `VerityPost/VerityPost/StoryDetailView.swift`
+- **Why** — OwnersAudit Story Task 18. The product mechanic ("earn the discussion") was invisible to anon iOS readers — they couldn't see the tab existed. Now they see it, tap it, get the pitch.
+
+**iOS Timeline locked-state prompt (replaces silent EmptyView)**
+- **What** — `.timeline` switch case: `if canViewTimeline { timelineContent } else { EmptyView() }` → `else { timelineLockedPrompt }`. New view: "Timeline is part of paid plans." + body copy + "View plans" button → `showSubscription = true` (uses existing sheet wired at line 299). Same pattern as web Timeline upgrade prompt; identical wording across surfaces.
+- **Files** — `VerityPost/VerityPost/StoryDetailView.swift`
+- **Why** — OwnersAudit Story Task 19 implication on iOS: with the Timeline tab now always visible, viewers without the timeline permission must see *something* — silent `EmptyView()` looks broken.
+
+---
+
 ## 2026-04-26 (audit pickup batch — Home/Story/Profile/Browse/Search/Static/Settings/Kids/Admin)
 
 ### Home — OwnersAudit Tasks 1, 2

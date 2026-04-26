@@ -454,7 +454,7 @@ One parameter. Mirror the pattern already used by the quiz CTA at line 926.
 
 ---
 
-### Story Task 18 — Discussion tab hidden from anonymous iOS users; desktop web shows it locked
+### Story Task 18 — Discussion tab hidden from anonymous iOS users; desktop web shows it locked ✓ DONE
 
 **File:** `VerityPost/VerityPost/StoryDetailView.swift:407–410`
 **Source:** Panel review — Seam Inspector
@@ -471,11 +471,11 @@ case .discussion:
 ```
 `anonDiscussionPrompt`: "Create a free account, pass the quiz, and join the discussion." + Sign up + Sign in buttons. Mirror the existing pattern from `MessagesView.swift:68–101`.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (`visibleTabs` no longer filters; discussion case branches on `auth.isLoggedIn` → `discussionContent` vs new `anonDiscussionPrompt` view; `LoginView` sheet wired to `showLogin` state; copy: "Earn the discussion." + "Create a free account, pass the quiz, and join the conversation." + "Create free account" button + "Already have an account? Sign in" link)
 
 ---
 
-### Story Task 19 — Mobile web article tab bar is hardcoded off
+### Story Task 19 — Mobile web article tab bar is hardcoded off ✓ DONE
 
 **File:** `web/src/app/story/[slug]/page.tsx:1209`
 **Source:** Panel review — Seam Inspector
@@ -485,7 +485,7 @@ case .discussion:
 
 **Note:** This appears to be a deliberate prelaunch state rather than an accidental omission. The question is whether this ships at launch or is a post-launch drop.
 
-**Status:** Owner decision needed — confirm intentional vs. scheduled prelaunch lift. If staying off, replace `{false && ...}` with a comment naming the deferral so it is not read as dead code.
+**Status:** Done 2026-04-26 (owner decided 2026-04-26: ship 3 columns on mobile, both web + iOS, labels `Story | Timeline | Discussion`. Web: removed `false &&` from tab bar conditional + Timeline mobile content; renamed `Article` → `Story` in type union + state default + activeTab string literal. iOS: enum rawValue `"Article"` → `"Story"`; `visibleTabs` no longer filters anon. Permission gating now per-pane: Timeline-locked viewers see `timelineLockedPrompt` ("Timeline is part of paid plans. View plans") instead of empty tab on both surfaces.)
 
 ---
 
