@@ -160,17 +160,13 @@ POST-LAUNCH items, Apple-console-blocked items, and SHIPPED items are excluded. 
 
 62. **Add clean stop indicator to home page** (T-060) — small dated mark or thin rule after the last article signaling "that's today's brief"; page ends, not infinite scroll. Affects: `web/src/app/page.tsx`, `VerityPost/VerityPost/HomeView.swift`.
 
-63. **Add anon trial counter pill to story reader** (T-066) — top-right pill showing "1 of 2 free reads" so the paywall arrives expected. Affects: `web/src/app/story/[slug]/page.tsx`, `VerityPost/VerityPost/StoryDetailView.swift`.
+63. **Make story reader full-bleed with collapsing chrome** (T-061) — no persistent chrome; top bar collapses on scroll to a 1px progress line. Affects: `web/src/app/story/[slug]/page.tsx`, `VerityPost/VerityPost/StoryDetailView.swift`.
 
-64. **Make story reader full-bleed with collapsing chrome** (T-061) — no persistent chrome; top bar collapses on scroll to a 1px progress line. Affects: `web/src/app/story/[slug]/page.tsx`, `VerityPost/VerityPost/StoryDetailView.swift`.
+64. **Move source chips inline as superscript citations** (T-062) — sources currently at the bottom; move inline as superscript numbers with tap-to-reveal citation card. Affects: story reader web and iOS.
 
-65. **Move source chips inline as superscript citations** (T-062) — sources currently at the bottom; move inline as superscript numbers with tap-to-reveal citation card. Affects: story reader web and iOS.
+65. **Make quiz unfold inline in story reader** (T-063) — at ~50% scroll: ribbon whispers quiz availability; at ~95%: ribbon expands into quiz panel. No modal, no nav change. Affects: `web/src/app/story/[slug]/page.tsx`, `StoryDetailView.swift`.
 
-66. **Make quiz unfold inline in story reader** (T-063) — at ~50% scroll: ribbon whispers quiz availability; at ~95%: ribbon expands into quiz panel. No modal, no nav change. Affects: `web/src/app/story/[slug]/page.tsx`, `StoryDetailView.swift`.
-
-67. **Slide comment panel in beneath article on quiz pass** (T-064) — Discussion panel slides in beneath the article using the 200ms global transition; no tab switch. Affects: story reader web and iOS.
-
-68. **Add comprehension badge and score-tier color to comment avatars** (T-065) — avatar ring colored by commenter's verity score tier; comprehension badge on avatar. Affects: `web/src/components/CommentRow.tsx`, iOS comment views.
+66. **Add comprehension badge and score-tier color to comment avatars** (T-065) — avatar ring colored by commenter's verity score tier; comprehension badge on avatar. Affects: `web/src/components/CommentRow.tsx`, iOS comment views.
 
 69. **Remove curation-attribution language from all user-facing surfaces** (T-121) — no "Why we picked these," "hand-curated by," or any language naming or alluding to story selectors. Affects: home page, marketing pages, any UI copy referencing curation.
 
@@ -326,9 +322,7 @@ POST-LAUNCH items, Apple-console-blocked items, and SHIPPED items are excluded. 
 
 ## Tier 17 — Doc / repo hygiene
 
-136. **Fix 6 stale facts in `CLAUDE.md`** (T-007, OwnerQ Task 14) — Apple dev account claim, FALLBACK_CATEGORIES (gone from page.tsx), ParentalGate callers (4 not 0), hooks-disable count (25 not 23), settings page size (5247 not 3800), `100_backfill_admin_rank_rpcs_*.sql` path (in `Archived/` not `schema/`). Affects: `CLAUDE.md` (root).
-
-137. **Remove `.mcp.json` from `.gitignore`** (T-010, OwnerQ Task 17) — the file has no secrets; the gitignore entry forces each machine to recreate it manually. Affects: `.gitignore:57`.
+136. **Fix 3 remaining stale facts in `CLAUDE.md`** (T-007, OwnerQ Task 14) — 3 of 6 SHIPPED 2026-04-26 (56c8dad): FALLBACK_CATEGORIES note removed, hooks count de-numbered, settings page size updated to ~5,300. Still open: Apple dev account claim accuracy, ParentalGate callers (4 not 0), `100_backfill_admin_rank_rpcs_*.sql` path (in `Archived/` not `schema/`). Affects: `CLAUDE.md` (root).
 
 138. **Rewrite `Future Projects/02_PRICING_RESET.md` to reflect locked prices** (OwnerQ Task 7) — drop A/B framing; document Verity $3.99/$39.99, Pro $9.99/$99.99, Family $14.99/$149.99, FamilyXL $19.99/$199.99. Affects: `Ongoing Projects/Future/02_PRICING_RESET.md`, `Ongoing Projects/Future/views/ios_adult_subscription.md`.
 

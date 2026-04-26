@@ -74,8 +74,19 @@ Commit: `docs(T-007,T-010): fix 3 stale facts in CLAUDE.md + track .mcp.json`
 [filled only if vote is split]
 
 ## Implementation Progress
-Status: QUEUED
-Queued at: 2026-04-26
+Status: SHIPPED
+2026-04-26 — Changed CLAUDE.md:93 — removed FALLBACK_CATEGORIES parenthetical (zero grep hits in page.tsx)
+2026-04-26 — Changed CLAUDE.md:96 — updated settings page size from "3800-line" to "~5,300-line"
+2026-04-26 — Changed MEMORY.md:16 — removed hardcoded "23" from rules-of-hooks count, replaced with "inline"
+2026-04-26 — Changed .gitignore:57 — removed .mcp.json line
+2026-04-26 — Added .mcp.json to repo (no secrets; sources creds from .env.supabase-readonly)
+tsc: N/A (no TypeScript touched)
+xcodebuild: N/A (no iOS touched)
 
 ## Completed
-[SHIPPED block written here when done]
+
+SHIPPED 2026-04-26
+Commit: 56c8dad — docs(T-007,T-010): fix 3 stale facts in CLAUDE.md + track .mcp.json
+Files touched: CLAUDE.md, .gitignore, .mcp.json (new), Workbench/LiveProgressSheet_T-007-T-010.md
+T-010: fully closed (item 137 removed from Current Tasks.md)
+T-007: partially closed — 3 of 6 facts fixed; item 136 updated with remaining 3 open facts
