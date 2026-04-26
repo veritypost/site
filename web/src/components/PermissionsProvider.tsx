@@ -62,7 +62,8 @@ export function PermissionsProvider({ children }: PermissionsProviderProps) {
       }
     });
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event !== 'SIGNED_IN' && event !== 'SIGNED_OUT' && event !== 'USER_UPDATED') return;
       setUser(session?.user ?? null);
       invalidate();
       setTick((n) => n + 1);
@@ -85,6 +86,7 @@ export function PermissionsProvider({ children }: PermissionsProviderProps) {
     let cancelled = false;
 
     const check = async () => {
+      if (document.visibilityState !== 'visible') return;
       await refreshIfStale();
       if (!cancelled) setTick((n) => n + 1);
     };
@@ -92,12 +94,17 @@ export function PermissionsProvider({ children }: PermissionsProviderProps) {
     check();
     const iv = setInterval(check, 60_000);
     const onFocus = () => check();
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') check();
+    };
     window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
 
     return () => {
       cancelled = true;
       clearInterval(iv);
       window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, []);
 

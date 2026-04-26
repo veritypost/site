@@ -1,7 +1,15 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified shared_components 2026-04-18
 'use client';
-import { createContext, useCallback, useContext, useState, ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  ReactNode,
+} from 'react';
 
 type ToastTone = 'info' | 'success' | 'error';
 
@@ -28,24 +36,42 @@ const ToastContext = createContext<ToastApi | null>(null);
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const idRef = useRef<number>(0);
+  const timerRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
 
   const dismiss = useCallback((id: number) => {
+    const timer = timerRef.current.get(id);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      timerRef.current.delete(id);
+    }
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
   const show = useCallback(
     (message: ReactNode, opts: ToastOptions = {}) => {
-      const id = Date.now() + Math.random();
+      const id = ++idRef.current;
       const tone: ToastTone = opts.tone || 'info';
       const duration = opts.duration ?? 4000;
       setToasts((prev) => [...prev, { id, message, tone }]);
       if (duration > 0) {
-        setTimeout(() => dismiss(id), duration);
+        timerRef.current.set(
+          id,
+          setTimeout(() => dismiss(id), duration)
+        );
       }
       return id;
     },
     [dismiss]
   );
+
+  useEffect(() => {
+    const timers = timerRef.current;
+    return () => {
+      timers.forEach(clearTimeout);
+      timers.clear();
+    };
+  }, []);
 
   const api: ToastApi = {
     show,
