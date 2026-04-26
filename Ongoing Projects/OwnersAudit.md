@@ -1447,7 +1447,7 @@ if !categoriesLoaded {
 
 ---
 
-### Kids Mgmt Task 1 — "Parent PIN" web label misdescribes who types the PIN
+### Kids Mgmt Task 1 — "Parent PIN" web label misdescribes who types the PIN ✓ DONE
 
 **Files:** `web/src/app/profile/kids/page.tsx:939`, `VerityPost/VerityPost/FamilyViews.swift:1226`
 **Source:** Panel review — The Parent
@@ -1458,11 +1458,11 @@ The web setup form labels the PIN field "Parent PIN (4 digits, optional but reco
 **Proposed fix:**
 Change the web label at line 939 to: "Kid PIN (4 digits, optional) — your child types this to open the app." Matches iOS semantics, no ambiguity about who the PIN belongs to.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
-### Kids Mgmt Task 2 — Parent web setup flow has no CTA to download the kids app
+### Kids Mgmt Task 2 — Parent web setup flow has no CTA to download the kids app ✓ DONE
 
 **Files:** `web/src/app/profile/kids/page.tsx`, `VerityPost/VerityPost/FamilyViews.swift:1080–1098`
 **Source:** Panel review — The Parent
@@ -1485,11 +1485,11 @@ Show it persistently (not just post-creation) so parents who return later can st
 
 **Note:** App Store URL is an Apple Console dependency — use a placeholder until that session runs.
 
-**Status:** Pending execution — Apple Console dependency for App Store link
+**Status:** Done 2026-04-26 (`KidsAppBanner` component renders persistently above the kids list. URL is a single `KIDS_APP_STORE_URL` constant — null today shows "Coming soon to the App Store" non-clickable button + "Pair codes from this page will link the account once the app launches." copy. The moment Apple approves, set the constant and the banner flips to "Get the app" CTA + the active link copy. No other UI rework needed.)
 
 ---
 
-### Kids Mgmt Task 3 — Web and iOS parent dashboards show different metrics for the same child
+### Kids Mgmt Task 3 — Web and iOS parent dashboards show different metrics for the same child ✓ DONE
 
 **Files:** `web/src/app/profile/kids/page.tsx:772–774`, `VerityPost/VerityPost/FamilyViews.swift:443–533`
 **Source:** Panel review — The Parent, Seam Inspector
@@ -1500,11 +1500,11 @@ Web `MiniStat` shows: Read, Streak, Score. iOS `KidDashboardView` shows: Article
 **Proposed fix:**
 Align on a canonical three-stat set for both surfaces: Articles Read, Quizzes Passed, Streak. Rename web "Read" → "Articles" to match iOS. Add "Quizzes Passed" to web (or add Score to iOS — owner decision). Ensure both surfaces query identical fields from `kid_profiles` or the KPI endpoint.
 
-**Status:** Pending execution — owner to confirm preferred stat set
+**Status:** Done 2026-04-26 (owner-locked: `{Articles read, Quizzes passed, Streak}`. Web `MiniStat` row updated: `Read` → `Articles` (uses existing `articles_read_count`); `Score` → `Quizzes` (uses existing `quizzes_completed_count` column on `kid_profiles`, MCP-verified). iOS already shows the canonical set. Both surfaces now identical.)
 
 ---
 
-### Kids Mgmt Task 4 — Pause kid profile exists on web but has no iOS counterpart
+### Kids Mgmt Task 4 — Pause kid profile exists on web but has no iOS counterpart ✓ DONE
 
 **Files:** `web/src/app/profile/kids/page.tsx:270–296`, `VerityPost/VerityPost/FamilyViews.swift:280–324`
 **Source:** Panel review — Seam Inspector
@@ -1516,7 +1516,7 @@ Align on a canonical three-stat set for both surfaces: Articles Read, Quizzes Pa
 1. Add Pause/Resume to the iOS ellipsis menu. Check `k.pausedAt != nil` to determine label. The `PATCH /api/kids/:id` endpoint already handles the toggle.
 2. Add a visual indicator to the iOS `kidCard` when `pausedAt != nil` — a "Paused" caption below the kid's name, or reduced-opacity treatment on the avatar.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (`KidProfile` model gained `pausedAt: Date?` mapped to `paused_at`; new `KidsAPI.setPaused(kidId:paused:)` PATCHes `/api/kids/:id` mirroring the web `togglePause()` flow. Menu adds Pause/Resume entry; success refreshes the list and shows a flash. `kidCard` now reduces avatar opacity to 0.45 + replaces the age line with a "Paused" caption (in `VP.warn`) when `pausedAt != nil`.)
 
 ---
 

@@ -7,6 +7,38 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-26 (Group 3 — Kids Mgmt Tasks 1, 2, 3, 4)
+
+### Kid PIN label clarified
+
+**Task 1 — "Parent PIN" → "Kid PIN"**
+- **What** — Web `Field` label `"Parent PIN (4 digits, optional but recommended)"` → `"Kid PIN (4 digits, optional) — your child types this to open the app"`. Aligns with iOS `FamilyViews.swift:1226` semantics — same PIN, no ambiguity about who holds it.
+- **Files** — `web/src/app/profile/kids/page.tsx`
+- **Why** — OwnersAudit Kids Mgmt Task 1.
+
+### App Store CTA placeholder
+
+**Task 2 — `KidsAppBanner` component**
+- **What** — New persistent banner above the kids list. Single `KIDS_APP_STORE_URL` constant gates between two states: when `null` (today), shows "Coming soon to the App Store" non-clickable button + "Pair codes from this page will link the account once the app launches." copy. When set to a real URL, flips to "Get the app" `<a target="_blank">` button + "Then open the app and enter a pair code from this page to link the account." Once Apple approves, set the constant — no UI rework. Uses the existing `C` palette + 44pt button height.
+- **Files** — `web/src/app/profile/kids/page.tsx`
+- **Why** — OwnersAudit Kids Mgmt Task 2. Parents who set up profiles on web had no signal the next step was downloading the iOS app — the funnel dead-ended.
+
+### Dashboard stats parity
+
+**Task 3 — Web `MiniStat` row aligned to iOS**
+- **What** — `{Read | Streak | Score}` → `{Articles | Quizzes | Streak}`. `Read` → `Articles` (uses existing `articles_read_count`). `Score` → `Quizzes` (uses existing `quizzes_completed_count` on `kid_profiles`, MCP-verified before the swap). Matches iOS canonical set (`statBlock("Articles")` / `statBlock("Quizzes")` / `statBlock("Streak")`).
+- **Files** — `web/src/app/profile/kids/page.tsx`
+- **Why** — OwnersAudit Kids Mgmt Task 3. Owner-locked decision: parents need three concrete behaviors (Are they reading? Understanding? Coming back?) — Score was a noisy gamification number for parent context.
+
+### Pause/Resume parity
+
+**Task 4 — iOS pause kid profile parity with web**
+- **What** — Added `pausedAt: Date?` (mapped to `paused_at`) to the `KidProfile` model. New `KidsAPI.setPaused(kidId:paused:)` mirrors web `togglePause()` — PATCHes `/api/kids/:id` with `{paused: Bool}`; route already supports the toggle (line 49 of `[id]/route.js`). Ellipsis menu now includes "Pause profile" / "Resume profile" entry (label flips on `kid.pausedAt != nil`); success calls `load()` to refresh and sets a flash. `kidCard` shows reduced-opacity avatar (0.45) + "Paused" caption in `VP.warn` instead of the age line when paused. MCP-verified `paused_at` column exists on `kid_profiles`.
+- **Files** — `VerityPost/VerityPost/FamilyViews.swift`, `VerityPost/VerityPost/Models.swift`
+- **Why** — OwnersAudit Kids Mgmt Task 4. Web parents could pause; iOS parents had no equivalent control or visual signal of pause state.
+
+---
+
 ## 2026-04-26 (Group 2 — Profile Tasks 1, 2, 6, 7, 9)
 
 ### Profile — branch LockedTab on actual lock reason

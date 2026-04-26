@@ -348,6 +348,7 @@ struct KidProfile: Codable, Identifiable {
     var ageRange: String?
     var readingLevel: String?
     var createdAt: Date?
+    var pausedAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -360,6 +361,7 @@ struct KidProfile: Codable, Identifiable {
         case ageRange = "age_range"
         case readingLevel = "reading_level"
         case createdAt = "created_at"
+        case pausedAt = "paused_at"
     }
 
     var name: String? { displayName }

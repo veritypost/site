@@ -306,6 +306,15 @@ struct FamilyDashboardView: View {
                 } label: {
                     Label("Open Kids App", systemImage: "arrow.up.forward.app")
                 }
+                Button {
+                    Task { await togglePause(kid) }
+                } label: {
+                    if kid.pausedAt != nil {
+                        Label("Resume profile", systemImage: "play.circle")
+                    } else {
+                        Label("Pause profile", systemImage: "pause.circle")
+                    }
+                }
                 if canRemoveKid {
                     Divider()
                     Button(role: .destructive) {
@@ -326,7 +335,8 @@ struct FamilyDashboardView: View {
     }
 
     private func kidCard(_ kid: KidProfile) -> some View {
-        HStack(spacing: 12) {
+        let paused = kid.pausedAt != nil
+        return HStack(spacing: 12) {
             Circle()
                 .fill(Color(hex: kid.avatarColor ?? "999999"))
                 .frame(width: 40, height: 40)
@@ -335,13 +345,20 @@ struct FamilyDashboardView: View {
                         .font(.system(.headline, design: .default, weight: .bold))
                         .foregroundColor(.white)
                 )
+                .opacity(paused ? 0.45 : 1)
             VStack(alignment: .leading, spacing: 2) {
                 Text(kid.safeName)
                     .font(.system(.subheadline, design: .default, weight: .semibold))
                     .foregroundColor(VP.text)
-                Text(kid.ageLabel)
-                    .font(.caption)
-                    .foregroundColor(VP.dim)
+                if paused {
+                    Text("Paused")
+                        .font(.caption)
+                        .foregroundColor(VP.warn)
+                } else {
+                    Text(kid.ageLabel)
+                        .font(.caption)
+                        .foregroundColor(VP.dim)
+                }
             }
             Spacer()
             Image(systemName: "chevron.right")
@@ -351,6 +368,23 @@ struct FamilyDashboardView: View {
         .padding(14)
         .background(VP.card)
         .cornerRadius(10)
+    }
+
+    /// OwnersAudit Kids Mgmt Task 4 — toggle paused via API and refresh list.
+    private func togglePause(_ kid: KidProfile) async {
+        error = ""; flash = ""
+        let nextPaused = kid.pausedAt == nil
+        do {
+            let result = try await KidsAPI.setPaused(kidId: kid.id, paused: nextPaused)
+            if result.ok {
+                flash = nextPaused ? "Profile paused." : "Profile resumed."
+                await load()
+            } else {
+                error = result.error ?? "Couldn't update profile. Try again."
+            }
+        } catch {
+            self.error = "Couldn't update profile. Try again."
+        }
     }
 
     // MARK: - Banner
@@ -838,6 +872,22 @@ enum KidsAPI {
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         if status == 200 { return (true, nil) }
         return (false, decodeError(from: data) ?? "Could not save PIN (HTTP \(status)).")
+    }
+
+    /// OwnersAudit Kids Mgmt Task 4 — pause/resume parity with web.
+    /// Web `togglePause()` PATCHes /api/kids/:id with `{ paused: true|false }`;
+    /// the route flips `paused_at` accordingly.
+    static func setPaused(kidId: String, paused: Bool) async throws -> (ok: Bool, error: String?) {
+        var req = URLRequest(url: endpoint("api/kids/\(kidId)"))
+        req.httpMethod = "PATCH"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(try await bearer())", forHTTPHeaderField: "Authorization")
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["paused": paused])
+        let (data, response) = try await URLSession.shared.data(for: req)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        if status == 200 { return (true, nil) }
+        let action = paused ? "pause" : "resume"
+        return (false, decodeError(from: data) ?? "Could not \(action) profile (HTTP \(status)).")
     }
 
     static func resetPin(kidId: String, password: String) async throws -> (ok: Bool, error: String?) {

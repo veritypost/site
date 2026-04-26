@@ -380,6 +380,8 @@ export default function ParentKidsPage() {
 
       {canViewKpis && (canAdd || trialActive) && <KpiRow kpis={kpis} />}
 
+      <KidsAppBanner />
+
       {kids.length > 0 && (
         <div
           style={{
@@ -519,6 +521,91 @@ export default function ParentKidsPage() {
         onConfirm={confirmRemoveKid}
         onClose={() => !removeBusy && setPendingRemove(null)}
       />
+    </div>
+  );
+}
+
+// OwnersAudit Kids Mgmt Task 2 — App Store CTA so parents who set up on web
+// know the next step is downloading the kids iOS app. Renders persistently
+// (not just post-creation) so parents who return later can still find the
+// download path. URL is a placeholder constant; flip `KIDS_APP_STORE_URL` to
+// the live App Store link when Apple approves the listing — no UI rework.
+const KIDS_APP_STORE_URL: string | null = null;
+
+function KidsAppBanner() {
+  const live = !!KIDS_APP_STORE_URL;
+  return (
+    <div
+      style={{
+        background: '#f0f9ff',
+        border: `1px solid ${C.border}`,
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 12,
+        flexWrap: 'wrap',
+      }}
+    >
+      <div style={{ flex: 1, minWidth: 220 }}>
+        <div
+          style={{
+            fontSize: 14,
+            fontWeight: 700,
+            color: C.text,
+            marginBottom: 4,
+          }}
+        >
+          Next step: download Verity Kids on your child&rsquo;s device.
+        </div>
+        <div style={{ fontSize: 12, color: C.dim, lineHeight: 1.5 }}>
+          {live
+            ? 'Then open the app and enter a pair code from this page to link the account.'
+            : 'Coming soon to the App Store. Pair codes from this page will link the account once the app launches.'}
+        </div>
+      </div>
+      {live ? (
+        <a
+          href={KIDS_APP_STORE_URL!}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '10px 18px',
+            minHeight: 44,
+            background: '#111',
+            color: '#fff',
+            borderRadius: 8,
+            fontSize: 13,
+            fontWeight: 600,
+            textDecoration: 'none',
+          }}
+        >
+          Get the app
+        </a>
+      ) : (
+        <span
+          aria-disabled="true"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '10px 18px',
+            minHeight: 44,
+            background: C.card,
+            color: C.dim,
+            border: `1px solid ${C.border}`,
+            borderRadius: 8,
+            fontSize: 13,
+            fontWeight: 600,
+          }}
+        >
+          Coming soon to the App Store
+        </span>
+      )}
     </div>
   );
 }
@@ -769,9 +856,9 @@ function KidCard({
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-        <MiniStat value={kid.articles_read_count || 0} label="Read" />
+        <MiniStat value={kid.articles_read_count || 0} label="Articles" />
+        <MiniStat value={kid.quizzes_completed_count || 0} label="Quizzes" />
         <MiniStat value={kid.streak_current || 0} label="Streak" />
-        <MiniStat value={kid.verity_score || 0} label="Score" />
       </div>
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -936,7 +1023,7 @@ function CreateKidForm({
           ))}
         </div>
       </Field>
-      <Field label="Parent PIN (4 digits, optional but recommended)">
+      <Field label="Kid PIN (4 digits, optional) — your child types this to open the app">
         <input
           value={form.pin}
           onChange={(e) => setForm({ ...form, pin: e.target.value.replace(/\D/g, '').slice(0, 4) })}
