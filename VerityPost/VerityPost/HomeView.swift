@@ -36,6 +36,30 @@ struct HomeView: View {
 
     private static let editorialTimeZone = TimeZone(identifier: "America/New_York") ?? .current
 
+    // MARK: - Formatters (static to avoid per-render allocation)
+    private static let computeIsoFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.timeZone = editorialTimeZone
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+    private static let computeHumanFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.timeZone = editorialTimeZone
+        f.locale = Locale(identifier: "en_US")
+        f.dateFormat = "EEEE, MMMM d, yyyy"
+        return f
+    }()
+    private static let loadDataISOFmt = ISO8601DateFormatter()
+    private static let timeShortFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.timeZone = editorialTimeZone
+        f.locale = Locale(identifier: "en_US")
+        f.dateFormat = "MMM d"
+        return f
+    }()
+
     private struct EditorialToday {
         let isoDate: String   // "2026-04-23" matching `hero_pick_for_date`
         let startUtc: Date    // midnight ETZ today, expressed as Date (UTC under the hood)
@@ -45,18 +69,12 @@ struct HomeView: View {
     private static func computeToday() -> EditorialToday {
         let now = Date()
 
-        let isoFmt = DateFormatter()
-        isoFmt.timeZone = editorialTimeZone
-        isoFmt.locale = Locale(identifier: "en_US_POSIX")
-        isoFmt.dateFormat = "yyyy-MM-dd"
+        let isoFmt = HomeView.computeIsoFmt
 
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = editorialTimeZone
 
-        let humanFmt = DateFormatter()
-        humanFmt.timeZone = editorialTimeZone
-        humanFmt.locale = Locale(identifier: "en_US")
-        humanFmt.dateFormat = "EEEE, MMMM d, yyyy"
+        let humanFmt = HomeView.computeHumanFmt
 
         return EditorialToday(
             isoDate: isoFmt.string(from: now),
@@ -424,7 +442,7 @@ struct HomeView: View {
         today = HomeView.computeToday()
 
         do {
-            let todayStartIso = ISO8601DateFormatter().string(from: today.startUtc)
+            let todayStartIso = HomeView.loadDataISOFmt.string(from: today.startUtc)
 
             async let storiesReq: [Story] = client.from("articles")
                 .select()
@@ -547,11 +565,7 @@ struct HomeView: View {
         if mins < 60 { return "\(mins)m ago" }
         let hours = mins / 60
         if hours < 24 { return "\(hours)h ago" }
-        let fmt = DateFormatter()
-        fmt.timeZone = HomeView.editorialTimeZone
-        fmt.locale = Locale(identifier: "en_US")
-        fmt.dateFormat = "MMM d"
-        return fmt.string(from: date)
+        return HomeView.timeShortFmt.string(from: date)
     }
 }
 

@@ -9,6 +9,19 @@ struct MessagesView: View {
     @StateObject private var perms = PermissionStore.shared
     private let client = SupabaseManager.shared.client
 
+    // MARK: - Formatters (static to avoid per-message allocation)
+    private static let msgISO: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+    private static let msgISOFallback: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
+    private static let nowISO = ISO8601DateFormatter()
+
     @State private var conversations: [DMConversation] = []
     @State private var loading = true
     @State private var hasDmAccess = false
@@ -514,7 +527,7 @@ struct MessagesView: View {
         if let i = conversations.firstIndex(where: { $0.id == convoId }) {
             conversations[i].unread = 0
         }
-        let nowIso = ISO8601DateFormatter().string(from: Date())
+        let nowIso = MessagesView.nowISO.string(from: Date())
         try? await client.from("conversation_participants")
             .update(["last_read_at": nowIso])
             .eq("conversation_id", value: convoId)
@@ -648,11 +661,8 @@ struct MessagesView: View {
             }()
             let lastAt: Date? = {
                 guard case let .string(v) = change.record["last_message_at"] else { return nil }
-                let f = ISO8601DateFormatter()
-                f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-                if let d = f.date(from: v) { return d }
-                f.formatOptions = [.withInternetDateTime]
-                return f.date(from: v)
+                if let d = MessagesView.msgISO.date(from: v) { return d }
+                return MessagesView.msgISOFallback.date(from: v)
             }()
             await MainActor.run {
                 guard let i = conversations.firstIndex(where: { $0.id == convoId }) else { return }
@@ -881,11 +891,8 @@ struct DMThreadView: View {
             }()
             let createdAt: Date? = {
                 guard case let .string(v) = change.record["created_at"] else { return nil }
-                let f = ISO8601DateFormatter()
-                f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-                if let d = f.date(from: v) { return d }
-                f.formatOptions = [.withInternetDateTime]
-                return f.date(from: v)
+                if let d = MessagesView.msgISO.date(from: v) { return d }
+                return MessagesView.msgISOFallback.date(from: v)
             }()
             let msg = Msg(id: newId, senderId: senderId, body: body, createdAt: createdAt)
             await MainActor.run {
@@ -948,7 +955,7 @@ struct DMThreadView: View {
         }
         let others = messages.filter { $0.senderId != userId }
         if others.isEmpty { return }
-        let nowIso = ISO8601DateFormatter().string(from: Date())
+        let nowIso = MessagesView.nowISO.string(from: Date())
         let rows: [Receipt] = others.map { Receipt(message_id: $0.id, user_id: userId, read_at: nowIso) }
         do {
             try await client.from("message_receipts")
@@ -1056,11 +1063,8 @@ struct DMThreadView: View {
             // the realtime handler at subscribeToNewMessages() (lines 719-726).
             let createdAt: Date? = {
                 guard let v = env.message.created_at else { return nil }
-                let f = ISO8601DateFormatter()
-                f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-                if let d = f.date(from: v) { return d }
-                f.formatOptions = [.withInternetDateTime]
-                return f.date(from: v)
+                if let d = MessagesView.msgISO.date(from: v) { return d }
+                return MessagesView.msgISOFallback.date(from: v)
             }()
             let msg = Msg(
                 id: env.message.id,

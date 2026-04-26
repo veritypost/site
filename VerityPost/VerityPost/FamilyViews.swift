@@ -1193,7 +1193,6 @@ struct PairCodeSheet: View {
             if let pair = result.pair {
                 code = pair.code
                 expiresAt = ISO8601DateFormatter.kidsAPI.date(from: pair.expires_at)
-                    ?? ISO8601DateFormatter().date(from: pair.expires_at)
                 now = Date()
             } else {
                 error = result.error ?? "Could not generate code."

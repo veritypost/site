@@ -192,16 +192,26 @@ struct RecapSummary: Codable, Identifiable {
         case myAttempt = "my_attempt"
     }
 
+    // MARK: - Formatters (static to avoid per-render allocation)
+    private static let recapInputFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f
+    }()
+    private static let recapOutputFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMM d"
+        return f
+    }()
+
     // Derived for the row UI. week_start / week_end are `date` strings
     // (YYYY-MM-DD) from Postgres, not ISO 8601 datetimes.
     var dateRange: String? {
         guard let s = weekStart, let e = weekEnd else { return nil }
-        let input = DateFormatter()
-        input.dateFormat = "yyyy-MM-dd"
-        input.locale = Locale(identifier: "en_US_POSIX")
+        let input = RecapSummary.recapInputFmt
         guard let sd = input.date(from: s), let ed = input.date(from: e) else { return "\(s) – \(e)" }
-        let output = DateFormatter()
-        output.dateFormat = "MMM d"
+        let output = RecapSummary.recapOutputFmt
         return "\(output.string(from: sd)) – \(output.string(from: ed))"
     }
 

@@ -40,6 +40,7 @@ final class EventsClient {
     private let maxEventBytes = 4 * 1024
     private let maxBufferBytes = 32 * 1024
 
+    private static let isoFmt = ISO8601DateFormatter()
     private let sessionId: String = UUID().uuidString
     private var deviceId: String {
         if let existing = UserDefaults.standard.string(forKey: "vp.device_id") {
@@ -63,7 +64,7 @@ final class EventsClient {
         let evt = Event(
             event: event,
             surface: "ios_adult",
-            occurred_at: ISO8601DateFormatter().string(from: Date()),
+            occurred_at: EventsClient.isoFmt.string(from: Date()),
             session_id: sessionId,
             device_id: deviceId,
             page: page,

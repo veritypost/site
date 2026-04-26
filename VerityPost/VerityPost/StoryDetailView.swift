@@ -122,6 +122,10 @@ struct StoryDetailView: View {
     // D17: TTS is now permission-gated (`article.tts.play`).
     @StateObject private var tts = TTSPlayer()
 
+    // Push prompt — shown once after first quiz pass if status is .notDetermined.
+    @StateObject private var push = PushPermission.shared
+    @State private var showPushPrompt = false
+
     // D1: pass threshold is 3 out of 5. Used only for UX copy; server is the
     // authority on pass/fail (result.passed is what actually unlocks).
     private var passThreshold: Int {
@@ -148,6 +152,29 @@ struct StoryDetailView: View {
     @State private var upNextStories: [Story] = []
     @State private var upNextRequested = false
     @State private var endOfArticleHit = false
+
+    // MARK: - Formatters (static to avoid per-render allocation)
+    private static let muteDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .short
+        return f
+    }()
+    private static let displayDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMMM d, yyyy"
+        return f
+    }()
+    private static let muteISOFmt: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+    private static let muteISOFmtFallback: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
 
     // MARK: - Body
     var body: some View {
@@ -270,6 +297,21 @@ struct StoryDetailView: View {
             Text("Free accounts can save up to 10 bookmarks. Unlimited bookmarks and collections are available on paid plans.")
         }
         .sheet(isPresented: $showSubscription) { SubscriptionView().environmentObject(auth) }
+        .sheet(isPresented: $showPushPrompt) {
+            PushPromptSheet(
+                title: "Stay informed",
+                detail: "Get notified when stories you\u{2019}ve read break new developments.",
+                onEnable: {
+                    await push.requestIfNeeded()
+                    if push.isOn, let uid = auth.currentUser?.id {
+                        PushRegistration.shared.setCurrentUser(uid)
+                    }
+                },
+                onDecline: {
+                    push.markPrePromptDeclined()
+                }
+            )
+        }
         // Apple Guideline 1.2 — Report Content / Block User affordances.
         .confirmationDialog(
             "Report comment",
@@ -341,6 +383,7 @@ struct StoryDetailView: View {
         .task(id: story.id) { await loadData() }
         .task(id: story.id) { await loadUpNextStories() }
         .task(id: story.id) { await subscribeToNewComments() }
+        .task { await push.refresh() }
         .task(id: perms.changeToken) {
             canPlayTTS = await PermissionService.shared.has("article.tts.play")
             canTakeQuiz = await PermissionService.shared.has("quiz.attempt.start")
@@ -1126,10 +1169,7 @@ struct StoryDetailView: View {
         let untilText: String = {
             if mute.banned { return "indefinitely — your account is banned." }
             if let until = mute.mutedUntil {
-                let f = DateFormatter()
-                f.dateStyle = .medium
-                f.timeStyle = .short
-                return "until \(f.string(from: until))."
+                return "until \(StoryDetailView.muteDateFormatter.string(from: until))."
             }
             return "."
         }()
@@ -1791,7 +1831,7 @@ struct StoryDetailView: View {
     }
 
     private func formatDate(_ date: Date) -> String {
-        let f = DateFormatter(); f.dateFormat = "MMMM d, yyyy"; return f.string(from: date)
+        return StoryDetailView.displayDateFormatter.string(from: date)
     }
 
     // MARK: - Data loading
@@ -1903,34 +1943,6 @@ struct StoryDetailView: View {
             }
         }
 
-        // Expert Q&A
-        #if false
-        // TODO(round9-expert-qa-shape): expert_discussions uses title/body/parent_id/is_expert_question tree, not question/answer/question_id cols. Redesign needed to reconstruct Q+A pairs via parent_id + is_expert_question + expert_question_status.
-        do {
-            struct EQ: Decodable { let id: String; let question: String }
-            let qs: [EQ] = try await client.from("expert_discussions")
-                .select("id, question")
-                .eq("article_id", value: story.id)
-                .eq("status", value: "answered")
-                .execute().value
-            if !qs.isEmpty {
-                struct EA: Decodable {
-                    let question_id: String; let answer: String; let users: U
-                    struct U: Decodable { let username: String? }
-                }
-                let ids = qs.map { $0.id }
-                let answers: [EA] = try await client.from("expert_discussions")
-                    .select("question_id, answer, users:expert_id(username)")
-                    .in("question_id", values: ids)
-                    .execute().value
-                let qMap = Dictionary(uniqueKeysWithValues: qs.map { ($0.id, $0.question) })
-                expertAnswers = answers.compactMap { a in
-                    guard let q = qMap[a.question_id] else { return nil }
-                    return (q, a.answer, a.users.username ?? "Expert")
-                }
-            }
-        } catch {}
-        #endif
     }
 
     // MARK: - Mute-state fetch
@@ -1955,11 +1967,8 @@ struct StoryDetailView: View {
         let banned = row.is_banned == true
         let untilDate: Date? = {
             guard let s = row.muted_until, !s.isEmpty else { return nil }
-            let f = ISO8601DateFormatter()
-            f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            if let d = f.date(from: s) { return d }
-            f.formatOptions = [.withInternetDateTime]
-            return f.date(from: s)
+            if let d = StoryDetailView.muteISOFmt.date(from: s) { return d }
+            return StoryDetailView.muteISOFmtFallback.date(from: s)
         }()
         let muteActive = (row.is_muted == true)
             && ((row.mute_level ?? 0) >= 1)
@@ -2214,7 +2223,14 @@ struct StoryDetailView: View {
             await MainActor.run {
                 quizResult = decoded
                 quizStage = .result
-                if decoded.passed { userPassedQuiz = true }
+                if decoded.passed {
+                    userPassedQuiz = true
+                    if push.status == .notDetermined,
+                       !push.prePromptRecentlyDeclined,
+                       !push.hasBeenPrompted {
+                        showPushPrompt = true
+                    }
+                }
             }
         } catch {
             await MainActor.run { quizStage = .answering; quizError = "Network issue." }
@@ -2448,68 +2464,6 @@ struct StoryDetailView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - Scoring
-    // Server-authoritative. All verity_score / streak / achievement writes
-    // happen in the award_reading_points(p_article_id uuid) RPC
-    // (SECURITY DEFINER, owned by postgres; bypasses the privileged-column
-    // trigger on public.users). We never write users.verity_score from the
-    // client — the users_update RLS policy + reject_privileged_user_updates
-    // trigger would raise 42501 anyway.
-    private func appAwardPoints(userId: String, action: String) async {
-        // action is a legacy parameter; the server uses the fixed
-        // 'read_article' rule key. We only pass the article id.
-        guard action == "read_article" else { return }
-        let articleId = story.id
-        let ss = SettingsService.shared
-        do {
-            struct Params: Encodable { let p_article_id: String }
-            struct RPCResult: Decodable {
-                let awarded: Bool?
-                let points: Int?
-                let streak: StreakPayload?
-                struct StreakPayload: Decodable {
-                    let advanced: Bool?
-                    let streak: Int?
-                    let best: Int?
-                    let milestone: String?
-                }
-            }
-            let result: RPCResult = try await client
-                .rpc("award_reading_points", params: Params(p_article_id: articleId))
-                .execute().value
-
-            let awarded = result.awarded ?? false
-            if awarded, ss.isEnabled("achievement_toasts", default: true) {
-                struct A: Decodable { let id: String; let achievements: I; struct I: Decodable { let name: String? } }
-                let recent: [A] = (try? await client.from("user_achievements")
-                    .select("id, achievements:achievement_id(name)")
-                    .eq("user_id", value: userId)
-                    .order("earned_at", ascending: false)
-                    .limit(1)
-                    .execute().value) ?? []
-                if let latest = recent.first, let name = latest.achievements.name {
-                    achievementToastText = "Achievement: \(name)"
-                    showAchievementToast = true
-                    Task {
-                        try? await Task.sleep(nanoseconds: 3_000_000_000)
-                        await MainActor.run { showAchievementToast = false }
-                    }
-                }
-            }
-
-            if ss.isEnabled("streak_celebration"),
-               let streakInfo = result.streak,
-               streakInfo.advanced == true,
-               let current = streakInfo.streak {
-                streakCount = current
-                showStreakCelebration = true
-                Task {
-                    try? await Task.sleep(nanoseconds: 2_500_000_000)
-                    await MainActor.run { showStreakCelebration = false }
-                }
-            }
-        } catch { Log.d("Award points error:", error) }
-    }
 }
 
 // MARK: - Server-graded quiz API shapes (D1/D6/D8/D41)

@@ -320,10 +320,14 @@ struct BookmarksView: View {
         } catch { return nil }
     }
 
-    private func shortDate(_ d: Date) -> String {
+    private static let bookmarkDateFmt: DateFormatter = {
         let f = DateFormatter()
         f.dateStyle = .short
-        return f.string(from: d)
+        return f
+    }()
+
+    private func shortDate(_ d: Date) -> String {
+        return BookmarksView.bookmarkDateFmt.string(from: d)
     }
 }
 

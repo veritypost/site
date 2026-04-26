@@ -100,11 +100,15 @@ struct VPUser: Codable, Identifiable {
         return String(s.prefix(1)).uppercased()
     }
 
+    private static let memberSinceFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMMM yyyy"
+        return f
+    }()
+
     var memberSince: String {
         guard let date = createdAt else { return "" }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMMM yyyy"
-        return formatter.string(from: date)
+        return VPUser.memberSinceFmt.string(from: date)
     }
 
     var planDisplay: String {
@@ -361,10 +365,15 @@ struct KidProfile: Codable, Identifiable {
     var name: String? { displayName }
     var ageTier: String? { ageRange }
 
+    private static let dobFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+
     var age: Int? {
         guard let dob = dateOfBirth else { return nil }
-        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
-        guard let d = f.date(from: dob) else { return nil }
+        guard let d = KidProfile.dobFmt.date(from: dob) else { return nil }
         let years = Calendar.current.dateComponents([.year], from: d, to: Date()).year
         return years
     }

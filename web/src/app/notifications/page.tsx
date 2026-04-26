@@ -25,6 +25,31 @@ type NotificationRow = Pick<
 
 type Filter = 'all' | 'unread';
 
+function groupNotifications(
+  notifications: NotificationRow[]
+): { section: string; items: NotificationRow[] }[] {
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const weekStart = new Date(todayStart.getTime() - 6 * 24 * 60 * 60 * 1000);
+  const groups: { section: string; items: NotificationRow[] }[] = [];
+  const today = notifications.filter(
+    (n) => n.created_at != null && new Date(n.created_at) >= todayStart
+  );
+  const thisWeek = notifications.filter(
+    (n) =>
+      n.created_at != null &&
+      new Date(n.created_at) >= weekStart &&
+      new Date(n.created_at) < todayStart
+  );
+  const earlier = notifications.filter(
+    (n) => n.created_at == null || new Date(n.created_at) < weekStart
+  );
+  if (today.length) groups.push({ section: 'Today', items: today });
+  if (thisWeek.length) groups.push({ section: 'This week', items: thisWeek });
+  if (earlier.length) groups.push({ section: 'Earlier', items: earlier });
+  return groups;
+}
+
 const C = {
   card: '#f7f7f7',
   border: '#e5e5e5',
@@ -336,43 +361,64 @@ export default function NotificationsInbox() {
             : 'No notifications yet. When someone replies, mentions you, or an article breaks, it lands here.'}
         </div>
       ) : (
-        items.map((n) => (
-          <a
-            key={n.id}
-            href={n.action_url || '#'}
-            onClick={() => markOne(n.id)}
-            style={{
-              display: 'block',
-              background: n.is_read ? C.card : '#fff',
-              border: `1px solid ${n.is_read ? C.border : C.accent}`,
-              borderRadius: 10,
-              padding: 12,
-              marginBottom: 8,
-              textDecoration: 'none',
-              color: C.text,
-            }}
-          >
-            <div style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
-              <span
+        groupNotifications(items).map(({ section, items: sectionItems }) => (
+          <div key={section}>
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: C.dim,
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                marginBottom: 6,
+                marginTop: section !== 'Today' ? 20 : 0,
+                paddingBottom: 4,
+                borderBottom: `1px solid ${C.border}`,
+              }}
+            >
+              {section}
+            </div>
+            {sectionItems.map((n) => (
+              <a
+                key={n.id}
+                href={n.action_url || '#'}
+                onClick={() => markOne(n.id)}
                 style={{
-                  fontSize: 10,
-                  padding: '2px 8px',
+                  display: 'block',
+                  background: n.is_read ? C.card : '#fff',
+                  border: `1px solid ${n.is_read ? C.border : C.accent}`,
                   borderRadius: 10,
-                  background: C.card,
-                  color: C.dim,
-                  fontWeight: 700,
-                  textTransform: 'uppercase',
+                  padding: 12,
+                  marginBottom: 8,
+                  textDecoration: 'none',
+                  color: C.text,
                 }}
               >
-                {n.type as NotificationType}
-              </span>
-              <span style={{ fontSize: 14, fontWeight: 600 }}>{n.title}</span>
-              <span style={{ marginLeft: 'auto', fontSize: 11, color: C.dim }}>
-                {formatDateTime(n.created_at)}
-              </span>
-            </div>
-            {n.body && <div style={{ fontSize: 13, color: C.text, marginTop: 4 }}>{n.body}</div>}
-          </a>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+                  <span
+                    style={{
+                      fontSize: 10,
+                      padding: '2px 8px',
+                      borderRadius: 10,
+                      background: C.card,
+                      color: C.dim,
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    {n.type as NotificationType}
+                  </span>
+                  <span style={{ fontSize: 14, fontWeight: 600 }}>{n.title}</span>
+                  <span style={{ marginLeft: 'auto', fontSize: 11, color: C.dim }}>
+                    {formatDateTime(n.created_at)}
+                  </span>
+                </div>
+                {n.body && (
+                  <div style={{ fontSize: 13, color: C.text, marginTop: 4 }}>{n.body}</div>
+                )}
+              </a>
+            ))}
+          </div>
         ))
       )}
     </main>

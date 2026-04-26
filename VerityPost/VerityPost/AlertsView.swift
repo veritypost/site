@@ -188,13 +188,40 @@ struct AlertsView: View {
 
     // MARK: - Alerts Content
 
+    // Groups notifications into Today / This week / Earlier sections.
+    // Only non-empty sections are returned.
+    private func groupedNotifications() -> [(section: String, items: [VPNotification])] {
+        let cal = Calendar.current
+        let now = Date()
+        var groups: [(section: String, items: [VPNotification])] = []
+        let today = notifications.filter {
+            guard let d = $0.createdAt else { return false }
+            return cal.isDateInToday(d)
+        }
+        let thisWeek = notifications.filter {
+            guard let d = $0.createdAt else { return false }
+            return !cal.isDateInToday(d) && cal.isDate(d, equalTo: now, toGranularity: .weekOfYear)
+        }
+        let earlier = notifications.filter {
+            guard let d = $0.createdAt else { return true }
+            return !cal.isDateInToday(d) && !cal.isDate(d, equalTo: now, toGranularity: .weekOfYear)
+        }
+        if !today.isEmpty { groups.append((section: "Today", items: today)) }
+        if !thisWeek.isEmpty { groups.append((section: "This week", items: thisWeek)) }
+        if !earlier.isEmpty { groups.append((section: "Earlier", items: earlier)) }
+        return groups
+    }
+
     private var alertsContent: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                if loading {
+        Group {
+            if loading {
+                ScrollView {
                     ProgressView()
                         .padding(.top, 60)
-                } else if notifications.isEmpty {
+                        .padding(.bottom, 100)
+                }
+            } else if notifications.isEmpty {
+                ScrollView {
                     VStack(spacing: 12) {
                         Image(systemName: "bell.slash")
                             .font(.largeTitle)
@@ -210,31 +237,52 @@ struct AlertsView: View {
                     }
                     .padding(.top, 80)
                     .padding(.horizontal, 40)
-                } else {
-                    LazyVStack(spacing: 0) {
-                        ForEach(Array(notifications.enumerated()), id: \.element.id) { idx, notif in
-                            Button {
-                                Task {
-                                    await markAsRead(notif)
-                                    if let slug = notif.storySlug {
-                                        navigateToSlug = slug
+                    .padding(.bottom, 100)
+                }
+            } else {
+                List {
+                    ForEach(groupedNotifications(), id: \.section) { group in
+                        Section {
+                            ForEach(group.items) { notif in
+                                Button {
+                                    Task {
+                                        await markAsRead(notif)
+                                        if let slug = notif.storySlug {
+                                            navigateToSlug = slug
+                                        }
+                                    }
+                                } label: {
+                                    notificationRow(notif)
+                                }
+                                .buttonStyle(.plain)
+                                .listRowInsets(EdgeInsets())
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
+                                .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                                    if !notif.isRead {
+                                        Button {
+                                            Task { await markAsRead(notif) }
+                                        } label: {
+                                            Label("Mark Read", systemImage: "envelope.open")
+                                        }
+                                        .tint(.blue)
                                     }
                                 }
-                            } label: {
-                                notificationRow(notif)
                             }
-                            .buttonStyle(.plain)
-
-                            if idx < notifications.count - 1 {
-                                Divider().background(VP.border)
-                            }
+                        } header: {
+                            Text(group.section)
+                                .font(.system(.caption, design: .default, weight: .semibold))
+                                .foregroundColor(VP.dim)
+                                .textCase(.uppercase)
+                                .padding(.horizontal, 16)
+                                .padding(.top, 8)
                         }
                     }
-                    .background(VP.bg)
-                    .padding(.top, 8)
                 }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .background(VP.bg)
             }
-            .padding(.bottom, 100)
         }
     }
 
@@ -642,20 +690,9 @@ struct AlertsView: View {
             // subscription feature is disabled until Round 7 designs a
             // `subscription_topics` table + API route. See
             // 05-Working/OWNER_TO_DO.md ("Alert subscriptions model").
-            #if false
-            let subs: [AlertSubscription] = try await client.from("alert_preferences")
-                .select()
-                .eq("user_id", value: userId)
-                .execute().value
-
-            subscribedCategories = subs.filter { $0.type == "category" }
-            subscribedSubcategories = subs.filter { $0.type == "subcategory" }
-            subscribedKeywords = subs.filter { $0.type == "keyword" }
-            #else
             subscribedCategories = []
             subscribedSubcategories = []
             subscribedKeywords = []
-            #endif
 
             // Fetch all categories
             allCategories = try await client.from("categories")
@@ -676,60 +713,18 @@ struct AlertsView: View {
         guard let userId = auth.currentUser?.id, !selectedCategoryToAdd.isEmpty else { return }
         let catName = allCategories.first(where: { $0.id == selectedCategoryToAdd })?.name ?? selectedCategoryToAdd
 
-        // Round 6 iOS-DATA: gated off until Round 7 redesign — see
-        // loadManageData() comment. Kept in source so the UI wiring is
-        // trivial to re-enable once the real table exists.
-        #if false
-        struct NewSub: Encodable {
-            let user_id: String
-            let type: String
-            let value: String
-            let reference_id: String
-        }
-
-        do {
-            let sub = NewSub(user_id: userId, type: "category", value: catName, reference_id: selectedCategoryToAdd)
-            try await client.from("alert_preferences").insert(sub).execute()
-            selectedCategoryToAdd = ""
-            await loadManageData()
-            await maybeOfferPush()
-        } catch {
-            Log.d("Failed to add category subscription: \(error)")
-        }
-        #else
         _ = userId; _ = catName
         selectedCategoryToAdd = ""
         await loadManageData()
-        #endif
     }
 
     private func addSubcategorySubscription() async {
         guard let userId = auth.currentUser?.id, !selectedSubcategoryToAdd.isEmpty else { return }
         let subName = allSubcategories.first(where: { $0.id == selectedSubcategoryToAdd })?.name ?? selectedSubcategoryToAdd
 
-        // Round 6 iOS-DATA: gated off until Round 7 redesign.
-        #if false
-        struct NewSub: Encodable {
-            let user_id: String
-            let type: String
-            let value: String
-            let reference_id: String
-        }
-
-        do {
-            let sub = NewSub(user_id: userId, type: "subcategory", value: subName, reference_id: selectedSubcategoryToAdd)
-            try await client.from("alert_preferences").insert(sub).execute()
-            selectedSubcategoryToAdd = ""
-            await loadManageData()
-            await maybeOfferPush()
-        } catch {
-            Log.d("Failed to add subcategory subscription: \(error)")
-        }
-        #else
         _ = userId; _ = subName
         selectedSubcategoryToAdd = ""
         await loadManageData()
-        #endif
     }
 
     private func addKeywordSubscription() async {
@@ -737,28 +732,9 @@ struct AlertsView: View {
         let keyword = newKeyword.trimmingCharacters(in: .whitespaces)
         guard !keyword.isEmpty else { return }
 
-        // Round 6 iOS-DATA: gated off until Round 7 redesign.
-        #if false
-        struct NewSub: Encodable {
-            let user_id: String
-            let type: String
-            let value: String
-        }
-
-        do {
-            let sub = NewSub(user_id: userId, type: "keyword", value: keyword)
-            try await client.from("alert_preferences").insert(sub).execute()
-            newKeyword = ""
-            await loadManageData()
-            await maybeOfferPush()
-        } catch {
-            Log.d("Failed to add keyword subscription: \(error)")
-        }
-        #else
         _ = userId; _ = keyword
         newKeyword = ""
         await loadManageData()
-        #endif
     }
 
     /// Offer push enrollment the first time a user subscribes to anything.
@@ -771,25 +747,7 @@ struct AlertsView: View {
     }
 
     private func removeSubscription(_ sub: AlertSubscription) async {
-        // Round 6 iOS-DATA: gated off until Round 7 redesign. The
-        // subscription list is always empty in the current build, so
-        // this path is unreachable — but preserved in source for Round 7.
-        #if false
-        do {
-            try await client.from("alert_preferences")
-                .delete()
-                .eq("id", value: sub.id)
-                .execute()
-
-            subscribedCategories.removeAll { $0.id == sub.id }
-            subscribedSubcategories.removeAll { $0.id == sub.id }
-            subscribedKeywords.removeAll { $0.id == sub.id }
-        } catch {
-            Log.d("Failed to remove subscription: \(error)")
-        }
-        #else
         _ = sub
-        #endif
     }
 }
 

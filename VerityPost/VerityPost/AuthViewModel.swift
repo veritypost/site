@@ -38,6 +38,7 @@ final class AuthViewModel: ObservableObject {
     private var authStateTask: Task<Void, Never>?
     private var subscriptionObserver: NSObjectProtocol?
     private var wasLoggedIn = false
+    private static let isoFmt = ISO8601DateFormatter()
 
     init() {
         // Refresh the cached user row whenever StoreKit / restore posts a
@@ -171,7 +172,7 @@ final class AuthViewModel: ObservableObject {
                 struct Patch: Encodable { let last_login_at: String }
                 try await client.rpc(
                     "update_own_profile",
-                    params: Args(p_fields: Patch(last_login_at: ISO8601DateFormatter().string(from: Date())))
+                    params: Args(p_fields: Patch(last_login_at: AuthViewModel.isoFmt.string(from: Date())))
                 ).execute()
             } catch {
                 Log.d("last_login_at update failed: \(error)")

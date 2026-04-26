@@ -1577,10 +1577,16 @@ struct LoginActivityView: View {
         .task { await load() }
     }
 
+    private static let loginActivityISO = ISO8601DateFormatter()
+    private static let loginActivityDisplayFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMM d \u{00B7} h:mm a"
+        return f
+    }()
+
     private static func formatDate(_ iso: String?) -> String {
-        guard let s = iso, let date = ISO8601DateFormatter().date(from: s) else { return "" }
-        let f = DateFormatter(); f.dateFormat = "MMM d \u{00B7} h:mm a"
-        return f.string(from: date)
+        guard let s = iso, let date = Self.loginActivityISO.date(from: s) else { return "" }
+        return Self.loginActivityDisplayFmt.string(from: date)
     }
 
     private func load() async {

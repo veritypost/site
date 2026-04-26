@@ -1551,6 +1551,12 @@ struct ProfileView: View {
     private static let achFormatter: DateFormatter = {
         let f = DateFormatter(); f.dateFormat = "MMM d, yyyy"; return f
     }()
+    private static let dayLabelFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMM d"
+        return f
+    }()
+    private static let streakISO = ISO8601DateFormatter()
 
     // MARK: - Empty state helper
     private func emptyState(title: String, description: String) -> some View {
@@ -1657,8 +1663,7 @@ struct ProfileView: View {
     }
 
     private func dayAccessibilityLabel(day: Date, isRead: Bool) -> String {
-        let f = DateFormatter(); f.dateFormat = "MMM d"
-        return "\(f.string(from: day)): \(isRead ? "read" : "no read")"
+        return "\(ProfileView.dayLabelFmt.string(from: day)): \(isRead ? "read" : "no read")"
     }
 
     private func loadStreak(userId: String) async {
@@ -1666,7 +1671,7 @@ struct ProfileView: View {
         do {
             let cal = Calendar.current
             guard let since = cal.date(byAdding: .day, value: -30, to: cal.startOfDay(for: Date())) else { return }
-            let iso = ISO8601DateFormatter().string(from: since)
+            let iso = ProfileView.streakISO.string(from: since)
             // `.is("kid_profile_id", value: nil)` — every kids-app
             // reading_log row carries the kid_profile_id, so without
             // this filter the parent's own streak grid would also count

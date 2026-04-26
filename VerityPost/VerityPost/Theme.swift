@@ -248,6 +248,12 @@ struct PillButton: View {
 
 // MARK: - Time ago formatter
 
+private let _timeAgoFmt: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "MMM d"
+    return f
+}()
+
 func timeAgo(_ date: Date) -> String {
     let now = Date()
     let diff = now.timeIntervalSince(date)
@@ -257,7 +263,5 @@ func timeAgo(_ date: Date) -> String {
     if mins < 60 { return mins <= 1 ? "just now" : "\(mins)m ago" }
     if hours < 24 { return "\(hours)h ago" }
     if days < 30 { return "\(days)d ago" }
-    let formatter = DateFormatter()
-    formatter.dateFormat = "MMM d"
-    return formatter.string(from: date)
+    return _timeAgoFmt.string(from: date)
 }
