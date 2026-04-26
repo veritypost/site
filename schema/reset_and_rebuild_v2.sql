@@ -7157,6 +7157,115 @@ REVOKE ALL ON FUNCTION public.get_own_login_activity(int) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_own_login_activity(int) TO authenticated, service_role;
 
 -- ------------------------------------------------------------
+-- require_outranks (Q6 — admin rank gate; backfilled from prod 2026-04-19)
+-- Source: Archived/100_backfill_admin_rank_rpcs_2026_04_19.sql
+-- Returns true iff auth.uid() strictly outranks target by max roles.hierarchy_level.
+-- service_role bypass. Used by admin API routes for F-034/F-035/F-036 rank guards.
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.require_outranks(target_user_id uuid)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_caller uuid := auth.uid();
+  v_role   text := current_setting('request.jwt.claim.role', true);
+  v_caller_level int;
+  v_target_level int;
+  v_target_exists boolean;
+BEGIN
+  -- service_role bypass: server-side jobs always win.
+  IF v_role = 'service_role' THEN
+    RETURN true;
+  END IF;
+
+  -- Unauthed caller: never outranks anyone.
+  IF v_caller IS NULL THEN
+    RETURN false;
+  END IF;
+
+  -- Target must exist.
+  SELECT EXISTS(SELECT 1 FROM public.users WHERE id = target_user_id) INTO v_target_exists;
+  IF NOT v_target_exists THEN
+    RETURN false;
+  END IF;
+
+  -- Caller's max hierarchy level across all assigned roles.
+  SELECT COALESCE(MAX(r.hierarchy_level), 0)
+    INTO v_caller_level
+    FROM public.user_roles ur
+    JOIN public.roles r ON r.id = ur.role_id
+   WHERE ur.user_id = v_caller
+     AND (ur.expires_at IS NULL OR ur.expires_at > now());
+
+  -- Target's max hierarchy level.
+  SELECT COALESCE(MAX(r.hierarchy_level), 0)
+    INTO v_target_level
+    FROM public.user_roles ur
+    JOIN public.roles r ON r.id = ur.role_id
+   WHERE ur.user_id = target_user_id
+     AND (ur.expires_at IS NULL OR ur.expires_at > now());
+
+  RETURN v_caller_level > v_target_level;
+END;
+$function$
+;
+
+REVOKE ALL ON FUNCTION public.require_outranks(uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.require_outranks(uuid) FROM anon;
+GRANT  EXECUTE ON FUNCTION public.require_outranks(uuid) TO authenticated;
+GRANT  EXECUTE ON FUNCTION public.require_outranks(uuid) TO service_role;
+
+-- ------------------------------------------------------------
+-- caller_can_assign_role (Q6 — admin role-grant gate; backfilled from prod 2026-04-19)
+-- Source: Archived/100_backfill_admin_rank_rpcs_2026_04_19.sql
+-- Returns true iff auth.uid() has max hierarchy_level >= the role being granted.
+-- Paired with require_outranks for admin role-grant flow.
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.caller_can_assign_role(p_role_name text)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_caller uuid := auth.uid();
+  v_role   text := current_setting('request.jwt.claim.role', true);
+  v_caller_level int;
+  v_role_level int;
+BEGIN
+  IF v_role = 'service_role' THEN
+    RETURN true;
+  END IF;
+
+  IF v_caller IS NULL THEN
+    RETURN false;
+  END IF;
+
+  SELECT hierarchy_level INTO v_role_level FROM public.roles WHERE name = p_role_name;
+  IF v_role_level IS NULL THEN
+    RETURN false; -- unknown role
+  END IF;
+
+  SELECT COALESCE(MAX(r.hierarchy_level), 0)
+    INTO v_caller_level
+    FROM public.user_roles ur
+    JOIN public.roles r ON r.id = ur.role_id
+   WHERE ur.user_id = v_caller
+     AND (ur.expires_at IS NULL OR ur.expires_at > now());
+
+  RETURN v_caller_level >= v_role_level;
+END;
+$function$
+;
+
+REVOKE ALL ON FUNCTION public.caller_can_assign_role(text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.caller_can_assign_role(text) FROM anon;
+GRANT  EXECUTE ON FUNCTION public.caller_can_assign_role(text) TO authenticated;
+GRANT  EXECUTE ON FUNCTION public.caller_can_assign_role(text) TO service_role;
+
+-- ------------------------------------------------------------
 -- award_reading_points (Round 4 — iOS award-on-read shim)
 -- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.award_reading_points(p_article_id uuid)
