@@ -2,8 +2,8 @@ import SwiftUI
 import Supabase
 
 // Kid article reader. Loads full article text, renders in kid-friendly style.
-// Tracks scroll progress; when the kid scrolls to ≥80% of the article,
-// emits a reading_log INSERT (completed=true). Button at end: "Take the quiz".
+// Reading is logged when the kid taps "Take the quiz" — completion is recorded
+// at that point. Scroll-progress tracking is deferred.
 
 struct KidReaderView: View {
     let article: KidArticle
@@ -259,15 +259,3 @@ struct KidReaderView: View {
     }
 }
 
-private struct ReaderContentHeightKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
-    }
-}
-
-private struct ReaderScroll: Equatable {
-    let offset: CGFloat
-    let contentHeight: CGFloat
-    let viewportHeight: CGFloat
-}

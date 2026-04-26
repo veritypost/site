@@ -111,34 +111,63 @@ export default function Modal({
             style={{
               padding: `${S[4]}px ${S[4]}px ${S[3]}px`,
               borderBottom: `1px solid ${ADMIN_C.divider}`,
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              gap: S[3],
             }}
           >
-            {title && (
-              <h2
-                id="vp-admin-modal-title"
-                style={{
-                  margin: 0,
-                  fontSize: F.lg,
-                  fontWeight: 600,
-                  color: ADMIN_C.white,
-                  letterSpacing: '-0.01em',
-                }}
-              >
-                {title}
-              </h2>
-            )}
-            {description && (
-              <p
-                style={{
-                  margin: `${S[1]}px 0 0`,
-                  fontSize: F.sm,
-                  color: ADMIN_C.dim,
-                  lineHeight: 1.5,
-                }}
-              >
-                {description}
-              </p>
-            )}
+            <div style={{ minWidth: 0, flex: 1 }}>
+              {title && (
+                <h2
+                  id="vp-admin-modal-title"
+                  style={{
+                    margin: 0,
+                    fontSize: F.lg,
+                    fontWeight: 600,
+                    color: ADMIN_C.white,
+                    letterSpacing: '-0.01em',
+                  }}
+                >
+                  {title}
+                </h2>
+              )}
+              {description && (
+                <p
+                  style={{
+                    margin: `${S[1]}px 0 0`,
+                    fontSize: F.sm,
+                    color: ADMIN_C.dim,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {description}
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              aria-label="Close"
+              onClick={attemptClose}
+              style={{
+                border: 'none',
+                background: 'transparent',
+                color: ADMIN_C.dim,
+                padding: 12,
+                fontSize: 20,
+                lineHeight: 1,
+                cursor: 'pointer',
+                borderRadius: 4,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = ADMIN_C.accent;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = ADMIN_C.dim;
+              }}
+            >
+              ×
+            </button>
           </div>
         )}
 

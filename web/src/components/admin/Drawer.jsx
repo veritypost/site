@@ -145,7 +145,7 @@ export default function Drawer({
               border: 'none',
               background: 'transparent',
               color: ADMIN_C.dim,
-              padding: 4,
+              padding: 12,
               fontSize: 20,
               lineHeight: 1,
               cursor: 'pointer',

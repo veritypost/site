@@ -886,9 +886,7 @@ struct StoryDetailView: View {
             Text("Pass to comment.")
                 .font(.system(.callout, design: .default, weight: .bold))
                 .foregroundColor(VP.text)
-            Text(hasUnlimitedQuizAttempts
-                 ? "5 questions about what you just read. Get 3 right and the conversation opens. Unlimited attempts on your plan."
-                 : "5 questions about what you just read. Get 3 right and the conversation opens. Free accounts get 2 attempts; each pulls a fresh set of questions.")
+            Text("5 questions about what you just read. Get 3 right and the conversation opens.")
                 .font(.caption)
                 .foregroundColor(VP.soft)
                 .lineSpacing(2)

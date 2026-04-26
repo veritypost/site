@@ -62,7 +62,7 @@ struct ExpertSessionsView: View {
                                 .foregroundStyle(.white)
                                 .padding(.horizontal, 18)
                                 .padding(.vertical, 8)
-                                .frame(minHeight: 36)
+                                .frame(minHeight: 44)
                                 .background(K.teal)
                                 .clipShape(Capsule())
                         }
@@ -254,10 +254,14 @@ struct ExpertSessionsView: View {
         }
     }
 
-    private func formatted(_ date: Date) -> String {
+    private static let sessionDateFormatter: DateFormatter = {
         let fmt = DateFormatter()
         fmt.dateFormat = "MMM d, h:mm a"
-        return fmt.string(from: date)
+        return fmt
+    }()
+
+    private func formatted(_ date: Date) -> String {
+        Self.sessionDateFormatter.string(from: date)
     }
 
     private func load() async {

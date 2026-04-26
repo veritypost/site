@@ -10,7 +10,6 @@ import type { Tables } from '@/types/database-helpers';
 import Page, { PageHeader } from '@/components/admin/Page';
 import PageSection from '@/components/admin/PageSection';
 import Badge from '@/components/admin/Badge';
-import KBD from '@/components/admin/KBD';
 import Spinner from '@/components/admin/Spinner';
 
 type Article = Tables<'articles'>;
@@ -77,14 +76,13 @@ const PAGES: HubGroup[] = [
   ]},
 ];
 
-// Quick links — commonly accessed destinations; Cmd-K hint is a visual
-// placeholder only (the launcher itself is a later pass).
-const QUICK_LINKS: { href: string; label: string; hint: string }[] = [
-  { href: '/admin/stories',       label: 'Articles',     hint: 'G A' },
-  { href: '/admin/story-manager', label: 'New article',  hint: 'G N' },
-  { href: '/admin/users',         label: 'Users',        hint: 'G U' },
-  { href: '/admin/reports',       label: 'Reports',      hint: 'G R' },
-  { href: '/admin/support',       label: 'Support',      hint: 'G S' },
+// Quick links — commonly accessed destinations.
+const QUICK_LINKS: { href: string; label: string }[] = [
+  { href: '/admin/stories',       label: 'Articles' },
+  { href: '/admin/story-manager', label: 'New article' },
+  { href: '/admin/users',         label: 'Users' },
+  { href: '/admin/reports',       label: 'Reports' },
+  { href: '/admin/support',       label: 'Support' },
 ];
 
 export default function AdminHubPage() {
@@ -160,13 +158,6 @@ export default function AdminHubPage() {
         hideBreadcrumb
         title="Admin Hub"
         subtitle={`${total} pages across ${PAGES.length} sections`}
-        actions={(
-          <div style={{ display: 'flex', alignItems: 'center', gap: S[2], color: C.dim, fontSize: F.sm }}>
-            <span style={{ display: 'none' }} aria-hidden />
-            <span style={{ whiteSpace: 'nowrap' }}>Search</span>
-            <KBD keys="Cmd+K" />
-          </div>
-        )}
       />
 
       {/* Quick links — compact navigation for the most-used destinations */}
@@ -211,7 +202,6 @@ export default function AdminHubPage() {
               }}
             >
               <span>{ql.label}</span>
-              <KBD keys={ql.hint} size="xs" />
             </Link>
           ))}
         </div>

@@ -2,6 +2,7 @@
 // @feature-verified search 2026-04-18
 'use client';
 import { useState, useEffect, CSSProperties } from 'react';
+import Link from 'next/link';
 import { createClient } from '../../lib/supabase/client';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import { usePageViewTrack } from '@/lib/useTrack';
@@ -50,7 +51,6 @@ export default function SearchPage() {
   const [results, setResults] = useState<ArticleHit[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
-  const [mode, setMode] = useState<string>('basic');
 
   useEffect(() => {
     (async () => {
@@ -97,12 +97,13 @@ export default function SearchPage() {
     try {
       const res = await fetch(`/api/search?${params.toString()}`);
       const data = (await res.json().catch(() => ({}))) as SearchResponse;
-      if (!res.ok) throw new Error(data?.error || 'Search failed');
+      if (!res.ok) {
+        if (data?.error) console.error('[search]', data.error);
+        throw new Error('Search failed');
+      }
       setResults(data.articles || []);
-      setMode(data.mode || 'basic');
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Search failed';
-      setError(msg);
+    } catch {
+      setError('Search failed. Try again.');
     } finally {
       setLoading(false);
     }
@@ -153,6 +154,7 @@ export default function SearchPage() {
           disabled={!q.trim() || loading}
           style={{
             padding: '10px 18px',
+            minHeight: 44,
             borderRadius: 10,
             border: 'none',
             background: q.trim() && !loading ? '#111' : '#ccc',
@@ -236,16 +238,15 @@ export default function SearchPage() {
       {error && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 10 }}>{error}</div>}
 
       <div style={{ fontSize: 11, color: '#999', marginBottom: 6 }}>
-        {results.length > 0
-          ? `${results.length} result${results.length === 1 ? '' : 's'} · ${mode}`
-          : null}
+        {results.length > 0 ? `${results.length} result${results.length === 1 ? '' : 's'}` : null}
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {results.map((a) => (
-          <a
+          <Link
             key={a.id}
             href={`/story/${a.slug}`}
+            prefetch={false}
             style={{
               display: 'block',
               background: '#f7f7f7',
@@ -265,7 +266,7 @@ export default function SearchPage() {
               {a.categories?.name && a.published_at ? ' · ' : ''}
               {formatDate(a.published_at)}
             </div>
-          </a>
+          </Link>
         ))}
         {results.length === 0 && !loading && q && (
           <div style={{ padding: 40, textAlign: 'center' }}>
@@ -275,7 +276,7 @@ export default function SearchPage() {
             <div style={{ fontSize: 13, color: '#666', marginBottom: 14, lineHeight: 1.5 }}>
               Try shorter keywords, or browse by category.
             </div>
-            <a
+            <Link
               href="/browse"
               aria-label="Browse all categories"
               style={{
@@ -290,7 +291,7 @@ export default function SearchPage() {
               }}
             >
               Browse categories
-            </a>
+            </Link>
           </div>
         )}
       </div>

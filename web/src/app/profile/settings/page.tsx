@@ -3068,7 +3068,7 @@ function AlertsCard({
                           gap: S[2],
                           fontSize: F.sm,
                           color: C.text,
-                          minHeight: 32,
+                          minHeight: 44,
                         }}
                       >
                         <span>{ch.label}</span>

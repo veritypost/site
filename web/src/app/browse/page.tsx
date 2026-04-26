@@ -2,6 +2,7 @@
 // @feature-verified shared_pages 2026-04-18
 'use client';
 import { useState, useEffect, CSSProperties } from 'react';
+import Link from 'next/link';
 import { createClient } from '../../lib/supabase/client';
 import { usePageViewTrack } from '@/lib/useTrack';
 import type { Tables } from '@/types/database-helpers';
@@ -214,7 +215,7 @@ export default function BrowsePage() {
               placeholder="Search categories..."
               style={{
                 width: '100%',
-                height: 42,
+                minHeight: 44,
                 border: `1px solid ${PALETTE.border}`,
                 borderRadius: 10,
                 paddingLeft: 38,
@@ -239,9 +240,7 @@ export default function BrowsePage() {
 
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '20px 16px 40px' }}>
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '60px 0', color: PALETTE.dim, fontSize: 15 }}>
-            Loading...
-          </div>
+          <BrowseSkeleton />
         ) : (
           <>
             {/* Trending Now */}
@@ -267,7 +266,7 @@ export default function BrowsePage() {
                     fontSize: 14,
                   }}
                 >
-                  No new stories yet today. Check back later.
+                  No new stories yet.
                 </div>
               ) : (
                 <div
@@ -278,7 +277,7 @@ export default function BrowsePage() {
                   }}
                 >
                   {featured.map((story) => (
-                    <a
+                    <Link
                       key={story.id}
                       href={`/story/${story.slug}`}
                       style={{
@@ -340,7 +339,7 @@ export default function BrowsePage() {
                           </span>
                         </div>
                       </div>
-                    </a>
+                    </Link>
                   ))}
                 </div>
               )}
@@ -468,7 +467,7 @@ export default function BrowsePage() {
                             textTransform: 'uppercase',
                           }}
                         >
-                          Trending in {cat.name}
+                          Latest in {cat.name}
                         </div>
                         {cat.trending.length === 0 ? (
                           <div style={{ fontSize: 13, color: PALETTE.dim, padding: '8px 0' }}>
@@ -507,9 +506,9 @@ export default function BrowsePage() {
                               textDecoration: 'none',
                             };
                             return h.slug ? (
-                              <a key={i} href={`/story/${h.slug}`} style={rowStyle}>
+                              <Link key={i} href={`/story/${h.slug}`} style={rowStyle}>
                                 {inner}
-                              </a>
+                              </Link>
                             ) : (
                               <div key={i} style={rowStyle}>
                                 {inner}
@@ -517,7 +516,7 @@ export default function BrowsePage() {
                             );
                           })
                         )}
-                        <a
+                        <Link
                           href={`/category/${cat.slug}`}
                           style={{
                             marginTop: 10,
@@ -537,7 +536,7 @@ export default function BrowsePage() {
                           onClick={(e) => e.stopPropagation()}
                         >
                           View all {cat.name} articles
-                        </a>
+                        </Link>
                       </div>
                     )}
                   </div>
@@ -548,5 +547,93 @@ export default function BrowsePage() {
         )}
       </div>
     </main>
+  );
+}
+
+function BrowseSkeleton() {
+  const bar = (w: number | string, h: number, mt = 0): CSSProperties => ({
+    background: PALETTE.border,
+    borderRadius: 4,
+    width: typeof w === 'number' ? w : w,
+    height: h,
+    marginTop: mt,
+    animation: 'vp-pulse 1.6s ease-in-out infinite',
+  });
+  return (
+    <div aria-hidden="true">
+      <style>{`@keyframes vp-pulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.55 } }`}</style>
+      {/* Latest grid */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={bar(80, 16)} />
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+            gap: 12,
+            marginTop: 14,
+          }}
+        >
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              style={{
+                background: PALETTE.card,
+                border: `1px solid ${PALETTE.border}`,
+                borderRadius: 12,
+                overflow: 'hidden',
+              }}
+            >
+              <div style={{ height: 80, background: PALETTE.border, opacity: 0.6 }} />
+              <div style={{ padding: '10px 12px' }}>
+                <div style={bar('80%', 13)} />
+                <div style={bar('55%', 13, 6)} />
+                <div style={bar(70, 11, 8)} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* Categories grid */}
+      <div>
+        <div style={bar(120, 16)} />
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+            gap: 12,
+            marginTop: 14,
+          }}
+        >
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <div
+              key={i}
+              style={{
+                background: PALETTE.card,
+                border: `1px solid ${PALETTE.border}`,
+                borderRadius: 12,
+                padding: 14,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+              }}
+            >
+              <div
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 10,
+                  background: PALETTE.border,
+                  animation: 'vp-pulse 1.6s ease-in-out infinite',
+                }}
+              />
+              <div style={{ flex: 1 }}>
+                <div style={bar('70%', 14)} />
+                <div style={bar('50%', 11, 6)} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }

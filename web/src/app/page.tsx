@@ -277,20 +277,7 @@ export default function HomePage() {
       >
         <Masthead humanDate={today.humanDate} />
 
-        {loading && (
-          <p
-            style={{
-              fontFamily: serifStack,
-              fontStyle: 'italic',
-              color: C.dim,
-              fontSize: 15,
-              textAlign: 'center',
-              padding: '48px 0',
-            }}
-          >
-            Loading today&rsquo;s front page…
-          </p>
-        )}
+        {loading && <FrontPageSkeleton />}
 
         {!loading && loadFailed && <FetchFailed onRetry={() => setReloadKey((k) => k + 1)} />}
 
@@ -628,10 +615,9 @@ const hairlineStyle: CSSProperties = {
   margin: 0,
 };
 
-// Anon = articles only on web (owner directive 2026-04-23). Anon viewers
-// see the today's-front-page dismount as just "That's today's front page."
-// Logged-in viewers also get the "Browse all categories →" link to /browse,
-// which the middleware locks for anon. Same shape on EmptyDay below.
+// Anon viewers who reach the bottom of the front page are warm leads — surface
+// the product pitch + sign-up CTA. Logged-in viewers see the browse link they
+// already have permission for. Per OwnersAudit Home Task 2.
 function EndOfFrontPage({ loggedIn }: { loggedIn: boolean }) {
   return (
     <footer
@@ -669,8 +655,162 @@ function EndOfFrontPage({ loggedIn }: { loggedIn: boolean }) {
             Browse all categories &rarr;
           </Link>
         </p>
-      ) : null}
+      ) : (
+        <>
+          <p
+            style={{
+              fontFamily: serifStack,
+              fontSize: 15,
+              color: C.soft,
+              margin: '16px 0 0',
+              lineHeight: 1.5,
+            }}
+          >
+            Create a free account to unlock comments and track your reading streak.
+          </p>
+          <p style={{ margin: '12px 0 0' }}>
+            <Link
+              href="/signup"
+              style={{
+                fontFamily: serifStack,
+                fontSize: 16,
+                color: C.accent,
+                textDecoration: 'underline',
+                textUnderlineOffset: 4,
+                fontWeight: 500,
+              }}
+            >
+              Create free account &rarr;
+            </Link>
+          </p>
+        </>
+      )}
     </footer>
+  );
+}
+
+function FrontPageSkeleton() {
+  return (
+    <div aria-hidden="true">
+      <style>{`@keyframes vp-pulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.55 } }`}</style>
+      {/* Hero block — mirrors the full-bleed dark band */}
+      <div
+        style={{
+          background: HERO_DEFAULT_BG,
+          position: 'relative',
+          left: '50%',
+          right: '50%',
+          marginLeft: '-50vw',
+          marginRight: '-50vw',
+          width: '100vw',
+          padding: '48px 0 40px',
+          marginBottom: 32,
+        }}
+      >
+        <div style={{ maxWidth: 720, margin: '0 auto', padding: '0 20px' }}>
+          <div
+            style={{
+              height: 11,
+              width: 90,
+              background: 'rgba(255,255,255,0.18)',
+              borderRadius: 2,
+              marginBottom: 20,
+              animation: 'vp-pulse 1.6s ease-in-out infinite',
+            }}
+          />
+          <div
+            style={{
+              height: 36,
+              width: '88%',
+              background: 'rgba(255,255,255,0.14)',
+              borderRadius: 4,
+              marginBottom: 12,
+              animation: 'vp-pulse 1.6s ease-in-out infinite',
+            }}
+          />
+          <div
+            style={{
+              height: 36,
+              width: '62%',
+              background: 'rgba(255,255,255,0.14)',
+              borderRadius: 4,
+              marginBottom: 24,
+              animation: 'vp-pulse 1.6s ease-in-out infinite',
+            }}
+          />
+          <div
+            style={{
+              height: 17,
+              width: '90%',
+              background: 'rgba(255,255,255,0.10)',
+              borderRadius: 3,
+              marginBottom: 8,
+              animation: 'vp-pulse 1.6s ease-in-out infinite',
+            }}
+          />
+          <div
+            style={{
+              height: 17,
+              width: '70%',
+              background: 'rgba(255,255,255,0.10)',
+              borderRadius: 3,
+              animation: 'vp-pulse 1.6s ease-in-out infinite',
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Supporting cards */}
+      <section style={{ marginTop: 56 }}>
+        {[0, 1, 2, 3].map((i) => (
+          <Fragment key={i}>
+            {i > 0 && <hr style={hairlineStyle} />}
+            <div style={{ padding: '24px 0' }}>
+              <div
+                style={{
+                  height: 11,
+                  width: 80,
+                  background: C.rule,
+                  borderRadius: 2,
+                  marginBottom: 12,
+                  animation: 'vp-pulse 1.6s ease-in-out infinite',
+                }}
+              />
+              <div
+                style={{
+                  height: 22,
+                  width: '85%',
+                  background: C.rule,
+                  borderRadius: 3,
+                  marginBottom: 10,
+                  animation: 'vp-pulse 1.6s ease-in-out infinite',
+                }}
+              />
+              <div
+                style={{
+                  height: 14,
+                  width: '70%',
+                  background: C.rule,
+                  borderRadius: 3,
+                  marginBottom: 8,
+                  animation: 'vp-pulse 1.6s ease-in-out infinite',
+                }}
+              />
+              <div
+                style={{
+                  height: 12,
+                  width: 60,
+                  background: C.rule,
+                  borderRadius: 2,
+                  marginTop: 12,
+                  animation: 'vp-pulse 1.6s ease-in-out infinite',
+                }}
+              />
+            </div>
+          </Fragment>
+        ))}
+      </section>
+    </div>
   );
 }
 

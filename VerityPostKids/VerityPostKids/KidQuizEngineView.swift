@@ -157,6 +157,15 @@ struct KidQuizEngineView: View {
                 .limit(10)
                 .execute()
                 .value
+            // Pool-size guard: adult web hides the quiz block entirely
+            // when fewer than 10 questions exist. Kids gets a lower floor
+            // (5) since there's no free/paid attempt-pool variation, but
+            // we still refuse to grade a 2-question quiz as a real pass.
+            guard rows.count >= 5 else {
+                self.questions = []
+                self.startedAt = nil
+                return
+            }
             self.questions = rows
             self.startedAt = Date()
         } catch {

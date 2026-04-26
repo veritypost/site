@@ -1,5 +1,6 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified shared_pages 2026-04-18
+import Link from 'next/link';
 
 interface Step {
   number: string;
@@ -139,7 +140,7 @@ export default function HowItWorksPage() {
         </div>
 
         <div style={{ textAlign: 'center' }}>
-          <a
+          <Link
             href="/signup"
             style={{
               display: 'inline-block',
@@ -153,7 +154,7 @@ export default function HowItWorksPage() {
             }}
           >
             Get Started
-          </a>
+          </Link>
         </div>
       </div>
     </div>

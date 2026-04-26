@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import type { Metadata } from 'next';
+import Link from 'next/link';
 
 export const metadata: Metadata = {
   title: 'About — Verity Post',
@@ -109,29 +110,29 @@ export default function AboutPage() {
             }}
           >
             <li>
-              <a href="/terms" style={linkStyle}>
+              <Link href="/terms" style={linkStyle}>
                 Terms of Service
-              </a>
+              </Link>
             </li>
             <li>
-              <a href="/privacy" style={linkStyle}>
+              <Link href="/privacy" style={linkStyle}>
                 Privacy Policy
-              </a>
+              </Link>
             </li>
             <li>
-              <a href="/cookies" style={linkStyle}>
+              <Link href="/cookies" style={linkStyle}>
                 Cookie Policy
-              </a>
+              </Link>
             </li>
             <li>
-              <a href="/accessibility" style={linkStyle}>
+              <Link href="/accessibility" style={linkStyle}>
                 Accessibility Statement
-              </a>
+              </Link>
             </li>
             <li>
-              <a href="/dmca" style={linkStyle}>
+              <Link href="/dmca" style={linkStyle}>
                 DMCA
-              </a>
+              </Link>
             </li>
           </ul>
         </Section>

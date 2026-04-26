@@ -87,7 +87,7 @@ struct LeaderboardView: View {
                                 .foregroundStyle(.white)
                                 .padding(.horizontal, 18)
                                 .padding(.vertical, 8)
-                                .frame(minHeight: 36)
+                                .frame(minHeight: 44)
                                 .background(K.teal)
                                 .clipShape(Capsule())
                         }

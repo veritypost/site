@@ -202,7 +202,7 @@ struct PairCodeView: View {
                 // T-042 — don't leak raw Swift errors to a child's UI.
                 // Log the real error for debugging; show a friendly line.
                 print("[PairCodeView] pair failed:", error)
-                errorMessage = "Something went wrong. Please try again."
+                errorMessage = "Something went wrong. Try again."
             }
             isPairing = false
         }

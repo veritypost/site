@@ -5,6 +5,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 
 type Status = 'idle' | 'submitting' | 'success' | 'error';
 
@@ -55,15 +56,8 @@ export default function KidsAppLanding() {
         return;
       }
 
-      // Parse error message if JSON, fall back to generic.
-      let msg = "Couldn't save. Try again in a moment.";
-      try {
-        const j = (await res.json().catch(() => ({}))) as { error?: string };
-        if (j?.error) msg = j.error;
-      } catch {
-        // not JSON — keep generic
-      }
-      setErrorMsg(msg);
+      // Generic message only — internal API error strings stay server-side.
+      setErrorMsg("Couldn't save. Try again in a moment.");
       setStatus('error');
     } catch {
       setErrorMsg('Network issue. Try again.');
@@ -177,6 +171,7 @@ export default function KidsAppLanding() {
                 style={{
                   flex: '1 1 220px',
                   padding: '10px 12px',
+                  minHeight: '44px',
                   border: '1px solid #d4d4d4',
                   borderRadius: '8px',
                   fontSize: '15px',
@@ -189,6 +184,7 @@ export default function KidsAppLanding() {
                 disabled={status === 'submitting' || email.length < 5}
                 style={{
                   padding: '10px 18px',
+                  minHeight: '44px',
                   background: '#111111',
                   color: '#ffffff',
                   border: 'none',
@@ -236,7 +232,7 @@ export default function KidsAppLanding() {
         )}
 
         <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
-          <a
+          <Link
             href="/"
             style={{
               padding: '12px 24px',
@@ -249,8 +245,8 @@ export default function KidsAppLanding() {
             }}
           >
             Back to home
-          </a>
-          <a
+          </Link>
+          <Link
             href="/login"
             style={{
               padding: '12px 24px',
@@ -264,7 +260,7 @@ export default function KidsAppLanding() {
             }}
           >
             Parent account sign-in
-          </a>
+          </Link>
         </div>
       </div>
     </div>

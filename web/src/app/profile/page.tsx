@@ -422,7 +422,7 @@ function ProfilePageInner() {
         />
         <EmptyState
           title="We couldn't load your profile"
-          description="Something went wrong retrieving your account. Try refreshing, or head back home."
+          description="Refresh the page, or head back home."
           cta={
             <Button variant="primary" onClick={() => router.replace('/')}>
               Back to home
@@ -1497,6 +1497,7 @@ function MilestonesTab({
   scoreTiers: ScoreTier[];
   verityScore: number | null | undefined;
 }) {
+  const router = useRouter();
   const score = verityScore ?? 0;
   const tierColor = tierInfo?.color_hex || ADMIN_C.muted;
   const tierLabel = tierInfo?.display_name || 'Newcomer';
@@ -1586,8 +1587,8 @@ function MilestonesTab({
             title="No achievements yet"
             description="Complete a quiz or hit your first streak to start collecting badges."
             cta={
-              <Button variant="primary" onClick={() => window.location.assign('/')}>
-                Take a quiz
+              <Button variant="primary" onClick={() => router.push('/browse')}>
+                Find an article
               </Button>
             }
           />

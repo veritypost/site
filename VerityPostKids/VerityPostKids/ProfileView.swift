@@ -135,6 +135,7 @@ struct ProfileView: View {
                     .foregroundStyle(K.dim)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 7)
+                    .frame(minHeight: 44)
                     .background(K.card)
                     .clipShape(Capsule())
                     .overlay(Capsule().strokeBorder(K.border, lineWidth: 1))

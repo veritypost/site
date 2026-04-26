@@ -109,7 +109,7 @@ Items from UI_IMPROVEMENTS.md that no longer apply:
 
 ---
 
-### Home Task 1 — Loading state is italic text, should be skeleton
+### Home Task 1 — Loading state is italic text, should be skeleton ✓ DONE
 
 **File:** `web/src/app/page.tsx:252–264`
 **Source:** UI_IMPROVEMENTS.md, Home section [3/4]
@@ -120,11 +120,11 @@ Loading state renders as italic serif text: "Loading today's front page…". The
 **Proposed fix:**
 Replace the text with a skeleton — one large block for the hero (mimicking the 36px serif headline + excerpt shape) and 3–4 narrow blocks for supporting cards. One `Skeleton` component, reused across surfaces.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (inline `FrontPageSkeleton` matching hero full-bleed band + 4 supporting card placeholders; `vp-pulse` keyframe injected once per the pattern shipped across bookmarks/messages/story)
 
 ---
 
-### Home Task 2 — Anon user hits end of page with no sign-up prompt
+### Home Task 2 — Anon user hits end of page with no sign-up prompt ✓ DONE
 
 **File:** `web/src/app/page.tsx:567–607`
 **Source:** UI_IMPROVEMENTS.md, Home section [1/4] + direct code review
@@ -137,7 +137,7 @@ Replace the text with a skeleton — one large block for the hero (mimicking the
 **Proposed fix:**
 In the `EndOfFrontPage` component, add an anon branch (mirror of the `loggedIn` branch) with a brief pitch and a "Create free account" link to `/signup`.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (anon branch under "That's today's front page." — pitch line "Create a free account to unlock comments and track your reading streak." + "Create free account →" Link to `/signup`)
 
 ---
 
@@ -379,7 +379,7 @@ On pass, briefly show an affirmative state inside the quiz result card before th
 
 ---
 
-### Story Task 14 — Attempt count shown in iOS quiz idle card before reader starts
+### Story Task 14 — Attempt count shown in iOS quiz idle card before reader starts ✓ DONE
 
 **File:** `VerityPost/VerityPost/StoryDetailView.swift:889–892`
 **Source:** Panel review — Trust Auditor
@@ -390,7 +390,7 @@ The idle card shows "Free accounts get 2 attempts; each pulls a fresh set of que
 **Proposed fix:**
 Remove the attempt count from the idle card. After a failed attempt, show "1 attempt remaining." After the last attempt fails, show "No more attempts on this quiz." The idle card retains only the "BEFORE YOU DISCUSS" header and the threshold line.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (collapsed both branches of the conditional — idle now reads only "5 questions about what you just read. Get 3 right and the conversation opens." matching web copy. Post-fail attempt context already lives in result-state copy at lines 967 + 999-1001, so anxiety prime is gone without losing actionable info.)
 
 ---
 
@@ -1131,7 +1131,7 @@ Also skip the data fetch in `loadTabData()` when the corresponding `canView*` fl
 
 ---
 
-### Profile Task 3 — Web load-error description is off-voice
+### Profile Task 3 — Web load-error description is off-voice ✓ DONE
 
 **File:** `web/src/app/profile/page.tsx:422–433`
 **Source:** UI_IMPROVEMENTS.md profile section [2/4]
@@ -1150,11 +1150,11 @@ description="Something went wrong retrieving your account. Try refreshing, or he
 description="Refresh the page, or head back home."
 ```
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
-### Profile Task 4 — Kids "Unpair this device" button touch target too small
+### Profile Task 4 — Kids "Unpair this device" button touch target too small ✓ DONE
 
 **File:** `VerityPostKids/VerityPostKids/ProfileView.swift:132–141`
 **Source:** Direct code review — WCAG 44pt minimum
@@ -1184,7 +1184,7 @@ Text("Unpair this device")
     .overlay(Capsule().strokeBorder(K.border, lineWidth: 1))
 ```
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
@@ -1353,7 +1353,7 @@ const stats = [
 
 ---
 
-### Profile Task 8 — Milestones empty-state CTA routes to home, not a reading surface
+### Profile Task 8 — Milestones empty-state CTA routes to home, not a reading surface ✓ DONE
 
 **File:** `web/src/app/profile/page.tsx:1604`
 **Source:** Direct code review — dead end
@@ -1372,7 +1372,7 @@ Route to `/browse` (the category/article browser) which is the most direct surfa
 
 Label change from "Take a quiz" to "Find an article" — more honest about the action since the quiz is downstream of finding and reading an article.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (added `useRouter()` to MilestonesTab; CTA routes via `router.push('/browse')`)
 
 ---
 
@@ -1649,7 +1649,7 @@ if (upErr) {
 
 ---
 
-### Settings Task 5 — Alerts channel checkboxes have 32px label height
+### Settings Task 5 — Alerts channel checkboxes have 32px label height ✓ DONE
 
 **File:** `web/src/app/profile/settings/page.tsx:3070`
 **Source:** Direct code review — touch target
@@ -1660,7 +1660,7 @@ Line 3070: `minHeight: 32` on the `<label>` elements wrapping each notification 
 **Proposed fix:**
 Change `minHeight: 32` to `minHeight: 44` on the label style.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
@@ -1720,7 +1720,7 @@ No kids surface — kids app has no browse or search UI.
 
 ---
 
-### Browse Task 1 — Three internal links use raw `<a>` instead of `<Link>`
+### Browse Task 1 — Three internal links use raw `<a>` instead of `<Link>` ✓ DONE
 
 **File:** `web/src/app/browse/page.tsx:283, 510, 521`
 **Source:** Direct code review — navigation pattern
@@ -1744,11 +1744,11 @@ import Link from 'next/link';
 <Link href={`/category/${cat.slug}`} style={...}>
 ```
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (also migrated the trending-row inner `<a>` for completeness)
 
 ---
 
-### Browse Task 2 — Search input touch target is 42px
+### Browse Task 2 — Search input touch target is 42px ✓ DONE
 
 **File:** `web/src/app/browse/page.tsx:218`
 **Source:** Direct code review — touch target
@@ -1759,11 +1759,11 @@ Line 218: `height: 42` on the keyword search input inside the Browse filter area
 **Proposed fix:**
 Change `height: 42` to `minHeight: 44`.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
-### Browse Task 3 — Loading state shows plain text instead of skeleton
+### Browse Task 3 — Loading state shows plain text instead of skeleton ✓ DONE
 
 **File:** `web/src/app/browse/page.tsx:242`
 **Source:** Direct code review — loading UX
@@ -1780,7 +1780,7 @@ if (loading) return <div>Loading...</div>;
 // With skeleton rows that match the page grid layout
 ```
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (`BrowseSkeleton` component — 3 featured-card placeholders + 6 category-card placeholders, `vp-pulse` keyframe pattern)
 
 ---
 
@@ -1807,7 +1807,7 @@ Add an `error` state. If `fetchData()` throws or returns a Supabase error, set `
 
 ---
 
-### Browse Task 5 — "Trending in {cat.name}" label is wrong — data is recency-based
+### Browse Task 5 — "Trending in {cat.name}" label is wrong — data is recency-based ✓ DONE
 
 **File:** `web/src/app/browse/page.tsx:471`
 **Source:** Direct code review — copy accuracy
@@ -1818,11 +1818,11 @@ Line 471 renders `Trending in {cat.name}` when a category card expands. The quer
 **Proposed fix:**
 Change the label to `Latest in {cat.name}`. Matches the actual data. When a real trending signal (view count / engagement) is built, revert to "Trending."
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
-### Browse Task 6 — Featured section empty state copy is time-bound and wrong
+### Browse Task 6 — Featured section empty state copy is time-bound and wrong ✓ DONE
 
 **File:** `web/src/app/browse/page.tsx:270`
 **Source:** Direct code review — copy
@@ -1833,7 +1833,7 @@ Line 270: `"No new stories yet today. Check back later."` — this is the empty 
 **Proposed fix:**
 Change to: `"No featured articles right now."` — accurate regardless of timing, no false urgency.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (used `"No new stories yet."` to match the section heading which was already renamed from "Featured" to "Latest")
 
 ---
 
@@ -1879,7 +1879,7 @@ Export a `VP_PALETTE` (or similar) from a shared `web/src/lib/theme.ts` covering
 
 ---
 
-### Search Task 1 — Two internal links use raw `<a>` instead of `<Link>`
+### Search Task 1 — Two internal links use raw `<a>` instead of `<Link>` ✓ DONE
 
 **File:** `web/src/app/search/page.tsx:246, 279`
 **Source:** Direct code review — navigation pattern
@@ -1899,11 +1899,11 @@ import Link from 'next/link';
 <Link href="/browse" style={...}>
 ```
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (story result Link uses `prefetch={false}` to avoid mass prefetch on long lists)
 
 ---
 
-### Search Task 2 — Search button has no explicit `minHeight`
+### Search Task 2 — Search button has no explicit `minHeight` ✓ DONE
 
 **File:** `web/src/app/search/page.tsx:152–166`
 **Source:** Direct code review — touch target
@@ -1914,11 +1914,11 @@ Line 152–166: the Search button uses `padding: '10px 18px'` and `fontSize: 14`
 **Proposed fix:**
 Add `minHeight: 44` to the button style object.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
-### Search Task 3 — Mode label exposes developer detail to users
+### Search Task 3 — Mode label exposes developer detail to users ✓ DONE
 
 **File:** `web/src/app/search/page.tsx:240`
 **Source:** Direct code review — copy / information hygiene
@@ -1934,11 +1934,11 @@ Remove `· ${mode}` entirely. The result count is sufficient. If a paid filter i
 {results.length > 0 ? `${results.length} result${results.length === 1 ? '' : 's'}` : null}
 ```
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
-### Search Task 4 — Error display may expose raw API error strings
+### Search Task 4 — Error display may expose raw API error strings ✓ DONE
 
 **File:** `web/src/app/search/page.tsx:100, 103–105, 236`
 **Source:** Direct code review — information hygiene
@@ -1955,7 +1955,7 @@ Sanitize in the catch block — only pass the generic fallback to the state:
 ```
 The existing `console.error` on the server side already captures the real detail.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (catch swallows error; `data?.error` (if present) is logged client-side via `console.error('[search]', ...)` for debugging — never surfaced to UI)
 
 ---
 
@@ -2049,7 +2049,7 @@ Pages not re-audited (exist, confirmed clean): `cookies/`, `accessibility/`, `dm
 
 ---
 
-### Static Task 1 — Kids-app: two navigation links use raw `<a>`
+### Static Task 1 — Kids-app: two navigation links use raw `<a>` ✓ DONE
 
 **File:** `web/src/app/kids-app/page.tsx:239, 253`
 **Source:** Direct code review — navigation pattern
@@ -2067,11 +2067,11 @@ import Link from 'next/link';
 <Link href="/login" style={...}>Parent account sign-in</Link>
 ```
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
-### Static Task 2 — Kids-app: email input and submit button below 44px touch target
+### Static Task 2 — Kids-app: email input and submit button below 44px touch target ✓ DONE
 
 **File:** `web/src/app/kids-app/page.tsx:165–203`
 **Source:** Direct code review — touch target
@@ -2085,11 +2085,11 @@ Both are below the 44px WCAG minimum for interactive elements. This is particula
 **Proposed fix:**
 Add `minHeight: '44px'` to both the `<input>` and `<button>` style objects.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
-### Static Task 3 — Kids-app: API error string surfaces in error toast
+### Static Task 3 — Kids-app: API error string surfaces in error toast ✓ DONE
 
 **File:** `web/src/app/kids-app/page.tsx:59–66`
 **Source:** Direct code review — information hygiene
@@ -2110,11 +2110,11 @@ setErrorMsg("Couldn't save. Try again in a moment.");
 setStatus('error');
 ```
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (entire `j?.error` parse path removed; only the generic copy ever reaches the user)
 
 ---
 
-### Static Task 4 — How-it-works: "Get Started" uses raw `<a>`
+### Static Task 4 — How-it-works: "Get Started" uses raw `<a>` ✓ DONE
 
 **File:** `web/src/app/how-it-works/page.tsx:142`
 **Source:** Direct code review — navigation pattern
@@ -2129,7 +2129,7 @@ import Link from 'next/link';
 <Link href="/signup" style={...}>Get Started</Link>
 ```
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
@@ -2151,7 +2151,7 @@ Change Step 4 description to:
 
 ---
 
-### Static Task 6 — About: five internal policy links use raw `<a>`
+### Static Task 6 — About: five internal policy links use raw `<a>` ✓ DONE
 
 **File:** `web/src/app/about/page.tsx:112–131`
 **Source:** Direct code review — navigation pattern
@@ -2172,11 +2172,11 @@ import Link from 'next/link';
 // Each of the five href-only links becomes <Link href="...">
 ```
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
-### Static Task 7 — Privacy and Terms both say "Kids Mode" — product was renamed
+### Static Task 7 — Privacy and Terms both say "Kids Mode" — product was renamed ✓ DONE
 
 **Files:** `web/src/app/privacy/page.tsx:164`, `web/src/app/terms/page.tsx:111`
 **Source:** Direct code review — branding accuracy
@@ -2191,11 +2191,11 @@ import Link from 'next/link';
 - Privacy line 164: "Verity Kids collects minimal data and does not enable social features or public profile creation."
 - Terms line 111: "Users aged 13 to 17 may use Verity Post with parental consent. A dedicated Verity Kids app provides age-appropriate content."
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
-### Static Task 8 — Terms: "Family Dashboard" may not match the product term
+### Static Task 8 — Terms: "Family Dashboard" may not match the product term ✓ DONE
 
 **File:** `web/src/app/terms/page.tsx:116`
 **Source:** Direct code review — terminology consistency
@@ -2208,7 +2208,7 @@ The parent management surface lives at `/profile/kids` on web and in `FamilyView
 **Proposed fix:**
 Change to: "Parents and guardians may manage child accounts, including content filters and usage limits, through the Family section of their account."
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
@@ -2409,7 +2409,7 @@ if loading && articles.isEmpty {
 
 ---
 
-### Kids Task 5 — Dead code in KidReaderView: scroll-progress structs declared but never used
+### Kids Task 5 — Dead code in KidReaderView: scroll-progress structs declared but never used ✓ DONE
 
 **File:** `VerityPostKids/VerityPostKids/KidReaderView.swift:259–271`
 **Source:** Direct code review — dead code
@@ -2436,11 +2436,11 @@ Delete the two unused structs (lines 259–271). Update the file-level comment t
 
 If scroll-progress tracking is desired in the future, it should be a tracked task with a real implementation — not misleading scaffolding.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (deleted both `ReaderContentHeightKey` + `ReaderScroll`; updated file-level comment to drop the false ≥80% scroll claim)
 
 ---
 
-### Kids Task 6 — Leaderboard and ExpertSessions "Retry" buttons below 44pt touch target
+### Kids Task 6 — Leaderboard and ExpertSessions "Retry" buttons below 44pt touch target ✓ DONE
 
 **Files:** `VerityPostKids/VerityPostKids/LeaderboardView.swift:90`, `VerityPostKids/VerityPostKids/ExpertSessionsView.swift:65`
 **Source:** Direct code review — touch target
@@ -2451,11 +2451,11 @@ Both files define a "Retry" button in their error state with `.frame(minHeight: 
 **Proposed fix:**
 Change `minHeight: 36` → `minHeight: 44` in both files.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
-### Kids Task 7 — PairCodeView error copy uses "Please"
+### Kids Task 7 — PairCodeView error copy uses "Please" ✓ DONE
 
 **File:** `VerityPostKids/VerityPostKids/PairCodeView.swift:205`
 **Source:** T-013 copy sweep
@@ -2466,11 +2466,11 @@ Line 205: `errorMessage = "Something went wrong. Please try again."` — part of
 **Proposed fix:**
 Change to: `"Something went wrong. Try again."`
 
-**Status:** Pending execution — batch with T-013 global sweep
+**Status:** Done 2026-04-26
 
 ---
 
-### Kids Task 8 — ExpertSessionsView creates a new DateFormatter per call
+### Kids Task 8 — ExpertSessionsView creates a new DateFormatter per call ✓ DONE
 
 **File:** `VerityPostKids/VerityPostKids/ExpertSessionsView.swift:252–256`
 **Source:** Direct code review — performance
@@ -2501,7 +2501,7 @@ private func formatted(_ date: Date) -> String {
 }
 ```
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
@@ -2547,7 +2547,7 @@ Add one line to the result view connecting the outcome to something concrete. On
 
 ---
 
-### Kids Task 11 — Kids quiz has no pool-size gate; adult web rejects articles under 10 questions
+### Kids Task 11 — Kids quiz has no pool-size gate; adult web rejects articles under 10 questions ✓ DONE
 
 **Files:** `VerityPostKids/VerityPostKids/KidQuizEngineView.swift:149–165`, `web/src/app/story/[slug]/page.tsx:912`
 **Source:** Panel review — Seam Inspector
@@ -2565,7 +2565,7 @@ guard questions.count >= 5 else {
 ```
 5 is a reasonable minimum for kids (lower than adult 10 because kids have no free/paid attempt pool variation). The existing `emptyState` copy handles the zero-question case and works here too.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (guard returns early after `loadQuestions()` rows < 5; `startedAt` reset to nil so a re-attempt doesn't ride a stale clock)
 
 ---
 
@@ -2617,7 +2617,7 @@ Both are correct COPPA implementations. The gate works — math challenge (multi
 
 ---
 
-### Admin Task 1 — Button touch targets are too small for mobile (ALL admin pages)
+### Admin Task 1 — Button touch targets are too small for mobile (ALL admin pages) ✓ DONE
 
 **File:** `web/src/components/admin/Button.jsx:8-10`
 **Scope:** Every action button across all 44 admin pages.
@@ -2653,11 +2653,11 @@ const SIZES = {
 
 This is a one-line fix that upgrades every admin button on every page simultaneously.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (also resolves Admin Task 6 — DataTable pagination Prev/Next inherits the new floor automatically)
 
 ---
 
-### Admin Task 2 — Remove KBD ghost shortcuts from admin hub
+### Admin Task 2 — Remove KBD ghost shortcuts from admin hub ✓ DONE
 
 **File:** `web/src/app/admin/page.tsx:82-88, 167-168, 213-214`
 
@@ -2678,7 +2678,7 @@ Per product rule: no keyboard shortcuts in admin UI (keyboard shortcuts / hotkey
 - Remove the `<KBD keys={ql.hint} size="xs" />` from each quick-link card in the QUICK_LINKS map.
 - The quick-link card layout already has `justifyContent: 'space-between'` — with KBD removed, the label just sits left-aligned, which is correct.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (KBD import + actions prop + per-card hint all removed; QUICK_LINKS shape narrowed to drop `hint`)
 
 ---
 
@@ -2718,7 +2718,7 @@ On desktop this is a subtle breadcrumb. On mobile it becomes the primary navigat
 
 ---
 
-### Admin Task 4 — Drawer close button is too small for touch
+### Admin Task 4 — Drawer close button is too small for touch ✓ DONE
 
 **File:** `web/src/components/admin/Drawer.jsx:140-162`
 
@@ -2755,11 +2755,11 @@ padding: 12,
 
 The visual `×` character stays the same size (`fontSize: 20`). Only the clickable zone grows.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
-### Admin Task 5 — Modal lacks a close button (inconsistent with Drawer)
+### Admin Task 5 — Modal lacks a close button (inconsistent with Drawer) ✓ DONE
 
 **File:** `web/src/components/admin/Modal.jsx`
 
@@ -2808,7 +2808,7 @@ Add a close button to Modal's header using the same pattern as Drawer:
 
 The close button only appears when a title or description is rendered (same guard as the existing header block). If a modal has neither, the close mechanism remains backdrop + Esc — which is acceptable for those rare modal shapes.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 

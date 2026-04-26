@@ -161,8 +161,8 @@ export default function PrivacyPage() {
               verifiable parental consent.
             </li>
             <li>
-              Kids Mode collects minimal data and does not enable social features or public profile
-              creation.
+              Verity Kids collects minimal data and does not enable social features or public
+              profile creation.
             </li>
             <li>
               Parents may review, modify, or delete their child&apos;s data by contacting

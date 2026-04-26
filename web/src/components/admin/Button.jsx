@@ -4,9 +4,11 @@ import { forwardRef } from 'react';
 import { ADMIN_C, F, S } from '../../lib/adminPalette';
 import Spinner from './Spinner';
 
+// height is the floor for tap-target compliance (WCAG 2.5.5 / iOS HIG = 44px).
+// Visual padding stays sm vs md; only the minHeight floor is shared.
 const SIZES = {
-  sm: { padY: 4, padX: 10, fontSize: F.sm, height: 26 },
-  md: { padY: 6, padX: 14, fontSize: F.base, height: 32 },
+  sm: { padY: 4, padX: 10, fontSize: F.sm, height: 44 },
+  md: { padY: 6, padX: 14, fontSize: F.base, height: 44 },
 };
 
 const VARIANTS = {
