@@ -284,7 +284,7 @@ struct BookmarksView: View {
         if let i = original { items.remove(at: i) }
         guard let session = try? await client.auth.session else {
             if let i = original, i <= items.count { items.insert(b, at: i) }
-            errorText = "Please sign in."
+            errorText = "Sign in to manage your bookmarks."
             return
         }
         let site = SupabaseManager.shared.siteURL

@@ -1,7 +1,8 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified bookmarks 2026-04-18
 'use client';
-import { useState, useEffect, CSSProperties, ReactNode } from 'react';
+import { useState, useEffect, useRef, CSSProperties, ReactNode } from 'react';
+import Link from 'next/link';
 import { createClient } from '../../lib/supabase/client';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import EmptyState from '@/components/EmptyState';
@@ -9,6 +10,7 @@ import LockedFeatureCTA from '@/components/LockedFeatureCTA';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import { getPlanLimitValue } from '@/lib/plans';
 import { formatDate } from '@/lib/dates';
+import { useToast } from '../../components/Toast';
 import type { Tables } from '@/types/database-helpers';
 
 // T-016: bookmark cap is now DB-driven via plan_features.bookmarks
@@ -60,6 +62,8 @@ function stripKidsTag(name: string | null | undefined): string {
 
 export default function BookmarksPage() {
   const supabase = createClient();
+  const { show, dismiss } = useToast();
+  const undoTimerRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const [items, setItems] = useState<BookmarkRow[]>([]);
   const [collections, setCollections] = useState<CollectionRow[]>([]);
   const [activeCollection, setActiveCollection] = useState<string>('all'); // 'all' | 'uncategorised' | collection_id
@@ -182,6 +186,13 @@ export default function BookmarksPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    const timers = undoTimerRef.current;
+    return () => {
+      timers.forEach((t) => clearTimeout(t));
+    };
+  }, []);
+
   async function loadMore() {
     if (loadingMore || !hasMore) return;
     const last = items[items.length - 1];
@@ -216,14 +227,64 @@ export default function BookmarksPage() {
     setLoadingMore(false);
   }
 
-  async function removeBookmark(id: string) {
-    const res = await fetch(`/api/bookmarks/${id}`, { method: 'DELETE' });
-    if (!res.ok) {
-      const d = await res.json().catch(() => ({}));
-      setError(d?.error || 'Remove failed');
-      return;
-    }
+  function removeBookmark(bookmark: BookmarkRow) {
+    const id = bookmark.id;
+    const originalIndex = items.findIndex((b) => b.id === id);
     setItems((prev) => prev.filter((b) => b.id !== id));
+
+    const toastId = show(
+      <span>
+        Bookmark removed{' '}
+        <button
+          onClick={() => {
+            dismiss(toastId);
+            const t = undoTimerRef.current.get(id);
+            if (t !== undefined) {
+              clearTimeout(t);
+              undoTimerRef.current.delete(id);
+            }
+            setItems((prev) => {
+              const idx =
+                originalIndex >= 0 && originalIndex <= prev.length ? originalIndex : prev.length;
+              const next = [...prev];
+              next.splice(idx, 0, bookmark);
+              return next;
+            });
+          }}
+          style={{
+            color: '#fff',
+            background: 'transparent',
+            border: '1px solid rgba(255,255,255,0.4)',
+            borderRadius: 4,
+            fontSize: 11,
+            padding: '2px 8px',
+            cursor: 'pointer',
+            marginLeft: 8,
+          }}
+        >
+          Undo
+        </button>
+      </span>,
+      { duration: 0 }
+    );
+
+    const timer = setTimeout(async () => {
+      undoTimerRef.current.delete(id);
+      dismiss(toastId);
+      const res = await fetch(`/api/bookmarks/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setItems((prev) => {
+          const idx =
+            originalIndex >= 0 && originalIndex <= prev.length ? originalIndex : prev.length;
+          const next = [...prev];
+          next.splice(idx, 0, bookmark);
+          return next;
+        });
+        setError(d?.error || 'Remove failed');
+      }
+    }, 5000);
+    undoTimerRef.current.set(id, timer);
   }
 
   async function saveNotes(id: string) {
@@ -310,17 +371,42 @@ export default function BookmarksPage() {
 
   if (loading) {
     return (
-      <div
-        style={{
-          minHeight: '100vh',
-          background: '#fff',
-          padding: 40,
-          textAlign: 'center',
-          color: '#666',
-        }}
-      >
-        Loading bookmarks…
-      </div>
+      <main style={{ minHeight: '100vh', background: '#fff', padding: '20px 16px 80px' }}>
+        <style>{`
+          @keyframes vp-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+          }
+        `}</style>
+        <div style={{ maxWidth: 900, margin: '0 auto' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {[1, 2, 3, 4].map((n) => (
+              <div
+                key={n}
+                style={{
+                  background: '#f7f7f7',
+                  border: '1px solid #e5e5e5',
+                  borderRadius: 10,
+                  padding: 16,
+                  animation: 'vp-pulse 1.4s ease-in-out infinite',
+                  animationDelay: `${(n - 1) * 0.1}s`,
+                }}
+              >
+                <div
+                  style={{
+                    height: 14,
+                    borderRadius: 4,
+                    background: '#e5e5e5',
+                    marginBottom: 10,
+                    width: n % 2 === 0 ? '60%' : '75%',
+                  }}
+                />
+                <div style={{ height: 11, borderRadius: 4, background: '#e5e5e5', width: '40%' }} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </main>
     );
   }
 
@@ -372,12 +458,12 @@ export default function BookmarksPage() {
             <div style={{ display: 'flex', gap: 8 }}>
               {canExport && (
                 <button onClick={exportAll} style={btnGhost}>
-                  Export JSON
+                  Download my bookmarks
                 </button>
               )}
               {canCollections && (
                 <button onClick={() => setShowNewCollection(true)} style={btnSolid}>
-                  + Collection
+                  New collection
                 </button>
               )}
             </div>
@@ -449,6 +535,7 @@ export default function BookmarksPage() {
                       fontSize: 13,
                       fontWeight: 600,
                       cursor: 'pointer',
+                      minHeight: 36,
                     }}
                   >
                     {c.name}
@@ -466,6 +553,7 @@ export default function BookmarksPage() {
                         color: '#666',
                         fontSize: 12,
                         cursor: 'pointer',
+                        minHeight: 44,
                       }}
                     >
                       ×
@@ -489,12 +577,13 @@ export default function BookmarksPage() {
               }}
             >
               <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6, lineHeight: 1.4 }}>
-                <a
-                  href={`/story/${b.articles?.slug}`}
+                <Link
+                  href={b.articles?.slug ? `/story/${b.articles.slug}` : '#'}
+                  prefetch={false}
                   style={{ color: '#111', textDecoration: 'none' }}
                 >
                   {b.articles?.title || 'Untitled'}
-                </a>
+                </Link>
               </div>
               <div
                 style={{
@@ -538,7 +627,7 @@ export default function BookmarksPage() {
                     </select>
                   )}
                   <button
-                    onClick={() => removeBookmark(b.id)}
+                    onClick={() => removeBookmark(b)}
                     style={{
                       background: 'none',
                       border: 'none',
@@ -546,6 +635,7 @@ export default function BookmarksPage() {
                       color: '#dc2626',
                       fontWeight: 600,
                       cursor: 'pointer',
+                      minHeight: 44,
                     }}
                   >
                     Remove
@@ -615,6 +705,7 @@ export default function BookmarksPage() {
                       cursor: 'pointer',
                       padding: 0,
                       fontStyle: 'italic',
+                      minHeight: 44,
                     }}
                   >
                     + Add note
@@ -706,6 +797,7 @@ const btnSolid: CSSProperties = {
   fontSize: 12,
   fontWeight: 700,
   cursor: 'pointer',
+  minHeight: 36,
 };
 const btnGhost: CSSProperties = {
   padding: '8px 14px',
@@ -716,4 +808,5 @@ const btnGhost: CSSProperties = {
   fontSize: 12,
   fontWeight: 600,
   cursor: 'pointer',
+  minHeight: 36,
 };

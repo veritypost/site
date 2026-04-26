@@ -595,7 +595,7 @@ Items from UI_IMPROVEMENTS.md that no longer apply:
 
 ---
 
-### Bookmarks Task 1 — Loading state is text, not skeleton
+### Bookmarks Task 1 — Loading state is text, not skeleton ✓ DONE
 
 **File:** `web/src/app/bookmarks/page.tsx:299–313`
 **Source:** UI_IMPROVEMENTS.md, Feature section [2/4]
@@ -606,11 +606,11 @@ Items from UI_IMPROVEMENTS.md that no longer apply:
 **Proposed fix:**
 Replace with skeleton rows matching the bookmark card shape: title bar (~60% width), meta line (~30% width), repeated 4–5 times. Reuse the same `Skeleton` component from Home Task 1.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
-### Bookmarks Task 2 — Individual bookmark remove fires with no confirm and no undo
+### Bookmarks Task 2 — Individual bookmark remove fires with no confirm and no undo ✓ DONE
 
 **File:** `web/src/app/bookmarks/page.tsx:510–521`
 **Source:** UI_IMPROVEMENTS.md, Feature section [2/4]
@@ -621,11 +621,11 @@ Replace with skeleton rows matching the bookmark card shape: title bar (~60% wid
 **Proposed fix:**
 Add a 5-second undo toast on remove: optimistically remove the item from the list, show "Bookmark removed — Undo" toast with a countdown. If the user taps Undo within 5 seconds, re-add the item client-side and cancel the DELETE. If not, fire the DELETE. Same pattern used by Gmail, Notion, and every other tool where silent deletion is a frustration driver. iOS (`BookmarksView.swift:167`) needs the same treatment.
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (web only — iOS has optimistic remove + error rollback already; undo toast is web-specific per pattern decision)
 
 ---
 
-### Bookmarks Task 3 — Touch targets below minimum across the page
+### Bookmarks Task 3 — Touch targets below minimum across the page ✓ DONE
 
 **File:** `web/src/app/bookmarks/page.tsx`
 **Source:** UI_IMPROVEMENTS.md, Top 20 #8 [4/4 Critical]
@@ -645,7 +645,7 @@ Five interactive elements fail the 44px minimum:
 - Collection pills: add `minHeight: 36`
 - `btnSolid` / `btnGhost`: add `minHeight: 36` to both shared style objects — fixes every button that uses them in one edit
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26 (Remove + × + Add note → `minHeight: 44`; pills + btnSolid + btnGhost → `minHeight: 36`)
 
 ---
 
@@ -663,7 +663,7 @@ Line 362: `href="/profile/settings#billing"` — same T-073 dependency as Story 
 
 ---
 
-### Bookmarks Task 5 — Button label copy
+### Bookmarks Task 5 — Button label copy ✓ DONE
 
 **File:** `web/src/app/bookmarks/page.tsx:344,349`
 **Source:** UI_IMPROVEMENTS.md, Feature section [2/4]
@@ -676,11 +676,11 @@ Line 362: `href="/profile/settings#billing"` — same T-073 dependency as Story 
 - `Export JSON` → `Download my bookmarks`
 - `+ Collection` → `New collection`
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
-### Bookmarks Task 6 — iOS "Please sign in" error copy
+### Bookmarks Task 6 — iOS "Please sign in" error copy ✓ DONE
 
 **File:** `VerityPost/VerityPost/BookmarksView.swift:270`
 **Source:** UI_IMPROVEMENTS.md, Copy audit — global sweep
@@ -691,7 +691,7 @@ Line 270: `errorText = "Please sign in."` — "Please" in an error message. Not 
 **Proposed fix:**
 `"Sign in to manage your bookmarks."`
 
-**Status:** Pending execution
+**Status:** Done 2026-04-26
 
 ---
 
