@@ -4,10 +4,11 @@ import { useEffect, useMemo, useState, type KeyboardEvent, type ChangeEvent, typ
 import { useRouter } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/client';
 import {
-  TIERS,
   TIER_ORDER,
-  PRICING,
   formatCents,
+  getTierDisplayName,
+  getTierPriceCents,
+  getPlans,
   getWebVisibleTiers,
 } from '../../../lib/plans';
 import DestructiveActionConfirm from '@/components/admin/DestructiveActionConfirm';
@@ -48,22 +49,15 @@ type DestructiveState = {
   oldValue: unknown; newValue: unknown; run: (ctx: { reason?: string }) => Promise<void>;
 };
 
-// PLANS is derived from the DB-visible tier set, not the full hardcoded
-// TIER_ORDER, so iOS-only tiers (family / family_xl) don't appear in the
-// admin "all marketed plans" overview. Builds at module-init against the
-// hardcoded snapshot; the inner component filters again at render time
-// with the live DB set to catch mid-session toggles.
-type PlanTiersMap = Record<string, { name: string; features: string[] }>;
-type PlanPricingMap = Record<string, { monthly: { cents: number } }>;
-const TIERS_MAP = TIERS as PlanTiersMap;
-const PRICING_MAP = PRICING as PlanPricingMap;
-const PLANS_ALL = TIER_ORDER.map((tier: string) => ({
-  key: tier,
-  name: TIERS_MAP[tier].name,
-  price: tier === 'free' ? 'Free' : formatCents(PRICING_MAP[tier].monthly.cents),
-  interval: tier === 'free' ? 'forever' : 'month',
-  features: TIERS_MAP[tier].features.slice(0, 4),
-}));
+// Plan overview rows are built from DB data after getPlans() resolves,
+// so display names and prices always reflect the live plans table.
+type PlanOverviewRow = {
+  key: string;
+  name: string;
+  price: string;
+  interval: string;
+  features: string[];
+};
 
 function SubscriptionsInner() {
   const router = useRouter();
@@ -90,21 +84,42 @@ function SubscriptionsInner() {
   const [maxPauseDays, setMaxPauseDays] = useState(30);
   const [refundWindowDays, setRefundWindowDays] = useState(30);
   const [freezeConfirmOpen, setFreezeConfirmOpen] = useState(false);
-  // Live DB-visible tier set. Filters PLANS_ALL so family / family_xl (sold
+  // Live DB-visible tier set. Filters plansAll so family / family_xl (sold
   // via iOS only) don't inflate the "marketed plans" overview with tiers
-  // no web user can actually purchase. Initialised to the full hardcoded
-  // set so the overview renders before the DB fetch lands; replaced with
-  // the live set once getWebVisibleTiers resolves.
+  // no web user can actually purchase. Initialised to the full TIER_ORDER
+  // set so the overview doesn't flash empty before the DB fetch lands.
   const [webVisibleTiers, setWebVisibleTiers] = useState<Set<string>>(
     () => new Set(TIER_ORDER)
   );
+  // Plan overview rows built from DB data — display names and prices come
+  // from the plans table, not hardcoded constants.
+  const [plansAll, setPlansAll] = useState<PlanOverviewRow[]>([]);
 
   useEffect(() => {
-    getWebVisibleTiers(supabase).then(setWebVisibleTiers).catch(() => {
-      // Swallow — keep the full set on lookup failure so the overview
-      // doesn't disappear; the API-side guard in /api/stripe/checkout
-      // still blocks invisible-plan purchases regardless.
-    });
+    Promise.all([getWebVisibleTiers(supabase), getPlans(supabase)])
+      .then(([visible, planRows]) => {
+        setWebVisibleTiers(visible);
+        // Build one overview row per distinct tier using the monthly plan row
+        // for price. Features come from plan_features via plan_features table;
+        // for this overview we show the plan description as a single bullet.
+        const rows: PlanOverviewRow[] = TIER_ORDER.map((tier) => {
+          const monthlyRow = (planRows as Array<{ tier: string; billing_period: string | null; display_name: string; price_cents: number; description?: string }>).find(
+            (p) => p.tier === tier && (tier === 'free' ? true : p.billing_period === 'month')
+          );
+          return {
+            key: tier,
+            name: monthlyRow?.display_name ?? tier,
+            price: tier === 'free' ? 'Free' : formatCents(monthlyRow?.price_cents ?? null),
+            interval: tier === 'free' ? 'forever' : 'month',
+            features: monthlyRow?.description ? [monthlyRow.description] : [],
+          };
+        });
+        setPlansAll(rows);
+      })
+      .catch(() => {
+        // Swallow — keep the initial empty set; the API-side guard in
+        // /api/stripe/checkout still blocks invisible-plan purchases.
+      });
   }, [supabase]);
 
   useEffect(() => {
@@ -154,7 +169,7 @@ function SubscriptionsInner() {
     return acc;
   }, {});
 
-  const plansWithCounts = PLANS_ALL.filter((p) => webVisibleTiers.has(p.key)).map((p) => ({
+  const plansWithCounts = plansAll.filter((p) => webVisibleTiers.has(p.key)).map((p) => ({
     ...p,
     users: planCounts[p.name] || 0,
   }));

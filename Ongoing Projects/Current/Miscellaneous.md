@@ -68,8 +68,6 @@ SHIPPED 2026-04-26. Full audit of all webhook billing paths confirmed: `billing_
 
 **`cleanup_rate_limit_events` RPC is broken — 8,562 rows uncleared.** T-002 tracks the fix. The column mismatch (`occurred_at` vs `created_at`) means the cleanup RPC has never successfully deleted a row. The `rate_limit_events` table has 8,562 rows of accumulated data. This is a known ongoing accumulation until T-002 ships.
 
-**`lib/plans.js` hardcoded TIERS / PRICING / TIER_ORDER.** The `plans` table has `display_name`, `price_cents`, and `sort_order` columns with all the same data. Any admin change to plan pricing in the DB requires a redeploy to take effect. DB-default-rule violation. Source: MASTER_TRIAGE L12, QUESTIONS_AND_CONTRADICTIONS Q38.
-
 **`CommentRow.tsx` hardcoded `COMMENT_MAX_DEPTH = 2`.** The `settings` table has `comment_max_depth = 2` (values coincidentally match today), but the `post_comment` RPC uses the settings lookup while the UI reads a hardcoded constant. If an admin changes the setting in DB, the UI will still render depth-2 threading. Source: QUESTIONS_AND_CONTRADICTIONS Q39.
 
 **`tsc --noEmit` and `xcodebuild` not confirmed green.** OwnerQuestions Q38 deferred green-build confirmation to the end-of-sprint pass. Current build state is unverified. Source: QUESTIONS_AND_CONTRADICTIONS N24.

@@ -36,12 +36,13 @@ import {
   invalidate,
 } from '@/lib/permissions';
 import {
-  TIERS,
   TIER_ORDER,
-  PRICING,
   formatCents,
   pricedPlanName,
   annualSavingsPercent,
+  getTierDisplayName,
+  getTierDescription,
+  getTierPriceCents,
   resolveUserTier,
 } from '@/lib/plans';
 
@@ -3913,7 +3914,7 @@ function BillingBundle({
   const isFrozen = planState === 'frozen';
 
   const handleChangePlan = async (tier: string) => {
-    const planName = pricedPlanName(tier, cycle);
+    const planName = pricedPlanName(tier, cycle, plans);
     if (!planName) return;
     setBusy(`change:${tier}`);
     try {
@@ -3958,7 +3959,7 @@ function BillingBundle({
     // Grace: current tier is "Keep my plan"; others are switches.
     if (isGrace) {
       if (tier === 'free') return null;
-      const name = (TIERS as Record<string, { name: string }>)[tier]?.name || tier;
+      const name = getTierDisplayName(tier, plans);
       if (tier === currentTier) {
         return {
           label: 'Keep my plan',
@@ -3985,7 +3986,7 @@ function BillingBundle({
           }
         : null;
     }
-    const tName = (TIERS as Record<string, { name: string }>)[tier]?.name || tier;
+    const tName = getTierDisplayName(tier, plans);
     if (currentTier === 'free') {
       return {
         label: `Start ${tName}`,
@@ -4103,8 +4104,9 @@ function BillingBundle({
 
   const priceLabel = (tier: string, c: 'monthly' | 'annual'): string => {
     if (tier === 'free') return 'Free';
-    const p = (PRICING as Record<string, Record<string, { cents: number }>>)[tier]?.[c];
-    return p ? (c === 'annual' ? `${formatCents(p.cents)}/yr` : `${formatCents(p.cents)}/mo`) : '—';
+    const cents = getTierPriceCents(tier, c, plans);
+    if (cents == null) return '—';
+    return c === 'annual' ? `${formatCents(cents)}/yr` : `${formatCents(cents)}/mo`;
   };
 
   if (loading)
@@ -4215,7 +4217,7 @@ function BillingBundle({
                 Current plan
               </div>
               <div style={{ fontSize: F.xxl, fontWeight: 700 }}>
-                {(TIERS as Record<string, { name: string }>)[currentTier]?.name || 'Free'}
+                {getTierDisplayName(currentTier, plans)}
               </div>
               <div style={{ opacity: 0.85, fontSize: F.sm, marginTop: 4 }}>
                 {isPaidActive && resolved.planRow?.billing_period
@@ -4276,7 +4278,9 @@ function BillingBundle({
                     cursor: 'pointer',
                   }}
                 >
-                  {c === 'annual' ? `Annual · save ~${annualSavingsPercent('verity')}%` : 'Monthly'}
+                  {c === 'annual'
+                    ? `Annual · save ~${annualSavingsPercent('verity', plans)}%`
+                    : 'Monthly'}
                 </button>
               ))}
             </div>
@@ -4290,7 +4294,10 @@ function BillingBundle({
             }}
           >
             {TIER_ORDER.filter((tier) => webVisibleTiers.has(tier)).map((tier) => {
-              const t = (TIERS as Record<string, { name: string; tagline: string }>)[tier];
+              const t = {
+                name: getTierDisplayName(tier, plans),
+                tagline: getTierDescription(tier, plans),
+              };
               const isCurrent = tier === currentTier && !isFrozen;
               const action = actionFor(tier);
               // M9: gate the buttons by permission. Resubscribe (frozen flow)

@@ -1,121 +1,18 @@
 // ============================================================
-// v2 plan catalog — 5 marketed tiers, 9 DB plan rows.
+// v2 plan catalog -- 5 marketed tiers, 9 DB plan rows.
 // DB rows (see schema/reset_and_rebuild_v2.sql INSERT INTO plans):
 //   free
 //   verity_monthly           / verity_annual
 //   verity_pro_monthly       / verity_pro_annual
 //   verity_family_monthly    / verity_family_annual
 //   verity_family_xl_monthly / verity_family_xl_annual
-// Prices in cents per D42.
+//
+// TIER_ORDER is a static string list used for ordering and upgrade
+// comparison. It carries no price or display data -- those come from
+// the DB via getPlans().
 // ============================================================
 
 export const TIER_ORDER = ['free', 'verity', 'verity_pro', 'verity_family', 'verity_family_xl'];
-
-export const TIERS = {
-  free: {
-    tier: 'free',
-    name: 'Free',
-    tagline: 'The core experience.',
-    maxKids: 0,
-    features: [
-      'Read every article',
-      'Article quizzes — 2 attempts',
-      'Comment once you pass 3/5',
-      '10 bookmarks',
-      'Streaks, achievements, global leaderboard',
-      '1 breaking-news alert per day',
-    ],
-    missing: [
-      'DMs, follows, @mentions',
-      'Unlimited bookmarks + collections',
-      'Ask an Expert',
-      'Kid profiles',
-    ],
-  },
-  verity: {
-    tier: 'verity',
-    name: 'Verity',
-    tagline: 'The social + power-reader layer.',
-    maxKids: 0,
-    features: [
-      'Everything in Free',
-      '80% fewer ads',
-      'Unlimited bookmarks + collections + notes',
-      'Unlimited quiz retakes',
-      'Text-to-speech + advanced search',
-      'DMs, follows, @mentions',
-      'Ask an Expert (@expert / @category)',
-      'See other users’ Verity Scores',
-      'Unlimited breaking-news alerts',
-      'Category leaderboards + weekly recap quiz',
-      'Profile banner + shareable card',
-    ],
-    missing: ['Streak freezes', 'Completely ad-free', 'Kid profiles'],
-  },
-  verity_pro: {
-    tier: 'verity_pro',
-    name: 'Verity Pro',
-    tagline: 'Ad-free with streak freezes.',
-    maxKids: 0,
-    features: [
-      'Everything in Verity',
-      'Completely ad-free',
-      'Streak freezes — 2 per week',
-      'Priority support',
-    ],
-    missing: ['Kid profiles'],
-  },
-  verity_family: {
-    tier: 'verity_family',
-    name: 'Verity Family',
-    tagline: 'Verity Pro for two adults + kids.',
-    maxKids: 2,
-    features: [
-      'Verity Pro for 2 adults',
-      'Up to 2 kid profiles',
-      'Scheduled expert sessions for kids',
-      'Family leaderboard + shared achievements',
-      'Weekly family reading report',
-      'Parental dashboard + device binding',
-    ],
-    missing: [],
-  },
-  verity_family_xl: {
-    tier: 'verity_family_xl',
-    name: 'Verity Family XL',
-    tagline: 'Same family features, more kids.',
-    maxKids: 4,
-    features: [
-      'Verity Pro for 2 adults',
-      'Up to 4 kid profiles',
-      'Scheduled expert sessions for kids',
-      'Family leaderboard + shared achievements',
-      'Weekly family reading report',
-      'Parental dashboard + device binding',
-    ],
-    missing: [],
-  },
-};
-
-// Cents per tier × cycle. Matches plans seed block exactly.
-export const PRICING = {
-  verity: {
-    monthly: { cents: 399, planName: 'verity_monthly' },
-    annual: { cents: 3999, planName: 'verity_annual' },
-  },
-  verity_pro: {
-    monthly: { cents: 999, planName: 'verity_pro_monthly' },
-    annual: { cents: 9999, planName: 'verity_pro_annual' },
-  },
-  verity_family: {
-    monthly: { cents: 1499, planName: 'verity_family_monthly' },
-    annual: { cents: 14999, planName: 'verity_family_annual' },
-  },
-  verity_family_xl: {
-    monthly: { cents: 1999, planName: 'verity_family_xl_monthly' },
-    annual: { cents: 19999, planName: 'verity_family_xl_annual' },
-  },
-};
 
 export function formatCents(cents, { currency = 'USD', compact = false } = {}) {
   if (cents == null) return '—';
@@ -124,16 +21,63 @@ export function formatCents(cents, { currency = 'USD', compact = false } = {}) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(dollars);
 }
 
-export function pricedPlanName(tier, cycle) {
-  if (tier === 'free') return 'free';
-  return PRICING[tier]?.[cycle]?.planName ?? null;
+// ---- Pure helpers that work against an already-loaded plans list ----
+//
+// These accept the array returned by getPlans() so callers that already
+// have the list in state avoid a second async fetch.
+
+// Returns the canonical display name for a tier. Picks the monthly plan
+// row's display_name (e.g. "Verity", "Verity Pro") as the label.
+// Falls back to the title-cased tier key when the DB row is absent.
+export function getTierDisplayName(tier, plansList) {
+  if (tier === 'free') return 'Free';
+  const row = (plansList || []).find((p) => p.tier === tier && p.billing_period === 'month');
+  if (row && row.display_name) return row.display_name;
+  // Fallback: title-case the tier key
+  return tier.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export function annualSavingsPercent(tier) {
-  const p = PRICING[tier];
-  if (!p) return 0;
-  const yearIfMonthly = p.monthly.cents * 12;
-  return Math.round(((yearIfMonthly - p.annual.cents) / yearIfMonthly) * 100);
+// Returns the description (tagline) for a tier from the already-loaded plans
+// list. Uses the monthly plan row's description, which holds the canonical
+// one-liner. The annual row description is "X -- billed annually" which is
+// not suitable as a standalone tagline.
+export function getTierDescription(tier, plansList) {
+  if (!plansList) return '';
+  const billingPeriod = tier === 'free' ? null : 'month';
+  const row = plansList.find(
+    (p) => p.tier === tier && (billingPeriod === null || p.billing_period === billingPeriod)
+  );
+  return row && row.description ? row.description : '';
+}
+
+// Returns the plan row name (e.g. "verity_monthly") for a tier + cycle,
+// derived from the already-loaded plans list.
+export function pricedPlanName(tier, cycle, plansList) {
+  if (tier === 'free') return 'free';
+  if (!plansList) return null;
+  const billingPeriod = cycle === 'annual' ? 'year' : 'month';
+  const row = plansList.find((p) => p.tier === tier && p.billing_period === billingPeriod);
+  return row && row.name ? row.name : null;
+}
+
+// Returns the annual saving percentage for a tier, computed from the
+// already-loaded plans list.
+export function annualSavingsPercent(tier, plansList) {
+  if (!plansList) return 0;
+  const monthly = plansList.find((p) => p.tier === tier && p.billing_period === 'month');
+  const annual = plansList.find((p) => p.tier === tier && p.billing_period === 'year');
+  if (!monthly || !monthly.price_cents || !annual || !annual.price_cents) return 0;
+  const yearIfMonthly = monthly.price_cents * 12;
+  return Math.round(((yearIfMonthly - annual.price_cents) / yearIfMonthly) * 100);
+}
+
+// Returns price_cents for a tier + cycle from the already-loaded plans list.
+export function getTierPriceCents(tier, cycle, plansList) {
+  if (tier === 'free') return 0;
+  if (!plansList) return null;
+  const billingPeriod = cycle === 'annual' ? 'year' : 'month';
+  const row = plansList.find((p) => p.tier === tier && p.billing_period === billingPeriod);
+  return row && row.price_cents != null ? row.price_cents : null;
 }
 
 // ---- DB lookup helpers ----
@@ -155,12 +99,11 @@ export async function getPlans(supabase) {
   return _cache;
 }
 
-// Tier set that should appear in web-surface purchase pickers. Used to
-// filter the hardcoded TIER_ORDER loop so DB-hidden plans (family + family_xl
-// are sold via iOS StoreKit only) don't render on the web billing page or
-// the admin subscriptions picker. Bundles `free` unconditionally — it's the
-// baseline and always visible even when the DB row is intentionally
-// non-purchasable.
+// Tier set that should appear in web-surface purchase pickers. Filters out
+// DB-hidden plans (family + family_xl are sold via iOS StoreKit only) so they
+// don't render on the web billing page or the admin subscriptions picker.
+// Bundles 'free' unconditionally -- it's the baseline and always visible even
+// when the DB row is intentionally non-purchasable.
 export async function getWebVisibleTiers(supabase) {
   const plans = await getPlans(supabase);
   const visible = new Set(['free']);
@@ -172,14 +115,14 @@ export async function getWebVisibleTiers(supabase) {
 
 // ---- plan_features limit lookup ----
 //
-// T-016 — route callers that need a per-plan numeric limit (bookmark
+// T-016 -- route callers that need a per-plan numeric limit (bookmark
 // cap, breaking-news alerts per day, quiz attempts per article, kid
 // profiles, streak freezes) through this helper instead of hardcoding
 // the limit in the consumer. Reads `plan_features` with a 60s cache
 // keyed by (plan_id, feature_key). Anon/no-plan_id callers fall back
 // to the free plan's limit via a name lookup.
 //
-// Returns: { enabled, limitValue, limitType } — `limitValue` null means
+// Returns: { enabled, limitValue, limitType } -- `limitValue` null means
 // "unlimited" (feature enabled with no numeric cap). `enabled=false`
 // means the feature is off for this plan entirely.
 
@@ -189,7 +132,7 @@ const FEATURE_TTL = 60_000;
 async function _resolveFreePlanId(supabase) {
   const plans = await getPlans(supabase);
   const free = plans.find((p) => p.tier === 'free' || p.name === 'free');
-  return free?.id || null;
+  return free ? free.id : null;
 }
 
 export async function getPlanLimit(supabase, planId, featureKey) {
@@ -224,10 +167,10 @@ export async function getPlanLimit(supabase, planId, featureKey) {
   const row = data || { is_enabled: false, limit_value: null, limit_type: null };
   const result = {
     enabled: !!row.is_enabled,
-    limitValue: row.limit_value ?? null,
-    limitType: row.limit_type ?? null,
+    limitValue: row.limit_value != null ? row.limit_value : null,
+    limitType: row.limit_type != null ? row.limit_type : null,
   };
-  _featureCache.set(cacheKey, { ...result, ts: Date.now() });
+  _featureCache.set(cacheKey, Object.assign({}, result, { ts: Date.now() }));
   return result;
 }
 
@@ -258,8 +201,8 @@ export async function getPlanById(supabase, id) {
 export function resolveUserTier(userRow, plansList) {
   if (!userRow) return { tier: 'free', planRow: null, state: 'anonymous' };
   if (userRow.frozen_at) return { tier: 'free', planRow: null, state: 'frozen' };
-  const planRow = plansList?.find((p) => p.id === userRow.plan_id) || null;
-  const tier = planRow?.tier || 'free';
+  const planRow = (plansList && plansList.find((p) => p.id === userRow.plan_id)) || null;
+  const tier = planRow && planRow.tier ? planRow.tier : 'free';
   const state = userRow.plan_grace_period_ends_at ? 'grace' : tier === 'free' ? 'free' : 'active';
   return { tier, planRow, state };
 }
