@@ -47,7 +47,22 @@ Intake | reset_and_rebuild_v2.sql:7083-7126 | create_support_ticket should match
 [filled only if vote is split]
 
 ## Implementation Progress
-[filled by background agents during execution]
+- Queried supabase_migrations.schema_migrations to recover full SQL statements for 092 and 093
+- schema/092_rls_lockdown_2026_04_19.sql: written (12KB, Round A RLS lockdown — public_user_profiles view, PII column REVOKEs, audit_log/webhook_log policies, perms_global_version RLS, bookmark_collections/user_warnings/weekly_recap_attempts/family_achievement_progress/comment_context_tags/category_supervisors policies, reject_privileged_user_updates trigger)
+- schema/092b_rls_lockdown_followup_2026_04_19.sql: written (pre-existing, gap-fill for V2/V10 anon column narrowing)
+- schema/093_rpc_actor_lockdown_2026_04_19.sql: written (Round A RPC actor lockdown — 10 RPCs moved to service_role only, create_support_ticket rewritten to 3-param signature)
+- reset_and_rebuild_v2.sql: require_outranks and caller_can_assign_role inserted at line 7158 (within MODERN RPCs section, after get_own_login_activity grants)
+- Headers added to all three new schema files matching project file style
+- T-003 removed from Ongoing Projects/Current/Current Tasks.md
 
 ## Completed
-[SHIPPED block written here when done]
+SHIPPED 2026-04-26
+Commit: 78f8f22 (schema files 092/092b/093 + reset_and_rebuild_v2.sql)
+Files touched:
+- schema/092_rls_lockdown_2026_04_19.sql (new — 12KB reconstruction from DB)
+- schema/092b_rls_lockdown_followup_2026_04_19.sql (new — pre-existing follow-up)
+- schema/093_rpc_actor_lockdown_2026_04_19.sql (new — RPC lockdown reconstruction)
+- schema/reset_and_rebuild_v2.sql (require_outranks + caller_can_assign_role added at line 7158)
+- Ongoing Projects/Current/Current Tasks.md (item 2 / T-003 removed)
+Verification: grep confirmed require_outranks at lines 7160-7218 in reset_and_rebuild_v2.sql. All three schema files present with correct headers. T-003 confirmed absent from Current Tasks.md.
+Pre-existing DR drift logged (out of scope): create_support_ticket still has old 5-param signature in reset_and_rebuild_v2.sql; public_user_profiles view missing from reset_and_rebuild_v2.sql; reject_privileged_user_updates SECURITY INVOKER vs DEFINER variance.
