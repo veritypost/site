@@ -637,7 +637,7 @@ function OverviewTab({
 
   return (
     <>
-      {/* Header card with tier ring */}
+      {/* Header card */}
       <PageSection>
         <div
           style={{
@@ -651,23 +651,8 @@ function OverviewTab({
             flexWrap: 'wrap',
           }}
         >
-          <div
-            style={{
-              padding: 3,
-              borderRadius: '50%',
-              background: `conic-gradient(${tierColor} 0deg, ${tierColor} ${progress * 360}deg, ${ADMIN_C.divider} ${progress * 360}deg 360deg)`,
-              flexShrink: 0,
-            }}
-          >
-            <div
-              style={{
-                padding: 3,
-                borderRadius: '50%',
-                background: ADMIN_C.bg,
-              }}
-            >
-              <Avatar user={user} size={72} />
-            </div>
+          <div style={{ flexShrink: 0 }}>
+            <Avatar user={user} size={72} />
           </div>
 
           <div style={{ flex: 1, minWidth: 220 }}>

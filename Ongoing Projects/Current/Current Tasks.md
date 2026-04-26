@@ -206,7 +206,7 @@ SHIPPED 2026-04-26. Web: position:fixed bottom bar (zIndex 100) renders when myR
 
 108. **Swap all `LockModal` call sites to `LockedFeatureCTA`** (T-067) — plan-gated = upsell; role-gated = muted explainer; verification-gated = CTA to verify. **Blocked on item 42 (build component) and item 43 (classify call sites).** Affects: all `LockModal` usage across web and iOS.
 
-109. **Rebuild profile hero with verity score ring** (T-068) — score ring as centerpiece, tier name as soft subhead, delta-to-next as small gauge. **Blocked on T-085 (owner decides nav model — do not start until decided).** Affects: `web/src/app/profile/page.tsx`, `ProfileView.swift`.
+109. ~~**Rebuild profile hero with verity score ring** (T-068)~~ — SHIPPED 2026-04-26. Score ring never wanted. Avatar is a plain circle on both web and iOS; hero content (name, tier badge text, score number, progress bar) already correct. Ring removed from `web/src/app/profile/page.tsx` and `VerityPost/VerityPost/ProfileView.swift`; `tierRingReveal` state + animation fully deleted.
 
 110. **Replace streak integer cards with 30-day calendar grid** (T-069) — full-width 30-day calendar with activity-colored cells. **Blocked on T-085.** Affects: profile page web and iOS.
 

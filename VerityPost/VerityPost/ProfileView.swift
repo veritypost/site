@@ -106,7 +106,6 @@ struct ProfileView: View {
     @State private var streakLoaded = false
 
     // Reveal animation flags (first-load spring on hero + streak)
-    @State private var tierRingReveal: Bool = false
     @State private var streakGridReveal: Bool = false
 
     // Expansion state (milestones / categories drilldown)
@@ -181,14 +180,6 @@ struct ProfileView: View {
                 async let ach: Void = loadAchievements(userId: uid)
                 _ = await (a, s, ach)
             }
-            // Stagger the reveal animations so the hero and streak don't
-            // pop in simultaneously — feels like a sequence rather than a
-            // flash. Keep total duration under 600ms so pull-to-refresh
-            // still feels instant on repeat.
-            withAnimation(.spring(response: 0.55, dampingFraction: 0.8)) {
-                tierRingReveal = true
-            }
-            try? await Task.sleep(nanoseconds: 120_000_000)
             withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
                 streakGridReveal = true
             }
@@ -400,22 +391,11 @@ struct ProfileView: View {
         let deltaToNext = max(0, (next?.minScore ?? score) - score)
 
         HStack(alignment: .center, spacing: 14) {
-            // Compact avatar with single-color tier ring (tap to edit color + name)
+            // Plain circle avatar (tap to edit color + name)
             Button {
                 showAvatarEdit = true
             } label: {
-                ZStack {
-                    Circle()
-                        .stroke(VP.border, lineWidth: 3)
-                    if tiersReady {
-                        Circle()
-                            .trim(from: 0, to: CGFloat(tierRingReveal ? progress : 0))
-                            .stroke(tierColor, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                            .rotationEffect(.degrees(-90))
-                    }
-                    AvatarView(user: user, size: 56)
-                }
-                .frame(width: 68, height: 68)
+                AvatarView(user: user, size: 68)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Edit avatar color and display name")
@@ -482,7 +462,7 @@ struct ProfileView: View {
                                 .frame(height: 4)
                             RoundedRectangle(cornerRadius: 3)
                                 .fill(tierColor)
-                                .frame(width: geo.size.width * CGFloat(tierRingReveal ? progress : 0), height: 4)
+                                .frame(width: geo.size.width * CGFloat(progress), height: 4)
                         }
                     }
                     .frame(height: 4)
