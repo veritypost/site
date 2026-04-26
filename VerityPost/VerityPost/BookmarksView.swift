@@ -23,6 +23,14 @@ struct BookmarksView: View {
     private var isFreeTier: Bool { !hasUnlimitedBookmarks }
 
     private var atCap: Bool { isFreeTier && items.count >= 10 }
+    // T-088: proactive cap counter — visible at 50%+ of the 10-bookmark free cap.
+    // Tone escalates: neutral (5-6), amber (7-8), danger (9+).
+    private var nearCap: Bool { isFreeTier && items.count >= 5 }
+    private var capToneColor: Color {
+        if items.count >= 9 { return Color(hex: "dc2626") }
+        if items.count >= 7 { return Color(hex: "b45309") }
+        return VP.dim
+    }
 
     private var filtered: [BookmarkItem] {
         if activeCollection == "all" { return items }
@@ -93,12 +101,21 @@ struct BookmarksView: View {
     // MARK: - Header
 
     private var headerRow: some View {
-        HStack(alignment: .firstTextBaseline) {
-            let counter = isFreeTier ? "\(items.count) of 10" : "\(items.count)"
-            Text("Saved articles · \(counter)")
-                .font(.system(.title3, design: .default, weight: .bold))
-                .foregroundColor(VP.text)
-            Spacer()
+        // T-088: VStack wraps the title row so the proactive cap counter appears
+        // as a small caption line below when the user is at 50%+ capacity.
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .firstTextBaseline) {
+                let counter = isFreeTier ? "\(items.count) of 10" : "\(items.count)"
+                Text("Saved articles · \(counter)")
+                    .font(.system(.title3, design: .default, weight: .bold))
+                    .foregroundColor(VP.text)
+                Spacer()
+            }
+            if nearCap {
+                Text("\(items.count) / 10 free bookmarks")
+                    .font(.system(.caption2, design: .default, weight: .semibold))
+                    .foregroundColor(capToneColor)
+            }
         }
     }
 
