@@ -50,7 +50,7 @@ Things being watched but not acted on — not bugs with assigned tasks, but real
 
 **Apple JWS header timestamp not validated — past-dated receipt replay.** MASTER_TRIAGE item B14. A receipt with a past-dated header can be replayed without the server rejecting it. Flagged as deferred in the 2026-04-24 session because testing requires a real Apple JWS. Risk is real; fix requires a test harness that does not exist yet. Source: MASTER_TRIAGE B14.
 
-**`billing_cancel_subscription` RPC rejects already-frozen users with no recovery path.** MASTER_TRIAGE item B17. A frozen user cannot cancel their subscription — the RPC rejects them. No route exists for a frozen user to cancel via normal means. Requires a separate RPC fix. Source: MASTER_TRIAGE B17.
+**`billing_cancel_subscription` RPC skips cancellation for frozen users — no recovery path.** MASTER_TRIAGE item B17. Migration 157 changed the behavior from throwing to returning a no-op `skipped=true` response for frozen users, but still never performs the actual cancellation. A frozen user's subscription remains active with no exit path. Fix written: `schema/188_fix_billing_cancel_frozen_user.sql` removes the frozen-user short-circuit entirely, allowing cancellation to proceed regardless of freeze state. Owner must apply `schema/188_fix_billing_cancel_frozen_user.sql` via the Supabase dashboard. Source: MASTER_TRIAGE B17.
 
 **Family plan seat counting and decrement not implemented.** MASTER_TRIAGE 3-C deferred items include family plan seat counting and decrement. The `verity_family` and `verity_family_xl` plans have no seat-enforcement logic in any route or RPC. When family plans go live, seat limits will not be enforced unless this is built first.
 
