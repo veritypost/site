@@ -11,6 +11,7 @@ import { permissionError, recordAdminAction } from '@/lib/adminMutation';
 import { renderTemplate, sendEmail } from '@/lib/email';
 import { APPROVAL_TEMPLATE, buildApprovalVars } from '@/lib/betaApprovalEmail';
 import { getSiteUrl } from '@/lib/siteUrl';
+import type { TableUpdate } from '@/types/database-helpers';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -108,7 +109,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
   }
 
   // Mark approved + bind code + stamp invite_sent_at if email succeeded.
-  const updatePayload: Record<string, unknown> = {
+  const updatePayload: TableUpdate<'access_requests'> = {
     status: 'approved',
     approved_by: actor.id,
     approved_at: new Date().toISOString(),
