@@ -7,6 +7,22 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (T309 closed — all three RPCs already cross-clear correctly, verified via MCP) — _pending push to git_
+
+Owner authorized the MCP query for T309. Read all three function bodies via `pg_proc`:
+
+- **`billing_freeze_profile`** — `UPDATE users SET frozen_at = now(), frozen_verity_score = verity_score, plan_id = v_free_plan_id, plan_status = 'frozen', plan_grace_period_ends_at = NULL, updated_at = now() WHERE id = p_user_id;` Sets the freeze AND clears the grace period in the same statement. ✓
+- **`billing_resubscribe`** — `UPDATE users SET ... frozen_at = NULL, frozen_verity_score = NULL, plan_grace_period_ends_at = NULL, ...` Clears all three in one statement. ✓
+- **`billing_unfreeze`** — `UPDATE users SET frozen_at = NULL, frozen_verity_score = NULL, plan_id = v_sub.plan_id, plan_status = 'active', plan_grace_period_ends_at = NULL, ...` Same. ✓
+
+System map §16 #10 was authored when the bodies couldn't be read from local SQL files; the concern was hypothetical pending verification. Now verified: the cross-clear is correctly implemented across all three RPCs. **T309 closed as already-correct, no migration needed.** Body removed from TODO; owner-queue entry removed.
+
+Sister observation (NOT a new TODO entry, just noted): I didn't see an RPC that *sets* `plan_grace_period_ends_at` — that path presumably lives in the Stripe webhook handler when a payment goes `past_due`. If a user is already frozen when grace gets re-set, that's the only theoretical path to a both-set state. Worth a one-line check next time the Stripe webhook is in scope, but not a TODO entry — it's defensive belt-and-braces, not a verified bug.
+
+- **Files** — `Ongoing Projects/TODO.md` (T309 body + owner-queue entry deleted), `Ongoing Projects/CHANGELOG.md` (this entry).
+
+---
+
 ## 2026-04-27 (wave 6 — code-resolved owner-queue items: T54 + T298 + T318 + T319) — _shipped, pushed to git_ (commit 855dcf3)
 
 After the owner asked which queue questions could be answered from current code, four were resolvable end-to-end.

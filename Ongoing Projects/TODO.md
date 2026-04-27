@@ -314,13 +314,6 @@ _(Above queue items added during the AUTH/PERMS SYSTEM MAP fifth-pass audit, 202
   - **Options I see:** (A) close T117, intentional pattern; (B) unify on `<ErrorState>`, ~16 admin pages to migrate; (C) build a third primitive `<AdminErrorState>` that visually matches admin's denser layout. **Recommended pick: A** — admin's denser table-style pages don't benefit from `<ErrorState>`'s hero treatment.
   - **What I did instead:** removed T117 from skip list, captured here.
 
-- **2026-04-27** — T309 billing-state RPC cross-clearing
-  - **What I was doing:** sixth-pass re-audit of the `frozen_at` + `plan_grace_period_ends_at` interaction.
-  - **What's blocking:** RPC bodies (`billing_freeze_profile` / `billing_resubscribe` / `billing_unfreeze`) aren't readable from local SQL files; need MCP to confirm whether they cross-clear each other.
-  - **Question for owner:** ready to MCP-inspect the three RPC bodies so we can write the migration to fix cross-clearing (or confirm it's already correct)?
-  - **Options I see:** (A) MCP-inspect now and ship migration if needed; (B) defer until billing-state-machine pass (T347 consolidation); (C) leave as-is and only address if it surfaces in support. **Recommended pick: A** — pair with T308 (manual-sync ignores `frozen_at`) for one billing-state-machine bundle.
-  - **What I did instead:** captured here.
-
 - **2026-04-27** — T338 deletion-scheduled banner severity (`warnSoft` vs `dangerSoft`)
   - **What I was doing:** sixth-pass re-audit of the redesign banner severity classes.
   - **What's blocking:** verifier and adversary disagreed. Verifier called the original CONFIRMED (yellow understates 30-day countdown urgency); adversary called STALE (warn correctly signals "reversible during the window," danger would oversignal).
@@ -670,10 +663,6 @@ Source: `Ongoing Projects/2026-04-27_AUTH_PERMS_SYSTEM_MAP.md`. 4 parallel Explo
 #### T308 — Admin manual-sync downgrade ignores `frozen_at` — **HIGH** (state coherence)
 **File:** `web/src/app/api/admin/subscriptions/[id]/manual-sync/route.js:100-150` (downgrade branch). Comment at line 32 says "we leave verity_score / frozen_at alone" — frozen user downgraded to free remains frozen-on-free, logically incoherent (no plan to be frozen against).
 **Fix:** Branch on `frozen_at` — admin downgrade should either unfreeze or surface a confirmation that frozen state will persist.
-
-#### T309 — `frozen_at` and `plan_grace_period_ends_at` don't clear each other — **HIGH** (state machine)
-**File:** RPCs `billing_freeze_profile` / `billing_resubscribe` / `billing_unfreeze` (in migrations). User can have both columns set; AccountStateBanner only shows the higher-priority one. Defer-to-MCP needed to verify the exact RPC bodies — cited in system map §16 #10 as unverifiable from local SQL.
-**Fix:** T5 schema/RPC change — halt and queue migration. Pair with T308 for the broader billing-state-machine consolidation.
 
 #### T310 — Audit-log writes are best-effort across multiple routes — **HIGH** (compliance)
 **File:** Pattern recurs across the auth surface. Sixth-pass enumerated explicitly: `web/src/app/api/auth/signup/route.js:200-210`, `web/src/app/api/auth/login/route.js:119-128`, `web/src/app/api/auth/callback/route.js:157-166`, `web/src/app/api/auth/email-change/route.js:132-148`. All four wrap the `audit_log` insert in `try { ... } catch { console.error(...) }`. Connection-pool exhaustion or transient DB partition produces un-audited account creations / mod actions.
