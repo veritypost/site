@@ -329,12 +329,51 @@ export async function middleware(request) {
     }
   );
 
-  // Skip GoTrue call on public routes. Only the protected-route redirect
-  // and the /kids/* fork below branch on `user`, so every other request
-  // (home, story, /api/*, /login, etc.) can avoid a Supabase auth round-trip
-  // entirely. Cuts middleware p50 on public pages dramatically.
-  const needsUser = isProtected(pathname) || pathname === '/kids' || pathname.startsWith('/kids/');
+  // Closed-beta global gate. NEXT_PUBLIC_BETA_GATE=1 turns the entire
+  // public surface into invite-only: every anonymous request is bounced
+  // to /login (which carries the access-code redeem field). Allowlist
+  // covers the auth surface itself, the link-redemption / request-access
+  // flow, public assets, and the admin pre-auth probe (the admin layout
+  // does its own role check). Once the visitor signs in or redeems an
+  // invite, normal route logic resumes.
+  const betaGateEnabled = process.env.NEXT_PUBLIC_BETA_GATE === '1';
+  const betaGateAllowed =
+    pathname === '/login' ||
+    pathname === '/beta-locked' ||
+    pathname === '/request-access' ||
+    pathname === '/forgot-password' ||
+    pathname === '/reset-password' ||
+    pathname === '/preview' ||
+    pathname === '/welcome' ||
+    pathname.startsWith('/r/') ||
+    pathname.startsWith('/api/') ||
+    pathname.startsWith('/_next/') ||
+    pathname === '/favicon.ico' ||
+    pathname === '/robots.txt' ||
+    pathname === '/sitemap.xml';
+
+  // Skip GoTrue call on public routes. Only the protected-route redirect,
+  // the closed-beta gate, and the /kids/* fork below branch on `user`,
+  // so every other request can avoid a Supabase auth round-trip entirely.
+  const needsUser =
+    isProtected(pathname) ||
+    pathname === '/kids' ||
+    pathname.startsWith('/kids/') ||
+    (betaGateEnabled && !betaGateAllowed);
   const user = needsUser ? (await supabase.auth.getUser()).data.user : null;
+
+  if (betaGateEnabled && !betaGateAllowed && !user) {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = '/login';
+    loginUrl.search = '';
+    if (pathname !== '/' && pathname !== '/login') {
+      loginUrl.searchParams.set('next', pathname + request.nextUrl.search);
+    }
+    const redirect = NextResponse.redirect(loginUrl, { status: 302 });
+    redirect.headers.set('x-request-id', requestId);
+    setCspHeader(redirect, csp, cspStrictReport);
+    return redirect;
+  }
 
   if (!user && isProtected(pathname)) {
     const loginUrl = request.nextUrl.clone();

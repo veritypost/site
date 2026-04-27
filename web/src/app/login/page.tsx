@@ -62,6 +62,49 @@ function LoginPageInner() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  // Closed-beta invite redemption: paste a slug or full /r/<code> URL.
+  // POSTs to /api/access-redeem; on success the server sets vp_ref and
+  // we route to /signup so the user can create their account.
+  const [showInvite, setShowInvite] = useState<boolean>(false);
+  const [inviteCode, setInviteCode] = useState<string>('');
+  const [inviteBusy, setInviteBusy] = useState<boolean>(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+
+  const inviteReasonText: Record<string, string> = {
+    invalid_format: "That doesn't look like a valid code.",
+    code_not_found: "We couldn't find that invite.",
+    code_disabled: 'That invite has been disabled.',
+    code_expired: 'That invite has expired.',
+    code_exhausted: 'That invite has already been used.',
+    rate_limited: 'Too many attempts. Try again in a minute.',
+    server_misconfig: 'Server is missing config. Contact the team.',
+    internal_error: 'Something went wrong. Please try again.',
+  };
+
+  const submitInvite = async (e: FormEvent) => {
+    e.preventDefault();
+    setInviteError(null);
+    if (!inviteCode.trim()) return;
+    setInviteBusy(true);
+    try {
+      const res = await fetch('/api/access-redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: inviteCode.trim() }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.ok) {
+        setInviteError(inviteReasonText[json.reason] || 'Could not redeem that invite.');
+        return;
+      }
+      window.location.href = json.redirect_to || '/signup';
+    } catch {
+      setInviteError('Network issue. Please try again.');
+    } finally {
+      setInviteBusy(false);
+    }
+  };
+
   // Inbound ?toast=... query-string notices from other flows. Currently
   // the reset-password page bounces here with toast=reset_invalid when a
   // recovery link is missing or expired, so the user gets a clean reason
@@ -568,15 +611,139 @@ function LoginPageInner() {
           </button>
         </form>
 
-        <p style={{ textAlign: 'center', fontSize: '13px', color: C.dim, margin: 0 }}>
-          New here?{' '}
-          <a
-            href="/signup"
-            style={{ color: C.accent, fontWeight: 600, fontSize: '13px', textDecoration: 'none' }}
-          >
-            Create an account
-          </a>
-        </p>
+        {/* Closed-beta invite redemption. Replaces the old "Create an account"
+            link. New accounts can only be created via a valid invite code or
+            the /r/<slug> URL the inviter sent. Existing users continue to
+            sign in above without involvement here. */}
+        <div
+          style={{
+            borderTop: `1px solid ${C.border}`,
+            paddingTop: 16,
+            marginTop: 4,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 12,
+          }}
+        >
+          {!showInvite ? (
+            <button
+              type="button"
+              onClick={() => setShowInvite(true)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: C.accent,
+                fontWeight: 600,
+                fontSize: '13px',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                padding: 0,
+                textAlign: 'center',
+              }}
+            >
+              Have an invite? Enter your code →
+            </button>
+          ) : (
+            <form
+              onSubmit={submitInvite}
+              style={{ display: 'flex', flexDirection: 'column', gap: 10 }}
+            >
+              <label
+                htmlFor="invite-code"
+                style={{
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: C.dim,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                }}
+              >
+                Invite code or link
+              </label>
+              <input
+                id="invite-code"
+                type="text"
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value)}
+                disabled={inviteBusy}
+                placeholder="abc123xyz9 or full URL"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  border: `1px solid ${C.border}`,
+                  fontSize: 14,
+                  background: '#ffffff',
+                  color: C.text,
+                  fontFamily: 'ui-monospace, SFMono-Regular, monospace',
+                }}
+              />
+              {inviteError && (
+                <div
+                  style={{
+                    fontSize: 13,
+                    color: C.danger,
+                    background: '#fef2f2',
+                    border: `1px solid ${C.danger}`,
+                    borderRadius: 6,
+                    padding: '6px 10px',
+                  }}
+                >
+                  {inviteError}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="submit"
+                  disabled={inviteBusy || !inviteCode.trim()}
+                  style={{
+                    flex: 1,
+                    padding: '10px 14px',
+                    borderRadius: 8,
+                    background: C.accent,
+                    color: '#ffffff',
+                    border: 'none',
+                    fontWeight: 600,
+                    fontSize: 14,
+                    cursor: inviteBusy ? 'wait' : 'pointer',
+                    opacity: !inviteCode.trim() ? 0.5 : 1,
+                  }}
+                >
+                  {inviteBusy ? 'Checking…' : 'Continue'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowInvite(false);
+                    setInviteCode('');
+                    setInviteError(null);
+                  }}
+                  disabled={inviteBusy}
+                  style={{
+                    padding: '10px 14px',
+                    borderRadius: 8,
+                    background: 'transparent',
+                    color: C.dim,
+                    border: `1px solid ${C.border}`,
+                    fontSize: 14,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+              <div style={{ fontSize: 12, color: C.dim, textAlign: 'center' }}>
+                Don&apos;t have an invite?{' '}
+                <a href="/request-access" style={{ color: C.accent, fontWeight: 600 }}>
+                  Request access
+                </a>
+              </div>
+            </form>
+          )}
+        </div>
       </div>
     </div>
   );
