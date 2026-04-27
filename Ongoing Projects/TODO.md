@@ -581,9 +581,14 @@ Source: `Ongoing Projects/2026-04-27_AUTH_PERMS_SYSTEM_MAP.md`. 4 parallel Explo
 **File:** `web/src/app/api/auth/signup/route.js:57`. `.ilike('email', email)` does ASCII case-folding only — Unicode homoglyphs (Cyrillic 'а' U+0430 vs Latin 'a' U+0061) bypass the banned-account match.
 **Fix:** NFKD-normalize both sides before compare; or use a homoglyph-aware library; or normalize at insert time so the DB only stores canonical form. 5-line change.
 
-#### T300 partial — public-profile column-level leak migration drafted — **CRITICAL** (privacy/PII)
-**Migration drafted 2026-04-27** at `Ongoing Projects/migrations/2026-04-27_T300_public_profile_view.sql`. Creates `public_profiles_v` SECURITY DEFINER view with whitelisted columns (no email/plan_id/stripe_customer_id/cohort/frozen_at/etc.); revokes anon SELECT on `public.users`; tightens RLS policies on `public.users` to `id=auth.uid()` (self) + `is_admin_or_above()` (admin) only.
-**Caller-side sweep required AFTER apply (separate code commit BEFORE deploy):** swap `supabase.from('users').select(...)` to `from('public_profiles_v')` in `/u/[username]/page.tsx`, `/card/[username]/*`, `/leaderboard/page.tsx`, `CommentThread.tsx` author joins, iOS `PublicProfileView.swift`. Self-row reads in `/profile/page.tsx` + `NavWrapper.tsx` keep using `from('users')` (RLS allows `id=auth.uid()` through). Admin reads via service-role unchanged. Apply order: branch → caller sweep deployed → merge.
+#### T300 partial — migration drafted + 5 of 7 caller swaps shipped — **CRITICAL** (privacy/PII)
+**Migration:** `Ongoing Projects/migrations/2026-04-27_T300_public_profile_view.sql` (drafted 2026-04-27, awaiting owner apply).
+**Caller swaps shipped 2026-04-27 (commit 540f2df):** `/u/[username]/page.tsx`, `/u/[username]/layout.js`, `/card/[username]/page.js`, `/card/[username]/layout.js`, `/card/[username]/opengraph-image.js`. All read via `public_profiles_v`; column lists within whitelisted set; existing `'private'/'hidden'` branches now dead code (view filters them) but harmless.
+**Still pending caller swaps:**
+- `web/src/app/leaderboard/page.tsx` (4 occurrences at lines 168/238/305/327) — needs column-list audit; some leaderboard projections may select fields outside the view.
+- `web/src/components/CommentThread.tsx` — `users!user_id(...)` relation embed; needs runtime verification post-apply (embed may bypass RLS via the comments-side relation).
+- `VerityPost/VerityPost/PublicProfileView.swift:360` — iOS read.
+**Apply order:** ship the remaining 3 swaps first, then apply the migration.
 
 #### T301 partial — Kids-security follow-up (parent confirmation + first-pair alert) — **HIGH** (kids security)
 **Status:** TTL reduced 7d → 24h shipped 2026-04-27 (`web/src/app/api/kids/pair/route.js:24`). Two follow-up defenses still pending:

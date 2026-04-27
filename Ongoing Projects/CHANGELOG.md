@@ -7,6 +7,28 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (wave 14 — T300 caller-side sweep, 5 of 7 paths swapped) — _shipped, pushed to git_ (commit 540f2df)
+
+5 public-facing read paths now use `public_profiles_v` instead of `from('users').select(...)`:
+- `/u/[username]/page.tsx` (TS-cast `as never` on view name; types not yet regen'd post-migration draft)
+- `/u/[username]/layout.js` (SSR metadata)
+- `/card/[username]/page.js` (card share)
+- `/card/[username]/layout.js` (card metadata)
+- `/card/[username]/opengraph-image.js` (OG image)
+
+All select column lists fit within the view's whitelist. Existing `=== 'private' || === 'hidden'` branches now dead code (view filters them) but harmless — left in place to minimise diff risk.
+
+**Still pending caller swaps before T300 migration is safe to apply:**
+- `web/src/app/leaderboard/page.tsx` (4 occurrences) — needs column-list audit
+- `web/src/components/CommentThread.tsx` — `users!user_id(...)` relation embed; needs runtime verification
+- `VerityPost/VerityPost/PublicProfileView.swift:360`
+
+Apply order: this commit → 3-path follow-up → migration apply → monitor.
+
+T300 body re-scoped from "migration drafted" to "migration drafted + 5 of 7 caller swaps shipped."
+
+---
+
 ## 2026-04-27 (wave 13 — T57 button + T300 migration + T333 mirror + T339 type + T341 CTAs) — _shipped, pushed to git_ (commit c006e5f; 4 redesign files in untracked tree roll with T357)
 
 ### Shipped (5 items + 1 migration draft)
