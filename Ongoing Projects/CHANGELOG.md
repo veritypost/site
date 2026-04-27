@@ -7,6 +7,20 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (T17 — bidirectional blocked_users enforcement on DM RPCs) — _migration applied; route patch deferred per TODO-only mode_
+
+### T17 — start_conversation + post_message reject blocked counterparties
+
+- **Migration applied** (owner): `Ongoing Projects/migrations/2026-04-27_T17_dm_block_enforcement.sql`. MCP verified post-apply — both `start_conversation(uuid,uuid)` and `post_message(uuid,uuid,text)` definitions now contain `DM_BLOCKED`.
+- **What changed**:
+  - `start_conversation` — bidirectional `blocked_users` check. Either direction blocks. Sits after the T16 recipient-opt-out check.
+  - `post_message` — only fires on direct (`type='direct'`) conversations. Looks up the other participant, rejects if blocked in either direction. Group conversations skip — block-in-multi-party is a per-message UX hide, separate concern.
+- **New error code** `[DM_BLOCKED]`. Currently surfaces from the route as a default 400 ("Could not start conversation" / equivalent) until the route patch lands. Per owner direction (TODO-only mode), the route patch (fold `DM_BLOCKED` into the T283 / T16 uniform `cannot_dm` 403 collapse) is deferred — owner says "patch the route" when ready.
+- **Closes the audit hole**: a blocked user can no longer call `start_conversation` against the user who blocked them, nor keep messaging in an existing pre-block conversation. Data-layer enforcement; third-party clients with the anon key are now gated.
+- **Files** — `Ongoing Projects/migrations/2026-04-27_T17_dm_block_enforcement.sql` (applied).
+
+---
+
 ## 2026-04-27 (T16 — recipient allow_messages enforced at RPC + uniform 403 collapse) — _shipped, pushed to git/Vercel_
 
 ### T16 — start_conversation honors recipient opt-out

@@ -33,7 +33,6 @@ Do not pick up these IDs autonomously. The owner has explicitly reserved them. I
 
 **TODO.md items requiring owner decision/action:**
 - **T2** — Cookie consent banner: **OWNER DECIDED 2026-04-27 → Funding Choices (option A)**. Implementation deferred until AdSense console access is available; ready to ship as soon as owner signals "go."
-- **T17** — VERIFIED 2026-04-27 — block enforcement missing from both DM RPCs. Migration drafted at `Ongoing Projects/migrations/2026-04-27_T17_dm_block_enforcement.sql`. Awaiting owner apply.
 - **T26, T173** — MCP `pg_proc` queries (require DB-read permission grant)
 - **T19** — Home feed prefs: wire vs. delete decision (owner direction)
 - **T20** — iOS expert application schema match (depends on editor process tolerance — owner)
