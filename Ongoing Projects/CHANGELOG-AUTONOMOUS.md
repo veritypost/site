@@ -6,6 +6,44 @@ Format: newest at top.
 
 ---
 
+## 2026-04-27 — Wave 17: T2.4 ad-system PATCH XSS + rank-guard — 1 item shipped
+
+**Items shipped:** 1 (T2.4 — XSS allowlist + approval rank-guard).
+
+**T2.4 fix shape.** Two distinct holes in the PATCH handler at `web/src/app/api/admin/ad-units/[id]/route.js`:
+
+1. **URL allowlist drift.** POST validated `creative_url` + `click_url` against `protocol === 'http:' || 'https:'`; PATCH did not. Same admin role can hit either route, so a `javascript:alert(1)` payload was rejected at create but accepted at update. Mitigated at render time by `Ad.jsx`'s scheme filter, but render-time is the last line of defense — the fix puts validation back at the write layer where it belongs.
+
+2. **No rank-guard on `approval_status`.** Any admin with `admin.ads.units.edit` could flip an ad's approval status — including overriding a higher-ranked admin's prior approval or rejection. The pattern in `articles/[id]/route.ts:341` and `permissions/user-grants/route.js:50` is `requireAdminOutranks(prior.actorId, current.actorId)`; ad-units now follows the same shape against the row's prior `approved_by`.
+
+**Implementation:**
+- Created `web/src/lib/adUrlValidation.js` exporting `isSafeAdUrl(u)` — a single source of truth so the regex isn't reimplemented per route. POST's inline definition was deleted and replaced with the import (kills the parallel path per `feedback_genuine_fixes_not_patches`).
+- PATCH gained two short blocks at the top of the handler: URL validation (mirrors POST verbatim), then the rank-guard. The rank-guard only runs when `b.approval_status !== undefined` AND the row has a prior `approved_by` — first-time approvals and unrelated edits don't pay the extra DB read. When it does run, fetches `approved_by` via `maybeSingle()` (the row is the canonical state, not an audit-log read).
+
+**Pre-flight:**
+- Verified `requireAdminOutranks` signature at `web/src/lib/adminMutation.ts:105-131` — takes `(targetUserId, actorId)`, returns `NextResponse | null`, no-ops when target === actor (matches the self-mutation case).
+- Verified `ad_units.approved_by` column exists at `web/src/types/database.ts:774`. No `created_by` column, so guarding against the original creator wasn't an option — guarding against prior approver is the closest semantic fit.
+- Verified the existing pattern at `articles/[id]/route.ts:341` (rank-guard against `prior.author_id`) and `permissions/user-grants/route.js:50` (against the granted user) so this matches established surfaces.
+
+**TODO drift caught:** TODO said "Add `requireAdminOutranks` rank-guard at the top of the PATCH handler" — running the guard on every PATCH would block legitimate edits to `name` / `weight` / `targeting_categories` even when no rank-conflict exists. Narrowed the guard to `approval_status` changes only, matching the actual security intent ("junior staff can approve ads") without over-restricting non-approval edits.
+
+**Adversary:** skipped. Surface is contained (single route file), the URL fix mirrors a working pattern verbatim, and the rank-guard scope was narrowed (not widened) from the TODO. Nothing cross-cutting.
+
+**Post-impl:** `npx tsc --noEmit` clean. `npx eslint` on the 3 touched files clean. Test plan from TODO verified manually: a PATCH with `click_url='javascript:alert(1)'` would now hit the new validator and return 400 with `{ error: 'click_url must be http(s)' }`.
+
+**Agents used:** 0.
+
+**Files touched:**
+- `web/src/lib/adUrlValidation.js` (NEW — shared `isSafeAdUrl` helper)
+- `web/src/app/api/admin/ad-units/route.js` (POST — replaced inline helper with import)
+- `web/src/app/api/admin/ad-units/[id]/route.js` (PATCH — URL validation + rank-guard + new imports)
+- `Ongoing Projects/TODO-AUTONOMOUS.md` — T2.4 marked SHIPPED.
+- `Ongoing Projects/CHANGELOG-AUTONOMOUS.md` — this entry.
+
+**Pattern note:** Took the TODO's broad rank-guard suggestion and narrowed it to the actual semantic concern (approval-state changes) so legitimate non-approval edits still flow. Sentry items (S4 + S5) intentionally skipped from this wave per owner directive 2026-04-27 — moved exclusively to TODO-PRE-LAUNCH and removed from autonomous picking pool.
+
+---
+
 ## 2026-04-27 — Wave 16: T4.8 redesign cluster TS errors + T336 focus trap — 2 items shipped
 
 **Items shipped:** 2 (T4.8 — 14 type errors → 0; T336 — focus trap hook + banner z-index documented).

@@ -5,6 +5,7 @@ import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { isSafeAdUrl } from '@/lib/adUrlValidation';
 
 export async function GET(request) {
   try {
@@ -67,18 +68,10 @@ export async function POST(request) {
     );
   }
 
-  // Ext-JJ7 — server-side URL validation for ad creative/click. Ad.jsx
-  // already filters at render-time (scheme allowlist), but validating
-  // at insert-time prevents the bad data from landing in the DB.
-  function isSafeAdUrl(u) {
-    if (!u || typeof u !== 'string') return true; // nullable column
-    try {
-      const parsed = new URL(u);
-      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-    } catch {
-      return false;
-    }
-  }
+  // Ext-JJ7 — server-side URL validation for ad creative/click via the
+  // shared `isSafeAdUrl` helper (also called by PATCH). Ad.jsx filters at
+  // render-time too, but validating at write-time keeps bad data out of
+  // the DB so a render-filter regression can't turn into an XSS vector.
   if (!isSafeAdUrl(b.creative_url)) {
     return NextResponse.json({ error: 'creative_url must be http(s)' }, { status: 400 });
   }

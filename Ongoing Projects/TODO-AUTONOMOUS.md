@@ -35,18 +35,9 @@ Approach: reject all non-ASCII codepoints at input rather than try to TR39-fold 
 
 See `CHANGELOG-AUTONOMOUS.md` Wave 10. **Adversary saved a half-fix that was security theater** — without that catch, this would have shipped 60+ lines of duplicate-I/O code that didn't move the security bar.
 
-## S4 — `observability.captureException` extras leak PII — MEDIUM
+## Sentry items — MOVED to TODO-PRE-LAUNCH (do not migrate back)
 
-(Listed in TODO-PRE-LAUNCH.md too — same code edit, but the fix is autonomous.)
-**Verified:** 2026-04-27 against `web/src/lib/observability.js:46-53`.
-**Fix:** Either iterate `context` keys in `captureException` and skip + redact matching `REDACT_BODY_KEYS`, or extend `web/sentry.shared.js`'s `beforeSend` scrubber to walk `event.extra`. Pick (b) — single source of truth.
-**Tier:** T2.
-
-## S5 — Sentry instrumentation TS hygiene — LOW
-
-**Verified:** 2026-04-27 against `web/src/instrumentation.ts:21-22, 31-32`.
-**Fix:** Import `BeforeSendCallback` from `@sentry/types`. Type `scrubPII: BeforeSendCallback`. Drop the `as unknown` assertions.
-**Tier:** T1 (single-file type cleanup).
+**S4** (`observability.captureException` extras leak PII) and **S5** (Sentry instrumentation TS hygiene) live exclusively in `TODO-PRE-LAUNCH.md` going forward (per owner 2026-04-27). All Sentry-touching work is gated on the Sentry-launch decision (paid tool; deferred until revenue / paging pain). Do not re-add to TODO-AUTONOMOUS even if "the fix is autonomous" — the cost-of-tool gate is what blocks, not the engineering shape.
 
 ---
 
@@ -593,12 +584,9 @@ Stamp removed from notify branch; only `captureMessage` remains (operator-visibl
 
 ### Tier 2 — compliance + security
 
-## T2.4 — Ad-system PATCH lacks URL allowlist — HIGH (XSS)
+## T2.4 — Ad-system PATCH lacks URL allowlist — SHIPPED 2026-04-27
 
-**Verified:** 2026-04-27 against `web/src/app/api/admin/ad-units/[id]/route.js`. POST validates http(s); PATCH does not. Also missing rank-guard on the PATCH (junior staff can approve ads).
-**Fix:** Same URL validation in PATCH path as POST: reject any `click_url` not matching `^https?://`. Add `requireAdminOutranks` rank-guard at the top of the PATCH handler.
-**Tier:** T2 (defense-in-depth, no logic change).
-**Test:** PATCH an ad with `click_url='javascript:alert(1)'` → 400.
+Extracted `isSafeAdUrl` to `web/src/lib/adUrlValidation.js` (was inline in POST handler) so POST and PATCH share one regex — a render-filter regression in `Ad.jsx` can't slip an XSS payload through one write path while the other rejects it. PATCH now mirrors POST's `creative_url` + `click_url` validation — `javascript:alert(1)` returns 400. Added rank-guard for `approval_status` changes only: when the row already has an `approved_by`, calls `requireAdminOutranks(prior.approved_by, user.id)` so a junior admin can't override a higher-ranked admin's prior approval/rejection. First-time approvals + non-status edits are unaffected. See `CHANGELOG-AUTONOMOUS.md` Wave 17.
 
 ## T2.5 — iOS password change doesn't require current password — DEFERRED (moot post-AUTH-MIGRATION)
 
