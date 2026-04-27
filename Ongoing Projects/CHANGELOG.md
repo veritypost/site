@@ -7,6 +7,60 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (Pass A — pipeline prompt-vs-schema alignment, generation unblocked) — _shipped, pushed to git/Vercel (commit `d3b5c47`)_
+
+### Context
+
+Pipeline `pipeline_runs` was 0 completed / 5 failed across the last 90 days. Audit traced every failure to drift between what prompts told the LLM to output and what the route's Zod schemas actually accepted. This commit is the surgical alignment pass — Phase 0 of the AI + Plan Change Implementation roadmap (`Ongoing Projects/AI + Plan Change Implementation/`). No DB migrations, no UI, no infrastructure — just text edits on prompts + Zod tweaks on the route.
+
+### Cluster — editorial-guide.ts dead-block strips
+
+- **EDITORIAL_GUIDE: dropped "RELATED VP STORIES" block (~20 lines).** Route never feeds related stories to the model, so the entire conditional block was instructing the LLM about a feature that doesn't exist.
+- **TIMELINE_PROMPT: dropped "LINKING TO EXISTING VP ARTICLES" + "INHERITING EXISTING THREAD TIMELINES" sections (~90 lines).** Both blocks instruct the LLM to emit `vp_slug`, `is_current`, `is_future` fields and to consume thread context. Route never passes thread context, never reads those output fields. `TimelineEventSchema` has no slot for them. Pure dead text that confused the model.
+- **TIMELINE_PROMPT: dropped the `text`/`summary` field block in EVENT RULES.** Prose described two output fields named `text` and `summary`. The OUTPUT FORMAT block immediately below described `event_date`/`event_label`/`event_body`. The two halves of the same prompt disagreed on the output schema. Caused 1/5 generation failures (model picked the prose path, Zod rejected). Replaced with prose that aligns with the OUTPUT FORMAT.
+- **EDITORIAL_GUIDE: dropped `<!-- insufficient_data: ... -->` instruction.** Prompt told the LLM to emit this when source data was thin. No parser exists; `extractJSON` rejects HTML comments; Zod fails. Replaced with "write the best article you can; route will reject thin output."
+- **EDITORIAL_GUIDE: dropped `<!-- word_count: 178 -->` trailing comment instruction.** Incompatible with JSON output (route forces JSON in the user-turn override). The model dutifully emitting the comment after `}` would crash extractJSON.
+- **EDITORIAL_GUIDE: loosened "no markdown / plain text only" rules.** The route's body-step user-turn explicitly allows markdown paragraphs and `**bold** sparingly`. The system prompt forbidding both directly contradicted that. Replaced with rules that match what the route actually wants (paragraph breaks `\n\n` and sparing bold OK; no headers, bullets, horizontal rules).
+
+### Cluster — editorial-guide.ts schema fixes
+
+- **HEADLINE_PROMPT OUTPUT FORMAT:** `"title"` → `"headline"` (matches `HeadlineSummarySchema` field). Added `"slug"` field (route's user-turn requests it; schema has it as optional but model wasn't told to emit it).
+- **AUDIENCE_PROMPT OUTPUT JSON:** `"reason": "one sentence"` (singular string) → `"reasons": ["one sentence"]` (array of strings, matches `AudienceCheckSchema`).
+- **KID_QUIZ_PROMPT OUTPUT:** `"correct_answer"` → `"correct_index"` (unifies with QUIZ_PROMPT and the route's normalizer's preferred key).
+- **KID_ARTICLE_PROMPT OUTPUT:** dropped the `kid_title`/`kid_summary`/`kid_content`/`kid_category` shape; replaced with `title`/`body`/`word_count`/`reading_time_minutes` (matches `BodySchema`). Previously every kid run emitted four fields the route silently dropped while expecting a different shape entirely.
+- **QUIZ_PROMPT verification protocol:** internal references to `correct_answer` corrected to `correct_index` (the prompt was inconsistent with itself across step 8b and step 8e).
+
+### Cluster — route.ts schema + user-turn fixes
+
+- **`HeadlineSummarySchema.headline`:** changed from `min(1).max(200)` to `max(200).optional().default('')`. Was guaranteeing failure on the summary step (which intentionally returned an empty headline). Headline step still requires non-empty headline because user-turn requests it.
+- **`TimelineEventSchema`:** dropped vestigial `title` and `description` optional fields. Both were schema accommodations for an earlier prompt shape; no current prompt outputs them. Persist mapping at `:1649-1650` updated to use `event_label`/`event_body` directly.
+- **Summary user-turn:** rewrote from `Return JSON: {"headline":"<leave as empty string>","summary":"<your summary>"}` to `Return JSON with ONLY a "summary" field: {"summary":"<your summary>"}`. Empty-string instruction was Zod-incompatible.
+- **Quiz user-turn:** added explicit JSON shape inline + reminder "Each option MUST be an object with a 'text' field — never a bare string." Previously 2/5 generation failures were the model emitting `options: ["...","..."]` bare strings instead of `[{"text":"..."}]` objects. System prompt's schema didn't override the under-specified user-turn.
+
+### Verification
+
+- `grep -E "vp_slug|RELATED VP|insufficient_data|<!-- word_count|leave as empty string|kid_title|kid_summary|kid_content|kid_category|EXISTING VP STORIES|INHERITING EXISTING THREAD"` returns 0 matches across both files.
+- `npx tsc --noEmit` clean.
+- ESLint + Prettier ran via husky pre-commit hook, all green.
+
+### Files touched
+
+- `web/src/lib/pipeline/editorial-guide.ts` (-181 / +35 lines net)
+- `web/src/app/api/admin/pipeline/generate/route.ts` (+28 / -10 lines net)
+
+### Acceptance test (owner-driven)
+
+Trigger one adult run and one kid run via `/admin/newsroom`. Both should reach `persist` step and produce `pipeline_runs.status='completed'`. If `error_type='schema_validation'` returns, the user-turn's embedded JSON shape needs further tightening; iterate from the error message.
+
+### What this DOESN'T fix (deferred to later phases)
+
+- `kid_articles` table is still being written to by the persist RPC (the writes succeed; the table is just unread). Phase 1 of the AI + Plan Change roadmap consolidates kid runs into `articles`.
+- Banded generation (kids 7-9 + tweens 10-12) is Phase 3, not Pass A. Today's `KID_ARTICLE_PROMPT` produces a single mid-band kid voice. Phase 3 splits it.
+- `CATEGORY_PROMPTS` covers 13 of 66 DB categories. The remaining ~50 fall through to the generic guide. Coverage backfill is a non-blocking separate project.
+- 5 inline prompts (categorization, source_grounding, kid_url_sanitizer, quiz_verification, plagiarism rewrite in `plagiarism-check.ts`) are out of scope here. None had observed schema_validation issues.
+
+---
+
 ## 2026-04-27 (Parallel sweep wave 7 — 11 items + iOS pre-submission prep) — _shipped, pushed to git/Vercel_
 
 ### Cluster — iOS Info.plist + entitlements (T255-T262)
