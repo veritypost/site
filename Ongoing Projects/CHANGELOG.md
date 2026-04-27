@@ -7,7 +7,7 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
-## 2026-04-27 (wave 6 — code-resolved owner-queue items: T54 + T298 + T318 + T319) — _pending push to git_
+## 2026-04-27 (wave 6 — code-resolved owner-queue items: T54 + T298 + T318 + T319) — _shipped, pushed to git_ (commit 855dcf3)
 
 After the owner asked which queue questions could be answered from current code, four were resolvable end-to-end.
 
