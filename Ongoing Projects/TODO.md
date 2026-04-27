@@ -619,9 +619,9 @@ Source: `Ongoing Projects/2026-04-27_AUTH_PERMS_SYSTEM_MAP.md`. 4 parallel Explo
 
 ### Analytics — instrumentation gaps
 
-#### T322 — Most defined event types never fire (3 of 19 wired) — **HIGH** (analytics fidelity)
-**File:** `web/src/lib/events/types.ts:67-101` defines 19 event names. Sixth-pass recount of `trackServer\(` + `trackEvent\(` call sites in `web/src/` finds only 3 distinct events firing: `signup_complete, onboarding_complete, page_view` (the last via `usePageViewTrack('home')`). `quiz_started` / `quiz_completed` not actually wired despite earlier audit. Missing: `signup_start, verify_email_complete, subscribe_start, subscribe_complete, comment_post, bookmark_add, article_read_start, article_read_complete, scroll_depth, score_earned`, all ad/quiz events, etc.
-**Fix:** Wire the unwired event types at their natural call sites. Precondition for any meaningful conversion-funnel work.
+#### T322 partial — 6 of 19 events wired (3 just shipped); 13 remain — **HIGH** (analytics fidelity)
+**Status:** 6 events now fire: `signup_complete`, `onboarding_complete`, `page_view`, plus 3 shipped 2026-04-27 — `comment_post` (after `post_comment` RPC + scoring at `/api/comments/route.js`), `bookmark_add` (after row insert at `/api/bookmarks/route.js`), `verify_email_complete` (on the actual email_verified=false → true transition in `/api/auth/callback/route.js`). All fire-and-forget via `trackServer`; never block responses.
+**Still unwired (13):** `signup_start` (signup form mount), `subscribe_start` (Stripe checkout init), `subscribe_complete` (Stripe webhook handleCheckoutCompleted), `article_read_start` (story page mount), `article_read_complete` (scroll-to-bottom or N-seconds-on-page), `scroll_depth` (throttled story-page scroll listener), `score_earned` (scoring lib), all 9 ad/quiz events. The simpler ones (subscribe_complete, signup_start, article_read_start) ship next pass; ad/quiz/scroll events need design (sampling rates, throttling) before instrumentation.
 
 #### T328 — GA4 + custom-events pipelines fire in parallel, page_view only on home for custom — **MEDIUM** (analytics integrity)
 **File:** `web/src/components/GAListener.tsx:45` (GA4 page_view on every route) vs `web/src/app/_HomeFooter.tsx:23` (custom page_view on home only). Story / leaderboard / settings views never captured in custom events pipeline.

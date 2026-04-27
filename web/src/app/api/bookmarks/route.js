@@ -6,6 +6,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { v2LiveGuard } from '@/lib/featureFlags';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { trackServer } from '@/lib/trackServer';
 
 // T170/T209 — bookmarks are per-user state; never cacheable by a CDN
 // or shared proxy.
@@ -91,5 +92,18 @@ export async function POST(request) {
       headers: NO_STORE,
     });
   }
+
+  // T322 — fire bookmark_add after the row lands. Fire-and-forget.
+  void trackServer('bookmark_add', 'product', {
+    user_id: user.id,
+    article_id,
+    request,
+    payload: {
+      bookmark_id: data.id,
+      collection_id: collection_id || null,
+      has_notes: !!notes,
+    },
+  });
+
   return NextResponse.json({ id: data.id }, { headers: NO_STORE });
 }

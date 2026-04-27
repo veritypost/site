@@ -10,6 +10,7 @@ import { getClientIp } from '@/lib/rateLimit';
 import { checkSignupGate } from '@/lib/betaGate';
 import { REF_COOKIE_NAME } from '@/lib/referralCookie';
 import { cookies } from 'next/headers';
+import { trackServer } from '@/lib/trackServer';
 
 // F-038 — IdP-supplied `display_name` and `avatar_url` used to flow
 // straight into users/auth_providers. A hostile IdP (or a malicious
@@ -234,6 +235,13 @@ export async function GET(request) {
     if (user.email_confirmed_at && existing.email_verified === false) {
       try {
         await serviceForExisting.rpc('complete_email_verification', { p_user_id: user.id });
+        // T322 — fire verify_email_complete on the actual transition only
+        // (existing.email_verified === false). Per-login no-op safe; no
+        // duplicate fires.
+        void trackServer('verify_email_complete', 'product', {
+          user_id: user.id,
+          request,
+        });
       } catch (e) {
         console.error('[auth.callback] complete_email_verification threw:', e);
       }

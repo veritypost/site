@@ -7,6 +7,7 @@ import { scoreCommentPost } from '@/lib/scoring';
 import { v2LiveGuard } from '@/lib/featureFlags';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { getSettings, getNumber } from '@/lib/settings';
+import { trackServer } from '@/lib/trackServer';
 
 // T173 — defense-in-depth body length cap. The post_comment RPC has its
 // own enforcement, but capping at the API layer fast-fails hostile or
@@ -162,6 +163,20 @@ export async function POST(request) {
   // Phase 14: award post_comment points + advance streak.
   const scoring = await scoreCommentPost(service, { userId: user.id, commentId: data.id });
   if (scoring?.error) console.error('score_on_comment_post failed', scoring.error);
+
+  // T322 — fire comment_post analytics event after the authoritative
+  // RPC + scoring write succeeds. Fire-and-forget; telemetry must
+  // never block the response.
+  void trackServer('comment_post', 'product', {
+    user_id: user.id,
+    article_id,
+    request,
+    payload: {
+      comment_id: data.id,
+      is_reply: !!parent_id,
+      has_mentions: Array.isArray(mentions) && mentions.length > 0,
+    },
+  });
 
   // Re-fetch the row so the client gets the full shape (counts etc.).
   const { data: full } = await service
