@@ -273,8 +273,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
     cooldown_ends_at: string | null;
     direction: 'younger' | 'older' | 'same';
   } | null;
-  if (insErr) {
-    if (insErr.code === '23505') {
+  if (insErr || !inserted) {
+    if (insErr?.code === '23505') {
       return NextResponse.json(
         {
           error: 'You already have a pending correction request for this profile.',
@@ -283,7 +283,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         { status: 409 }
       );
     }
-    console.error('[dob-correction.submit]', insErr.message);
+    console.error('[dob-correction.submit]', insErr?.message ?? 'no row returned');
     return NextResponse.json(
       { error: 'Could not submit request', code: 'insert_failed' },
       { status: 500 }

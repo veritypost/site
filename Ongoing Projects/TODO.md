@@ -33,7 +33,8 @@ Do not pick up these IDs autonomously. The owner has explicitly reserved them. I
 
 **TODO.md items requiring owner decision/action:**
 - **T2** — Cookie consent banner: **OWNER DECIDED 2026-04-27 → Funding Choices (option A)**. Implementation deferred until AdSense console access is available; ready to ship as soon as owner signals "go."
-- **T26, T173** — MCP `pg_proc` queries (require DB-read permission grant)
+- **T26** — VERIFIED 2026-04-27 — `post_comment` RPC does NOT insert into `notifications` for replies or mentions. Awaiting owner answers on scope (replies only vs replies + mentions) + 3 sub-questions before drafting migration. See T26 body in CRITICAL section.
+- **T173** — MCP `pg_proc` queries (require DB-read permission grant)
 - **T19** — Home feed prefs: wire vs. delete decision (owner direction)
 - **T20** — iOS expert application schema match (depends on editor process tolerance — owner)
 - **T34, T35, T54** — trust-positioning calls (downvotes, rank notifications, kids volume framing)
@@ -462,10 +463,17 @@ The numbered items below retain their original section placement for readability
 **Fix:** Add `subscription_topics(user_id, category_id, created_at)` table. Add `/api/alerts/subscriptions` GET/POST. Flip the iOS flag to true. Wire publish-time trigger that fans out to subscribers.
 **Recommendation:** **Topic alerts are the second-strongest return-visit lever** (after reply notifications T26). Same publish-time pipeline as breaking-news, just filtered by category subscription.
 
-### T26 — Comment reply notifications wired up but RPC body unverified — **CRITICAL** *pending MCP verify* (single biggest return-visit gap)
-**File:** Email template + preference UI + push cron all exist for `comment_reply`; `web/src/app/api/comments/route.js` shows no app-layer `create_notification` call. Need to verify whether `post_comment` RPC inserts into `notifications` server-side.
-**Verify first:** Query `pg_proc` for `post_comment` body via MCP. If it inserts the notification row, this finding closes. If not, add the insert via migration.
-**Recommendation:** **Reply notifications are the single biggest "why come back" gap** noted in the external review. Confirm before assuming gap.
+### T26 — `post_comment` RPC does NOT insert notifications — **CRITICAL** (verified 2026-04-27, awaiting owner direction)
+**MCP verify 2026-04-27:** CONFIRMED REAL. The `post_comment(p_user_id, p_article_id, p_body, p_parent_id, p_mentions)` RPC body inserts the comment row + bumps `reply_count` on parent + bumps user `comment_count`, but **never inserts into `notifications`** for either replies or mentions. Verified zero triggers on the `comments` table (`information_schema.triggers` returns 0 rows). Email templates, preference UI, push cron all exist for `comment_reply` — but the source-of-truth INSERT that those downstream consumers read never fires. Audit's "biggest single return-visit lever" claim is correct.
+**Two-part gap:**
+- (a) **Reply notifications** — when `p_parent_id IS NOT NULL`, the parent comment's author should receive a `comment_reply` notification. Currently silent.
+- (b) **Mention notifications** — when `mentions` jsonb has entries (paid-tier authors only — free-tier mentions are stripped at line ~30 of the RPC), each mentioned user should receive a `comment_mention` notification. Currently silent.
+**Open questions for owner:**
+1. **Scope** — fix both (a) + (b) in one migration, or strict T26 = replies only and queue mentions as a separate item?
+2. **Notification schema** — `notifications.type` enum already includes `comment_reply` (and likely `comment_mention`). Confirm any additional fields needed (e.g., `action_url` shape, `metadata` jsonb keys consumed by client).
+3. **Self-reply guard** — should a user replying to their own comment fire a notification to themselves? Standard answer is no — defer the INSERT when `parent.user_id = p_user_id`. Confirming.
+4. **Muted/blocked sender** — should a reply from a user the parent-author has blocked still create a notification? Standard answer: no notification (silent block). Confirming.
+**Status:** awaiting owner answers; no migration drafted yet, no code changed.
 
 ### T27 — Iframe of inert email/alert settings on iOS + web — **HIGH** (paired with T9/T10)
 **File:** iOS `SettingsView.swift:1887-2040` writes `users.metadata.notifications` (different keys from web); web `profile/settings/page.tsx:2112-2167` writes `users.metadata.notification_prefs`; backend reads `alert_preferences`. Repo-wide search shows no consumer for `metadata.notifications` or `metadata.notification_prefs` outside settings pages.

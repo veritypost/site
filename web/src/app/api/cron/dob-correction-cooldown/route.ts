@@ -84,8 +84,9 @@ async function checkFraudSignals(
   // Signal 2: parent has any prior approved correction (defense-in-depth
   // beyond the unique index).
   try {
-    const { count } = await service
-      .from('kid_dob_correction_requests')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const corrTable = service.from('kid_dob_correction_requests' as any);
+    const { count } = await corrTable
       .select('id', { count: 'exact', head: true })
       .eq('parent_user_id', row.parent_user_id)
       .eq('status', 'approved');

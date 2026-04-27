@@ -417,6 +417,32 @@ export async function middleware(request) {
     return NextResponse.redirect(dest, { status: 302 });
   }
 
+  // Redesign-port override. When the dev server runs on :3333, rewrite
+  // profile-area paths to the redesigned routes under /redesign/*. The
+  // legacy code keeps serving on :3000 untouched so we can compare
+  // side-by-side without parallel codepaths or feature flags. Auth and
+  // protected-prefix checks above already ran against the original
+  // /profile path, so gating still works correctly. Production never
+  // hits this — :3333 is dev-only.
+  const host = request.headers.get('host') || '';
+  if (host.endsWith(':3333')) {
+    const isProfileArea =
+      pathname === '/profile' ||
+      pathname.startsWith('/profile/') ||
+      pathname === '/u' ||
+      pathname.startsWith('/u/');
+    if (isProfileArea) {
+      const dest = request.nextUrl.clone();
+      dest.pathname = '/redesign' + pathname;
+      const rewritten = NextResponse.rewrite(dest, {
+        request: { headers: forwardedHeaders },
+      });
+      rewritten.headers.set('x-request-id', requestId);
+      setCspHeader(rewritten, csp, cspStrictReport);
+      return rewritten;
+    }
+  }
+
   return response;
 }
 
