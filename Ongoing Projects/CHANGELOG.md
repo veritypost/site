@@ -7,7 +7,7 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
-## 2026-04-27 (TODO cleanup — close 4 fully-shipped items) — _pending push to git_
+## 2026-04-27 (TODO cleanup — close 4 fully-shipped items) — _shipped, pushed to git_ (commit 004026e)
 
 Owner applied all 4 of the pending migrations + the REINDEX. MCP-verified live state matches expected. Closing the bodies of items that are now fully done in BOTH code and SQL so the autonomous loop doesn't re-evaluate them.
 
