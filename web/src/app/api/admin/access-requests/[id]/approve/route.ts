@@ -97,6 +97,8 @@ export async function POST(_request: Request, { params }: { params: { id: string
       text: tpl.text,
       fromName: tpl.fromName,
       fromEmail: tpl.fromEmail,
+      replyTo: undefined,
+      unsubscribeUrl: undefined,
     });
     emailId = (result as { id?: string })?.id || null;
   } catch (e) {
