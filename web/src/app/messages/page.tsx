@@ -151,6 +151,10 @@ function MessagesPageInner() {
   const [showReportDialog, setShowReportDialog] = useState<boolean>(false);
   const [reportReason, setReportReason] = useState<string>('');
   const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set());
+  // T113 — viewer-controlled dismiss for the DM paywall (× button +
+  // Esc key). Resets on every fresh page mount so the paywall is
+  // re-shown for new sessions.
+  const [dmPaywallDismissed, setDmPaywallDismissed] = useState<boolean>(false);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const searchModalRef = useRef<HTMLDivElement | null>(null);
@@ -161,6 +165,15 @@ function MessagesPageInner() {
       setSearchResults([]);
       setRoleFilter('all');
     },
+  });
+  // T113 — DM paywall focus trap + Esc-to-close. Hooks must run on
+  // every render, so we declare them above any early return. The
+  // overlay-active flag is recomputed locally to mirror the
+  // `showDmPaywall` derivation further down (early returns sit
+  // between the two, blocking a single shared variable).
+  const dmPaywallRef = useRef<HTMLDivElement | null>(null);
+  useFocusTrap(!canCompose && dmLocked === false && !dmPaywallDismissed, dmPaywallRef, {
+    onEscape: () => setDmPaywallDismissed(true),
   });
 
   // Silence the linter on `authLoaded` / `muteUntil` — they exist for
@@ -810,7 +823,11 @@ function MessagesPageInner() {
   // dialog that mirrors the /story/[slug] regwall pattern. No auto-
   // redirect — the user sees context, explanation, and both Upgrade and
   // Back to home actions. Pattern source: story/[slug]/page.tsx:606-650.
-  const showDmPaywall = !canCompose && dmLocked === false;
+  // T113 — viewer can also dismiss via × or Esc; once dismissed the
+  // overlay stays down for this session even though the underlying
+  // permission check is unchanged. (Hooks live above the early returns
+  // earlier in the component so React's rules-of-hooks is satisfied.)
+  const showDmPaywall = !canCompose && dmLocked === false && !dmPaywallDismissed;
 
   const currentConvo = conversations.find((c) => c.id === selected);
 
@@ -844,6 +861,7 @@ function MessagesPageInner() {
           }}
         >
           <div
+            ref={dmPaywallRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="dm-paywall-title"
@@ -855,17 +873,79 @@ function MessagesPageInner() {
               maxWidth: 420,
               textAlign: 'center',
               margin: '0 16px',
+              position: 'relative',
             }}
           >
+            {/* T113 — explicit dismiss control. Esc is wired via
+                useFocusTrap above. */}
+            <button
+              type="button"
+              aria-label="Close"
+              onClick={() => setDmPaywallDismissed(true)}
+              style={{
+                position: 'absolute',
+                top: 10,
+                right: 10,
+                width: 32,
+                height: 32,
+                background: 'transparent',
+                border: 'none',
+                fontSize: 22,
+                lineHeight: 1,
+                color: '#666',
+                cursor: 'pointer',
+                borderRadius: 8,
+              }}
+            >
+              ×
+            </button>
             <div
               id="dm-paywall-title"
               style={{ fontSize: 20, fontWeight: 800, marginBottom: 10, color: '#111' }}
             >
               Direct messages are a paid feature
             </div>
-            <div style={{ fontSize: 14, color: '#666', marginBottom: 20, lineHeight: 1.5 }}>
-              Upgrade to Verity or above to start conversations with experts, authors, and other
-              readers.
+            <div style={{ fontSize: 14, color: '#666', marginBottom: 18, lineHeight: 1.5 }}>
+              Start conversations with experts, authors, and other readers — included on Verity and
+              up.
+            </div>
+            {/* T112 — show the unlocking tier as a small preview card so
+                the user understands exactly what they're upgrading to.
+                Pricing is hardcoded; no live fetch in scope here. */}
+            <div
+              style={{
+                background: '#f7f7f7',
+                border: '1px solid #e5e5e5',
+                borderRadius: 12,
+                padding: '14px 16px',
+                marginBottom: 18,
+                textAlign: 'left',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'baseline',
+                  justifyContent: 'space-between',
+                  marginBottom: 8,
+                }}
+              >
+                <span style={{ fontSize: 15, fontWeight: 800, color: '#111' }}>Verity</span>
+                <span style={{ fontSize: 13, color: '#666' }}>$3.99/mo</span>
+              </div>
+              <ul
+                style={{
+                  margin: 0,
+                  paddingLeft: 18,
+                  fontSize: 13,
+                  color: '#444',
+                  lineHeight: 1.6,
+                }}
+              >
+                <li>Direct messages</li>
+                <li>Unlimited bookmarks</li>
+                <li>Ad-free reading</li>
+              </ul>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <a

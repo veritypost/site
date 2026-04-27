@@ -124,6 +124,15 @@ export default function CommentComposer({
     }
   }
 
+  // T108 \u2014 Live, pre-submit mention-permission hint.
+  // Watches the current draft for an `@<word>` pattern and surfaces the
+  // paid-feature explainer inline so the reader sees it BEFORE they hit
+  // Post (the previous-only signal lived in the post-submit error
+  // branch). MENTION_RE is `/g`-flagged \u2192 use .match() so re-renders
+  // don't carry .test()'s lastIndex across calls.
+  const draftHasMention = !!body.match(MENTION_RE);
+  const showMentionHint = permsLoaded && !canMention && draftHasMention;
+
   if (!permsLoaded) return null;
   if (!canPost) return null;
 
@@ -137,6 +146,15 @@ export default function CommentComposer({
 
   return (
     <div style={containerStyle}>
+      {showMentionHint && (
+        // Live tooltip above the textarea \u2014 informational, not blocking.
+        // Disappears the moment the user upgrades (canMention flips true)
+        // or removes the @-handle. The post-submit toast at submit() is
+        // kept as a redundant safety net; the user dismisses it themselves.
+        <div role="note" style={mentionHintStyle}>
+          @mentions are a paid feature &mdash; your text will post as plain text.
+        </div>
+      )}
       <textarea
         autoFocus={autoFocus}
         value={body}
@@ -214,6 +232,16 @@ const postBtnStyle: CSSProperties = {
   color: '#fff',
   fontSize: 12,
   fontWeight: 700,
+};
+const mentionHintStyle: CSSProperties = {
+  fontSize: 11,
+  color: '#b45309',
+  background: '#fffbeb',
+  border: '1px solid #fde68a',
+  borderRadius: 6,
+  padding: '6px 8px',
+  marginBottom: 8,
+  lineHeight: 1.4,
 };
 const muteBannerStyle: CSSProperties = {
   border: '1px solid #fecaca',

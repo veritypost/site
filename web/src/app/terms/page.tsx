@@ -184,6 +184,11 @@ export default function TermsPage() {
               Upon termination, your right to access the platform ceases immediately, though certain
               provisions of these terms survive.
             </li>
+            <li>
+              If your account is suspended, banned, or has a moderator action against it, you may
+              file an appeal at any time through your account settings or by emailing
+              legal@veritypost.com. Appeals are reviewed within 14 days.
+            </li>
           </ul>
         </div>
 

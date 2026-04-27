@@ -42,6 +42,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { verifyCronAuth } from '@/lib/cronAuth';
 import { withCronLog } from '@/lib/cronLog';
 import { logCronHeartbeat } from '@/lib/cronHeartbeat';
+import { captureMessage } from '@/lib/observability';
 
 const CRON_NAME = 'pipeline-cleanup';
 
@@ -81,12 +82,22 @@ async function run(request: Request) {
       .select('id');
     if (error) {
       console.error('[cron.pipeline-cleanup.orphan_runs]', error.message);
+      await captureMessage('pipeline-cleanup orphan_runs failed', 'warning', {
+        error: String(error.message),
+        sweep: 'orphan_runs',
+        threshold_iso: thresholdIso,
+      });
       orphanRunsErrCode = 'orphan_runs_failed';
     } else {
       orphanRunsCount = data?.length ?? 0;
     }
   } catch (err) {
     console.error('[cron.pipeline-cleanup.orphan_runs]', err);
+    await captureMessage('pipeline-cleanup orphan_runs failed', 'warning', {
+      error: String(err),
+      sweep: 'orphan_runs',
+      threshold_iso: thresholdIso,
+    });
     orphanRunsErrCode = 'orphan_runs_failed';
   }
 
@@ -103,12 +114,24 @@ async function run(request: Request) {
         .select('id');
       if (error) {
         console.error(`[cron.pipeline-cleanup.orphan_items.${table}]`, error.message);
+        await captureMessage('pipeline-cleanup orphan_items failed', 'warning', {
+          error: String(error.message),
+          sweep: 'orphan_items',
+          table,
+          threshold_iso: thresholdIso,
+        });
         orphanItemsErrCode = 'orphan_items_failed';
       } else {
         orphanItemsCount += data?.length ?? 0;
       }
     } catch (err) {
       console.error(`[cron.pipeline-cleanup.orphan_items.${table}]`, err);
+      await captureMessage('pipeline-cleanup orphan_items failed', 'warning', {
+        error: String(err),
+        sweep: 'orphan_items',
+        table,
+        threshold_iso: thresholdIso,
+      });
       orphanItemsErrCode = 'orphan_items_failed';
     }
   }
@@ -129,12 +152,22 @@ async function run(request: Request) {
       .select('id');
     if (error) {
       console.error('[cron.pipeline-cleanup.orphan_locks]', error.message);
+      await captureMessage('pipeline-cleanup orphan_locks failed', 'warning', {
+        error: String(error.message),
+        sweep: 'orphan_locks',
+        lock_threshold_iso: lockThresholdIso,
+      });
       orphanLocksErrCode = 'orphan_locks_failed';
     } else {
       orphanLocksCount = data?.length ?? 0;
     }
   } catch (err) {
     console.error('[cron.pipeline-cleanup.orphan_locks]', err);
+    await captureMessage('pipeline-cleanup orphan_locks failed', 'warning', {
+      error: String(err),
+      sweep: 'orphan_locks',
+      lock_threshold_iso: lockThresholdIso,
+    });
     orphanLocksErrCode = 'orphan_locks_failed';
   }
 
@@ -214,6 +247,13 @@ async function run(request: Request) {
       });
       if (rpcErr) {
         console.error('[cron.pipeline-cleanup.cluster_expiry.rpc]', id, rpcErr.message);
+        await captureMessage('pipeline-cleanup cluster_expiry failed', 'warning', {
+          error: String(rpcErr.message),
+          sweep: 'cluster_expiry',
+          stage: 'rpc',
+          cluster_id: id,
+          expiry_threshold_iso: expiryThresholdIso,
+        });
         clustersArchivedErrCode = 'cluster_expiry_partial';
         continue;
       }
@@ -222,6 +262,12 @@ async function run(request: Request) {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[cron.pipeline-cleanup.cluster_expiry]', msg);
+    await captureMessage('pipeline-cleanup cluster_expiry failed', 'warning', {
+      error: msg,
+      sweep: 'cluster_expiry',
+      stage: 'outer',
+      expiry_threshold_iso: expiryThresholdIso,
+    });
     clustersArchivedErrCode = 'cluster_expiry_failed';
   }
 

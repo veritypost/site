@@ -265,6 +265,7 @@ export default function CommentRow({
                   fontSize: 13,
                   outline: 'none',
                   fontFamily: 'inherit',
+                  resize: 'vertical',
                 }}
               />
               <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
@@ -279,7 +280,8 @@ export default function CommentRow({
                     background: 'var(--accent, #111)',
                     color: '#fff',
                     fontWeight: 600,
-                    cursor: 'pointer',
+                    cursor: busy === 'edit' ? 'not-allowed' : 'pointer',
+                    opacity: busy === 'edit' ? 0.6 : 1,
                   }}
                 >
                   Save

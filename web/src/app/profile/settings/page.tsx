@@ -3197,9 +3197,13 @@ function AccessibilityCard({
   markDirty: (d: boolean) => void;
 }): ReactElement {
   const canEditTts = hasPermission(PERM.ACTION_A11Y_TTS);
-  const canEditTextSize = hasPermission(PERM.ACTION_A11Y_TEXT_SIZE);
-  const canEditMotion = hasPermission(PERM.ACTION_A11Y_REDUCE_MOTION);
-  const canEditContrast = hasPermission(PERM.ACTION_A11Y_HIGH_CONTRAST);
+  // T63 — three permission gates kept (and recomputed) so re-enabling
+  // is a one-line flip. Once the reader honors textSize / reduceMotion
+  // / highContrast, drop the underscore prefix and pass `disabled={!_}`
+  // to the inputs.
+  const _canEditTextSize = hasPermission(PERM.ACTION_A11Y_TEXT_SIZE);
+  const _canEditMotion = hasPermission(PERM.ACTION_A11Y_REDUCE_MOTION);
+  const _canEditContrast = hasPermission(PERM.ACTION_A11Y_HIGH_CONTRAST);
 
   const [ttsDefault, setTtsDefault] = useState(false);
   const [textSize, setTextSize] = useState<'sm' | 'md' | 'lg' | 'xl'>('md');
@@ -3260,6 +3264,12 @@ function AccessibilityCard({
     await refreshAllPermissions();
   };
 
+  // T63 — textSize / reduceMotion / highContrast saved to
+  // users.metadata.a11y but no consumer (verified grep). Disabled +
+  // relabelled "Coming soon" until the reader honors them. State + RPC
+  // payload kept intact per launch-phase rule so re-enabling is a
+  // one-line flip (drop the `disabled` overrides). ttsDefault stays
+  // editable because TTSButton now auto-starts when it's true.
   return (
     <Card
       id="accessibility"
@@ -3279,25 +3289,29 @@ function AccessibilityCard({
           <FieldLabel>Text size</FieldLabel>
           <Select
             value={textSize}
-            disabled={!canEditTextSize}
+            disabled
             onChange={(e: ChangeEvent<HTMLSelectElement>) =>
               setTextSize(e.target.value as typeof textSize)
             }
             options={TEXT_SIZES}
           />
+          <div style={{ fontSize: F.xs, color: C.dim, marginTop: 4, lineHeight: 1.4 }}>
+            Coming soon — backend wiring is in progress; reader will honor this once it reads the
+            preference.
+          </div>
         </div>
         <Switch
           label="Reduce motion"
-          hint="Minimise animations and transitions."
+          hint="Coming soon — backend wiring is in progress; reader will honor this once it reads the preference."
           checked={reduceMotion}
-          disabled={!canEditMotion}
+          disabled
           onChange={setReduceMotion}
         />
         <Switch
           label="High contrast"
-          hint="Bolder borders, higher contrast typography."
+          hint="Coming soon — backend wiring is in progress; reader will honor this once it reads the preference."
           checked={highContrast}
-          disabled={!canEditContrast}
+          disabled
           onChange={setHighContrast}
         />
         <div>
@@ -4880,12 +4894,12 @@ function ExpertProfileCard({
 // ---------------------------------------------------------------------------
 
 function ExpertVacationCard({
-  user,
+  user: _user,
   userId: _userId,
   highlight,
-  supabase,
-  pushToast,
-  onSaved,
+  supabase: _supabase,
+  pushToast: _pushToast,
+  onSaved: _onSaved,
 }: {
   user: UserRow | null;
   userId: string;
@@ -4894,38 +4908,13 @@ function ExpertVacationCard({
   pushToast: Pusher;
   onSaved: () => Promise<void> | void;
 }): ReactElement {
-  // No dedicated column — we store in users.metadata.expertVacation.
-  // TODO: confirm with owner whether to add a first-class column.
-  const on = !!readMeta(user).expertVacation;
-  const [busy, setBusy] = useState(false);
-
-  const toggle = async (next: boolean) => {
-    if (!user) return;
-    setBusy(true);
-    // C2 — expertVacation is a scalar under metadata, no subtree merge
-    // needed. Send only the delta; server's `||` shallow merge at the
-    // top level preserves every other key (feed, a11y, avatar,
-    // expertWatchlist, notification_prefs).
-    const { error } = await supabase.rpc('update_own_profile', {
-      p_fields: { metadata: { expertVacation: next } },
-    });
-    setBusy(false);
-    if (error) {
-      pushToast({
-        message: 'Could not update vacation mode. Please try again.',
-        variant: 'danger',
-      });
-      return;
-    }
-    pushToast({
-      message: next ? 'Vacation mode on. Ask-an-expert requests are paused.' : 'Vacation mode off.',
-      variant: 'success',
-    });
-    await onSaved();
-    // H8 — refresh perms cache (vacation mode flips expert-related gates)
-    await refreshAllPermissions();
-  };
-
+  // T61 — Coming soon: backend wiring is in progress. The toggle saved
+  // to users.metadata.expertVacation but no consumer reads it (verified
+  // grep), so the queue never actually paused. Disabled + relabelled
+  // until expert routing reads the flag. Hidden, not deleted, per
+  // launch-phase rule — flip back on by removing the disabled prop and
+  // restoring the toggle handler. Original handler kept intact in git
+  // history.
   return (
     <Card
       id="expert-vacation"
@@ -4935,14 +4924,12 @@ function ExpertVacationCard({
     >
       <Row last>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: F.base, fontWeight: 600 }}>
-            {on ? 'On — questions paused' : 'Off — accepting questions'}
-          </div>
+          <div style={{ fontSize: F.base, fontWeight: 600 }}>Coming soon</div>
           <div style={{ fontSize: F.xs, color: C.dim }}>
-            Your profile still shows the expert badge.
+            Backend wiring is in progress; toggle will activate once expert routing reads it.
           </div>
         </div>
-        <Switch checked={on} disabled={busy} onChange={toggle} />
+        <Switch checked={false} disabled onChange={() => {}} />
       </Row>
     </Card>
   );
@@ -4956,14 +4943,21 @@ function ExpertWatchlistCard({
   userId,
   highlight,
   supabase,
-  pushToast,
+  pushToast: _pushToast,
 }: {
   userId: string;
   highlight: boolean;
   supabase: DbClient;
   pushToast: Pusher;
 }): ReactElement {
-  const [cats, setCats] = useState<{ id: string; name: string; watched: boolean }[]>([]);
+  // T62 — Coming soon: backend wiring is in progress. Saves to
+  // users.metadata.expertWatchlist had no consumer (verified grep), so
+  // notifications never filtered by these categories. Read still runs
+  // so an already-approved expert sees their categories, but the chips
+  // are disabled and show no "watched" state until notification
+  // routing actually reads the flag. Hidden, not deleted, per
+  // launch-phase rule.
+  const [cats, setCats] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -4987,16 +4981,6 @@ function ExpertWatchlistCard({
       .from('expert_application_categories')
       .select('category_id, categories:categories(id, name)')
       .eq('application_id', (app as { id: string }).id);
-    // 3) find existing watchlist (stored in users.metadata.expertWatchlist)
-    const { data: user } = await supabase
-      .from('users')
-      .select('metadata')
-      .eq('id', userId)
-      .maybeSingle();
-    const watched = new Set<string>(
-      (user as { metadata?: { expertWatchlist?: string[] } } | null)?.metadata?.expertWatchlist ||
-        []
-    );
     const list = (
       (catRows as
         | { category_id: string; categories: { id: string; name: string } | null }[]
@@ -5004,7 +4988,7 @@ function ExpertWatchlistCard({
     )
       .map((row) => row.categories)
       .filter((c): c is { id: string; name: string } => !!c)
-      .map((c) => ({ id: c.id, name: c.name, watched: watched.has(c.id) }));
+      .map((c) => ({ id: c.id, name: c.name }));
     setCats(list);
     setLoading(false);
   }, [supabase, userId]);
@@ -5013,35 +4997,12 @@ function ExpertWatchlistCard({
     void load();
   }, [load]);
 
-  const toggle = async (id: string) => {
-    const prev = cats;
-    const nextCats = cats.map((c) => (c.id === id ? { ...c, watched: !c.watched } : c));
-    setCats(nextCats);
-    const watched = nextCats.filter((c) => c.watched).map((c) => c.id);
-    // C2 — expertWatchlist is a flat array replaced wholesale on each
-    // toggle, so no subtree merge is needed. Send only the delta;
-    // server's `||` shallow merge preserves every other top-level
-    // metadata key (feed, a11y, avatar, expertVacation,
-    // notification_prefs).
-    const { error } = await supabase.rpc('update_own_profile', {
-      p_fields: { metadata: { expertWatchlist: watched } },
-    });
-    if (error) {
-      setCats(prev);
-      pushToast({ message: 'Could not update watchlist. Please try again.', variant: 'danger' });
-    } else {
-      pushToast({ message: 'Watchlist updated.', variant: 'success' });
-      // H8 — refresh perms cache (watchlist categories feed expert-area gates)
-      await refreshAllPermissions();
-    }
-  };
-
   return (
     <Card
       id="expert-watchlist"
       title="Category watchlist"
       highlight={highlight}
-      description="Get notified when new questions land in your approved categories."
+      description="Get notified when new questions land in your approved categories. Coming soon — backend wiring is in progress; selections will activate once notification routing reads them."
     >
       {loading ? (
         <SkeletonBar width={200} />
@@ -5057,16 +5018,18 @@ function ExpertWatchlistCard({
             <button
               key={c.id}
               type="button"
-              onClick={() => toggle(c.id)}
+              disabled
+              aria-disabled="true"
               style={{
                 padding: `${S[1]}px ${S[3]}px`,
                 borderRadius: 999,
-                border: `1px solid ${c.watched ? C.accent : C.border}`,
-                background: c.watched ? C.accent : C.bg,
-                color: c.watched ? '#fff' : C.text,
+                border: `1px solid ${C.border}`,
+                background: C.bg,
+                color: C.dim,
                 fontSize: F.sm,
                 fontWeight: 500,
-                cursor: 'pointer',
+                cursor: 'not-allowed',
+                opacity: 0.7,
               }}
             >
               {c.name}

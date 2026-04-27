@@ -318,6 +318,9 @@ export default function StoryPage() {
   const [userTier, setUserTier] = useState<string>('free');
   const [canBookmarkAdd, setCanBookmarkAdd] = useState<boolean>(false);
   const [canListenTts, setCanListenTts] = useState<boolean>(false);
+  // T63 — users.metadata.a11y.ttsDefault. When true and TTS is permitted,
+  // TTSButton auto-fires once per article on mount.
+  const [ttsAutoStart, setTtsAutoStart] = useState<boolean>(false);
   // Default to false so paid-content flashes don't leak while permissions
   // resolve. Anonymous path sets them true explicitly below (public
   // gating is via regwall/quiz, not these per-article permission keys).
@@ -532,14 +535,19 @@ export default function StoryPage() {
         if (authUser) {
           const { data: userData } = await supabase
             .from('users')
-            .select('email_verified, plans(tier)')
+            .select('email_verified, metadata, plans(tier)')
             .eq('id', authUser.id)
             .single();
           const userRow = userData as {
             email_verified?: boolean | null;
+            metadata?: { a11y?: { ttsDefault?: boolean } } | null;
             plans?: { tier?: string | null } | null;
           } | null;
           setUserTier(userRow?.plans?.tier || 'free');
+          // T63 — read TTS auto-start preference; TTSButton consumes
+          // this on mount, gated by canListenTts and a per-article
+          // sessionStorage key to fire once per page load.
+          setTtsAutoStart(!!userRow?.metadata?.a11y?.ttsDefault);
 
           await refreshAllPermissions();
           await refreshIfStale();
@@ -1543,7 +1551,13 @@ export default function StoryPage() {
                     {` · ${readMinutes} min read`}
                   </span>
                   <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                    {canListenTts && <TTSButton text={`${story.title}. ${story.body || ''}`} />}
+                    {canListenTts && (
+                      <TTSButton
+                        text={`${story.title}. ${story.body || ''}`}
+                        autoStart={ttsAutoStart}
+                        articleId={story.id}
+                      />
+                    )}
                     {/* T-016: free-plan bookmark cap is DB-driven. Previously
                      * hardcoded `>= 10` and "10 of 10"; bookmarkCap now
                      * comes from plan_features.bookmarks for the user's plan. */}
@@ -1906,15 +1920,42 @@ export default function StoryPage() {
             }}
           >
             <div
-              id="report-modal-title"
               style={{
-                fontSize: 16,
-                fontWeight: 700,
-                color: 'var(--text-primary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
                 marginBottom: 12,
               }}
             >
-              Report this article
+              <div
+                id="report-modal-title"
+                style={{
+                  fontSize: 16,
+                  fontWeight: 700,
+                  color: 'var(--text-primary)',
+                }}
+              >
+                Report this article
+              </div>
+              <button
+                type="button"
+                aria-label="Close"
+                onClick={() => {
+                  setShowReportModal(false);
+                  setReportError('');
+                }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-primary)',
+                  fontSize: 20,
+                  lineHeight: 1,
+                  padding: '0 4px',
+                  cursor: 'pointer',
+                }}
+              >
+                {'×'}
+              </button>
             </div>
             {reportSuccess ? (
               <div style={{ fontSize: 13, color: 'var(--right)' }}>

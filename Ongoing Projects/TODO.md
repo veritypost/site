@@ -514,11 +514,6 @@ The numbered items below retain their original section placement for readability
 
 ## MEDIUM — quality and parity
 
-### T32 — Web comment-report uses free text, iOS uses structured categories — **MEDIUM**
-**File:** `CommentThread.tsx` (free text) vs `StoryDetailView.swift:316-335` (`ReportReason.allCases`).
-**Fix:** Replace web free-text field with category picker matching iOS `ReportReason` enum.
-**Recommendation:** **Structured categories produce actionable moderation signals.** Match the iOS shape — also makes admin moderation tooling easier.
-
 ### T34 — Downvotes are decorative — **MEDIUM**
 **File:** Both surfaces sort by `upvote_count DESC, created_at ASC` (`CommentThread.tsx:104-106`, `StoryDetailView.swift:1850-1851`); `downvote_count` ignored.
 **Fix:** Add `downvote_count` as demoting signal: `upvote_count - (downvote_count * 0.5) DESC`.
@@ -624,18 +619,6 @@ The numbered items below retain their original section placement for readability
 **File:** `VerityPost/VerityPost/SettingsView.swift:2330-2436` writes `users.metadata.expert`. Web expert queue / back-channel only consult permissions/categories — no consumer for `metadata.expert` outside this settings page.
 **Fix:** Wire queue routing / expert notifications to `metadata.expert`, OR remove the screen.
 **Recommendation:** Verify any backend RPC reads it before deleting. If not, **delete** — fake-functional settings are worse than missing settings.
-
-### T61 — Web expert vacation mode likely doesn't pause queue — **MEDIUM** (likely dead UI)
-**File:** `web/src/app/profile/settings/page.tsx:4882-4911` saves `users.metadata.expertVacation`. No consumer found in queue/routing/notifications.
-**Fix:** Enforce in the expert routing path, or remove the promise that questions are paused.
-
-### T62 — Web expert watchlist saves but doesn't filter notifications — **MEDIUM** (likely dead UI)
-**File:** `web/src/app/profile/settings/page.tsx:4940-5021` saves `users.metadata.expertWatchlist`. Live expert queue/back-channel work off permissions, not the watchlist.
-**Fix:** Use `expertWatchlist` when choosing expert notifications/queue surfacing, OR relabel as "Coming soon" and disable writes.
-
-### T63 — Web accessibility preferences save but reader doesn't honor them — **MEDIUM** (verified: save works correctly at `settings/page.tsx:3237-3243`; the gap is `TTSButton.tsx:22-62` never auto-starts from `metadata.a11y.ttsDefault` — TTS only fires on user click. Other a11y flags `textSize`/`reduceMotion`/`highContrast` also unread by reader. Fix scope: wire ttsDefault auto-start, decide on the rest.)
-**File:** `web/src/app/profile/settings/page.tsx:3167-3245,3251-3289` saves `users.metadata.a11y` (`ttsDefault`, `textSize`, `reduceMotion`, `highContrast`). `story/[slug]/page.tsx:535-541` reads only `article.listen_tts` perm; `TTSButton.tsx:22-99` never auto-starts from `ttsDefault`.
-**Fix:** Wire prefs into article rendering + TTS startup, OR remove. If motion should follow OS, relabel.
 
 ---
 
@@ -745,30 +728,6 @@ The numbered items below retain their original section placement for readability
 **Fix:** On catch, set a dedicated `'check_failed'` state and render a small "Couldn't verify availability — we'll check on submit" hint.
 **Recommendation:** Truth-in-UI. Consistent with T19 / T44.
 
-#### T98 — Web verify-email resend has no "email sent" toast — **MEDIUM**
-**File:** `web/src/app/verify-email/page.tsx:105-142` (cooldown countdown only, no success confirmation).
-**Problem:** User taps Resend, sees the button enter cooldown, has no positive confirmation the email actually sent. Under magic-link auth this becomes the primary login mechanism — UX matters more.
-**Fix:** Transient toast "Sent — check your inbox." on successful POST.
-**Recommendation:** Bundle with T99 / T100 / T101 — same email-friction cluster. AUTH-MIGRATION should reshape the page; bundle changes.
-
-#### T99 — Web verify-email page lacks recovery alternatives — **MEDIUM** (re-scoped: "Change email address" button DOES exist at `verify-email/page.tsx:545-561`; only the contact-support link is missing — drop the "try a different address" half of the fix)
-**File:** `web/src/app/verify-email/page.tsx:512-560` ("Didn't get it" only mentions spam folder + resend; no support link, no "try a different address").
-**Problem:** Wrong email address, deliverability issue, corporate firewall — user has no path forward.
-**Fix:** Add "Contact support" link below the resend section; surface "Try a different email address" that re-opens the email field.
-**Recommendation:** AUTH-MIGRATION bundle.
-
-#### T100 — Web verify-email page has no mail-app deep-link — **MEDIUM**
-**File:** `web/src/app/verify-email/page.tsx` (no `mailto:` or webmail open buttons).
-**Problem:** User has to manually switch tabs / open Mail. Standard newsletter-grade UX shows "Open Gmail" / "Open Outlook" buttons.
-**Fix:** Detect domain from masked email; render a single "Open <provider>" button when domain matches gmail/outlook/yahoo/icloud, falling back to instruction text.
-**Recommendation:** AUTH-MIGRATION bundle. Removes one of the most consistent friction points in any email-auth flow.
-
-#### T101 — Web logout page doesn't redirect — **MEDIUM**
-**File:** `web/src/app/logout/page.js` (renders "You've been signed out" with manual links; no auto-redirect).
-**Problem:** User clicks Logout, sits on the logout page wondering if anything happened.
-**Fix:** After successful signout, redirect to `/` after 1.5s with "Signed out — redirecting…" message.
-**Recommendation:** Two-line change with `router.push('/')` in a `setTimeout`.
-
 #### T102 — iOS splash 10s timeout has no slow-network grace — **MEDIUM**
 **File:** `VerityPost/VerityPost/AuthViewModel.swift:80` (hard 10-second timeout).
 **Problem:** 3G or weak-signal sessions hit the failure screen even though a 12s wait would have succeeded.
@@ -805,12 +764,6 @@ The numbered items below retain their original section placement for readability
 **Fix:** Branch the copy: `quizPassed == false` → "Pass the quiz above to join the discussion." Otherwise keep current copy.
 **Recommendation:** Frame the quiz as the price of entry — matches the trust principle.
 
-#### T108 — Mention-permission warning fires AFTER comment submission — **MEDIUM**
-**File:** `web/src/components/CommentComposer.tsx:86-125` (warning shown post-submit).
-**Problem:** Free user types `@handle`, hits Post, sees warning that mentions are paid, comment posts as plain text. Mid-engagement permission discovery.
-**Fix:** Detect `@<word>` regex inline in the textarea; if user lacks `comments.mention.insert`, render an inline tooltip "@mentions are a paid feature — your text will post as plain text."
-**Recommendation:** Pre-empt the gate at typing time, not post-submit.
-
 #### T109 — No read/unread state on home feed cards — **MEDIUM** (return-visit)
 **File:** `web/src/app/page.tsx` (no read-state metadata on supporting cards); iOS `HomeView.swift` same.
 **Problem:** Returning user can't tell at a glance which articles they've already read. Wastes scan time.
@@ -829,18 +782,6 @@ The numbered items below retain their original section placement for readability
 **Fix:** Remove now. Restore when filter pipeline + `view_count` tracking ship.
 **Recommendation:** Better to ship absence than fake presence.
 
-#### T112 — DM paywall doesn't name the unlocking tier visually — **MEDIUM**
-**File:** `web/src/app/messages/page.tsx:867` ("Upgrade to Verity or above").
-**Problem:** "Verity or above" is plan-jargon. User has no visual cue which of Free / Verity / Verity Pro is the upgrade target.
-**Fix:** Render a tier-card preview next to the modal CTA, highlighting the minimum unlocking tier.
-**Recommendation:** Pair with T113 — same modal.
-
-#### T113 — DM paywall modal has no X / Esc dismiss — **MEDIUM**
-**File:** `web/src/app/messages/page.tsx:846-900` (no close handler, no Esc handler).
-**Problem:** User who lands on `/messages` accidentally is trapped. Only escapes are "Upgrade" (leaves) or "Back to home" (leaves).
-**Fix:** Add X button + Esc keyboard handler that returns the user to wherever they came from (or `/` as fallback).
-**Recommendation:** Modal accessibility baseline.
-
 #### T116 — iOS comment rate-limit shows "Wait" without countdown — **MEDIUM**
 **File:** `VerityPost/VerityPost/StoryDetailView.swift:2404-2420` (rate-limit flag flips, no duration shown).
 **Problem:** User taps Send, gets "Wait", retries, gets "Wait" again. Same friction as kids pair-code lockout.
@@ -858,12 +799,6 @@ The numbered items below retain their original section placement for readability
 **Problem:** Shared `veritypost://story/<slug>` URL opens the app but doesn't navigate to the article.
 **Fix:** Branch on URL host: auth deep-links → existing `auth.handleDeepLink`; story deep-links → push StoryDetailView via NavigationStack programmatic push.
 **Recommendation:** Bundle with T96 (kids deep-link routing).
-
-#### T119 — Search zero-results has no refinement suggestions — **MEDIUM**
-**File:** `web/src/app/search/page.tsx:238-242` (renders "no results" with nothing else).
-**Problem:** Dead-end. User typed something, got nothing, has no path forward.
-**Fix:** Below "no results", render trending searches + top categories + "Try fewer keywords" hint.
-**Recommendation:** Editorial-curated trending. Cheap retention fix.
 
 #### T121 — iOS push 7-day cooldown after "Not now" too long — **MEDIUM**
 **File:** `VerityPost/VerityPost/PushPermission.swift:32` (`prePromptCooldown = 7 * 24 * 60 * 60`).
@@ -899,21 +834,9 @@ The numbered items below retain their original section placement for readability
 
 ### UI/UX Manager (T127-T139)
 
-#### T129 — Comment edit Save button has no busy disabled-state styling — **MEDIUM** (UX)
-**File:** `web/src/components/CommentRow.tsx:273-285`. `disabled` attr set, no opacity/cursor change.
-**Fix:** `style={{ opacity: busy === 'edit' ? 0.6 : 1, cursor: busy === 'edit' ? 'not-allowed' : 'pointer' }}`.
-
-#### T130 — Modal close (×) buttons lack guaranteed keyboard accessibility — **RE-SCOPED MEDIUM** (verification: story report modal at `web/src/app/story/[slug]/page.tsx:1828-1960` has NO × button at all — only Cancel/Submit footer buttons. Interstitial.tsx:100-102 has `aria-label="Close"`. Admin Modal.jsx is correct. Real action: add a × close to the report modal AND audit any other ad-hoc modals that lack one.)
-**File:** `web/src/app/story/[slug]/page.tsx:~1050-1100` (report modal); `web/src/components/Interstitial.tsx:100-102`. Some are `<div role="button">` with `aria-label="Close"`. Pattern inconsistency vs admin Modal.jsx:149 which is a real `<button>`.
-**Fix:** Standardize all modal close buttons to `<button type="button">` with global `:focus-visible` rule.
-
 #### T131 — iOS comment vote buttons missing visual disabled-when-active state — **MEDIUM** (UX)
 **File:** `VerityPost/VerityPost/StoryDetailView.swift:~1800-1860`. `active: Bool` parameter passed but no visual differentiation.
 **Fix:** Apply `.disabled(already_voted)` or opacity/color when `active`.
-
-#### T136 — Web textarea elements lack visible resize affordance — **LOW** (discoverability)
-**File:** `web/src/components/CommentComposer.tsx`, `CommentRow.tsx:256-269`. No corner triangle or instruction.
-**Fix:** `resize: vertical; cursor: nwse-resize;` styling cue.
 
 #### T137 — iOS email input lacks client-side format validation — **LOW** (UX)
 **File:** `VerityPost/VerityPost/SettingsView.swift:1391-1452`. Server-side only; user submits invalid → server rejection.
@@ -934,17 +857,9 @@ The numbered items below retain their original section placement for readability
 **File:** `web/src/components/ArticleQuiz.tsx` — claim line `:72` was off; problem is real but actual CTA-rendering location TBD. Stage = 'passed' celebrates with no path forward to discussion or related reads.
 **Fix:** Add "View Discussion" + "More in [Category]" buttons in the passed state. Bundles with T11/T53.
 
-#### T142 — Comment empty states aren't pedagogic — **MEDIUM** (engagement)
-**File:** `web/src/components/CommentThread.tsx:81-84,147-149`. Empty/gated state shows generic "no comments" without explaining why (quiz gate vs plan gate vs no engagement).
-**Fix:** Branch copy on cause: "Pass the quiz to unlock discussion" / "Be the first to comment."
-
 #### T143 — Messages empty state buries Ask-an-Expert discovery — **MEDIUM** (engagement)
 **File:** `web/src/app/messages/page.tsx:86-150`. New user lands on empty inbox with no first-action hook.
 **Fix:** Hero card "Browse experts and ask questions" with link to expert discovery.
-
-#### T144 — Bookmark cap warning lacks benefit framing — **MEDIUM** (conversion)
-**File:** `web/src/app/bookmarks/page.tsx` — claim line `99-108` showed counter logic, not warning copy itself. Warning UI lives elsewhere in the same file; verify location before edit. Substance unchanged: cap warning treats limit as a punishment, not a benefit-unlock.
-**Fix:** Reframe as "Save unlimited articles with Verity+" + tier comparison card.
 
 #### T145 — Profile zero-state shows three separate empty states without prioritization — **MEDIUM** (activation)
 **File:** `web/src/app/profile/page.tsx:853, 1166, 1730`. Activity/categories/achievements all empty independently.
@@ -984,10 +899,6 @@ The numbered items below retain their original section placement for readability
 **File:** `web/src/app/beta-locked/page.tsx:27`. No runtime validation.
 **Fix:** Zod parse or shape guard.
 
-#### T160 — Click handler on `<div>` in CommentThread overlay — **MEDIUM** (a11y)
-**File:** `web/src/components/CommentThread.tsx:699`. `<div onClick={closeDialog}>` lacks keyboard handler.
-**Fix:** Use `<button>` or add `role="button"` + `onKeyDown` for Escape/Enter.
-
 #### T161 — `usePermissionsContext() as { user: unknown }` defeats context typing — **MEDIUM** (TS)
 **File:** `web/src/components/LockModal.tsx:80`.
 **Fix:** Define `PermissionsContext` interface; type `createContext` with it.
@@ -1011,12 +922,6 @@ The numbered items below retain their original section placement for readability
 #### T167 — Hard-coded user-facing strings throughout web — **LOW** (i18n readiness)
 **Example:** `web/src/components/CommentComposer.tsx:97` — "Mentions are available on paid plans...".
 **Fix:** Move to a constants module; foundation for future i18n.
-
-#### T168 — Comment composer dedup creates intermediate Array — **LOW** (perf micro)
-**File:** `web/src/components/CommentComposer.tsx:78`. `Array.from(new Set([...].map(...)))`.
-**Fix:** Build Set; convert only when needed downstream.
-
-### Senior Backend (T170-T181)
 
 #### T170 — No `Cache-Control: private, no-store` on authenticated API routes — **MEDIUM** (privacy)
 **File:** ~30 routes including `web/src/app/api/comments/route.js:128`, `messages/route.js:62`, `bookmarks/route.js`. CDN/proxy could cache auth-scoped data.
@@ -1203,26 +1108,6 @@ Items below already moved to Pre-Launch Assessment (Apple/Sentry/COPPA-CRITICAL)
 
 ### DevOps / SRE (T224-T232)
 
-#### T225 — pipeline-cleanup cron swallows per-sweep errors with `console.error` only — **MEDIUM**
-**File:** `web/src/app/api/cron/pipeline-cleanup/route.ts:69-91, 98-114, 124-139, 156-226`.
-**Fix:** Wrap each sweep with `await captureMessage(...)` on failure (level=warning).
-
-#### T226 — `kids-waitlist` route uses `console.log` for anti-fraud signals — **MEDIUM**
-**File:** `web/src/app/api/kids-waitlist/route.ts:50,65,73,150` (bot_ua_drop, honeypot_hit, too_fast, signup).
-**Fix:** Replace each with `await captureMessage(...)` at appropriate level.
-
-#### T227 — Stripe webhook 1 MiB body-size rejection has no observability — **MEDIUM**
-**File:** `web/src/app/api/stripe/webhook/route.js:67,72`. Legitimate large payloads silently 413; Stripe retries hidden.
-**Fix:** `await captureMessage('stripe webhook body exceeds 1 MiB', 'warning', { actual_size })` on the rejection path.
-
-#### T228 — Cron heartbeat insert errors silenced via `console.error` — **MEDIUM**
-**File:** `web/src/lib/cronHeartbeat.js:20-31`. Operator can't distinguish "cron didn't run" from "ran but log failed."
-**Fix:** Capture exception to Sentry before swallowing.
-
-#### T229 — Cron `maxDuration=60` documented risk at scale, no timeout-detection cleanup — **MEDIUM**
-**File:** `web/src/app/api/cron/check-user-achievements/route.js:21,43-49`. Vercel kills mid-flight; 'start' heartbeats hang.
-**Fix:** Post-flight cleanup cron marks >60s old 'start' rows as 'timeout'; alert on `processing_status='timeout'`.
-
 #### T231 — No CI integration test for `vercel.json` cron paths ↔ route handlers — **LOW**
 **File:** `web/vercel.json` vs `web/src/app/api/cron/*/route.*`.
 **Fix:** CI step: assert `count(crons in vercel.json) == count(handler files)`.
@@ -1393,33 +1278,13 @@ Items below already moved to Pre-Launch Assessment (Apple/Sentry/COPPA-CRITICAL)
 **File:** `web/src/app/api/admin/moderation/users/[id]/penalty/route.js:10-27`. Moderators must manually pick the next tier.
 **Fix:** Auto-escalate based on `user_warnings` history within 60d.
 
-#### T277 — Auto-hide threshold action has no audit trail — **HIGH**
-**File:** `web/src/app/api/reports/route.js:62-76`. Auto-hide doesn't call `recordAdminAction()`; threshold edits are silent.
-**Fix:** Wrap auto-hide in audit; log threshold-config changes.
-
 #### T278 — No CSAM reporting / NCMEC path — **HIGH** (legal duty)
 **File:** Codebase-wide. `/api/reports` accepts free text; no urgent severity, no fast-lane, no NCMEC integration.
 **Fix:** Add `reason: 'csam' | 'child_exploitation' | 'grooming'` enum on kids-surface reports; auto-prioritize + on-call alert; CyberTipline footer link.
 
-#### T279 — Comment hide doesn't redact body (subpoena exposure) — **HIGH**
-**File:** `web/src/app/api/admin/moderation/comments/[id]/hide/route.js:39-48`. `status='hidden'` only; body remains queryable in DB.
-**Fix:** Two modes — "hide" (preserve for audit) vs "redact" (overwrite body, keep meta). Log mode chosen.
-
-#### T280 — Comment-edit window unbounded; edit-after-quote vector — **MEDIUM**
-**File:** `web/src/app/api/comments/[id]/route.js:10-52`. Users can edit indefinitely.
-**Fix:** Freeze edits after 10 min OR persist `comment_edits` history with "Edited" badge.
-
-#### T281 — Reporter rate limit per-user only, no per-target anti-brigading — **MEDIUM**
-**File:** `web/src/app/api/comments/[id]/report/route.js:32-43`. Same target reportable 10×/hr by single user.
-**Fix:** Extend rate-limit key with `target_user_id`; cap at 3/day same target.
-
 #### T282 — Block scope hides DMs/comments only, not leaderboard/profile/expert-Q&A — **MEDIUM**
 **File:** `web/src/app/api/users/blocked/route.js`. Pairs with T17.
 **Fix:** Extend block to hide mentions, expert responses, leaderboard, public profile.
-
-#### T283 — Conversation-start error codes leak user-existence (enumeration) — **MEDIUM**
-**File:** `web/src/app/api/conversations/route.js:60-84`. `USER_NOT_FOUND` (404) vs `DM_PAID_PLAN` (403) distinguishes existence.
-**Fix:** Return uniform 403 for "cannot DM"; rate-limit by `other_user_id`.
 
 #### T284 — Expert credential expiry has no auto-revoke — **MEDIUM**
 **File:** `web/src/app/api/cron/flag-expert-reverifications/route.js:13-16`. Flags only; expired experts keep badge.
@@ -1428,10 +1293,6 @@ Items below already moved to Pre-Launch Assessment (Apple/Sentry/COPPA-CRITICAL)
 #### T285 — Web comment report uses free text; iOS uses structured — **MEDIUM** *(pairs with T32)*
 **File:** `web/src/app/api/comments/[id]/report/route.js:45-46`. Pairs with T32.
 **Fix:** Server-side enum validation; UI category picker on web.
-
-#### T286 — De-platforming appeal process not documented in TOS or in-app — **LOW**
-**File:** `web/src/app/api/appeals/route.js:8-62`. Banned user has no easy path to find appeal flow.
-**Fix:** In-app banner on mute/ban: "You can appeal." + TOS section "Right to Appeal."
 
 #### T287 — No system-wide kill-switch UI for comments / expert Q&A — **LOW**
 **File:** `web/src/lib/featureFlags.js`. `v2LiveGuard()` exists but no admin-facing toggle UI.

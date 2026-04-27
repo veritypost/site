@@ -3,6 +3,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '../../lib/supabase/client';
 
 const C = {
@@ -16,10 +17,24 @@ const C = {
 };
 
 export default function LogoutPage() {
+  const router = useRouter();
   const [hovered, setHovered] = useState(null);
   const [status, setStatus] = useState('signing_out'); // signing_out | done | error
   const [recentReads, setRecentReads] = useState([]);
   const [retrying, setRetrying] = useState(false);
+
+  // T101 — once the signout succeeds, fire a delayed redirect to home
+  // so the user doesn't end up sitting on a dead-end page. The manual
+  // "Sign back in" / "Go to homepage" links remain — clicking either
+  // before the timer fires opts out of the auto-redirect. Only `done`
+  // triggers; `error` keeps the user on the page so they can retry.
+  useEffect(() => {
+    if (status !== 'done') return;
+    const t = setTimeout(() => {
+      router.push('/');
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [status, router]);
 
   const doLogout = async () => {
     setStatus('signing_out');
@@ -108,7 +123,7 @@ export default function LogoutPage() {
             ? 'Signing you out\u2026'
             : status === 'error'
               ? 'Signed out locally'
-              : "You've been signed out"}
+              : 'Signed out \u2014 redirecting\u2026'}
         </h1>
         <p style={{ fontSize: '14px', color: C.dim, margin: '0 0 28px 0', lineHeight: '1.6' }}>
           {status === 'signing_out' && 'One moment while we end your session.'}

@@ -41,6 +41,27 @@ export async function PATCH(request, { params }) {
   const { body } = await request.json().catch(() => ({}));
   if (!body) return NextResponse.json({ error: 'body required' }, { status: 400 });
 
+  // T280 — cap the self-edit window to 10 minutes so authors can fix typos
+  // but can't silently rewrite a comment after it has been replied to,
+  // quoted, or reported. Mods/admins use the moderation surface, which
+  // gates on a different permission and isn't affected. The RPC is
+  // SECURITY DEFINER so we read the row through the service client first.
+  const EDIT_WINDOW_MS = 10 * 60 * 1000;
+  const { data: existing, error: lookupErr } = await service
+    .from('comments')
+    .select('user_id, created_at')
+    .eq('id', id)
+    .maybeSingle();
+  if (lookupErr || !existing) {
+    return NextResponse.json({ error: 'not_found' }, { status: 404 });
+  }
+  if (existing.user_id === user.id) {
+    const createdAt = new Date(existing.created_at).getTime();
+    if (Number.isFinite(createdAt) && Date.now() - createdAt > EDIT_WINDOW_MS) {
+      return NextResponse.json({ error: 'edit_window_expired' }, { status: 403 });
+    }
+  }
+
   const { error } = await service.rpc('edit_comment', {
     p_user_id: user.id,
     p_comment_id: id,

@@ -26,6 +26,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import { truncateIpV4 } from '@/lib/apiErrors';
 import { isBotUserAgent } from '@/lib/botDetect';
+import { captureMessage } from '@/lib/observability';
 
 const MIN_ELAPSED_MS = 1500; // below this = bot (form-open to submit)
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -48,6 +49,10 @@ export async function POST(request: NextRequest) {
   // Bots don't need to know we filtered them.
   if (isBotUserAgent(ua_raw)) {
     console.log('[api/kids-waitlist] bot_ua_drop', { ua_trunc: ua.slice(0, 80) });
+    await captureMessage('kids-waitlist bot_ua_drop', 'warning', {
+      ip: ip_prefix,
+      user_agent: ua.slice(0, 200),
+    });
     return NextResponse.json({ ok: true });
   }
 
@@ -63,6 +68,10 @@ export async function POST(request: NextRequest) {
   // a bot filled it. Log + 200 (no error signal back to the bot).
   if (typeof body.website === 'string' && body.website.trim().length > 0) {
     console.log('[api/kids-waitlist] honeypot_hit', { ip_prefix });
+    await captureMessage('kids-waitlist honeypot_hit', 'warning', {
+      ip: ip_prefix,
+      user_agent: ua.slice(0, 200),
+    });
     return NextResponse.json({ ok: true });
   }
 
@@ -71,6 +80,11 @@ export async function POST(request: NextRequest) {
   const elapsed_ms = typeof body.elapsed_ms === 'number' ? body.elapsed_ms : 0;
   if (elapsed_ms < MIN_ELAPSED_MS) {
     console.log('[api/kids-waitlist] too_fast', { elapsed_ms });
+    await captureMessage('kids-waitlist too_fast', 'warning', {
+      ip: ip_prefix,
+      user_agent: ua.slice(0, 200),
+      elapsed_ms,
+    });
     return NextResponse.json({ ok: true });
   }
 
@@ -150,6 +164,12 @@ export async function POST(request: NextRequest) {
   console.log('[api/kids-waitlist] signup', {
     source,
     ip_prefix,
+    new: isNew,
+  });
+  await captureMessage('kids-waitlist signup', 'info', {
+    ip: ip_prefix,
+    user_agent: ua.slice(0, 200),
+    source,
     new: isNew,
   });
 

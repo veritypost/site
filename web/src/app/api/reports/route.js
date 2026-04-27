@@ -1,6 +1,6 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified reports 2026-04-18
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { getSettings } from '@/lib/settings';
@@ -72,6 +72,25 @@ export async function POST(request) {
 
       if ((count || 0) >= threshold) {
         await supabase.from('comments').update({ status: 'hidden' }).eq('id', targetId);
+
+        // T277 — auto-hide is a system action, not an admin one. Use the
+        // service client to write into `audit_log` directly with
+        // `actor_id: null` so the trail records "system" rather than the
+        // reporter who happened to cross the threshold. recordAdminAction
+        // can't be used here: it's auth.uid()-scoped and writes to
+        // admin_audit_log, which is the wrong table for system events.
+        try {
+          const service = createServiceClient();
+          await service.from('audit_log').insert({
+            actor_id: null,
+            action: 'comment.auto_hide',
+            target_type: 'comment',
+            target_id: targetId,
+            metadata: { threshold, report_count: count || 0 },
+          });
+        } catch (auditErr) {
+          console.error('[reports] audit_log auto_hide insert failed:', auditErr);
+        }
       }
     }
 

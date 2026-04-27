@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { verifyWebhook, retrieveSubscription } from '@/lib/stripe';
+import { captureMessage } from '@/lib/observability';
 
 // Auth: Stripe HMAC signature on raw body via verifyWebhook (see lib/stripe.js).
 // Raw body is read before JSON parse; signature is verified BEFORE any DB write.
@@ -65,11 +66,21 @@ export async function POST(request) {
 
   const declaredLen = Number(request.headers.get('content-length'));
   if (Number.isFinite(declaredLen) && declaredLen > MAX_BODY_SIZE) {
+    await captureMessage('stripe webhook body exceeds 1 MiB', 'warning', {
+      actual_size: declaredLen,
+      content_length: request.headers.get('content-length'),
+      stage: 'declared',
+    });
     return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
   }
 
   const raw = await request.text();
   if (raw.length > MAX_BODY_SIZE) {
+    await captureMessage('stripe webhook body exceeds 1 MiB', 'warning', {
+      actual_size: raw.length,
+      content_length: request.headers.get('content-length'),
+      stage: 'buffered',
+    });
     return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
   }
 

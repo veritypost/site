@@ -471,12 +471,18 @@ export default function BookmarksPage() {
         </div>
 
         {atCap && (
-          // T-044: replaced Banner with LockedFeatureCTA inline strip.
-          // The title above already shows "X of Y" when at-cap; the strip
-          // carries the upgrade nudge without repeating the count.
+          // T-044 / T144: LockedFeatureCTA renders the cap nudge as a
+          // benefit-unlock (headline "Upgrade to unlock", neutral card
+          // styling, single CTA into billing). The "X of Y" count is
+          // already in the page header, so this strip carries only the
+          // unlocked-on-upgrade benefits — no punishment framing, no
+          // duplicated counter. Copy lists the four concrete things
+          // paid plans add to bookmarks specifically; intentionally
+          // avoids generic "sync across devices" claims since free
+          // accounts already sync across devices.
           <LockedFeatureCTA
             gateType="plan"
-            lockMessage="Paid plans add unlimited bookmarks, collections, notes, and export."
+            lockMessage="Upgrade to save unlimited articles, organize them into collections, add private notes, and export them anytime."
             style={{ marginBottom: 12 }}
           />
         )}

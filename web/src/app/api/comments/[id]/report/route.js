@@ -53,6 +53,31 @@ export async function POST(request, { params }) {
     return NextResponse.json({ error: 'Input too long' }, { status: 400 });
   }
 
+  // T281 — per-reporter rate limit (above) caps total volume; this
+  // second limit caps per-target so a reporter can't brigade the same
+  // author by reporting their comments scattered across the site.
+  // Lookup the comment's author first so we can key on target user.
+  const { data: targetComment, error: lookupErr } = await service
+    .from('comments')
+    .select('user_id')
+    .eq('id', params.id)
+    .maybeSingle();
+  if (lookupErr || !targetComment) {
+    return NextResponse.json({ error: 'not_found' }, { status: 404 });
+  }
+  const targetRate = await checkRateLimit(service, {
+    key: `report:reporter:${user.id}:target:${targetComment.user_id}`,
+    policyKey: 'comment_report.target',
+    max: 3,
+    windowSec: 86400,
+  });
+  if (targetRate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(targetRate.windowSec ?? 86400) } }
+    );
+  }
+
   const { data, error } = await service
     .from('reports')
     .insert({

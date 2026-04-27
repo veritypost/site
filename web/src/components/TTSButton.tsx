@@ -1,7 +1,7 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified tts 2026-04-18
 'use client';
-import { useEffect, useState, CSSProperties } from 'react';
+import { useEffect, useRef, useState, CSSProperties } from 'react';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 
 // D17 / Pass 17 — text-to-speech button. Uses the browser's
@@ -17,13 +17,27 @@ import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/perm
 interface TTSButtonProps {
   text: string;
   title?: string;
+  // T63 — when true, auto-fire start() once per page load. The story
+  // page reads users.metadata.a11y.ttsDefault and threads it down.
+  // Per-article sessionStorage guard prevents re-fire on rerenders or
+  // remounts within the same browsing session.
+  autoStart?: boolean;
+  articleId?: string;
 }
 
-export default function TTSButton({ text, title = 'Listen' }: TTSButtonProps) {
+export default function TTSButton({
+  text,
+  title = 'Listen',
+  autoStart = false,
+  articleId,
+}: TTSButtonProps) {
   const [supported, setSupported] = useState<boolean>(false);
   const [speaking, setSpeaking] = useState<boolean>(false);
   const [paused, setPaused] = useState<boolean>(false);
   const [allowed, setAllowed] = useState<boolean>(false);
+  // T63 — guard auto-start so it only fires once per page load even if
+  // the parent re-renders or perms resolve in two passes.
+  const autoStartedRef = useRef<boolean>(false);
 
   useEffect(() => {
     setSupported(typeof window !== 'undefined' && 'speechSynthesis' in window);
@@ -38,6 +52,35 @@ export default function TTSButton({ text, title = 'Listen' }: TTSButtonProps) {
       }
     };
   }, []);
+
+  // T63 — auto-start once permissions resolve. Gated by:
+  //   1) autoStart prop (users.metadata.a11y.ttsDefault),
+  //   2) supported + allowed (browser + permission),
+  //   3) autoStartedRef so a re-render can't double-fire,
+  //   4) per-article sessionStorage key so a back/forward navigation
+  //      to the same article doesn't keep re-narrating.
+  useEffect(() => {
+    if (!autoStart || !supported || !allowed || autoStartedRef.current) return;
+    if (typeof window === 'undefined') return;
+    const key = articleId ? `vp_tts_autoplayed_${articleId}` : null;
+    if (key) {
+      try {
+        if (window.sessionStorage.getItem(key) === '1') {
+          autoStartedRef.current = true;
+          return;
+        }
+        window.sessionStorage.setItem(key, '1');
+      } catch {
+        // sessionStorage can throw in private mode — fall through and
+        // rely on the ref to prevent double-fire within this mount.
+      }
+    }
+    autoStartedRef.current = true;
+    start();
+    // start() is stable (defined in module scope of this component);
+    // intentionally exhaustive on the inputs that should re-evaluate.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart, supported, allowed, articleId]);
 
   if (!supported || !allowed) return null;
 

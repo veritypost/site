@@ -292,6 +292,52 @@ export default function SearchPage() {
             >
               Browse categories
             </Link>
+
+            {/* T119 — refinement tips so a zero-results query has a
+                concrete path forward instead of a dead end. */}
+            <div
+              style={{
+                marginTop: 24,
+                paddingTop: 18,
+                borderTop: '1px solid #e5e5e5',
+                textAlign: 'left',
+                maxWidth: 320,
+                marginLeft: 'auto',
+                marginRight: 'auto',
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: '#111',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  marginBottom: 8,
+                }}
+              >
+                Try a different search
+              </div>
+              <ul
+                style={{
+                  margin: 0,
+                  paddingLeft: 18,
+                  fontSize: 13,
+                  color: '#666',
+                  lineHeight: 1.7,
+                }}
+              >
+                <li>Use fewer keywords.</li>
+                <li>Check spelling.</li>
+                <li>
+                  Browse{' '}
+                  <Link href="/browse" style={{ color: '#111', fontWeight: 600 }}>
+                    categories
+                  </Link>
+                  .
+                </li>
+              </ul>
+            </div>
           </div>
         )}
       </div>

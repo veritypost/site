@@ -58,6 +58,9 @@ export default function VerifyEmailPage() {
   const [focused, setFocused] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [updateLoading, setUpdateLoading] = useState<boolean>(false);
+  // T98 — transient confirmation that the resend POST succeeded. Auto-
+  // clears after 4 s. Sits above the resend button.
+  const [resentMessage, setResentMessage] = useState<string>('');
 
   useEffect(() => {
     const supabase = createClient();
@@ -123,6 +126,10 @@ export default function VerifyEmailPage() {
       }
 
       setCooldown(60);
+      // T98 — transient success confirmation. Cleared after 4s so it
+      // doesn't linger past the cooldown window.
+      setResentMessage('Sent — check your inbox.');
+      setTimeout(() => setResentMessage(''), 4000);
       const interval = setInterval(() => {
         setCooldown((prev) => {
           if (prev <= 1) {
@@ -495,9 +502,52 @@ export default function VerifyEmailPage() {
         <p style={{ fontSize: '14px', color: C.dim, margin: '0 0 4px 0', lineHeight: 1.55 }}>
           We sent a verification link to
         </p>
-        <p style={{ fontSize: '15px', fontWeight: 600, color: C.text, margin: '0 0 26px 0' }}>
+        <p style={{ fontSize: '15px', fontWeight: 600, color: C.text, margin: '0 0 18px 0' }}>
           {userEmail ? maskEmail(userEmail) : '…'}
         </p>
+
+        {/* T100 — provider-specific deep-link to the user's webmail.
+            Only renders for the four largest providers; unknown
+            domains skip the button rather than risk a wrong target. */}
+        {(() => {
+          const domain = userEmail.split('@')[1]?.toLowerCase() || '';
+          const map: Record<string, { href: string; label: string }> = {
+            'gmail.com': { href: 'https://mail.google.com', label: 'Open Gmail' },
+            'googlemail.com': { href: 'https://mail.google.com', label: 'Open Gmail' },
+            'outlook.com': { href: 'https://outlook.live.com', label: 'Open Outlook' },
+            'hotmail.com': { href: 'https://outlook.live.com', label: 'Open Outlook' },
+            'live.com': { href: 'https://outlook.live.com', label: 'Open Outlook' },
+            'yahoo.com': { href: 'https://mail.yahoo.com', label: 'Open Yahoo Mail' },
+            'icloud.com': { href: 'https://www.icloud.com/mail', label: 'Open iCloud Mail' },
+            'me.com': { href: 'https://www.icloud.com/mail', label: 'Open iCloud Mail' },
+          };
+          const entry = map[domain];
+          if (!entry) return null;
+          return (
+            <a
+              href={entry.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'block',
+                width: '100%',
+                padding: '12px',
+                fontSize: '14px',
+                fontWeight: 600,
+                color: '#fff',
+                backgroundColor: C.accent,
+                border: 'none',
+                borderRadius: '10px',
+                textDecoration: 'none',
+                marginBottom: '14px',
+                minHeight: 44,
+                boxSizing: 'border-box',
+              }}
+            >
+              {entry.label}
+            </a>
+          );
+        })()}
 
         <div
           style={{
@@ -516,6 +566,27 @@ export default function VerifyEmailPage() {
             Check your spam folder, or wait a minute and resend. The link expires after 24 hours.
           </p>
         </div>
+
+        {/* T98 — transient success banner shown after a 200 from
+            /api/auth/resend-verification. Auto-clears after 4 s. */}
+        {resentMessage && (
+          <div
+            role="status"
+            aria-live="polite"
+            style={{
+              backgroundColor: '#f0fdf4',
+              border: '1px solid #bbf7d0',
+              borderRadius: '10px',
+              padding: '10px 14px',
+              marginBottom: '12px',
+              textAlign: 'left',
+            }}
+          >
+            <p style={{ margin: 0, fontSize: '13px', color: '#166534', fontWeight: 500 }}>
+              {resentMessage}
+            </p>
+          </div>
+        )}
 
         <button
           type="button"
@@ -573,6 +644,23 @@ export default function VerifyEmailPage() {
                 }}
               >
                 Use a different account
+              </a>
+            </div>
+            {/* T99 — escape hatch when resend keeps failing. */}
+            <div style={{ marginTop: '2px' }}>
+              <a
+                href="mailto:support@veritypost.com"
+                style={{
+                  display: 'inline-block',
+                  fontSize: '12px',
+                  color: C.dim,
+                  fontFamily: 'inherit',
+                  textDecoration: 'underline',
+                  padding: '10px 8px',
+                  minHeight: 44,
+                }}
+              >
+                Contact support
               </a>
             </div>
           </>

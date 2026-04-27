@@ -18,6 +18,15 @@ const CRON_NAME = 'check-user-achievements';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+// T229 — Vercel Hobby maxDuration ceiling. Two-tier risk at scale: (a) the
+// run itself can be killed mid-loop (handled by L5 concurrency cap above);
+// (b) when the run is killed, the 'start' heartbeat we wrote at line 27
+// stays orphaned with no matching 'end' or 'error' phase, so an operator
+// looking at webhook_log can't distinguish "cron ran but timed out" from
+// "cron crashed early." Need a separate global cron route that periodically
+// scans webhook_log for `cron:*:start` rows older than maxDuration + grace
+// (e.g. 90s) without a paired terminal phase, and writes a synthetic
+// `cron:*:timeout` heartbeat. Out of scope for this PR; track as T229.
 export const maxDuration = 60;
 
 async function run(request) {

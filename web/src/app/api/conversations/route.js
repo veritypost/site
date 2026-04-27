@@ -63,23 +63,29 @@ export async function POST(request) {
     // Prefix is server-internal (never shipped to the client).
     const codeMatch = msg.match(/^\[([A-Z_]+)\]/);
     const code = codeMatch?.[1] || null;
+    // T283 — collapse USER_NOT_FOUND / DM_PAID_PLAN / DM_MUTED into a
+    // single `cannot_dm` 403. Distinguishing them by status code lets a
+    // caller enumerate which user_ids exist (404 vs 403) and which are
+    // on a paid tier vs blocked. Keep the granular reason in server
+    // logs only; the client-facing surface is uniform. Self-message and
+    // missing-ids are caller-input shape errors and stay as 400 — they
+    // don't leak target-user state.
     let status;
-    if (code === 'DM_PAID_PLAN') status = 403;
-    else if (code === 'DM_MUTED') status = 403;
-    else if (code === 'USER_NOT_FOUND') status = 404;
-    else if (code === 'SELF_CONV') status = 400;
-    else if (code === 'DM_MISSING_IDS') status = 400;
-    else status = 400;
-    const isSelf = code === 'SELF_CONV';
-    const userMsg =
-      status === 404
-        ? 'Recipient not found.'
-        : status === 403
-          ? 'You cannot start a conversation with this user.'
-          : isSelf
-            ? 'You cannot message yourself.'
-            : 'Could not start conversation';
-    console.error('[conversations.post]', error);
+    let userMsg;
+    if (code === 'DM_PAID_PLAN' || code === 'DM_MUTED' || code === 'USER_NOT_FOUND') {
+      status = 403;
+      userMsg = 'cannot_dm';
+    } else if (code === 'SELF_CONV') {
+      status = 400;
+      userMsg = 'You cannot message yourself.';
+    } else if (code === 'DM_MISSING_IDS') {
+      status = 400;
+      userMsg = 'Could not start conversation';
+    } else {
+      status = 400;
+      userMsg = 'Could not start conversation';
+    }
+    console.error('[conversations.post]', { code, message: msg });
     return NextResponse.json({ error: userMsg }, { status });
   }
   return NextResponse.json({ conversation: data });

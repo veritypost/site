@@ -7,6 +7,89 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (Parallel sweep — 28 items shipped + 2 stale-confirmed across 6 clusters) — _shipped, pushed to git/Vercel_
+
+Six implementer agents dispatched in parallel covering non-overlapping file clusters. Each cluster summarized below.
+
+### Cluster A — Trust & Safety server hardening
+
+- **T277** — `web/src/app/api/reports/route.js`: auto-hide threshold-crossing branch now writes a system audit_log entry (`actor_id: null`, `action: 'comment.auto_hide'`, target + threshold + report_count metadata). Direct insert via service client (not `recordAdminAction` — that helper is auth.uid()-scoped and would log the reporter).
+- **T279** — `web/src/app/api/admin/moderation/comments/[id]/hide/route.js`: accepts `mode: 'hide' | 'redact'`. Default `'hide'` (status-only). `'redact'` additionally overwrites `body = '[redacted by moderator]'` + nulls `body_html`. Audit log carries the chosen mode; response echoes it. Closes subpoena-exposure gap when comment content needs to disappear from queryable storage.
+- **T280** — `web/src/app/api/comments/[id]/route.js`: 10-minute self-edit window. Looks up the comment row, computes `Date.now() - created_at`, returns 403 `{error: 'edit_window_expired'}` for self-edits past 10min. Mods/admins editing on a different surface unaffected.
+- **T281** — `web/src/app/api/comments/[id]/report/route.js`: per-target anti-brigading rate-limit (3 reports same target per 24h, keyed `report:reporter:${reporterId}:target:${targetUserId}`). Existing per-reporter rate-limit preserved.
+- **T283** — `web/src/app/api/conversations/route.js`: `USER_NOT_FOUND` (404), `DM_PAID_PLAN` (403), `DM_MUTED` collapsed to uniform `403 {error: 'cannot_dm'}`. Closes user-existence enumeration via response code or timing. Granular reason kept in server logs.
+- **T286** — `web/src/app/terms/page.tsx` Section 7 Termination: added "Right to Appeal" bullet documenting the in-app + email path + 14-day SLA. `/api/appeals/route.js` already exists.
+
+### Cluster B — DevOps observability
+
+- **T225** — `web/src/app/api/cron/pipeline-cleanup/route.ts`: every per-sweep `console.error` block now also fires `captureMessage` (orphan_runs, orphan_items per-table, orphan_locks, cluster_expiry per-cluster). Sentry is already wired through `web/src/lib/observability.js` — no-op when DSN unset, plumbed when on.
+- **T226** — `web/src/app/api/kids-waitlist/route.ts`: anti-fraud signals (bot_ua_drop, honeypot_hit, too_fast) → `captureMessage` warning; signup → captureMessage info. console.log retained for dev.
+- **T227** — `web/src/app/api/stripe/webhook/route.js`: 1 MiB rejection paths (declared Content-Length + post-buffer) emit captureMessage with `actual_size` + stage.
+- **T228** — `web/src/lib/cronHeartbeat.js`: insert/update failures call `captureException` with `{route, stage, cron_name}`. Operator can now distinguish "cron didn't run" from "ran but heartbeat failed."
+- **T229** — `web/src/app/api/cron/check-user-achievements/route.js`: comment block added documenting the global stale-`start`-heartbeat sweep cron that's still owed (separate route — not built in this PR).
+
+### Cluster C — UI polish
+
+- **T129** — `web/src/components/CommentRow.tsx`: comment-edit Save button now shows visible disabled state (`opacity: 0.6`, `cursor: not-allowed`) when `busy === 'edit'`.
+- **T130** — `web/src/app/story/[slug]/page.tsx`: report modal title row now flex with an `<button aria-label="Close">×</button>` calling `setShowReportModal(false) + setReportError('')`. `id="report-modal-title"` preserved for `aria-labelledby`. Other modals (Interstitial.tsx) untouched — their existing patterns are acceptable.
+- **T136** — `web/src/components/CommentRow.tsx`: edit textarea inline style adds `resize: 'vertical'`. `CommentComposer.tsx` already had it.
+- **T160 + T168 STALE** — confirmed, no changes. CommentThread dialog backdrop is fine because the inner modal has `useFocusTrap({onEscape: closeDialog})`. Composer dedup `Array.from(new Set([...].map(...)))` is a non-issue.
+
+### Cluster D — Settings dead-UI sweep
+
+- **T61** — `web/src/app/profile/settings/page.tsx:4878-4920`: expert "Vacation mode" toggle disabled + relabeled "Coming soon" with explanatory subtitle. Zero consumers verified via grep before changing. Re-enable = restore the original handler.
+- **T62** — same file:4924-5045: expert "Watchlist" chips rendered disabled + relabeled "Coming soon." Load logic kept so an approved expert still sees their categories; only the toggle/write was removed.
+- **T63** — same file:3199-3328: a11y `textSize`/`reduceMotion`/`highContrast` flags relabeled "Coming soon" disabled. `ttsDefault` auto-start wired end-to-end: `web/src/app/story/[slug]/page.tsx` user fetch extended with `metadata`, `<TTSButton>` props extended with `autoStart` + `articleId`. `web/src/components/TTSButton.tsx` adds a one-shot useEffect: when `autoStart && supported && allowed`, fires `start()` once per article via `autoStartedRef` + `sessionStorage` key `vp_tts_autoplayed_<articleId>` (back/forward protection within session). RPC payload still writes all four metadata.a11y keys per launch-phase rule.
+
+### Cluster E — Comments + paywall + activation copy
+
+- **T32** — `web/src/components/CommentThread.tsx`: comment-report dialog now renders 5 radio categories (`spam, harassment, off_topic, misinformation, other`) mirroring iOS `BlockService.ReportReason` enum. Free-text textarea persists only when `other` selected. Submit handler sends `{reason}` (+ optional `description` when other). Server-side enum validation tracked under T285. **`flag` and `hide` dialogs unchanged** — moderator/expert flows keep their existing free-text inputs.
+- **T108** — `web/src/components/CommentComposer.tsx`: live mention-permission hint. Watches body for `@<word>` regex; when matched and user lacks `comments.mention.insert`, renders an inline amber tooltip "@mentions are a paid feature — your text will post as plain text." Disappears when the user removes the mention or upgrades. Post-submit `setError` toast preserved as redundant safety net.
+- **T142 — SCOPED-DOWN** — `web/src/components/CommentThread.tsx` empty-state copy refined to "No comments yet. You passed the quiz — start the conversation." The three-state branch the audit asked for is already implemented at the parent (`story/[slug]/page.tsx:1151-1187`); CommentThread only renders when `userPassedQuiz === true`, so only the auth+passed copy applies inside it.
+- **T144 — PARTIAL** — `web/src/app/bookmarks/page.tsx:473-488`: lockMessage tightened to "Upgrade to save unlimited articles, organize them into collections, add private notes, and export them anytime." The "punishment-style" copy the audit cited didn't actually exist; the page already used a benefit-framed `LockedFeatureCTA`. Improvement is a sharper benefit list; "limit reached" wording was a phantom claim.
+
+### Cluster F — Verify-email + logout + search + DM polish
+
+- **T98** — `web/src/app/verify-email/page.tsx`: success toast "Sent — check your inbox." after resend, auto-clearing at 4s. Green role="status" banner above the resend button.
+- **T99** — same file: "Contact support" mailto link added inside the "!changeEmail" branch beside the existing "Use a different account" link.
+- **T100** — same file: domain-detection helper renders a single primary "Open Gmail / Outlook / Yahoo Mail / iCloud Mail" button when masked email matches gmail/googlemail/outlook/hotmail/live/yahoo/icloud/me. Other domains: nothing rendered (avoid wrong-button).
+- **T101** — `web/src/app/logout/page.js`: success state now triggers `setTimeout(() => router.push('/'), 1500)` and message updates to "Signed out — redirecting…". Manual links preserved so users can opt out by clicking earlier.
+- **T119** — `web/src/app/search/page.tsx:271-296` (audit-cited 238-242 was stale): zero-results block adds a refinement-tips section ("Try a different search" heading + 3 bullets: fewer keywords / spelling / browse categories link). Static text — no new fetches.
+- **T112** — `web/src/app/messages/page.tsx`: DM paywall now shows a tier-card preview block beside the existing CTA. Verity tier name + $3.99/mo + 3-bullet perks ("Direct messages", "Unlimited bookmarks", "Ad-free reading"). Pricing hardcoded; no live `getPlans()` fetch in scope.
+- **T113** — same file: DM paywall × close button + Esc dismiss via shared `useFocusTrap`. `dmPaywallDismissed` state added; `showDmPaywall` derived gate now respects it. `aria-label="Close"` × button in modal top-right.
+
+### Files touched (alphabetical)
+
+- `web/src/app/api/admin/moderation/comments/[id]/hide/route.js`
+- `web/src/app/api/comments/[id]/report/route.js`
+- `web/src/app/api/comments/[id]/route.js`
+- `web/src/app/api/conversations/route.js`
+- `web/src/app/api/cron/check-user-achievements/route.js`
+- `web/src/app/api/cron/pipeline-cleanup/route.ts`
+- `web/src/app/api/kids-waitlist/route.ts`
+- `web/src/app/api/reports/route.js`
+- `web/src/app/api/stripe/webhook/route.js`
+- `web/src/app/bookmarks/page.tsx`
+- `web/src/app/logout/page.js`
+- `web/src/app/messages/page.tsx`
+- `web/src/app/profile/settings/page.tsx`
+- `web/src/app/search/page.tsx`
+- `web/src/app/story/[slug]/page.tsx`
+- `web/src/app/terms/page.tsx`
+- `web/src/app/verify-email/page.tsx`
+- `web/src/components/CommentComposer.tsx`
+- `web/src/components/CommentRow.tsx`
+- `web/src/components/CommentThread.tsx`
+- `web/src/components/TTSButton.tsx`
+- `web/src/lib/cronHeartbeat.js`
+
+### Stale items confirmed (no changes — left in TODO history note)
+
+- T160 (CommentThread overlay div onClick) — backdrop is fine; modal already focus-trapped.
+- T168 (composer dedup intermediate Array) — micro-perf, no measurable benefit.
+
+---
+
 ## 2026-04-27 (T39 + T146 + T147 — engagement-loop polish bundle) — _shipped, pushed to git/Vercel_
 
 ### T39 — Welcome carousel routes signup into reading

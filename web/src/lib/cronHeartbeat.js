@@ -16,6 +16,7 @@
 // so a webhook_log outage cannot bring down a cron job.
 
 import { createServiceClient } from '@/lib/supabase/server';
+import { captureException } from '@/lib/observability';
 
 export async function logCronHeartbeat(name, phase, payload) {
   try {
@@ -27,5 +28,10 @@ export async function logCronHeartbeat(name, phase, payload) {
     });
   } catch (err) {
     console.error(`[cron.heartbeat] cron:${name}:${phase} insert failed:`, err?.message || err);
+    await captureException(err, {
+      route: 'cronHeartbeat',
+      stage: phase,
+      cron_name: name,
+    });
   }
 }

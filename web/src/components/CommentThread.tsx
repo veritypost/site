@@ -22,6 +22,20 @@ import Skeleton from './Skeleton';
 
 type CommentDb = Database['public']['Tables']['comments']['Row'];
 
+// T32 — Web comment-report categories must mirror the iOS ReportReason
+// enum at VerityPost/VerityPost/BlockService.swift so reports landing in
+// the `reports` table from either surface use the same set of strings.
+// Keep this list in sync with that enum (spam, harassment, off_topic,
+// misinformation, other). Server-side enum validation is tracked under
+// T285 — for now the API accepts any string.
+const REPORT_REASONS: ReadonlyArray<{ value: string; label: string }> = [
+  { value: 'spam', label: 'Spam' },
+  { value: 'harassment', label: 'Harassment or hate' },
+  { value: 'off_topic', label: 'Off-topic' },
+  { value: 'misinformation', label: 'Misinformation' },
+  { value: 'other', label: 'Other' },
+];
+
 type CommentWithAuthor = CommentDb & {
   users?: {
     id?: string;
@@ -373,10 +387,17 @@ export default function CommentThread({
         return;
       }
       if (dialog.action === 'report' && dialog.commentId) {
+        // T32 — `reason` is a category enum value (see REPORT_REASONS).
+        // Free-text context is only sent when the user picked "other".
+        const isOther = dialog.reason === 'other';
+        const description = isOther ? dialog.description.trim() : '';
         const res = await fetch(`/api/comments/${dialog.commentId}/report`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reason: dialog.reason, description: dialog.description }),
+          body: JSON.stringify({
+            reason: dialog.reason,
+            ...(description ? { description } : {}),
+          }),
         });
         if (!res.ok) {
           const d = await res.json().catch(() => ({}));
@@ -727,9 +748,93 @@ export default function CommentThread({
               </p>
             )}
 
-            {(dialog.action === 'report' ||
-              dialog.action === 'flag' ||
-              dialog.action === 'hide') && (
+            {dialog.action === 'report' && (
+              // T32 — Structured category radio matching iOS ReportReason
+              // (BlockService.swift). Free-text "Context" only appears when
+              // the user picks "Other"; for the named categories the reason
+              // alone is sent and the description field is suppressed.
+              <>
+                <fieldset style={{ border: 'none', padding: 0, margin: '0 0 10px 0' }}>
+                  <legend
+                    style={{
+                      display: 'block',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: 'var(--dim, #666)',
+                      textTransform: 'uppercase',
+                      marginBottom: 6,
+                      padding: 0,
+                    }}
+                  >
+                    Reason
+                  </legend>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {REPORT_REASONS.map((r, idx) => (
+                      <label
+                        key={r.value}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          fontSize: 13,
+                          color: 'var(--white, #111)',
+                          cursor: 'pointer',
+                          minHeight: 28,
+                        }}
+                      >
+                        <input
+                          type="radio"
+                          name="report-reason"
+                          value={r.value}
+                          checked={dialog.reason === r.value}
+                          onChange={() => updateDialog({ reason: r.value })}
+                          autoFocus={idx === 0}
+                          style={{ margin: 0 }}
+                        />
+                        {r.label}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                {dialog.reason === 'other' && (
+                  <>
+                    <label
+                      style={{
+                        display: 'block',
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: 'var(--dim, #666)',
+                        textTransform: 'uppercase',
+                        marginBottom: 4,
+                      }}
+                    >
+                      Tell us more
+                    </label>
+                    <textarea
+                      value={dialog.description}
+                      onChange={(e) => updateDialog({ description: e.target.value })}
+                      rows={3}
+                      maxLength={1000}
+                      placeholder="What's the issue?"
+                      style={{
+                        width: '100%',
+                        padding: '8px 10px',
+                        borderRadius: 8,
+                        border: '1px solid var(--border, #e5e5e5)',
+                        fontSize: 13,
+                        outline: 'none',
+                        fontFamily: 'inherit',
+                        marginBottom: 10,
+                        boxSizing: 'border-box',
+                        resize: 'vertical',
+                      }}
+                    />
+                  </>
+                )}
+              </>
+            )}
+
+            {(dialog.action === 'flag' || dialog.action === 'hide') && (
               <>
                 <label
                   style={{
@@ -820,8 +925,12 @@ export default function CommentThread({
                 onClick={runDialogAction}
                 disabled={
                   dialog.submitting ||
-                  ((dialog.action === 'report' || dialog.action === 'flag') &&
-                    !dialog.reason.trim())
+                  (dialog.action === 'flag' && !dialog.reason.trim()) ||
+                  // T32 — report requires a category; "other" additionally
+                  // requires non-empty context so we don't ship the server
+                  // an empty meaningless payload.
+                  (dialog.action === 'report' &&
+                    (!dialog.reason || (dialog.reason === 'other' && !dialog.description.trim())))
                 }
                 style={{
                   padding: '7px 14px',
@@ -854,6 +963,12 @@ export default function CommentThread({
       )}
 
       {tops.length === 0 ? (
+        // T142 — CommentThread is only mounted for readers who already
+        // passed the quiz (story page gates the not-passed and anon
+        // states with their own pedagogic lock-panels at
+        // app/story/[slug]/page.tsx). So the empty-state here only ever
+        // addresses the auth+passed reader: name the unlock and invite
+        // them to start the conversation rather than reciting the rule.
         <div
           style={{
             fontSize: 13,
@@ -862,8 +977,7 @@ export default function CommentThread({
             padding: '30px 0',
           }}
         >
-          No comments yet. Everyone who posts here passed the article quiz &mdash; be the first to
-          start the discussion.
+          No comments yet. You passed the quiz &mdash; start the conversation.
         </div>
       ) : (
         <>

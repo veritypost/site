@@ -35,7 +35,16 @@ export async function POST(request, { params }) {
       { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
     );
   }
-  const { reason } = await request.json().catch(() => ({}));
+  const body = await request.json().catch(() => ({}));
+  const reason = body?.reason;
+  // T279 — two-mode soft-removal. 'hide' is the routine moderator path
+  // (status flips to hidden, body preserved for unhide / appeals). 'redact'
+  // additionally overwrites the body so that on a legal/safety action the
+  // text isn't recoverable from the comment row itself — closes a subpoena
+  // exposure where 'hide' alone left the original content sitting on disk.
+  // Default 'hide' keeps every existing caller backward-compatible.
+  const mode = body?.mode === 'redact' ? 'redact' : 'hide';
+
   const { error } = await service.rpc('hide_comment', {
     p_mod_id: user.id,
     p_comment_id: params.id,
@@ -47,14 +56,29 @@ export async function POST(request, { params }) {
       fallbackStatus: 400,
     });
 
+  if (mode === 'redact') {
+    const { error: redactErr } = await service
+      .from('comments')
+      .update({ body: '[redacted by moderator]', body_html: null })
+      .eq('id', params.id);
+    if (redactErr) {
+      // Hide already landed; surface the partial-failure so the caller
+      // can retry redact without re-hiding.
+      return safeErrorResponse(NextResponse, redactErr, {
+        route: 'admin.moderation.comments.id.hide.redact',
+        fallbackStatus: 500,
+      });
+    }
+  }
+
   // C21 — audit the comment hide. Pre-fix, comment removal left zero
-  // audit trail.
+  // audit trail. T279 adds the chosen mode to the trail.
   await recordAdminAction({
     action: 'moderation.comment.hide',
     targetTable: 'comments',
     targetId: params.id,
-    newValue: { reason: reason || 'moderator action' },
+    newValue: { reason: reason || 'moderator action', mode },
   });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, mode });
 }
