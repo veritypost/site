@@ -21,7 +21,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import Page from '@/components/admin/Page';
+import Page, { PageHeader } from '@/components/admin/Page';
 import { createClient } from '@/lib/supabase/client';
 import type { Tables } from '@/types/database';
 
@@ -63,11 +63,15 @@ export default function TweensStoryManagerPage() {
         return;
       }
       try {
+        // Cast: generated Database types lag the Phase 3 migration that
+        // adds age_band to articles; the column exists post-deploy.
         const { data, error } = await supabase
           .from('articles')
           .select('*')
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .eq('is_kids_safe', true)
-          .eq('age_band', 'tweens')
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .eq('age_band' as never, 'tweens')
           .order('created_at', { ascending: false })
           .limit(200);
         if (cancelled) return;
@@ -95,11 +99,11 @@ export default function TweensStoryManagerPage() {
   });
 
   return (
-    <Page
-      accentColor="#7c3aed"
-      title="Tweens Story Manager"
-      subtitle="Review + edit articles for ages 10-12. Generated alongside the kids version (ages 7-9) when a kid-safe cluster is published. Edit each in /admin/articles/:id."
-    >
+    <Page>
+      <PageHeader
+        title="Tweens Story Manager"
+        subtitle="Review + edit articles for ages 10-12. Generated alongside the kids version (ages 7-9) when a kid-safe cluster is published. Edit each in /admin/articles/:id."
+      />
       <div style={{ marginBottom: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {(['all', 'draft', 'review', 'published', 'archived'] as const).map((s) => (
           <button

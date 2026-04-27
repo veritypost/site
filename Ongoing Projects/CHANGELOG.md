@@ -7,6 +7,94 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (Phase 3 — age banding, code shipped + migration staged) — _code shipped; migration staged for owner SQL editor apply_
+
+### Context
+
+Phase 3 of the AI + Plan Change Implementation roadmap. Decisions locked 2026-04-26:
+- 3 reading bands: kids (7-9), tweens (10-12), graduated (13+)
+- Ratchet-only progression — never reverts (graduated > tweens > kids)
+- System-derived from kid_profiles.date_of_birth, never user-set
+- articles.age_band tags every article into kids|tweens|adult
+- Pipeline produces up to 2 articles per kid-safe cluster (one kids, one tweens) — admin tooling presents each band as its own editor
+
+### Cluster — DB migration staged
+
+`Ongoing Projects/migrations/2026-04-27_phase3_age_banding.sql`:
+- `kid_profiles` adds `reading_band text NOT NULL DEFAULT 'kids' CHECK (kids|tweens|graduated)` + `band_changed_at timestamptz` + `band_history jsonb`. Backfill from `date_of_birth` (>= 13 → graduated, 10-12 → tweens, else kids; null DOB defaults kids). First-history entry written with `reason='phase3_backfill_from_dob'`.
+- `kid_profiles` drops vestigial `age_range` column.
+- Drop the 5 `(Kids)` category variants (Science, World, Tech, Sports, Health). Reparent any FK refs (`articles.category_id`, `ai_prompt_overrides.category_id`, `feed_clusters.category_id`) to the matching base category, then DELETE the variant rows.
+- Defensive UPDATE to flag base kid-safe categories `is_kids_safe=true` (Animals, Arts, History, Space, Weather, Health, Science, Technology, World, Sports, Education).
+- `feed_clusters` adds `primary_kid_article_id uuid` + `primary_tween_article_id uuid` FKs to `articles(id)` ON DELETE SET NULL, with partial indexes for non-null lookups.
+- New SQL fn `kid_visible_bands(profile_id)`: returns `text[]` of bands a profile may see (kids → ['kids']; tweens → ['kids','tweens']; graduated → []).
+- New SQL fn `current_kid_profile_id()`: pulls `auth.jwt()->'app_metadata'->>'kid_profile_id'` for kid sessions.
+- Drop + recreate `articles_read_kid_jwt` RLS policy to gate kid SELECT on `is_kid_delegated() AND status='published' AND is_kids_safe=true AND (age_band IS NULL OR age_band = ANY kid_visible_bands(current_kid_profile_id()))`. NULL `age_band` permitted so legacy single-tier kid articles (pre-Phase-3) keep showing.
+
+### Cluster — banded prompts (`web/src/lib/pipeline/editorial-guide.ts`)
+
+Added 8 new banded prompts (kept existing `KID_*` constants exported as-is for reference, no longer used by the route):
+- `KIDS_HEADLINE_PROMPT`, `TWEENS_HEADLINE_PROMPT` — band-voiced headline + summary
+- `KIDS_ARTICLE_PROMPT` (80-120 words, ages 7-9 voice) and `TWEENS_ARTICLE_PROMPT` (120-180 words, ages 10-12 voice). Both output match BodySchema (title/body/word_count/reading_time_minutes).
+- `KIDS_TIMELINE_PROMPT` (4-6 events, max 8-word labels), `TWEENS_TIMELINE_PROMPT` (4-8 events, max 10-word labels).
+- `KIDS_QUIZ_PROMPT`, `TWEENS_QUIZ_PROMPT` — band-appropriate difficulty curves; both unify on `correct_index`.
+
+### Cluster — pipeline route refactor (`web/src/app/api/admin/pipeline/generate/route.ts`)
+
+- Added optional `age_band: 'kids' | 'tweens'` to RequestSchema. Adult runs ignore. Kid runs default to `'tweens'` if omitted (back-compat with the legacy single-tier kid voice).
+- New `effectiveAgeBand` constant (`'kids' | 'tweens' | 'adult'`) derived from input.
+- `headlineSystem`, `bodySystem`, `timelineSystem`, `quizSystem` selectors all branch on `(audience, effectiveAgeBand)` to pick the band-appropriate prompt. Adult selectors unchanged.
+- Persist payload `age_band` field set from `effectiveAgeBand` (was `audience === 'kid' ? 'tweens' : null` in Phase 1).
+- Cluster update extended: when audience='kid' AND age_band='kids' → set `primary_kid_article_id`; band='tweens' → set `primary_tween_article_id`; adult → `primary_article_id` (unchanged). Multiple kid runs against the same cluster (one per band) accumulate across the two FK slots without overwriting each other.
+- `KID_*` constants no longer imported (replaced by `KIDS_*` + `TWEENS_*`).
+
+### Cluster — kid iOS app
+
+- **`VerityPostKids/VerityPostKids/Models.swift`** — `KidProfile` adds `readingBand: String?` (decoded from `reading_band`); drops `ageRange` field (column dropped in migration). New computed `visibleBands` returns `[String]` per the band visibility rule. `KidArticle` adds `ageBand: String?` (decoded from `age_band`).
+- **`VerityPostKids/VerityPostKids/KidsAppState.swift`** — `@Published readingBand: String = "kids"` cached on the state object. New `visibleBands` computed property mirroring server-side logic. `loadKidRow()` query now selects `streak_current, reading_band` and caches both.
+- **`VerityPostKids/VerityPostKids/ArticleListView.swift`** — accepts `visibleBands: [String] = ["kids"]` prop. Article list query adds `.in("age_band", values: bands)` filter (defense-in-depth alongside RLS). Empty bands defaults to `["kids"]`.
+- **`VerityPostKids/VerityPostKids/KidsAppRoot.swift`** — passes `state.visibleBands` to ArticleListView.
+
+### Cluster — admin tooling
+
+- **`web/src/app/admin/kids-story-manager/page.tsx`** — list + refetch + delete-refetch queries scoped to `age_band='kids' OR age_band IS NULL` (NULL surfaces legacy pre-Phase-3 kid content). Article save sets `age_band: 'kids'`.
+- **`web/src/app/admin/tweens-story-manager/page.tsx` (NEW)** — minimal Tweens Story Manager. Status filter chips (all/draft/review/published/archived). Lists `articles` scoped to `is_kids_safe=true AND age_band='tweens'`. Click-through to `/admin/articles/:id` for the actual edit (Phase 1 already consolidated the unified article edit endpoint to handle both audiences via `is_kids_safe`).
+
+### Verification
+
+- `npx tsc --noEmit` clean (one `as never` cast on the Tweens Story Manager `.eq('age_band', ...)` call until generated types regen post-migration; same pattern as Phase 1's `kid_seats_paid` cast).
+- ESLint + Prettier via husky hook clean.
+
+### Files touched (8 + 2 new + 1 migration file)
+
+- `web/src/lib/pipeline/editorial-guide.ts`
+- `web/src/app/api/admin/pipeline/generate/route.ts`
+- `web/src/app/admin/kids-story-manager/page.tsx`
+- NEW: `web/src/app/admin/tweens-story-manager/page.tsx`
+- `VerityPostKids/VerityPostKids/Models.swift`
+- `VerityPostKids/VerityPostKids/KidsAppState.swift`
+- `VerityPostKids/VerityPostKids/ArticleListView.swift`
+- `VerityPostKids/VerityPostKids/KidsAppRoot.swift`
+- NEW: `Ongoing Projects/migrations/2026-04-27_phase3_age_banding.sql`
+
+### Owner action items
+
+1. **Apply migration.** Paste `Ongoing Projects/migrations/2026-04-27_phase3_age_banding.sql` into Supabase SQL editor.
+2. **Regenerate types.** `npm run types:gen` to refresh `web/src/types/database.ts` so `kid_profiles.reading_band` + `articles.age_band` + `feed_clusters.primary_*_article_id` columns appear; the `as never` cast in tweens-story-manager can then be dropped.
+3. **Smoke test:**
+   - Trigger one adult run → verify `articles.age_band='adult'`, no `primary_kid_article_id` set on the cluster.
+   - Trigger one kid run with `age_band='kids'` → verify article in `articles` with `is_kids_safe=true, age_band='kids'`; cluster `primary_kid_article_id` set.
+   - Trigger one kid run with `age_band='tweens'` (or omit, defaults to tweens) → verify article in `articles` with `age_band='tweens'`; cluster `primary_tween_article_id` set.
+   - In kid iOS app, test profile with reading_band='kids' sees only kids articles; profile with reading_band='tweens' sees both kids+tweens.
+
+### What this DOESN'T do (deferred)
+
+- **Server-side band-loop generation** (one API call → both kids+tweens articles). Today this Phase 3 ship requires the operator to call `/api/admin/pipeline/generate` twice (once per band). A future BandedStoryEditor refactor + cluster detail 3-tab view (Phase 6 polish or post-launch) will consolidate.
+- **Phase 4 — DOB correction system** — band ratchet trigger, request form, admin queue. Phase 3 doesn't add the trigger (band can be set freely by service-role writes); Phase 4 locks the ratchet via a DB trigger.
+- **Phase 5 — graduation flow** — birthday cron, parent CTAs, adult-account creation. Today reading_band='graduated' is set by the migration backfill but no UI surfaces the transition.
+- **Reading-level vs reading-band UI** — `kid_profiles.reading_level` (parent-set early/intermediate/advanced) is independent of `reading_band` (system-derived from DOB). The web/iOS forms still show reading_level; future Phase 5/6 polish surfaces both.
+
+---
+
 ## 2026-04-27 (Phase 2 — plan structure rewrite, code shipped + migration staged) — _code shipped; migration staged for owner SQL editor apply_
 
 ### Context
