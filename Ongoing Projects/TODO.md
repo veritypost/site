@@ -32,7 +32,7 @@ Companion files in `Ongoing Projects/`: `CHANGELOG.md` (work history), `SYSTEM_N
 Do not pick up these IDs autonomously. The owner has explicitly reserved them. If the next item in your sweep is on this list, skip it and pick the next non-listed item.
 
 **TODO.md items requiring owner decision/action:**
-- **T2** — Cookie consent banner: CMP choice (Funding Choices vs Cookiebot/Osano vs hand-rolled). Funding Choices needs AdSense console access. AdSense gate not active per memory; queued at start of autonomous run.
+- **T2** — Cookie consent banner: **OWNER DECIDED 2026-04-27 → Funding Choices (option A)**. Implementation deferred until AdSense console access is available; ready to ship as soon as owner signals "go."
 - **T16, T17, T26, T173** — MCP `pg_proc` queries (require DB-read permission grant)
 - **T19** — Home feed prefs: wire vs. delete decision (owner direction)
 - **T20** — iOS expert application schema match (depends on editor process tolerance — owner)
@@ -405,11 +405,12 @@ The numbered items below retain their original section placement for readability
 
 ## LAUNCH BLOCKERS
 
-### T2 — Cookie consent banner missing — AdSense approval blocker — **CRITICAL**
+### T2 — Cookie consent banner missing — AdSense approval blocker — **CRITICAL** (owner decided: Funding Choices)
+**Decision (2026-04-27):** Owner picked **Funding Choices** (option A — free, Google-supported, single-script integration). Implementation deferred until AdSense console access is set up by owner.
 **File:** `web/src/app/layout.js` (verified — only mention of consent is a TODO comment at line 166 about a "consent-gated loader once the CMP is installed"; no `CookieBanner`/`ConsentBanner` component exists anywhere in `web/src/`).
 **Problem:** GA4 + AdSense load unconditionally. AdSense approval is at risk; EU traffic is legally exposed.
-**Fix:** Add a bottom-of-screen consent bar. Gate `ga4-loader`, `ga4-init`, `GAListener`, and the AdSense script on accepted consent. Reject keeps scripts off. Persist decision in localStorage or a cookie.
-**Recommendation:** Use a **TCF v2.2-compliant CMP** (Funding Choices is free and Google-supported, or Cookiebot/Osano). Hand-rolling is a maintenance burden once you ship to multiple jurisdictions. Critical that scripts are gated *before* consent — disclosure copy alone fails GDPR and AdSense audits.
+**Fix when ready:** (1) Owner enables Funding Choices in the Google AdSense / Funding Choices console + selects EEA/UK/CH coverage. (2) Owner provides the publisher ID + script tag from the console. (3) Code adds the script to `web/src/app/layout.js` above the existing `ga4-loader` / `ga4-init` / `GAListener` / AdSense script tags, gated so those scripts only load on accepted consent (Google's Funding Choices supplies the standard consent-state API — `googlefc.callbackQueue.push(...)` or the IAB TCF `__tcfapi`). (4) Persist consent state via the CMP's own cookie (no extra localStorage needed). Reject keeps scripts off. (5) Update `web/src/app/cookies/page.tsx` copy to reflect the live banner (T288 already softened it; replace with truthful "first-visit banner via Funding Choices" once shipped).
+**What I need from owner to ship this:** the publisher ID + the consent-callback shape from the Funding Choices console (different accounts get slightly different snippets). 30-min implementation window once those land.
 
 ---
 
