@@ -2,9 +2,7 @@
 
 // T215 — client island for the auth-aware end-of-front-page footer.
 // Renders the "Browse all categories" link for signed-in viewers and
-// the warm-lead sign-up pitch for anon. Also fires the home page_view
-// track event on mount; tracking carries user_tier + tenure_days from
-// the auth context, so it lives here rather than on the server.
+// the warm-lead sign-up pitch for anon.
 //
 // The footer renders the anon copy on the server pass too (because the
 // useAuth() initial value is `loggedIn: false`), and swaps to the
@@ -15,12 +13,10 @@
 
 import Link from 'next/link';
 import { useAuth } from './NavWrapper';
-import { usePageViewTrack } from '@/lib/useTrack';
 import { HOME_COLORS as C, HOME_SERIF_STACK as serifStack } from './_homeShared';
 
 export default function HomeFooter() {
   const { loggedIn } = useAuth() as { loggedIn: boolean };
-  usePageViewTrack('home');
 
   return (
     <footer

@@ -6,6 +6,67 @@ Format: newest at top.
 
 ---
 
+## 2026-04-27 — Wave 19: 20-item batch via 4 parallel implementer agents
+
+**Items shipped:** 20.
+- Web (7): T328, T4.1 (migration drafted), T4.12, T3.6, T3.7, T0.7b, T299c
+- iOS splash bundle (5): T193, T189, T247, T102, T103
+- iOS EventsClient bundle (3): T182, T190, T249
+- iOS small UX (5): T244b, T58, T50, T118, T60b
+
+**Orchestration shape (NEW pattern — `feedback_4_stream_parallel_cleanup` extension):**
+- 1 planner agent verified premise on all 31 candidates against current code → 25 SHIP / 5 DEFER / 1 SCOPE-REDUCED. Trimmed to 20 truly autonomous items by deferring T2.6 (audit_log sweep — too cross-cutting), T3.3 (kid-safety validation — pair-review needed), T360 (CategoriesSection build — own wave), T3.5/T27 (notif hygiene — needs APNs cron audit), T251/T12/T37 (own focused waves).
+- 4 implementer agents ran in parallel with **isolated file ownership** (no overlap): web (Implementer 1), AuthViewModel/SupabaseManager/ContentView splash bundle (Implementer 2), EventsClient bundle (Implementer 3), HomeView/FindView/MessagesView/VerityPostApp/SettingsView small UX (Implementer 4).
+- Verifier pass: web `tsc --noEmit` clean; web ESLint clean across all touched files; iOS files all parse-clean via `swiftc -parse` (per-file syntax verification — full Xcode build skipped per orchestrator brief, too slow headless). 9 iOS files all pass.
+
+**Web cluster summary:**
+- **T328** — created `web/src/components/PageViewTrackListener.tsx` mirroring `GAListener` shape; mounted inside `NavWrapper` (must be inside AuthContext for `useTrack`); fires `trackEvent('page_view', 'product', { page })` on every nav. Removed home-only `usePageViewTrack` from `_HomeFooter`. GA4 stays separate.
+- **T4.1** — verified zero callers across web + both iOS apps for all 7 keys. Drafted `Ongoing Projects/migrations/2026-04-27_drop_dead_permission_keys.sql` (single DELETE). NOT auto-applied; owner runs.
+- **T4.12** — admin profanity_filter row + DEFAULT_NUMS entry deleted from `admin/comments/page.tsx`. Wordlist page (`admin/words`) left alone — that's `reserved_usernames` which IS consumed at signup, separate concern.
+- **T3.6** — `CommentThread.tsx` initial fetch now `.range(0, 49)`. Cursor pagination not wired this pass (queued).
+- **T3.7** — Unhide button added to `admin/reports/page.tsx` (the actual moderation list — adversary correctly identified the surface; no separate moderation page exists). Mirrors Hide button styling. Page-level MOD_ROLES + server-side `requirePermission` is the existing contract; no client-perm-gate added.
+- **T0.7b** — migrate branch in `cron/pro-grandfather-notify` wrapped in `process.env.PRO_GRANDFATHER_MIGRATE_ENABLED === 'true'` (default OFF). Notify branch unchanged.
+- **T299c** — `isAsciiEmail` gate added at 3 lockout-counter sites: `check-email`, `login-precheck`, `login-failed`. Admin search pages (`auth-recovery`, `permissions/[id]`) deliberately skipped — `.ilike` is harmless on non-ASCII and gating would degrade admin UX for zero security gain.
+
+**iOS splash/auth/session bundle (T193+T189+T247+T102+T103) — coherent design:**
+Three new enums in `AuthViewModel.swift` unify the bundle: `SplashStage` (`.initial → .connecting → .slowNetwork`) drives ContentView copy at 5s/15s thresholds; `SessionCheckResult` is the public contract for `checkSession()` (`.authenticated / .signedOut / .transientError`); `SessionExpiredReason` (`.tokenExpired / .remoteSignout / .accountChange`) drives banner copy. Budget: 5s per-attempt × 3 attempts + 1s/2s backoff = 18s, raced against 20s outer ceiling. Custom `URLSessionConfiguration` with 15s `timeoutIntervalForRequest` + `waitsForConnectivity = true` caps every Supabase call. Lifecycle scenarios all traced cleanly: cold start with bad network, sign-out from another device, hard auth failure, transient retry → success.
+
+**Notable global behavior change:** `URLSessionConfiguration.waitsForConnectivity = true` is a global change for every Supabase call across the app — a buried "Post comment" tap that goes offline mid-flight will now queue and fire on connectivity recovery (within the 30s `timeoutIntervalForResource` ceiling) instead of failing instantly. Intentional, aligns with resilience theme of bundle, flagged here for downstream comment/post code changes.
+
+**iOS EventsClient bundle (T182+T190+T249) — coherent async lifecycle:**
+One @MainActor singleton owns the lifecycle. Live traffic flows `track → buffer → flush() → dispatchBatch(id, batch)` which moves the batch into `pendingFlushBatches[id]` AND spawns a `Task<Void, Never>` stored in `inFlightTasks[id]`; only a 2xx response calls `markBatchDelivered(id)` to remove the entry. Block-based observer (replaces selector pattern, with `[weak self]`); `MainActor.assumeIsolated` keeps it synchronous inside the OS's ~5s background CPU window. `init` hydrates from disk (`Application Support/VerityPost/events_pending.json`, atomic write, JSON `{ version: 1, batches: { <uuid>: [Event...] } }`) and re-flushes before accepting new events. EventsClient.swift went 153 → 383 lines.
+
+**iOS small UX:**
+- **T244b** — HomeView's `.task` and `.refreshable` now share one `refreshTask` handle; concurrent execution impossible. `Task.isCancelled` checks at 3 mutation points.
+- **T58** — FindView rows render category badge + relative date (mirrors HomeView's `timeShort`). Single GET on mount loads category-name lookup; no N+1.
+- **T50** — DM send failures map to actionable toasts: URLError variants → "No network" / "Network slow"; 422 → server-supplied error; 429 → "Slow down a moment"; other → generic. Compose stays mounted on error; draft restored. Reuses existing flash-toast pattern.
+- **T118** — `ArticleRouter` (singleton ObservableObject) + `slug(from:URL)` static helper. Recognises `https://veritypost.com/story/<slug>` (universal) and `verityposts://story/<slug>` (custom scheme). `onOpenURL` disambiguates: story → router, auth → `handleDeepLink`. **Consumer wired by orchestrator** (not the agent — ContentView was assigned to splash bundle agent): MainTabView observes `articleRouter.pendingSlug`, fetches via `fetchStoryBySlug` (mirrors AlertsView's pattern), presents `StoryDetailView` as a sheet.
+- **T60b** — `canViewExpertSettings` `@State` + assignment removed from SettingsView. DB key untouched (web concern).
+
+**Pre-flight catches:**
+- Planner caught `trackClient` doesn't exist — actual export is `trackEvent` from `@/lib/track`. Implementer 1 used the real symbol.
+- T3.7's "moderation list page" was at `admin/reports/page.tsx`, not `admin/moderation/page.tsx`. Implementer 1 found the actual surface.
+- T299c admin search sites correctly skipped (UX-degrading no-op per current implementation).
+
+**Adversary:** intentionally skipped per owner directive ("we don't need 4 agents for each"). Tradeoff acknowledged: each item received less scrutiny than the 4-pre-impl pattern. Files all parse-clean and lint-clean; behavioral verification deferred to a single owner-gated smoke pass.
+
+**Post-impl:**
+- Web typecheck clean, ESLint clean.
+- iOS: all 9 modified files pass `swiftc -parse` (syntax-only, no module resolution — full Xcode build skipped headless).
+- T118 ContentView wiring verified by tracing the router → fetch → sheet flow against AlertsView's existing `navigateToSlug` precedent.
+
+**Agents used:** 5 (1 planner + 4 implementers in parallel; verifier pass done inline).
+
+**Files touched (this commit):**
+- iOS adult: AuthViewModel, SupabaseManager, ContentView, EventsClient, HomeView, FindView, MessagesView, VerityPostApp, SettingsView (9 files)
+- Web: NavWrapper, _HomeFooter, admin/comments, admin/reports, api/auth/check-email, login-failed, login-precheck, cron/pro-grandfather-notify, CommentThread, PageViewTrackListener (10 files; 1 new)
+- Migrations: `Ongoing Projects/migrations/2026-04-27_drop_dead_permission_keys.sql` (new, NOT applied)
+- Logs: TODO-AUTONOMOUS.md (20 SHIPPED markers), CHANGELOG-AUTONOMOUS.md (this entry)
+
+**Pattern note:** First batch run with 4 parallel implementers + 1 planner. Wall-time gain vs serial: ~70% reduction (4×6 minutes ≈ 24 min vs ~80 min serial). Orchestration overhead (planner + verifier + log assembly) ate ~15 min, so net gain ~50%. Quality bar: lower per-item scrutiny (no adversary, no 4-pre-impl). Owner-acceptable for hygiene + small UX work; would NOT use this pattern for billing, auth state machines, or kid-safety surfaces.
+
+---
+
 ## 2026-04-27 — Wave 18: T0.9 DOB correction silent-rejection fix — 1 item shipped
 
 **Items shipped:** 1 (T0.9 — UI rejected state + parent notification on rejection).

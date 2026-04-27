@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { isAsciiEmail } from '@/lib/emailNormalize';
 
 // Pre-flight lockout check before the client-side
 // supabase.auth.signInWithPassword call. Returns a constant-shape response
@@ -27,7 +28,7 @@ export async function POST(request) {
   const rawEmail = typeof body?.email === 'string' ? body.email : '';
   const email = rawEmail.trim().toLowerCase();
 
-  if (!email || !email.includes('@') || email.length > 254) {
+  if (!email || !email.includes('@') || email.length > 254 || !isAsciiEmail(email)) {
     return NextResponse.json({ locked: false });
   }
 

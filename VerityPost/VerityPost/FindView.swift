@@ -18,9 +18,19 @@ struct FindView: View {
     @State private var loading = false
     @State private var errorText: String?
     @State private var hasSearched = false
+    // category_id → display name lookup, populated once on mount so the
+    // result rows can render the category label without an N+1 round trip.
+    @State private var categoryNames: [String: String] = [:]
 
     // Simple debounce: cancel the previous search task when the query changes.
     @State private var searchTask: Task<Void, Never>?
+
+    private static let dateFmtFallback: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US")
+        f.dateFormat = "MMM d"
+        return f
+    }()
 
     var body: some View {
         NavigationStack {
@@ -32,6 +42,7 @@ struct FindView: View {
             .background(VP.bg)
             .navigationTitle("Find")
             .navigationBarTitleDisplayMode(.inline)
+            .task { await loadCategoryNames() }
         }
     }
 
@@ -136,7 +147,8 @@ struct FindView: View {
     }
 
     private func storyRow(_ story: Story) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
+            metaLine(for: story)
             Text(story.title ?? "Untitled")
                 .font(.system(.subheadline, design: .default, weight: .semibold))
                 .foregroundColor(VP.text)
@@ -152,6 +164,65 @@ struct FindView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 12)
+    }
+
+    @ViewBuilder
+    private func metaLine(for story: Story) -> some View {
+        let cat = story.categoryId.flatMap { categoryNames[$0] }
+        let date = relativeDate(story.publishedAt)
+        if cat != nil || date != nil {
+            HStack(spacing: 8) {
+                if let cat {
+                    Text(cat.uppercased())
+                        .font(.system(size: 10, weight: .semibold, design: .serif))
+                        .tracking(1.2)
+                        .foregroundColor(VP.muted)
+                }
+                if cat != nil && date != nil {
+                    Circle()
+                        .fill(VP.muted)
+                        .frame(width: 2, height: 2)
+                }
+                if let date {
+                    Text(date)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(VP.muted)
+                }
+            }
+        }
+    }
+
+    /// Short relative-time helper. Mirrors `HomeView.timeShort` so result
+    /// rows read the same as the front page ("2h ago" / "3d ago" / "Apr 17").
+    private func relativeDate(_ date: Date?) -> String? {
+        guard let date else { return nil }
+        let secs = Date().timeIntervalSince(date)
+        if secs < 60 { return "just now" }
+        let mins = Int(secs / 60)
+        if mins < 60 { return "\(mins)m ago" }
+        let hours = mins / 60
+        if hours < 24 { return "\(hours)h ago" }
+        let days = hours / 24
+        if days < 7 { return "\(days)d ago" }
+        return FindView.dateFmtFallback.string(from: date)
+    }
+
+    // MARK: - Categories
+
+    private func loadCategoryNames() async {
+        guard categoryNames.isEmpty else { return }
+        do {
+            let cats: [VPCategory] = try await client.from("categories")
+                .select()
+                .eq("is_active", value: true)
+                .execute()
+                .value
+            var map: [String: String] = [:]
+            for c in cats { map[c.id] = c.displayName }
+            await MainActor.run { categoryNames = map }
+        } catch {
+            Log.d("FindView category map load failed: \(error)")
+        }
     }
 
     // MARK: - Search

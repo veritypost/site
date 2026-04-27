@@ -6,6 +6,41 @@ import Supabase
 // @migrated-to-permissions 2026-04-18
 // @feature-verified system_auth 2026-04-18
 
+/// Two-stage budget for the launch splash. ContentView reads this to swap
+/// the loading copy (silent → "Connecting…" → slow-network fallback) so a
+/// stalled cold start surfaces progress instead of an indefinite spinner.
+enum SplashStage: Equatable {
+    /// First moments of launch — no copy, just the branded fade-in.
+    case initial
+    /// 5s+ into the session check — show "Connecting…".
+    case connecting
+    /// 15s+ — give the user the choice to keep waiting or use the app anon.
+    case slowNetwork
+}
+
+/// Result of a single session-resolution attempt. `transientError` carries
+/// the underlying URLError so the caller can decide retry-vs-bail; in
+/// practice the splash retries on transient + bails on signedOut.
+enum SessionCheckResult {
+    case authenticated
+    case signedOut
+    case transientError(URLError)
+}
+
+/// Why the session-expired banner is showing. Drives banner copy in
+/// ContentView so the user understands what happened (token refresh
+/// failed mid-session vs. logged-out remotely vs. account-change reauth).
+enum SessionExpiredReason: Equatable {
+    /// Local token expired or refresh failed (network cause, server cause).
+    case tokenExpired
+    /// Server reports the session was revoked elsewhere — another device
+    /// signed out, admin force-signout, or the account was deleted.
+    case remoteSignout
+    /// Account-affecting change (email change, password change from
+    /// elsewhere, MFA enrollment) requires a fresh sign-in.
+    case accountChange
+}
+
 @MainActor
 final class AuthViewModel: ObservableObject {
     @Published var isLoggedIn = false
@@ -47,10 +82,26 @@ final class AuthViewModel: ObservableObject {
     /// so the UI can offer a retry rather than spinning forever.
     @Published var splashTimedOut = false
 
+    /// Two-stage splash budget: ContentView swaps copy as the stage advances
+    /// from `.initial` → `.connecting` (5s) → `.slowNetwork` (15s). The hard
+    /// 20s ceiling lives in `runSessionCheck()`.
+    @Published var splashStage: SplashStage = .initial
+
+    /// Why the session-expired banner is showing. nil hides the banner.
+    /// Set at every signout path: token-refresh failure → `.tokenExpired`,
+    /// remote signout / userDeleted → `.remoteSignout`, deep-link reauth /
+    /// password change confirmation → `.accountChange`.
+    @Published var sessionExpiredReason: SessionExpiredReason?
+
     private let client = SupabaseManager.shared.client
     private var authStateTask: Task<Void, Never>?
     private var subscriptionObserver: NSObjectProtocol?
     private var wasLoggedIn = false
+    /// In-flight guard for `checkSession()`. `retrySession()` cancels this
+    /// before re-entering so a retry tap never races a still-running prior
+    /// attempt (which would otherwise double-fire stage transitions and the
+    /// 20s ceiling).
+    private var sessionCheckTask: Task<Void, Never>?
     // T254 — auto-dismiss timer for the session-expired banner. Cancelled
     // on manual dismiss (xmark / Sign-in tap) and on each new sessionExpired
     // = true so a re-fire restarts the timer cleanly.
@@ -104,7 +155,10 @@ final class AuthViewModel: ObservableObject {
             try? await Task.sleep(nanoseconds: 8 * 1_000_000_000)
             guard let self, !Task.isCancelled else { return }
             await MainActor.run {
-                if self.sessionExpired { self.sessionExpired = false }
+                if self.sessionExpired {
+                    self.sessionExpired = false
+                    self.sessionExpiredReason = nil
+                }
             }
         }
     }
@@ -116,43 +170,227 @@ final class AuthViewModel: ObservableObject {
         sessionExpiredDismissTask?.cancel()
         sessionExpiredDismissTask = nil
         sessionExpired = false
+        sessionExpiredReason = nil
     }
 
     // MARK: - Check session on launch
 
+    /// Splash-time session resolution with a coordinated retry + budget model:
+    ///
+    /// - Per-attempt timeout: 5s. We race the SDK call against a Task.sleep
+    ///   so a stalled radio / DNS hang doesn't burn the entire splash budget
+    ///   on a single attempt.
+    /// - Up to 3 attempts (initial + 2 retries) on transient URLErrors with
+    ///   1s, 2s backoff. Hard signout errors bail immediately.
+    /// - Total ceiling: 20s. The outer race against `Task.sleep(20s)` is the
+    ///   absolute backstop — if we hit it, we drop into `splashTimedOut`
+    ///   regardless of attempt state. Per-attempt 5s × 3 + 1s + 2s = 18s,
+    ///   leaving 2s of slack for backoff jitter and main-thread hops.
+    /// - Stage transitions: `.initial` → `.connecting` at 5s → `.slowNetwork`
+    ///   at 15s. ContentView reads `splashStage` to swap copy.
+    /// - In-flight guard: `sessionCheckTask` prevents `retrySession()` from
+    ///   spawning a parallel run; the prior task is cancelled first.
     func checkSession() async {
-        // Guarantee the splash never hangs forever. After 10s we drop the
-        // loading state and let the UI render (anon mode), exposing a flag
-        // the caller can use to surface a retry affordance.
-        let timeoutTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 10 * 1_000_000_000)
-            guard let self else { return }
+        sessionCheckTask?.cancel()
+        let task = Task { [weak self] in
+            await self?.runSessionCheck()
+        }
+        sessionCheckTask = task
+        await task.value
+    }
+
+    private func runSessionCheck() async {
+        splashStage = .initial
+        splashTimedOut = false
+
+        // Stage advancer — flips splashStage at 5s + 15s. Cancelled in the
+        // defer below regardless of outcome.
+        let stageTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 5 * 1_000_000_000)
             await MainActor.run {
-                if self.isLoading {
-                    self.splashTimedOut = true
-                    self.isLoading = false
-                }
+                guard let self, self.isLoading else { return }
+                if self.splashStage == .initial { self.splashStage = .connecting }
+            }
+            try? await Task.sleep(nanoseconds: 10 * 1_000_000_000)
+            await MainActor.run {
+                guard let self, self.isLoading else { return }
+                self.splashStage = .slowNetwork
             }
         }
+        defer {
+            stageTask.cancel()
+        }
 
-        do {
-            let session = try await client.auth.session
-            await loadUser(id: session.user.id.uuidString)
+        // 20s outer ceiling. Race the retrying attempts against this so a
+        // pathological network state (radio that thinks it has connectivity
+        // but doesn't) can't pin the splash forever.
+        let ceilingTask = Task<SessionCheckResult, Never> {
+            try? await Task.sleep(nanoseconds: 20 * 1_000_000_000)
+            return .transientError(URLError(.timedOut))
+        }
+        let attemptsTask = Task<SessionCheckResult, Never> { [weak self] in
+            await self?.attemptSessionWithRetries() ?? .signedOut
+        }
+
+        let result: SessionCheckResult = await withTaskGroup(of: SessionCheckResult.self) { group in
+            group.addTask { await ceilingTask.value }
+            group.addTask { await attemptsTask.value }
+            let first = await group.next() ?? .signedOut
+            group.cancelAll()
+            return first
+        }
+        ceilingTask.cancel()
+        attemptsTask.cancel()
+
+        switch result {
+        case .authenticated:
+            // attemptSession already loaded the user + flipped isLoggedIn.
             isLoggedIn = true
             wasLoggedIn = true
-        } catch {
+            splashTimedOut = false
+        case .signedOut:
             isLoggedIn = false
+            splashTimedOut = false
+        case .transientError:
+            // Network never recovered within budget — let the UI render
+            // anon mode and offer a retry. Don't claim the user is signed
+            // out, because we genuinely don't know.
+            splashTimedOut = true
         }
-        timeoutTask.cancel()
+
         isLoading = false
-        splashTimedOut = false
+        splashStage = .initial
         startAuthStateListener()
     }
 
-    /// Called from the splash-timeout UI to retry session resolution.
+    /// Run up to 3 session-resolution attempts (initial + 2 retries) with
+    /// 1s, 2s backoff between them. Bails on the first non-transient result.
+    private func attemptSessionWithRetries() async -> SessionCheckResult {
+        let backoffsNs: [UInt64] = [1_000_000_000, 2_000_000_000]
+        for attempt in 0...2 {
+            if Task.isCancelled { return .signedOut }
+            let result = await attemptSession()
+            switch result {
+            case .authenticated, .signedOut:
+                return result
+            case .transientError:
+                if attempt < 2 {
+                    try? await Task.sleep(nanoseconds: backoffsNs[attempt])
+                    continue
+                }
+                return result
+            }
+        }
+        return .signedOut
+    }
+
+    /// Internal result variant that threads the user id back so the outer
+    /// runner can `loadUser` on the MainActor without re-fetching the
+    /// session. `SessionCheckResult` (the public-facing enum) intentionally
+    /// stays minimal per T189's contract.
+    private enum SessionAttempt {
+        case authenticated(uid: String)
+        case signedOut
+        case transientError(URLError)
+    }
+
+    /// Single session-resolution attempt with a 5s race. Discriminates the
+    /// thrown error: `URLError.notConnectedToInternet`, `.timedOut`,
+    /// `.networkConnectionLost` and friends are TRANSIENT (don't sign the
+    /// user out — the session may still be valid, we just couldn't reach
+    /// the server). `AuthError.sessionMissing` is a real signout.
+    private func attemptSession() async -> SessionCheckResult {
+        let attemptTask = Task<SessionAttempt, Never> { [client] in
+            do {
+                let session = try await client.auth.session
+                return .authenticated(uid: session.user.id.uuidString)
+            } catch {
+                return Self.classify(error)
+            }
+        }
+        let timeoutTask = Task<SessionAttempt, Never> {
+            try? await Task.sleep(nanoseconds: 5 * 1_000_000_000)
+            return .transientError(URLError(.timedOut))
+        }
+        let attempt: SessionAttempt = await withTaskGroup(of: SessionAttempt.self) { group in
+            group.addTask { await attemptTask.value }
+            group.addTask { await timeoutTask.value }
+            let first = await group.next() ?? .signedOut
+            group.cancelAll()
+            return first
+        }
+        attemptTask.cancel()
+        timeoutTask.cancel()
+
+        switch attempt {
+        case .authenticated(let uid):
+            await loadUser(id: uid)
+            return .authenticated
+        case .signedOut:
+            return .signedOut
+        case .transientError(let err):
+            return .transientError(err)
+        }
+    }
+
+    /// Map a thrown error from `client.auth.session` onto the attempt enum.
+    /// Anything not explicitly identified as a transient URL/network error
+    /// is treated as `.signedOut` — this matches the prior behavior for
+    /// genuine auth failures (sessionMissing, refresh-token revoked) while
+    /// preserving the transient-vs-real distinction T189 calls for.
+    private static func classify(_ error: Error) -> SessionAttempt {
+        if let urlErr = error as? URLError {
+            switch urlErr.code {
+            case .notConnectedToInternet,
+                 .timedOut,
+                 .networkConnectionLost,
+                 .dnsLookupFailed,
+                 .cannotConnectToHost,
+                 .cannotFindHost,
+                 .internationalRoamingOff,
+                 .callIsActive,
+                 .dataNotAllowed:
+                return .transientError(urlErr)
+            default:
+                break
+            }
+        }
+        // Bare NSURLErrorDomain wrappers can slip through if the SDK boxes
+        // the URLError into an NSError before re-throw. Catch by domain too.
+        let nsError = error as NSError
+        if nsError.domain == NSURLErrorDomain {
+            let transientCodes: Set<Int> = [
+                NSURLErrorNotConnectedToInternet,
+                NSURLErrorTimedOut,
+                NSURLErrorNetworkConnectionLost,
+                NSURLErrorDNSLookupFailed,
+                NSURLErrorCannotConnectToHost,
+                NSURLErrorCannotFindHost,
+                NSURLErrorInternationalRoamingOff,
+                NSURLErrorCallIsActive,
+                NSURLErrorDataNotAllowed,
+            ]
+            if transientCodes.contains(nsError.code) {
+                return .transientError(URLError(URLError.Code(rawValue: nsError.code)))
+            }
+        }
+        if case AuthError.sessionMissing = error {
+            return .signedOut
+        }
+        // Anything else (Postgrest decode failure, server 5xx wrapped as
+        // AuthError.api, etc.) is treated as a hard failure rather than a
+        // transient. Erring on the side of "show login" is safer than
+        // "spin forever on a malformed token".
+        return .signedOut
+    }
+
+    /// Called from the splash-timeout UI to retry session resolution. The
+    /// in-flight guard inside `checkSession()` cancels the prior task so
+    /// stage transitions and the 20s ceiling restart cleanly.
     func retrySession() async {
         isLoading = true
         splashTimedOut = false
+        sessionExpiredReason = nil
         await checkSession()
     }
 
@@ -177,6 +415,15 @@ final class AuthViewModel: ObservableObject {
                     self.isLoggedIn = false
                     self.wasLoggedIn = false
                     if wasSignedIn {
+                        // T103 — discriminate the cause. `userDeleted` is
+                        // unambiguously remote (account deleted server-side
+                        // or admin force-signout). A bare `signedOut` event
+                        // arriving when we never called logout() means the
+                        // local refresh failed: the token expired and could
+                        // not be renewed.
+                        self.sessionExpiredReason = (event == .userDeleted)
+                            ? .remoteSignout
+                            : .tokenExpired
                         self.sessionExpired = true
                         self.scheduleSessionExpiredAutoDismiss()
                     }
@@ -198,6 +445,7 @@ final class AuthViewModel: ObservableObject {
                         self.isLoggedIn = true
                         self.wasLoggedIn = true
                         self.sessionExpired = false
+                        self.sessionExpiredReason = nil
                     }
                 default:
                     break
@@ -573,6 +821,7 @@ final class AuthViewModel: ObservableObject {
         // But surface signOut failures so the server-side session isn't silently left alive.
         wasLoggedIn = false
         sessionExpired = false
+        sessionExpiredReason = nil
         do {
             try await client.auth.signOut()
         } catch {

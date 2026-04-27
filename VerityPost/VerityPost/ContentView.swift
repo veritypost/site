@@ -19,7 +19,10 @@ struct ContentView: View {
             if auth.isLoading {
                 // Splash — branded fade-in. VP tile scales + fades, wordmark
                 // follows at +200ms, ProgressView appears at +500ms so it
-                // never flashes ahead of the branding.
+                // never flashes ahead of the branding. Stage copy:
+                //   .initial — no copy (just branded mark + spinner)
+                //   .connecting (5s+) — "Connecting…"
+                //   .slowNetwork (15s+) — "Network seems slow — keep waiting?"
                 ZStack {
                     VP.bg.ignoresSafeArea()
                     VStack(spacing: 14) {
@@ -46,7 +49,28 @@ struct ContentView: View {
                             .tint(VP.dim)
                             .opacity(splashWordmarkOpacity)
                             .padding(.top, 4)
+
+                        if let copy = splashStageCopy {
+                            Text(copy)
+                                .font(.footnote)
+                                .foregroundColor(VP.dim)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 40)
+                                .padding(.top, 4)
+                                .transition(.opacity)
+                        }
+
+                        if auth.splashStage == .slowNetwork {
+                            Button("Continue without signing in") {
+                                auth.splashTimedOut = true
+                                auth.isLoading = false
+                            }
+                            .font(.footnote)
+                            .foregroundColor(VP.accent)
+                            .padding(.top, 4)
+                        }
                     }
+                    .animation(.easeInOut(duration: 0.25), value: auth.splashStage)
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel("Verity Post. Loading.")
                 }
@@ -136,14 +160,33 @@ struct ContentView: View {
             splashWordmarkOpacity = 1
         }
     }
+
+    /// T102 — copy that surfaces alongside the branded splash once the
+    /// session check has been running long enough that the user might
+    /// reasonably wonder whether anything is happening.
+    private var splashStageCopy: String? {
+        switch auth.splashStage {
+        case .initial: return nil
+        case .connecting: return "Connecting\u{2026}"
+        case .slowNetwork:
+            return "Network seems slow. Keep waiting, or continue without signing in?"
+        }
+    }
 }
 
 // MARK: - Main Tab View — 4-tab layout: Home, Notifications, Most Informed, Profile
 
 struct MainTabView: View {
     @EnvironmentObject var auth: AuthViewModel
+    @EnvironmentObject var articleRouter: ArticleRouter
     @State private var selectedTab: Tab = .home
     @State private var showLogin = false
+    // T118 — story deep-link landing pad. ArticleRouter publishes the
+    // slug; the .onChange below fetches the Story and presents
+    // StoryDetailView as a sheet so the deep-link doesn't have to push
+    // onto a specific tab's nav stack (each tab has its own).
+    @State private var deepLinkStory: Story?
+    private let deepLinkClient = SupabaseManager.shared.client
 
     // IA 2026-04-26 (owner-locked, second pass): bottom bar always shows
     // the same 4 slots — Home / Notifications / Most Informed / Profile —
@@ -236,13 +279,55 @@ struct MainTabView: View {
             // Anon users keep the Profile tab visible (relabelled "Sign up");
             // no auto-redirect to .home on logout.
         }
+        .onChange(of: articleRouter.pendingSlug) { _, slug in
+            guard let slug = slug else { return }
+            articleRouter.pendingSlug = nil
+            Task {
+                if let story = await fetchStoryBySlug(slug) {
+                    deepLinkStory = story
+                }
+            }
+        }
+        .sheet(item: $deepLinkStory) { story in
+            NavigationStack {
+                StoryDetailView(story: story).environmentObject(auth)
+            }
+        }
+    }
+
+    private func fetchStoryBySlug(_ slug: String) async -> Story? {
+        do {
+            let stories: [Story] = try await deepLinkClient.from("articles")
+                .select()
+                .eq("slug", value: slug)
+                .limit(1)
+                .execute().value
+            return stories.first
+        } catch {
+            Log.d("Failed to fetch story by slug:", error)
+            return nil
+        }
     }
 
     // MARK: - Session-expired banner
 
+    /// T103 — branch banner copy on the cause. Falls back to the original
+    /// generic line when the listener fired without setting a reason
+    /// (defensive — every wired signout path now sets one).
+    private var sessionExpiredCopy: String {
+        switch auth.sessionExpiredReason {
+        case .tokenExpired, .none:
+            return "Session expired \u{2014} please sign in."
+        case .remoteSignout:
+            return "Signed out from another device."
+        case .accountChange:
+            return "Account changes detected \u{2014} please sign in again."
+        }
+    }
+
     private var sessionExpiredBanner: some View {
         HStack(spacing: 10) {
-            Text("Your session expired. Please sign in again.")
+            Text(sessionExpiredCopy)
                 .font(.system(.footnote, design: .default, weight: .medium))
                 .foregroundColor(.white)
             Spacer(minLength: 0)

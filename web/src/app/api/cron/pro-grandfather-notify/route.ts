@@ -160,7 +160,13 @@ async function handle() {
     }
 
     // Migrate path
-    if (renewalAt <= migrateBy && notifiedAt && process.env.STRIPE_SECRET_KEY) {
+    // Owner flips this on after engagement-email pipeline ships + notify campaign runs.
+    if (
+      process.env.PRO_GRANDFATHER_MIGRATE_ENABLED === 'true' &&
+      renewalAt <= migrateBy &&
+      notifiedAt &&
+      process.env.STRIPE_SECRET_KEY
+    ) {
       if (!dryRun) {
         try {
           const remote = await stripeRetrieveSubscription(sub.stripe_subscription_id!);

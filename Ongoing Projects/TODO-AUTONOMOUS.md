@@ -83,7 +83,7 @@ See `CHANGELOG-AUTONOMOUS.md` Wave 10. **Adversary saved a half-fix that was sec
 
 **Tier:** T3 (multi-file, multi-route).
 
-## T328 — GA4 + custom-events parallel pipelines — MEDIUM
+## T328 — GA4 + custom-events parallel pipelines — SHIPPED 2026-04-27 (Wave 19)
 
 **Verified:** 2026-04-27 against `web/src/components/GAListener.tsx:45` (GA4 page_view on every route change) + `web/src/app/_HomeFooter.tsx:23` (custom page_view via `usePageViewTrack('home')` only on home).
 **What's wrong:** Two independent pipelines. Story / leaderboard / settings / profile views are captured in GA4 but missing from the custom-events table. Admin dashboard reads custom events (T329) — so half the traffic is invisible to in-product analytics.
@@ -355,13 +355,13 @@ Added shared `SettingsErrorBanner` private component. `NotificationsSettingsView
 
 `NotificationsSettingsView` + `FeedPreferencesSettingsView` `load()` switched from `try?` (swallows) to explicit `do/catch`. On network/decode failure: sets `loadError` + renders retry banner above the form. Form still shows with default values; banner explicitly tells user the data may be stale. (Conservative version vs. the originally-planned full LoadState enum — adversary flagged that hiding the form on first-load could break new accounts.) DM-receipts subsurface (third cited line in original TODO) is in MessagesView, not Settings — not in this bundle. See `CHANGELOG-AUTONOMOUS.md` Wave 4.
 
-## T50 — iOS DM creation/send failures silent — MEDIUM
+## T50 — iOS DM creation/send failures silent — SHIPPED 2026-04-27 (Wave 19)
 
 **Verified:** 2026-04-27 against `MessagesView.swift:1107` (`catch { Log.d("Failed to send: \(error)") }`).
 **Fix:** Map common HTTP failures → actionable copy. Keep compose surface open. Show error toast with retry button.
 **Tier:** T2.
 
-## T58 — iOS Find rows missing category + date — MEDIUM
+## T58 — iOS Find rows missing category + date — SHIPPED 2026-04-27 (Wave 19)
 
 **Verified:** 2026-04-27 against `FindView.swift:138-155`. Result rows render only title + excerpt.
 **Fix:** Add category name + relative date (`"2h ago"` / `"3d ago"`) to each row. Match the iOS `HomeView` story-row pattern.
@@ -399,7 +399,7 @@ Wave 6 pre-flight verified the server side: web's notification creation paths (`
 
 ## iOS — resilience / lifecycle / data-loss
 
-## T102 — iOS splash 10s timeout no slow-network grace — MEDIUM (queued for Wave 5b)
+## T102 — iOS splash 10s timeout no slow-network grace — SHIPPED 2026-04-27 (Wave 19)
 
 **Bundles with:** T189, T247, T193 — all `AuthViewModel.checkSession()` + URLSession config. Adversary flagged a real splash-budget conflict if shipped piecemeal: T193's 15s URLSession timeout + T247's 2x retry backoff = worst case 48s, vs. splash gate at 15s. `retrySession()` doesn't cancel prior `checkSession()`. Must ship together with a single in-flight guard (`sessionCheckTask: Task?` + cancel-on-retry).
 
@@ -408,7 +408,7 @@ Wave 6 pre-flight verified the server side: web's notification creation paths (`
 **Fix:** Two-stage budget: at 5s show "Connecting…"; at 15-20s show fallback. Total 20s ceiling. Differentiate transient (retry) vs no-session.
 **Tier:** T2.
 
-## T103 — iOS session-expired banner generic — MEDIUM
+## T103 — iOS session-expired banner generic — SHIPPED 2026-04-27 (Wave 19)
 
 **Verified:** 2026-04-27 against `ContentView.swift:229`. Hardcoded text.
 **Fix:** Pass cause through `auth.sessionExpiredReason` enum: `.tokenExpired / .remoteSignout / .accountChange`. Banner branches: "Session expired — please sign in" / "Signed out from another device" / "Account changes detected — please sign in again".
@@ -418,7 +418,7 @@ Wave 6 pre-flight verified the server side: web's notification creation paths (`
 
 Wave 3 verification: `@State` per-article scope is the intended design — teaser resets when navigating to a new article. Original TODO claim was wrong. No changes shipped. Closing.
 
-## T118 — iOS adult deep-link no article routing — MEDIUM
+## T118 — iOS adult deep-link no article routing — SHIPPED 2026-04-27 (Wave 19)
 
 **Verified:** 2026-04-27 against `VerityPostApp.swift:15-17`. `auth.handleDeepLink(url)` only handles auth deep-links.
 **Fix:** Branch on URL host: auth deep-links → existing `auth.handleDeepLink`; story deep-links → push StoryDetailView via NavigationStack programmatic push.
@@ -428,7 +428,7 @@ Wave 3 verification: `@State` per-article scope is the intended design — tease
 
 `Task { await PushPermission.shared.refresh() }` added to the existing `.onChange(of: scenePhase)` block in `VerityPostApp.swift` (alongside StoreManager + PermissionService refresh). Cleaner than an in-PushPermission singleton-init observer (avoids the singleton-not-touched-yet timing risk the adversary flagged). See `CHANGELOG-AUTONOMOUS.md` Wave 5a.
 
-## T182 — `EventsClient.shared` observer cleanup — MEDIUM (queued for Wave 5c)
+## T182 — `EventsClient.shared` observer cleanup — SHIPPED 2026-04-27 (Wave 19)
 
 **Bundles with:** T190 + T249 — all `EventsClient.swift`. Adversary flagged: switching from `addObserver(self, selector:...)` to block-based observer + Task hop trades synchronous-on-main for an async hop in the exact 5-second background CPU window the observer exists to use. If kept block-based, must use `MainActor.assumeIsolated` or stay synchronous via the selector pattern.
 
@@ -441,7 +441,7 @@ Wave 3 verification: `@State` per-article scope is the intended design — tease
 
 `PushRegistration.setCurrentUser` now validates non-nil input via `UUID(uuidString:)`. `assertionFailure` in DEBUG, `Log.d` always, early return without mutating state on bad input. Nil input still stores cleanly. See `CHANGELOG-AUTONOMOUS.md` Wave 5a.
 
-## T189 — `checkSession` error type discrimination — MEDIUM (queued for Wave 5b)
+## T189 — `checkSession` error type discrimination — SHIPPED 2026-04-27 (Wave 19)
 
 **Bundles with:** T102 + T247 + T193. See T102 entry for the splash-budget reconciliation requirement.
 
@@ -450,7 +450,7 @@ Wave 3 verification: `@State` per-article scope is the intended design — tease
 **Fix:** Discriminate `URLError.notConnectedToInternet` / `URLError.timedOut` (transient → keep retrying) from `auth.AuthError.sessionMissing` (real signout). Surface error type to caller.
 **Tier:** T2.
 
-## T190 — `Task.detached` analytics flush no cancellation — MEDIUM (queued for Wave 5c)
+## T190 — `Task.detached` analytics flush no cancellation — SHIPPED 2026-04-27 (Wave 19)
 
 **Bundles with:** T182 + T249. See T249 for the bigger persistence-of-in-flight-batch design requirement.
 
@@ -459,7 +459,7 @@ Wave 3 verification: `@State` per-article scope is the intended design — tease
 **Fix:** Store `Task` handle. Await synchronously in `handleBackground` (or cancel + persist on background).
 **Tier:** T2.
 
-## T193 — SupabaseClient timeout config — MEDIUM (queued for Wave 5b)
+## T193 — SupabaseClient timeout config — SHIPPED 2026-04-27 (Wave 19)
 
 **Bundles with:** T102 + T189 + T247. Custom `URLSessionConfiguration(timeoutIntervalForRequest=15, waitsForConnectivity=true)` interacts with the splash retry budget — must be reconciled in the same wave. Also flag: `waitsForConnectivity=true` is a global behavior change (e.g., a buried "Post comment" tap-then-background can fire 14s later — affects every Supabase call).
 
@@ -472,7 +472,7 @@ Wave 3 verification: `@State` per-article scope is the intended design — tease
 
 4 sites updated (HomeView, CategoryDetailView, ProfileView, SettingsView). Each enclosing struct now owns `@State refreshTask: Task<Void, Never>?`; `.refreshable` cancels prior + spawns new + awaits the value (so the spinner stays alive until the load completes). Adversary-flagged pull-vs-`.task` race deferred to T244b. See `CHANGELOG-AUTONOMOUS.md` Wave 5a.
 
-## T247 — iOS splash transient retry — MEDIUM (queued for Wave 5b)
+## T247 — iOS splash transient retry — SHIPPED 2026-04-27 (Wave 19)
 
 **Bundles with:** T102 + T189 + T193. See T102 entry.
 
@@ -481,7 +481,7 @@ Wave 3 verification: `@State` per-article scope is the intended design — tease
 **Fix:** Wrap auth call in Task with explicit timeout. On `URLError`, retry up to 2 times with backoff. Cancel timer on success.
 **Tier:** T2 (combine with T102).
 
-## T249 — `EventsClient.flush` events lost on background-then-kill — MEDIUM (queued for Wave 5c)
+## T249 — `EventsClient.flush` events lost on background-then-kill — SHIPPED 2026-04-27 (Wave 19)
 
 **Bundles with:** T182 + T190. Adversary caught a real design gap in the original plan: `toSend` is captured into the detached Task at flush time and is no longer in `buffer`, so persisting `buffer` on background still loses in-flight events on kill. Correct design: move events into a `pendingFlushBatches: [[Event]]` set keyed by an id; persist the whole set on background; remove on flush success.
 
@@ -617,13 +617,13 @@ Extracted `isSafeAdUrl` to `web/src/lib/adUrlValidation.js` (was inline in POST 
 **Fix:** Tighten signal thresholds. Specifically: change `large_shift > 2y` → `large_shift >= 1y AND direction='younger'` for younger-direction. Require admin review for any younger-direction shift exceeding 1 year.
 **Tier:** T2.
 
-## T3.6 — Comment fetch unbounded — MEDIUM (perf / blast)
+## T3.6 — Comment fetch unbounded — SHIPPED 2026-04-27 (Wave 19)
 
 **Verified:** 2026-04-27 against `web/src/components/CommentThread.tsx:127-135`. `.select('*').eq('article_id', ...)` with no `.limit()`. 50k-comment article = full row blast.
 **Fix:** Initial fetch `.range(0, 49)`; cursor-based load-more pattern. Keep top-N logic for initial render.
 **Tier:** T2.
 
-## T3.7 — `unhide_comment` admin UI missing — LOW (admin gap)
+## T3.7 — `unhide_comment` admin UI missing — SHIPPED 2026-04-27 (Wave 19)
 
 **Verified:** 2026-04-27 — RPC + route exist; no UI button.
 **Fix:** Add Unhide action to admin moderation comment list. Gate on `admin.moderation.comments.unhide` permission.
@@ -650,7 +650,7 @@ Comment edited to remove the false profanity-filter claim; lists only the four f
 
 ### Tier 4 — hygiene / dead code / drift
 
-## T4.1 — Drop 7 dead permission keys — LOW
+## T4.1 — Drop 7 dead permission keys — SHIPPED 2026-04-27 (Wave 19, migration drafted)
 
 **Verified:** 2026-04-27 — REMEDIATION confirmed zero callers for: `kids.bookmark.add`, `kids.bookmarks.add`, `kids.streak.use_freeze` (live key is `kids.streak.freeze.use`), `kids.leaderboard.global_opt_in`, `kids.leaderboard.global.opt_in`, `kids.streak.view_own`, `kids.streaks.view_own`.
 **Fix:** Migration `DELETE FROM permissions WHERE key IN (...)`. Owner applies via SQL editor (small enough to be inline; doesn't need a migration file).
@@ -710,7 +710,7 @@ Pre-flight `npx tsc --noEmit` enumeration grouped the 14 errors into 3 buckets: 
 
 ---
 
-## T299c — Hardener pass on email read-side / lockout sites — LOW (NEW 2026-04-27)
+## T299c — Hardener pass on email read-side / lockout sites — SHIPPED 2026-04-27 (Wave 19)
 
 **Verified:** 2026-04-27 — Wave 9 T299 adversary identified read-side sites that don't write emails but still compare them: `/api/auth/check-email`, `/api/auth/login-precheck`, `/api/auth/login-failed`, admin search at `admin/auth-recovery/page.tsx`, `admin/permissions/page.tsx`, `admin/users/[id]/permissions/page.tsx`. Per-call fixes vary: some need to reject non-ASCII input (pre-T299 Cyrillic stored emails won't be findable via Latin search anyway, so this is post-T299b cleanup); others need consistent canonicalization (lockout-counter keys).
 **Fix:** Walk each cited site post-T299b. Apply `isAsciiEmail` gate or normalize the comparison key, depending on read semantics. Largely cosmetic for security (T299 main ship blocks the actual bypass); this pass closes secondary leaks.
@@ -718,7 +718,7 @@ Pre-flight `npx tsc --noEmit` enumeration grouped the 14 errors into 3 buckets: 
 
 ---
 
-## T244b — iOS `.task` vs `.refreshable` initial-load race — LOW (NEW 2026-04-27)
+## T244b — iOS `.task` vs `.refreshable` initial-load race — SHIPPED 2026-04-27 (Wave 19)
 
 **Verified:** 2026-04-27 — surfaced by Wave 5a T244 adversary review. T244 fixed pull-vs-pull races, but `.task` initial-load and `.refreshable` are still independent: a user pulling-to-refresh while the initial `.task` load is mid-flight gets two parallel writes to the same `@Published` state. Each load function (`loadData`, `refreshAll`, `load`) doesn't guard against concurrent execution.
 **Fix:** Either (A) wrap both `.task` initial load and `.refreshable` with the same `refreshTask` handle, OR (B) add a `loadInFlight: Bool` guard at the top of each load function. (A) is cleaner; (B) is less invasive.
@@ -726,7 +726,7 @@ Pre-flight `npx tsc --noEmit` enumeration grouped the 14 errors into 3 buckets: 
 
 ---
 
-## T0.7b — Park pro-migration migrate branch behind feature flag — LOW (NEW 2026-04-27)
+## T0.7b — Park pro-migration migrate branch behind feature flag — SHIPPED 2026-04-27 (Wave 19)
 
 **Verified:** 2026-04-27 — surfaced by T0.7 adversary review. After T0.7 ship, the notify branch no longer stamps `pro_migration_notified_at`, so the migrate branch (gated on `notifiedAt && STRIPE_SECRET_KEY`) will never fire for NEW users. But any subs already stamped in prod (from prior cron runs) will still auto-migrate at next renewal — silently, without ever having been actually notified.
 **What's wrong:** Memory says engagement-email pipeline is permanently parked. If that's true, the migrate branch is dead code that could fire on legacy state. Better to fully park it behind a flag.
@@ -736,7 +736,7 @@ Pre-flight `npx tsc --noEmit` enumeration grouped the 14 errors into 3 buckets: 
 
 ---
 
-## T60b — Drop unused `canViewExpertSettings` perm gate — LOW (NEW 2026-04-27)
+## T60b — Drop unused `canViewExpertSettings` perm gate — SHIPPED 2026-04-27 (Wave 19)
 
 **Verified:** 2026-04-27 — surfaced by Wave 4 T60 ship. `canViewExpertSettings` is still declared as `@State` and assigned via `PermissionService.shared.has(...)` after the ExpertSettingsView delete; no view consumes it now.
 **Fix:** Remove the `@State` declaration + the assignment line in the `.task(id: perms.changeToken)` block. Don't touch the underlying `expert.settings.view` permission key in DB — that may still be referenced by web (verify via grep before any DB cleanup).
@@ -744,7 +744,7 @@ Pre-flight `npx tsc --noEmit` enumeration grouped the 14 errors into 3 buckets: 
 
 ---
 
-## T4.12 — Admin profanity_filter UI is dead — LOW (NEW 2026-04-27)
+## T4.12 — Admin profanity_filter UI is dead — SHIPPED 2026-04-27 (Wave 19)
 
 **Verified:** 2026-04-27 — surfaced by T3.12 regression hunt. `web/src/app/admin/words/page.tsx` + `web/src/app/admin/comments/page.tsx` expose `profanity_filter` + `profanity_cooldown` toggles to admins. The `post_comment` RPC + `web/src/app/api/comments/route.*` never consult them. Toggling does nothing.
 **What's wrong:** Admin UI lies — admins think they're enabling a filter; the filter doesn't run. Either wire it or delete the UI.

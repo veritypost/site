@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { createEphemeralClient, createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { isAsciiEmail } from '@/lib/emailNormalize';
 
 // DA-092 / F-012 — Records a failed-password attempt for email-level
 // lockout bookkeeping (migration 054). The pre-fix route accepted any
@@ -29,8 +30,11 @@ export async function POST(request) {
   const password = typeof body?.password === 'string' ? body.password : null;
 
   // Missing / malformed body: pretend success so callers cannot probe
-  // for shape differences.
-  if (!email || !password) {
+  // for shape differences. Non-ASCII emails fall into the same bucket —
+  // the write-side ASCII gate (T299) blocks signups, so a non-ASCII
+  // email here can never match a real account; treating it as malformed
+  // keeps the lockout-counter key space ASCII-canonical.
+  if (!email || !password || !isAsciiEmail(email)) {
     return NextResponse.json({ locked: false });
   }
 

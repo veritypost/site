@@ -642,7 +642,6 @@ struct SettingsView: View {
     // Permission gates — mirrored from web SECTIONS tree. Resolved by
     // PermissionService on mount and refreshed when perms.changeToken
     // bumps (admin-driven grants land without a relaunch).
-    @State private var canViewExpertSettings: Bool = false
     @State private var canApplyExpert: Bool = false
     @State private var canEditProfile: Bool = false
     @State private var canEditEmail: Bool = false
@@ -1135,7 +1134,6 @@ struct SettingsView: View {
     // MARK: Loaders
 
     private func loadPerms() async {
-        canViewExpertSettings = await PermissionService.shared.has("settings.expert.view")
         canApplyExpert = await PermissionService.shared.has("expert.application.apply")
         canEditProfile = await PermissionService.shared.has("settings.view")
         canEditEmail = await PermissionService.shared.has("settings.account.edit_email")

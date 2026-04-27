@@ -14,6 +14,7 @@ import {
 import { usePathname } from 'next/navigation';
 import { createClient } from '../lib/supabase/client';
 import AccountStateBanner from '../components/AccountStateBanner';
+import PageViewTrackListener from '../components/PageViewTrackListener';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '../lib/permissions';
 import type { Tables } from '@/types/database-helpers';
 import { Z } from '@/lib/zIndex';
@@ -411,6 +412,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
         tenureDays: daysSince(user?.created_at ?? null),
       }}
     >
+      <PageViewTrackListener />
       {loggedIn && user && <AccountStateBanner user={user} />}
       <div
         style={{

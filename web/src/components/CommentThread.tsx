@@ -124,6 +124,9 @@ export default function CommentThread({
     // since posting won't appear in the batch; the merge below produces
     // `users: null` for them, which the existing `user.username || 'user'`
     // fallback in CommentRow handles.
+    // T3.6 — initial fetch capped at 50 rows to prevent full-row blast on
+    // hot articles. Cursor-based load-more is queued separately; until it
+    // ships, threads beyond 50 rows render the top-50 by quality order.
     const { data: rows, error: loadErr } = await supabase
       .from('comments')
       .select('*')
@@ -132,7 +135,8 @@ export default function CommentThread({
       .is('deleted_at', null)
       .order('is_context_pinned', { ascending: false })
       .order('upvote_count', { ascending: false })
-      .order('created_at', { ascending: true });
+      .order('created_at', { ascending: true })
+      .range(0, 49);
     if (loadErr) {
       setError(loadErr.message);
       setLoading(false);

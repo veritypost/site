@@ -50,8 +50,34 @@ final class SupabaseManager {
         return key
     }()
 
+    /// Shared URLSession used by the Supabase client + every sub-client
+    /// (Auth, Postgrest, Storage, Functions). The OS default `timeoutIntervalForRequest`
+    /// is 60s, which leaves the splash + every other in-flight call hanging for a full
+    /// minute on a stalled radio. 15s is the longest a Supabase call should plausibly
+    /// take; anything longer is a connectivity problem the UI should surface.
+    ///
+    /// `waitsForConnectivity = true` is intentional: when the device is briefly
+    /// offline (e.g., elevator, subway entrance), URLSession queues the request and
+    /// fires it as soon as the radio recovers — instead of failing instantly. This
+    /// is a global behavior change for every Supabase call, but the
+    /// `timeoutIntervalForRequest` ceiling caps the worst case at 15s.
+    private static func makeURLSession() -> URLSession {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 15
+        config.timeoutIntervalForResource = 30
+        config.waitsForConnectivity = true
+        return URLSession(configuration: config)
+    }
+
     lazy var client: SupabaseClient = {
-        SupabaseClient(supabaseURL: supabaseURL, supabaseKey: supabaseKey)
+        let options = SupabaseClientOptions(
+            global: .init(session: SupabaseManager.makeURLSession())
+        )
+        return SupabaseClient(
+            supabaseURL: supabaseURL,
+            supabaseKey: supabaseKey,
+            options: options
+        )
     }()
 
     /// Base URL of the Next.js site. Used when we need to hit server-side API

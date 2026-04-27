@@ -196,8 +196,13 @@ struct HomeView: View {
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarTitleDisplayMode(.inline)
         .task {
+            // T244b — share `refreshTask` with `.refreshable` so a pull-to-refresh
+            // started before the initial load finishes cancels the in-flight task
+            // instead of stacking a second writer onto the same @State.
             today = HomeView.computeToday()
-            await loadData()
+            refreshTask?.cancel()
+            refreshTask = Task { await loadData() }
+            _ = await refreshTask?.value
         }
         .task(id: perms.changeToken) {
             canViewBreakingBanner = await PermissionService.shared.has("home.breaking_banner.view")
@@ -388,7 +393,8 @@ struct HomeView: View {
                 .foregroundColor(VP.dim)
                 .multilineTextAlignment(.center)
             Button {
-                Task { await loadData() }
+                refreshTask?.cancel()
+                refreshTask = Task { await loadData() }
             } label: {
                 Text("Try again")
                     .font(.system(size: 14, weight: .medium))
@@ -439,6 +445,7 @@ struct HomeView: View {
 
     private func loadData() async {
         await SettingsService.shared.loadIfNeeded()
+        if Task.isCancelled { return }
         loading = true
         loadError = nil
         today = HomeView.computeToday()
@@ -477,6 +484,8 @@ struct HomeView: View {
                 .value
 
             let raw = try await storiesReq
+            let breakingFirst = try await breakingReq.first
+            let cats = try await catsReq
             // Hero-pick first, then most-recent. Same logic as web.
             let ranked = raw.sorted { a, b in
                 let aHero = (a.heroPickForDate == today.isoDate) ? 1 : 0
@@ -486,13 +495,19 @@ struct HomeView: View {
                 let bT = b.publishedAt ?? .distantPast
                 return aT > bT
             }
+            // T244b — bail before mutating state so a cancelled task (replaced
+            // by a pull-to-refresh that already kicked off a new fetch) can't
+            // overwrite the newer task's results with its stale payload.
+            if Task.isCancelled { return }
             stories = ranked
-            breakingStory = try await breakingReq.first
-            categories = try await catsReq
+            breakingStory = breakingFirst
+            categories = cats
         } catch {
+            if Task.isCancelled { return }
             Log.d("Home load failed: \(error)")
             loadError = "We couldn’t reach Verity Post. Check your connection."
         }
+        if Task.isCancelled { return }
         loading = false
     }
 

@@ -180,6 +180,23 @@ function ReportsAdminInner() {
     toast.push({ message: 'Comment hidden', variant: 'success' });
   }
 
+  async function unhide() {
+    if (!targetComment) return;
+    setBusy('unhide');
+    const res = await fetch(`/api/admin/moderation/comments/${targetComment.id}/unhide`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    setBusy('');
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      toast.push({ message: d?.error || 'Unhide failed', variant: 'danger' });
+      return;
+    }
+    setTargetComment((prev) => (prev ? { ...prev, status: 'visible' } : prev));
+    toast.push({ message: 'Comment restored', variant: 'success' });
+  }
+
   async function resolve(resolution: 'actioned' | 'dismissed' | 'duplicate') {
     if (!selected) return;
     setBusy('resolve');
@@ -377,7 +394,7 @@ function ReportsAdminInner() {
                     {targetComment.status !== 'hidden' ? (
                       <Button variant="primary" size="sm" onClick={hide} loading={busy === 'hide'}>Hide comment</Button>
                     ) : (
-                      <Badge variant="neutral">Already hidden</Badge>
+                      <Button variant="secondary" size="sm" onClick={unhide} loading={busy === 'unhide'}>Unhide comment</Button>
                     )}
                     {(() => {
                       // C23 mirror — strict outrank: actor must be

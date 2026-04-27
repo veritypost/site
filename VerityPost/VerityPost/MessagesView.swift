@@ -777,6 +777,12 @@ struct DMThreadView: View {
     // Client-side gate on markVisibleMessagesAsSeen — default true
     // preserves always-on behavior.
     @State private var dmReceiptsEnabled: Bool = true
+    // T50 — visible error caption next to the input bar. Mirrors the
+    // parent MessagesView's `threadToast` pattern (auto-dismiss after a
+    // few seconds, single in-flight) so a failed send tells the user
+    // *why* instead of silently restoring the draft.
+    @State private var sendError: String? = nil
+    @State private var sendErrorDismissTask: Task<Void, Never>? = nil
 
     struct Msg: Codable, Identifiable {
         let id: String
@@ -861,28 +867,48 @@ struct DMThreadView: View {
             }
 
             // Input bar
-            HStack(spacing: 8) {
-                TextField("Type a message...", text: $input)
-                    .font(.callout)
+            VStack(spacing: 0) {
+                if let err = sendError {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.circle.fill")
+                            .font(.system(.caption2, design: .default, weight: .semibold))
+                            .foregroundColor(VP.danger)
+                        Text(err)
+                            .font(.system(.caption, design: .default, weight: .medium))
+                            .foregroundColor(VP.danger)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 0)
+                    }
                     .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(VP.bg)
-                    .cornerRadius(20)
-                    .overlay(RoundedRectangle(cornerRadius: 20).stroke(VP.border))
-                    .onSubmit { Task { await send() } }
-
-                Button {
-                    Task { await send() }
-                } label: {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.largeTitle)
-                        .foregroundColor(input.trimmingCharacters(in: .whitespaces).isEmpty ? Color(hex: "CCCCCC") : VP.accent)
+                    .padding(.top, 8)
+                    .padding(.bottom, 4)
                 }
-                .disabled(input.trimmingCharacters(in: .whitespaces).isEmpty || sending)
+
+                HStack(spacing: 8) {
+                    TextField("Type a message...", text: $input)
+                        .font(.callout)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(VP.bg)
+                        .cornerRadius(20)
+                        .overlay(RoundedRectangle(cornerRadius: 20).stroke(VP.border))
+                        .onSubmit { Task { await send() } }
+
+                    Button {
+                        Task { await send() }
+                    } label: {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.largeTitle)
+                            .foregroundColor(input.trimmingCharacters(in: .whitespaces).isEmpty ? Color(hex: "CCCCCC") : VP.accent)
+                    }
+                    .disabled(input.trimmingCharacters(in: .whitespaces).isEmpty || sending)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
             .background(Color(hex: "F7F7F7"))
+            .animation(.easeInOut(duration: 0.2), value: sendError)
         }
         .task(id: conversation.id) { await loadMessages() }
         .task(id: conversation.id) { await subscribeToNewMessages() }
@@ -1050,7 +1076,7 @@ struct DMThreadView: View {
 
         do {
             guard let session = try? await client.auth.session else {
-                await MainActor.run { input = text }
+                await restoreDraft(text, error: "Couldn\u{2019}t send your message. Please try again.")
                 return
             }
             let url = SupabaseManager.shared.siteURL.appendingPathComponent("api/messages")
@@ -1078,9 +1104,8 @@ struct DMThreadView: View {
 
             let (data, response) = try await URLSession.shared.data(for: req)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                // 403 = paid / muted / banned / not-participant,
-                // 429 = rate-limit, 400 = length/validation. Restore draft.
-                await MainActor.run { input = text }
+                let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+                await restoreDraft(text, error: errorMessage(forStatus: status, body: data))
                 return
             }
             let env = try JSONDecoder().decode(Envelope.self, from: data)
@@ -1102,10 +1127,70 @@ struct DMThreadView: View {
                 if !messages.contains(where: { $0.id == msg.id }) {
                     messages.append(msg)
                 }
+                // Clear any prior failure once a send succeeds.
+                clearSendError()
             }
         } catch {
             Log.d("Failed to send: \(error)")
-            await MainActor.run { input = text }
+            await restoreDraft(text, error: errorMessage(for: error))
         }
+    }
+
+    @MainActor
+    private func restoreDraft(_ text: String, error: String) {
+        input = text
+        flashSendError(error)
+    }
+
+    /// Map a transport-layer error (URLError + decode + generic) to copy.
+    private func errorMessage(for error: Error) -> String {
+        if let urlErr = error as? URLError {
+            switch urlErr.code {
+            case .notConnectedToInternet, .networkConnectionLost, .dataNotAllowed:
+                return "No network — your message wasn\u{2019}t sent."
+            case .timedOut:
+                return "Network slow — please try again."
+            default:
+                break
+            }
+        }
+        return "Couldn\u{2019}t send your message. Please try again."
+    }
+
+    /// Map a non-200 HTTP status (+ optional server JSON body) to copy.
+    /// Keeps server-supplied `error` text when present (validation surfaces).
+    private func errorMessage(forStatus status: Int, body: Data) -> String {
+        struct Err: Decodable { let error: String? }
+        let serverMsg = (try? JSONDecoder().decode(Err.self, from: body))?.error
+        switch status {
+        case 422, 400:
+            if let m = serverMsg, !m.isEmpty { return "Couldn\u{2019}t send: \(m)" }
+            return "Couldn\u{2019}t send: that message can\u{2019}t be delivered."
+        case 429:
+            return "Slow down a moment — try again in a minute."
+        case 401, 403:
+            if let m = serverMsg, !m.isEmpty { return "Couldn\u{2019}t send: \(m)" }
+            return "Couldn\u{2019}t send your message. Please try again."
+        default:
+            return "Couldn\u{2019}t send your message. Please try again."
+        }
+    }
+
+    @MainActor
+    private func flashSendError(_ text: String) {
+        sendErrorDismissTask?.cancel()
+        sendError = text
+        sendErrorDismissTask = Task {
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            await MainActor.run {
+                if sendError == text { sendError = nil }
+            }
+        }
+    }
+
+    @MainActor
+    private func clearSendError() {
+        sendErrorDismissTask?.cancel()
+        sendError = nil
     }
 }

@@ -89,7 +89,6 @@ const SETTINGS: SettingGroup[] = [
     { k: 'evolution_filter', l: 'Show Evolved filter', desc: 'Add "Evolved" filter pill in discussion', on: true },
   ]},
   { group: 'Moderation', items: [
-    { k: 'profanity_filter', l: 'Profanity filter', desc: 'Reject comments with profanity', on: true, num: 'profanity_cooldown', unit: 'sec cooldown' },
     { k: 'rate_limit_comments', l: 'Rate limit comments', desc: 'Prevent comment spam', on: true, num: 'comment_rate_sec', unit: 'sec between' },
     { k: 'auto_flag_links', l: 'Auto-flag external links', desc: 'Flag comments with URLs for review', on: false },
     { k: 'firsthand_filter', l: 'Firsthand filter', desc: 'Show filter for verified expert comments', on: true },
@@ -106,7 +105,7 @@ const DEFAULT_NUMS: NumericSettings = {
   replies_shown: 3, collapse_depth: 3,
   health_max: 100, health_lock_threshold: 30,
   max_evolutions: 1,
-  profanity_cooldown: 30, comment_rate_sec: 30,
+  comment_rate_sec: 30,
 };
 
 function CommentsAdminInner() {

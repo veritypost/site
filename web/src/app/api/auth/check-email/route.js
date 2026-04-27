@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { isAsciiEmail } from '@/lib/emailNormalize';
 
 // Pass 17 / UJ-708 — async "is this email taken?" check used by the
 // signup form on email-field blur. Rate-limited per IP (30/hour) to
@@ -11,7 +12,7 @@ import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 export async function GET(request) {
   const url = new URL(request.url);
   const email = (url.searchParams.get('email') || '').trim().toLowerCase();
-  if (!email || !email.includes('@') || email.length > 254) {
+  if (!email || !email.includes('@') || email.length > 254 || !isAsciiEmail(email)) {
     return NextResponse.json({ available: true, checked: false });
   }
 
