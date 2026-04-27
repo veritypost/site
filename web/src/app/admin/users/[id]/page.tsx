@@ -239,9 +239,11 @@ export default function UserDossierPage() {
             <Link href={`/admin/users/${userId}/permissions`} style={{ textDecoration: 'none' }}>
               <Button variant="secondary">Permissions</Button>
             </Link>
-            <Link href={`/u/${user.username || userId}`} style={{ textDecoration: 'none' }}>
-              <Button variant="secondary">View profile</Button>
-            </Link>
+            {user.username ? (
+              <Link href={`/card/${user.username}`} style={{ textDecoration: 'none' }}>
+                <Button variant="secondary">View profile</Button>
+              </Link>
+            ) : null}
           </>
         }
       />

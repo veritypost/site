@@ -65,7 +65,7 @@ function renderBody(body: string, mentions: Mention[] = []): ReactNode[] {
       parts.push(
         <a
           key={idx}
-          href={`/u/${name}`}
+          href={`/card/${name}`}
           style={{ color: 'var(--accent, #111)', fontWeight: 600, textDecoration: 'none' }}
         >
           @{name}

@@ -455,11 +455,6 @@ The numbered items below retain their original section placement for readability
 **Fix:** When `streak_current === 0 && streak_best > 0 && streak_freeze_remaining > 0` → "Your streak ended. Use a freeze to restore it? ([N] remaining)" with one button. Otherwise: "Streak reset — start a new one today."
 **Recommendation:** Mirror the kid surface presentation — already designed and shipping there.
 
-### T15 — User-link surfaces dead-end into kill-switched `/u/[username]` — **CRITICAL** (re-graded — anon-visible, first-impression kill)
-**File:** `web/src/app/u/[username]/page.tsx:17-21` (`PUBLIC_PROFILE_ENABLED = false`); live links from `leaderboard/page.tsx:847-910`, `card/[username]/page.js:264-289`, `CommentRow.tsx:64-72`.
-**Fix:** Until public profiles ship, route those CTAs to `/card/[username]` (already live) or render plain text. If public profiles ARE meant to be live, flip the gate and test end-to-end.
-**Recommendation:** **Don't link to kill-switched routes from live surfaces.** Either gate the link or redirect to a working fallback. Don't leave users hitting placeholders.
-
 ### T16 — DM enforcement gap: `allow_messages` flag may not be honored at recipient — **CRITICAL** *pending MCP verify* (privacy)
 **File:** `web/src/app/api/conversations/route.js:8-17,56-85`, `web/src/app/api/messages/route.js:10-16,32-56` (only sender-side `messages.dm.compose` enforced); `MessagesView.swift:592-615`.
 **Verify first:** Query `pg_proc` for `start_conversation` / `post_message` via MCP — check whether they read `users.allow_messages` for the recipient. If yes, finding collapses to "hide DM CTA when target opts out" (UI fix). If no, this is a real privacy hole.

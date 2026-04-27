@@ -7,6 +7,21 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-26 (T15 — kill-switched /u/[username] linkers redirected to /card/) — _shipped, pushed to git/Vercel_
+
+### T15 — Live surfaces stop dead-ending into the gated public-profile route
+
+- **What** — `web/src/app/u/[username]/page.tsx` is hard-coded `PUBLIC_PROFILE_ENABLED = false` and returns `<UnderConstruction />`. Five live linkers were still pointing at `/u/[username]`, dropping anon visitors and authed users alike onto a placeholder. Per memory rule "Launch-phase hides are temporary — don't delete," the gated page itself stays untouched (one-line flip restores it). Only the external linkers were updated.
+- **5 link surfaces redirected** — `web/src/app/leaderboard/page.tsx:870` (every leaderboard row), `web/src/components/CommentRow.tsx:68` (resolved `@mention` auto-link in every comment thread), `web/src/app/admin/users/[id]/page.tsx:242` (admin "View profile"), `web/src/app/admin/users/[id]/permissions/page.tsx:581` (admin permissions "View profile") — all flipped to `/card/[username]`. `/card/[username]` is fully public (no gate, takes the same `username` param, renders Verity Score + bio + avatar + role badges + top categories).
+- **Card self-link removed entirely** — `web/src/app/card/[username]/page.js:264-289` had a "View full profile" CTA that routed authed viewers from `/card/X` → `/u/X` (dead) and anon viewers through `/signup?next=/u/X` (pre-promising a dead-end). Both paths gone — the card IS the public profile surface; "view full profile" was redundant and outright broken. Per memory rule "Genuine fixes, never patches": killed the loop, removed the dead `viewerIsAuthed` state + its `setViewerIsAuthed(!!user)` setter that had no remaining consumer.
+- **Admin null-username guard** — admin linkers previously fell back to `userId` if `username` was null (`/u/${user.username || userId}`). `/card/<uuid>` would 404, so the link is now conditionally rendered only when `username` exists (`{user.username ? <Link.../> : null}`). Two admin pages updated.
+- **Followers/following list inside the gated page (line 684)** intentionally NOT touched — it's behind the `PUBLIC_PROFILE_ENABLED=false` gate and never renders. Editing it would be busy-work.
+- **iOS unaffected** — no Swift code generates `/u/<username>` URLs (verified via grep across `VerityPost/`); references in `PublicProfileView.swift` are comments documenting web parity, not URL builders.
+- **Files** — `web/src/app/leaderboard/page.tsx`, `web/src/components/CommentRow.tsx`, `web/src/app/admin/users/[id]/page.tsx`, `web/src/app/admin/users/[id]/permissions/page.tsx`, `web/src/app/card/[username]/page.js`.
+- **Why** — TODO graded T15 CRITICAL (re-graded HIGH→CRITICAL because the leaderboard is anon-visible and "View profile" → placeholder is a first-impression killer for cold visitors, plus comment `@mention` auto-linking propagates the dead-end into every article's discussion).
+
+---
+
 ## 2026-04-26 (T7 — iOS profile editor silent-bio-overwrite fix) — _shipped, pushed to git/Vercel_
 
 ### T7 — iOS profile editor was wiping web-set bio on every save

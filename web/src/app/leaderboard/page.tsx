@@ -867,7 +867,7 @@ function LeaderRow({
   showVerityScore = false,
   isPodium = false,
 }: LeaderRowProps) {
-  const profileHref = u.username ? `/u/${u.username}` : null;
+  const profileHref = u.username ? `/card/${u.username}` : null;
   return (
     <div
       style={{

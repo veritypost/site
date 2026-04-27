@@ -33,23 +33,14 @@ export default function CardPage() {
   const [roles, setRoles] = useState([]);
   const [state, setState] = useState('loading');
   const [copied, setCopied] = useState(false);
-  // Q1 — card is fully public. We still track viewer auth so the
-  // "View full profile" CTA can route anon visitors through signup
-  // (with `next` preserved) while authed viewers go straight to /u/<name>.
-  const [viewerIsAuthed, setViewerIsAuthed] = useState(false);
 
   useEffect(() => {
     (async () => {
-      // Q1 — card is fully public. No viewer-side permission check:
+      // Card is fully public. No viewer-side permission check:
       // `profile.card.view` was removed as a gate because crawlers and
       // anon recipients of shared card links must be able to render the
       // card and its OG image. Target-side checks (user exists, not
       // deleted, not `profile_visibility='private'`) remain below.
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      setViewerIsAuthed(!!user);
-
       const { data: targetRow } = await supabase
         .from('users')
         .select(
@@ -260,33 +251,6 @@ export default function CardPage() {
               ))}
             </div>
           )}
-
-          {/* Q1 — auth-aware profile link. Authed viewers go directly to
-           *  /u/<username>; anon viewers get bounced to /signup with the
-           *  profile URL in `next` so they land on the intended profile
-           *  after account creation (whenever /signup starts honoring
-           *  `next` — see tracker for the pre-existing gap). */}
-          <a
-            href={
-              viewerIsAuthed
-                ? `/u/${target.username}`
-                : `/signup?next=${encodeURIComponent(`/u/${target.username}`)}`
-            }
-            style={{
-              display: 'block',
-              textAlign: 'center',
-              padding: '10px 0',
-              background: C.text,
-              color: '#fff',
-              borderRadius: 8,
-              fontSize: 13,
-              fontWeight: 600,
-              textDecoration: 'none',
-              marginBottom: 8,
-            }}
-          >
-            View full profile
-          </a>
 
           <button
             onClick={copyLink}

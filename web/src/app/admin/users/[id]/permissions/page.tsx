@@ -578,9 +578,11 @@ export default function UserPermissionsPage() {
             <Link href={`/admin/users/${userId}`} style={{ textDecoration: 'none' }}>
               <Button variant="secondary">View dossier</Button>
             </Link>
-            <Link href={`/u/${targetUser?.username || userId}`} style={{ textDecoration: 'none' }}>
-              <Button variant="secondary">View profile</Button>
-            </Link>
+            {targetUser?.username ? (
+              <Link href={`/card/${targetUser.username}`} style={{ textDecoration: 'none' }}>
+                <Button variant="secondary">View profile</Button>
+              </Link>
+            ) : null}
           </>
         }
       />
