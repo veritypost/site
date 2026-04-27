@@ -499,10 +499,6 @@ The numbered items below retain their original section placement for readability
 **Fix:** Weekly cron diffs each user's rank vs 7 days ago. In-app notification (not push) for moves of 3+ spots, top-10 entry/exit. Cap at 1/week.
 **Recommendation:** **Don't push** — rank changes are check-in-worthy, not ping-worthy. In-app surface only.
 
-### T57 partial — Stripe price mint endpoint shipped; admin UI button still pending — **MEDIUM**
-**Status:** `web/src/app/api/admin/plans/[id]/mint-stripe-price/route.js` shipped 2026-04-27 — POST `/api/admin/plans/[id]/mint-stripe-price` calls Stripe `prices.create` with idempotency-key + lookup_key, writes back `stripe_price_id`. Refuses to mint if a price already exists, requires `price_cents > 0`, requires `billing_period IN ('month','year')`. Admin role-gated (`admin.plans.edit`). Audit row written.
-**Still pending:** add a "Mint Stripe price" button to `web/src/app/admin/plans/page.tsx` so the route is callable from the UI without curl. Cheap follow-up — ~10 lines of JSX next to the existing "Save pricing" button, conditional on `!plan.stripe_price_id`.
-
 ---
 
 ## LOW — opportunistic
@@ -585,9 +581,9 @@ Source: `Ongoing Projects/2026-04-27_AUTH_PERMS_SYSTEM_MAP.md`. 4 parallel Explo
 **File:** `web/src/app/api/auth/signup/route.js:57`. `.ilike('email', email)` does ASCII case-folding only — Unicode homoglyphs (Cyrillic 'а' U+0430 vs Latin 'a' U+0061) bypass the banned-account match.
 **Fix:** NFKD-normalize both sides before compare; or use a homoglyph-aware library; or normalize at insert time so the DB only stores canonical form. 5-line change.
 
-#### T300 — Public-profile column-level leakage on `users` table — **CRITICAL** (privacy/PII)
-**File:** RLS policy on `users` is row-level: `id=auth.uid() OR profile_visibility='public' OR is_admin_or_above()`. When `profile_visibility='public'`, the entire row is readable via PostgREST `from('users').select('*')` — including `email, plan_id, stripe_customer_id, comped_until, cohort, frozen_at`, all kill-switch flags.
-**Fix:** Either (a) SECURITY DEFINER view `public_profiles_v` with whitelisted columns + RLS-revoke direct SELECT on `users`, or (b) split into a `public_profile` view + private internal `users` table. T5 schema change — halt and queue migration for owner.
+#### T300 partial — public-profile column-level leak migration drafted — **CRITICAL** (privacy/PII)
+**Migration drafted 2026-04-27** at `Ongoing Projects/migrations/2026-04-27_T300_public_profile_view.sql`. Creates `public_profiles_v` SECURITY DEFINER view with whitelisted columns (no email/plan_id/stripe_customer_id/cohort/frozen_at/etc.); revokes anon SELECT on `public.users`; tightens RLS policies on `public.users` to `id=auth.uid()` (self) + `is_admin_or_above()` (admin) only.
+**Caller-side sweep required AFTER apply (separate code commit BEFORE deploy):** swap `supabase.from('users').select(...)` to `from('public_profiles_v')` in `/u/[username]/page.tsx`, `/card/[username]/*`, `/leaderboard/page.tsx`, `CommentThread.tsx` author joins, iOS `PublicProfileView.swift`. Self-row reads in `/profile/page.tsx` + `NavWrapper.tsx` keep using `from('users')` (RLS allows `id=auth.uid()` through). Admin reads via service-role unchanged. Apply order: branch → caller sweep deployed → merge.
 
 #### T301 partial — Kids-security follow-up (parent confirmation + first-pair alert) — **HIGH** (kids security)
 **Status:** TTL reduced 7d → 24h shipped 2026-04-27 (`web/src/app/api/kids/pair/route.js:24`). Two follow-up defenses still pending:
@@ -638,9 +634,6 @@ These items live in `web/src/app/redesign/*` (currently dev-mounted at `localhos
 **File:** `web/src/app/redesign/_components/PrivacyCard.tsx:168` writes `'hidden'`; `PublicProfileSection.tsx:75` writes `'public'|'private'`. Saving in either surface flips the other unexpectedly.
 **Fix:** Unify — PublicProfileSection reads `'hidden'` as a third tri-state (render read-only with link to PrivacyCard) OR expose the same tri-state.
 
-#### T333 partial — middleware NODE_ENV guard shipped; redesign ProfileApp still pending — **LOW** (defense-in-depth)
-**Status:** `web/src/middleware.js` `_isRedesignPort` check now `&&`'s `process.env.NODE_ENV !== 'production'` — shipped 2026-04-27. The mirror in `web/src/app/redesign/profile/_components/ProfileApp.tsx:117-121` is in the untracked redesign tree; ships with the redesign-cutover commit (T357).
-
 #### T335 — `Field.tsx` declares CSS transitions but never wires `:focus`/`:hover` — **HIGH** (a11y)
 **File:** `web/src/app/redesign/_components/Field.tsx:62`. Transition rule present; `focusRing` helper exists in `palette.ts:124` but isn't applied. Keyboard users get no focus feedback in any settings card.
 **Fix:** Add `onFocus`/`onBlur` handlers toggling `boxShadow: SH.ring`; `:hover` background changes for button variants.
@@ -651,14 +644,6 @@ These items live in `web/src/app/redesign/*` (currently dev-mounted at `localhos
 #### T337 — Native `window.confirm()` in 3 redesign components — **MEDIUM** (visual consistency)
 **File:** `web/src/app/redesign/_components/BillingCard.tsx`, `MFACard.tsx`, `SessionsSection.tsx`. Inconsistent with the rest of the redesign's modal style.
 **Fix:** Replace with `Card variant="danger"` pattern already used by Hidden lockdown confirm.
-
-#### T339 — `as never` casts on Avatar in PrivacyCard + BlockedSection — **MEDIUM** (type safety)
-**File:** `web/src/app/redesign/_components/PrivacyCard.tsx:492` and `BlockedSection.tsx:123`. Avatar receivers may be null → silent broken-avatar fallback.
-**Fix:** Define proper `AvatarUser` type; explicit null guard.
-
-#### T341 — `YouSection` action cards drive users out of profile — **MEDIUM** (retention)
-**File:** `web/src/app/redesign/profile/YouSection.tsx:86-119`. ActionCards link to `/`, `/bookmarks`, `/messages`, `/expert-queue`, `/profile/family` — primary abandonment vector for users who came to edit profile.
-**Fix:** Replace with profile-internal CTAs ("Polish your profile: avatar / bio / privacy"); move outbound nudges into a discrete onboarding card only when `articles_read_count === 0`.
 
 ### Architectural / sequencing concerns surfaced from system map (non-finding considerations)
 

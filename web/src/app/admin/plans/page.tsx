@@ -188,6 +188,38 @@ export default function PlansAdmin() {
     toast.push({ message: 'Pricing saved', variant: 'success' });
   };
 
+  // T57 — mint a Stripe price for the selected plan. Only callable when
+  // stripe_price_id is empty; the route refuses re-mint to avoid
+  // double-billing surprises.
+  const [mintingStripe, setMintingStripe] = useState(false);
+  const mintStripePrice = async () => {
+    if (!selected) return;
+    setMintingStripe(true);
+    const res = await fetch(`/api/admin/plans/${selected.id}/mint-stripe-price`, {
+      method: 'POST',
+    });
+    setMintingStripe(false);
+    const j = (await res.json().catch(() => ({}))) as {
+      ok?: boolean;
+      stripe_price_id?: string;
+      error?: string;
+    };
+    if (!res.ok || !j.ok) {
+      toast.push({
+        message: `Mint failed: ${j.error || res.statusText}`,
+        variant: 'danger',
+      });
+      return;
+    }
+    const newId = j.stripe_price_id;
+    if (newId) {
+      setPlans((prev) =>
+        prev.map((p) => (p.id === selected.id ? { ...p, stripe_price_id: newId } : p))
+      );
+    }
+    toast.push({ message: 'Stripe price minted', variant: 'success' });
+  };
+
   const upsertFeature = async (feature: PlanFeature, patch: Partial<PlanFeature>): Promise<boolean> => {
     setSavingFeatureKey(feature.feature_key);
     const row = {
@@ -521,7 +553,20 @@ export default function PlansAdmin() {
                   </div>
                 )}
 
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: S[2] }}>
+                  {/* T57 — mint Stripe price button. Only shown when the
+                      plan doesn't have a stripe_price_id yet. The route
+                      refuses re-mint to avoid double-billing. */}
+                  {!selected.stripe_price_id ? (
+                    <Button
+                      variant="secondary"
+                      loading={mintingStripe}
+                      disabled={!selected.price_cents || !selected.billing_period}
+                      onClick={mintStripePrice}
+                    >
+                      Mint Stripe price
+                    </Button>
+                  ) : null}
                   <Button
                     variant={planDirty ? 'primary' : 'secondary'}
                     loading={savingPlan}
