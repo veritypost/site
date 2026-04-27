@@ -63,6 +63,8 @@ import { SkeletonBar } from '@/components/admin/SkeletonRow';
 import { ADMIN_C_LIGHT, F, S } from '@/lib/adminPalette';
 
 import type { Tables, DbClient } from '@/types/database-helpers';
+import BetaStatusBanner from '@/components/profile/BetaStatusBanner';
+import InviteFriendsCard from '@/components/profile/InviteFriendsCard';
 
 // ---------------------------------------------------------------------------
 // Permission keys
@@ -773,6 +775,12 @@ function SettingsInner(): ReactElement {
 
         {/* Content */}
         <main style={{ minWidth: 0 }}>
+          {/* Beta cohort status banner — verify-locked / soft-warning / nag */}
+          <BetaStatusBanner user={userRow as Parameters<typeof BetaStatusBanner>[0]['user']} />
+
+          {/* Invite friends — beta-cohort users see their 2 referral slugs */}
+          {userRow?.cohort === 'beta' && <InviteFriendsCard />}
+
           {/* 1. Account */}
           {(() => {
             const hasAny =

@@ -5,6 +5,11 @@ import { NextResponse } from 'next/server';
 import { resolveNext, resolveNextForRedirect } from '@/lib/authRedirect';
 import { getSiteUrl } from '@/lib/siteUrl';
 import { scoreDailyLogin } from '@/lib/scoring';
+import { processSignupReferralAndCohort } from '@/lib/referralProcessing';
+import { getClientIp } from '@/lib/rateLimit';
+import { checkSignupGate } from '@/lib/betaGate';
+import { REF_COOKIE_NAME } from '@/lib/referralCookie';
+import { cookies } from 'next/headers';
 
 // F-038 — IdP-supplied `display_name` and `avatar_url` used to flow
 // straight into users/auth_providers. A hostile IdP (or a malicious
@@ -67,11 +72,33 @@ export async function GET(request) {
 
     const { data: existing } = await supabase
       .from('users')
-      .select('id, username, onboarding_completed_at')
+      .select('id, username, onboarding_completed_at, email_verified')
       .eq('id', user.id)
       .maybeSingle();
 
     if (!existing) {
+      // Closed-beta gate for new OAuth signups. The session was already
+      // exchanged (auth.users row exists in supabase auth), but we
+      // refuse to create the public.users row + role + auth_provider
+      // entries unless a valid vp_ref cookie is present. The auth.users
+      // record is rolled back via deleteUser so the email isn't
+      // reserved indefinitely, and we redirect to /beta-locked. This
+      // mirrors the email-signup gate.
+      const gateService = createServiceClient();
+      const cookieJar = await cookies();
+      const refCookie = cookieJar.get(REF_COOKIE_NAME)?.value;
+      const gate = await checkSignupGate(gateService, refCookie);
+      if (!gate.allowed) {
+        try {
+          await gateService.auth.admin.deleteUser(user.id);
+        } catch (e) {
+          console.error('[auth.callback] gate-deny: deleteUser failed:', e);
+        }
+        return NextResponse.redirect(
+          `${siteUrl}/beta-locked?reason=${encodeURIComponent(gate.reason)}`
+        );
+      }
+
       const provider = user.app_metadata?.provider || 'unknown';
       const meta = user.user_metadata || {};
       const safeDisplayName = sanitizeDisplayName(meta.full_name || meta.name || null);
@@ -150,13 +177,27 @@ export async function GET(request) {
         console.error('[callback] scoreDailyLogin threw', e);
       }
 
-      // Validate rawNext before forwarding so we don't ship an
-      // open-redirect through the onboarding chain. `resolveNext` rejects
-      // `//evil.com`, backslash tricks, Unicode slash homoglyphs, and
-      // anything non-same-origin; null return = no next to preserve.
+      // Beta cohort grant + referral redemption for new OAuth signups.
+      // OAuth users have email_confirmed_at set by the IdP, so they hit
+      // the email_verified=true branch in apply_signup_cohort and get
+      // Pro immediately even on user-tier referral links.
       const validatedNext = resolveNext(rawNext, null);
       const nextQs = validatedNext ? `?next=${encodeURIComponent(validatedNext)}` : '';
-      return NextResponse.redirect(`${siteUrl}/signup/pick-username${nextQs}`);
+      const oauthRedirect = NextResponse.redirect(`${siteUrl}/signup/pick-username${nextQs}`);
+      try {
+        const ip = await getClientIp();
+        await processSignupReferralAndCohort(
+          service,
+          user.id,
+          user.email || null,
+          request,
+          oauthRedirect,
+          ip
+        );
+      } catch (e) {
+        console.error('[auth.callback] referral processing threw:', e);
+      }
+      return oauthRedirect;
     }
 
     // D40: silent welcome-back — if the account is still inside the 30-day
@@ -179,6 +220,20 @@ export async function GET(request) {
     try {
       await serviceForExisting.rpc('cancel_account_deletion', { p_user_id: user.id });
     } catch {}
+
+    // Email-verify completion event: this is the email-confirm callback
+    // that flipped email_verified from false to true. Promotes a deferred
+    // beta-cohort signup into Pro, clears verify_locked_at, mints the
+    // user's 2 referral slugs. Idempotent; safe to call repeatedly. Only
+    // runs on the actual transition so we don't bump perms_version on
+    // every login.
+    if (user.email_confirmed_at && existing.email_verified === false) {
+      try {
+        await serviceForExisting.rpc('complete_email_verification', { p_user_id: user.id });
+      } catch (e) {
+        console.error('[auth.callback] complete_email_verification threw:', e);
+      }
+    }
 
     // Y2 / scoring: award `daily_login` (1 pt, max_per_day=1) and advance
     // the streak. Both are idempotent per local-day; failure must not

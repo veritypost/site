@@ -6,6 +6,10 @@ import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import { validatePasswordServer } from '@/lib/password';
 import { getSiteUrl } from '@/lib/siteUrl';
 import { trackServer } from '@/lib/trackServer';
+import { processSignupReferralAndCohort } from '@/lib/referralProcessing';
+import { checkSignupGate } from '@/lib/betaGate';
+import { REF_COOKIE_NAME } from '@/lib/referralCookie';
+import { cookies } from 'next/headers';
 
 export async function POST(request) {
   try {
@@ -38,6 +42,24 @@ export async function POST(request) {
         { error: 'Too many signup attempts' },
         { status: 429, headers: { 'Retry-After': '3600' } }
       );
+    }
+
+    // Closed-beta gate: during beta_active=true, signup requires a valid
+    // vp_ref cookie pointing at an active referral code (owner or user
+    // tier). Existing authenticated users log in unaffected — only new
+    // signup is gated. Returns 403 with redirect_to=/beta-locked so the
+    // client can route the user to the request-access page.
+    {
+      const service = createServiceClient();
+      const cookieJar = await cookies();
+      const refCookie = cookieJar.get(REF_COOKIE_NAME)?.value;
+      const gate = await checkSignupGate(service, refCookie);
+      if (!gate.allowed) {
+        return NextResponse.json(
+          { error: 'Signup is invite-only', reason: gate.reason, redirect_to: '/beta-locked' },
+          { status: 403 }
+        );
+      }
     }
 
     const siteUrl = getSiteUrl();
@@ -186,7 +208,20 @@ export async function POST(request) {
       });
     }
 
-    return NextResponse.json({ user: authData.user, needsEmailConfirmation });
+    // Beta cohort grant + referral redemption. Cookie cleared first
+    // unconditionally; never blocks signup. Owner-tier links grant Pro
+    // immediately; user-tier and direct signups defer Pro until email
+    // verification fires complete_email_verification().
+    const response = NextResponse.json({ user: authData.user, needsEmailConfirmation });
+    if (userId) {
+      try {
+        const service = createServiceClient();
+        await processSignupReferralAndCohort(service, userId, email, request, response, ip);
+      } catch (e) {
+        console.error('[auth.signup] referral processing threw:', e);
+      }
+    }
+    return response;
   } catch (err) {
     console.error('[signup]', err);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
