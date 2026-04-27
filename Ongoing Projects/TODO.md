@@ -417,11 +417,6 @@ The numbered items below retain their original section placement for readability
 
 ## HIGH — close before launch quality bar
 
-### T12 — iOS comment threading missing — **HIGH**
-**File:** `VerityPost/VerityPost/StoryDetailView.swift:2371` (TODO comment: "parent_id is omitted here — iOS UI doesn't expose threaded reply yet"); `parent_id` IS fetched at lines 1921, 2077.
-**Fix:** Surface a Reply button per comment. Indent replies (left border). Pass `parent_id` on submit.
-**Recommendation:** Web has it; data is already there. One-session task. **DB plumbing already done.**
-
 ### T14 — Streak break on adult profile shows "0d" with no recovery offer — **HIGH** (DB-WORK-PARTIAL)
 **Note 2026-04-26:** Full fix needs a `use_streak_freeze` RPC + endpoint (T5 schema work, halt-and-queue per runbook). Only `use_kid_streak_freeze` exists. Half the value (the "Streak reset — start a new one today" branch) can ship as a UI-only copy edit; the freeze-restore branch is queued.
 **File:** `web/src/app/profile/page.tsx:700-701`, `VerityPost/VerityPost/ProfileView.swift:495`
@@ -429,39 +424,11 @@ The numbered items below retain their original section placement for readability
 **Fix:** When `streak_current === 0 && streak_best > 0 && streak_freeze_remaining > 0` → "Your streak ended. Use a freeze to restore it? ([N] remaining)" with one button. Otherwise: "Streak reset — start a new one today."
 **Recommendation:** Mirror the kid surface presentation — already designed and shipping there.
 
-### T18 — iOS email change bypasses hardened server flow — **HIGH** (re-scoped: under magic-link, "change email" sends a confirm-link to the new address; no password to verify)
-**File:** `VerityPost/VerityPost/SettingsView.swift:1391-1452` (calls `client.auth.update(user: UserAttributes(email:))` directly).
-**Problem:** Skips `/api/auth/email-change` rate limit, audit, and the `users.email_verified = false` flip. iOS profile gating reads `email_verified` — user can change email and stay treated as verified.
-**Fix:** Route iOS email changes through `/api/auth/email-change`, then reload the user record on success.
-**Recommendation:** Same pattern as T5 (route through hardened server endpoint). **One canonical server-owned path** for any auth-state mutation.
-
 ### T19 — Home feed preferences are decorative on both web and iOS — **HIGH** (truth-in-UI)
 **File:** `web/src/app/profile/settings/page.tsx:2682-2778,2783-2878` + iOS `SettingsView.swift:2044-2142`; readers `web/src/app/page.tsx:12-19,176-257` and `HomeView.swift:7-12,118-190` never consume them.
 **Problem:** Settings save `users.metadata.feed` flags (preferred categories, `showBreaking`, `showTrending`, `showRecommended`, `minScore`, display mode). Home reads zero of them. Save success message is a lie.
 **Fix:** Either (a) keep the editorial hero, but bias supporting slots based on category preferences + `minScore` / `kidSafe` filters, or (b) **remove the settings cards** if the product is intentionally editorial-only.
 **Recommendation:** **Decision required from owner.** Don't promise personalization you don't deliver. If editorial-only is the answer, ship the deletion this week. If personalization is on roadmap, keep + relabel as "Coming soon" with the cards disabled.
-
-### T20 — iOS verification application underspecified vs web — **HIGH** (silent failure)
-**File:** `VerityPost/VerityPost/SettingsView.swift:1013-1021,2148-2324` (sends `application_type`, `full_name`, `organization`, `title`, `bio`, `social_links`, `portfolio_urls`); web sends those + `expertise_areas`, `credentials`, `category_ids`, 3 `sample_responses`.
-**Problem:** iOS creates incomplete applications editors can't review properly, OR the RPC rejects and iOS only logs the non-200 with no user signal.
-**Fix:** Match the web contract. Also surface failure inline — keep the form open with an error banner, don't dismiss silently.
-**Recommendation:** Single `expert_application_payload` schema in `web/src/types/database.ts` should be the source of truth — both surfaces validate against it.
-
-### T22 — iOS social signup (Apple/Google) skips pick-username step — **RE-SCOPED** (no social; pick-username step still required for first-time magic-link signup)
-**File:** `VerityPost/VerityPost/AuthViewModel.swift:587-599,616-667` (calls `loadUser()` and routes by `needsOnboarding`); web `api/auth/callback/route.js:153-160,195-199` forces `/signup/pick-username` when `!existing.username`.
-**Problem:** First-time SIWA / Google account on iOS lands with `username == nil`. Later surfaces (share/public-card, leaderboard, profile/messaging displays) assume a handle.
-**Fix:** Add a pick-username gate that runs after social OAuth, before `ContentView` lets the session through. Email signup is already correct.
-**Recommendation:** Reuse the web pick-username flow's logic — same uniqueness check, same `/api/auth/check-username` endpoint.
-
-### T23 — iOS sign-in skips server lockout/audit/daily-login bookkeeping — **HIGH** (security telemetry)
-**File:** `VerityPost/VerityPost/AuthViewModel.swift:162-188,562-667` (calls `client.auth.signIn(...)` directly + best-effort `last_login_at`); web `login/page.tsx:156-239` runs `/api/auth/login-precheck` → reports failures via `/api/auth/login-failed` → POSTs `/api/auth/login` for the bookkeeping pass.
-**Fix:** Mirror the web auth contract on iOS: resolve usernames, honor lockout precheck, report failures, call the server bookkeeping path on success.
-**Recommendation:** **Single auth contract across surfaces.** Without server bookkeeping, lockout is iOS-bypassable, audit log is incomplete, and `daily_login` streak/score events are inconsistent.
-
-### T25 — No topic/category alerts (publish-time fan-out) — **HIGH** (return-visit driver)
-**File:** `alert_preferences` table exists, `breaking_news` is a global blast; `AlertsView.swift:300` has `manageSubscriptionsEnabled = false` (UI built but flagged off). No `subscription_topics` table; no API route.
-**Fix:** Add `subscription_topics(user_id, category_id, created_at)` table. Add `/api/alerts/subscriptions` GET/POST. Flip the iOS flag to true. Wire publish-time trigger that fans out to subscribers.
-**Recommendation:** **Topic alerts are the second-strongest return-visit lever** (after reply notifications T26). Same publish-time pipeline as breaking-news, just filtered by category subscription.
 
 ### T26 — `post_comment` RPC does NOT insert notifications — **CRITICAL** (verified 2026-04-27, awaiting owner direction)
 **MCP verify 2026-04-27:** CONFIRMED REAL. The `post_comment(p_user_id, p_article_id, p_body, p_parent_id, p_mentions)` RPC body inserts the comment row + bumps `reply_count` on parent + bumps user `comment_count`, but **never inserts into `notifications`** for either replies or mentions. Verified zero triggers on the `comments` table (`information_schema.triggers` returns 0 rows). Email templates, preference UI, push cron all exist for `comment_reply` — but the source-of-truth INSERT that those downstream consumers read never fires. Audit's "biggest single return-visit lever" claim is correct.
@@ -480,16 +447,6 @@ The numbered items below retain their original section placement for readability
 **Fix:** Make iOS use the same storage/backend as web. Remove email-digest/lifecycle controls. If anything from `metadata.notifications` is worth migrating, do a one-time read-fallback.
 **Recommendation:** Bundle with **T9/T10** (transactional-only email cleanup). Same direction, same PR.
 
-### T28 — iOS exposes Back-channel queue tab that's a placeholder — **HIGH** (parity)
-**File:** `VerityPost/VerityPost/ExpertQueueView.swift:20-24,79-112,188-199` (tab listed, body shows "Coming soon"); web `expert-queue/page.tsx:153-231` has the real flow.
-**Fix:** Hide the iOS Back-channel tab until parity exists, OR implement load/post against the same API web uses.
-**Recommendation:** **Hide first** (one-line conditional). Build parity in a dedicated session.
-
-### T29 — Empty alerts inbox tells iOS users to use disabled Manage tab — **HIGH** (dead-end CTA)
-**File:** `VerityPost/VerityPost/AlertsView.swift:223-234,291-321` ("Subscribe to categories in Manage to get alerts" copy + `manageSubscriptionsEnabled = false`).
-**Fix:** Update empty-state copy until Manage actually works (paired with **T25**), or just remove the instruction.
-**Recommendation:** Lands with T25 — same flip.
-
 ---
 
 ## MEDIUM — quality and parity
@@ -504,61 +461,9 @@ The numbered items below retain their original section placement for readability
 **Fix:** Weekly cron diffs each user's rank vs 7 days ago. In-app notification (not push) for moves of 3+ spots, top-10 entry/exit. Cap at 1/week.
 **Recommendation:** **Don't push** — rank changes are check-in-worthy, not ping-worthy. In-app surface only.
 
-### T37 — iOS browse is a subset of web browse — **MEDIUM**
-**File:** `VerityPost/VerityPost/HomeView.swift:577-657` (plain category list); web shows counts + top-3 trending + filter + Latest strip.
-**Fix:** Add article count + 1-2 article previews per category row on iOS.
-
-### T38 — iOS search has no advanced filters — **MEDIUM**
-**File:** `VerityPost/VerityPost/FindView.swift:8` (MVP deferral comment).
-**Fix:** Add category filter + date range picker for paid tiers, gated on the same web permission keys.
-
 ### T40 — Web story timeline desktop aside is `false &&` killed — **MEDIUM** (decision needed)
 **File:** `web/src/app/story/[slug]/page.tsx:1776`
 **Fix:** Decide whether desktop aside ships at launch. If yes, drop the `false &&`. If no, document as deliberate launch-phase hide.
-
-### T41 — iOS notification taps ignore non-story `action_url` — **MEDIUM**
-**File:** `VerityPost/VerityPost/AlertsView.swift:247-252,790-795` (only routes `/story/<slug>`). Backend emits `/profile/settings/billing`, `/signup`, signed download URLs — iOS taps mark-as-read but don't navigate.
-**Fix:** Route generic internal `action_url`s on iOS, or suppress tap affordance for unsupported actions.
-
-### T42 — iOS data export uses old direct-insert path + forgets pending requests — **MEDIUM**
-**File:** `VerityPost/VerityPost/SettingsView.swift:2446-2482,2538-2546` (direct `data_requests.insert()`); web routes through `/api/account/data-export` for permission/rate-limit/audit/dedupe.
-**Fix:** Route iOS through `/api/account/data-export`. Load existing rows so pending state survives relaunch.
-
-### T43 — iOS can't see/cancel pending deletion while signed in — **MEDIUM**
-**File:** `VerityPost/VerityPost/SettingsView.swift:2446-2565`; `AuthViewModel.swift:181-185,521-530,690-705`; `Models.swift:5-46`.
-**Fix:** Add `deletion_scheduled_for` to iOS user model. Surface countdown in Settings. Add cancel action via `/api/account/delete`.
-
-### T44 — Multiple iOS settings pages fail silently on save — **MEDIUM**
-**File:** `VerityPost/VerityPost/SettingsView.swift:1958-2040,2090-2142,2393-2436` (Alerts, Feed, Expert all `Log.d` errors with no UI signal).
-**Fix:** Add success/error banners matching the profile editor pattern.
-
-### T45 — iOS settings pages render fallbacks as "loaded" on fetch failure — **MEDIUM**
-**File:** `VerityPost/VerityPost/SettingsView.swift:1592-1601,1996-2014,2103-2116,2406-2416,2513-2522` (`try?` swallow → render defaults).
-**Fix:** Distinct load-error state with retry. Disable save until successful initial fetch.
-
-### T46 — iOS "Sign-in activity" isn't real session management — **MEDIUM**
-**File:** `VerityPost/VerityPost/SettingsView.swift:1519-1598` (renders audit rows from `get_own_login_activity`); web reads `user_sessions` with revoke action.
-**Fix:** Back the iOS screen with `user_sessions`. Show active vs ended. Add "Sign out other sessions."
-
-### T48 — iOS auth deep-link failures are silent — **MEDIUM**
-**File:** `VerityPost/VerityPost/VerityPostApp.swift:15-17`; `AuthViewModel.swift:377-409`; `ContentView.swift:99-105`.
-**Fix:** Surface invalid/expired link state with recovery CTA (resend verification / new reset link).
-
-### T49 — iOS Username field is editable, web says it's immutable — **MEDIUM** (contract mismatch)
-**File:** `VerityPost/VerityPost/SettingsView.swift:1283-1287,1320-1375` (editable); `web/src/app/profile/settings/page.tsx:1716-1720` ("Usernames cannot be changed.").
-**Fix:** Decide the contract. If immutable, disable iOS field. If changeable, document and message it consistently.
-
-### T50 — iOS DM creation/send failures largely silent — **MEDIUM**
-**File:** `VerityPost/VerityPost/MessagesView.swift:600-658,1041-1107`
-**Fix:** Keep compose/search surface open on failure. Show error state mapping common HTTP failures to actionable copy.
-
-### T52 — Trust header missing on iOS comments — **MEDIUM**
-**File:** `VerityPost/VerityPost/StoryDetailView.swift:1093-1151`. Web has "Every reader here passed the quiz." (`CommentThread.tsx`); iOS jumps straight to composer.
-**Fix:** Add the trust header on iOS, conditional on `visible.length > 0`.
-**Recommendation:** Core-value-prop surface — iOS shouldn't be missing it.
-
-### T53 — Web missing related-reads at end of articles (parity with iOS Up Next) — **MEDIUM**
-**Fix:** See T11 above (combined item).
 
 ### T54 — Kids parent dashboard leads with volume/streak metrics — **MEDIUM** (framing)
 **File:** `web/src/app/profile/kids/page.tsx:749-756` (KPI order: Articles → Minutes → Quizzes Passed → Longest Streak).
@@ -579,34 +484,13 @@ The numbered items below retain their original section placement for readability
 **Fix:** Either (a) script the Stripe price creation as part of plan creation (admin route POSTs to Stripe + writes back the ID), or (b) add `stripe_price_id` to admin PATCH `ALLOWED_FIELDS` so it can be entered without a DB poke.
 **Recommendation:** **Option (a)** — eliminates the silent-fail class entirely. Stripe `prices.create` is idempotent with the right `lookup_key` so re-runs are safe.
 
-### T58 — iOS Find rows missing category + date — **MEDIUM**
-**File:** `VerityPost/VerityPost/FindView.swift` — search-result rows. Web search rows show category + date; iOS Find doesn't.
-**Fix:** Add category name + relative date to each `FindView` story row.
-
-### T60 — iOS Expert settings save to nowhere — **MEDIUM** (likely dead UI)
-**File:** `VerityPost/VerityPost/SettingsView.swift:2330-2436` writes `users.metadata.expert`. Web expert queue / back-channel only consult permissions/categories — no consumer for `metadata.expert` outside this settings page.
-**Fix:** Wire queue routing / expert notifications to `metadata.expert`, OR remove the screen.
-**Recommendation:** Verify any backend RPC reads it before deleting. If not, **delete** — fake-functional settings are worse than missing settings.
-
 ---
 
 ## LOW — opportunistic
 
-### T66 — iOS bookmarks empty-state CTA is a dead button — **LOW**
-**File:** `VerityPost/VerityPost/BookmarksView.swift:212-228` (verified — button action is just `// Would navigate back to home; tab bar handles the actual swap.`).
-**Fix:** Wire the button to switch tabs to Home/Find, OR replace with static guidance.
-
 ---
 
 ## OPERATIONAL DEBT
-
-### T72 — iOS Browse-tab commit/code drift — **DEBT** (investigate)
-**Files:** Commits `79fd8ae` + `0826728` claim Browse swap; `ContentView.swift:182,194` still has `case .mostInformed`. No `BrowseView.swift`.
-**Fix:** Read full `ContentView.swift` + `git log -p ContentView.swift` to determine whether the swap landed under a different name, was reverted, or was never applied.
-
-### T77 — `MASTER-6` (password verification) needs SHIPPED marker — **DEBT** (owner action)
-**Status:** `web/src/app/api/auth/verify-password/route.js` exists with `requireAuth`, 5/hour rate limit, ephemeral client, `record_failed_login_by_email`. Settings password card calls it. **No code change needed.**
-**Action:** Owner records the commit SHA and marks MASTER-6 SHIPPED in pre-launch tracker.
 
 ---
 
@@ -617,16 +501,8 @@ The numbered items below retain their original section placement for readability
 **Dependents (must land same deploy):** Story Task 6 (paywall anchor), Bookmarks Task 4 (cap banner anchor), Messages Task 8 (DM paywall anchor), Notifications Task 5 (alerts link), Profile Note A (profile anchors), Settings Task 6 (DM read receipts → `PrivacyPrefsCard`), Search Note A (line 230 billing anchor).
 **Recommendation:** **Single-deploy window required.** Don't split partial.
 
-### T81 — iOS TTS-per-article toggle — **DEFERRED**
-**Scope:** Web saves `users.metadata.tts_per_article`; iOS has no row to toggle whether the listen button appears.
-**Fix:** Add Article-audio toggle to iOS Preferences. Gate on `settings.a11y.tts_per_article` perm. Read/write `users.metadata.tts_per_article` via `update_own_profile`. Bundle with TTS player QA.
-
 ### T84 — "Please try again" copy sweep (T-013) — **DEFERRED**
 **Scope:** Settings is the largest cluster. Bundle with global T-013 sweep across remaining surfaces.
-
-### T85 — Profile Task 5 perm-key migration — **DEFERRED** (owner action)
-**Scope:** iOS short-form perm-key swap is in source (`ProfileView.swift:191-193`). DB binding migration was written but the file is missing from the repo (see T71). Until applied, free-user iOS Categories tab is broken.
-**Apply order:** (1) re-create + run the migration via MCP `apply_migration`, (2) bump `users.perms_version` to invalidate live perms cache, (3) push the iOS build. Out of order = brief stale-perm window.
 
 ---
 
@@ -636,18 +512,6 @@ The numbered items below retain their original section placement for readability
 
 ### HIGH — engagement, retention, compliance
 
-#### T88 — iOS onboarding stamp failure blocks app entry — **HIGH**
-**File:** `VerityPost/VerityPost/WelcomeView.swift:67-73` (`stampError` shows "Couldn't finish onboarding. Please try again." with no bypass).
-**Problem:** Backend hiccup on `/api/account/onboarding` POST = user is stuck on WelcomeView forever. Onboarding is a metric, not a gate, but the code treats it as a gate.
-**Fix:** Allow "Continue anyway" after one failed retry. Stamp can be re-attempted next session via existing `onboarding_completed_at IS NULL` check.
-**Recommendation:** Telemetry should never block app entry. Two-line change.
-
-#### T89 — iOS unverified user gets entire profile gated — **HIGH**
-**File:** `VerityPost/VerityPost/ProfileView.swift:143-149` (when `user.emailVerified == false`, hero/stats/streak grid hidden behind `verifyEmailGate`).
-**Problem:** Reading still works; only the profile surface is gated. Inconsistent — web doesn't gate profile this hard.
-**Fix:** Show profile with a non-blocking "verify your email to comment and save" banner. Keep hard gates only on actions that require verification (commenting, save).
-**Recommendation:** Becomes moot post-AUTH-MIGRATION (every signed-in user is inherently verified under magic-link). Decide whether to ship now or wait.
-
 #### T92 — No web push at all — **HIGH** (return-visit)
 **File:** Repo grep: no VAPID keys, no service worker, no push subscription routes. Confirmed in TODO.md NOTES.
 **Problem:** Web has zero ambient notification channel. iOS push ships breaking news + reply alerts; web users get nothing.
@@ -655,74 +519,6 @@ The numbered items below retain their original section placement for readability
 **Recommendation:** Standard PWA push stack. Dedicated session — not bundleable with T1.
 
 ### MEDIUM — quality and parity
-
-#### T102 — iOS splash 10s timeout has no slow-network grace — **MEDIUM**
-**File:** `VerityPost/VerityPost/AuthViewModel.swift:80` (hard 10-second timeout).
-**Problem:** 3G or weak-signal sessions hit the failure screen even though a 12s wait would have succeeded.
-**Fix:** Two-stage: at 5s show "Connecting...", at 15-20s show fallback. Total budget extended to 20s.
-**Recommendation:** Match real-world cellular latency, not the typical wifi case.
-
-#### T103 — iOS session-expired banner is generic — **MEDIUM**
-**File:** `VerityPost/VerityPost/ContentView.swift:229` ("Your session expired. Please sign in again.").
-**Problem:** Could be token-refresh fail, remote signout, account ban, password change. User can't tell whether to retry or contact support.
-**Fix:** Pass cause through `auth.sessionExpiredReason`; banner branches on cause: "Signed out from another device" / "Session expired — please sign in" / "Account changes detected — please sign in again."
-**Recommendation:** Three causes max. AuthViewModel already knows the cause; surface it.
-
-#### T104 — iOS bottom-nav 4th tab label flips between "Sign up" and "Profile" — **MEDIUM**
-**File:** `VerityPost/VerityPost/ContentView.swift:282` (`Item(id: .profile, label: isLoggedIn ? "Profile" : "Sign up")`).
-**Problem:** Same icon, label flips on auth state. Visual continuity broken; "Sign up" doesn't belong as a tab.
-**Fix:** Keep Profile icon + label; gate behind a sign-up prompt screen if user is anon (matches existing Notifications anon-gate pattern).
-**Recommendation:** "Sign up" should be a CTA inside the Profile screen the tab opens, not a tab itself.
-
-#### T105 — iOS quiz teaser dismiss is per-article only — **MEDIUM**
-**File:** `VerityPost/VerityPost/StoryDetailView.swift:1689,1798` (`quizTeaserDismissed` is local state).
-**Problem:** Dismiss on article 1, open article 2, teaser fires again at 50% scroll. Feels like a nag.
-**Fix:** Persist dismiss as a per-session @AppStorage. Optionally rate-limit to once per N articles.
-**Recommendation:** Combine with T11 / T37 (move teaser to article end, not 50% scroll).
-
-#### T106 — iOS quiz submission failure leaves user stuck — **MEDIUM**
-**File:** `VerityPost/VerityPost/StoryDetailView.swift:2360+` (error sets `quizError` string but no retry button at the failure point).
-**Problem:** Network blip mid-submit → quiz state shows error text. User must navigate away and reopen the article to retry.
-**Fix:** Add "Try again" button next to `quizError` text when state is `.submitting` failure.
-**Recommendation:** Consistent with T44 / T45 retry-state requests.
-
-#### T107 — iOS comments composer doesn't explain quiz-pass gate — **MEDIUM** (re-scoped: cited copy "You can't post comments right now." at `StoryDetailView.swift:1252` is the muted/banned banner, NOT the quiz-pass gate; quiz gate uses separate `passToCommentCTA` at line 634 with "PASS TO COMMENT" copy. Verify whether quiz gate copy needs the same explanation treatment.)
-**File:** `VerityPost/VerityPost/StoryDetailView.swift:1254` ("You can't post comments right now.").
-**Problem:** Logged-in user who hasn't passed the quiz sees a generic block message. No explanation that passing the quiz unlocks discussion.
-**Fix:** Branch the copy: `quizPassed == false` → "Pass the quiz above to join the discussion." Otherwise keep current copy.
-**Recommendation:** Frame the quiz as the price of entry — matches the trust principle.
-
-#### T116 — iOS comment rate-limit shows "Wait" without countdown — **MEDIUM**
-**File:** `VerityPost/VerityPost/StoryDetailView.swift:2404-2420` (rate-limit flag flips, no duration shown).
-**Problem:** User taps Send, gets "Wait", retries, gets "Wait" again. Same friction as kids pair-code lockout.
-**Fix:** Track `comment_rate_sec` server response and render "Try again in Xs" countdown.
-**Recommendation:** Apply the same UX pattern across the app — every rate-limited action gets a visible countdown.
-
-#### T118 — Adult iOS deep-link handler has no article routing — **MEDIUM**
-**File:** `VerityPost/VerityPost/VerityPostApp.swift:15-17` (`auth.handleDeepLink(url)` only handles auth deep links; no article navigation).
-**Problem:** Shared `veritypost://story/<slug>` URL opens the app but doesn't navigate to the article.
-**Fix:** Branch on URL host: auth deep-links → existing `auth.handleDeepLink`; story deep-links → push StoryDetailView via NavigationStack programmatic push.
-**Recommendation:** Bundle with T96 (kids deep-link routing).
-
-#### T121 — iOS push 7-day cooldown after "Not now" too long — **MEDIUM**
-**File:** `VerityPost/VerityPost/PushPermission.swift:32` (`prePromptCooldown = 7 * 24 * 60 * 60`).
-**Problem:** User dismisses to clear the sheet, changes mind in minutes, can't re-trigger for a week.
-**Fix:** Two-tier cooldown: 24h after "Not now", but also re-prompt at the next high-value moment (first comment posted, first save) regardless of cooldown.
-**Recommendation:** Pair with T1 (push pre-prompt fix).
-
-#### T122 — iOS push status not auto-refreshed on foreground — **MEDIUM**
-**File:** `VerityPost/VerityPost/PushPermission.swift:63-69` (`refresh()` not called on app foreground).
-**Problem:** User denies, manually enables in iOS Settings, returns to app — UI still shows "denied" until next manual refresh call or full app restart.
-**Fix:** Call `refresh()` in a `UIApplication.didBecomeActiveNotification` observer.
-**Recommendation:** Standard iOS lifecycle pattern.
-
-### LOW — opportunistic
-
-#### T126 — iOS onboarding "Skip" on every screen — **LOW**
-**File:** `VerityPost/VerityPost/WelcomeView.swift:35` (Skip button visible on all 3 screens unconditionally).
-**Problem:** User can skip from screen 0 immediately, bypassing the Read/Quiz/Discuss preview, landing on Home with no orientation.
-**Fix:** Hide Skip on screens 0 and 1; show only on the final screen (matches typical iOS onboarding pattern).
-**Recommendation:** Get the value across before allowing skip.
 
 ---
 
@@ -732,24 +528,6 @@ The numbered items below retain their original section placement for readability
 
 ### UI/UX Manager (T127-T139)
 
-#### T131 — iOS comment vote buttons missing visual disabled-when-active state — **MEDIUM** (UX)
-**File:** `VerityPost/VerityPost/StoryDetailView.swift:~1800-1860`. `active: Bool` parameter passed but no visual differentiation.
-**Fix:** Apply `.disabled(already_voted)` or opacity/color when `active`.
-
-#### T137 — iOS email input lacks client-side format validation — **LOW** (UX)
-**File:** `VerityPost/VerityPost/SettingsView.swift:1391-1452`. Server-side only; user submits invalid → server rejection.
-**Fix:** Inline regex check in `onChange`, gray ✓ / red "Invalid email" hint.
-
-#### T139 — Audit error handling pattern across iOS Settings subpages — **MEDIUM** (UX consistency)
-**File:** `VerityPost/VerityPost/SettingsView.swift:1958-2040, 2090-2142, 2393-2436`. Multiple subpages use `try?` + `Log.d` swallow pattern. (Partially overlaps T44/T45 but broader.)
-**Fix:** Standardize on the profile-editor red-banner pattern across all settings subpages.
-
-### Engagement / Retention (T140-T154)
-
-#### T148 — iOS Alerts shows Manage tab to anon, lands on disabled state — **MEDIUM** (UX)
-**File:** `VerityPost/VerityPost/AlertsView.swift:137-150,29-32`. Two tabs visible; Manage tab is disabled placeholder.
-**Fix:** Hide Manage for anon. On signed-in first visit, jump to Manage to onboard category selection.
-
 #### T165 — 90+ inline `CSSProperties` objects, no stylesheet/Tailwind/CSS modules — **LOW** (maintainability)
 **File:** Across `web/src/components/`, `web/src/app/`. Maintenance burden, bundle size cost.
 **Fix:** Migrate critical components to CSS modules; consider Tailwind for new work.
@@ -757,54 +535,6 @@ The numbered items below retain their original section placement for readability
 #### T166 — Zero `data-testid` attributes in codebase — **LOW** (testability)
 **Problem:** No test selectors; e2e tests are brittle.
 **Fix:** Add `data-testid` to key interactive elements as new tests are written.
-
-#### T182 — `EventsClient.shared` observer never removed — **MEDIUM** (anti-pattern)
-**File:** `VerityPost/VerityPost/EventsClient.swift:18-23`. Singleton OK today, but `[weak self]` + deinit hygiene lacking.
-**Fix:** Block-based observer with `[weak self]`; explicit deinit removal.
-
-#### T185 — Hardcoded user-facing strings throughout iOS (no localization) — **LOW** (i18n future-proofing)
-**File:** `HomeView.swift` and across most `*View.swift`. Verification: 0 uses of `String(localized:)` confirmed. **Severity downgraded** — English-first product is intentional; this is future-proofing only. Don't ship pre-launch.
-**Fix:** When multi-language is roadmapped, wrap in `String(localized: ...)` + add `.xcstrings` catalog. Not now.
-
-#### T187 — `setCurrentUser` doesn't validate UUID format — **LOW** (defense)
-**File:** `VerityPost/VerityPost/PushRegistration.swift:20-22,46`. Malformed userId → server upsert fails silently (`Log.d`).
-**Fix:** UUID validation; fail loudly in DEBUG builds.
-
-#### T188 — `StoryDetailView` has 69 `@State` properties in one view — **MEDIUM** (perf + maintainability)
-**File:** `VerityPost/VerityPost/StoryDetailView.swift:28-179` (file is 2,590 lines). Verified count: 69 `@State` props (originally claimed 80+). Body recomputes on any state change; refactor target stands.
-**Fix:** Extract `QuizEngine`, `DiscussionManager` as `@StateObject`s into child views.
-
-#### T189 — `AuthViewModel.checkSession` swallows network vs no-session distinction — **MEDIUM** (UX correctness)
-**File:** `VerityPost/VerityPost/AuthViewModel.swift:91-96`. Both paths set `isLoggedIn = false`.
-**Fix:** Surface error type; offer retry on transient network failure.
-
-#### T190 — `Task.detached` analytics flush has no cancellation handle — **LOW** (data loss)
-**File:** `VerityPost/VerityPost/EventsClient.swift:101-115`. Backgrounding mid-flush may abandon up to ~20 events silently.
-**Fix:** Store Task handle; await synchronously in `handleBackground`.
-
-#### T193 — SupabaseClient initialized without timeout config — **MEDIUM** (UX on flaky networks)
-**File:** `VerityPost/VerityPost/SupabaseManager.swift:53-55`. Uses OS default 60s.
-**Fix:** Set `URLSessionConfiguration.timeoutIntervalForRequest = 15` and `waitsForConnectivity = true`.
-
-#### T194 — `KidsAppState.loadUser` surfaces raw error strings — **LOW** (UX)
-**File:** `VerityPostKids/VerityPostKids/KidsAppState.swift:78-93`. "Couldn't load streak: error.localizedDescription" is hostile copy.
-**Fix:** Map to friendly strings; offer retry button.
-
-#### T195 — Kids quiz server-verdict has no timeout fallback — **LOW** (resilience)
-**File:** `VerityPostKids/VerityPostKids/KidQuizEngineView.swift:68-69,145-148`. `verdictPending` may hang indefinitely.
-**Fix:** 5s timeout; fall back to local computation with warning log.
-
-#### T197 — `LoginView.canSubmit` recomputes every body render — **LOW** (perf micro)
-**File:** `VerityPost/VerityPost/LoginView.swift:228-230`.
-**Fix:** Cache as `@State`; update via `.onChange(of:)`.
-
-#### T198 — `VerityPostApp` only handles `.active` scenePhase, not `.background` — **LOW** (data loss)
-**File:** `VerityPost/VerityPost/VerityPostApp.swift:28-32`. Force-close mid-StoreKit-restore abandons pending work.
-**Fix:** `.background` handler to flush pending writes.
-
-#### T200 — Signup username retry loop wastes 300ms on permanent errors — **LOW** (UX)
-**File:** `VerityPost/VerityPost/AuthViewModel.swift:312-331`. Verification: early-break logic exists (`guard msg.contains("p0002") || msg.contains("not found") else { break }`), so non-transient errors break after first attempt. Remaining waste is 300ms on the first attempt before the break — minor. Pre-AUTH-MIGRATION concern only; magic-link reshapes the signup flow.
-**Fix:** Skip the initial 300ms sleep entirely on permanent errors; match error message for "reserved"/"taken" pre-RPC.
 
 ---
 
@@ -816,91 +546,17 @@ Items below already moved to Pre-Launch Assessment (Apple/Sentry/COPPA-CRITICAL)
 
 ### Security (T202-T214)
 
-#### T206 — Deep-link `setSession()` not validated against Supabase issuer/audience — **HIGH**
-**File:** `VerityPost/VerityPost/AuthViewModel.swift:377-407`. `verity://` URL scheme is registered; attacker can craft a deep-link with fake `access_token`/`refresh_token` and the app calls `setSession()` blindly.
-**Fix:** After `setSession()`, immediately call `auth.getUser()` to validate; reject + clear session on failure. Validate `aud`/`iss` claims if available.
-
-#### T214 — Keychain `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` for tokens — **LOW** (acceptable, monitor)
-**File:** `VerityPost/VerityPost/Keychain.swift:20`. Correct level, but document acceptance + revisit if Apple changes guidance.
-
-### Performance (T215-T223)
-
 #### T233 — Hard-delete on articles, no soft-delete window — **HIGH**
 **File:** `web/src/app/api/admin/articles/[id]/route.ts:611`. `.delete()` removes permanently; audit log writes after delete (orphan if persist fails).
 **Fix:** Soft-delete via `deleted_at`; write audit before mutation; cron purges after 30 days.
-
-#### T244 — Pull-to-refresh stacks parallel network calls — **MEDIUM**
-**File:** `HomeView.swift:180`, `ProfileView.swift:173`, `SettingsView.swift:652`. `.refreshable` doesn't cancel prior in-flight load.
-**Fix:** Store `loadTask` handle; cancel before re-firing.
-
-#### T245 — Quiz auto-submit double-fire on rapid network recovery — **MEDIUM**
-**File:** `StoryDetailView.swift:1137-1145`. 350ms `asyncAfter` fires regardless of network state.
-**Fix:** Cancel timer task before retry-path `submitQuiz()`; gate on `quizStage != .submitting`.
-
-#### T246 — Comment post 200 with body `{ "error": "..." }` clears UI without error feedback — **MEDIUM**
-**File:** `StoryDetailView.swift:2355-2425`. Decode fails on shape mismatch; UI clears composer; user loses draft silently.
-**Fix:** Check JSON for `error` field before decode; preserve composer + show error.
-
-#### T247 — Splash 10s timeout doesn't retry on transient network — **MEDIUM**
-**File:** `AuthViewModel.swift:75-101`. 8s success → still un-flips `splashTimedOut=true` later; relaunch shows duplicate splash.
-**Fix:** Wrap auth call in Task with proper timeout enforcement; cancel timer on success.
-
-#### T248 — Vote buttons silently fail when session expired — **MEDIUM**
-**File:** `StoryDetailView.swift:2430-2456`. `try? await client.auth.session` returns nil; vote bails; UI shows optimistic update.
-**Fix:** Throw on session-fetch failure; surface "Please sign in again."
-
-#### T249 — `EventsClient.flush` Task.detached uncancellable; events lost on background-then-kill — **MEDIUM**
-**File:** `EventsClient.swift:92-115`. Buffer cleared before HTTP enqueued; process kill drops events.
-**Fix:** Persist buffer to disk on background; await flush completion.
-
-#### T250 — APNs token arrives before `setCurrentUser()`; no retry — **MEDIUM**
-**File:** `PushRegistration.swift:44-80`. Token-before-login → silent ignore; subsequent logins don't re-register.
-**Fix:** Persist token; retry RPC registration on `setCurrentUser()`.
-
-#### T251 — Kids quiz writes pending when app backgrounded; "success" celebration on stale state — **MEDIUM**
-**File:** `KidQuizEngineView.swift:62-68`, `KidsAppState.swift:187-200`. `pendingWrites` Tasks cancelled; counter not persisted.
-**Fix:** Wait for all pending writes (with timeout) before showing result; "Couldn't save" path on timeout.
-
-#### T252 — Username availability race vs `auth.signUp` — **MEDIUM**
-**File:** `AuthViewModel.swift:249-278`. Available at check-time → taken between check and signup → signup row has NULL username; trigger seeds NULL.
-**Fix:** Surface "username unavailable" + rollback auth row on race detect.
-
-#### T253 — TTSPlayer doesn't release buffer on memory warning — **LOW**
-**File:** `StoryDetailView.swift:125`. No `UIApplication.didReceiveMemoryWarningNotification` observer.
-**Fix:** Stop + release TTS buffers in observer.
-
-#### T254 — `sessionExpired` banner stays sticky after dismissal — **LOW**
-**File:** `AuthViewModel.swift:114-158`. No auto-dismiss; user navigating in cached views sees stale banner.
-**Fix:** Auto-dismiss after 5s OR add "Sign in again" CTA that calls `checkSession()`.
-
-### iOS Implementation Manager (T255-T263)
-
-#### T261 — Deployment target `iOS 17.0` excludes ~10-15% of users on iOS 16 — **LOW**
-**File:** project.pbxproj `IPHONEOS_DEPLOYMENT_TARGET = 17.0`. Audit code for iOS 17-only APIs; if none required, lower to 16.
-**Fix:** Test build at 16; lower if no API gates.
-
-#### T263 — `PrivacyInfo.xcprivacy` privacy manifest unverified — **MEDIUM** (iOS 17+ requirement)
-**File:** Both apps. Apple requires `PrivacyInfo.xcprivacy` declaring API usage + tracking domains for any SDK touching sensitive APIs.
-**Fix:** Add `PrivacyInfo.xcprivacy` for both apps; declare APIs used (file timestamp, system boot time, disk space, etc.) and tracking domains (none, ideally).
-
-### Attorney / Legal (T264-T273)
 
 #### T271 — Missing choice-of-law clause — **LOW** (contract enforceability)
 **File:** `terms/page.tsx`. No "Governing Law" section.
 **Fix:** Add: "Governed by laws of [Delaware/California], exclusive jurisdiction in [county/state]."
 
-#### T272 — Accessibility statement page absent (ADA defense) — **MEDIUM**
-**File:** `web/src/app/accessibility/page.tsx` exists but lacks formal Accessibility Statement (WCAG commitment + known limitations + contact).
-**Fix:** Add statement section: WCAG 2.1 AA commitment + accessibility@veritypost.com contact.
-
 #### T285 — Web comment report uses free text; iOS uses structured — **MEDIUM** *(pairs with T32)*
 **File:** `web/src/app/api/comments/[id]/report/route.js:45-46`. Pairs with T32.
 **Fix:** Server-side enum validation; UI category picker on web.
-
-#### T291 — Help page omits Ask-an-Expert from Verity tier feature list — **MEDIUM** (truth-in-pricing)
-**File:** `web/src/app/help/page.tsx:96-98`. Lists ads/bookmarks/quiz/TTS/DMs/follows; no expert access mentioned.
-**Fix:** Confirm whether Verity tier includes expert access; update copy to match.
-
 
 ---
 
