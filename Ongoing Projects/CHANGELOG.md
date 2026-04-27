@@ -7,7 +7,7 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
-## 2026-04-27 (post-migration audit — diagnose what landed, write 4 corrected migration files) — _pending push to git_
+## 2026-04-27 (post-migration audit — diagnose what landed, write 4 corrected migration files) — _shipped, pushed to git_ (commit 7f716b2)
 
 Owner reported "applied all 8 migrations but some failed." Ran an MCP audit. **4 of the 8 had issues; 4 landed cleanly.**
 
