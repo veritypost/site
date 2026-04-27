@@ -1038,9 +1038,20 @@ export default function StoryPage() {
           articleId={story.id}
           initialPassed={userPassedQuiz}
           userTier={userTier}
-          onPass={() => {
+          onPass={(newAchievements) => {
             setUserPassedQuiz(true);
             setJustPassedCeremony(true);
+            // T13 — surface achievement unlocks the same way iOS does
+            // (single toast per badge, understated). The /api/quiz/submit
+            // response carries newAchievements; previously the story page
+            // discarded it. Fires before the reveal-ceremony delay so the
+            // toast and the discussion-unlock land together.
+            if (Array.isArray(newAchievements) && newAchievements.length > 0) {
+              for (const a of newAchievements) {
+                const label = a?.name ? `You earned ${a.name}` : 'Achievement unlocked';
+                show(label);
+              }
+            }
             setTimeout(() => {
               setJustPassedCeremony(false);
               setJustRevealedThisSession(true);

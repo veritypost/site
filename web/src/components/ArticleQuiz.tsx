@@ -44,12 +44,21 @@ interface QuizResult {
 
 type Stage = 'idle' | 'loading-start' | 'answering' | 'loading-submit' | 'result' | 'passed';
 
+// T13 — newAchievements is what /api/quiz/submit returns when the
+// pass triggers any new achievement unlocks. Shape matches what
+// checkAchievements emits server-side.
+export interface QuizPassAchievement {
+  id?: string;
+  name?: string;
+  description?: string;
+}
+
 interface ArticleQuizProps {
   articleId: string;
   initialPassed?: boolean;
   userTier?: string;
   kidProfileId?: string | null;
-  onPass?: () => void;
+  onPass?: (newAchievements?: QuizPassAchievement[]) => void;
 }
 
 const C = {
@@ -159,7 +168,12 @@ export default function ArticleQuiz({
           attempt_number: attemptMeta?.attempt_number ?? null,
         },
       });
-      if (data.passed && typeof onPass === 'function') onPass();
+      if (data.passed && typeof onPass === 'function') {
+        const achievements = Array.isArray(data?.newAchievements)
+          ? (data.newAchievements as QuizPassAchievement[])
+          : [];
+        onPass(achievements);
+      }
       if (seeInterstitialAd) {
         const n = bumpQuizCount();
         if (n > 0 && n % 3 === 0) setShowInterstitial(true);

@@ -7,6 +7,18 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-26 (T13 — achievement unlock toast on web quiz pass) — _shipped, pushed to git/Vercel_
+
+### T13 — Web surfaces newly-earned achievements after quiz pass
+
+- **What** — `/api/quiz/submit` already returns `{ ..., scoring, newAchievements }` (verified at line 113-115). `ArticleQuiz` discarded `newAchievements` and called `onPass()` with no payload. Story page's `onPass` callback re-rendered the discussion unlock without surfacing the badges. iOS already handles this via the equivalent flow; web was silent.
+- **Wiring** — `web/src/components/ArticleQuiz.tsx`: extended `onPass?: () => void` to `onPass?: (newAchievements?: QuizPassAchievement[]) => void` + new exported type `QuizPassAchievement`. The submit-response handler now extracts `data.newAchievements` (defensive Array.isArray check) and passes it through.
+- **Toast** — `web/src/app/story/[slug]/page.tsx`: story page already imports `useToast()`; the `onPass` callback now fires `show("You earned <Badge Name>")` for each new achievement before triggering the existing 1.5s reveal-ceremony delay. Matches iOS's understated tone — single toast per badge, no celebration animation.
+- **Files** — `web/src/components/ArticleQuiz.tsx`, `web/src/app/story/[slug]/page.tsx`.
+- **T14 status (deferred, not shipped)** — adjacent streak-break recovery offer needs a `use_streak_freeze` RPC that doesn't exist (only `use_kid_streak_freeze`). Schema work; T5 halt-and-queue. UI-only "Streak reset" copy half could ship but is small enough to land later when the RPC is approved. Marked DB-WORK-PARTIAL in TODO.
+
+---
+
 ## 2026-04-26 (T274 + T275 — server-side ban-evasion + mute gate at signup/login) — _shipped, pushed to git/Vercel_
 
 ### T274 — Signup rejects emails attached to banned accounts

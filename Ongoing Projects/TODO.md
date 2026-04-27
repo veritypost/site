@@ -438,12 +438,8 @@ The numbered items below retain their original section placement for readability
 **Fix:** Surface a Reply button per comment. Indent replies (left border). Pass `parent_id` on submit.
 **Recommendation:** Web has it; data is already there. One-session task. **DB plumbing already done.**
 
-### T13 — Achievement unlocks render silently on web — **HIGH**
-**File:** `web/src/app/api/stories/read/route.js:106` (verified — returns `newAchievements`); `web/src/app/story/[slug]/page.tsx` never reads it.
-**Fix:** When `newAchievements.length > 0` after quiz pass, fire a toast: "You earned [Badge Name]." Brief, non-blocking. iOS already handles this.
-**Recommendation:** Match the understated quiz-pass tone — single toast, no celebration animation.
-
-### T14 — Streak break on adult profile shows "0d" with no recovery offer — **HIGH**
+### T14 — Streak break on adult profile shows "0d" with no recovery offer — **HIGH** (DB-WORK-PARTIAL)
+**Note 2026-04-26:** Full fix needs a `use_streak_freeze` RPC + endpoint (T5 schema work, halt-and-queue per runbook). Only `use_kid_streak_freeze` exists. Half the value (the "Streak reset — start a new one today" branch) can ship as a UI-only copy edit; the freeze-restore branch is queued.
 **File:** `web/src/app/profile/page.tsx:700-701`, `VerityPost/VerityPost/ProfileView.swift:495`
 **Plumbing exists** (`streak_freeze_remaining` decoded in iOS Models.swift; admin `streak_freeze` flag on; kid profile shows freeze counter).
 **Fix:** When `streak_current === 0 && streak_best > 0 && streak_freeze_remaining > 0` → "Your streak ended. Use a freeze to restore it? ([N] remaining)" with one button. Otherwise: "Streak reset — start a new one today."
