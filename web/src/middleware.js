@@ -292,8 +292,11 @@ export async function middleware(request) {
   // have to redo the preview-cookie dance on a separate origin. Production
   // never serves on :3333. The host check is port-exact; a colon ensures we
   // don't match a real domain that happens to end with "3333".
+  // T333 — defense-in-depth: also gate on NODE_ENV !== 'production' so a
+  // misconfigured prod env that happens to expose :3333 can't bypass the
+  // coming-soon gate or unlock the dev-perms-all-true ProfileApp branch.
   const _host = request.headers.get('host') || '';
-  const _isRedesignPort = _host.endsWith(':3333');
+  const _isRedesignPort = process.env.NODE_ENV !== 'production' && _host.endsWith(':3333');
 
   if (
     process.env.NEXT_PUBLIC_SITE_MODE === 'coming_soon' &&

@@ -7,6 +7,30 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (autonomous wave 9 — T333 middleware + T366 admin auth-recovery page) — _pending push to git_
+
+### Shipped (2)
+
+- **T333 middleware partial.** `web/src/middleware.js`. Tightened `_isRedesignPort` to require `process.env.NODE_ENV !== 'production'` AND host ends with `:3333`. Defense-in-depth: a misconfigured prod env that happens to expose :3333 can't bypass the coming-soon gate or trigger the dev-perms-all-true ProfileApp branch. The mirror in `redesign/profile/_components/ProfileApp.tsx:117-121` is in the untracked redesign tree; ships with T357 cutover.
+
+- **T366 — `/admin/auth-recovery/` consolidated support page.** Owner picked option C earlier today; full spec was queued in TODO. Built it.
+  - **Page:** `web/src/app/admin/auth-recovery/page.tsx` (~225 lines). Search by email-or-username (uses `.or` filter for username/email match), renders the user's current recovery-relevant state (email_verified, verify_locked_at, locked_until, deletion_scheduled_for, is_banned) as labelled `<Badge>` pills, and offers 3 action buttons. Each button is auto-disabled when its action would be a no-op (Confirm Email greyed if already verified; Clear Verify Lock greyed if no `verify_locked_at`; Clear Login Lock greyed if no active `locked_until`). Plus an "Open user record →" shortcut to `/admin/users/[id]` for the deeper investigation flow. Toast feedback per action.
+  - **POST endpoint:** `web/src/app/api/admin/auth-recovery/[user_id]/route.ts` (~145 lines). Accepts `{ action: 'confirm_email' | 'clear_verify_lock' | 'clear_login_lock' }`. `requirePermission('admin.users.delete')` (same high-trust level as user-delete; if a narrower "support" perm is wanted later, mint `admin.auth_recovery` and grant it on top). `requireAdminOutranks` guard so a moderator can't recover an admin's account. Each action writes its own audit_log row via `recordAdminAction` (`admin:auth_recovery:confirm_email`, etc.) and the `confirm_email` path also `bump_user_perms_version`s so the 21 `requires_verified=true` perms re-evaluate without waiting for the 60s client poll.
+  - **Backend semantics:**
+    - `confirm_email` → `UPDATE users SET email_verified=true, email_verified_at=now()` + perms bump.
+    - `clear_verify_lock` → `UPDATE users SET verify_locked_at=NULL`.
+    - `clear_login_lock` → `service.rpc('clear_failed_login', { p_user_id })` (RPC already exists per `login/route.js:142`).
+
+TypeScript clean (13 pre-existing errors unchanged). Toast/Button/Badge all use the admin-system APIs (`toast.push({ variant: 'danger' })`, `Button variant="primary"`, `Badge variant="success"`).
+
+### Skipped (next-session candidates)
+
+Same skip-list as wave 8: T299 (homoglyph lib install), T348 (perm memo arch), T328 (owner direction), T354 (needs pg_cron job audit), all untracked redesign batch (waits for T357), all big-feature items (T92 web push, T322 16-events wire, T329 admin events panels, T360 Categories+Milestones, T363 public-profile redesign, T358 iOS port).
+
+- **Files** — `web/src/middleware.js`, `web/src/app/admin/auth-recovery/page.tsx` (new), `web/src/app/api/admin/auth-recovery/[user_id]/route.ts` (new), `Ongoing Projects/TODO.md`, `Ongoing Projects/CHANGELOG.md`.
+
+---
+
 ## 2026-04-27 (autonomous wave 8 — T317 + T310 + T355 shipped; T334 + T356 migrations drafted) — _shipped, pushed to git_ (commit 4791431)
 
 ### Shipped (3)

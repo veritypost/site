@@ -663,9 +663,8 @@ These items live in `web/src/app/redesign/*` (currently dev-mounted at `localhos
 **File:** `web/src/app/redesign/_components/PrivacyCard.tsx:168` writes `'hidden'`; `PublicProfileSection.tsx:75` writes `'public'|'private'`. Saving in either surface flips the other unexpectedly.
 **Fix:** Unify — PublicProfileSection reads `'hidden'` as a third tri-state (render read-only with link to PrivacyCard) OR expose the same tri-state.
 
-#### T333 — Dev-perms-all-true override gates only on `host === 'localhost:3333'` — **LOW** (defense-in-depth, demoted sixth-pass)
-**File:** `web/src/app/redesign/profile/ProfileApp.tsx:117-121`. Single host check; production hostnames never end in `:3333`, so the failure mode requires an environment misconfiguration AND a port collision — practically near-zero. Demoted from HIGH to LOW.
-**Fix:** Belt-and-suspenders — tighten to `process.env.NODE_ENV !== 'production' && host === 'localhost:3333'`. Same pattern in `web/src/middleware.js _isRedesignPort` check. Cheap edit; address opportunistically with the next redesign cutover work.
+#### T333 partial — middleware NODE_ENV guard shipped; redesign ProfileApp still pending — **LOW** (defense-in-depth)
+**Status:** `web/src/middleware.js` `_isRedesignPort` check now `&&`'s `process.env.NODE_ENV !== 'production'` — shipped 2026-04-27. The mirror in `web/src/app/redesign/profile/_components/ProfileApp.tsx:117-121` is in the untracked redesign tree; ships with the redesign-cutover commit (T357).
 
 #### T334 partial — `lockdown_self()` RPC migration drafted (T5, awaiting owner apply) — **HIGH** (auth/security)
 **File:** `Ongoing Projects/migrations/2026-04-27_T334_lockdown_self_rpc.sql` — SECURITY DEFINER function that atomically (a) flips `profile_visibility='hidden'`, (b) deletes the user's followers, (c) writes audit_log row, (d) bumps perms_version. Includes self-only auth.uid() check inside the function so RLS drift on follows can't compromise it.
@@ -763,19 +762,6 @@ System map §22 ("Cutover plan — taking the redesign live") was added after th
 **File:** `web/src/components/CommentThread.tsx` (query at line 117) + `web/src/components/CommentRow.tsx` (render around line 215).
 **Why this is a Phase 2:** T316 shipped the Pro badge in the profile hero (`web/src/app/profile/page.tsx`) by joining `plans:plan_id(tier)` into the user fetch. Comments need the same plumbing: extend the `users!user_id(...)` join in the comment fetch to include `plans:plan_id(tier)`, extend `CommentUser` type to carry the joined tier, render the existing neutral "Pro" badge next to username + VerifiedBadge in CommentRow.
 **Recommendation:** Single PR; T2-T3.
-
-#### T366 — Build `/admin/auth-recovery/` consolidated recovery page — **MEDIUM** (support tooling, owner-decided)
-**Owner pick (2026-04-27):** option C — one consolidated mini-page with multiple recovery levers (confirm email, clear `verify_locked_at`, reset failed-login lockout) rather than 3 separate per-action routes.
-**Spec:**
-- **Page:** `web/src/app/admin/auth-recovery/page.tsx`. Search-by-email or by-username input + a result panel with the user's current recovery-relevant state (email_verified, verify_locked_at, locked_until, deletion_scheduled_for) + 3 action buttons.
-- **Backend:** `web/src/app/api/admin/auth-recovery/[user_id]/route.ts` POST with `{ action: 'confirm_email' | 'clear_verify_lock' | 'clear_login_lock' }`.
-- **Permission:** new perm key `admin.auth_recovery` granted to admin + moderator role-set; backed by `requirePermission` server-side. Service-role does the actual mutation (each action wraps the right RPC or direct UPDATE).
-- **Audit:** every action writes a row to `audit_log` with `actor_id` + `action` (`admin:auth_recovery:confirm_email`, etc.) + `target_id`. Match the existing `recordAdminAction` pattern at `web/src/app/api/admin/articles/[id]/route.ts`.
-- **Confirm-email action:** `UPDATE users SET email_verified=true, email_verified_at=now() WHERE id=$1` + `bump_user_perms_version`.
-- **Clear-verify-lock action:** `UPDATE users SET verify_locked_at=NULL WHERE id=$1`.
-- **Clear-login-lock action:** call existing `clear_failed_login` RPC (already exists per `login/route.js:142`).
-- **Visual:** keep dense admin-table style; matches the existing `<EmptyState>` admin pattern, no `<ErrorState>` hero.
-**Why a single page:** support comes back to the same handful of tickets ("can't get the email", "locked out by failed verifies", "locked out by failed sign-ins"). One page = one bookmark for the support workflow.
 
 #### T363 — Public profile redesign placeholder needs full rebuild — **HIGH** (cutover-blocking)
 **File:** `web/src/app/redesign/u/[username]/page.tsx` is a static placeholder ("Public profile is being rebuilt"). The legacy `/u/[username]/page.tsx` is kill-switched (`PUBLIC_PROFILE_ENABLED=false`); on `:3333` the redesign just shows a holding state.
