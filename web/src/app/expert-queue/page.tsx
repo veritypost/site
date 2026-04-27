@@ -422,6 +422,17 @@ export default function ExpertQueuePage() {
                   ) : (
                     <div
                       dangerouslySetInnerHTML={{
+                        // T202 — explicit tight allowlist for the expert
+                        // answer preview. Replaces `USE_PROFILES: { html: true }`
+                        // which is documented as semantically equivalent to
+                        // the default safelist but signals "broad HTML is
+                        // intended" — wrong intent for user-authored content.
+                        // Event handlers are already stripped by DOMPurify
+                        // defaults; this enumerates the surface that markdown
+                        // realistically emits and refuses everything else,
+                        // future-proofing against any DOMPurify default drift.
+                        // Only consumer of expert-answer HTML in the repo is
+                        // this preview pane (verified 2026-04-26).
                         __html:
                           typeof window === 'undefined'
                             ? ''
@@ -429,7 +440,36 @@ export default function ExpertQueuePage() {
                                 marked.parse(answerDraft[it.id] || '', {
                                   async: false,
                                 }) as string,
-                                { USE_PROFILES: { html: true } }
+                                {
+                                  ALLOWED_TAGS: [
+                                    'p',
+                                    'br',
+                                    'strong',
+                                    'em',
+                                    'b',
+                                    'i',
+                                    'u',
+                                    's',
+                                    'del',
+                                    'code',
+                                    'pre',
+                                    'blockquote',
+                                    'h1',
+                                    'h2',
+                                    'h3',
+                                    'h4',
+                                    'h5',
+                                    'h6',
+                                    'ul',
+                                    'ol',
+                                    'li',
+                                    'a',
+                                    'img',
+                                    'hr',
+                                  ],
+                                  ALLOWED_ATTR: ['href', 'title', 'src', 'alt'],
+                                  ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|#|\/)/i,
+                                }
                               ),
                       }}
                       style={{

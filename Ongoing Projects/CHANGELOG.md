@@ -7,6 +7,20 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-26 (T202 — expert-queue DOMPurify hardening) — _shipped, pushed to git/Vercel_
+
+### T202 — Tighten DOMPurify config on expert markdown preview
+
+- **What** — `web/src/app/expert-queue/page.tsx:428-433` was sanitizing expert markdown with `DOMPurify.sanitize(html, { USE_PROFILES: { html: true } })`. Replaced with an explicit narrow allowlist (`ALLOWED_TAGS` covering only what `marked.parse` realistically emits + `ALLOWED_ATTR: ['href','title','src','alt']` + `ALLOWED_URI_REGEXP` rejecting non-http(s)/mailto/relative URIs).
+- **Audit claim was overstated** — TODO graded T202 CRITICAL on the premise that `<img onerror>` could survive the sanitize call. Both the Investigator and Adversary agents confirmed via DOMPurify v3.4.1 source that event-handler attributes are stripped by core regardless of `USE_PROFILES`. Current code was NOT actively exploitable; this commit is hardening, not a CVE patch.
+- **Why ship anyway** — `USE_PROFILES: { html: true }` reads as "broad HTML is intended" — wrong signal for user-authored content. Tight enumeration documents intent and future-proofs against DOMPurify default drift / library upgrade behavior. Cosmetic at runtime today; defensive against tomorrow.
+- **Why NOT also add server-side sanitization** — Per memory rule "don't add features beyond what the task requires." Single-consumer audit (verified): the expert-queue preview is the ONLY `dangerouslySetInnerHTML` site rendering expert-answer markdown. No admin view, no email body, no export consumes `answers.body` as HTML. Adding a server-side sanitization step at `/api/expert/queue/[id]/answer/route.js` for a hypothetical future consumer is premature abstraction. Revisit when a second consumer surfaces.
+- **SSR safety** — `typeof window === 'undefined' ? '' : DOMPurify.sanitize(...)` guard already in place from prior CHANGELOG entry; left untouched. Plain `dompurify` import (not `isomorphic-dompurify`) is correct per the 2026-04-26 jsdom-removal commit.
+- **CSP unchanged** — `script-src 'strict-dynamic' 'nonce-...'` (enforced) blocks injected scripts; `img-src 'self' data: blob: https:` is intentionally permissive for legitimate content; event handlers stripped at sanitize time mean `onerror` exfil is not a vector even if external image loads. No change warranted.
+- **Files** — `web/src/app/expert-queue/page.tsx` (single block at line 422-470 expanded with explicit allowlist + intent-comment).
+
+---
+
 ## 2026-04-26 (T3 + T64 + T65 — Phase 0A regwall preventative bundle) — _shipped, pushed to git/Vercel_
 
 ### T3 + T65 — Anon regwall and sign-up interstitial deferred to 80% scroll

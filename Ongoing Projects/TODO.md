@@ -1198,10 +1198,6 @@ Items below already moved to Pre-Launch Assessment (Apple/Sentry/COPPA-CRITICAL)
 
 ### Security (T202-T214)
 
-#### T202 — XSS via DOMPurify `USE_PROFILES: { html: true }` in expert markdown — **CRITICAL**
-**File:** `web/src/app/expert-queue/page.tsx:428-433`. `DOMPurify.sanitize(marked.parse(...), { USE_PROFILES: { html: true } })` then `dangerouslySetInnerHTML`. Expert can inject `<img onerror>` via Markdown.
-**Fix:** Drop `USE_PROFILES: html`; rely on default safe-list. Or strip all tags server-side before storage.
-
 #### T203 — Bearer token from Authorization header used without JWT signature check — **HIGH**
 **File:** `web/src/lib/auth.js:17-35`. `createClientFromToken(token)` is called with raw bearer; no verification of issuer/audience/signature before using.
 **Fix:** Verify JWT signature server-side via `SUPABASE_JWT_SECRET` before creating the client. Wrap `getUser()` to fail closed on invalid tokens.
