@@ -7,7 +7,7 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
-## 2026-04-27 (corrected migrations applied — T319 + T352 idx + T362 verified live; T307 final half wired) — _pending push to git_
+## 2026-04-27 (corrected migrations applied — T319 + T352 idx + T362 verified live; T307 final half wired) — _shipped, pushed to git_ (commit 4e42bc2)
 
 Owner applied the 3 corrected migration files. MCP verified all three landed:
 - `family_xl_remaining = 0` — T319 done (2 rows + 60 dependent rows cleared)
