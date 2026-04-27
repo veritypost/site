@@ -7,6 +7,30 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (owner-queue cleared — T117 closed, T338 closed, Confirm-email=OFF logged, T366 spawned) — _pending push to git_
+
+Owner cleared all four remaining queue items: T117 (option A), T338 (option A), `/admin/auth-recovery/` (option C), and confirmed Supabase "Confirm email" project setting is currently **OFF**.
+
+### Decisions logged
+
+- **T117 — closed.** Option A — the `<EmptyState>`-for-admin / `<ErrorState>`-for-user pattern split is intentional. Admin's table-dense layouts don't benefit from `<ErrorState>`'s hero treatment. T117 body deleted from TODO; the original ~19-page migration target was misframed and is no longer tracked.
+
+- **T338 — closed.** Option A — keep `warnSoft` (yellow) for the deletion-scheduled banner. Deletion is reversible during the 30-day window; warn (vs danger) signals "act if you didn't mean it" without oversignaling imminent irreversible loss. The user already saw a confirmation modal when scheduling deletion; the persistent banner is a reminder, not a panic alarm. T338 body deleted from TODO.
+
+- **Supabase "Confirm email" project setting = OFF.** Owner confirmed. Per the AUTH-MIGRATION pre-flight, the setting must flip ON before `signInWithOtp` traffic; otherwise sessions issue immediately on signup and magic-link doesn't actually wait for the click. **Logged into T345's body as an explicit pre-flight step** (alongside the existing beta-cron reconciliation). No code change today — this is an owner-applied dashboard toggle that lands inside the AUTH-MIGRATION execution session.
+
+- **`/admin/auth-recovery/` page — option C accepted; spawned as new T366.** Single consolidated mini-page with three recovery levers (confirm email, clear `verify_locked_at`, reset failed-login lockout) + audit-log entries per action. Full spec written into the T366 body in TODO so a future agent (or me, next session) can ship without re-deciding scope. Not built today — it's a security-touching admin page that deserves its own focused build session, not a tail-of-day commit.
+
+### Bookkeeping
+
+- TODO closures: T117 + T338 bodies deleted. Owner-queue section cleared (was 8 entries, now 0). T345 body updated with the Confirm-email=OFF finding. T366 spawned with full spec.
+- Owner-queue residual: **0 questions remain.** The autonomous loop is fully unblocked on every item except the AUTH-MIGRATION coordinated session (your call when to schedule).
+- Sister item not added: I noted in T309 closure that the only theoretical path to a both-set `frozen_at` + `plan_grace_period_ends_at` state would be a Stripe webhook setting grace while the user is already frozen. Worth a one-line check next time the Stripe webhook is in scope; not a verified bug.
+
+- **Files** — `Ongoing Projects/TODO.md` (T117 + T338 + 2 owner-queue entries deleted; T345 updated; T366 added), `Ongoing Projects/CHANGELOG.md` (this entry).
+
+---
+
 ## 2026-04-27 (T309 closed — all three RPCs already cross-clear correctly, verified via MCP) — _shipped, pushed to git_ (commit bd7c474)
 
 Owner authorized the MCP query for T309. Read all three function bodies via `pg_proc`:

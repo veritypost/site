@@ -80,7 +80,6 @@ LOCKED, awaiting "go" to ship code/migration:
 - **T26** — RPC migration adding `comment_reply` + `comment_mention` notifications via `create_notification`. Scope locked (in_app + push only).
 - **T55** — drop `ai_prompt_preset_versions` orphan table (T242 snapshot covers audit/replay).
 - **T57** — auto-mint Stripe price API on plan create (option B).
-- **T117** — _Moved to QUEUED FOR OWNER REVIEW (sixth-pass)._ Verification found admin pages use `<EmptyState>` by design (not `<ErrorState>`); only 6 user-facing pages currently use `<ErrorState>` (bookmarks, leaderboard, messages, notifications, profile, search). The original ~19-page migration target was misframed — admin's `<EmptyState>` pattern is intentional. Owner question queued.
 - **T-EMAIL-PRUNE** — drop 4 engagement types from `send-emails` cron; keep `data_export_ready` + `kid_trial_expired` + `expert_reverification_due`. Verified 2026-04-27: `web/src/app/api/cron/send-emails/route.js:21-29` currently maps 7 types. Concrete drops: `breaking_news`, `comment_reply`, `expert_answer_posted`, `kid_trial_day6`.
 
 DEFERRED (owner returning to it later — no decision yet):
@@ -291,37 +290,10 @@ Owner clears entries when they return. **Do NOT remove entries autonomously.**
 - A formatting / lint preference → defer to existing project conventions, keep going.
 - A "would be nice to also fix X" thought → add as a new TODO item if it's verified real, keep going.
 
-- **2026-04-27** — Supabase "Confirm email" project setting
-  - **What I was doing:** auditing the AUTH/PERMS SYSTEM MAP for blockers
-  - **What's blocking:** the system map's Phase 1 plan (and the AUTH-MIGRATION magic-link cutover) both depend on this setting being ON in Supabase Dashboard → Authentication → Sign In/Up. I cannot read this from code.
-  - **Question for owner:** is "Confirm email" currently ON in the production Supabase project? (If OFF, magic-link signups won't actually wait for the click — sessions will issue immediately on signup.)
-  - **Options I see:** (A) ON — proceed with AUTH-MIGRATION as planned; (B) OFF — flip ON before migration session, plan rollback if needed; (C) need help checking — owner pulls up the dashboard while we co-pilot. **Recommended pick: A** if it's already ON.
-  - **What I did instead:** captured the dependency as T345 (beta-cron pre-flight) + flagged here.
-
-- **2026-04-27** — Manual admin email-confirm tool (for support recovery cases)
-  - **What I was doing:** auditing the AUTH/PERMS SYSTEM MAP §13 (email-change flow leaves users stuck `email_verified=false` indefinitely if they never confirm)
-  - **What's blocking:** under magic-link, users who lose email access OR whose magic link gets eaten by a corporate scanner have NO recovery path other than support. The system map §18 raises whether an admin tool exists for this — I checked `web/src/app/admin/users/[id]/*` and there's no email-confirm action.
-  - **Question for owner:** ship a `/admin/users/[id]/confirm-email` action now (5-min route) so support has the lever, or wait until the first support ticket lands?
-  - **Options I see:** (A) ship now (defensive, ~1 hour incl. audit-log + 6-agent pattern); (B) defer until first ticket (lazy, but support has a manual SQL workaround anyway via the service-role connection); (C) add as a `/admin/auth-recovery/` mini-page with multiple recovery levers (confirm email, clear `verify_locked_at`, reset failed-login lockout) consolidated. **Recommended: C** — one page covers all the recovery cases that come up in beta + post-launch support.
-  - **What I did instead:** captured here.
 
 _(Above queue items added during the AUTH/PERMS SYSTEM MAP fifth-pass audit, 2026-04-27.)_
 
-- **2026-04-27** — T117 admin error-state primitive direction
-  - **What I was doing:** sixth-pass re-audit; original "migrate ~19 web pages to `<ErrorState>`" claim against admin pages.
-  - **What's blocking:** verification shows admin pages (analytics, breaking, ad-campaigns, ad-placements, email-templates, moderation, newsroom, pipeline, promo, recap, reports, sponsors, stories, subscriptions, support, webhooks) use `<EmptyState>` for both empty AND error rendering. User-facing pages (bookmarks, leaderboard, messages, notifications, profile, search) use `<ErrorState>`. The pattern split looks intentional, not a missed migration.
-  - **Question for owner:** keep the `<EmptyState>`-for-admin / `<ErrorState>`-for-user split (close T117 entirely), or unify everything onto `<ErrorState>` (re-enable the migration)?
-  - **Options I see:** (A) close T117, intentional pattern; (B) unify on `<ErrorState>`, ~16 admin pages to migrate; (C) build a third primitive `<AdminErrorState>` that visually matches admin's denser layout. **Recommended pick: A** — admin's denser table-style pages don't benefit from `<ErrorState>`'s hero treatment.
-  - **What I did instead:** removed T117 from skip list, captured here.
-
-- **2026-04-27** — T338 deletion-scheduled banner severity (`warnSoft` vs `dangerSoft`)
-  - **What I was doing:** sixth-pass re-audit of the redesign banner severity classes.
-  - **What's blocking:** verifier and adversary disagreed. Verifier called the original CONFIRMED (yellow understates 30-day countdown urgency); adversary called STALE (warn correctly signals "reversible during the window," danger would oversignal).
-  - **Question for owner:** UX call — `warnSoft` (yellow, current) or `dangerSoft` (red) for the 30-day deletion-scheduled banner?
-  - **Options I see:** (A) keep `warnSoft` — it's reversible; (B) switch to `dangerSoft` — irreversibility looms; (C) split severity by countdown remaining (warn → danger when <7 days left). **Recommended pick: A** unless owner wants harder pressure to revert.
-  - **What I did instead:** captured here, kept T338 body with the disagreement noted.
-
-_(Above queue items added during the sixth-pass full TODO re-audit, 2026-04-27.)_
+_(Above queue items added during the sixth-pass full TODO re-audit, 2026-04-27. **All resolved 2026-04-27** — see CHANGELOG.)_
 
 ---
 
@@ -724,11 +696,6 @@ These items live in `web/src/app/redesign/*` (currently dev-mounted at `localhos
 **File:** `web/src/app/redesign/_components/BillingCard.tsx`, `MFACard.tsx`, `SessionsSection.tsx`. Inconsistent with the rest of the redesign's modal style.
 **Fix:** Replace with `Card variant="danger"` pattern already used by Hidden lockdown confirm.
 
-#### T338 — Deletion-scheduled banner uses `warnSoft` not `dangerSoft` — **MEDIUM** (severity match — owner UX call queued)
-**File:** `web/src/app/redesign/_components/AccountStateBanner.tsx:78-82`. Account deletion is irreversible after 30 days; warn (yellow) understates severity.
-**Sixth-pass:** Reasonable case for keeping `warnSoft` — deletion is reversible during the 30-day window, so warn (vs danger) signals "act if you didn't mean it" rather than "imminent irreversible loss." Owner UX call queued.
-**Fix:** Switch to `dangerSoft` (red) only if owner agrees. Same change to `DataCard.tsx` inline pending-banner.
-
 #### T339 — `as never` casts on Avatar in PrivacyCard + BlockedSection — **MEDIUM** (type safety)
 **File:** `web/src/app/redesign/_components/PrivacyCard.tsx:492` and `BlockedSection.tsx:123`. Avatar receivers may be null → silent broken-avatar fallback.
 **Fix:** Define proper `AvatarUser` type; explicit null guard.
@@ -744,7 +711,8 @@ These aren't bugs with a file:line — they're architectural decisions, sequenci
 #### T345 — Beta-cron + AUTH-MIGRATION sequencing pre-flight — **CRITICAL** (BLOCKS AUTH-MIGRATION)
 **Source:** System map §11 (`sweep_beta_expirations` body lines 989-1090). When `settings.beta_active='false'`, the cron stamps `verify_locked_at=now()` for **every** beta user with `email_verified=false` — including owner-link recipients. The cron has a hard expiry baked in: any owner-link Pro user who hasn't verified by beta-end loses Pro AND gets stripped to the allowlist.
 **Why this matters now:** AUTH-MIGRATION (magic-link) cutover is the moment this trips. Currently-beta cohort users with passwords + `email_verified=false` get nuked at next sweep run after migration. Even if migration handles new signups via magic-link, the legacy beta cohort needs to be reconciled BEFORE the cron runs again.
-**Fix:** Pre-flight migration step before AUTH-MIGRATION ships: (a) bulk-trigger magic-link emails to all `cohort='beta' AND email_verified=false` users with a deadline, OR (b) admin-confirm them in bulk (set `email_verified=true` server-side under support exception), OR (c) flip `settings.beta_active='true'` permanently so the cron's downgrade path never fires. Pick one with owner before the migration session opens.
+**Confirmed 2026-04-27:** Supabase project setting "Confirm email" is currently **OFF**. Owner confirmed. This is an additional pre-flight item: under magic-link, "Confirm email" must flip ON or `signInWithOtp` won't wait for the click — sessions issue immediately on signup. The flip happens in Supabase Dashboard → Authentication → Sign In/Up before AUTH-MIGRATION's first traffic.
+**Fix:** Pre-flight steps before AUTH-MIGRATION ships, in order: (a) flip Supabase "Confirm email" setting ON; (b) reconcile the legacy beta cohort via bulk magic-link emails OR bulk admin-confirm OR keep `settings.beta_active='true'` through the migration window (owner's pick).
 
 #### T346 — Freeze scope is monetization-only, not content lockout — **MEDIUM** (product decision)
 **Source:** System map §14. `frozen_at` disables score scoring, DM, leaderboard visibility — but **NOT** comments, voting, following, or reading. A frozen user (e.g., disputed payment) can still post comments and follow others. Question: is freeze supposed to be a content lockout, or only a monetization signal?
@@ -822,6 +790,19 @@ System map §22 ("Cutover plan — taking the redesign live") was added after th
 **File:** `web/src/components/CommentThread.tsx` (query at line 117) + `web/src/components/CommentRow.tsx` (render around line 215).
 **Why this is a Phase 2:** T316 shipped the Pro badge in the profile hero (`web/src/app/profile/page.tsx`) by joining `plans:plan_id(tier)` into the user fetch. Comments need the same plumbing: extend the `users!user_id(...)` join in the comment fetch to include `plans:plan_id(tier)`, extend `CommentUser` type to carry the joined tier, render the existing neutral "Pro" badge next to username + VerifiedBadge in CommentRow.
 **Recommendation:** Single PR; T2-T3.
+
+#### T366 — Build `/admin/auth-recovery/` consolidated recovery page — **MEDIUM** (support tooling, owner-decided)
+**Owner pick (2026-04-27):** option C — one consolidated mini-page with multiple recovery levers (confirm email, clear `verify_locked_at`, reset failed-login lockout) rather than 3 separate per-action routes.
+**Spec:**
+- **Page:** `web/src/app/admin/auth-recovery/page.tsx`. Search-by-email or by-username input + a result panel with the user's current recovery-relevant state (email_verified, verify_locked_at, locked_until, deletion_scheduled_for) + 3 action buttons.
+- **Backend:** `web/src/app/api/admin/auth-recovery/[user_id]/route.ts` POST with `{ action: 'confirm_email' | 'clear_verify_lock' | 'clear_login_lock' }`.
+- **Permission:** new perm key `admin.auth_recovery` granted to admin + moderator role-set; backed by `requirePermission` server-side. Service-role does the actual mutation (each action wraps the right RPC or direct UPDATE).
+- **Audit:** every action writes a row to `audit_log` with `actor_id` + `action` (`admin:auth_recovery:confirm_email`, etc.) + `target_id`. Match the existing `recordAdminAction` pattern at `web/src/app/api/admin/articles/[id]/route.ts`.
+- **Confirm-email action:** `UPDATE users SET email_verified=true, email_verified_at=now() WHERE id=$1` + `bump_user_perms_version`.
+- **Clear-verify-lock action:** `UPDATE users SET verify_locked_at=NULL WHERE id=$1`.
+- **Clear-login-lock action:** call existing `clear_failed_login` RPC (already exists per `login/route.js:142`).
+- **Visual:** keep dense admin-table style; matches the existing `<EmptyState>` admin pattern, no `<ErrorState>` hero.
+**Why a single page:** support comes back to the same handful of tickets ("can't get the email", "locked out by failed verifies", "locked out by failed sign-ins"). One page = one bookmark for the support workflow.
 
 #### T363 — Public profile redesign placeholder needs full rebuild — **HIGH** (cutover-blocking)
 **File:** `web/src/app/redesign/u/[username]/page.tsx` is a static placeholder ("Public profile is being rebuilt"). The legacy `/u/[username]/page.tsx` is kill-switched (`PUBLIC_PROFILE_ENABLED=false`); on `:3333` the redesign just shows a holding state.
