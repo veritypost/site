@@ -1392,14 +1392,6 @@ Items below already moved to Pre-Launch Assessment (Apple/Sentry/COPPA-CRITICAL)
 
 ### Attorney / Legal (T264-T273)
 
-#### T265 — Missing CCPA "Do Not Sell or Share My Personal Information" link — **HIGH** (CPRA)
-**File:** `privacy/page.tsx:186` mentions California rights but no opt-out link/page exists.
-**Fix:** Footer link "Your California Privacy Rights" → opt-out page or modal. Declare GA4/AdSense as "sharing" if applicable; provide toggle.
-
-#### T266 — Missing Section 230 immunity language in TOS — **HIGH** (defamation defense)
-**File:** `terms/page.tsx:76-77`. No §230 disclaimer for user-generated comments / fact-checks.
-**Fix:** Add section: "Verity Post is a neutral platform under Section 230. Users are solely responsible for their comments and analyses."
-
 #### T267 — AI-generated content disclosure missing (EU AI Act + CA AB 2655) — **HIGH**
 **File:** `privacy/page.tsx:85-88` mentions AI processing but no end-user-facing disclosure on stories.
 **Fix:** Wire `is_ai_generated` flag to a story-page label "Summary generated with AI assistance"; update privacy policy to cite EU AI Act Article 50 + AB 2655 compliance.
@@ -1411,10 +1403,6 @@ Items below already moved to Pre-Launch Assessment (Apple/Sentry/COPPA-CRITICAL)
 #### T269 — Auto-renewal disclosure not at point of purchase (FTC ROSCA) — **MEDIUM**
 **File:** `terms/page.tsx:98-99` discloses auto-renewal but only at TOS page, not at checkout/billing UI.
 **Fix:** Inline disclosure at checkout: "Subscription auto-renews at $X.XX/[period] unless cancelled." Affirmative confirm before purchase button activates.
-
-#### T270 — Refund policy ambiguous — **LOW** (consumer protection)
-**File:** `terms/page.tsx:102-103`. "No paid content accessed" undefined.
-**Fix:** "Refunds available within 7 days of purchase OR before first paid-feature use, whichever comes first."
 
 #### T271 — Missing choice-of-law clause — **LOW** (contract enforceability)
 **File:** `terms/page.tsx`. No "Governing Law" section.
@@ -1496,9 +1484,6 @@ Items below already moved to Pre-Launch Assessment (Apple/Sentry/COPPA-CRITICAL)
 **File:** `web/src/app/help/page.tsx:96-98`. Lists ads/bookmarks/quiz/TTS/DMs/follows; no expert access mentioned.
 **Fix:** Confirm whether Verity tier includes expert access; update copy to match.
 
-#### T292 — Admin hub uses internal jargon "F7-native editor" — **MEDIUM** (admin clarity)
-**File:** `web/src/app/admin/page.tsx:32`. F7 is a project-internal codename.
-**Fix:** Replace with plain "integrated editor" or "newsroom editor."
 
 #### T295 — Help page price fallback hides Stripe-fetch failure — **MEDIUM**
 **File:** `web/src/app/help/page.tsx:28-31`. Falls back silently to hardcoded `$3.99/$9.99/$14.99`.

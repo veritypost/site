@@ -7,6 +7,29 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-26 (T265 + T266 + T270 + T292 — legal copy + admin jargon) — _shipped, pushed to git/Vercel_
+
+### T265 — California privacy disclosure + footer link
+
+- **What** — `web/src/app/privacy/page.tsx:184-189` had a 1-line mention of CCPA but no opt-out link or rights enumeration. Replaced with an explicit California rights bullet (id="california" anchor) listing right-to-know, right-to-delete, right-to-correct, right-to-opt-out, the GA4 + AdSense "sharing" disclosure under CPRA's broader sharing definition, and the request method (legal@veritypost.com with "California Privacy Request" subject + 45-day response window).
+- **Footer link** — `web/src/app/NavWrapper.tsx:395` adds "Your California Privacy Rights" → `/privacy#california` to the footer link cluster. Visible on every page; meets the CPRA "clear and conspicuous" placement requirement for the opt-out link.
+
+### T266 — Section 230 language in TOS
+
+- **What** — `web/src/app/terms/page.tsx` Section 2 (Content & Conduct) gains a new bullet: "Verity Post is an interactive computer service under 47 U.S.C. § 230. Comments, fact-checks, and other user-generated content reflect the views of their authors; users are solely responsible for material they post." Establishes the platform-vs-publisher posture explicitly. Sits next to the existing licensing + abuse-of-Verity-Score language.
+
+### T270 — Refund policy clarification
+
+- **What** — Section 3 bullet "Refunds are available within 7 days of purchase if no paid content has been accessed." → "within 7 days of purchase, or before the first paid feature is used after upgrading, whichever comes first. Contact support to request one." The original "no paid content has been accessed" was undefined; the new wording matches FTC consumer-protection guidance and tells the user how to act on it.
+
+### T292 — Admin hub jargon swap
+
+- **What** — `web/src/app/admin/page.tsx:32` Articles row description "review/edit/publish via the F7-native editor" → "review, edit, and publish through the integrated newsroom editor." F7 is an internal codename; an admin landing for the first time has no context for it.
+
+- **Files** — `web/src/app/privacy/page.tsx`, `web/src/app/NavWrapper.tsx`, `web/src/app/terms/page.tsx`, `web/src/app/admin/page.tsx`.
+
+---
+
 ## 2026-04-26 (T293 + T294 + T296 + T297 — page-walkthrough hardening pass) — _shipped, pushed to git/Vercel_
 
 ### Four small hardening fixes across notifications/reset-password/contact/ideas

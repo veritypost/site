@@ -29,7 +29,7 @@ const PAGES: HubGroup[] = [
     { href: '/admin/categories', title: 'Categories', desc: 'Taxonomy editor — top-level + subcategories, kids-safe gate, slug, status' },
     { href: '/admin/prompt-presets', title: 'Prompt presets', desc: 'Reusable generation instructions — adult, kid, or both' },
     { href: '/admin/feeds', title: 'Feeds', desc: 'RSS sources — outlets, audience routing, health, last poll' },
-    { href: '/admin/stories', title: 'Articles', desc: 'Browse all articles; click into a row to review/edit/publish via the F7-native editor' },
+    { href: '/admin/stories', title: 'Articles', desc: 'Browse all articles; click into a row to review, edit, and publish through the integrated newsroom editor' },
   ]},
   { group: 'Community & Moderation', desc: 'User-generated content, discussion rules, and content moderation', items: [
     { href: '/admin/comments', title: 'Discussion Settings', desc: 'Quiz gate, AI tagging, role badges, threading depth, health scoring' },

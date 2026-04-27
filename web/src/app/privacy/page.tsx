@@ -180,10 +180,17 @@ export default function PrivacyPage() {
               You may opt out of non-essential communications and data processing for recommendation
               purposes.
             </li>
-            <li>
-              California residents may exercise additional rights under the CCPA. EU residents are
-              protected under GDPR.
+            <li id="california">
+              <strong>California residents</strong> have additional rights under the CCPA / CPRA,
+              including the right to know what personal information we collect, the right to delete
+              it, the right to correct inaccuracies, and the right to opt out of any sale or sharing
+              of personal information. Verity Post does not sell or share personal information for
+              cross-context behavioral advertising; we use Google Analytics and Google AdSense for
+              limited purposes which may be deemed &quot;sharing&quot; under California law. To
+              exercise your rights — including the right to opt out — email legal@veritypost.com
+              with the subject line <em>California Privacy Request</em>. We respond within 45 days.
             </li>
+            <li>EU residents are protected under GDPR.</li>
             <li>
               To exercise any data rights, contact legal@veritypost.com or use the in-app privacy
               controls.

@@ -84,6 +84,11 @@ export default function TermsPage() {
               Abuse of the Verity Score system, including coordinated manipulation, will result in
               account suspension.
             </li>
+            <li>
+              Verity Post is an interactive computer service under 47 U.S.C. § 230. Comments,
+              fact-checks, and other user-generated content reflect the views of their authors;
+              users are solely responsible for material they post.
+            </li>
           </ul>
         </div>
 
@@ -99,7 +104,8 @@ export default function TermsPage() {
               the current billing period.
             </li>
             <li>
-              Refunds are available within 7 days of purchase if no paid content has been accessed.
+              Refunds are available within 7 days of purchase, or before the first paid feature is
+              used after upgrading, whichever comes first. Contact support to request one.
             </li>
           </ul>
         </div>
