@@ -713,14 +713,6 @@ Source: `Ongoing Projects/2026-04-27_AUTH_PERMS_SYSTEM_MAP.md`. 4 parallel Explo
 
 ### Auth/Billing flow — MEDIUM
 
-#### T312 — Perms cache has no realtime push (~60s nav lag) — **MEDIUM** (CX)
-**File:** `web/src/lib/permissions.js:81-99`. `refreshIfStale` polls `my_perms_version()` only on page navigation. Plan upgrade in another tab doesn't unlock UI until refresh.
-**Fix:** Wire 60s `setInterval` polling into ProfileApp + comment composer host pages, OR Supabase realtime subscription on `users.perms_version`.
-
-
-#### T316 — No Pro pride-of-status surface — **MEDIUM** (retention/upsell)
-**Status:** CONFIRMED-ABSENT. No tier-badge code in `web/src/components/CommentThread.tsx`, no Pro pill on profile header, no nav indicator.
-**Fix:** Small "Pro" pill next to username in comments + on profile header. Pride-of-status is a real retention driver for paid tiers.
 
 #### T317 — `access_codes.type` taxonomy is dual-purpose and mostly dead — **MEDIUM** (dead UI)
 **File:** `web/src/app/r/[slug]/route.ts:76-77` and `web/src/app/api/access-redeem/route.ts:62-63` filter `.eq('type', 'referral')` only. `web/src/app/admin/access/page.tsx:37` mints `'invite'|'press'|'beta'|'partner'` — none honored by redemption routes.
@@ -878,14 +870,6 @@ System map §22 ("Cutover plan — taking the redesign live") was added after th
 **Pre-flight: T359 (`profile_visibility='hidden'` audit) ships first.** T360 also a precondition (web Categories+Milestones must exist before iOS can mirror them).
 **Estimated:** Multi-week build, ships only after web cutover (T357) stabilizes. T4 review at minimum (cross-surface, security-sensitive).
 
-#### T359 — iOS `profile_visibility='hidden'` enum audit + lockdown read parity — **CRITICAL** (privacy leak parallel to T330)
-**Source:** System map §22.4 + §22.9. The redesign added `'hidden'` as a third value of `users.profile_visibility` (lockdown tier). Web has 4 of 5 read paths fixed; the 5th is T330. **iOS code currently only knows `'public' | 'private'`** — when web flips on `PUBLIC_PROFILE_ENABLED` and a lockdown user's row carries `'hidden'`, every iOS read path that gates on `=== 'private'` only is a parallel leak.
-**Fix:**
-- `grep -rn "profile_visibility" VerityPost/VerityPost/` to enumerate every read site
-- Update each to handle `'hidden'` the same as `'private'` (lockdown semantics — block public read)
-- Update `PublicProfileView.swift` (and any future `PublicProfileEditView` from T358) to handle the third state
-**Independent of T358 scope** — can ship as a small standalone PR before the full iOS port. **Should ship before** `PUBLIC_PROFILE_ENABLED` ever flips. T3 review (kids-or-adult-privacy-touching).
-
 #### T360 — Build redesign `CategoriesSection` + `MilestonesSection` on web — **MEDIUM** (gap, blocks T358)
 **Source:** System map §22.6 mapping table — both rows say "TBD on web — currently LinkOut". The redesign's profile shell currently uses `LinkOutSection.tsx` to point users at the legacy `/profile/category` and `/profile/milestones` pages instead of having inline section views. Cutover (T357) inherits this gap; iOS port (T358) cannot mirror sections that don't exist on web yet.
 **Fix:**
@@ -893,6 +877,11 @@ System map §22 ("Cutover plan — taking the redesign live") was added after th
 - Build `MilestonesSection.tsx` showing earned + still-ahead achievements with countdown ("76 days to go", "253 articles to go") per the `/redesign/preview` fixture.
 - Replace the two `LinkOutSection` entries in `ProfileApp.tsx` with the new section components.
 **Estimated:** Each section is ~300-400 LoC against existing data sources (`category_scores` and `user_achievements`). Single PR, T3 review.
+
+#### T365 — Pro pride pill in CommentRow (Phase 2 of T316) — **MEDIUM** (retention/upsell)
+**File:** `web/src/components/CommentThread.tsx` (query at line 117) + `web/src/components/CommentRow.tsx` (render around line 215).
+**Why this is a Phase 2:** T316 shipped the Pro badge in the profile hero (`web/src/app/profile/page.tsx`) by joining `plans:plan_id(tier)` into the user fetch. Comments need the same plumbing: extend the `users!user_id(...)` join in the comment fetch to include `plans:plan_id(tier)`, extend `CommentUser` type to carry the joined tier, render the existing neutral "Pro" badge next to username + VerifiedBadge in CommentRow.
+**Recommendation:** Single PR; T2-T3.
 
 #### T363 — Public profile redesign placeholder needs full rebuild — **HIGH** (cutover-blocking)
 **File:** `web/src/app/redesign/u/[username]/page.tsx` is a static placeholder ("Public profile is being rebuilt"). The legacy `/u/[username]/page.tsx` is kill-switched (`PUBLIC_PROFILE_ENABLED=false`); on `:3333` the redesign just shows a holding state.

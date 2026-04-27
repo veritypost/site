@@ -32,6 +32,12 @@ struct VPUser: Codable, Identifiable {
     /// Followers / Following) is hidden on every public surface. Defaults
     /// to `true` per the DB column default.
     var showActivity: Bool?
+    /// Mirrors `users.profile_visibility`. Three states: 'public' (default),
+    /// 'private' (opt-in hide from non-self viewers), 'hidden' (lockdown
+    /// tier added by the redesign — same gating as 'private' for read paths).
+    /// PublicProfileView gates render on this; the redesign cutover (T357 +
+    /// T363) will gate the public profile rebuild the same way.
+    var profileVisibility: String?
     var displayName: String?
     var bio: String?
     var avatarColor: String?
@@ -82,6 +88,7 @@ struct VPUser: Codable, Identifiable {
         case followersCount = "followers_count"
         case followingCount = "following_count"
         case showActivity = "show_activity"
+        case profileVisibility = "profile_visibility"
         case displayName = "display_name"
         case avatarColor = "avatar_color"
         case createdAt = "created_at"
@@ -90,7 +97,7 @@ struct VPUser: Codable, Identifiable {
 
     /// Backwards-compat accessor — every callsite reads `user.plan`.
     /// Returns the tier string ("free", "verity", "verity_pro",
-    /// "verity_family", "verity_family_xl") from the embedded plans row.
+    /// "verity_family") from the embedded plans row.
     var plan: String? { plans?.tier }
 
     var needsOnboarding: Bool { onboardingCompletedAt == nil }
@@ -117,7 +124,6 @@ struct VPUser: Codable, Identifiable {
         case "verity": return "Verity"
         case "verity_pro": return "Verity Pro"
         case "verity_family": return "Verity Family"
-        case "verity_family_xl": return "Verity Family XL"
         case "free": return "Free"
         default: return p.replacingOccurrences(of: "_", with: " ").capitalized
         }
@@ -345,10 +351,10 @@ struct KidProfile: Codable, Identifiable {
     var avatarUrl: String?
     var avatarPreset: String?
     var dateOfBirth: String?
-    var ageRange: String?
-    var readingLevel: String?
     var createdAt: Date?
     var pausedAt: Date?
+    var isActive: Bool?
+    var readingBand: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -358,14 +364,13 @@ struct KidProfile: Codable, Identifiable {
         case avatarUrl = "avatar_url"
         case avatarPreset = "avatar_preset"
         case dateOfBirth = "date_of_birth"
-        case ageRange = "age_range"
-        case readingLevel = "reading_level"
         case createdAt = "created_at"
         case pausedAt = "paused_at"
+        case isActive = "is_active"
+        case readingBand = "reading_band"
     }
 
     var name: String? { displayName }
-    var ageTier: String? { ageRange }
 
     private static let dobFmt: DateFormatter = {
         let f = DateFormatter()
@@ -385,17 +390,10 @@ struct KidProfile: Codable, Identifiable {
     }
 
     var ageLabel: String {
-        if let a = age {
-            if a < 13 { return "Under 13" }
-            if a <= 15 { return "13\u{2013}15" }
-            return "16+"
-        }
-        switch ageRange {
-        case "6-8", "9-12": return "Under 13"
-        case "13-15": return "13\u{2013}15"
-        case "16-17": return "16+"
-        default: return "Unknown"
-        }
+        guard let a = age else { return "Unknown" }
+        if a < 13 { return "Under 13" }
+        if a <= 15 { return "13\u{2013}15" }
+        return "16+"
     }
 }
 

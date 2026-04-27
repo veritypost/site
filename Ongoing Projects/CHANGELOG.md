@@ -7,6 +7,44 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (autonomous-fix wave 4 — T312 + T316 partial + T359 + 7 migration drafts) — _pending push to git_
+
+Fourth execution wave on the sixth-pass audit set. Three code-shippable items closed end-to-end + seven SQL migration files drafted for owner apply.
+
+### Shipped (code)
+
+- **T312 — perms cache 60s polling.** `web/src/app/NavWrapper.tsx`. Added `refreshIfStale` import + `setInterval(() => void refreshIfStale(), 60_000)` inside the auth useEffect, with `clearInterval` in the cleanup. The lib's `refreshIfStale` short-circuits when `my_perms_version()` matches the cached pair, so the typical tick is one cheap RPC. On a real bump, it hard-clears the capability cache so the UI picks up plan upgrades / lockout flips / admin perm edits without waiting for the next route navigation. The redesign mirror (T342) is in untracked files; ships with the redesign-cutover commit.
+
+- **T316 partial — Pro pride pill on profile hero.** `web/src/app/profile/page.tsx`. Added `plans:plan_id(tier)` to the user fetch + a Pro badge in the role-badges row when `plans.tier` is `verity` / `verity_pro` / `verity_family` / `verity_family_xl`. Single neutral pill (no color-per-tier per the owner-locked rule). Comment-thread Pro pill (the second half of T316) needs query plumbing in `CommentThread.tsx` + `CommentRow.tsx` and is captured as new **T365**.
+
+- **T359 — iOS `profile_visibility='hidden'` parity.** `VerityPost/VerityPost/Models.swift` + `VerityPost/VerityPost/PublicProfileView.swift`. Added `profileVisibility: String?` to `VPUser` (was selected from DB but discarded by the Codable decoder because the field wasn't declared), plus the `profile_visibility` CodingKey mapping. Then mirrored the web `/u/[username]/page.tsx:190` gate in `PublicProfileView.load()` — if the fetched row has `profile_visibility ∈ ('private', 'hidden')` AND the viewer isn't the profile owner, set `notFound = true` and return. The original audit framed this as a "missing 'hidden' check" but verification showed iOS had NO visibility gate at all — public profiles rendered regardless of the column value. Both bugs closed by the same fix.
+
+### Migration drafts queued for owner apply (`Ongoing Projects/migrations/`)
+
+- **`2026-04-27_T233_articles_soft_delete.sql`** — `admin_soft_delete_article` + `admin_restore_article` + `purge_soft_deleted_articles` cron + RLS read filter that excludes `deleted_at IS NOT NULL` for non-admin readers. Schema unchanged (`articles.deleted_at` already exists). Includes the route-side code change spec at the bottom.
+
+- **`2026-04-27_T352_audit_log_retention.sql`** — `anonymize_audit_log_pii()` (NULLs `actor_id` + `target_id` after 90 days for PII-class actions, lists those actions explicitly) + `purge_audit_log()` (hard-deletes after 365 days) + `audit_log_created_at_idx` (CONCURRENTLY, after the BEGIN/COMMIT block). GDPR data-minimization aligned.
+
+- **`2026-04-27_T353_webhook_log_retention.sql`** — `purge_webhook_log()` deletes rows older than 30 days. Stripe-idempotency only needs ~24h of recent events; 30d is the safety margin.
+
+- **`2026-04-27_T354_events_partition_drop.sql`** — converts `public.events` to PARTITION BY RANGE on `occurred_at`, monthly partitions, builds backfill partitions for any historical month present, ships `events_create_next_partition()` (mid-month cron, builds month+2) + `events_drop_old_partitions()` (1st-of-month cron, detaches+drops > 12mo). The CREATE TABLE column list mirrors `lib/events/types.ts` shape — owner verifies against the actual `events_legacy` schema before applying.
+
+- **`2026-04-27_T361_billing_period_standardize.sql`** — second half of T56's locked spec. Updates DB rows from `'monthly'`/`'annual'` → `'month'`/`'year'`, handles any leftover `'lifetime'` rows defensively (NOTICE'd for owner triage), adds CHECK constraint on `('month','year','')`. Code change spec for the admin form is in the file footer.
+
+- **`2026-04-27_T362_update_metadata_rpc.sql`** — `update_metadata(uuid, jsonb)` SECURITY DEFINER with `metadata = COALESCE(metadata, '{}') || $2` semantics. Caller must be self OR admin (service-role bypasses, which is the email-change path). Unblocks the deferred half of T307 (re-stamping `metadata.terms_accepted_at` on email change) — code change spec in file footer.
+
+- **`2026-04-27_T347_user_state_enum_DRAFT.sql`** — DRAFT only, no SQL body. Surfaces three model options (single-state enum + severity / bitmask / sidecar table) for owner pick before the full migration can be written. Touches ~30 read sites; large enough to halt before SQL bodies are committed.
+
+### Bookkeeping
+
+- TODO closures: bodies for T312, T316, T359 deleted. T365 added (Pro pill comment-thread Phase 2).
+- TypeScript: 13 pre-existing errors unchanged; my edits compile clean.
+- iOS Swift: no project compile run; SourceKit diagnostic about Supabase module is environmental (not from my edits — applies broadly outside Xcode).
+
+- **Files** — `web/src/app/NavWrapper.tsx` (T312), `web/src/app/profile/page.tsx` (T316), `VerityPost/VerityPost/Models.swift` + `VerityPost/VerityPost/PublicProfileView.swift` (T359), 7 new files in `Ongoing Projects/migrations/`, `Ongoing Projects/TODO.md`, `Ongoing Projects/CHANGELOG.md`.
+
+---
+
 ## 2026-04-27 (preview-fixture audit — 1 new TODO item, 2 confirmed-already-built) — _no code; bookkeeping only_ — _shipped, pushed to git_ (commit 82d51d1)
 
 Owner asked whether the redesign preview fixture (`web/src/app/redesign/preview/page.tsx` at `localhost:3333/redesign/preview`) had UI patterns not yet accounted for in TODO. Audited every section in the fixture against its corresponding live `_sections/` component. Result: 1 real gap, 2 confirmed-built, 2 already-tracked.

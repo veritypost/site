@@ -14,7 +14,7 @@ import {
 import { usePathname } from 'next/navigation';
 import { createClient } from '../lib/supabase/client';
 import AccountStateBanner from '../components/AccountStateBanner';
-import { hasPermission, refreshAllPermissions } from '../lib/permissions';
+import { hasPermission, refreshAllPermissions, refreshIfStale } from '../lib/permissions';
 import type { Tables } from '@/types/database-helpers';
 import { Z } from '@/lib/zIndex';
 
@@ -236,9 +236,20 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
       loadProfile(session?.user || null);
     });
 
+    // T312 — 60s perms-version poll. refreshIfStale() short-circuits when
+    // the global + user perms_version values match the cached pair, so the
+    // typical tick is a single RPC round-trip. On a real bump (admin edit /
+    // plan upgrade / lockout flip) it hard-clears + repopulates the
+    // capability cache so the UI picks up the change without waiting for
+    // the next route navigation.
+    const permsPollInterval = setInterval(() => {
+      void refreshIfStale();
+    }, 60_000);
+
     return () => {
       cancelled = true;
       sub?.subscription?.unsubscribe?.();
+      clearInterval(permsPollInterval);
     };
   }, []);
 

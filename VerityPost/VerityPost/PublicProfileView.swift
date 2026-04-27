@@ -362,6 +362,18 @@ struct PublicProfileView: View {
                 .limit(1)
                 .single()
                 .execute().value
+            // T330 / T359 — mirror the web /u/[username]/page.tsx gate:
+            // 'private' is the legacy opt-in hide; 'hidden' is the lockdown
+            // tier added by the redesign. Both must look like notFound to
+            // anyone other than the profile owner — otherwise lockdown
+            // leaks the moment PUBLIC_PROFILE_ENABLED flips.
+            if let visibility = row?.profileVisibility,
+               (visibility == "private" || visibility == "hidden"),
+               row?.id != auth.currentUser?.id {
+                profile = nil
+                notFound = true
+                return
+            }
             profile = row
             if row == nil { notFound = true }
             if let target = row?.id, let me = auth.currentUser?.id {

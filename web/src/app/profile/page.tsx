@@ -217,9 +217,12 @@ function ProfilePageInner() {
     let cancelled = false;
 
     async function load(authUserId: string) {
+      // T316 — pull joined plan tier so the Pro pride badge can render
+      // without a second round-trip. Other fields stay on `select('*')`
+      // so this is additive — no downstream caller change.
       const { data: row } = await supabase
         .from('users')
-        .select('*')
+        .select('*, plans:plan_id(tier)')
         .eq('id', authUserId)
         .maybeSingle();
       if (cancelled) return;
@@ -749,6 +752,22 @@ function OverviewTab({
   if (user.is_expert) roleBadges.push({ label: 'Expert', variant: 'info' });
   if (user.expert_title) roleBadges.push({ label: user.expert_title, variant: 'neutral' });
   if (user.is_verified_public_figure) roleBadges.push({ label: 'Verified', variant: 'success' });
+  // T316 — Pro pride badge. Single neutral pill (no color-per-tier per the
+  // owner-locked rule); says "Pro" for any paid billing tier. Free/anon
+  // users never see it. Renders alongside the existing role badges. The
+  // joined `plans` relation comes from the user-fetch query above.
+  {
+    const billingTier =
+      (user as UserRow & { plans?: { tier?: string | null } | null }).plans?.tier ?? null;
+    if (
+      billingTier === 'verity' ||
+      billingTier === 'verity_pro' ||
+      billingTier === 'verity_family' ||
+      billingTier === 'verity_family_xl'
+    ) {
+      roleBadges.push({ label: 'Pro', variant: 'neutral' });
+    }
+  }
 
   return (
     <>
