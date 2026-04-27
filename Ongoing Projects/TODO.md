@@ -541,10 +541,6 @@ The numbered items below retain their original section placement for readability
 **File:** `VerityPost/VerityPost/FindView.swift:8` (MVP deferral comment).
 **Fix:** Add category filter + date range picker for paid tiers, gated on the same web permission keys.
 
-### T39 — Onboarding "Get started" routes to home, not to a featured article — **MEDIUM**
-**File:** `web/src/app/welcome/page.tsx:228`
-**Fix:** Route to first article shown in carousel screen 3, fallback to `/browse`.
-
 ### T40 — Web story timeline desktop aside is `false &&` killed — **MEDIUM** (decision needed)
 **File:** `web/src/app/story/[slug]/page.tsx:1776`
 **Fix:** Decide whether desktop aside ships at launch. If yes, drop the `false &&`. If no, document as deliberate launch-phase hide.
@@ -953,14 +949,6 @@ The numbered items below retain their original section placement for readability
 #### T145 — Profile zero-state shows three separate empty states without prioritization — **MEDIUM** (activation)
 **File:** `web/src/app/profile/page.tsx:853, 1166, 1730`. Activity/categories/achievements all empty independently.
 **Fix:** Consolidated single empty state: "Read an article. Pass the quiz to unlock comments and build your score."
-
-#### T146 — Anon notifications page CTA doesn't explain what user will miss — **LOW** (conversion)
-**File:** `web/src/app/notifications/page.tsx:180-200`. "Sign in for breaking news alerts" — no mention of category alerts or reply notifications.
-**Fix:** Expanded copy listing the notification types they'd get.
-
-#### T147 — Recap kill-switch returns `null` with no "coming soon" surface — **MEDIUM** (discovery)
-**File:** `web/src/app/recap/page.tsx:42-45`. Users never learn the feature exists.
-**Fix:** Replace null with a landing card explaining recap, gated/dated.
 
 #### T148 — iOS Alerts shows Manage tab to anon, lands on disabled state — **MEDIUM** (UX)
 **File:** `VerityPost/VerityPost/AlertsView.swift:137-150,29-32`. Two tabs visible; Manage tab is disabled placeholder.

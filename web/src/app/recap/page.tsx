@@ -41,8 +41,64 @@ const C = {
 // companion revert guide in Sessions/04-21-2026.
 const LAUNCH_HIDE_RECAP = true;
 
+// T147 — when the launch hide is on, render a small landing card so
+// visitors who land on /recap (deep-link, search, navigation) understand
+// the feature exists and is on the way. Returning null leaves users on
+// a blank page wondering whether the route is broken.
+function RecapComingSoonCard() {
+  return (
+    <div
+      style={{
+        maxWidth: 540,
+        margin: '60px auto',
+        padding: '32px 24px',
+        background: '#fafafa',
+        border: '1px solid #e5e5e5',
+        borderRadius: 12,
+        textAlign: 'center',
+        color: '#111',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      }}
+    >
+      <div
+        style={{
+          fontSize: 12,
+          fontWeight: 700,
+          letterSpacing: '0.18em',
+          textTransform: 'uppercase',
+          color: '#666',
+          marginBottom: 12,
+        }}
+      >
+        Coming soon
+      </div>
+      <h1 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 12px' }}>Your weekly recap</h1>
+      <p style={{ fontSize: 14, lineHeight: 1.6, color: '#444', margin: '0 0 18px' }}>
+        Each Sunday Verity Post will compile the articles you read, the quizzes you passed, and the
+        threads you joined into a single Sunday-morning summary. We&apos;re finishing the editorial
+        polish; the recap goes live alongside paid plans.
+      </p>
+      <a
+        href="/"
+        style={{
+          display: 'inline-block',
+          padding: '10px 18px',
+          background: '#111',
+          color: '#fff',
+          borderRadius: 8,
+          fontSize: 13,
+          fontWeight: 600,
+          textDecoration: 'none',
+        }}
+      >
+        Back to home
+      </a>
+    </div>
+  );
+}
+
 export default function RecapListPage() {
-  if (LAUNCH_HIDE_RECAP) return null;
+  if (LAUNCH_HIDE_RECAP) return <RecapComingSoonCard />;
 
   // eslint-disable-next-line react-hooks/rules-of-hooks -- launch-hide pattern; remove when feature unhides (FIX_SESSION_1 launch-hides)
   const [loading, setLoading] = useState<boolean>(true);

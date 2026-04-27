@@ -130,7 +130,22 @@ export default function WelcomePage() {
         content_type: 'welcome',
         payload: { carousel_screen_reached: index + 1 },
       });
-      router.replace(getValidatedNextPath('/'));
+      // T39 — route a fresh signup straight into reading. The first
+      // article preview the user already saw on the carousel's screen 3
+      // is the natural target. /next= (validated) still wins when the
+      // signup came from an inviter or other deep-link; fall through to
+      // first-story → /browse if neither is available.
+      const validatedNext =
+        typeof window !== 'undefined'
+          ? resolveNext(new URLSearchParams(window.location.search).get('next'), null)
+          : null;
+      const firstStorySlug = stories?.[0]?.slug || null;
+      const target = validatedNext
+        ? validatedNext
+        : firstStorySlug
+          ? `/story/${firstStorySlug}`
+          : '/browse';
+      router.replace(target);
     } catch (err) {
       console.error('Onboarding finish failed', err);
       const msg =

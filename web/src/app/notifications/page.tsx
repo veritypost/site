@@ -219,8 +219,8 @@ export default function NotificationsInbox() {
           Keep track of what matters
         </h1>
         <p style={{ fontSize: 14, color: C.dim, margin: '0 0 22px', lineHeight: 1.55 }}>
-          Sign up to get notified when your favorite authors post and when your comments get
-          replies.
+          Sign up to get notified about breaking news, replies to your comments, new articles in
+          categories you follow, and achievements you unlock as you read.
         </p>
         <a
           href="/signup"

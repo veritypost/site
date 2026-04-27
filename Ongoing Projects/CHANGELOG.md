@@ -7,6 +7,23 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (T39 + T146 + T147 — engagement-loop polish bundle) — _shipped, pushed to git/Vercel_
+
+### T39 — Welcome carousel routes signup into reading
+
+- **What** — `web/src/app/welcome/page.tsx`: finishing onboarding called `router.replace(getValidatedNextPath('/'))`. Replaced with a tiered route picker: validated `?next=` wins (preserves inviter deep-links); falls through to `/story/<first carousel preview slug>` (already fetched at line 104 for the screen-3 preview); falls through to `/browse` as last resort. Reuses the existing `resolveNext` helper for the `next=` validation. Cold signup lands inside an article instead of an unfamiliar feed.
+
+### T146 — Anon notifications CTA enumerates value
+
+- **What** — `web/src/app/notifications/page.tsx:221-224`: copy "Sign up to get notified when your favorite authors post and when your comments get replies." → "Sign up to get notified about breaking news, replies to your comments, new articles in categories you follow, and achievements you unlock as you read." Lists the four notification surfaces concretely so cold visitors see the value beyond reply notifications.
+
+### T147 — Recap landing card replaces silent null
+
+- **What** — `web/src/app/recap/page.tsx`: pre-launch the page returned `null`, so deep-links to `/recap` rendered a blank page (looks broken). Added a `RecapComingSoonCard` component rendered only while `LAUNCH_HIDE_RECAP=true` — small landing card with "Coming soon" eyebrow, brief copy explaining the feature ("Each Sunday Verity Post will compile the articles you read, the quizzes you passed, and the threads you joined into a single Sunday-morning summary. We're finishing the editorial polish; the recap goes live alongside paid plans."), and a back-to-home CTA. Per memory rule "launch-phase hides are temporary — don't delete," the underlying flag stays; only the empty-render path was filled.
+- **Files** — `web/src/app/welcome/page.tsx`, `web/src/app/notifications/page.tsx`, `web/src/app/recap/page.tsx`.
+
+---
+
 ## 2026-04-26 (T30 + T31 — quiz UX polish) — _shipped, pushed to git/Vercel_
 
 ### T30 — Interstitial ad no longer hijacks score reveal
