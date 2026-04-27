@@ -32,74 +32,84 @@ function isActiveMute(user: UserRow): boolean {
   return new Date(user.muted_until) > new Date();
 }
 
-function pickState(user: UserRow | null | undefined): BannerState | null {
-  if (!user) return null;
+// T305 — return ALL applicable banner states, ordered high-severity first.
+// Previously `pickState` returned the FIRST match, so a banned + frozen user
+// only saw the ban notice; the frozen-score signal was hidden until the ban
+// lifted. Mirrors the redesign's `deriveAccountStates()` shape (every state
+// the user is in, sorted by severity) but stays scoped to the legacy banner's
+// 6 states + bespoke red/amber tokens.
+function pickStates(user: UserRow | null | undefined): BannerState[] {
+  if (!user) return [];
+  const states: BannerState[] = [];
 
   if (user.is_banned) {
-    return {
+    states.push({
       severity: 'high',
       message: 'Your account is banned. Comments, messages, and uploads are disabled.',
       ctaLabel: 'Appeal',
       ctaHref: '/appeal',
-    };
+    });
   }
 
   if (user.locked_until && new Date(user.locked_until) > new Date()) {
     const until = new Date(user.locked_until).toLocaleString();
-    return {
+    states.push({
       severity: 'high',
       message: `Account temporarily locked after repeated failed sign-ins. Try again after ${until}.`,
       ctaLabel: 'Reset password',
       ctaHref: '/forgot-password',
-    };
+    });
+  }
+
+  if (user.deletion_scheduled_for) {
+    const when = new Date(user.deletion_scheduled_for).toLocaleDateString();
+    states.push({
+      severity: 'high',
+      message: `Account deletion scheduled for ${when}. Sign in again before then to cancel.`,
+      ctaLabel: 'Cancel deletion',
+      ctaHref: '/profile/settings/data',
+    });
+  }
+
+  if (user.frozen_at) {
+    states.push({
+      severity: 'high',
+      message:
+        'Your Verity Score is frozen. Resubscribe to a paid plan to continue tracking progress.',
+      ctaLabel: 'Resubscribe',
+      ctaHref: '/billing',
+    });
   }
 
   if (isActiveMute(user)) {
     const until = user.muted_until ? new Date(user.muted_until).toLocaleString() : null;
-    return {
+    states.push({
       severity: 'low',
       message: until
         ? `You are muted until ${until}. You can read and react but not post comments.`
         : 'You are muted. You can read and react but not post comments.',
       ctaLabel: 'Appeal',
       ctaHref: '/appeal',
-    };
-  }
-
-  if (user.deletion_scheduled_for) {
-    const when = new Date(user.deletion_scheduled_for).toLocaleDateString();
-    return {
-      severity: 'high',
-      message: `Account deletion scheduled for ${when}. Sign in again before then to cancel.`,
-      ctaLabel: 'Cancel deletion',
-      ctaHref: '/profile/settings/data',
-    };
-  }
-
-  if (user.frozen_at) {
-    return {
-      severity: 'high',
-      message:
-        'Your Verity Score is frozen. Resubscribe to a paid plan to continue tracking progress.',
-      ctaLabel: 'Resubscribe',
-      ctaHref: '/billing',
-    };
+    });
   }
 
   if (user.plan_grace_period_ends_at) {
     const end = new Date(user.plan_grace_period_ends_at);
     if (end > new Date()) {
       const days = Math.max(1, Math.ceil((end.getTime() - Date.now()) / (24 * 60 * 60 * 1000)));
-      return {
+      states.push({
         severity: 'low',
         message: `Your plan ends in ${days} day${days === 1 ? '' : 's'}. Resume billing to keep paid features.`,
         ctaLabel: 'Resume billing',
         ctaHref: '/billing',
-      };
+      });
     }
   }
 
-  return null;
+  // High-severity first. Within a severity, preserve insertion order
+  // (mirror the legacy first-match priority: banned > locked > deletion >
+  // frozen > muted > plan_grace).
+  return states.sort((a, b) => (a.severity === b.severity ? 0 : a.severity === 'high' ? -1 : 1));
 }
 
 interface AccountStateBannerProps {
@@ -107,46 +117,52 @@ interface AccountStateBannerProps {
 }
 
 export default function AccountStateBanner({ user }: AccountStateBannerProps) {
-  const state = pickState(user);
-  if (!state) return null;
-
-  const palette =
-    state.severity === 'high'
-      ? { bg: C.redBg, border: C.redBorder, text: C.redText }
-      : { bg: C.amberBg, border: C.amberBorder, text: C.amberText };
+  const states = pickStates(user);
+  if (states.length === 0) return null;
 
   return (
-    <div
-      role="status"
-      aria-live="polite"
-      style={{
-        background: palette.bg,
-        borderBottom: `1px solid ${palette.border}`,
-        color: palette.text,
-        padding: '10px 16px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 16,
-        fontSize: 13,
-        lineHeight: 1.45,
-        flexWrap: 'wrap',
-      }}
-    >
-      <span style={{ fontWeight: 600 }}>{state.message}</span>
-      {state.ctaHref && (
-        <a
-          href={state.ctaHref}
-          style={{
-            color: C.cta,
-            fontWeight: 700,
-            textDecoration: 'underline',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {state.ctaLabel}
-        </a>
-      )}
-    </div>
+    <>
+      {states.map((state, i) => {
+        const palette =
+          state.severity === 'high'
+            ? { bg: C.redBg, border: C.redBorder, text: C.redText }
+            : { bg: C.amberBg, border: C.amberBorder, text: C.amberText };
+        return (
+          <div
+            key={`${state.severity}-${i}-${state.ctaLabel}`}
+            role="status"
+            aria-live="polite"
+            style={{
+              background: palette.bg,
+              borderBottom: `1px solid ${palette.border}`,
+              color: palette.text,
+              padding: '10px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 16,
+              fontSize: 13,
+              lineHeight: 1.45,
+              flexWrap: 'wrap',
+            }}
+          >
+            <span style={{ fontWeight: 600 }}>{state.message}</span>
+            {state.ctaHref && (
+              <a
+                href={state.ctaHref}
+                style={{
+                  color: C.cta,
+                  fontWeight: 700,
+                  textDecoration: 'underline',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {state.ctaLabel}
+              </a>
+            )}
+          </div>
+        );
+      })}
+    </>
   );
 }

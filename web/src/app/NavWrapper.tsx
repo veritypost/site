@@ -71,8 +71,14 @@ export const AuthContext = createContext<AuthContextValue>({
 export const useAuth = () => useContext(AuthContext);
 
 function deriveTier(user: ProfileRow | null): string {
+  // T302 — three states for the auth/verify dimension:
+  //   'anon'        no signed-in user (logged out / cold visit)
+  //   'unverified'  signed in but email_verified=false (was previously
+  //                 collapsed into 'anon', polluting Pro-unverified
+  //                 retention vs actually-anonymous retention).
+  //   <plan-tier>   verified, bucketed by paid tier or 'free_verified'.
   if (!user) return 'anon';
-  if (!user.email_verified) return 'anon';
+  if (!user.email_verified) return 'unverified';
   // Ext-B3 — read tier from the joined plans row instead of substring
   // matching the plan_id UUID. The previous heuristic could misfire if
   // a plan_id literal ever contained an unrelated substring, and added

@@ -11,6 +11,9 @@ import { trackServer } from '@/lib/trackServer';
 // surfaces. Returns one of: 'anon' / 'free_verified' / 'verity' /
 // 'verity_pro' / 'verity_family' / 'verity_family_xl'.
 async function deriveServerTier(userId) {
+  // Mirror NavWrapper.deriveTier — same buckets, same rules. T302 split
+  // 'unverified' out of 'anon' so the funnel-join can distinguish
+  // signed-in-unverified vs actually-anonymous viewers.
   if (!userId) return 'anon';
   try {
     const service = createServiceClient();
@@ -19,7 +22,7 @@ async function deriveServerTier(userId) {
       .select('email_verified, plans:plan_id(tier)')
       .eq('id', userId)
       .maybeSingle();
-    if (!data?.email_verified) return 'anon';
+    if (!data?.email_verified) return 'unverified';
     const tier = data.plans?.tier || null;
     if (
       tier === 'verity_family_xl' ||

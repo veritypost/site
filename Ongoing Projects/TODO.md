@@ -691,10 +691,6 @@ Source: `Ongoing Projects/2026-04-27_AUTH_PERMS_SYSTEM_MAP.md`. 4 parallel Explo
 
 ### Auth/Billing flow — HIGH
 
-#### T302 — NavWrapper undercounts Pro-unverified as `tier='anon'` — **HIGH** (analytics fidelity)
-**File:** `web/src/app/NavWrapper.tsx:74-86`. `if (!user.email_verified) return 'anon'` flattens unverified-with-Pro and actually-anonymous into the same bucket, polluting all downstream telemetry.
-**Fix:** Per system map §17 Phase 0.1 — simplify to 5 buckets `'anon' | 'unverified' | 'free' | 'pro' | 'family'`. Sweep ~9 hardcoded `=== 'anon'` callsites for compatibility.
-
 #### T303 — Leaderboard hardcoded `.eq('email_verified', true)` filters — **HIGH** (truth-in-UI)
 **File:** `web/src/app/leaderboard/page.tsx:207, 242, 327`. Three identical hardcoded filters that override the public `leaderboard.view` perm grant. Pro-unverified beta users see top-3-only.
 **Fix:** Drop all three filters (perm-driven only) OR consolidate via the same allowlist gate that compute_effective_perms uses. Owner decision required.
@@ -702,10 +698,6 @@ Source: `Ongoing Projects/2026-04-27_AUTH_PERMS_SYSTEM_MAP.md`. 4 parallel Explo
 #### T304 — Stripe + cohort double-billing risk — **HIGH** (revenue/CX)
 **File:** `web/src/app/api/stripe/checkout/route.js` (and `web/src/lib/stripe.js`). No pre-checkout guard against `cohort='beta' + plan_id=verity_pro_monthly + comped_until > now()`. A beta user who clicks Upgrade pays $9.99 Stripe-side; `sweep_beta_expirations` only modifies local state, never cancels upstream Stripe.
 **Fix:** Pre-checkout 409 if cohort-Pro-active. Bundle with billing-state-machine work.
-
-#### T305 — AccountStateBanner first-match only — **HIGH** (visibility)
-**File:** `web/src/components/AccountStateBanner.tsx` `pickState` lines 35-102 returns the first matching state. A banned + frozen user sees only the ban banner. Resolved in `web/src/app/redesign/_lib/states.ts` (returns sorted-severity stack) — pending redesign cutover.
-**Fix:** Either accelerate redesign cutover to pick up `deriveAccountStates()`, or backport the multi-state stack to the legacy banner. Tracked alongside Bundle 5.
 
 #### T308 — Admin manual-sync downgrade ignores `frozen_at` — **HIGH** (state coherence)
 **File:** `web/src/app/api/admin/subscriptions/[id]/manual-sync/route.js:100-150` (downgrade branch). Comment at line 32 says "we leave verity_score / frozen_at alone" — frozen user downgraded to free remains frozen-on-free, logically incoherent (no plan to be frozen against).

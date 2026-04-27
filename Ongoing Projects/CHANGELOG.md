@@ -7,6 +7,30 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (autonomous-fix wave 3: 2 T3 items shipped, 1 deferred with reason) — _pending push to git_
+
+Third execution wave. 2 of the 3 T3 medium items shipped end-to-end. T329 deferred because its precondition (T322 — wire 16 missing event types) hasn't shipped, so an admin events dashboard would have nothing meaningful to surface yet.
+
+### Shipped (T3, tracked files)
+
+- **T302 — `'anon'` tier bucket split into `'anon'` + `'unverified'`.** `web/src/app/NavWrapper.tsx:73-92` and the new `deriveServerTier` in `web/src/app/api/account/onboarding/route.js`. Three states for the auth/verify dimension now: `'anon'` (no signed-in user / cold visit), `'unverified'` (signed in but `email_verified=false`), `<plan-tier>` (verified, bucketed by paid tier). Pro-unverified retention vs actually-anonymous retention can now be distinguished — the previous flatten was polluting every downstream cohort analysis.
+  - **Scope-narrowing note:** the audit + system map §17 Phase 0.1 had recommended a full 5-bucket consolidation (`'anon' | 'unverified' | 'free' | 'pro' | 'family'` — i.e., also rename `verity_pro` → `pro`, etc.). I shipped only the `'anon'` split since that's the actual bug; the rename is product-facing analytics terminology that should have owner sign-off, and there are zero hardcoded `=== 'anon'` consumers in the codebase (the audit's "~9 callsites" claim was wrong — fresh grep returned 1 hit, the AuthContext default itself).
+
+- **T305 — AccountStateBanner returns ALL states, ordered high-severity first.** `web/src/components/AccountStateBanner.tsx`. Renamed `pickState` → `pickStates` (array return); component now maps to N stacked banners. A banned + frozen user used to see only the ban banner; now both render. Mirrors the redesign's `deriveAccountStates()` shape but stays scoped to the legacy banner's 6 states + bespoke red/amber tokens (no scope creep into the redesign's 14-state taxonomy). Sole consumer is `NavWrapper.tsx:397`; type-check confirms no other callers.
+
+### Deferred from this wave
+
+- **T329 — admin/analytics events-table panels.** Not shipped. The TODO body explicitly listed T322 (wire 16 missing event types — `article_read_start`, `subscribe_complete`, `bookmark_add`, etc.) as a precondition. Until those events fire, an `events`-table dashboard would render mostly-empty tiles. Pairing them in one bundle when T322 is picked up.
+
+### Verification
+
+- TypeScript: `npx tsc --noEmit -p tsconfig.json` — no new errors introduced. 13 pre-existing errors unchanged.
+- TODO closures: bodies for T302, T305 deleted from the file.
+
+- **Files touched** — `web/src/app/NavWrapper.tsx`, `web/src/app/api/account/onboarding/route.js`, `web/src/components/AccountStateBanner.tsx`, `Ongoing Projects/TODO.md`, `Ongoing Projects/CHANGELOG.md`.
+
+---
+
 ## 2026-04-27 (autonomous-fix wave 2: 7 T2 items shipped, 3 deferred with reasons) — _pending push to git_
 
 Second execution wave on the sixth-pass audit set. 7 T2 items shipped end-to-end. 3 T2 items deferred with explicit reasons (homoglyph library install, T5 retry-table, NavWrapper coupling). 3 T2 items in untracked redesign files held for the redesign-cutover commit.
