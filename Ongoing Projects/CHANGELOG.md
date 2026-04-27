@@ -7,6 +7,34 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (preview-fixture audit — 1 new TODO item, 2 confirmed-already-built) — _no code; bookkeeping only_ — _pending push to git_
+
+Owner asked whether the redesign preview fixture (`web/src/app/redesign/preview/page.tsx` at `localhost:3333/redesign/preview`) had UI patterns not yet accounted for in TODO. Audited every section in the fixture against its corresponding live `_sections/` component. Result: 1 real gap, 2 confirmed-built, 2 already-tracked.
+
+### Audit results
+
+- **YouSection — MATCHES preview.** `_sections/YouSection.tsx` uses `<TierProgress>` (`_components/TierProgress.tsx`) which renders the exact same shape: "Next tier" label + tier name + "N pts to go" + min/current/max range + progress bar. Plus the StatTile grid for the numbers (Verity Score / Articles / Quizzes / Comments / Followers / Following). No-action.
+
+- **PlanSection — MATCHES preview.** `_sections/PlanSection.tsx` delegates to `_cards/BillingCard.tsx`, which renders the exact "CURRENT PLAN" label + plan name + "Renews [date]" + "Active" pill (success-soft/green) the preview shows. Goes further with Trial/Cancelled state pills + Resume action. No-action.
+
+- **ActivitySection / MessagesSection / ExpertQueueSection — MATCH preview.** Filter pills, unread state, queue tabs all confirmed present. No-action.
+
+- **PrivacyCard followers multi-select — MATCHES preview.** `_cards/PrivacyCard.tsx` already implements the "Select all" + "X of N selected" + danger-soft pickup pattern shown in the fixture's Followers section. No-action.
+
+- **CategoriesSection + MilestonesSection — already tracked as T360.** Files don't exist yet; T360 captures the build (mirror leaderboard pill-row pattern + 2-stat drilldown for Categories; earned + still-ahead grid for Milestones).
+
+### New finding — T363
+
+- **Public profile redesign placeholder needs full rebuild.** `web/src/app/redesign/u/[username]/page.tsx` (83 lines) is a static "Public profile is being rebuilt" placeholder, not a real surface. Per its own copy, the rebuild needs: hero, member-since, expert badge with organization, tier expression (plain text per no-color-per-tier rule), paginated followers/following, real report sheet (the `lib/reportReasons` enum already exists), block-from-public action. The preview fixture covers user-own profile only; public-profile shape needs design first. T4 review minimum (cross-surface, security-sensitive — privacy leaks if wrong). Captured as **T363**, HIGH, cutover-blocking. Coordinates with T330 (just-shipped 'hidden' check) + T331 + T359 (iOS parallel) before `PUBLIC_PROFILE_ENABLED` ever flips.
+
+### Sentry / Pre-Launch hygiene check
+
+Owner direction was to ensure Sentry + Apple submission items live in `Pre-Launch Assessment.md`, not TODO. Grep confirms TODO's 8 Sentry mentions are all cross-references to Pre-Launch (runbook routing rules, "tracked separately" notes, closure logs) — zero active Sentry items on TODO. Same shape for Apple submission. No moves needed.
+
+- **Files** — `Ongoing Projects/TODO.md` (T363 added), `Ongoing Projects/CHANGELOG.md` (this entry).
+
+---
+
 ## 2026-04-27 (autonomous-fix wave 3: 2 T3 items shipped, 1 deferred with reason) — _shipped, pushed to git_ (commit 87bea57)
 
 Third execution wave. 2 of the 3 T3 medium items shipped end-to-end. T329 deferred because its precondition (T322 — wire 16 missing event types) hasn't shipped, so an admin events dashboard would have nothing meaningful to surface yet.

@@ -894,6 +894,12 @@ System map §22 ("Cutover plan — taking the redesign live") was added after th
 - Replace the two `LinkOutSection` entries in `ProfileApp.tsx` with the new section components.
 **Estimated:** Each section is ~300-400 LoC against existing data sources (`category_scores` and `user_achievements`). Single PR, T3 review.
 
+#### T363 — Public profile redesign placeholder needs full rebuild — **HIGH** (cutover-blocking)
+**File:** `web/src/app/redesign/u/[username]/page.tsx` is a static placeholder ("Public profile is being rebuilt"). The legacy `/u/[username]/page.tsx` is kill-switched (`PUBLIC_PROFILE_ENABLED=false`); on `:3333` the redesign just shows a holding state.
+**Per its own placeholder copy, the rebuild needs:** new hero, member-since, expert badge with organization, tier expression (plain text per the no-color-per-tier rule), paginated followers/following lists, real report sheet (matching the legacy `PROFILE_REPORT_REASONS` enum already in code at `lib/reportReasons`), and a working block-from-public action. The preview fixture at `redesign/preview/page.tsx` doesn't cover the public-profile shape — only the user-own-profile shape — so the design spec needs to be drawn before this can ship.
+**Coupling:** Co-ships with the T357 cutover OR ships earlier as a `/redesign/u/[username]` build that the T357 cutover then renames to `/u/[username]`. Either way, T330 (just-shipped 'hidden' check) AND T331 + T359 (iOS parallel) must all be in place before `PUBLIC_PROFILE_ENABLED` flips.
+**Estimated:** Multi-session build. T4 review (cross-surface, security-sensitive — leaks public PII if wrong).
+
 #### T362 — `update_metadata` RPC with JSONB merge semantics — **MEDIUM** (T5)
 **Source:** Half of the T307 spec — re-stamping `metadata.terms_accepted_at` after an email change requires merging into the existing JSONB column, not overwriting it. A plain `.update({ metadata: {...} })` clobbers other keys (`age_confirmed_at`, `terms_version`, etc.).
 **Fix:** SECURITY DEFINER RPC `update_metadata(p_user_id uuid, p_keys jsonb)` that does `UPDATE users SET metadata = COALESCE(metadata, '{}'::jsonb) || p_keys WHERE id = p_user_id`. Then call from `email-change/route.js` after the email-flip succeeds. T5 — halt and queue migration.
