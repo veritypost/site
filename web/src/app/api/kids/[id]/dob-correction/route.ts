@@ -125,21 +125,11 @@ export async function POST(request: Request, { params }: { params: { id: string 
       : null;
 
   // Resolve kid profile + parent ownership.
-  // Cast: generated Database types lag the Phase 3 migration that adds
-  // reading_band to kid_profiles; the column exists post-deploy.
-  type KidRow = {
-    id: string;
-    parent_user_id: string;
-    date_of_birth: string | null;
-    reading_band: string | null;
-    is_active: boolean | null;
-  };
-  const { data: kidRaw, error: kidErr } = await service
+  const { data: kid, error: kidErr } = await service
     .from('kid_profiles')
-    .select('id, parent_user_id, date_of_birth, reading_band, is_active' as never)
+    .select('id, parent_user_id, date_of_birth, reading_band, is_active')
     .eq('id', params.id)
     .maybeSingle();
-  const kid = kidRaw as unknown as KidRow | null;
   if (kidErr || !kid) {
     return NextResponse.json({ error: 'Kid not found' }, { status: 404 });
   }
@@ -223,11 +213,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
 
   // Pre-check: lifetime correction limit (one approved per kid, ever).
-  // Cast: kid_dob_correction_requests table is new in Phase 4; types
-  // regen post-migration drops the cast.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const corrTable = service.from('kid_dob_correction_requests' as any);
-  const { count: priorApproved } = await corrTable
+  const { count: priorApproved } = await service
+    .from('kid_dob_correction_requests')
     .select('id', { count: 'exact', head: true })
     .eq('kid_profile_id', params.id)
     .eq('status', 'approved');
@@ -248,13 +235,12 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   // Insert request. The unique index `idx_dob_corrections_one_pending`
   // catches the race where a concurrent submit beat us.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const insertTable = service.from('kid_dob_correction_requests' as any);
-  const { data: insertedRaw, error: insErr } = await insertTable
+  const { data: inserted, error: insErr } = await service
+    .from('kid_dob_correction_requests')
     .insert({
       kid_profile_id: params.id,
       parent_user_id: user.id,
-      current_dob: kid.date_of_birth,
+      current_dob: kid.date_of_birth!,
       requested_dob: body.requested_dob,
       current_band: currentBand,
       resulting_band: resultingBand,
@@ -267,12 +253,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
     })
     .select('id, status, cooldown_ends_at, direction')
     .single();
-  const inserted = insertedRaw as unknown as {
-    id: string;
-    status: string;
-    cooldown_ends_at: string | null;
-    direction: 'younger' | 'older' | 'same';
-  } | null;
   if (insErr || !inserted) {
     if (insErr?.code === '23505') {
       return NextResponse.json(
@@ -332,9 +312,8 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     return NextResponse.json({ error: 'Kid not found' }, { status: 404 });
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const histTable = service.from('kid_dob_correction_requests' as any);
-  const { data, error } = await histTable
+  const { data, error } = await service
+    .from('kid_dob_correction_requests')
     .select(
       'id, requested_dob, current_dob, current_band, resulting_band, direction, reason, status, decision_reason, decided_at, cooldown_ends_at, created_at'
     )

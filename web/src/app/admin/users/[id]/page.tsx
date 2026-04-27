@@ -325,7 +325,9 @@ export default function UserDossierPage() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 600, color: ADMIN_C.white }}>{kid.display_name}</div>
                   <div style={{ fontSize: F.xs, color: ADMIN_C.dim, marginTop: 2 }}>
-                    {kid.age_range ? `Age range: ${kid.age_range}` : '—'}
+                    {/* Phase 3: kid_profiles.age_range was retired; reading_band
+                        is the system-derived band ('kids' | 'tweens' | 'graduated'). */}
+                    {kid.reading_band ? `Band: ${kid.reading_band}` : '—'}
                     {kid.reading_level ? ` · Level: ${kid.reading_level}` : ''}
                     {` · VP: ${kid.verity_score}`}
                     {` · Streak: ${kid.streak_current}`}

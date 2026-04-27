@@ -63,15 +63,11 @@ export default function TweensStoryManagerPage() {
         return;
       }
       try {
-        // Cast: generated Database types lag the Phase 3 migration that
-        // adds age_band to articles; the column exists post-deploy.
         const { data, error } = await supabase
           .from('articles')
           .select('*')
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .eq('is_kids_safe', true)
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .eq('age_band' as never, 'tweens')
+          .eq('age_band', 'tweens')
           .order('created_at', { ascending: false })
           .limit(200);
         if (cancelled) return;

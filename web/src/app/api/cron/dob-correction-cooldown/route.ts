@@ -84,9 +84,8 @@ async function checkFraudSignals(
   // Signal 2: parent has any prior approved correction (defense-in-depth
   // beyond the unique index).
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const corrTable = service.from('kid_dob_correction_requests' as any);
-    const { count } = await corrTable
+    const { count } = await service
+      .from('kid_dob_correction_requests')
       .select('id', { count: 'exact', head: true })
       .eq('parent_user_id', row.parent_user_id)
       .eq('status', 'approved');
@@ -134,11 +133,8 @@ async function handle() {
 
   // Pull all pending younger-band requests whose cooldown has elapsed.
   const nowIso = new Date().toISOString();
-  // Cast: kid_dob_correction_requests is new in Phase 4; types regen
-  // post-migration drops the cast.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const corrTable = service.from('kid_dob_correction_requests' as any);
-  const { data: pending, error: pendingErr } = await corrTable
+  const { data: pending, error: pendingErr } = await service
+    .from('kid_dob_correction_requests')
     .select(
       'id, kid_profile_id, parent_user_id, current_dob, requested_dob, direction, cooldown_ends_at, created_at'
     )
@@ -159,7 +155,7 @@ async function handle() {
   let escalated = 0;
   let errors = 0;
 
-  const pendingRows = (pending as unknown as CorrectionRow[]) ?? [];
+  const pendingRows = (pending ?? []) as CorrectionRow[];
   for (const row of pendingRows) {
     try {
       const signals = await checkFraudSignals(service, row);
@@ -168,9 +164,8 @@ async function handle() {
         // re-evaluate immediately, and stash the signals on the row for
         // admin review visibility.
         const extended = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const updTable = service.from('kid_dob_correction_requests' as any);
-        await updTable
+        await service
+          .from('kid_dob_correction_requests')
           .update({
             cooldown_ends_at: extended,
             decision_reason: `Auto-approval blocked. Signals: ${signals.reasons.join(', ')}. Pending manual review.`,
@@ -184,9 +179,7 @@ async function handle() {
       // system_apply_dob_correction variant that's grantable to
       // service_role; the admin variant gates on auth.uid() which
       // returns null for cron / service role).
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const rpc = service.rpc as any;
-      await rpc('system_apply_dob_correction', {
+      await service.rpc('system_apply_dob_correction', {
         p_request_id: row.id,
         p_decision_reason: 'cooldown_auto_approval',
       });

@@ -226,6 +226,9 @@ export type Database = {
           approved_by: string | null
           created_at: string
           email: string
+          email_confirm_expires_at: string | null
+          email_confirm_token: string | null
+          email_confirmed_at: string | null
           id: string
           invite_sent_at: string | null
           ip_address: string | null
@@ -244,6 +247,9 @@ export type Database = {
           approved_by?: string | null
           created_at?: string
           email: string
+          email_confirm_expires_at?: string | null
+          email_confirm_token?: string | null
+          email_confirmed_at?: string | null
           id?: string
           invite_sent_at?: string | null
           ip_address?: string | null
@@ -262,6 +268,9 @@ export type Database = {
           approved_by?: string | null
           created_at?: string
           email?: string
+          email_confirm_expires_at?: string | null
+          email_confirm_token?: string | null
+          email_confirmed_at?: string | null
           id?: string
           invite_sent_at?: string | null
           ip_address?: string | null
@@ -1452,6 +1461,7 @@ export type Database = {
       }
       articles: {
         Row: {
+          age_band: string | null
           ai_confidence_score: number | null
           ai_model: string | null
           ai_prompt_id: string | null
@@ -1527,6 +1537,7 @@ export type Database = {
           word_count: number | null
         }
         Insert: {
+          age_band?: string | null
           ai_confidence_score?: number | null
           ai_model?: string | null
           ai_prompt_id?: string | null
@@ -1602,6 +1613,7 @@ export type Database = {
           word_count?: number | null
         }
         Update: {
+          age_band?: string | null
           ai_confidence_score?: number | null
           ai_model?: string | null
           ai_prompt_id?: string | null
@@ -5139,6 +5151,8 @@ export type Database = {
           locked_at: string | null
           locked_by: string | null
           primary_article_id: string | null
+          primary_kid_article_id: string | null
+          primary_tween_article_id: string | null
           similarity_threshold: number | null
           summary: string | null
           title: string | null
@@ -5163,6 +5177,8 @@ export type Database = {
           locked_at?: string | null
           locked_by?: string | null
           primary_article_id?: string | null
+          primary_kid_article_id?: string | null
+          primary_tween_article_id?: string | null
           similarity_threshold?: number | null
           summary?: string | null
           title?: string | null
@@ -5187,6 +5203,8 @@ export type Database = {
           locked_at?: string | null
           locked_by?: string | null
           primary_article_id?: string | null
+          primary_kid_article_id?: string | null
+          primary_tween_article_id?: string | null
           similarity_threshold?: number | null
           summary?: string | null
           title?: string | null
@@ -5205,6 +5223,20 @@ export type Database = {
             columns: ["locked_by"]
             isOneToOne: false
             referencedRelation: "pipeline_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feed_clusters_primary_kid_article_id_fkey"
+            columns: ["primary_kid_article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feed_clusters_primary_tween_article_id_fkey"
+            columns: ["primary_tween_article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
             referencedColumns: ["id"]
           },
           {
@@ -5384,6 +5416,50 @@ export type Database = {
             columns: ["following_id"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      graduation_tokens: {
+        Row: {
+          consumed_at: string | null
+          consumed_by_user_id: string | null
+          created_at: string
+          expires_at: string
+          intended_email: string
+          kid_profile_id: string
+          metadata: Json
+          parent_user_id: string
+          token: string
+        }
+        Insert: {
+          consumed_at?: string | null
+          consumed_by_user_id?: string | null
+          created_at?: string
+          expires_at: string
+          intended_email: string
+          kid_profile_id: string
+          metadata?: Json
+          parent_user_id: string
+          token: string
+        }
+        Update: {
+          consumed_at?: string | null
+          consumed_by_user_id?: string | null
+          created_at?: string
+          expires_at?: string
+          intended_email?: string
+          kid_profile_id?: string
+          metadata?: Json
+          parent_user_id?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "graduation_tokens_kid_profile_id_fkey"
+            columns: ["kid_profile_id"]
+            isOneToOne: false
+            referencedRelation: "kid_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -5603,227 +5679,6 @@ export type Database = {
           },
         ]
       }
-      kid_articles: {
-        Row: {
-          ai_confidence_score: number | null
-          ai_model: string | null
-          ai_prompt_id: string | null
-          ai_provider: string | null
-          author_id: string | null
-          body: string
-          body_html: string | null
-          bookmark_count: number
-          canonical_url: string | null
-          category_id: string
-          cluster_id: string | null
-          comment_count: number
-          content_flags: Json
-          cover_image_alt: string | null
-          cover_image_credit: string | null
-          cover_image_url: string | null
-          created_at: string
-          csam_scanned: boolean
-          deleted_at: string | null
-          difficulty_level: string | null
-          excerpt: string | null
-          external_id: string | null
-          generated_at: string | null
-          generated_by_model: string | null
-          generated_by_provider: string | null
-          id: string
-          is_ai_generated: boolean
-          is_breaking: boolean
-          is_developing: boolean
-          is_featured: boolean
-          is_opinion: boolean
-          is_verified: boolean
-          language: string
-          metadata: Json
-          moderation_notes: string | null
-          moderation_status: string
-          needs_manual_review: boolean
-          nsfw_score: number | null
-          plagiarism_status: string | null
-          prompt_fingerprint: string | null
-          publish_at: string | null
-          published_at: string | null
-          push_sent: boolean
-          reading_time_minutes: number | null
-          retraction_reason: string | null
-          search_tsv: unknown
-          search_vector: unknown
-          seo_description: string | null
-          seo_keywords: string[] | null
-          seo_title: string | null
-          share_count: number
-          slug: string
-          source_feed_id: string | null
-          source_url: string | null
-          sponsor_id: string | null
-          status: string
-          subcategory_id: string | null
-          subtitle: string | null
-          tags: string[] | null
-          thumbnail_url: string | null
-          title: string
-          unpublished_at: string | null
-          updated_at: string
-          verified_at: string | null
-          verified_by: string | null
-          view_count: number
-          visibility: string
-          word_count: number | null
-        }
-        Insert: {
-          ai_confidence_score?: number | null
-          ai_model?: string | null
-          ai_prompt_id?: string | null
-          ai_provider?: string | null
-          author_id?: string | null
-          body: string
-          body_html?: string | null
-          bookmark_count?: number
-          canonical_url?: string | null
-          category_id: string
-          cluster_id?: string | null
-          comment_count?: number
-          content_flags?: Json
-          cover_image_alt?: string | null
-          cover_image_credit?: string | null
-          cover_image_url?: string | null
-          created_at?: string
-          csam_scanned?: boolean
-          deleted_at?: string | null
-          difficulty_level?: string | null
-          excerpt?: string | null
-          external_id?: string | null
-          generated_at?: string | null
-          generated_by_model?: string | null
-          generated_by_provider?: string | null
-          id?: string
-          is_ai_generated?: boolean
-          is_breaking?: boolean
-          is_developing?: boolean
-          is_featured?: boolean
-          is_opinion?: boolean
-          is_verified?: boolean
-          language?: string
-          metadata?: Json
-          moderation_notes?: string | null
-          moderation_status?: string
-          needs_manual_review?: boolean
-          nsfw_score?: number | null
-          plagiarism_status?: string | null
-          prompt_fingerprint?: string | null
-          publish_at?: string | null
-          published_at?: string | null
-          push_sent?: boolean
-          reading_time_minutes?: number | null
-          retraction_reason?: string | null
-          search_tsv?: unknown
-          search_vector?: unknown
-          seo_description?: string | null
-          seo_keywords?: string[] | null
-          seo_title?: string | null
-          share_count?: number
-          slug: string
-          source_feed_id?: string | null
-          source_url?: string | null
-          sponsor_id?: string | null
-          status?: string
-          subcategory_id?: string | null
-          subtitle?: string | null
-          tags?: string[] | null
-          thumbnail_url?: string | null
-          title: string
-          unpublished_at?: string | null
-          updated_at?: string
-          verified_at?: string | null
-          verified_by?: string | null
-          view_count?: number
-          visibility?: string
-          word_count?: number | null
-        }
-        Update: {
-          ai_confidence_score?: number | null
-          ai_model?: string | null
-          ai_prompt_id?: string | null
-          ai_provider?: string | null
-          author_id?: string | null
-          body?: string
-          body_html?: string | null
-          bookmark_count?: number
-          canonical_url?: string | null
-          category_id?: string
-          cluster_id?: string | null
-          comment_count?: number
-          content_flags?: Json
-          cover_image_alt?: string | null
-          cover_image_credit?: string | null
-          cover_image_url?: string | null
-          created_at?: string
-          csam_scanned?: boolean
-          deleted_at?: string | null
-          difficulty_level?: string | null
-          excerpt?: string | null
-          external_id?: string | null
-          generated_at?: string | null
-          generated_by_model?: string | null
-          generated_by_provider?: string | null
-          id?: string
-          is_ai_generated?: boolean
-          is_breaking?: boolean
-          is_developing?: boolean
-          is_featured?: boolean
-          is_opinion?: boolean
-          is_verified?: boolean
-          language?: string
-          metadata?: Json
-          moderation_notes?: string | null
-          moderation_status?: string
-          needs_manual_review?: boolean
-          nsfw_score?: number | null
-          plagiarism_status?: string | null
-          prompt_fingerprint?: string | null
-          publish_at?: string | null
-          published_at?: string | null
-          push_sent?: boolean
-          reading_time_minutes?: number | null
-          retraction_reason?: string | null
-          search_tsv?: unknown
-          search_vector?: unknown
-          seo_description?: string | null
-          seo_keywords?: string[] | null
-          seo_title?: string | null
-          share_count?: number
-          slug?: string
-          source_feed_id?: string | null
-          source_url?: string | null
-          sponsor_id?: string | null
-          status?: string
-          subcategory_id?: string | null
-          subtitle?: string | null
-          tags?: string[] | null
-          thumbnail_url?: string | null
-          title?: string
-          unpublished_at?: string | null
-          updated_at?: string
-          verified_at?: string | null
-          verified_by?: string | null
-          view_count?: number
-          visibility?: string
-          word_count?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "kid_articles_cluster_id_fkey"
-            columns: ["cluster_id"]
-            isOneToOne: false
-            referencedRelation: "feed_clusters"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       kid_category_permissions: {
         Row: {
           category_id: string
@@ -5863,72 +5718,114 @@ export type Database = {
           },
         ]
       }
-      kid_discovery_items: {
+      kid_dob_correction_requests: {
         Row: {
-          article_id: string | null
-          cluster_id: string | null
+          cooldown_ends_at: string | null
           created_at: string
-          feed_id: string | null
-          fetched_at: string
+          current_band: string
+          current_dob: string
+          decided_at: string | null
+          decided_by: string | null
+          decision_reason: string | null
+          direction: string
+          documentation_url: string | null
           id: string
-          metadata: Json
-          raw_body: string | null
-          raw_published_at: string | null
-          raw_title: string | null
-          raw_url: string
-          state: string
-          updated_at: string
+          ip_address: unknown
+          kid_profile_id: string
+          parent_user_id: string
+          reason: string
+          requested_dob: string
+          resulting_band: string
+          status: string
         }
         Insert: {
-          article_id?: string | null
-          cluster_id?: string | null
+          cooldown_ends_at?: string | null
           created_at?: string
-          feed_id?: string | null
-          fetched_at?: string
+          current_band: string
+          current_dob: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_reason?: string | null
+          direction: string
+          documentation_url?: string | null
           id?: string
-          metadata?: Json
-          raw_body?: string | null
-          raw_published_at?: string | null
-          raw_title?: string | null
-          raw_url: string
-          state?: string
-          updated_at?: string
+          ip_address?: unknown
+          kid_profile_id: string
+          parent_user_id: string
+          reason: string
+          requested_dob: string
+          resulting_band: string
+          status?: string
         }
         Update: {
-          article_id?: string | null
-          cluster_id?: string | null
+          cooldown_ends_at?: string | null
           created_at?: string
-          feed_id?: string | null
-          fetched_at?: string
+          current_band?: string
+          current_dob?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_reason?: string | null
+          direction?: string
+          documentation_url?: string | null
           id?: string
-          metadata?: Json
-          raw_body?: string | null
-          raw_published_at?: string | null
-          raw_title?: string | null
-          raw_url?: string
-          state?: string
-          updated_at?: string
+          ip_address?: unknown
+          kid_profile_id?: string
+          parent_user_id?: string
+          reason?: string
+          requested_dob?: string
+          resulting_band?: string
+          status?: string
         }
         Relationships: [
           {
-            foreignKeyName: "kid_discovery_items_article_id_fkey"
-            columns: ["article_id"]
+            foreignKeyName: "kid_dob_correction_requests_kid_profile_id_fkey"
+            columns: ["kid_profile_id"]
             isOneToOne: false
-            referencedRelation: "kid_articles"
+            referencedRelation: "kid_profiles"
             referencedColumns: ["id"]
           },
+        ]
+      }
+      kid_dob_history: {
+        Row: {
+          actor_user_id: string | null
+          change_source: string
+          created_at: string
+          decision_reason: string | null
+          id: string
+          ip_address: unknown
+          kid_profile_id: string
+          new_dob: string
+          old_dob: string | null
+        }
+        Insert: {
+          actor_user_id?: string | null
+          change_source: string
+          created_at?: string
+          decision_reason?: string | null
+          id?: string
+          ip_address?: unknown
+          kid_profile_id: string
+          new_dob: string
+          old_dob?: string | null
+        }
+        Update: {
+          actor_user_id?: string | null
+          change_source?: string
+          created_at?: string
+          decision_reason?: string | null
+          id?: string
+          ip_address?: unknown
+          kid_profile_id?: string
+          new_dob?: string
+          old_dob?: string | null
+        }
+        Relationships: [
           {
-            foreignKeyName: "kid_discovery_items_cluster_id_fkey"
-            columns: ["cluster_id"]
+            foreignKeyName: "kid_dob_history_kid_profile_id_fkey"
+            columns: ["kid_profile_id"]
             isOneToOne: false
-            referencedRelation: "feed_clusters"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "kid_discovery_items_feed_id_fkey"
-            columns: ["feed_id"]
-            isOneToOne: false
-            referencedRelation: "feeds"
+            referencedRelation: "kid_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -6108,11 +6005,13 @@ export type Database = {
       }
       kid_profiles: {
         Row: {
-          age_range: string | null
           articles_read_count: number
           avatar_color: string | null
           avatar_preset: string | null
           avatar_url: string | null
+          band_changed_at: string
+          band_history: Json
+          birthday_prompt_at: string | null
           coppa_consent_at: string | null
           coppa_consent_given: boolean
           created_at: string
@@ -6132,6 +6031,7 @@ export type Database = {
           pin_locked_until: string | null
           pin_salt: string | null
           quizzes_completed_count: number
+          reading_band: string
           reading_level: string | null
           streak_best: number
           streak_current: number
@@ -6142,11 +6042,13 @@ export type Database = {
           verity_score: number
         }
         Insert: {
-          age_range?: string | null
           articles_read_count?: number
           avatar_color?: string | null
           avatar_preset?: string | null
           avatar_url?: string | null
+          band_changed_at?: string
+          band_history?: Json
+          birthday_prompt_at?: string | null
           coppa_consent_at?: string | null
           coppa_consent_given?: boolean
           created_at?: string
@@ -6166,6 +6068,7 @@ export type Database = {
           pin_locked_until?: string | null
           pin_salt?: string | null
           quizzes_completed_count?: number
+          reading_band?: string
           reading_level?: string | null
           streak_best?: number
           streak_current?: number
@@ -6176,11 +6079,13 @@ export type Database = {
           verity_score?: number
         }
         Update: {
-          age_range?: string | null
           articles_read_count?: number
           avatar_color?: string | null
           avatar_preset?: string | null
           avatar_url?: string | null
+          band_changed_at?: string
+          band_history?: Json
+          birthday_prompt_at?: string | null
           coppa_consent_at?: string | null
           coppa_consent_given?: boolean
           created_at?: string
@@ -6200,6 +6105,7 @@ export type Database = {
           pin_locked_until?: string | null
           pin_salt?: string | null
           quizzes_completed_count?: number
+          reading_band?: string
           reading_level?: string | null
           streak_best?: number
           streak_current?: number
@@ -6222,83 +6128,6 @@ export type Database = {
             columns: ["parent_user_id"]
             isOneToOne: false
             referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      kid_quizzes: {
-        Row: {
-          article_id: string
-          attempt_count: number
-          correct_count: number
-          created_at: string
-          deleted_at: string | null
-          description: string | null
-          difficulty: string | null
-          explanation: string | null
-          id: string
-          is_active: boolean
-          metadata: Json
-          options: Json
-          points: number
-          pool_group: number
-          question_text: string
-          question_type: string
-          retention_policy: string
-          sort_order: number
-          title: string
-          updated_at: string
-        }
-        Insert: {
-          article_id: string
-          attempt_count?: number
-          correct_count?: number
-          created_at?: string
-          deleted_at?: string | null
-          description?: string | null
-          difficulty?: string | null
-          explanation?: string | null
-          id?: string
-          is_active?: boolean
-          metadata?: Json
-          options?: Json
-          points?: number
-          pool_group?: number
-          question_text: string
-          question_type?: string
-          retention_policy?: string
-          sort_order?: number
-          title: string
-          updated_at?: string
-        }
-        Update: {
-          article_id?: string
-          attempt_count?: number
-          correct_count?: number
-          created_at?: string
-          deleted_at?: string | null
-          description?: string | null
-          difficulty?: string | null
-          explanation?: string | null
-          id?: string
-          is_active?: boolean
-          metadata?: Json
-          options?: Json
-          points?: number
-          pool_group?: number
-          question_text?: string
-          question_type?: string
-          retention_policy?: string
-          sort_order?: number
-          title?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "kid_quizzes_article_id_fkey"
-            columns: ["article_id"]
-            isOneToOne: false
-            referencedRelation: "kid_articles"
             referencedColumns: ["id"]
           },
         ]
@@ -6354,118 +6183,6 @@ export type Database = {
             columns: ["parent_user_id"]
             isOneToOne: false
             referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      kid_sources: {
-        Row: {
-          article_id: string
-          author_name: string | null
-          created_at: string
-          id: string
-          metadata: Json
-          published_date: string | null
-          publisher: string | null
-          quote: string | null
-          sort_order: number
-          source_type: string | null
-          title: string | null
-          updated_at: string
-          url: string | null
-        }
-        Insert: {
-          article_id: string
-          author_name?: string | null
-          created_at?: string
-          id?: string
-          metadata?: Json
-          published_date?: string | null
-          publisher?: string | null
-          quote?: string | null
-          sort_order?: number
-          source_type?: string | null
-          title?: string | null
-          updated_at?: string
-          url?: string | null
-        }
-        Update: {
-          article_id?: string
-          author_name?: string | null
-          created_at?: string
-          id?: string
-          metadata?: Json
-          published_date?: string | null
-          publisher?: string | null
-          quote?: string | null
-          sort_order?: number
-          source_type?: string | null
-          title?: string | null
-          updated_at?: string
-          url?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "kid_sources_article_id_fkey"
-            columns: ["article_id"]
-            isOneToOne: false
-            referencedRelation: "kid_articles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      kid_timelines: {
-        Row: {
-          article_id: string
-          created_at: string
-          description: string | null
-          event_body: string | null
-          event_date: string
-          event_image_url: string | null
-          event_label: string
-          id: string
-          metadata: Json
-          sort_order: number
-          source_url: string | null
-          title: string | null
-          updated_at: string
-        }
-        Insert: {
-          article_id: string
-          created_at?: string
-          description?: string | null
-          event_body?: string | null
-          event_date: string
-          event_image_url?: string | null
-          event_label: string
-          id?: string
-          metadata?: Json
-          sort_order?: number
-          source_url?: string | null
-          title?: string | null
-          updated_at?: string
-        }
-        Update: {
-          article_id?: string
-          created_at?: string
-          description?: string | null
-          event_body?: string | null
-          event_date?: string
-          event_image_url?: string | null
-          event_label?: string
-          id?: string
-          metadata?: Json
-          sort_order?: number
-          source_url?: string | null
-          title?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "kid_timelines_article_id_fkey"
-            columns: ["article_id"]
-            isOneToOne: false
-            referencedRelation: "kid_articles"
             referencedColumns: ["id"]
           },
         ]
@@ -8977,10 +8694,13 @@ export type Database = {
           grace_period_started_at: string | null
           id: string
           is_family_member: boolean
+          kid_seats_paid: number
           metadata: Json
+          next_renewal_at: string | null
           pause_end: string | null
           pause_start: string | null
           plan_id: string
+          platform: string
           promo_code_id: string | null
           source: string
           status: string
@@ -9013,10 +8733,13 @@ export type Database = {
           grace_period_started_at?: string | null
           id?: string
           is_family_member?: boolean
+          kid_seats_paid?: number
           metadata?: Json
+          next_renewal_at?: string | null
           pause_end?: string | null
           pause_start?: string | null
           plan_id: string
+          platform?: string
           promo_code_id?: string | null
           source: string
           status?: string
@@ -9049,10 +8772,13 @@ export type Database = {
           grace_period_started_at?: string | null
           id?: string
           is_family_member?: boolean
+          kid_seats_paid?: number
           metadata?: Json
+          next_renewal_at?: string | null
           pause_end?: string | null
           pause_start?: string | null
           plan_id?: string
+          platform?: string
           promo_code_id?: string | null
           source?: string
           status?: string
@@ -10527,6 +10253,14 @@ export type Database = {
       _user_is_moderator: { Args: { p_user_id: string }; Returns: boolean }
       _user_is_paid: { Args: { p_user_id: string }; Returns: boolean }
       _user_tier_or_anon: { Args: { p_user_id: string }; Returns: string }
+      admin_apply_dob_correction: {
+        Args: {
+          p_decision: string
+          p_decision_reason: string
+          p_request_id: string
+        }
+        Returns: undefined
+      }
       advance_streak: {
         Args: { p_kid_profile_id?: string; p_user_id?: string }
         Returns: Json
@@ -10655,6 +10389,14 @@ export type Database = {
           locked_by: string
         }[]
       }
+      claim_graduation_token: {
+        Args: { p_new_user_id: string; p_token: string }
+        Returns: {
+          display_name: string
+          kid_profile_id: string
+          parent_user_id: string
+        }[]
+      }
       claim_next_export_request: {
         Args: never
         Returns: {
@@ -10705,6 +10447,7 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: undefined
       }
+      compute_band_from_dob: { Args: { p_dob: string }; Returns: string }
       compute_effective_perms: {
         Args: { p_user_id: string }
         Returns: {
@@ -10747,6 +10490,7 @@ export type Database = {
         Args: { p_body: string; p_category: string; p_subject: string }
         Returns: Json
       }
+      current_kid_profile_id: { Args: never; Returns: string }
       decline_queue_item: {
         Args: { p_queue_item_id: string; p_user_id: string }
         Returns: undefined
@@ -10857,6 +10601,13 @@ export type Database = {
         }[]
       }
       get_user_lockout_by_email: { Args: { p_email: string }; Returns: string }
+      graduate_kid_profile: {
+        Args: { p_intended_email: string; p_kid_profile_id: string }
+        Returns: {
+          expires_at: string
+          token: string
+        }[]
+      }
       grant_pro_to_cohort: {
         Args: { p_cohort: string; p_months: number }
         Returns: number
@@ -10944,6 +10695,7 @@ export type Database = {
         Args: { p_kid_profile_id: string; p_token: string }
         Returns: boolean
       }
+      kid_visible_bands: { Args: { p_profile_id: string }; Returns: string[] }
       log_ad_click: { Args: { p_impression_id: string }; Returns: undefined }
       log_ad_impression: {
         Args: {
@@ -10968,6 +10720,7 @@ export type Database = {
       }
       mint_owner_referral_link: {
         Args: {
+          p_actor_user_id?: string
           p_description?: string
           p_expires_at?: string
           p_max_uses?: number
@@ -11314,6 +11067,10 @@ export type Database = {
       sweep_beta_expirations: { Args: never; Returns: Json }
       sweep_expired_deletions: { Args: never; Returns: number }
       sweep_kid_trial_expiries: { Args: never; Returns: number }
+      system_apply_dob_correction: {
+        Args: { p_decision_reason?: string; p_request_id: string }
+        Returns: undefined
+      }
       toggle_context_tag: {
         Args: { p_comment_id: string; p_user_id: string }
         Returns: Json

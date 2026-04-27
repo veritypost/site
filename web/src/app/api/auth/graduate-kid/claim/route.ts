@@ -59,15 +59,15 @@ export async function POST(request: Request) {
   // Pre-check: token exists, not consumed, not expired, email matches.
   // The RPC re-verifies but we want a clean error before creating the
   // auth.users row (which is harder to roll back).
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: tokenRow } = await (service.from('graduation_tokens' as any) as any)
+  const { data: tokenRow } = await service
+    .from('graduation_tokens')
     .select('token, intended_email, expires_at, consumed_at')
     .eq('token', body.token)
     .maybeSingle();
   if (!tokenRow) {
     return NextResponse.json({ error: 'Invalid token', code: 'token_not_found' }, { status: 404 });
   }
-  const t = tokenRow as { intended_email: string; expires_at: string; consumed_at: string | null };
+  const t = tokenRow;
   if (t.consumed_at) {
     return NextResponse.json(
       { error: 'Token already used', code: 'token_consumed' },
@@ -122,9 +122,7 @@ export async function POST(request: Request) {
   }
 
   // Consume the token + carry over categories.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rpc = service.rpc as any;
-  const { data: claimData, error: claimErr } = await rpc('claim_graduation_token', {
+  const { data: claimData, error: claimErr } = await service.rpc('claim_graduation_token', {
     p_token: body.token,
     p_new_user_id: newUserId,
   });

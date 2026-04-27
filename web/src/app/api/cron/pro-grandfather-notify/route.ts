@@ -114,8 +114,8 @@ async function handle() {
   }
   const proPlanIds = (proPlans as Array<{ id: string }>).map((p) => p.id);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (service.from('subscriptions') as any)
+  const { data, error } = await service
+    .from('subscriptions')
     .select('id, user_id, stripe_subscription_id, current_period_end, metadata, plan_id')
     .eq('platform', 'stripe')
     .in('status', ['active', 'trialing'])
@@ -154,8 +154,8 @@ async function handle() {
           user_id: sub.user_id,
           renewal_at: sub.current_period_end,
         });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (service.from('subscriptions') as any)
+        await service
+          .from('subscriptions')
           .update({
             metadata: { ...meta, pro_migration_notified_at: new Date().toISOString() },
             updated_at: new Date().toISOString(),

@@ -210,11 +210,9 @@ export async function POST(request: Request) {
   // Update DB. The Stripe quantity update is owned by the caller (or by
   // a follow-up call to /api/stripe/portal). This endpoint records intent
   // and stripe webhook reconciliation will correct any drift.
-  // Cast: generated Database types lag the Phase 2 migration that adds
-  // kid_seats_paid to the subscriptions row; the column exists post-deploy.
   const { error: updErr } = await service
     .from('subscriptions')
-    .update({ kid_seats_paid: paid, updated_at: new Date().toISOString() } as never)
+    .update({ kid_seats_paid: paid, updated_at: new Date().toISOString() })
     .eq('user_id', user.id)
     .in('status', ['active', 'trialing']);
   if (updErr) {

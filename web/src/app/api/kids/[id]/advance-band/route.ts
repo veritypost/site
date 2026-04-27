@@ -53,17 +53,11 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const service = createServiceClient();
 
   // Resolve kid + verify ownership.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: kidRaw, error: kidErr } = await (service.from('kid_profiles') as any)
+  const { data: kid, error: kidErr } = await service
+    .from('kid_profiles')
     .select('id, parent_user_id, reading_band, is_active')
     .eq('id', params.id)
     .maybeSingle();
-  const kid = kidRaw as {
-    id: string;
-    parent_user_id: string;
-    reading_band: string | null;
-    is_active: boolean | null;
-  } | null;
   if (kidErr || !kid) {
     return NextResponse.json({ error: 'Kid not found' }, { status: 404 });
   }
@@ -89,15 +83,11 @@ export async function POST(request: Request, { params }: { params: { id: string 
     }
     // Direct band advance — no graduation token; just flip the band.
     // Trigger enforces ratchet: kids → tweens passes.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error: updErr } = await (service.from('kid_profiles') as any)
+    const { error: updErr } = await service
+      .from('kid_profiles')
       .update({
         reading_band: 'tweens',
         band_changed_at: new Date().toISOString(),
-        // Caller-supplied band_history append happens via a follow-up
-        // SELECT + UPDATE to preserve existing entries; simpler approach
-        // here is to let the band_changed_at update the row and surface
-        // the change in audit downstream.
         updated_at: new Date().toISOString(),
         birthday_prompt_at: null,
       })
@@ -127,9 +117,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
 
   // Invoke the SECURITY DEFINER RPC that mints the token + flips kid state.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rpc = service.rpc as any;
-  const { data, error } = await rpc('graduate_kid_profile', {
+  const { data, error } = await service.rpc('graduate_kid_profile', {
     p_kid_profile_id: params.id,
     p_intended_email: body.email.trim().toLowerCase(),
   });

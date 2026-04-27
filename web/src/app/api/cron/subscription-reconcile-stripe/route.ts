@@ -73,8 +73,8 @@ async function handle() {
 
   const service = createServiceClient();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (service.from('subscriptions') as any)
+  const { data, error } = await service
+    .from('subscriptions')
     .select('id, user_id, stripe_subscription_id, kid_seats_paid')
     .eq('platform', 'stripe')
     .in('status', ['active', 'trialing'])
@@ -115,8 +115,8 @@ async function handle() {
       const expected = isFamilyBase ? Math.min(4, 1 + extras) : sub.kid_seats_paid;
       if (expected !== sub.kid_seats_paid) {
         drifted++;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { error: updErr } = await (service.from('subscriptions') as any)
+        const { error: updErr } = await service
+          .from('subscriptions')
           .update({ kid_seats_paid: expected, updated_at: new Date().toISOString() })
           .eq('id', sub.id);
         if (updErr) {

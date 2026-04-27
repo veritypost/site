@@ -1785,13 +1785,13 @@ Empty array if all correct.`;
     // articles, so both audiences write to the same table now.
     if (needsManualReview || plagiarismStatus !== 'ok') {
       // Cast: generated Database types lag behind migration 166; the
-      // columns exist post-deploy. Trigger remains the SoT for status.
+      // Trigger remains the SoT for plagiarism_status.
       const { error: flagErr } = await service
         .from('articles')
         .update({
           needs_manual_review: needsManualReview,
           plagiarism_status: plagiarismStatus,
-        } as never)
+        })
         .eq('id', articleId);
       if (flagErr) {
         // Non-fatal — pipeline already persisted; log and continue so the
@@ -1868,12 +1868,7 @@ Empty array if all correct.`;
     } else if (effectiveAgeBand === 'tweens') {
       clusterUpdate.primary_tween_article_id = articleId;
     }
-    // Cast: generated Database types lag the Phase 3 migration that adds
-    // primary_kid_article_id + primary_tween_article_id to feed_clusters.
-    await service
-      .from('feed_clusters')
-      .update(clusterUpdate as never)
-      .eq('id', cluster_id);
+    await service.from('feed_clusters').update(clusterUpdate).eq('id', cluster_id);
 
     finalStatus = 'completed';
   } catch (err) {

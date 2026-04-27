@@ -52,8 +52,8 @@ async function handle() {
 
   // Pull active kids with DOB. Page through if you ever exceed 1000;
   // current scale is well under that.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (service.from('kid_profiles') as any)
+  const { data, error } = await service
+    .from('kid_profiles')
     .select('id, date_of_birth, reading_band, birthday_prompt_at, is_active')
     .eq('is_active', true)
     .not('date_of_birth', 'is', null)
@@ -80,8 +80,8 @@ async function handle() {
     }
 
     if (needsPrompt && !row.birthday_prompt_at) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: updErr } = await (service.from('kid_profiles') as any)
+      const { error: updErr } = await service
+        .from('kid_profiles')
         .update({ birthday_prompt_at: new Date().toISOString() })
         .eq('id', row.id);
       if (!updErr) prompted++;

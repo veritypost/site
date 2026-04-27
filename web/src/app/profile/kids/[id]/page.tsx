@@ -441,13 +441,9 @@ export default function KidDashboardPage() {
         </div>
       )}
 
-      {/* Phase 5 of AI + Plan Change Implementation: band-advance + graduation panel.
-          Reads reading_band + birthday_prompt_at off the kid row. Cast is
-          temporary until generated types regen post-Phase 5 migration. */}
+      {/* Phase 5 of AI + Plan Change Implementation: band-advance + graduation panel. */}
       <BandPanel
-        kid={
-          kid as unknown as KidRow & { reading_band?: string; birthday_prompt_at?: string | null }
-        }
+        kid={kid}
         kidId={id}
         onAdvanced={(msg) => {
           setFlash(msg);
@@ -776,7 +772,7 @@ function BandPanel({
   onAdvanced,
   onError,
 }: {
-  kid: KidRow & { reading_band?: string; birthday_prompt_at?: string | null };
+  kid: KidRow;
   kidId: string;
   onAdvanced: (msg: string) => void;
   onError: (msg: string) => void;

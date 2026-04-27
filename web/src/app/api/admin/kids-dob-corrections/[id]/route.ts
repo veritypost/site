@@ -30,95 +30,53 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
   const service = createServiceClient();
 
-  // Cast: kid_dob_correction_requests + kid_dob_history are new in
-  // Phase 4 migration; types regen post-deploy drops the casts.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const corrTable = service.from('kid_dob_correction_requests' as any);
-  const { data: req, error: reqErr } = await corrTable
+  const { data: req, error: reqErr } = await service
+    .from('kid_dob_correction_requests')
     .select('*')
     .eq('id', params.id)
     .maybeSingle();
   if (reqErr || !req) {
     return NextResponse.json({ error: 'Request not found' }, { status: 404 });
   }
-  const r = req as unknown as {
-    kid_profile_id: string;
-    parent_user_id: string;
-    current_dob: string;
-    requested_dob: string;
-    [k: string]: unknown;
-  };
 
-  // Kid info. Cast: reading_band + band_history added in Phase 3 migration.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: kidRaw } = await (service.from('kid_profiles') as any)
+  // Kid info
+  const { data: kid } = await service
+    .from('kid_profiles')
     .select(
       'id, display_name, avatar_color, date_of_birth, reading_band, band_history, created_at, articles_read_count, quizzes_completed_count, streak_current, last_active_at, is_active'
     )
-    .eq('id', r.kid_profile_id)
+    .eq('id', req.kid_profile_id)
     .maybeSingle();
-  const kid = kidRaw as unknown as {
-    id: string;
-    display_name: string | null;
-    avatar_color: string | null;
-    date_of_birth: string | null;
-    reading_band: string | null;
-    band_history: unknown;
-    created_at: string;
-    articles_read_count: number | null;
-    quizzes_completed_count: number | null;
-    streak_current: number | null;
-    last_active_at: string | null;
-    is_active: boolean | null;
-  } | null;
 
   // Parent info
   const { data: parent } = await service
     .from('users')
     .select('id, email, plan_id, plan_status, created_at, plans:plan_id(name, tier)')
-    .eq('id', r.parent_user_id)
+    .eq('id', req.parent_user_id)
     .maybeSingle();
 
-  // Sibling kids in the household. Same Phase 3 cast.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: siblingsRaw } = await (service.from('kid_profiles') as any)
+  // Sibling kids in the household
+  const { data: siblingsData } = await service
+    .from('kid_profiles')
     .select('id, display_name, date_of_birth, reading_band, is_active, created_at')
-    .eq('parent_user_id', r.parent_user_id)
-    .neq('id', r.kid_profile_id);
-  const siblings =
-    (siblingsRaw as unknown as Array<{
-      id: string;
-      display_name: string | null;
-      date_of_birth: string | null;
-      reading_band: string | null;
-      is_active: boolean | null;
-      created_at: string | null;
-    }> | null) ?? [];
+    .eq('parent_user_id', req.parent_user_id)
+    .neq('id', req.kid_profile_id);
+  const siblings = siblingsData ?? [];
 
   // Parent's lifetime DOB-correction count
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const corrCountTable = service.from('kid_dob_correction_requests' as any);
-  const { count: parentCorrectionCount } = await corrCountTable
+  const { count: parentCorrectionCount } = await service
+    .from('kid_dob_correction_requests')
     .select('id', { count: 'exact', head: true })
-    .eq('parent_user_id', r.parent_user_id);
+    .eq('parent_user_id', req.parent_user_id);
 
   // DOB audit history for this kid
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const histTable = service.from('kid_dob_history' as any);
-  const { data: dobHistoryRaw } = await histTable
+  const { data: dobHistoryData } = await service
+    .from('kid_dob_history')
     .select('id, old_dob, new_dob, change_source, decision_reason, created_at')
-    .eq('kid_profile_id', r.kid_profile_id)
+    .eq('kid_profile_id', req.kid_profile_id)
     .order('created_at', { ascending: false })
     .limit(20);
-  const dobHistory =
-    (dobHistoryRaw as unknown as Array<{
-      id: string;
-      old_dob: string | null;
-      new_dob: string;
-      change_source: string;
-      decision_reason: string | null;
-      created_at: string;
-    }> | null) ?? [];
+  const dobHistory = dobHistoryData ?? [];
 
   // Compute fraud signals on demand for the admin view
   const signals: string[] = [];
@@ -128,8 +86,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   }
   if ((parentCorrectionCount ?? 0) > 1) signals.push('parent_prior_corrections');
   try {
-    const cur = new Date(r.current_dob as string);
-    const reqDate = new Date(r.requested_dob as string);
+    const cur = new Date(req.current_dob);
+    const reqDate = new Date(req.requested_dob);
     const yearsShift = Math.abs(reqDate.getUTCFullYear() - cur.getUTCFullYear());
     if (yearsShift > 2) signals.push('large_shift');
   } catch {
@@ -193,10 +151,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   // The RPC enforces the actual permission check + state machine.
   // It uses auth.uid() server-side so we don't pass the actor explicitly.
-  // Cast: RPC is new in Phase 4 migration; types regen post-deploy.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rpc = service.rpc as any;
-  const { error: rpcErr } = await rpc('admin_apply_dob_correction', {
+  const { error: rpcErr } = await service.rpc('admin_apply_dob_correction', {
     p_request_id: params.id,
     p_decision: body.decision,
     p_decision_reason: body.reason.trim(),

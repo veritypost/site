@@ -45,11 +45,8 @@ export async function GET(request: Request) {
   const statusParam = url.searchParams.get('status');
   const directionParam = url.searchParams.get('direction');
 
-  // Cast: kid_dob_correction_requests is new in Phase 4; types regen
-  // post-migration drops the cast.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let query: any = service
-    .from('kid_dob_correction_requests' as never)
+  let query = service
+    .from('kid_dob_correction_requests')
     .select(
       'id, kid_profile_id, parent_user_id, current_dob, requested_dob, current_band, resulting_band, direction, reason, documentation_url, status, decision_reason, decided_at, cooldown_ends_at, created_at, ip_address'
     )
