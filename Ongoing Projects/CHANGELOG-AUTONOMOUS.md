@@ -6,6 +6,40 @@ Format: newest at top.
 
 ---
 
+## 2026-04-27 — Wave 18: T0.9 DOB correction silent-rejection fix — 1 item shipped
+
+**Items shipped:** 1 (T0.9 — UI rejected state + parent notification on rejection).
+
+**T0.9 fix shape.** Two halves of the same broken contract: web copy promises "reviewed within 7 days" but a rejected decision was both invisible in the UI AND triggered no inbound signal to the parent.
+
+1. **UI render path.** `web/src/app/profile/kids/[id]/page.tsx:1138-1140` filtered `history` to `['pending', 'documentation_requested', 'approved']` only. After a rejection, neither `pendingOrApproved` nor a fallback rendered — the "Request correction" button just reappeared with no trace. Added a `lastRejected` finder that runs only when nothing's pending/approved AND the form isn't open; renders a danger-bordered card with a `Rejected` status pill, the decision reason, and a "Resubmit with corrected info" CTA. The lifetime SQL index only blocks one *approved* correction per kid (`idx_dob_corrections_lifetime`), so resubmission after rejection is intentional. Extended the `history` row type to include `decision_reason` (the GET endpoint already returns it; only the local TS type was missing the field).
+
+2. **Notify on rejection.** `web/src/app/api/admin/kids-dob-corrections/[id]/route.ts` POST handler runs the SECURITY DEFINER RPC and writes audit, but never inserted a `notifications` row. Added a best-effort insert when `decision === 'rejected'`: fetches `parent_user_id + kid_profile_id` from the request via `maybeSingle()`, then writes `{ user_id, title: 'DOB correction request rejected', body: <reason>, type: 'kid_dob_correction.rejected', action_url: '/profile/kids/<kid>', sender_id: actor.id }`. Mirrors the audit-write pattern: a notify failure logs to console but doesn't fail the decision (the RPC has already landed; the parent shouldn't see a 500 because the notification side-channel had a hiccup).
+
+**Pre-flight verification:**
+- Read the RPC body in `Ongoing Projects/migrations/2026-04-27_phase4_dob_correction_system.sql:226-316` to confirm it does NOT insert a notification — server-side notify is the correct layer.
+- Verified the lifetime constraint at line 157: `idx_dob_corrections_lifetime` is partial (`WHERE status = 'approved'`), so rejected entries don't block resubmission.
+- Confirmed the parent GET at `web/src/app/api/kids/[id]/dob-correction/route.ts:315-322` already returns `decision_reason` in its select list — no server work needed for the UI to read it.
+- Confirmed `notifications` insert pattern by reading `admin/notifications/broadcast/route.ts:85-92` — minimum shape is `{ user_id, title, body, type }`, which is what the new insert uses (plus optional `action_url` + `sender_id`).
+
+**Scope decision:** TODO suggested notifying on rejection; declined to also notify on `documentation_requested` even though that state has the same "parent has to come back to discover it" problem. The TODO was narrow on rejection; documentation_requested is at least visible in the existing UI render path. Out-of-scope expansion gets filed if owner wants it. Approval notifications are also out — the existing UI shows "Correction already used" post-fact; not the same broken-promise pattern.
+
+**Adversary:** skipped. Surface is contained (one UI component + one server handler), the notification insert mirrors an existing pattern verbatim, and the UI change is a render-path addition with no state mutations of its own. Nothing cross-cutting; no auth/billing/RBAC surface beyond what's already gated.
+
+**Post-impl:** `npx tsc --noEmit` clean. `npx eslint` on the two touched files clean.
+
+**Agents used:** 0.
+
+**Files touched:**
+- `web/src/app/profile/kids/[id]/page.tsx` (history row type extended; lastRejected finder; rejected-state render block; button-visibility guard updated)
+- `web/src/app/api/admin/kids-dob-corrections/[id]/route.ts` (notification insert on rejection)
+- `Ongoing Projects/TODO-AUTONOMOUS.md` — T0.9 marked SHIPPED.
+- `Ongoing Projects/CHANGELOG-AUTONOMOUS.md` — this entry.
+
+**Pattern note:** Surfaced a server-side gap (RPC doesn't notify) by reading the SQL definition first instead of assuming. The RPC could have been amended via migration to notify directly, but doing it in the route layer is reversible (no schema change), keeps notification policy in code (versioned with the rest of the route logic), and matches how other "decision endpoints" in the codebase notify (e.g., `recordAdminAction` is also a route-layer side-effect, not an RPC mutation).
+
+---
+
 ## 2026-04-27 — Wave 17: T2.4 ad-system PATCH XSS + rank-guard — 1 item shipped
 
 **Items shipped:** 1 (T2.4 — XSS allowlist + approval rank-guard).

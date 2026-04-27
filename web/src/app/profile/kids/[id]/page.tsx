@@ -1071,7 +1071,13 @@ function DobCorrectionRequest({
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [history, setHistory] = useState<
-    Array<{ id: string; status: string; requested_dob: string; created_at: string }>
+    Array<{
+      id: string;
+      status: string;
+      requested_dob: string;
+      created_at: string;
+      decision_reason?: string | null;
+    }>
   >([]);
 
   useEffect(() => {
@@ -1139,6 +1145,14 @@ function DobCorrectionRequest({
     ['pending', 'documentation_requested', 'approved'].includes(h.status)
   );
 
+  // T0.9 — surface the most-recent rejected request when nothing's
+  // pending/approved. The lifetime constraint only blocks one *approved*
+  // correction per kid, so a parent can resubmit after a rejection. The
+  // history endpoint returns rows newest-first; the find() picks the
+  // latest rejected one.
+  const lastRejected =
+    !pendingOrApproved && !open ? history.find((h) => h.status === 'rejected') : null;
+
   return (
     <div style={cardStyle}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -1150,7 +1164,7 @@ function DobCorrectionRequest({
             DOB is locked after profile creation. Was this entered incorrectly?
           </div>
         </div>
-        {!open && !pendingOrApproved && (
+        {!open && !pendingOrApproved && !lastRejected && (
           <button
             onClick={() => setOpen(true)}
             style={{
@@ -1167,6 +1181,59 @@ function DobCorrectionRequest({
           </button>
         )}
       </div>
+
+      {lastRejected && (
+        <div
+          style={{
+            marginTop: 10,
+            padding: 12,
+            background: 'var(--bg)',
+            border: `1px solid ${C.danger}`,
+            borderRadius: 8,
+            fontSize: 12,
+            color: C.dim,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                padding: '2px 8px',
+                borderRadius: 999,
+                background: C.danger,
+                color: '#fff',
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+              }}
+            >
+              Rejected
+            </span>
+            <span style={{ color: C.dim }}>
+              {new Date(lastRejected.created_at).toLocaleDateString()}
+            </span>
+          </div>
+          {lastRejected.decision_reason ? (
+            <div style={{ marginBottom: 8, color: C.text, lineHeight: 1.45 }}>
+              {lastRejected.decision_reason}
+            </div>
+          ) : null}
+          <button
+            onClick={() => setOpen(true)}
+            style={{
+              padding: '6px 12px',
+              borderRadius: 7,
+              border: `1px solid ${C.border}`,
+              background: 'transparent',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Resubmit with corrected info
+          </button>
+        </div>
+      )}
 
       {pendingOrApproved && !open && (
         <div

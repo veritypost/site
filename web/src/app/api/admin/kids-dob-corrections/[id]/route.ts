@@ -173,5 +173,31 @@ export async function POST(request: Request, { params }: { params: { id: string 
     console.error('[admin.dob-corrections.audit]', err?.message || err);
   });
 
+  // T0.9 — notify the parent on rejection. The web copy promises
+  // "reviewed within 7 days," and prior to this notify the rejected
+  // outcome was UI-invisible (the parent kids page only rendered
+  // pending/docs_requested/approved). Best-effort: a notify failure
+  // doesn't fail the decision, but it is logged.
+  if (body.decision === 'rejected') {
+    const { data: req } = await service
+      .from('kid_dob_correction_requests')
+      .select('parent_user_id, kid_profile_id')
+      .eq('id', params.id)
+      .maybeSingle();
+    if (req?.parent_user_id) {
+      const { error: notifErr } = await service.from('notifications').insert({
+        user_id: req.parent_user_id,
+        title: 'DOB correction request rejected',
+        body: body.reason.trim(),
+        type: 'kid_dob_correction.rejected',
+        action_url: req.kid_profile_id ? `/profile/kids/${req.kid_profile_id}` : null,
+        sender_id: actor.id,
+      });
+      if (notifErr) {
+        console.error('[admin.dob-corrections.notify]', notifErr.message);
+      }
+    }
+  }
+
   return NextResponse.json({ ok: true, decision: body.decision });
 }

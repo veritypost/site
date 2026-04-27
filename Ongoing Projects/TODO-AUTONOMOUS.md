@@ -573,14 +573,9 @@ These items came from the audit-derived REMEDIATION pass. Surface-deduped agains
 
 Stamp removed from notify branch; only `captureMessage` remains (operator-visible log). Migrate branch unchanged — gates on `notifiedAt && STRIPE_SECRET_KEY`, so it now never fires for new users (intended). Existing stamps in prod (if any) will still satisfy the migrate gate; backfill is a separate operator decision not bundled here. See `CHANGELOG-AUTONOMOUS.md` Wave 2. **Follow-up filed:** T0.7b (fully park migrate branch behind feature flag once owner confirms engagement-email pipeline is permanently parked).
 
-## T0.9 — DOB correction outcome silently disappears on rejection — HIGH
+## T0.9 — DOB correction outcome silently disappears on rejection — SHIPPED 2026-04-27
 
-**Verified:** 2026-04-27 against `web/src/app/profile/kids/[id]/page.tsx:1138-1186`.
-**What's wrong:** UI only renders states `pending | documentation_requested | approved`. On rejection, the row reverts to "no request" with no notification, no UI trace. Web copy promises "reviewed within 7 days" — silent rejection breaks that contract.
-**Fix:**
-1. Render rejected state in the UI: status pill + reason + "Resubmit with corrected info?" CTA.
-2. Add `notifications` insert in the admin reject handler so the parent gets an in-app banner. (Email is out of scope per memory; in-app sufficient.)
-**Tier:** T2 (UI + server — touches both `profile/kids/[id]/page.tsx` and the admin reject handler).
+UI: extended `history` row type with `decision_reason`; added `lastRejected` finder (most-recent rejected when no pending/approved); rendered a danger-bordered card with status pill, reason text, and a "Resubmit with corrected info" CTA that opens the existing form. The lifetime constraint only blocks one *approved* correction per kid, so resubmission after rejection is intentional and the CTA is correct. Server: admin reject handler now inserts a `notifications` row when `decision === 'rejected'` — fetches `parent_user_id + kid_profile_id` from the request, builds a notification with `type='kid_dob_correction.rejected'`, body = the decision reason, action_url linking back to the kid page. Best-effort: a notify failure logs but doesn't fail the decision (matches the audit-write pattern). See `CHANGELOG-AUTONOMOUS.md` Wave 18.
 
 ### Tier 2 — compliance + security
 
