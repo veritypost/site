@@ -152,8 +152,8 @@ export async function GET(request) {
         });
       }
 
-      // Ext-D2 — wrap audit insert so a transient DB failure can't fail
-      // the OAuth callback. Best-effort + log.
+      // Ext-D2 / T310 — wrap audit insert so a transient DB failure can't
+      // fail the OAuth callback. Best-effort + Sentry capture for visibility.
       try {
         await service.from('audit_log').insert({
           actor_id: user.id,
@@ -164,6 +164,10 @@ export async function GET(request) {
         });
       } catch (auditErr) {
         console.error('[auth.callback] audit_log insert failed:', auditErr);
+        try {
+          const { captureException } = await import('@/lib/observability');
+          await captureException(auditErr, { route: 'auth.callback', actor_id: user.id });
+        } catch {}
       }
 
       // Y2 / scoring: first OAuth session counts as today's login event.

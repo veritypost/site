@@ -195,8 +195,10 @@ export async function POST(request) {
         return NextResponse.json({ error: 'Signup failed. Please try again.' }, { status: 500 });
       }
 
-      // Ext-D2 — wrap audit insert so a transient DB failure doesn't
-      // fail the signup post-rollback. Best-effort + log.
+      // Ext-D2 / T310 — wrap audit insert so a transient DB failure doesn't
+      // fail the signup post-rollback. Best-effort + Sentry capture so
+      // missed audit rows surface in alerting instead of dying silently
+      // in console.error / Vercel function logs (7-day retention, no paging).
       try {
         await service.from('audit_log').insert({
           actor_id: userId,
@@ -207,6 +209,10 @@ export async function POST(request) {
         });
       } catch (auditErr) {
         console.error('[auth.signup] audit_log insert failed:', auditErr);
+        try {
+          const { captureException } = await import('@/lib/observability');
+          await captureException(auditErr, { route: 'auth.signup', actor_id: userId });
+        } catch {}
       }
     }
 

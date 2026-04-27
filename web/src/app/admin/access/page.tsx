@@ -34,7 +34,13 @@ type AccessRequest = Tables<'access_requests'>;
 type Plan = Tables<'plans'>;
 type Role = Tables<'roles'>;
 
-const TYPE_OPTIONS = ['invite', 'press', 'beta', 'partner'] as const;
+// T317 — `referral` is the only `type` the redemption routes (/r/[slug] +
+// /api/access-redeem) actually honor; the other values were inert. Reduced
+// to a single canonical option so admins don't mint codes that silently
+// skip the redemption pipeline. Schema enum can be tightened in a
+// follow-up migration once any historical rows with the legacy types are
+// confirmed unused.
+const TYPE_OPTIONS = ['referral'] as const;
 
 interface CodeForm {
   code: string;
@@ -50,7 +56,7 @@ interface CodeForm {
 const EMPTY_FORM: CodeForm = {
   code: '',
   description: '',
-  type: 'invite',
+  type: 'referral',
   grants_plan_id: '',
   grants_role_id: '',
   max_uses: '10',

@@ -114,8 +114,10 @@ export async function POST(_request) {
         amount: 1,
       });
 
-      // Ext-D2 — wrap audit insert so a transient DB failure doesn't
-      // fail the login. Best-effort + log.
+      // Ext-D2 / T310 — wrap audit insert so a transient DB failure doesn't
+      // fail the login. Best-effort + Sentry capture for visibility on
+      // missed audit rows (otherwise they die silently in Vercel function
+      // logs with no alerting).
       try {
         await service.from('audit_log').insert({
           actor_id: userId,
@@ -126,6 +128,10 @@ export async function POST(_request) {
         });
       } catch (auditErr) {
         console.error('[auth.login] audit_log insert failed:', auditErr);
+        try {
+          const { captureException } = await import('@/lib/observability');
+          await captureException(auditErr, { route: 'auth.login', actor_id: userId });
+        } catch {}
       }
 
       // D40: silent welcome-back — if the account is still inside the 30-day

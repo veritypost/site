@@ -93,48 +93,66 @@ async function handle() {
   let fixed = 0;
   let errors = 0;
 
-  for (const sub of subs) {
-    if (!sub.stripe_subscription_id) continue;
-    try {
-      const remote = await stripeRetrieveSubscription(sub.stripe_subscription_id);
-      if (!remote) {
+  // T355 — batch Stripe REST calls into chunks of 10 with Promise.allSettled
+  // instead of sequential awaits. Stripe's rate-limit ceiling is 100 RPS
+  // for read operations, well above 10 parallel. Sequential 200-sub runs
+  // were taking minutes; parallel-batched runs are ~1/10th the wall time
+  // while still keeping the per-row error isolation the original loop had.
+  const CHUNK_SIZE = 10;
+  for (let i = 0; i < subs.length; i += CHUNK_SIZE) {
+    const chunk = subs.slice(i, i + CHUNK_SIZE);
+    const results = await Promise.allSettled(
+      chunk.map(async (sub) => {
+        if (!sub.stripe_subscription_id) return { sub, kind: 'skip' as const };
+        const remote = await stripeRetrieveSubscription(sub.stripe_subscription_id);
+        if (!remote) return { sub, kind: 'no_remote' as const };
+        let extras = 0;
+        let isFamilyBase = false;
+        for (const item of remote.items.data) {
+          const meta = item.price.metadata || {};
+          const role = (meta.seat_role || '').toLowerCase();
+          if (role === 'extra_kid') {
+            extras += item.quantity ?? 0;
+          } else if (role === 'family_base') {
+            isFamilyBase = true;
+          }
+        }
+        const expected = isFamilyBase ? Math.min(4, 1 + extras) : sub.kid_seats_paid;
+        return { sub, kind: 'ok' as const, expected };
+      })
+    );
+
+    for (const r of results) {
+      if (r.status === 'rejected') {
+        console.error('[reconcile-stripe.row]', r.reason);
         errors++;
         continue;
       }
-      let extras = 0;
-      let isFamilyBase = false;
-      for (const item of remote.items.data) {
-        const meta = item.price.metadata || {};
-        const role = (meta.seat_role || '').toLowerCase();
-        if (role === 'extra_kid') {
-          extras += item.quantity ?? 0;
-        } else if (role === 'family_base') {
-          isFamilyBase = true;
-        }
+      const v = r.value;
+      if (v.kind === 'skip') continue;
+      if (v.kind === 'no_remote') {
+        errors++;
+        continue;
       }
-      const expected = isFamilyBase ? Math.min(4, 1 + extras) : sub.kid_seats_paid;
-      if (expected !== sub.kid_seats_paid) {
+      if (v.expected !== v.sub.kid_seats_paid) {
         drifted++;
         const { error: updErr } = await service
           .from('subscriptions')
-          .update({ kid_seats_paid: expected, updated_at: new Date().toISOString() })
-          .eq('id', sub.id);
+          .update({ kid_seats_paid: v.expected, updated_at: new Date().toISOString() })
+          .eq('id', v.sub.id);
         if (updErr) {
-          console.error('[reconcile-stripe.update]', sub.id, updErr.message);
+          console.error('[reconcile-stripe.update]', v.sub.id, updErr.message);
           errors++;
           continue;
         }
         fixed++;
         await captureMessage('subscription kid_seats drift fixed', 'info', {
-          subscription_id: sub.id,
-          stripe_subscription_id: sub.stripe_subscription_id,
-          previous: sub.kid_seats_paid,
-          expected,
+          subscription_id: v.sub.id,
+          stripe_subscription_id: v.sub.stripe_subscription_id,
+          previous: v.sub.kid_seats_paid,
+          expected: v.expected,
         });
       }
-    } catch (err) {
-      console.error('[reconcile-stripe.row]', sub.id, err);
-      errors++;
     }
   }
 

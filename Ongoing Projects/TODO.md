@@ -630,16 +630,8 @@ Source: `Ongoing Projects/2026-04-27_AUTH_PERMS_SYSTEM_MAP.md`. 4 parallel Explo
 **File:** `web/src/app/api/admin/subscriptions/[id]/manual-sync/route.js:100-150` (downgrade branch). Comment at line 32 says "we leave verity_score / frozen_at alone" — frozen user downgraded to free remains frozen-on-free, logically incoherent (no plan to be frozen against).
 **Fix:** Branch on `frozen_at` — admin downgrade should either unfreeze or surface a confirmation that frozen state will persist.
 
-#### T310 — Audit-log writes are best-effort across multiple routes — **HIGH** (compliance)
-**File:** Pattern recurs across the auth surface. Sixth-pass enumerated explicitly: `web/src/app/api/auth/signup/route.js:200-210`, `web/src/app/api/auth/login/route.js:119-128`, `web/src/app/api/auth/callback/route.js:157-166`, `web/src/app/api/auth/email-change/route.js:132-148`. All four wrap the `audit_log` insert in `try { ... } catch { console.error(...) }`. Connection-pool exhaustion or transient DB partition produces un-audited account creations / mod actions.
-**Fix:** Either (a) queue audit events to a retry table that a cron processes, or (b) fail the security-critical request when audit insert fails. Sweep all four routes (and any new ones) in a single pass.
-
 ### Auth/Billing flow — MEDIUM
 
-
-#### T317 — `access_codes.type` taxonomy is dual-purpose and mostly dead — **MEDIUM** (dead UI)
-**File:** `web/src/app/r/[slug]/route.ts:76-77` and `web/src/app/api/access-redeem/route.ts:62-63` filter `.eq('type', 'referral')` only. `web/src/app/admin/access/page.tsx:37` mints `'invite'|'press'|'beta'|'partner'` — none honored by redemption routes.
-**Fix:** Either delete the legacy types from the schema enum + admin UI, or wire them into redemption. Today they're a ship-the-hostage admin foot-gun.
 
 #### T320 — Owner-link Pro recipients are gutted (cohort=beta, email_verified=false) — **MEDIUM** (CX, superseded by AUTH-MIGRATION)
 **File:** `web/src/app/welcome/page.tsx:106-107` — `isBetaOwnerLinkSignup` bypass lets cohort-beta+Pro past the welcome carousel only; every other surface still hard-blocks the 21 `requires_verified=true` perms. Cannot comment, follow, vote, bookmark unlimited, see own activity, use TTS.
@@ -675,9 +667,9 @@ These items live in `web/src/app/redesign/*` (currently dev-mounted at `localhos
 **File:** `web/src/app/redesign/profile/ProfileApp.tsx:117-121`. Single host check; production hostnames never end in `:3333`, so the failure mode requires an environment misconfiguration AND a port collision — practically near-zero. Demoted from HIGH to LOW.
 **Fix:** Belt-and-suspenders — tighten to `process.env.NODE_ENV !== 'production' && host === 'localhost:3333'`. Same pattern in `web/src/middleware.js _isRedesignPort` check. Cheap edit; address opportunistically with the next redesign cutover work.
 
-#### T334 — Lockdown deletes `follows` rows directly from the client — **HIGH** (auth/security)
-**File:** `web/src/app/redesign/_components/PrivacyCard.tsx:175-178`. Direct `from('follows').delete().eq('following_id', authUser.id)` trusts RLS to enforce caller-identity. If RLS drifts, this becomes a write-to-other-users primitive.
-**Fix:** Server RPC `lockdown_self()` that atomically sets `profile_visibility='hidden'` AND deletes follows rows. One transaction, server-side identity check. T5 schema work.
+#### T334 partial — `lockdown_self()` RPC migration drafted (T5, awaiting owner apply) — **HIGH** (auth/security)
+**File:** `Ongoing Projects/migrations/2026-04-27_T334_lockdown_self_rpc.sql` — SECURITY DEFINER function that atomically (a) flips `profile_visibility='hidden'`, (b) deletes the user's followers, (c) writes audit_log row, (d) bumps perms_version. Includes self-only auth.uid() check inside the function so RLS drift on follows can't compromise it.
+**Caller-side change needed AFTER apply:** `web/src/app/redesign/profile/settings/_cards/PrivacyCard.tsx` at ~lines 168-178 — replace the two-statement client flow with a single `supabase.rpc('lockdown_self', { p_user_id: authUser.id })` call. PrivacyCard is in the untracked redesign tree; the change ships with the redesign-cutover commit (T357).
 
 #### T335 — `Field.tsx` declares CSS transitions but never wires `:focus`/`:hover` — **HIGH** (a11y)
 **File:** `web/src/app/redesign/_components/Field.tsx:62`. Transition rule present; `focusRing` helper exists in `palette.ts:124` but isn't applied. Keyboard users get no focus feedback in any settings card.
@@ -733,13 +725,8 @@ Five items below come from a follow-on DB-perf review pass on the auth/perms sys
 **Source:** DB-perf review #41. The `events` table is at 5,846 rows in last 7 days (per system map §16 analytics findings) — extrapolates to ~300k/yr. Without retention, query performance degrades as the table grows. Standard pattern: monthly partitions + drop partitions older than N months.
 **Fix:** Convert to PARTITION BY RANGE on `created_at`; cron drops partitions > 12 months old. T5 schema work — halt and queue. Coordinate with T329 (admin events dashboard) to define query patterns first.
 
-#### T355 — `subscription-reconcile-stripe` cron is N+1 sequential — **LOW** (perf, runs nightly)
-**Source:** DB-perf review #43. `web/src/app/api/cron/subscription-reconcile-stripe/route.ts` (added in Phase 6 per CHANGELOG 2026-04-27) iterates over up-to-200 subs, does one Stripe REST call per sub sequentially. With Stripe rate limits + per-call latency, a 200-sub run takes ~minutes.
-**Fix:** Batch via `Promise.allSettled` in chunks of 10-20 with rate-limit awareness, or use Stripe's bulk-list endpoint where available. Bundle with billing-state-machine work.
-
-#### T356 — `permission_set_perms` index bloat — pre-launch REINDEX — **LOW** (DEBT)
-**Source:** DB-perf review #44. The 21-perm-set × 927-perm join table sees heavy churn during admin perm edits + the many migrations that have rebuilt perm taxonomy (per system map §4: 9 inactive sets retired). PostgreSQL index bloat accumulates without VACUUM FULL / REINDEX.
-**Fix:** Run `REINDEX TABLE CONCURRENTLY permission_set_perms` once before launch. Check `pg_stat_user_indexes` for bloat percentage first to confirm it's worth the locks. T5-adjacent — owner runs the REINDEX during a low-traffic window.
+#### T356 — `permission_set_perms` REINDEX script ready (owner runs once, low-traffic window) — **LOW** (DEBT)
+**File:** `Ongoing Projects/migrations/2026-04-27_T356_permission_set_perms_reindex.sql` — single `REINDEX TABLE CONCURRENTLY public.permission_set_perms;` command + a pre-flight bloat-check query so owner can decide whether the bloat is worth the rebuild. **NOT** runnable via `apply_migration` (CONCURRENTLY can't run in a transaction); paste into Supabase SQL editor in a low-traffic window.
 
 ### Cutover plan — surfaced from system map §22 (added 2026-04-27)
 

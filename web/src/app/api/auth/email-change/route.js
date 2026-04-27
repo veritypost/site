@@ -162,10 +162,10 @@ export async function POST(request) {
     }
   }
 
-  // Ext-M2 — audit the email-change initiation. Only the SUCCESS path
-  // is audited (auth.updateUser already returned ok). Failure paths
+  // Ext-M2 / T310 — audit the email-change initiation. Only the SUCCESS
+  // path is audited (auth.updateUser already returned ok). Failure paths
   // earlier in the function never mutated anything, so no audit needed.
-  // Best-effort: don't fail the request if audit insert fails.
+  // Best-effort + Sentry capture so missed audit rows surface in alerting.
   try {
     await service.from('audit_log').insert({
       actor_id: user.id,
@@ -182,6 +182,10 @@ export async function POST(request) {
     });
   } catch (e) {
     console.error('[auth.email-change] audit_log insert failed:', e);
+    try {
+      const { captureException } = await import('@/lib/observability');
+      await captureException(e, { route: 'auth.email-change', actor_id: user.id });
+    } catch {}
   }
 
   return NextResponse.json({ ok: true });

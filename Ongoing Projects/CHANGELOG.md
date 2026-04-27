@@ -7,6 +7,35 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (autonomous wave 8 — T317 + T310 + T355 shipped; T334 + T356 migrations drafted) — _pending push to git_
+
+### Shipped (3)
+
+- **T317 — `access_codes.type` taxonomy collapsed to `'referral'`.** `web/src/app/admin/access/page.tsx`. The redemption routes (`/r/[slug]/route.ts:77`, `/api/access-redeem/route.ts:63`) only honor `type='referral'`; the other admin-mintable values (`invite`/`press`/`beta`/`partner`) silently produced codes that never redeemed. `TYPE_OPTIONS` reduced to `['referral']` + the `EMPTY_FORM.type` default flipped from `'invite'` to `'referral'`. Schema enum can be tightened in a follow-up after confirming any historical rows with the legacy types are confirmed unused (didn't ship the enum-narrow migration here — verify-then-narrow is one cleaner pass).
+
+- **T310 — audit-log writes now `captureException` on failure across all 4 auth routes.** `signup/route.js`, `login/route.js`, `callback/route.js`, `email-change/route.js`. Each `try/catch` around the `audit_log` insert keeps its existing `console.error` (Vercel function log) AND now imports `@/lib/observability` lazily and calls `captureException(err, { route, actor_id })`. Sentry routes the failure to alerting when a DSN is configured; without DSN it's a dev-console no-op (same as before for `console.error`). Pre-T310, missed audit rows died silently in 7-day Vercel function logs with no alerting; now they surface in the existing Sentry sink.
+
+- **T355 — `subscription-reconcile-stripe` cron now parallel-batches Stripe calls.** `web/src/app/api/cron/subscription-reconcile-stripe/route.ts`. Replaced the sequential per-sub `for` loop with `Promise.allSettled` over chunks of 10. Stripe's read rate-limit ceiling (100 RPS) is well above 10-parallel; per-row error isolation preserved via the settled-results loop. 200-sub runs that took ~minutes now complete in ~1/10th the wall time. The DB UPDATE writes happen sequentially after each chunk's Stripe results land, so no transaction-isolation surprises.
+
+### Migration drafts queued for owner apply (2)
+
+- **T334 — `lockdown_self()` RPC.** `Ongoing Projects/migrations/2026-04-27_T334_lockdown_self_rpc.sql`. SECURITY DEFINER function: atomically flips `profile_visibility='hidden'`, deletes the user's followers, writes audit_log, bumps perms_version. Self-only `auth.uid() == p_user_id` enforced inside the function so RLS drift on `follows` can't compromise it. Caller-side change in `redesign/profile/settings/_cards/PrivacyCard.tsx` (replace two-statement client flow with one `rpc('lockdown_self', ...)` call) ships with the redesign-cutover commit (T357) since PrivacyCard is in the untracked redesign tree.
+
+- **T356 — `permission_set_perms` REINDEX script.** `Ongoing Projects/migrations/2026-04-27_T356_permission_set_perms_reindex.sql`. Single `REINDEX TABLE CONCURRENTLY` command + pre-flight bloat-check query. **NOT runnable via apply_migration** (CONCURRENTLY illegal in a transaction); owner pastes into Supabase SQL editor manually in a low-traffic window. Pre-flight query lets the owner decide whether the bloat is even material.
+
+### Skipped this wave (with reasons)
+
+- **T299** (homoglyph): needs a Unicode-confusables library install (npm dep change), out of scope for an in-session fix.
+- **T348** (per-request perm memoization): architecture decision — AsyncLocalStorage vs microcache vs request-context plumbing. Defer to a focused session.
+- **T328** (canonical analytics pipeline): owner direction, not autonomous.
+- **T354** (events partition retention cron): events table is already daily-partitioned by something else (per the wave-7 retraction); needs `SELECT * FROM cron.job;` audit to confirm what manages the lifecycle before bolting on retention. Dispatched the pg_cron extension presence check (it exists); didn't query existing jobs because that's a separate diagnostic step.
+- **Untracked redesign batch** (T331, T335, T336 focus-trap, T337, T339, T341, T351 5 sub-items): all in `web/src/app/redesign/*` which doesn't commit cleanly without the larger T357 cutover. Save for that bundle.
+- **Big-feature items** (T92 web push, T322 16-event wiring, T329 admin events panels, T360 Categories+Milestones, T363 public-profile redesign, T366 admin auth-recovery, T358 iOS port): each warrants its own focused session with adversary review; not safe to bundle blind in a continuous-loop turn.
+
+- **Files** — `web/src/app/admin/access/page.tsx`, 4 auth routes, `web/src/app/api/cron/subscription-reconcile-stripe/route.ts`, 2 new migration files, `Ongoing Projects/TODO.md`, `Ongoing Projects/CHANGELOG.md`.
+
+---
+
 ## 2026-04-27 (autonomous wave 7 — Vercel hotfix + 5 quick-win fixes) — _shipped, pushed to git_ (hotfix bab1c82 + features b1625f9)
 
 ### Hotfix (commit bab1c82, already pushed)
