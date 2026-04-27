@@ -156,10 +156,16 @@ function KidsStoryManagerInner() {
       setCategories(parents);
       setSubcategories(subsByParentName);
 
+      // Phase 3 of AI + Plan Change Implementation: Kids Story Manager
+      // is now scoped to age_band='kids' specifically. Tweens land in
+      // /admin/tweens-story-manager. NULL age_band rows surface here as
+      // legacy single-tier kid content (back-compat with pre-Phase-3
+      // articles that pre-date the band split).
       const { data: stories } = await supabase
         .from('articles')
         .select('*, categories!fk_articles_category_id!inner(name, is_kids_safe)')
         .eq('categories.is_kids_safe', true)
+        .or('age_band.eq.kids,age_band.is.null')
         .order('created_at', { ascending: false })
         .limit(200);
 
@@ -379,6 +385,10 @@ function KidsStoryManagerInner() {
             is_breaking: story.is_breaking || false,
             is_kids_safe: true,
             kids_summary: story.summary || '',
+            // Phase 3 of AI + Plan Change Implementation: this manager
+            // saves the kids-band variant. Tweens-band edits go through
+            // /admin/tweens-story-manager.
+            age_band: 'kids',
           },
           timeline_entries: entries.map((entry) => ({
             id: entry.id,
@@ -424,10 +434,12 @@ function KidsStoryManagerInner() {
       }
 
       setIsDirty(false);
+      // Phase 3: refetch scoped to age_band='kids' (or null for legacy).
       const { data: refreshed } = await supabase
         .from('articles')
         .select('*, categories!fk_articles_category_id!inner(name, is_kids_safe)')
         .eq('categories.is_kids_safe', true)
+        .or('age_band.eq.kids,age_band.is.null')
         .order('created_at', { ascending: false })
         .limit(200);
       setStoryList((refreshed as unknown as ArticleRow[]) || []);
@@ -467,10 +479,12 @@ function KidsStoryManagerInner() {
         }
         toast.push({ message: 'Kids article deleted', variant: 'success' });
         newStory();
+        // Phase 3: refetch scoped to age_band='kids' (or null for legacy).
         const { data: refreshed } = await supabase
           .from('articles')
           .select('*, categories!inner(name, is_kids_safe)')
           .eq('categories.is_kids_safe', true)
+          .or('age_band.eq.kids,age_band.is.null')
           .order('created_at', { ascending: false })
           .limit(200);
         setStoryList((refreshed as unknown as ArticleRow[]) || []);

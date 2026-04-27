@@ -6,6 +6,10 @@ import Foundation
 
 // MARK: - Kid Profile
 // Table: public.kid_profiles
+//
+// Phase 3 of AI + Plan Change Implementation: `reading_band` is the
+// system-derived band ("kids" / "tweens" / "graduated"). The vestigial
+// `age_range` column was dropped in the Phase 3 migration.
 struct KidProfile: Codable, Identifiable, Equatable {
     let id: String
     var parentUserId: String?
@@ -14,8 +18,8 @@ struct KidProfile: Codable, Identifiable, Equatable {
     var avatarUrl: String?
     var avatarPreset: String?
     var dateOfBirth: String?
-    var ageRange: String?
     var readingLevel: String?
+    var readingBand: String?
 
     var verityScore: Int?
     var articlesReadCount: Int?
@@ -40,8 +44,8 @@ struct KidProfile: Codable, Identifiable, Equatable {
         case avatarUrl = "avatar_url"
         case avatarPreset = "avatar_preset"
         case dateOfBirth = "date_of_birth"
-        case ageRange = "age_range"
         case readingLevel = "reading_level"
+        case readingBand = "reading_band"
         case verityScore = "verity_score"
         case articlesReadCount = "articles_read_count"
         case quizzesCompletedCount = "quizzes_completed_count"
@@ -59,6 +63,18 @@ struct KidProfile: Codable, Identifiable, Equatable {
     var safeName: String { displayName ?? "Child" }
     var streak: Int { streakCurrent ?? 0 }
     var score: Int { verityScore ?? 0 }
+
+    /// Bands this profile is permitted to see in the article feed.
+    /// kids → ["kids"]; tweens → ["kids", "tweens"]; graduated → []
+    /// (graduated profiles shouldn't be in the kid app at all; the
+    /// graduation flow signs them out, but defensive empty array.)
+    var visibleBands: [String] {
+        switch readingBand {
+        case "kids": return ["kids"]
+        case "tweens": return ["kids", "tweens"]
+        default: return []
+        }
+    }
 }
 
 // MARK: - Category
@@ -83,6 +99,11 @@ struct VPCategory: Codable, Identifiable, Equatable, Hashable {
 
 // MARK: - Article (kid-safe)
 // Table: public.articles
+//
+// Phase 3 of AI + Plan Change Implementation: `age_band` tags articles
+// into kids|tweens|adult. The kid app filters by the profile's visibleBands
+// (kids profiles see only age_band='kids'; tweens see kids+tweens). Server-
+// side RLS enforces the same rule via kid_visible_bands(profile_id).
 struct KidArticle: Codable, Identifiable, Equatable {
     let id: String
     let title: String?
@@ -93,6 +114,7 @@ struct KidArticle: Codable, Identifiable, Equatable {
     let categoryId: String?
     let readingTimeMinutes: Int?
     let difficultyLevel: String?
+    let ageBand: String?
     let publishedAt: Date?
 
     enum CodingKeys: String, CodingKey {
@@ -102,6 +124,7 @@ struct KidArticle: Codable, Identifiable, Equatable {
         case categoryId = "category_id"
         case readingTimeMinutes = "reading_time_minutes"
         case difficultyLevel = "difficulty_level"
+        case ageBand = "age_band"
         case publishedAt = "published_at"
     }
 }

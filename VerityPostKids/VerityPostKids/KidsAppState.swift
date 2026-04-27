@@ -15,6 +15,22 @@ final class KidsAppState: ObservableObject {
     @Published var kidId: String = ""
     @Published var kidName: String = ""
 
+    /// Phase 3 of AI + Plan Change Implementation: the system-derived
+    /// reading band ("kids" / "tweens" / "graduated"). Drives age_band
+    /// filtering in ArticleListView/KidReaderView/KidQuizEngineView.
+    /// Defaults to "kids" until kid_profiles row loads (safest fallback).
+    @Published var readingBand: String = "kids"
+
+    /// Bands this profile may see. Mirrors the server-side
+    /// kid_visible_bands(profile_id) RLS helper. Empty for graduated.
+    var visibleBands: [String] {
+        switch readingBand {
+        case "kids": return ["kids"]
+        case "tweens": return ["kids", "tweens"]
+        default: return []
+        }
+    }
+
     // Progress
     @Published var streakDays: Int = 0
     @Published var verityScore: Int = 0
@@ -77,16 +93,22 @@ final class KidsAppState: ObservableObject {
 
     private func loadKidRow() async {
         guard !kidId.isEmpty else { return }
-        struct Row: Decodable { let streak_current: Int? }
+        struct Row: Decodable {
+            let streak_current: Int?
+            let reading_band: String?
+        }
         do {
             let row: Row = try await client
                 .from("kid_profiles")
-                .select("streak_current")
+                .select("streak_current, reading_band")
                 .eq("id", value: kidId)
                 .single()
                 .execute()
                 .value
             self.streakDays = row.streak_current ?? 0
+            // Phase 3: cache the reading band so feed/article/quiz queries
+            // can filter age_band locally as defense-in-depth on top of RLS.
+            self.readingBand = row.reading_band ?? "kids"
         } catch {
             self.loadError = "Couldn't load streak: \(error.localizedDescription)"
         }

@@ -8,6 +8,10 @@ struct ArticleListView: View {
     let categoryName: String
     let categoryColor: Color
     let categorySlug: String?
+    /// Phase 3 of AI + Plan Change Implementation: bands this profile is
+    /// permitted to see. ["kids"] for kids-band; ["kids","tweens"] for
+    /// tweens. Empty for graduated. Server-side RLS enforces the same.
+    var visibleBands: [String] = ["kids"]
 
     @State private var articles: [KidArticle] = []
     @State private var loading: Bool = true
@@ -195,12 +199,18 @@ struct ArticleListView: View {
             }
         }
 
+        // Phase 3: filter by age_band visible to this profile. RLS already
+        // enforces this server-side; the client-side filter is defense-
+        // in-depth so a stale JWT or RLS misconfig still produces an empty
+        // list rather than leaking bands.
+        let bands = visibleBands.isEmpty ? ["kids"] : visibleBands
         do {
             let baseQuery = client
                 .from("articles")
-                .select("id, title, slug, excerpt, kids_summary, cover_image_url, category_id, reading_time_minutes, difficulty_level, published_at")
+                .select("id, title, slug, excerpt, kids_summary, cover_image_url, category_id, reading_time_minutes, difficulty_level, age_band, published_at")
                 .eq("status", value: "published")
                 .eq("is_kids_safe", value: true)
+                .in("age_band", values: bands)
 
             let filtered = categoryId.map { baseQuery.eq("category_id", value: $0) } ?? baseQuery
 

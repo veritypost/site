@@ -57,9 +57,18 @@ import {
   QUIZ_PROMPT,
   TIMELINE_PROMPT,
   AUDIENCE_PROMPT,
-  KID_ARTICLE_PROMPT,
-  KID_TIMELINE_PROMPT,
-  KID_QUIZ_PROMPT,
+  // Phase 3: banded kid prompts. KID_ARTICLE_PROMPT / KID_TIMELINE_PROMPT /
+  // KID_QUIZ_PROMPT (the legacy single-tier kid prompts) are retained as
+  // exports in editorial-guide.ts for reference but no longer used by this
+  // route — every kid run now picks a band-specific prompt.
+  KIDS_HEADLINE_PROMPT,
+  TWEENS_HEADLINE_PROMPT,
+  KIDS_ARTICLE_PROMPT,
+  TWEENS_ARTICLE_PROMPT,
+  KIDS_TIMELINE_PROMPT,
+  TWEENS_TIMELINE_PROMPT,
+  KIDS_QUIZ_PROMPT,
+  TWEENS_QUIZ_PROMPT,
 } from '@/lib/pipeline/editorial-guide';
 import {
   persistGeneratedArticle,
@@ -113,6 +122,12 @@ const SourceUrlSchema = z
 const RequestSchema = z.object({
   cluster_id: z.string().uuid(),
   audience: z.enum(['adult', 'kid']),
+  // Phase 3 of AI + Plan Change Implementation: kid runs may be band-tagged.
+  // 'kids' = ages 7-9; 'tweens' = ages 10-12. Adult runs ignore this field.
+  // When omitted on a kid run, defaults to 'tweens' (closest to the legacy
+  // single-tier kid voice). The newsroom UI may call this route twice per
+  // kid-safe cluster (once per band) to produce both versions.
+  age_band: z.enum(['kids', 'tweens']).optional(),
   freeform_instructions: z.string().max(2000).optional(),
   provider: z.enum(['anthropic', 'openai']).default('anthropic'),
   model: z.string().min(3).max(100).default('claude-sonnet-4-6'),
@@ -473,6 +488,13 @@ export async function POST(req: Request) {
   }
 
   const { cluster_id, audience, freeform_instructions, provider, model, source_urls } = input;
+  // Phase 3: derive the effective age_band for this run.
+  // - Adult runs: 'adult' (passed straight to persist; column allows NULL but
+  //   we set it for clarity).
+  // - Kid runs: caller-supplied 'kids' or 'tweens'; defaults to 'tweens' if
+  //   omitted (back-compat with the legacy single-tier kid voice).
+  const effectiveAgeBand: 'kids' | 'tweens' | 'adult' =
+    audience === 'kid' ? (input.age_band ?? 'tweens') : 'adult';
   // De-dupe + drop empties; the schema already trimmed + validated each entry.
   // `sourceUrlsExplicit` tracks whether the client passed URLs in the body —
   // distinct from `sourceUrlsOverridden` (which may also be true after the
@@ -1096,9 +1118,19 @@ ${catListText}`;
       .slice(0, 10)}.${freeformBlock}\n\nSOURCES:\n${corpus}`;
     const categorizationUser = `Pick the best category for this cluster. Return ONLY the JSON.${freeformBlock}\n\nSOURCES:\n${corpus}`;
 
+    // Phase 3 of AI + Plan Change Implementation: pick the band-appropriate
+    // headline/summary system prompt for kid runs. Adult runs continue to
+    // use the generic HEADLINE_PROMPT.
+    const headlineSystem =
+      audience === 'kid'
+        ? effectiveAgeBand === 'kids'
+          ? KIDS_HEADLINE_PROMPT
+          : TWEENS_HEADLINE_PROMPT
+        : HEADLINE_PROMPT;
+
     promptParts.push(
-      { step: 'headline', system: HEADLINE_PROMPT, user: headlineUser },
-      { step: 'summary', system: HEADLINE_PROMPT, user: summaryUser },
+      { step: 'headline', system: headlineSystem, user: headlineUser },
+      { step: 'summary', system: headlineSystem, user: summaryUser },
       { step: 'categorization', system: CATEGORIZATION_PROMPT, user: categorizationUser }
     );
 
@@ -1125,7 +1157,7 @@ ${catListText}`;
       callModel({
         provider,
         model,
-        system: composeSystemPrompt(HEADLINE_PROMPT, promptOverrides.get('headline')),
+        system: composeSystemPrompt(headlineSystem, promptOverrides.get('headline')),
         prompt: headlineUser,
         max_tokens: 600,
         pipeline_run_id: runId,
@@ -1136,7 +1168,7 @@ ${catListText}`;
       callModel({
         provider,
         model,
-        system: composeSystemPrompt(HEADLINE_PROMPT, promptOverrides.get('summary')),
+        system: composeSystemPrompt(headlineSystem, promptOverrides.get('summary')),
         prompt: summaryUser,
         max_tokens: 400,
         pipeline_run_id: runId,
@@ -1192,9 +1224,13 @@ ${catListText}`;
     const categoryAppend = CATEGORY_PROMPTS[catNameLower]
       ? `\n\n${CATEGORY_PROMPTS[catNameLower]}`
       : '';
+    // Phase 3: pick band-appropriate body system prompt for kid runs.
+    // Adult runs continue to use EDITORIAL_GUIDE + category append.
     const bodySystem =
       audience === 'kid'
-        ? KID_ARTICLE_PROMPT
+        ? effectiveAgeBand === 'kids'
+          ? KIDS_ARTICLE_PROMPT
+          : TWEENS_ARTICLE_PROMPT
         : `${EDITORIAL_GUIDE}${categoryAppend}\n\nIMPORTANT: Return your response as a JSON object. Do NOT include any HTML tags or code blocks in JSON fields. Markdown paragraphs ALLOWED in "body" (use \\n\\n between paragraphs, **bold** sparingly, no other markup).`;
     const bodyUser = `Write an ORIGINAL news article from the sources below. Today is ${new Date()
       .toISOString()
@@ -1444,7 +1480,13 @@ Return JSON:
       audience,
       step: timelineStepName,
     });
-    const timelineSystem = audience === 'kid' ? KID_TIMELINE_PROMPT : TIMELINE_PROMPT;
+    // Phase 3: band-appropriate timeline prompt
+    const timelineSystem =
+      audience === 'kid'
+        ? effectiveAgeBand === 'kids'
+          ? KIDS_TIMELINE_PROMPT
+          : TWEENS_TIMELINE_PROMPT
+        : TIMELINE_PROMPT;
     const timelineUser = `ARTICLE BODY:\n${finalBodyMarkdown}\n\nGenerate the timeline as JSON:\n{\n  "events": [\n    {"event_date": "YYYY-MM-DDTHH:mm:ssZ", "event_label": "Short label", "event_body": "...", "source_url": "..."}\n  ]\n}${freeformBlock}\n\nSOURCES:\n${corpus}`;
     promptParts.push({
       step: timelineStepName,
@@ -1534,7 +1576,13 @@ Return JSON:
       audience,
       step: quizStepName,
     });
-    const quizSystem = audience === 'kid' ? KID_QUIZ_PROMPT : QUIZ_PROMPT;
+    // Phase 3: band-appropriate quiz prompt
+    const quizSystem =
+      audience === 'kid'
+        ? effectiveAgeBand === 'kids'
+          ? KIDS_QUIZ_PROMPT
+          : TWEENS_QUIZ_PROMPT
+        : QUIZ_PROMPT;
     const quizUser = `ARTICLE BODY:\n${finalBodyMarkdown}\n\nGenerate 5 Quick Check questions as JSON. Return EXACTLY this shape:
 {
   "questions": [
@@ -1693,7 +1741,7 @@ Empty array if all correct.`;
       // band-split kid generation into two outputs (kids 7-9 + tweens
       // 10-12); for now every kid run ships as 'tweens' (closer to the
       // current single-tier kid voice). Adult runs leave age_band null.
-      age_band: audience === 'kid' ? 'tweens' : null,
+      age_band: effectiveAgeBand,
       // Persist the kid summary onto articles.kids_summary for the kid iOS
       // app's existing kids_summary read path. Adult runs leave it null.
       kids_summary: audience === 'kid' ? summary || null : null,
@@ -1796,14 +1844,35 @@ Empty array if all correct.`;
     });
 
     // 9q. Update cluster — last_generation_run_id column is live
-    // (migration 116) and typed, so this folds into the primary update.
+    // (migration 116) and typed. Phase 3 adds sibling FK columns:
+    // - primary_article_id stays as "the adult article" for back-compat
+    // - primary_kid_article_id tracks the age_band='kids' article id
+    // - primary_tween_article_id tracks the age_band='tweens' article id
+    // The newsroom 3-tab cluster view reads these to render Adult /
+    // Kids / Tweens panes.
+    type ClusterUpdate = {
+      primary_article_id?: string;
+      primary_kid_article_id?: string;
+      primary_tween_article_id?: string;
+      last_generation_run_id: string;
+      updated_at: string;
+    };
+    const clusterUpdate: ClusterUpdate = {
+      last_generation_run_id: runId,
+      updated_at: new Date().toISOString(),
+    };
+    if (audience === 'adult') {
+      clusterUpdate.primary_article_id = articleId;
+    } else if (effectiveAgeBand === 'kids') {
+      clusterUpdate.primary_kid_article_id = articleId;
+    } else if (effectiveAgeBand === 'tweens') {
+      clusterUpdate.primary_tween_article_id = articleId;
+    }
+    // Cast: generated Database types lag the Phase 3 migration that adds
+    // primary_kid_article_id + primary_tween_article_id to feed_clusters.
     await service
       .from('feed_clusters')
-      .update({
-        primary_article_id: articleId,
-        last_generation_run_id: runId,
-        updated_at: new Date().toISOString(),
-      })
+      .update(clusterUpdate as never)
       .eq('id', cluster_id);
 
     finalStatus = 'completed';

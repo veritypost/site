@@ -111,7 +111,7 @@ export async function POST(request) {
         .maybeSingle(),
     ]);
     const seatsPaid = subRes?.data?.kid_seats_paid ?? 1;
-    const planMeta = (subRes?.data?.plans?.metadata ?? {});
+    const planMeta = subRes?.data?.plans?.metadata ?? {};
     const maxKids = Number(planMeta.max_kids) || 4;
     const extraKidPriceCents = Number(planMeta.extra_kid_price_cents) || 499;
     const next = (activeKidCount ?? 0) + 1;

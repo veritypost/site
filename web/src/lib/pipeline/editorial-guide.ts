@@ -921,3 +921,218 @@ OUTPUT JSON:
     }
   ]
 }`;
+
+// ═══════════════════════════════════════════════════════════════════════
+// PHASE 3 — BANDED KID PROMPTS (kids 7-9, tweens 10-12)
+//
+// The single-tier KID_* prompts above stay as defensive fallbacks. The
+// route uses the banded prompts below when an audience='kid' run is
+// dispatched with an explicit age_band. Phase 3 generates BOTH bands
+// per kid-safe cluster, producing two articles in `articles` (one
+// age_band='kids', one age_band='tweens'), so the kid iOS app can show
+// each profile the band-appropriate version via RLS.
+// ═══════════════════════════════════════════════════════════════════════
+
+export const KIDS_HEADLINE_PROMPT: string = `Generate a headline and summary for an article aimed at children aged 7-9 (early-to-middle elementary readers).
+
+VOICE:
+- Concrete and direct. Short, punchy headlines.
+- "Wow" or "huh" framing — make a 7-year-old curious without being silly.
+- Use words a third-grader knows. Not "negotiate" — "talk to figure out."
+- Active voice always. No passive constructions.
+
+HEADLINE RULES:
+- Maximum 8 words. Aim for 5-7.
+- State the most surprising or interesting fact. Not the politics, not the procedure — the thing that makes a kid lean forward.
+- Active voice. Subject-verb-object.
+- No idioms or wordplay a kid would miss.
+- Present tense.
+
+SUMMARY RULES:
+- 1-2 short sentences.
+- Connect to the kid's world. "That's like every school in your state closing at once."
+- Different facts than the headline.
+- No editorial language.
+
+OUTPUT FORMAT:
+{
+  "headline": "...",
+  "summary": "...",
+  "slug": "kebab-case-from-headline"
+}`;
+
+export const TWEENS_HEADLINE_PROMPT: string = `Generate a headline and summary for an article aimed at tweens aged 10-12 (upper elementary / middle school readers).
+
+VOICE:
+- Real news voice, just unpacked. Treats the reader as a competent reader, not a child.
+- Vocabulary one notch above kids voice — acronyms expanded once, jargon translated, but not condescending.
+- Conveys why the news matters without telling the reader what to think.
+
+HEADLINE RULES:
+- Maximum 9 words. Aim for 6-8.
+- State the fact. Active voice. Subject-verb-object.
+- No clickbait, no rhetorical questions.
+- Present tense for current events.
+
+SUMMARY RULES:
+- 2 sentences.
+- Different facts than the headline.
+- One sentence on what happened beyond the headline; one on why it matters in tween-relatable terms (school, family, money, gaming, sports, etc.) without forcing it.
+
+OUTPUT FORMAT:
+{
+  "headline": "...",
+  "summary": "...",
+  "slug": "kebab-case-from-headline"
+}`;
+
+export const KIDS_ARTICLE_PROMPT: string = `You are writing a news article for children aged 7-9. Not dumbing down — translating. Same facts, simpler language.
+
+THE GOAL: A 7-9 year old reads this and says "oh cool" or "wait, really?" — not "I don't get it."
+
+VOICE:
+- Short sentences. Average 8-12 words.
+- Concrete examples that connect to a kid's daily life: lunch money, school day, recess, family, weather, pets.
+- One idea per sentence. No nested clauses.
+- Replace jargon with plain English ("inflation" → "everything costing more money this year").
+- Active voice always.
+- No graphic violence, no political opinion, no fear-mongering. State facts gently.
+- "Whoa" moments first — start with the most interesting fact.
+
+LENGTH: 80-120 words. Tight. Every sentence earns its place.
+
+STRUCTURE:
+- Sentence 1-2: What happened. The most surprising fact.
+- Middle: How it happened, who was involved, what changed.
+- Last sentence: Why this matters to the reader's world. One concrete connection.
+
+EVERY WORD MUST BE 100% ORIGINAL. Do NOT copy phrasing from any source. Read the facts, close them, write fresh for kids.
+
+OUTPUT JSON (matches BodySchema; route persists into articles with is_kids_safe=true and age_band='kids'):
+{
+  "title": "kid-friendly headline, max 8 words",
+  "body": "the article body in 7-9 voice, 80-120 words, paragraphs separated by \\n\\n. Markdown paragraph breaks allowed; **bold** sparingly.",
+  "word_count": 100,
+  "reading_time_minutes": 1
+}`;
+
+export const TWEENS_ARTICLE_PROMPT: string = `You are writing a news article for tweens aged 10-12. Real news voice, just unpacked.
+
+THE GOAL: A 10-12 year old reads this and feels like they're being told the news, not lectured to. They should feel respected.
+
+VOICE:
+- Average sentence length 12-18 words. Variation is good.
+- Real news rhythm: lede first, then key details, then "so what."
+- Vocabulary above kids tier — acronyms expanded once on first use, then used freely.
+- Connect abstract concepts to real-world consequences in tween-relatable terms (school policy, money, family decisions, online life) without being preachy.
+- Active voice. Direct attribution ("according to [source]") for any contested claim.
+- No graphic violence, no political opinion. Tween-appropriate handling of disturbing topics: state facts, skip lurid detail.
+
+LENGTH: 120-180 words. Tight news writing.
+
+STRUCTURE:
+- Paragraph 1 (1-3 sentences): What happened. The lede.
+- Paragraph 2 (2-3 sentences): The critical details. How it happened, who was involved.
+- Optional paragraph 3 (1-2 sentences): Secondary development.
+- "So what" closer (1 sentence): Why this matters to the reader's world. Attributed if it's a claim.
+
+EVERY WORD MUST BE 100% ORIGINAL. Do NOT copy phrasing from any source.
+
+OUTPUT JSON (matches BodySchema; route persists into articles with is_kids_safe=true and age_band='tweens'):
+{
+  "title": "tween headline, max 9 words",
+  "body": "the article body in 10-12 voice, 120-180 words, paragraphs separated by \\n\\n. Markdown paragraph breaks allowed; **bold** sparingly.",
+  "word_count": 150,
+  "reading_time_minutes": 1
+}`;
+
+export const KIDS_TIMELINE_PROMPT: string = `Generate a timeline for children aged 7-9 about this news story.
+
+Same events as the adult timeline, simpler. Each event is ONE sentence, max 8 words. Use words a 7-9 year old knows. Put things in context they understand.
+
+RULES:
+- Same dates and facts as the adult version. Do NOT change what happened.
+- Simpler language. "Congress passes law" not "Legislature enacts statutory framework."
+- Add brief context where helpful: "the country next to China," "the company that makes iPhones."
+- Keep it scannable — short bullets, not paragraphs.
+- 4-6 events. Pick the most important ones; don't overwhelm.
+- 100% original wording. Do NOT copy from the adult timeline.
+
+OUTPUT JSON:
+{
+  "events": [
+    {"event_date": "Mon YYYY or Mon DD, YYYY", "event_label": "Max 8 words, kids-7-9 language", "event_body": "1-2 short sentences in kids voice, 15-30 words."}
+  ]
+}`;
+
+export const TWEENS_TIMELINE_PROMPT: string = `Generate a timeline for tweens aged 10-12 about this news story.
+
+Same events as the adult timeline, with vocabulary one notch below adult and slightly more depth than kids tier.
+
+RULES:
+- Same dates and facts as the adult version. Do NOT change what happened.
+- Real news vocabulary — acronyms expanded on first use, jargon translated.
+- Brief context where helpful, but don't over-explain.
+- 4-8 events. More density than kids tier; ongoing stories can need 6-8.
+- 100% original wording. Do NOT copy from any other timeline.
+
+OUTPUT JSON:
+{
+  "events": [
+    {"event_date": "Mon YYYY or Mon DD, YYYY", "event_label": "Max 10 words, tweens 10-12 language", "event_body": "1-2 sentences in tween voice with the why-it-mattered, 20-40 words."}
+  ]
+}`;
+
+export const KIDS_QUIZ_PROMPT: string = `Generate 5 Quick Check questions for children aged 7-9 about this article. Make it feel like a fun game, not a school test.
+
+VOICE:
+- Friendly, encouraging. "Did you spot...", "What cool thing...", "Here's an easy one to start..."
+- All questions answerable from the kids version of the article.
+- 4 answer options each. Wrong answers should be plausible but clearly wrong if you read.
+- Difficulty: Q1-Q2 easy (basic facts), Q3-Q4 medium (a small connection), Q5 a tiny bit harder (a specific detail).
+- No jargon in questions or options.
+- No "Which is NOT" / "All of the following EXCEPT" formats — confusing for early readers.
+
+OUTPUT JSON:
+{
+  "questions": [
+    {
+      "question_text": "...",
+      "options": [
+        { "text": "A" },
+        { "text": "B" },
+        { "text": "C" },
+        { "text": "D" }
+      ],
+      "correct_index": 0,
+      "section_hint": "..."
+    }
+  ]
+}`;
+
+export const TWEENS_QUIZ_PROMPT: string = `Generate 5 Quick Check questions for tweens aged 10-12 about this article. Treats the reader as a competent reader.
+
+VOICE:
+- Slightly more casual than the adult quiz, but real news questions.
+- All answerable from the tweens version of the article.
+- 4 answer options. Plausible distractors that don't contradict the article.
+- Difficulty: Q1 easy warm-up, Q2-Q3 substantive recall, Q4 connecting two parts of the article, Q5 a specific detail.
+- Don't quiz on dates (article uses relative time like "Friday," "this summer").
+- No "Which is NOT" / "All EXCEPT" formats.
+
+OUTPUT JSON:
+{
+  "questions": [
+    {
+      "question_text": "...",
+      "options": [
+        { "text": "..." },
+        { "text": "..." },
+        { "text": "..." },
+        { "text": "..." }
+      ],
+      "correct_index": 0,
+      "section_hint": "..."
+    }
+  ]
+}`;

@@ -63,8 +63,12 @@ export async function GET() {
       const m = p.metadata || {};
       const max = typeof m.max_kids === 'number' ? m.max_kids : Number(m.max_kids);
       const inc = typeof m.included_kids === 'number' ? m.included_kids : Number(m.included_kids);
-      const seats = typeof m.max_total_seats === 'number' ? m.max_total_seats : Number(m.max_total_seats);
-      const price = typeof m.extra_kid_price_cents === 'number' ? m.extra_kid_price_cents : Number(m.extra_kid_price_cents);
+      const seats =
+        typeof m.max_total_seats === 'number' ? m.max_total_seats : Number(m.max_total_seats);
+      const price =
+        typeof m.extra_kid_price_cents === 'number'
+          ? m.extra_kid_price_cents
+          : Number(m.extra_kid_price_cents);
       if (Number.isFinite(max) && max > 0) maxKids[p.tier] = max;
       if (Number.isFinite(inc) && inc >= 0) includedKids[p.tier] = inc;
       if (Number.isFinite(seats) && seats > 0) maxTotalSeats[p.tier] = seats;

@@ -33,7 +33,8 @@ Do not pick up these IDs autonomously. The owner has explicitly reserved them. I
 
 **TODO.md items requiring owner decision/action:**
 - **T2** — Cookie consent banner: **OWNER DECIDED 2026-04-27 → Funding Choices (option A)**. Implementation deferred until AdSense console access is available; ready to ship as soon as owner signals "go."
-- **T16, T17, T26, T173** — MCP `pg_proc` queries (require DB-read permission grant)
+- **T16** — VERIFIED 2026-04-27 — privacy hole real. Migration drafted at `Ongoing Projects/migrations/2026-04-27_T16_start_conversation_allow_messages.sql`. Awaiting owner apply.
+- **T17, T26, T173** — MCP `pg_proc` queries (require DB-read permission grant)
 - **T19** — Home feed prefs: wire vs. delete decision (owner direction)
 - **T20** — iOS expert application schema match (depends on editor process tolerance — owner)
 - **T34, T35, T54** — trust-positioning calls (downvotes, rank notifications, kids volume framing)
@@ -428,11 +429,12 @@ The numbered items below retain their original section placement for readability
 **Fix:** When `streak_current === 0 && streak_best > 0 && streak_freeze_remaining > 0` → "Your streak ended. Use a freeze to restore it? ([N] remaining)" with one button. Otherwise: "Streak reset — start a new one today."
 **Recommendation:** Mirror the kid surface presentation — already designed and shipping there.
 
-### T16 — DM enforcement gap: `allow_messages` flag may not be honored at recipient — **CRITICAL** *pending MCP verify* (privacy)
-**File:** `web/src/app/api/conversations/route.js:8-17,56-85`, `web/src/app/api/messages/route.js:10-16,32-56` (only sender-side `messages.dm.compose` enforced); `MessagesView.swift:592-615`.
-**Verify first:** Query `pg_proc` for `start_conversation` / `post_message` via MCP — check whether they read `users.allow_messages` for the recipient. If yes, finding collapses to "hide DM CTA when target opts out" (UI fix). If no, this is a real privacy hole.
-**Fix:** Enforce recipient opt-out in the RPC bodies; hide DM entry points when `target.allow_messages === false`.
-**Recommendation:** **Privacy enforcement at the data layer, not the UI.** Even if web/iOS hide the CTA, third-party clients with our public API key would bypass — RLS or RPC body must own this.
+### T16 — DM enforcement gap: `allow_messages` flag NOT honored at recipient — **CRITICAL** (verified 2026-04-27 — migration drafted, awaiting owner apply)
+**MCP verify result (2026-04-27):** CONFIRMED REAL. `start_conversation(p_user_id, p_other_user_id)` body checks sender DM access + sender mute/ban + recipient existence, but does NOT read `users.allow_messages` for the recipient. Privacy hole: third-party client with anon key can bypass UI hide and force-create conversations with users who opted out.
+**File:** RPC body in DB; client-side caller is `web/src/app/api/conversations/route.js`.
+**Fix migration drafted at:** `Ongoing Projects/migrations/2026-04-27_T16_start_conversation_allow_messages.sql`. Adds a single recipient-opt-out check + new error code `[DM_RECIPIENT_OPTED_OUT]`. Idempotent CREATE OR REPLACE; rollback via prior body in git history.
+**Apply order:** (1) owner runs the migration via Supabase Dashboard SQL editor or MCP write, (2) update `web/src/app/api/conversations/route.js` to add `DM_RECIPIENT_OPTED_OUT` to the existing T283 error-code-collapse mapping (so the 403 'cannot_dm' uniform response covers it too — prevents response-shape leakage of the recipient's preference). Step 2 is a 1-line code change once migration is in.
+**Status:** awaiting owner migration apply.
 
 ### T17 — Blocked-user DM protection appears UI-only — **CRITICAL** *pending MCP verify* (safety)
 **File:** `web/src/app/messages/page.tsx:232-264,1177-1183` (web filters via `blockedUserIds` for menu label only), `MessagesView.swift:494-499` (iOS filters locally because server returns blocked convos).

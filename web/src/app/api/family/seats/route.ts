@@ -152,10 +152,7 @@ export async function POST(request: Request) {
 
   const paid = Number(body.paid);
   if (!Number.isFinite(paid) || !Number.isInteger(paid) || paid < 0 || paid > 4) {
-    return NextResponse.json(
-      { error: 'paid must be an integer in [0, 4]' },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: 'paid must be an integer in [0, 4]' }, { status: 400 });
   }
 
   const state = await loadSeatState(service, user.id);
@@ -175,7 +172,8 @@ export async function POST(request: Request) {
   if (state.platform === 'apple') {
     return NextResponse.json(
       {
-        error: 'Subscription is billed via Apple. Manage seats in your iOS app or App Store settings.',
+        error:
+          'Subscription is billed via Apple. Manage seats in your iOS app or App Store settings.',
         code: 'platform_apple',
       },
       { status: 409 }
@@ -221,10 +219,7 @@ export async function POST(request: Request) {
     .in('status', ['active', 'trialing']);
   if (updErr) {
     console.error('[family.seats] subscription update failed:', updErr.message);
-    return NextResponse.json(
-      { error: 'Could not update seat count' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Could not update seat count' }, { status: 500 });
   }
 
   await recordAdminAction({

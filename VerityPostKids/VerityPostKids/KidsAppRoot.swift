@@ -155,10 +155,14 @@ struct KidsAppRoot: View {
                 onDone: { activeSheet = nil }
             )
         case .articles(let name, let color, let slug):
+            // Phase 3: pass the profile's visible bands so the list query
+            // filters by age_band. Defaults to ["kids"] until the kid_profiles
+            // row loads.
             ArticleListView(
                 categoryName: name,
                 categoryColor: color,
                 categorySlug: slug,
+                visibleBands: state.visibleBands.isEmpty ? ["kids"] : state.visibleBands,
                 onClose: { activeSheet = nil },
                 onQuizComplete: { result in
                     handleQuizComplete(result)
