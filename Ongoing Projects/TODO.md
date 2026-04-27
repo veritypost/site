@@ -27,7 +27,8 @@
 >
 > ### How to handle each TODO category
 >
-> - **LOCKED items** (T2, T19, T26, T40, T54, T55, T56, T57, T117, T173, T271, T-EMAIL-PRUNE): owner has decided. Body section contains the impl spec. When owner says "ship T<N>" or "go on locked items," execute the spec. Don't re-ask the decision. If a sub-question surfaces during impl that the spec didn't anticipate, ask once with a recommendation, then proceed.
+> - **LOCKED items** (T19, T26, T40, T54, T55, T56, T57, T117, T173, T-EMAIL-PRUNE): owner has decided. Body section contains the impl spec. When owner says "ship T<N>" or "go on locked items," execute the spec. Don't re-ask the decision. If a sub-question surfaces during impl that the spec didn't anticipate, ask once with a recommendation, then proceed.
+> - **LAUNCH BLOCKERS in `Pre-Launch Assessment.md`** (T2 — Funding Choices CMP; T271 — Maine governing-law TOS section): owner-touch only. Don't pick from the autonomous loop. Owner ships these in coordination with AdSense console access + legal sign-off windows.
 > - **DEFERRED items** (T14, T34, T35, T79, T84): owner has parked these. Don't pick them up. Don't re-recommend them. Don't tell the owner "next" includes them.
 > - **OPEN items in the body sections** (T27, T92, T165, T166, T233, T285): no owner decision needed; pick by priority and ship under the autonomous runbook. Each has audit evidence + recommended fix; verify the audit against current code before editing.
 > - **iOS items moved to Pre-Launch Assessment**: don't pick during a web session. They need a Swift build + iOS-Xcode environment to verify.
@@ -75,7 +76,6 @@ Do not pick up these IDs autonomously. The owner has explicitly reserved them. I
 **Skip-list status (post 2026-04-27 owner-decision pass).** All decisions documented are LOCKED — they're listed here because they need either implementation work the autonomous loop shouldn't pick up alone, or further owner input. Items already CLOSED are NOT listed; their closure record lives in `CHANGELOG.md` (search "Decision-log closures" for T77 / T85 / T268 / T272 / T291; T16 / T17 have full ship entries).
 
 LOCKED, awaiting "go" to ship code/migration:
-- **T2** — Funding Choices CMP; gated on AdSense console access.
 - **T19** — simplify home (categories nav + feed + Browse + occasional hero/breaking). See T19 body for impl spec.
 - **T26** — RPC migration adding `comment_reply` + `comment_mention` notifications via `create_notification`. Scope locked (in_app + push only).
 - **T40** — delete dead timeline aside (T11 covers the exit path).
@@ -85,7 +85,6 @@ LOCKED, awaiting "go" to ship code/migration:
 - **T57** — auto-mint Stripe price API on plan create (option B).
 - **T117** — migrate ~9 remaining web pages to `<ErrorState>` primitive.
 - **T173** — add comment-length cap to PATCH `/api/comments/[id]/route.js`.
-- **T271** — Maine governing-law section in TOS.
 - **T-EMAIL-PRUNE** — drop 4 engagement types from `send-emails` cron; keep `data_export_ready` + `kid_trial_expired` + `expert_reverification_due`.
 
 DEFERRED (owner returning to it later — no decision yet):
@@ -449,13 +448,6 @@ The numbered items below retain their original section placement for readability
 
 ## LAUNCH BLOCKERS
 
-### T2 — Cookie consent banner missing — AdSense approval blocker — **CRITICAL** (owner decided: Funding Choices)
-**Decision (2026-04-27):** Owner picked **Funding Choices** (option A — free, Google-supported, single-script integration). Implementation deferred until AdSense console access is set up by owner.
-**File:** `web/src/app/layout.js` (verified — only mention of consent is a TODO comment at line 166 about a "consent-gated loader once the CMP is installed"; no `CookieBanner`/`ConsentBanner` component exists anywhere in `web/src/`).
-**Problem:** GA4 + AdSense load unconditionally. AdSense approval is at risk; EU traffic is legally exposed.
-**Fix when ready:** (1) Owner enables Funding Choices in the Google AdSense / Funding Choices console + selects EEA/UK/CH coverage. (2) Owner provides the publisher ID + script tag from the console. (3) Code adds the script to `web/src/app/layout.js` above the existing `ga4-loader` / `ga4-init` / `GAListener` / AdSense script tags, gated so those scripts only load on accepted consent (Google's Funding Choices supplies the standard consent-state API — `googlefc.callbackQueue.push(...)` or the IAB TCF `__tcfapi`). (4) Persist consent state via the CMP's own cookie (no extra localStorage needed). Reject keeps scripts off. (5) Update `web/src/app/cookies/page.tsx` copy to reflect the live banner (T288 already softened it; replace with truthful "first-visit banner via Funding Choices" once shipped).
-**What I need from owner to ship this:** the publisher ID + the consent-callback shape from the Funding Choices console (different accounts get slightly different snippets). 30-min implementation window once those land.
-
 ---
 
 ## HIGH — close before launch quality bar
@@ -592,10 +584,6 @@ Items below already moved to Pre-Launch Assessment (Apple/Sentry/COPPA-CRITICAL)
 #### T233 — Hard-delete on articles, no soft-delete window — **HIGH**
 **File:** `web/src/app/api/admin/articles/[id]/route.ts:611`. `.delete()` removes permanently; audit log writes after delete (orphan if persist fails).
 **Fix:** Soft-delete via `deleted_at`; write audit before mutation; cron purges after 30 days.
-
-#### T271 — Missing choice-of-law clause — **LOW** (contract enforceability)
-**File:** `terms/page.tsx`. No "Governing Law" section.
-**Fix:** Add: "Governed by laws of [Delaware/California], exclusive jurisdiction in [county/state]."
 
 #### T285 — Web comment report uses free text; iOS uses structured — **MEDIUM** *(pairs with T32)*
 **File:** `web/src/app/api/comments/[id]/report/route.js:45-46`. Pairs with T32.

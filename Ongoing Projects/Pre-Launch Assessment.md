@@ -649,3 +649,24 @@ These items target `VerityPost/` or `VerityPostKids/` Swift code and need an iOS
 ### Attorney / Legal (T264-T273)
 
 
+
+
+---
+
+## LAUNCH BLOCKERS (moved from TODO.md 2026-04-27)
+
+These items are launch-gate-class: ship/decide them before AdSense or Apple-review submission. Owner-driven; not autonomous.
+
+### T2 — Cookie consent banner missing — AdSense approval blocker — **CRITICAL** (owner decided: Funding Choices)
+**Decision (2026-04-27):** Owner picked **Funding Choices** (option A — free, Google-supported, single-script integration). Implementation deferred until AdSense console access is set up by owner.
+**File:** `web/src/app/layout.js` (verified — only mention of consent is a TODO comment at line 166 about a "consent-gated loader once the CMP is installed"; no `CookieBanner`/`ConsentBanner` component exists anywhere in `web/src/`).
+**Problem:** GA4 + AdSense load unconditionally. AdSense approval is at risk; EU traffic is legally exposed.
+**Fix when ready:** (1) Owner enables Funding Choices in the Google AdSense / Funding Choices console + selects EEA/UK/CH coverage. (2) Owner provides the publisher ID + script tag from the console. (3) Code adds the script to `web/src/app/layout.js` above the existing `ga4-loader` / `ga4-init` / `GAListener` / AdSense script tags, gated so those scripts only load on accepted consent (Google's Funding Choices supplies the standard consent-state API — `googlefc.callbackQueue.push(...)` or the IAB TCF `__tcfapi`). (4) Persist consent state via the CMP's own cookie (no extra localStorage needed). Reject keeps scripts off. (5) Update `web/src/app/cookies/page.tsx` copy to reflect the live banner (T288 already softened it; replace with truthful "first-visit banner via Funding Choices" once shipped).
+**What I need from owner to ship this:** the publisher ID + the consent-callback shape from the Funding Choices console (different accounts get slightly different snippets). 30-min implementation window once those land.
+
+
+#### T271 — Missing choice-of-law clause — **LOW** (contract enforceability)
+**File:** `terms/page.tsx`. No "Governing Law" section.
+**Fix:** Add: "Governed by laws of [Delaware/California], exclusive jurisdiction in [county/state]."
+
+
