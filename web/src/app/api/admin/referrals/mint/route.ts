@@ -66,9 +66,9 @@ export async function POST(request: Request) {
         : null;
 
   const { data, error } = await service.rpc('mint_owner_referral_link', {
-    p_description: description || null,
-    p_max_uses: max_uses,
-    p_expires_at: expires_at,
+    p_description: description || undefined,
+    p_max_uses: max_uses ?? undefined,
+    p_expires_at: expires_at ?? undefined,
   });
   if (error || !data || !Array.isArray(data) || data.length === 0) {
     console.error('[admin.referrals.mint]', error?.message);
