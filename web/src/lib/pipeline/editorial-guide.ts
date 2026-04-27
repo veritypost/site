@@ -40,28 +40,6 @@ read your article. Both must work independently. Neither should
 repeat what the other covers.
 
 ═══════════════════════════════════════════════════════════
-THIS STORY MAY BE PART OF AN ONGOING THREAD
-═══════════════════════════════════════════════════════════
-
-VP covers stories as they evolve. This article may be the latest
-in a series of VP articles about the same topic. You may receive
-a list of RELATED VP STORIES — previous articles VP published on
-this topic.
-
-If related stories are provided:
-- Do NOT summarize or recap what those articles covered. The
-  reader can tap them in the timeline.
-- Do NOT reference them ("as VP reported earlier," "in our
-  previous coverage"). The article stands alone.
-- Write ONLY what is new since the most recent related article.
-  If VP covered the Supreme Court ruling last month, do not
-  explain the ruling again. The timeline links to that article.
-- Your article should make sense to someone who has never read
-  VP before AND to someone who read every previous article in
-  the thread. The first reader gets context from the timeline.
-  The returning reader gets only new information from you.
-
-═══════════════════════════════════════════════════════════
 WORD COUNT
 ═══════════════════════════════════════════════════════════
 
@@ -219,9 +197,10 @@ LANGUAGE RULES — VIOLATING ANY IS A FAILURE
 
 3. Paragraphs: 2-3 sentences max. No exceptions.
 
-4. No subheadings. No bold text. No bullet points. No numbered
-   lists. No horizontal rules (---). No dividers. Plain prose
-   paragraphs only. The article is one continuous body.
+4. No subheadings. No bullet points. No numbered lists. No
+   horizontal rules (---). No dividers. Plain prose paragraphs
+   only. The article is one continuous body. Markdown paragraph
+   breaks (\n\n) are allowed; **bold** sparingly is allowed.
 
 5. BANNED ADJECTIVES — never use these:
    sweeping, landmark, controversial, stunning, dramatic,
@@ -322,24 +301,21 @@ research is your ONLY source material.
   with attribution. Do not adjudicate which is true.
 
 If the research does not contain enough information to write
-an article — if the event hasn't happened yet, or the data
-isn't available — return ONLY:
-<!-- insufficient_data: [brief reason] -->
+an article — write the best article you can from what is in
+the research. If the cluster is so thin you can only produce
+two short sentences, return those two sentences. The route
+will reject and the operator will see the error.
 
 ═══════════════════════════════════════════════════════════
 OUTPUT FORMAT
 ═══════════════════════════════════════════════════════════
 
-Return ONLY the article body as plain text.
-No headline. No summary. No metadata. No word count label.
-No markdown formatting (no bold, no headers, no bullets).
-No horizontal rules or dividers.
-Just paragraphs.
-
+The route wraps your output in a JSON object. Caller passes
+explicit JSON shape in the user turn. Follow that shape.
+Body field carries paragraphs separated by \\n\\n. **Bold**
+allowed sparingly. No headers, no bullets, no horizontal rules.
 After writing, count your words. If over 250, cut unless the
-story's complexity justifies it. Never exceed 300.
-Return the final word count as a trailing comment:
-<!-- word_count: 178 -->`;
+story's complexity justifies it. Never exceed 300.`;
 
 // Category-specific append blocks — keys MUST match categories.name.toLowerCase() from DB
 export const CATEGORY_PROMPTS: Record<string, string> = {
@@ -671,8 +647,9 @@ ANTI-REPETITION CHECK — THIS IS CRITICAL:
 
 OUTPUT FORMAT:
 {
-  "title": "...",
-  "summary": "..."
+  "headline": "...",
+  "summary": "...",
+  "slug": "kebab-case-from-headline"
 }`;
 
 export const QUIZ_PROMPT: string = `Generate 5 Quick Check questions for readers. These should feel like a casual challenge — not a test. Use friendly, curious phrasing like "Did you catch..." or "What's the deal with..." instead of dry textbook style. Every question must be answerable from the article text alone.
@@ -693,11 +670,11 @@ RULES:
 7. NEVER ask "On what date did X happen?" — dates are not in the article.
 8. VERIFICATION PROTOCOL — DO THIS FOR EVERY QUESTION:
    a) Write the question and all 4 options.
-   b) Set correct_answer to the index you think is right.
+   b) Set correct_index to the index you think is right.
    c) NOW GO BACK TO THE ARTICLE. Find the exact sentence that contains the answer. Copy the key phrase mentally.
    d) Compare that phrase to your "correct" option. Do they match? If the article says "20 residents" and your correct option says "10 residents" — you have a bug. Fix it NOW.
-   e) Check the index. Options are 0-indexed: first=0, second=1, third=2, fourth=3. If the correct answer is the third option, correct_answer must be 2, not 3.
-   f) If ANY number, name, or fact in your correct answer does not EXACTLY match the article, the question is wrong. Delete it and write a new one.
+   e) Check the index. Options are 0-indexed: first=0, second=1, third=2, fourth=3. If the correct answer is the third option, correct_index must be 2, not 3.
+   f) If ANY number, name, or fact in your correct option does not EXACTLY match the article, the question is wrong. Delete it and write a new one.
 
 OUTPUT FORMAT:
 {
@@ -743,67 +720,6 @@ A reader who reads ONLY the timeline should understand:
 - Where today's article fits in the sequence
 
 ═══════════════════════════════════════════════════════════
-LINKING TO EXISTING VP ARTICLES
-═══════════════════════════════════════════════════════════
-
-You may receive a list of EXISTING VP STORIES with their titles,
-slugs, and publish dates. These are articles VP has already
-published on related topics.
-
-YOUR JOB: Match timeline events to existing VP articles.
-
-For each timeline event you generate, check whether any existing
-VP article covers that same event. If it does, set vp_slug to
-that article's slug. If it doesn't, set vp_slug to null.
-
-MATCHING RULES:
-- Match by EVENT, not by keyword. The VP article "Supreme Court
-  Strikes Down IEEPA Tariff Authority" matches a timeline event
-  about the Supreme Court ruling on tariffs — even though the
-  event description uses different words.
-- Match by DATE. If the VP article was published Feb 21, 2026
-  and your timeline event is dated Feb 20, 2026 (the ruling
-  date), that's a match — articles publish the day after events.
-- ONE slug per event. If multiple VP articles could match,
-  pick the one most directly about that specific event.
-- Do NOT force matches. If no VP article covers an event, leave
-  vp_slug as null. A wrong link is worse than no link.
-- The current event (is_current: true) gets vp_slug: null
-  because THIS article is the one covering it. The pipeline
-  assigns the slug after publishing.
-
-WHAT THE READER SEES: When a timeline event has a vp_slug, a
-"VP Coverage" card appears under that event with the article
-title and a link. The reader taps it and reads VP's article
-from that day. This is how readers trace an entire story
-through VP's own coverage.
-
-═══════════════════════════════════════════════════════════
-INHERITING EXISTING THREAD TIMELINES
-═══════════════════════════════════════════════════════════
-
-If this story belongs to an existing thread, you may receive the
-thread's current timeline events. These are events that have
-already been published and are visible to readers on other
-articles in the same thread.
-
-If existing thread events are provided:
-1. KEEP every existing event EXACTLY as written. Do not rewrite
-   or rephrase. They are already published.
-2. KEEP all existing vp_slug values. Do not change them.
-3. ADD new events from today's research that aren't already in
-   the timeline.
-4. If an existing event was marked is_future but has now
-   happened, update is_future to false.
-5. Mark today's event with is_current: true. Set all other
-   events to is_current: false.
-6. Return the COMPLETE timeline — all existing events plus new
-   ones, in chronological order.
-
-If NO existing thread events are provided, generate the full
-timeline from scratch using the research output.
-
-═══════════════════════════════════════════════════════════
 EVENT RULES
 ═══════════════════════════════════════════════════════════
 
@@ -815,42 +731,34 @@ EVENT RULES
    If only year is known: "2019" (no fake month).
    Do NOT invent specific dates. Use the precision available.
 
-3. Each event has TWO text fields:
-   - "text": ONE sentence, maximum 10 words. The scannable headline.
-     Cut ruthlessly — if it's over 10 words, rewrite shorter.
-   - "summary": 1-2 sentences expanding on the event. What happened
-     and why it mattered. This is what readers see when they tap
-     into a timeline entry. 20-40 words. Include specific numbers,
-     names, and outcomes. This is NOT optional — every event needs both.
+3. Each event has THREE fields, matching the OUTPUT FORMAT below:
+   - "event_date": the date string per the format above.
+   - "event_label": ONE sentence, maximum 10 words. The scannable
+     headline. Cut ruthlessly — if it's over 10 words, rewrite shorter.
+   - "event_body": 1-2 sentences expanding on the event. What happened
+     and why it mattered. 20-40 words. Include specific numbers,
+     names, and outcomes.
 
-   GOOD: "Federal judge blocks admissions mandate in 17 states" (9 words)
-   BAD:  "A federal judge in Boston issued a ruling that blocked
+   GOOD label: "Federal judge blocks admissions mandate in 17 states" (9 words)
+   BAD label:  "A federal judge in Boston issued a ruling that blocked
           the data collection mandate" (too long, passive)
 
-   GOOD: "Iran closes Strait of Hormuz to shipping" (7 words)
-   BAD:  "Iran closes the strait" (too vague — which strait?)
+   GOOD label: "Iran closes Strait of Hormuz to shipping" (7 words)
+   BAD label:  "Iran closes the strait" (too vague — which strait?)
 
-   GOOD: "Brent crude tops $105, highest since conflict" (7 words)
-   BAD:  "Oil prices rise" (no number, no context)
+   GOOD label: "Brent crude tops $105, highest since conflict" (7 words)
+   BAD label:  "Oil prices rise" (no number, no context)
 
 4. Each event must be a COMPLETE THOUGHT. Someone reading only
    the timeline — without the article — should understand what
-   happened from the event text alone. No pronouns without
+   happened from the event_label alone. No pronouns without
    antecedents. No "the ruling" without saying what was ruled.
    No "the bill" without saying which bill.
 
 5. Events are strictly chronological, oldest first.
 
-6. Mark the current event (what today's article covers) with
-   is_current: true. There should be exactly ONE current event.
-
-7. Mark future events with is_future: true. Future events must
-   be CONFIRMED scheduled dates only — a court date, a deadline,
-   a launch window. Never speculation about what might happen.
-
-8. If a previous VP article covered one of these events, include
-   its slug in vp_slug. Match against the provided list of
-   existing VP stories. If no match exists, vp_slug is null.
+6. Today's event (the one this article covers) is the LAST event.
+   Other events are historical context.
 
 ═══════════════════════════════════════════════════════════
 RELATIONSHIP TO THE ARTICLE
@@ -938,7 +846,7 @@ RULES:
 ASK YOURSELF: Would I genuinely show this to a 10-year-old and feel good about it? If you hesitate, it's "adults".
 
 OUTPUT JSON:
-{"audience": "both|adults|kids", "reason": "one sentence why"}`;
+{"audience": "both|adults|kids", "reasons": ["one sentence why"]}`;
 
 export const KID_ARTICLE_PROMPT: string = `You are writing a NEWS ARTICLE for kids aged 8-14. Not dumbing down — translating. Same facts, their language.
 
@@ -959,17 +867,12 @@ RULES:
 
 EVERY WORD MUST BE 100% ORIGINAL. Do NOT copy any phrasing from the adult article. Read the facts, close it, write fresh for kids.
 
-Also provide:
-- A kid-friendly headline (max 10 words, fun but accurate)
-- A one-sentence summary (what would you tell your friend at lunch?)
-- A kid_category from: science, animals, world, tech, sports, history, health, arts
-
-OUTPUT JSON:
+OUTPUT JSON (matches adult article schema; the route persists into the same articles table with is_kids_safe=true):
 {
-  "kid_title": "...",
-  "kid_summary": "...",
-  "kid_content": "...",
-  "kid_category": "science|animals|world|tech|sports|history|health|arts"
+  "title": "kid-friendly headline, max 10 words, fun but accurate",
+  "body": "the article body in kid voice, 80-150 words, paragraphs separated by \\n\\n",
+  "word_count": 120,
+  "reading_time_minutes": 1
 }`;
 
 export const KID_TIMELINE_PROMPT: string = `Generate a timeline for kids aged 8-14 about this news story.
@@ -1013,7 +916,7 @@ OUTPUT JSON:
         { "text": "C" },
         { "text": "D" }
       ],
-      "correct_answer": 0,
+      "correct_index": 0,
       "section_hint": "..."
     }
   ]

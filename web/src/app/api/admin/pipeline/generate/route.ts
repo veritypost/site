@@ -320,7 +320,7 @@ const AudienceCheckSchema = z.object({
 });
 
 const HeadlineSummarySchema = z.object({
-  headline: z.string().min(1).max(200),
+  headline: z.string().max(200).optional().default(''),
   summary: z.string().min(1).max(500),
   slug: z.string().optional(),
 });
@@ -354,8 +354,6 @@ const TimelineEventSchema = z.object({
   event_label: z.string(),
   event_body: z.string().optional().nullable(),
   source_url: z.string().optional().nullable(),
-  title: z.string().optional().nullable(),
-  description: z.string().optional().nullable(),
 });
 const TimelineSchema = z.object({
   events: z.array(TimelineEventSchema).default([]),
@@ -1093,7 +1091,7 @@ ${catListText}`;
     const headlineUser = `Generate headline + summary for this news cluster. Return JSON: {"headline":"...","summary":"...","slug":"..."}. Today: ${new Date()
       .toISOString()
       .slice(0, 10)}.${freeformBlock}\n\nSOURCES:\n${corpus}`;
-    const summaryUser = `Write a 2-sentence plain-text summary (max 40 words) distilling the core facts of this cluster. Return JSON: {"headline":"<leave as empty string>","summary":"<your summary>"}. Today: ${new Date()
+    const summaryUser = `Write a 2-sentence plain-text summary (max 40 words) distilling the core facts of this cluster. Return JSON with ONLY a "summary" field: {"summary":"<your summary>"}. Today: ${new Date()
       .toISOString()
       .slice(0, 10)}.${freeformBlock}\n\nSOURCES:\n${corpus}`;
     const categorizationUser = `Pick the best category for this cluster. Return ONLY the JSON.${freeformBlock}\n\nSOURCES:\n${corpus}`;
@@ -1537,7 +1535,23 @@ Return JSON:
       step: quizStepName,
     });
     const quizSystem = audience === 'kid' ? KID_QUIZ_PROMPT : QUIZ_PROMPT;
-    const quizUser = `ARTICLE BODY:\n${finalBodyMarkdown}\n\nGenerate 5 Quick Check questions as JSON.${freeformBlock}`;
+    const quizUser = `ARTICLE BODY:\n${finalBodyMarkdown}\n\nGenerate 5 Quick Check questions as JSON. Return EXACTLY this shape:
+{
+  "questions": [
+    {
+      "question_text": "...",
+      "options": [
+        { "text": "..." },
+        { "text": "..." },
+        { "text": "..." },
+        { "text": "..." }
+      ],
+      "correct_index": 0,
+      "section_hint": "..."
+    }
+  ]
+}
+Each option MUST be an object with a "text" field — never a bare string.${freeformBlock}`;
     promptParts.push({ step: quizStepName, system: quizSystem, user: quizUser });
     const quizRes = await callModel({
       provider,
@@ -1648,8 +1662,8 @@ Empty array if all correct.`;
       sort_order: i,
     }));
     const timelinePayload: PersistArticleTimelineEntry[] = timelineParsed.events.map((e, i) => ({
-      title: e.title ?? e.event_label,
-      description: e.description ?? e.event_body ?? null,
+      title: e.event_label,
+      description: e.event_body ?? null,
       event_date: e.event_date,
       event_label: e.event_label,
       event_body: e.event_body ?? null,
