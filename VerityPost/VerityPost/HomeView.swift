@@ -5,7 +5,7 @@ import Supabase
 // @feature-verified home_feed 2026-04-23
 
 // Hand-curated front page per Future Projects/09_HOME_FEED_REBUILD.md.
-// 1 hero + up to 7 supporting, dated, page ends. Mirrors web/src/app/page.tsx
+// 1 hero + supporting stories, dated, page ends. Mirrors web/src/app/page.tsx
 // — same hero-pick-by-date mechanism via the schema/144 columns
 // (`hero_pick_for_date`), same editorial timezone (America/New_York), same
 // "page ends with Browse all categories" dismount. No category pills, no
@@ -151,7 +151,7 @@ struct HomeView: View {
                                 heroBlock(hero)
                             }
 
-                            let supporting = Array(stories.dropFirst().prefix(7))
+                            let supporting = Array(stories.dropFirst())
                             if !supporting.isEmpty {
                                 VStack(spacing: 0) {
                                     ForEach(Array(supporting.enumerated()), id: \.element.id) { idx, story in
@@ -478,7 +478,7 @@ struct HomeView: View {
                 let bT = b.publishedAt ?? .distantPast
                 return aT > bT
             }
-            stories = Array(ranked.prefix(8))
+            stories = ranked
             breakingStory = try await breakingReq.first
             categories = try await catsReq
         } catch {

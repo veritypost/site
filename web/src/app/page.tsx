@@ -46,8 +46,8 @@ type CategoryRow = Pick<Tables<'categories'>, 'id' | 'name' | 'slug' | 'color_he
 
 // The home is wall-free by design — the registration-wall gate fires
 // inside `web/src/app/story/[slug]/page.tsx` per article view, not on
-// browse. Anonymous readers can see the masthead + 8 chosen stories
-// without trial spend. The wall protects the *content*, not the index.
+// browse. Anonymous readers can see the masthead + today's published
+// stories without trial spend. The wall protects the *content*, not the index.
 
 // Today's editorial date, DST-aware. Returns:
 //   isoDate    — "YYYY-MM-DD" matching `hero_pick_for_date` shape
@@ -173,8 +173,8 @@ export default function HomePage() {
     };
   }, []);
 
-  // Data fetch — today's published articles (max 8), hero-flagged first,
-  // plus an active breaking story (any time today, may overlap the 8).
+  // Data fetch — today's published articles, hero-flagged first,
+  // plus an active breaking story (any time today, may overlap).
   useEffect(() => {
     let cancelled = false;
     async function fetchData() {
@@ -235,7 +235,7 @@ export default function HomePage() {
         const bT = b.published_at ? new Date(b.published_at).getTime() : 0;
         return bT - aT;
       });
-      setStories(ranked.slice(0, 8));
+      setStories(ranked);
 
       const breakingRow = ((breakingRes.data as HomeStory[] | null) || [])[0] || null;
       setBreaking(breakingRow);
@@ -257,7 +257,7 @@ export default function HomePage() {
   }, [supabase, today.isoDate, today.startUtc, reloadKey]);
 
   const hero = stories[0] || null;
-  const supporting = stories.slice(1, 8);
+  const supporting = stories.slice(1);
 
   return (
     <div style={{ background: C.bg, color: C.text, minHeight: '100vh' }}>
