@@ -1,24 +1,14 @@
 /**
  * F7 Newsroom Redesign — POST /api/admin/newsroom/clusters/articles
  *
- * Batch lookup of generated-article existence per cluster, across BOTH
- * audiences (adult `articles` + `kid_articles`). The unified Newsroom feed
- * needs to render "Adult: View" / "Kid: View" badges per cluster row, so the
- * UI ships one POST with the visible cluster_ids and gets back the article
- * id + status for each (audience, cluster_id) pair that has been generated.
- *
- * The two tables have different SELECT RLS policies — `articles_select` lets
- * editors-and-above read drafts, but `kid_articles_read_kid_jwt` only opens
- * read access to active kid JWTs. Admin operators don't hold a kid JWT, so
- * the read MUST go through the service-role client. This route is the
- * canonical service-role read for both tables (mirrors the sources route's
- * pattern for the discovery tables).
+ * Batch lookup of generated-article existence per cluster across BOTH
+ * audiences. Phase 1 of AI + Plan Change Implementation consolidated kid
+ * runs into the `articles` table with is_kids_safe=true; this route now
+ * reads only `articles` and partitions by is_kids_safe to surface
+ * "Adult: View" / "Kid: View" badges per cluster row.
  *
  * Permission: admin.pipeline.clusters.manage
- *   — Same gate as the cluster mutation routes. If the operator can manage
- *     a cluster, they can see whether it has produced articles yet.
- * Rate limit: admin_cluster_read (120 / 60s, per user) — shared bucket with
- *   the sources route since both fire on cluster-list page loads.
+ * Rate limit: admin_cluster_read (120 / 60s, per user)
  * No audit (read).
  */
 
@@ -104,59 +94,36 @@ export async function POST(req: Request) {
     }
   }
 
-  // 4. Parallel reads — adult `articles` + kid `kid_articles`. Service-role
-  //    bypasses RLS on both. Filtering deleted_at IS NULL on adult only —
-  //    kid_articles has no soft-delete column. The Newsroom view wants the
-  //    "latest" article per (cluster, audience), so we order by created_at
-  //    desc and take the first match per cluster_id; if a cluster was
-  //    re-generated and the prior article is now archived, we still surface
-  //    the newest pointer.
-  const [adultRes, kidRes] = await Promise.all([
-    service
-      .from('articles')
-      .select('id, cluster_id, status, created_at')
-      .in('cluster_id', clusterIds)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false }),
-    service
-      .from('kid_articles')
-      .select('id, cluster_id, status, created_at')
-      .in('cluster_id', clusterIds)
-      .order('created_at', { ascending: false }),
-  ]);
+  // 4. Single read against `articles`, partitioned by is_kids_safe. Service-
+  //    role bypasses RLS. Order by created_at desc so first-match per
+  //    (cluster_id, audience) is the newest.
+  const articlesRes = await service
+    .from('articles')
+    .select('id, cluster_id, status, created_at, is_kids_safe')
+    .in('cluster_id', clusterIds)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false });
 
-  if (adultRes.error) {
-    console.error('[newsroom.clusters.articles] adult read failed:', adultRes.error.message);
-    Sentry.captureException(adultRes.error);
-    return NextResponse.json({ error: 'Could not load article rows' }, { status: 500 });
-  }
-  if (kidRes.error) {
-    console.error('[newsroom.clusters.articles] kid read failed:', kidRes.error.message);
-    Sentry.captureException(kidRes.error);
+  if (articlesRes.error) {
+    console.error('[newsroom.clusters.articles] read failed:', articlesRes.error.message);
+    Sentry.captureException(articlesRes.error);
     return NextResponse.json({ error: 'Could not load article rows' }, { status: 500 });
   }
 
-  // 5. Collapse to one (audience, cluster_id) → article tuple. Both queries
-  //    already came back ordered desc, so first-write-wins gives the latest.
+  // 5. Collapse to one (audience, cluster_id) → article tuple. Single read
+  //    came back ordered desc, so first-write-wins gives the latest per pair.
   const rows: ArticleHitRow[] = [];
   const adultSeen = new Set<string>();
-  for (const r of adultRes.data ?? []) {
-    if (!r.cluster_id || adultSeen.has(r.cluster_id)) continue;
-    adultSeen.add(r.cluster_id);
-    rows.push({
-      cluster_id: r.cluster_id,
-      audience: 'adult',
-      article_id: r.id as string,
-      status: String(r.status ?? ''),
-    });
-  }
   const kidSeen = new Set<string>();
-  for (const r of kidRes.data ?? []) {
-    if (!r.cluster_id || kidSeen.has(r.cluster_id)) continue;
-    kidSeen.add(r.cluster_id);
+  for (const r of articlesRes.data ?? []) {
+    if (!r.cluster_id) continue;
+    const audience: 'adult' | 'kid' = r.is_kids_safe ? 'kid' : 'adult';
+    const seen = audience === 'adult' ? adultSeen : kidSeen;
+    if (seen.has(r.cluster_id)) continue;
+    seen.add(r.cluster_id);
     rows.push({
       cluster_id: r.cluster_id,
-      audience: 'kid',
+      audience,
       article_id: r.id as string,
       status: String(r.status ?? ''),
     });

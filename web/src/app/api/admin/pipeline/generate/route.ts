@@ -1688,6 +1688,15 @@ Empty array if all correct.`;
     );
     const payload: PersistArticlePayload = {
       audience,
+      // Phase 1 of AI + Plan Change Implementation: kid runs land in
+      // articles with is_kids_safe=true and age_band tagged. Phase 3 will
+      // band-split kid generation into two outputs (kids 7-9 + tweens
+      // 10-12); for now every kid run ships as 'tweens' (closer to the
+      // current single-tier kid voice). Adult runs leave age_band null.
+      age_band: audience === 'kid' ? 'tweens' : null,
+      // Persist the kid summary onto articles.kids_summary for the kid iOS
+      // app's existing kids_summary read path. Adult runs leave it null.
+      kids_summary: audience === 'kid' ? summary || null : null,
       cluster_id,
       pipeline_run_id: runId,
       title: cleanText(headline),
@@ -1724,14 +1733,13 @@ Empty array if all correct.`;
     stepTimings[persistStepName] = Date.now() - persistStart;
 
     // M4 / Q9 — flag for manual review when plagiarism step soft-degraded.
-    // Routed to articles vs kid_articles based on audience (kid pipeline
-    // persists into kid_articles via the same RPC; M4 column lives on both).
+    // Phase 1 of AI + Plan Change Implementation consolidated kid runs into
+    // articles, so both audiences write to the same table now.
     if (needsManualReview || plagiarismStatus !== 'ok') {
-      const targetTable = audience === 'kid' ? 'kid_articles' : 'articles';
       // Cast: generated Database types lag behind migration 166; the
       // columns exist post-deploy. Trigger remains the SoT for status.
       const { error: flagErr } = await service
-        .from(targetTable)
+        .from('articles')
         .update({
           needs_manual_review: needsManualReview,
           plagiarism_status: plagiarismStatus,

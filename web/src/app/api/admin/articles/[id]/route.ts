@@ -2,16 +2,14 @@
  * F7 Phase 4 Tasks 23-25 — GET + PATCH /api/admin/articles/:id
  *
  * Unified admin endpoint backing the article review / edit / publish /
- * reject flow. Audience-routed across `articles` (adult) + `kid_articles`
- * (kid); the two tables share identical column shape for the fields we
- * edit here (title, subtitle, body, body_html, excerpt, status,
- * moderation_status, moderation_notes, retraction_reason, published_at,
- * unpublished_at, updated_at), verified via information_schema 2026-04-22.
+ * reject flow. Phase 1 of AI + Plan Change Implementation consolidated kid
+ * runs into the `articles` table (with is_kids_safe=true and age_band
+ * tagged); both audiences now live in the same table with identical column
+ * shape. Audience is derived from `articles.is_kids_safe` rather than which
+ * table the row lives in.
  *
- * GET fetches article + sources + timelines + quizzes in one round-trip.
- * Children are served from either `sources` / `timelines` / `quizzes`
- * (adult) or `kid_sources` / `kid_timelines` / `kid_quizzes` (kid),
- * picked from the audience detected by which table row the article lives in.
+ * GET fetches article + sources + timelines + quizzes in one round-trip
+ * from the unified `articles` + `sources` / `timelines` / `quizzes` tables.
  *
  * PATCH accepts three logical groups, each separately permission-gated:
  *   1. Content edits: title, subtitle, excerpt, body, moderation_notes.
@@ -77,43 +75,32 @@ type ArticleRow = {
 
 const ARTICLE_SELECT = `id, title, slug, subtitle, body, body_html, excerpt, status,
   moderation_status, moderation_notes, retraction_reason, published_at, unpublished_at,
-  author_id, cluster_id, category_id, updated_at`;
+  author_id, cluster_id, category_id, is_kids_safe, updated_at`;
 
 // ---------------------------------------------------------------------------
-// Audience resolution — try adult first, then kid. The two id-spaces are
-// disjoint UUID pools in practice, so there is no race where a single id
-// resolves to both tables; if one ever did, adult wins deterministically.
+// Audience resolution — Phase 1 consolidated kid runs into `articles`. The
+// `is_kids_safe` column is now the source of truth for audience.
 // ---------------------------------------------------------------------------
 
 async function fetchArticleWithAudience(
   service: SupabaseClient<Database>,
   id: string
 ): Promise<{ audience: Audience; row: ArticleRow } | null> {
-  const adult = await service.from('articles').select(ARTICLE_SELECT).eq('id', id).maybeSingle();
-  if (adult.data) {
-    return { audience: 'adult', row: adult.data as ArticleRow };
-  }
-  const kid = await service.from('kid_articles').select(ARTICLE_SELECT).eq('id', id).maybeSingle();
-  if (kid.data) {
-    return { audience: 'kid', row: kid.data as ArticleRow };
-  }
-  return null;
+  const res = await service.from('articles').select(ARTICLE_SELECT).eq('id', id).maybeSingle();
+  if (!res.data) return null;
+  const row = res.data as ArticleRow & { is_kids_safe?: boolean };
+  return { audience: row.is_kids_safe ? 'kid' : 'adult', row: row as ArticleRow };
 }
 
-function tableNames(audience: Audience) {
-  return audience === 'kid'
-    ? {
-        articles: 'kid_articles' as const,
-        sources: 'kid_sources' as const,
-        timelines: 'kid_timelines' as const,
-        quizzes: 'kid_quizzes' as const,
-      }
-    : {
-        articles: 'articles' as const,
-        sources: 'sources' as const,
-        timelines: 'timelines' as const,
-        quizzes: 'quizzes' as const,
-      };
+function tableNames(_audience: Audience) {
+  // Phase 1: both audiences share the unified set of tables now. The
+  // _audience param stays for call-site clarity but isn't switched on.
+  return {
+    articles: 'articles' as const,
+    sources: 'sources' as const,
+    timelines: 'timelines' as const,
+    quizzes: 'quizzes' as const,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -313,9 +300,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   }
   const body = parsed.data;
 
-  // Fetch current row first so we can (a) determine audience, (b) capture
-  // old state for audit, (c) validate status transition. Use service
-  // client — admin-scope route, RLS bypass needed for kid_articles reads.
+  // Fetch current row first so we can (a) determine audience via
+  // is_kids_safe, (b) capture old state for audit, (c) validate status
+  // transition. Use service client — admin-scope route, RLS bypass.
   const service = createServiceClient();
   const resolved = await fetchArticleWithAudience(service, id);
   if (!resolved) {
@@ -457,7 +444,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     // column; since our `update` shape is conditionally built we cast
     // through the never-index escape hatch that persist-article.ts uses
     // for the same reason. Fields written have all been verified via
-    // information_schema to exist on both articles + kid_articles.
+    // information_schema to exist on articles (Phase 1 consolidation).
     const { error: upErr } = await service
       .from(t.articles)
       .update(update as never)
@@ -734,10 +721,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 }
 
 // ---------------------------------------------------------------------------
-// DELETE — unchanged from T-005 (adult-only soft-guard). Kid article
-// deletion is not wired here yet; the kids pipeline is draft-only today
-// and deletes go through the newsroom flow. Extending DELETE to kid_articles
-// is a follow-up if the kids content moderation UI ever needs it.
+// DELETE — soft-guard. Phase 1 consolidated kid runs into `articles` so
+// the existing soft-delete path now covers both audiences (gated upstream
+// by admin permission check before reaching here).
 // ---------------------------------------------------------------------------
 
 export async function DELETE(_request: Request, { params }: { params: { id: string } }) {

@@ -126,10 +126,11 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   }
 
   if (run.cluster_id && run.audience) {
-    const discoveryTable = run.audience === 'kid' ? 'kid_discovery_items' : 'discovery_items';
+    // Phase 1 of AI + Plan Change Implementation consolidated kid runs into
+    // discovery_items; kid_discovery_items table is dropped.
     try {
       await service
-        .from(discoveryTable)
+        .from('discovery_items')
         .update({ state: 'clustered', updated_at: new Date().toISOString() })
         .eq('cluster_id', run.cluster_id)
         .eq('state', 'generating');

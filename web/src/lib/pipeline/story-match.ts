@@ -130,36 +130,10 @@ export async function loadStoryMatchCandidates(
   }));
 }
 
-/**
- * DB-reading helper — kid surface. Mirrors `loadStoryMatchCandidates` but
- * targets `kid_articles` so kid clustering never sees adult stories.
- * Same shape, same 200-row cap, same status filter.
- */
-export async function loadKidStoryMatchCandidates(
-  supabase?: SupabaseClient
-): Promise<StoryCandidate[]> {
-  const sb = supabase ?? createServiceClient();
-  const { data, error } = await sb
-    .from('kid_articles')
-    .select('id, title, slug, seo_keywords, tags, published_at')
-    .eq('status', 'published')
-    .order('published_at', { ascending: false })
-    .limit(STORY_MATCH_CANDIDATE_LIMIT);
-
-  if (error) {
-    console.error('[story-match:loadKidCandidates]', error.message);
-    return [];
-  }
-
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    title: row.title ?? '',
-    slug: row.slug ?? '',
-    seoKeywords: row.seo_keywords ?? null,
-    tags: row.tags ?? null,
-    publishedAt: row.published_at ?? null,
-  }));
-}
+// Phase 1 of AI + Plan Change Implementation: dropped loadKidStoryMatchCandidates.
+// Was a kid_articles-targeted helper with zero callers in the codebase.
+// Kid story-match should use loadStoryMatchCandidates filtered by is_kids_safe
+// once kid clustering needs it.
 
 /**
  * Settings helper — 60s cached. Mirrors cluster.ts `getClusterOverlapPct`

@@ -10,7 +10,8 @@
  *
  * Caller contract:
  *   - Pass a service-role client (RLS bypass required — the RPC writes to
- *     articles/kid_articles + child tables with status='draft').
+ *     articles + child tables with status='draft'; kid runs land in the
+ *     same articles table with is_kids_safe=true and age_band tagged).
  *   - `body_html` must be pre-sanitized by the caller (F7 Phase 3
  *     invariant). The RPC rejects empty bodies but does NOT sanitize.
  *   - Quiz `options[].is_correct` is stripped before insert; the correct
@@ -67,6 +68,16 @@ export interface PersistArticleQuizItem {
 
 export interface PersistArticlePayload {
   audience: 'adult' | 'kid';
+  // Phase 1 of AI + Plan Change Implementation: kid runs land in `articles`
+  // with is_kids_safe=true. Phase 3 will band-split (kids 7-9 vs tweens 10-12)
+  // by setting age_band; for now Phase 1 ships every kid run as 'tweens'
+  // (closest to the current single-tier kid voice). Adult runs leave it null
+  // or send 'adult'.
+  age_band?: 'kids' | 'tweens' | 'adult' | null;
+  // Optional kids-tier summary persisted onto articles.kids_summary so the
+  // kid iOS app's existing `kids_summary` reads (ArticleListView.swift) work
+  // without reading the body. Set on kid runs only.
+  kids_summary?: string | null;
   cluster_id: string;
   pipeline_run_id: string;
   title: string;
@@ -86,10 +97,6 @@ export interface PersistArticlePayload {
   seo_title?: string | null;
   seo_description?: string | null;
   seo_keywords?: string[];
-  // kids_summary intentionally absent — migration 124 removed the dead
-  // branch from persist_generated_article. The articles.kids_summary
-  // column still exists and is written by other surfaces (admin save,
-  // legacy ai/generate route), but the F7 persist RPC no longer reads it.
   metadata?: Record<string, unknown>;
   sources: PersistArticleSource[];
   timeline: PersistArticleTimelineEntry[];
@@ -123,8 +130,10 @@ export class PersistArticleError extends Error {
 
 /**
  * Calls persist_generated_article(p_payload jsonb). Single-transaction
- * insert of articles (or kid_articles) + sources + timelines + quizzes,
- * with slug-collision retry and audience routing all inside the RPC.
+ * insert of articles + sources + timelines + quizzes with slug-collision
+ * retry, all inside the RPC. Both adult and kid runs land in the same
+ * articles table; kid runs set is_kids_safe=true and age_band per the
+ * payload (Phase 1 of AI + Plan Change Implementation).
  *
  * Returns the persisted (article_id, slug, audience) — status is always
  * 'draft'; admin publish action promotes later.

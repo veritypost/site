@@ -7,6 +7,65 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (Phase 1 — kid_articles consolidation, code shipped + migration staged) — _code shipped + pushed; migration file staged for owner SQL editor apply_
+
+### Context
+
+Phase 1 of the AI + Plan Change Implementation roadmap (`Ongoing Projects/AI + Plan Change Implementation/`). Audit finding from yesterday: the kid iOS app reads from `articles WHERE is_kids_safe=true`, the admin Kids Story Manager writes to the same, but the pipeline writes kid runs to a separate `kid_articles` table that no consumer reads. Result: every successful kid generation has been a no-op as far as readers were concerned. Path A from the planning docs: kill the dead tables, write all audiences into `articles` with `is_kids_safe + age_band`. Pre-condition verified zero rows in all five tables (kid_articles, kid_sources, kid_timelines, kid_quizzes, kid_discovery_items) at migration time.
+
+### Cluster — code changes shipped (commit pending)
+
+- **`web/src/lib/pipeline/persist-article.ts`** — `PersistArticlePayload` extended with `age_band?: 'kids' | 'tweens' | 'adult' | null` and `kids_summary?: string | null`. Header docs updated to describe single-table consolidation. Header on `persistGeneratedArticle` rewritten to reflect the new RPC contract.
+- **`web/src/app/api/admin/pipeline/generate/route.ts`** — payload construction now sets `age_band: audience === 'kid' ? 'tweens' : null` (Phase 3 will band-split into kids 7-9 + tweens 10-12; Phase 1 ships every kid run as `'tweens'` so the existing single-tier kid voice doesn't regress) and `kids_summary: audience === 'kid' ? summary || null : null`. Post-persist `needs_manual_review` flag write now targets the unified `articles` table directly (was branching `articles` vs `kid_articles`).
+- **`web/src/app/api/admin/pipeline/runs/[id]/cancel/route.ts`** — cancel-route discovery state reset hardcoded to `discovery_items` (was branching on audience; `kid_discovery_items` is dropped).
+- **`web/src/app/api/admin/newsroom/clusters/articles/route.ts`** — replaced two parallel reads (adult `articles` + kid `kid_articles`) with one read against `articles`, partitioning rows by `is_kids_safe` to derive `audience`. Header rewritten.
+- **`web/src/app/api/admin/articles/[id]/route.ts`** — `fetchArticleWithAudience` rewritten as one query (was two — adult-then-kid fallback). Audience now derived from `articles.is_kids_safe`, not from which table holds the row. `tableNames(audience)` flattened — both audiences share the unified table set; the `_audience` parameter retained for call-site clarity. ARTICLE_SELECT picks up `is_kids_safe`. Three header comments updated.
+- **`web/src/app/api/cron/pipeline-cleanup/route.ts`** — sweep #2 (orphan discovery items) collapsed from a 2-table loop (`discovery_items` + `kid_discovery_items`) to single-table. Sweep #4 (cluster expiry) collapsed from two scans (articles + kid_articles → unioned set) to one scan. T241 source-verification cron TODO reduced to one source table. Three header comments updated.
+- **`web/src/lib/pipeline/story-match.ts`** — deleted dead export `loadKidStoryMatchCandidates` (zero callers across the codebase). Comment marker left behind documenting why; future kid story-match should use `loadStoryMatchCandidates` filtered by `is_kids_safe`.
+- **`web/src/app/admin/newsroom/page.tsx`** — header comment rewrite (no behavior change).
+
+### Cluster — migration staged
+
+- **`Ongoing Projects/migrations/2026-04-27_phase1_persist_article_consolidation.sql`** — single transactional migration covering:
+  - **A.** `ALTER TABLE articles ADD COLUMN age_band text` + check constraint (kids|tweens|adult|null) + partial index `idx_articles_kid_feed (is_kids_safe, age_band, status, published_at DESC)` for kid-feed reads.
+  - **B.** `CREATE OR REPLACE FUNCTION persist_generated_article` — full rewrite. Audience-branching at write removed; all rows land in `articles` + `sources` + `timelines` + `quizzes`. Kid runs set `is_kids_safe=true`, `kids_summary=coalesce(payload.kids_summary, payload.excerpt)`, `age_band` from payload (defaults to `'tweens'` for kid runs missing it). Adult runs set `is_kids_safe=false`, `kids_summary=NULL`, `age_band=NULL`. Validation extended to reject `age_band NOT IN ('kids','tweens','adult')`.
+  - **C.** Drops 14 RLS policies across the 5 kid_* tables.
+  - **D.** Inline `DO $$` block re-verifies zero rows pre-drop (raises if any race-window write snuck in), then `DROP TABLE ... CASCADE` for `kid_quizzes`, `kid_timelines`, `kid_sources`, `kid_articles`, `kid_discovery_items` in FK-dependency order.
+- **NOT YET APPLIED.** MCP is read-only. Owner must paste the SQL into Supabase SQL editor to apply.
+
+### Verification
+
+- `grep -rln "kid_articles|kid_sources|kid_timelines|kid_quizzes|kid_discovery_items" web/src --include="*.ts" --include="*.js"` returns 1 file (`types/database.ts` — generated; will regenerate post-migration). All other live refs eliminated.
+- `npx tsc --noEmit` clean.
+- ESLint + Prettier ran via husky pre-commit hook, all green.
+- Pre-migration zero-row check passes via MCP read query.
+
+### Files touched (8)
+
+- `web/src/lib/pipeline/persist-article.ts`
+- `web/src/lib/pipeline/story-match.ts`
+- `web/src/app/api/admin/pipeline/generate/route.ts`
+- `web/src/app/api/admin/pipeline/runs/[id]/cancel/route.ts`
+- `web/src/app/api/admin/newsroom/clusters/articles/route.ts`
+- `web/src/app/api/admin/articles/[id]/route.ts`
+- `web/src/app/api/cron/pipeline-cleanup/route.ts`
+- `web/src/app/admin/newsroom/page.tsx`
+- NEW: `Ongoing Projects/migrations/2026-04-27_phase1_persist_article_consolidation.sql`
+
+### Owner action items
+
+1. **Apply the migration.** Paste `Ongoing Projects/migrations/2026-04-27_phase1_persist_article_consolidation.sql` into Supabase SQL editor and run. Single transaction; rolls back on any error. Inline zero-row check is the safety net.
+2. **Regenerate Database types.** After migration: `npm run types:gen` (or whatever the project's type-gen command is) to refresh `web/src/types/database.ts` so the dropped kid_* table types disappear from the union.
+3. **Smoke test.** Trigger one kid generation in `/admin/newsroom`. Verify: row appears in `articles` with `is_kids_safe=true`, `age_band='tweens'`, `kids_summary` populated. Verify: kid iOS app feed query (`articles WHERE is_kids_safe=true AND status='published'`) returns the new row when published.
+
+### What this DOESN'T do (deferred)
+
+- **Phase 2 (plan rewrite)** — Verity solo $7.99, Family $14.99 + $4.99/kid, retire Pro, drop Family XL. Separate phase.
+- **Phase 3 (banded generation)** — split kid output into `kids` (7-9) + `tweens` (10-12) bands, two articles per kid cluster. The `age_band` column is added now; Phase 3 wires the band-split logic.
+- **`kid_profiles.age_range` column drop.** Vestigial, but waiting until Phase 3's `reading_band` introduction so the kid app's profile reads have one consistent migration.
+
+---
+
 ## 2026-04-27 (Pass A — pipeline prompt-vs-schema alignment, generation unblocked) — _shipped, pushed to git/Vercel (commit `d3b5c47`)_
 
 ### Context

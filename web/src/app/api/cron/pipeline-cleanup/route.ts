@@ -8,11 +8,12 @@
  *      maxDuration=300s with 5-min grace buffer. duration_ms is left NULL —
  *      per-row compute would require an RPC (out of scope for this task).
  *
- *   2. Orphan discovery items: both discovery_items + kid_discovery_items
- *      rows stuck in state='generating' older than 10 min are reset to
- *      'clustered' so next ingest cycle can re-queue them. Generate's
- *      finally normally handles this reset; this sweep catches the case
- *      where the lambda was killed before its finally ran.
+ *   2. Orphan discovery items: discovery_items rows stuck in state='generating'
+ *      older than 10 min are reset to 'clustered' so next ingest cycle can
+ *      re-queue them. Generate's finally normally handles this reset; this
+ *      sweep catches the case where the lambda was killed before its finally
+ *      ran. (Phase 1 of AI + Plan Change Implementation dropped
+ *      kid_discovery_items; the unified discovery_items table covers both.)
  *
  *   3. Orphan locks: feed_clusters rows where locked_at is older than
  *      15 minutes (> the RPC's 10-minute TTL + 5-minute grace) are
@@ -20,12 +21,13 @@
  *      insurance against release_cluster_lock failures.
  *
  *   4. Cluster expiry (Stage 3 / Stream 7): feed_clusters older than
- *      14 days that have NO articles or kid_articles referencing them
- *      (in any status — draft, review, published, archived) are soft-
- *      archived via the archive_cluster RPC with reason='auto_expired_14d'.
- *      Capped at 500/run to bound runtime. The "any status" filter is
- *      load-bearing: a draft article queued against a cluster keeps the
- *      cluster alive even before publish.
+ *      14 days that have NO articles referencing them (in any status —
+ *      draft, review, published, archived) are soft-archived via the
+ *      archive_cluster RPC with reason='auto_expired_14d'. Capped at
+ *      500/run to bound runtime. The "any status" filter is load-bearing:
+ *      a draft article queued against a cluster keeps the cluster alive
+ *      even before publish. Phase 1 consolidated kid runs into `articles`
+ *      so a single scan covers both audiences.
  *
  * Auth: verifyCronAuth (x-vercel-cron header OR CRON_SECRET bearer).
  * Response always 200 — per-sweep errors surface via console.error + cron
@@ -39,18 +41,15 @@
  * TODO(T241) — Source broken-link verification cron. Sources have no
  * expiry-checking today; URLs go stale silently. The proposed cron is a
  * weekly sweep (separate route from this one — schedule e.g. "0 7 * * 0")
- * that HEADs each `sources.url` (and `kid_sources.url`), updates a
- * `last_verified_at timestamptz` column with now(), and stores the HTTP
- * `status_code int`. Admin source-list view then surfaces 4xx/5xx flagged
- * rows for manual review. T5 schema halt blocks implementation until the
- * two columns + an idempotent backfill migration are approved:
+ * that HEADs each `sources.url`, updates a `last_verified_at timestamptz`
+ * column with now(), and stores the HTTP `status_code int`. Admin source-
+ * list view then surfaces 4xx/5xx flagged rows for manual review. T5
+ * schema halt blocks implementation until the two columns + an idempotent
+ * backfill migration are approved:
  *
- *   alter table sources         add column last_verified_at timestamptz;
- *   alter table sources         add column status_code      int;
- *   alter table kid_sources     add column last_verified_at timestamptz;
- *   alter table kid_sources     add column status_code      int;
- *   create index sources_status_code_idx     on sources     (status_code) where status_code >= 400;
- *   create index kid_sources_status_code_idx on kid_sources (status_code) where status_code >= 400;
+ *   alter table sources add column last_verified_at timestamptz;
+ *   alter table sources add column status_code      int;
+ *   create index sources_status_code_idx on sources (status_code) where status_code >= 400;
  *
  * Cron route would live at `web/src/app/api/cron/verify-sources/route.ts`
  * with cap = 500 URLs/run, 5s timeout per HEAD, AbortController, and the
@@ -124,10 +123,10 @@ async function run(request: Request) {
     orphanRunsErrCode = 'orphan_runs_failed';
   }
 
-  // 2. Orphan discovery items (both audiences) — P1-A from adversary
+  // 2. Orphan discovery items — Phase 1 consolidated to discovery_items only
   let orphanItemsCount = 0;
   let orphanItemsErrCode: string | null = null;
-  for (const table of ['discovery_items', 'kid_discovery_items'] as const) {
+  for (const table of ['discovery_items'] as const) {
     try {
       const { data, error } = await service
         .from(table)
@@ -195,10 +194,11 @@ async function run(request: Request) {
   }
 
   // 4. Cluster expiry (Stream 7 / Stage 3). Soft-archive feed_clusters
-  //    that are >14d old AND have no referencing articles or kid_articles
-  //    (in any status). Capped at 500/run to bound the per-sweep blast
-  //    radius — a healthy queue should never approach this; the cap is
-  //    a safety bound, not a steady-state expectation.
+  //    that are >14d old AND have no referencing articles (in any status).
+  //    Phase 1 consolidated kid runs into `articles` so a single scan
+  //    covers both audiences. Capped at 500/run to bound the per-sweep
+  //    blast radius — a healthy queue should never approach this; the cap
+  //    is a safety bound, not a steady-state expectation.
   //
   //    The "any status" filter is critical. We check `cluster_id IS NOT
   //    NULL` only — we deliberately do NOT filter on articles.status,
@@ -210,22 +210,17 @@ async function run(request: Request) {
   let clustersArchivedCount = 0;
   let clustersArchivedErrCode: string | null = null;
   try {
-    // Two scans (articles + kid_articles) → union of in-use cluster_ids,
-    // then filter feed_clusters by NOT IN that set. Doing this client-side
-    // avoids a NOT IN subquery against PostgREST, which doesn't support
-    // it cleanly across two source tables.
-    const [adultRefs, kidRefs] = await Promise.all([
-      service.from('articles').select('cluster_id').not('cluster_id', 'is', null),
-      service.from('kid_articles').select('cluster_id').not('cluster_id', 'is', null),
-    ]);
-    if (adultRefs.error) throw adultRefs.error;
-    if (kidRefs.error) throw kidRefs.error;
+    // Single scan against articles → set of in-use cluster_ids, then filter
+    // feed_clusters by NOT IN that set. Doing this client-side avoids a NOT
+    // IN subquery against PostgREST.
+    const articleRefs = await service
+      .from('articles')
+      .select('cluster_id')
+      .not('cluster_id', 'is', null);
+    if (articleRefs.error) throw articleRefs.error;
 
     const inUseIds = new Set<string>();
-    for (const r of adultRefs.data ?? []) {
-      if (r.cluster_id) inUseIds.add(r.cluster_id);
-    }
-    for (const r of kidRefs.data ?? []) {
+    for (const r of articleRefs.data ?? []) {
       if (r.cluster_id) inUseIds.add(r.cluster_id);
     }
 

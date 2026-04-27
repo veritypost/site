@@ -25,8 +25,8 @@
  * Source-row reads route through /api/admin/newsroom/clusters/sources
  * (service-role; bypasses the `admin.system.view` SELECT RLS on
  * discovery_items). Article-existence reads route through
- * /api/admin/newsroom/clusters/articles (also service-role; needed for
- * kid_articles which has only kid-JWT SELECT access).
+ * /api/admin/newsroom/clusters/articles (service-role; reads `articles`
+ * partitioned by is_kids_safe per Phase 1 of AI + Plan Change Implementation).
  *
  * URL persistence:
  *   ?cat=<uuid>           top-level category
