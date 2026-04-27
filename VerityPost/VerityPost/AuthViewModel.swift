@@ -30,6 +30,19 @@ final class AuthViewModel: ObservableObject {
     /// (e.g., token refresh failure). MainTabView uses this to show a
     /// "session expired" banner so the user knows why they were bounced.
     @Published var sessionExpired = false
+
+    /// T66 — cross-view request to flip the bottom tab to Home. Used by
+    /// deep views (BookmarksView empty-state CTA) that don't otherwise
+    /// have access to the tab-bar selection. ContentView observes this
+    /// flag and clears it after applying the switch.
+    @Published var pendingHomeJump: Bool = false
+
+    /// T88 — local-only onboarding bypass. Set when the server stamp
+    /// retries fail and the user taps "Continue anyway." ContentView's
+    /// `needsOnboarding` branch ORs this so the user reaches the main app.
+    /// On next launch, if `onboarding_completed_at IS NULL` server-side,
+    /// the welcome flow re-fires and the stamp retries cleanly.
+    @Published var bypassOnboardingLocally: Bool = false
     /// If the splash stalls (network down, Supabase unreachable), expose this
     /// so the UI can offer a retry rather than spinning forever.
     @Published var splashTimedOut = false
@@ -38,6 +51,16 @@ final class AuthViewModel: ObservableObject {
     private var authStateTask: Task<Void, Never>?
     private var subscriptionObserver: NSObjectProtocol?
     private var wasLoggedIn = false
+    // T254 — auto-dismiss timer for the session-expired banner. Cancelled
+    // on manual dismiss (xmark / Sign-in tap) and on each new sessionExpired
+    // = true so a re-fire restarts the timer cleanly.
+    private var sessionExpiredDismissTask: Task<Void, Never>?
+    /// T206 + T48 — surfaced deep-link failure. ContentView observes this
+    /// and renders a banner with a recovery CTA. Set by handleDeepLink on
+    /// rejected types or setSession failures. Cleared via
+    /// dismissDeepLinkError() or auto-dismiss after 8s.
+    @Published var deepLinkError: String? = nil
+    private var deepLinkErrorDismissTask: Task<Void, Never>?
     private static let isoFmt = ISO8601DateFormatter()
 
     init() {
@@ -65,9 +88,34 @@ final class AuthViewModel: ObservableObject {
 
     deinit {
         authStateTask?.cancel()
+        sessionExpiredDismissTask?.cancel()
+        deepLinkErrorDismissTask?.cancel()
         if let subscriptionObserver {
             NotificationCenter.default.removeObserver(subscriptionObserver)
         }
+    }
+
+    /// T254 — schedule the session-expired banner to auto-clear after 8s.
+    /// Cancels any prior pending dismiss so a re-fire (multiple expirations
+    /// in quick succession) starts the clock fresh.
+    private func scheduleSessionExpiredAutoDismiss() {
+        sessionExpiredDismissTask?.cancel()
+        sessionExpiredDismissTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 8 * 1_000_000_000)
+            guard let self, !Task.isCancelled else { return }
+            await MainActor.run {
+                if self.sessionExpired { self.sessionExpired = false }
+            }
+        }
+    }
+
+    /// Manual-dismiss helper for the session-expired banner. ContentView's
+    /// xmark + "Sign in" CTA both call this so the auto-dismiss timer
+    /// stops cleanly and doesn't re-flicker after a manual action.
+    func dismissSessionExpired() {
+        sessionExpiredDismissTask?.cancel()
+        sessionExpiredDismissTask = nil
+        sessionExpired = false
     }
 
     // MARK: - Check session on launch
@@ -130,6 +178,7 @@ final class AuthViewModel: ObservableObject {
                     self.wasLoggedIn = false
                     if wasSignedIn {
                         self.sessionExpired = true
+                        self.scheduleSessionExpiredAutoDismiss()
                     }
                 case .tokenRefreshed, .signedIn, .initialSession:
                     if let uid = session?.user.id.uuidString {
@@ -371,11 +420,26 @@ final class AuthViewModel: ObservableObject {
         }
     }
 
-    /// Handle a deep-link URL that Supabase sent for password recovery or
-    /// email verification. The URL fragment contains access_token,
-    /// refresh_token, and type (e.g., "recovery" or "signup").
+    /// Handle a deep-link URL that Supabase sent for password recovery,
+    /// email verification, magic-link signin, invite, email-change confirm,
+    /// or reauthentication. The URL fragment carries access_token,
+    /// refresh_token, and type.
+    ///
+    /// T206 — type allowlist + surfaced failure UX. Previously the only
+    /// type with explicit semantics was `"recovery"`; ANY other value
+    /// (typo, future SDK type, attacker-supplied) silently took the
+    /// full-signin branch. Now: validate type up front, set
+    /// `deepLinkError` on rejection so the UI can surface "Invalid or
+    /// expired link." Per adversary review, the redundant
+    /// `client.auth.user()` post-validation was dropped — Supabase Swift
+    /// SDK 2.43.1 `setSession` already performs the server round-trip
+    /// (calls `/user` on unexpired tokens, refreshSession on expired),
+    /// so a revoked/dead/cross-project token fails inside setSession.
     func handleDeepLink(_ url: URL) async {
-        guard let fragment = url.fragment ?? url.query else { return }
+        guard let fragment = url.fragment ?? url.query else {
+            setDeepLinkError("This link isn\u{2019}t valid. Try the most recent email we sent.")
+            return
+        }
         var params: [String: String] = [:]
         for pair in fragment.split(separator: "&") {
             let kv = pair.split(separator: "=", maxSplits: 1).map(String.init)
@@ -384,13 +448,37 @@ final class AuthViewModel: ObservableObject {
             }
         }
         guard let access = params["access_token"],
-              let refresh = params["refresh_token"] else { return }
+              let refresh = params["refresh_token"] else {
+            setDeepLinkError("This link is missing its token. Try the most recent email we sent.")
+            return
+        }
+
+        // T206 — type allowlist. Reject any type the app doesn't have an
+        // explicit branch for. Includes both legs of the email-change flow
+        // (`email_change_current` + `email_change_new`) per Supabase Auth
+        // emit shapes; `reauthentication` is included for forward
+        // compatibility (Supabase emits this for sensitive-action confirms).
+        let type = params["type"] ?? ""
+        let allowedTypes: Set<String> = [
+            "recovery", "signup", "magiclink", "invite",
+            "email_change", "email_change_current", "email_change_new",
+            "reauthentication",
+        ]
+        guard allowedTypes.contains(type) else {
+            Log.d("Deep link rejected — unknown type: \(type)")
+            setDeepLinkError("This link isn\u{2019}t valid. Try the most recent email we sent.")
+            return
+        }
+
         do {
             let session = try await client.auth.setSession(
                 accessToken: access,
                 refreshToken: refresh
             )
-            let type = params["type"] ?? ""
+            // Clear any prior deep-link error on success — the link worked.
+            deepLinkError = nil
+            deepLinkErrorDismissTask?.cancel()
+
             if type == "recovery" {
                 // Present the reset-password screen; do NOT mark
                 // isLoggedIn true — the user has a scoped recovery session,
@@ -398,7 +486,8 @@ final class AuthViewModel: ObservableObject {
                 // password is updated.
                 isRecoveringPassword = true
             } else {
-                // Signup confirmation or magic link — treat as a normal login.
+                // Signup confirmation, magic link, invite, email-change
+                // confirm, or reauthentication — treat as a normal login.
                 await loadUser(id: session.user.id.uuidString)
                 isLoggedIn = true
                 needsEmailVerification = false
@@ -406,7 +495,31 @@ final class AuthViewModel: ObservableObject {
             }
         } catch {
             Log.d("Deep link session failed: \(error)")
+            setDeepLinkError("This link expired or has already been used. Send a new one and try again.")
         }
+    }
+
+    /// T48 — set the deep-link error + schedule auto-dismiss. Mirrors the
+    /// session-expired banner pattern from Wave 5a (T254).
+    @MainActor
+    private func setDeepLinkError(_ msg: String) {
+        deepLinkErrorDismissTask?.cancel()
+        deepLinkError = msg
+        deepLinkErrorDismissTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 8 * 1_000_000_000)
+            guard let self, !Task.isCancelled else { return }
+            await MainActor.run {
+                if self.deepLinkError == msg { self.deepLinkError = nil }
+            }
+        }
+    }
+
+    /// Manual-dismiss helper for the deep-link error banner. ContentView's
+    /// xmark handler calls this so the auto-dismiss timer stops cleanly.
+    func dismissDeepLinkError() {
+        deepLinkErrorDismissTask?.cancel()
+        deepLinkErrorDismissTask = nil
+        deepLinkError = nil
     }
 
     /// Submit a new password after the user followed a recovery link.
@@ -473,6 +586,9 @@ final class AuthViewModel: ObservableObject {
         needsEmailVerification = false
         pendingVerificationEmail = nil
         isRecoveringPassword = false
+        bypassOnboardingLocally = false
+        pendingHomeJump = false
+        dismissDeepLinkError()
     }
 
     // MARK: - Login hooks

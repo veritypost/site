@@ -29,6 +29,12 @@ struct VerityPostApp: App {
                     if scenePhase == .active {
                         Task { await StoreManager.shared.checkEntitlements() }
                         Task { await PermissionService.shared.refreshIfStale() }
+                        // T122 — refresh OS push authorization on every
+                        // foreground. Without this, a user who toggled
+                        // push in iOS Settings while we were backgrounded
+                        // sees a stale "Off"/"On" label until a manual
+                        // refresh triggers the read.
+                        Task { await PushPermission.shared.refresh() }
                     }
                 }
         }

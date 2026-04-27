@@ -50,9 +50,9 @@ struct StoryDetailView: View {
     @State private var categoryName: String? = nil
     @State private var loading = true
     @State private var loadError: String? = nil
-    // Transient user-facing error for inline actions (reactions, comments,
-    // upvotes) that failed server-side after an optimistic UI update.
-    @State private var actionError: String? = nil
+    // Transient inline-action errors (post-comment 200-with-error, vote
+    // session-expired, vote network-failure) all surface via flashToast →
+    // moderationToast overlay at the top of the view.
 
     // Tabs
     enum StoryTab: String, CaseIterable { case story = "Story", timeline = "Timeline", discussion = "Discussion" }
@@ -74,7 +74,14 @@ struct StoryDetailView: View {
     // Comments
     @State private var commentText = ""
     @State private var commentSubmitting = false
-    @State private var commentRateLimited = false
+    // Comment rate-limit countdown. > 0 = button shows "Wait Ns" + disabled.
+    // Replaces the old boolean `commentRateLimited`.
+    @State private var commentRateRemainingSec: Int = 0
+    @State private var commentRateTask: Task<Void, Never>? = nil
+
+    // Cancellable 350ms auto-advance after a quiz option tap. Cancelled on
+    // option re-tap, on view disappear, and on stage transition.
+    @State private var quizAdvanceTask: Task<Void, Never>? = nil
     // D29: separate upvote/downvote tracking. Same vote twice clears.
     @State private var upvotedComments: Set<String> = []
     @State private var downvotedComments: Set<String> = []
@@ -382,6 +389,10 @@ struct StoryDetailView: View {
         }
         .animation(.easeInOut(duration: 0.25), value: moderationToast)
         .overlay(alignment: .center) { quizPassBurst }
+        .onDisappear {
+            quizAdvanceTask?.cancel()
+            commentRateTask?.cancel()
+        }
         .task(id: story.id) { await loadData() }
         .task(id: story.id) { await loadUpNextStories() }
         .task(id: story.id) { await subscribeToNewComments() }
@@ -974,7 +985,9 @@ struct StoryDetailView: View {
                 Button {
                     Task { await startQuiz() }
                 } label: {
-                    Text(quizStage == .loading ? "Starting quiz…" : "Take the quiz")
+                    Text(quizStage == .loading
+                         ? "Starting quiz…"
+                         : (quizError != nil ? "Try again" : "Take the quiz"))
                         .font(.system(.subheadline, design: .default, weight: .bold))
                         .foregroundColor(.white)
                         .padding(.horizontal, 20)
@@ -1020,7 +1033,18 @@ struct StoryDetailView: View {
                     Text("Grading…").font(.caption).foregroundColor(VP.dim)
                 }
                 if let err = quizError {
-                    Text(err).font(.caption).foregroundColor(VP.wrong)
+                    HStack(spacing: 8) {
+                        Text(err).font(.caption).foregroundColor(VP.wrong)
+                        Button {
+                            Task { await submitQuiz() }
+                        } label: {
+                            Text("Try again")
+                                .font(.system(.caption, design: .default, weight: .semibold))
+                                .foregroundColor(VP.accent)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(quizStage == .submitting)
+                    }
                 }
             }
         }
@@ -1136,7 +1160,13 @@ struct StoryDetailView: View {
             quizAnswers[quizId] = oi
             let isLast = quizCurrent >= quizQuestions.count - 1
             // Match web ArticleQuiz: 350ms settle, then auto-advance or submit.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            // Cancellable so a re-tap, view disappear, or stage transition
+            // doesn't trigger a stale advance/submit.
+            quizAdvanceTask?.cancel()
+            quizAdvanceTask = Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 350_000_000)
+                if Task.isCancelled { return }
+                guard quizStage == .answering else { return }
                 if isLast {
                     Task { await submitQuiz() }
                 } else {
@@ -1348,20 +1378,20 @@ struct StoryDetailView: View {
                         Button {
                             Task { await postComment() }
                         } label: {
-                            Text(commentSubmitting ? "..." : (commentRateLimited ? "Wait" : "Post"))
+                            Text(commentSubmitting ? "..." : (commentRateRemainingSec > 0 ? "Wait \(commentRateRemainingSec)s" : "Post"))
                                 .font(.system(.caption, design: .default, weight: .semibold))
                                 .foregroundColor(.white)
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 6)
                                 .background(
                                     RoundedRectangle(cornerRadius: 8).fill(
-                                        commentText.trimmingCharacters(in: .whitespaces).isEmpty || commentRateLimited
+                                        commentText.trimmingCharacters(in: .whitespaces).isEmpty || commentRateRemainingSec > 0
                                         ? VP.muted : VP.accent
                                     )
                                 )
                         }
                         .buttonStyle(.plain)
-                        .disabled(commentText.trimmingCharacters(in: .whitespaces).isEmpty || commentSubmitting || commentRateLimited)
+                        .disabled(commentText.trimmingCharacters(in: .whitespaces).isEmpty || commentSubmitting || commentRateRemainingSec > 0)
                     }
                 }
             }
@@ -2359,9 +2389,8 @@ struct StoryDetailView: View {
         commentSubmitting = true
         defer { commentSubmitting = false }
 
-        // Route through the Next.js /api/comments endpoint so server-side
-        // profanity filter, rate limits, quiz gate, banned-user check, and
-        // counters all apply. Direct Supabase insert would skip those.
+        // Route through /api/comments so rate limits, quiz gate, banned-user
+        // check, and counters all apply. Direct Supabase insert would skip those.
         let url = SupabaseManager.shared.siteURL.appendingPathComponent("api/comments")
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
@@ -2378,50 +2407,66 @@ struct StoryDetailView: View {
             let (data, response) = try await URLSession.shared.data(for: req)
             guard let http = response as? HTTPURLResponse else { return }
             if http.statusCode == 200 {
+                // Some servers can return 200 with `{ "error": "..." }` if the
+                // comment was accepted but moderation deferred or a soft fault
+                // occurred. Try the success shape first; fall back to error.
                 struct Resp: Decodable { let comment: VPComment }
+                struct Err: Decodable { let error: String? }
                 let decoder = JSONDecoder()
                 decoder.dateDecodingStrategy = .iso8601
-                let decoded = try decoder.decode(Resp.self, from: data)
-                await MainActor.run {
-                    comments.insert(decoded.comment, at: 0)
-                    commentText = ""
-                    composerFocused = false
-                    // Light selection haptic to confirm the send. Matches the
-                    // quiz-answer tap pattern — discrete, single-action.
-                    UISelectionFeedbackGenerator().selectionChanged()
-                    // Post-send Up Next: show once, only if we have
-                    // recommendations queued and the user hasn't already seen
-                    // the sheet via the end-of-article trigger.
-                    if !upNextStories.isEmpty && !showUpNext {
-                        if reduceMotion {
-                            showUpNext = true
-                        } else {
-                            withAnimation(.easeOut(duration: 0.35)) { showUpNext = true }
+                if let decoded = try? decoder.decode(Resp.self, from: data) {
+                    await MainActor.run {
+                        comments.insert(decoded.comment, at: 0)
+                        commentText = ""
+                        composerFocused = false
+                        // Light selection haptic to confirm the send. Matches the
+                        // quiz-answer tap pattern — discrete, single-action.
+                        UISelectionFeedbackGenerator().selectionChanged()
+                        // Post-send Up Next: show once, only if we have
+                        // recommendations queued and the user hasn't already seen
+                        // the sheet via the end-of-article trigger.
+                        if !upNextStories.isEmpty && !showUpNext {
+                            if reduceMotion {
+                                showUpNext = true
+                            } else {
+                                withAnimation(.easeOut(duration: 0.35)) { showUpNext = true }
+                            }
+                        }
+                        let ss = SettingsService.shared
+                        if ss.commentBool("rate_limit_comments") {
+                            let delay = ss.commentNumber("comment_rate_sec", default: 30)
+                            startCommentRateLimit(seconds: delay)
                         }
                     }
-                }
-                let ss = SettingsService.shared
-                if ss.commentBool("rate_limit_comments") {
-                    let delay = ss.commentNumber("comment_rate_sec", default: 30)
-                    commentRateLimited = true
-                    Task {
-                        try? await Task.sleep(nanoseconds: UInt64(delay) * 1_000_000_000)
-                        await MainActor.run { commentRateLimited = false }
-                    }
+                } else {
+                    let err = (try? decoder.decode(Err.self, from: data))?.error ?? "Comment couldn\u{2019}t be posted. Try again."
+                    await MainActor.run { flashModerationToast(err) }
                 }
             } else {
                 struct Err: Decodable { let error: String? }
                 let err = (try? JSONDecoder().decode(Err.self, from: data))?.error ?? "Could not post comment"
-                await MainActor.run { actionError = err }
-                if http.statusCode == 429 {
-                    commentRateLimited = true
-                    Task {
-                        try? await Task.sleep(nanoseconds: 30 * 1_000_000_000)
-                        await MainActor.run { commentRateLimited = false }
+                await MainActor.run {
+                    flashModerationToast(err)
+                    if http.statusCode == 429 {
+                        startCommentRateLimit(seconds: 30)
                     }
                 }
             }
         } catch { Log.d("Post comment error:", error) }
+    }
+
+    @MainActor
+    private func startCommentRateLimit(seconds: Int) {
+        commentRateTask?.cancel()
+        commentRateRemainingSec = max(0, seconds)
+        guard commentRateRemainingSec > 0 else { return }
+        commentRateTask = Task { @MainActor in
+            while commentRateRemainingSec > 0 {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                if Task.isCancelled { return }
+                commentRateRemainingSec = max(0, commentRateRemainingSec - 1)
+            }
+        }
     }
 
     /// D29 comment voting. Routes through /api/comments/[id]/vote which
@@ -2435,8 +2480,14 @@ struct StoryDetailView: View {
             applyVoteOptimistic(commentId: comment.id, type: type, wasUp: wasUp, wasDown: wasDown)
         }
         let site = SupabaseManager.shared.siteURL
-        guard let url = URL(string: "/api/comments/\(comment.id)/vote", relativeTo: site),
-              let session = try? await client.auth.session else { return }
+        guard let url = URL(string: "/api/comments/\(comment.id)/vote", relativeTo: site) else { return }
+        guard let session = try? await client.auth.session else {
+            await MainActor.run {
+                revertVoteOptimistic(commentId: comment.id, type: type, wasUp: wasUp, wasDown: wasDown)
+                flashModerationToast("Please sign in again.")
+            }
+            return
+        }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -2450,7 +2501,7 @@ struct StoryDetailView: View {
         } catch {
             await MainActor.run {
                 revertVoteOptimistic(commentId: comment.id, type: type, wasUp: wasUp, wasDown: wasDown)
-                actionError = "Couldn\u{2019}t update vote. Try again."
+                flashModerationToast("Couldn\u{2019}t update vote. Try again.")
             }
         }
     }

@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { isAsciiEmail } from '@/lib/emailNormalize';
 
 // UJ-702 + UJ-722 — email-change initiation. The user's
 // public.users.email_verified flag flips to false when they request a
@@ -65,6 +66,15 @@ export async function POST(request) {
   const { email } = await request.json().catch(() => ({}));
   if (!email || typeof email !== 'string' || !EMAIL_REGEX.test(email) || email.length > 254) {
     return NextResponse.json({ error: 'Valid new email required' }, { status: 400 });
+  }
+  // T299 — block homoglyph bypass on email change. A logged-in user
+  // changing to a Cyrillic homoglyph could otherwise sidestep any future
+  // ban-by-email check that ASCII-case-folds.
+  if (!isAsciiEmail(email)) {
+    return NextResponse.json(
+      { error: 'We can only accept emails using standard letters and numbers.' },
+      { status: 400 }
+    );
   }
 
   const normalized = email.trim().toLowerCase();

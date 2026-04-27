@@ -65,11 +65,23 @@ struct WelcomeView: View {
                 .padding(.top, 8)
 
                 if stampError {
-                    Text("Couldn\u{2019}t finish onboarding. Please try again.")
-                        .font(.footnote)
-                        .foregroundColor(VP.danger)
-                        .padding(.top, 10)
-                        .frame(maxWidth: .infinity, alignment: .center)
+                    VStack(spacing: 8) {
+                        Text("Couldn\u{2019}t finish onboarding. Please try again.")
+                            .font(.footnote)
+                            .foregroundColor(VP.danger)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                        // T88 — escape hatch after repeated stamp failures so
+                        // a flaky network on first launch doesn't permanently
+                        // block app entry. Bypass is local-only; the welcome
+                        // flow re-fires next launch if the server stamp is
+                        // still missing.
+                        Button("Continue anyway") {
+                            auth.bypassOnboardingLocally = true
+                        }
+                        .font(.footnote.weight(.semibold))
+                        .foregroundColor(VP.accent)
+                    }
+                    .padding(.top, 10)
                 }
             }
             .padding(.vertical, 20)

@@ -142,25 +142,18 @@ async function handle() {
     const meta = sub.metadata || {};
     const notifiedAt = (meta as { pro_migration_notified_at?: string }).pro_migration_notified_at;
 
-    // Notify path
+    // Notify path. Until the engagement-email pipeline ships (per memory:
+    // "email scope is security-only"), this branch only emits a captureMessage
+    // for operator visibility. The `pro_migration_notified_at` stamp MUST
+    // happen in the same transaction as a successful sendEmail() call —
+    // stamping without sending creates silent users who never get warned.
     if (renewalAt >= notifyMin && renewalAt <= notifyMax && !notifiedAt) {
       if (!dryRun) {
-        // Email send is owner-side infra; for now we just stamp the
-        // metadata so we don't double-notify, and log a captureMessage
-        // for the operator to send manually until the email template
-        // is wired up.
         await captureMessage('pro_migration_notify_due', 'info', {
           subscription_id: sub.id,
           user_id: sub.user_id,
           renewal_at: sub.current_period_end,
         });
-        await service
-          .from('subscriptions')
-          .update({
-            metadata: { ...meta, pro_migration_notified_at: new Date().toISOString() },
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', sub.id);
       }
       notified++;
       continue;

@@ -30,6 +30,10 @@ struct HomeView: View {
     @State private var loading = true
     @State private var loadError: String? = nil
     @State private var showRegistrationWall = false
+    // T244 — handle for the in-flight pull-to-refresh load. Cancelled
+    // before each new pull so two fast drags don't stack parallel HTTP
+    // requests fighting to write the same @State.
+    @State private var refreshTask: Task<Void, Never>? = nil
 
     @State private var canViewBreakingBanner: Bool = false
     @State private var canViewBreakingBannerPaid: Bool = false
@@ -177,7 +181,11 @@ struct HomeView: View {
                     }
                     .padding(.bottom, 80)
                 }
-                .refreshable { await loadData() }
+                .refreshable {
+                    refreshTask?.cancel()
+                    refreshTask = Task { await loadData() }
+                    _ = await refreshTask?.value
+                }
             }
             .background(VP.bg.ignoresSafeArea())
 
@@ -667,6 +675,7 @@ struct CategoryDetailView: View {
     @State private var stories: [Story] = []
     @State private var loading = true
     @State private var loadFailed = false
+    @State private var refreshTask: Task<Void, Never>? = nil
     private let client = SupabaseManager.shared.client
 
     var body: some View {
@@ -731,7 +740,11 @@ struct CategoryDetailView: View {
         .background(VP.bg.ignoresSafeArea())
         .navigationTitle(category.displayName)
         .navigationBarTitleDisplayMode(.inline)
-        .refreshable { await load() }
+        .refreshable {
+            refreshTask?.cancel()
+            refreshTask = Task { await load() }
+            _ = await refreshTask?.value
+        }
         .task { await load() }
     }
 

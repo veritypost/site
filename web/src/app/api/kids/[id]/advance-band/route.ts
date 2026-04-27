@@ -18,6 +18,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { isAsciiEmail } from '@/lib/emailNormalize';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -103,6 +104,18 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (typeof body.email !== 'string' || !EMAIL_RE.test(body.email.trim())) {
     return NextResponse.json(
       { error: 'A valid email is required for graduation', code: 'email_required' },
+      { status: 400 }
+    );
+  }
+  // T299 — block homoglyph bypass on intended_email. Otherwise a parent
+  // can write a Cyrillic homoglyph here and the kid redeems with a Latin
+  // variant (or reverse) — t.intended_email comparison silently mismatches.
+  if (!isAsciiEmail(body.email)) {
+    return NextResponse.json(
+      {
+        error: 'We can only accept emails using standard letters and numbers.',
+        code: 'email_invalid',
+      },
       { status: 400 }
     );
   }

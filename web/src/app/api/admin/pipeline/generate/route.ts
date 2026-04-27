@@ -57,10 +57,6 @@ import {
   QUIZ_PROMPT,
   TIMELINE_PROMPT,
   AUDIENCE_PROMPT,
-  // Phase 3: banded kid prompts. KID_ARTICLE_PROMPT / KID_TIMELINE_PROMPT /
-  // KID_QUIZ_PROMPT (the legacy single-tier kid prompts) are retained as
-  // exports in editorial-guide.ts for reference but no longer used by this
-  // route — every kid run now picks a band-specific prompt.
   KIDS_HEADLINE_PROMPT,
   TWEENS_HEADLINE_PROMPT,
   KIDS_ARTICLE_PROMPT,

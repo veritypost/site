@@ -17,6 +17,7 @@ import { NextResponse } from 'next/server';
 import { createServiceClient, createClient } from '@/lib/supabase/server';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import { truncateIpV4 } from '@/lib/apiErrors';
+import { isAsciiEmail } from '@/lib/emailNormalize';
 
 export async function POST(request) {
   const ip = await getClientIp();
@@ -46,6 +47,13 @@ export async function POST(request) {
 
   if (!category || !subject || !description || !email || !email.includes('@')) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+  }
+  // T299 — same homoglyph guard as every other public email-write surface.
+  if (!isAsciiEmail(email)) {
+    return NextResponse.json(
+      { error: 'We can only accept emails using standard letters and numbers.' },
+      { status: 400 }
+    );
   }
 
   // If the caller happens to be signed in, attribute the ticket to

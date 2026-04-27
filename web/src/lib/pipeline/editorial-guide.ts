@@ -848,90 +848,11 @@ ASK YOURSELF: Would I genuinely show this to a 10-year-old and feel good about i
 OUTPUT JSON:
 {"audience": "both|adults|kids", "reasons": ["one sentence why"]}`;
 
-export const KID_ARTICLE_PROMPT: string = `You are writing a NEWS ARTICLE for kids aged 8-14. Not dumbing down — translating. Same facts, their language.
 
-THE GOAL: A kid reads this and says "oh cool" or "wait, really?" — not "I don't get it" or "this is boring."
-
-RULES:
-- Keep ALL the same facts — do NOT change what happened, who was involved, or the outcome
-- Put it in CONTEXT they understand. "That's like if every school in your state closed at once." "Imagine your allowance buying half as much candy." Connect abstract concepts to their world.
-- Use simple, clear language a 10-year-old can understand
-- Replace jargon with plain explanations ("inflation" → "prices going up for everything")
-- Keep it short: 80-150 words max. Condensed. Every sentence matters.
-- Active voice always. Short sentences. Punch.
-- Start with the most interesting or surprising fact — the "whoa" moment
-- If the topic involves violence, crime, or disturbing content, state facts gently — no graphic details, no fear
-- NO opinion. NO bias. Just facts explained clearly.
-- End with a "why this matters to you" sentence that connects to their actual life
-- Make it FUN to read. Not silly — fun. There's a difference. Curiosity, not comedy.
-
-EVERY WORD MUST BE 100% ORIGINAL. Do NOT copy any phrasing from the adult article. Read the facts, close it, write fresh for kids.
-
-OUTPUT JSON (matches adult article schema; the route persists into the same articles table with is_kids_safe=true):
-{
-  "title": "kid-friendly headline, max 10 words, fun but accurate",
-  "body": "the article body in kid voice, 80-150 words, paragraphs separated by \\n\\n",
-  "word_count": 120,
-  "reading_time_minutes": 1
-}`;
-
-export const KID_TIMELINE_PROMPT: string = `Generate a timeline for kids aged 8-14 about this news story.
-
-Same events as the adult timeline but explained so a kid gets it. Each event is ONE sentence, max 10 words. Use simple words. Put things in context kids understand.
-
-RULES:
-- Same dates and facts as the adult version — do NOT change what happened
-- Simpler language. "Congress passes law" not "Legislature enacts statutory framework"
-- Add brief context where helpful: "the country next to China" or "the company that makes iPhones"
-- Keep it scannable — these are timeline bullets, not paragraphs
-- Every event must make sense to someone who knows nothing about this story
-- 4-8 events. Don't overwhelm. Pick the ones that tell the story.
-- 100% original wording. Do NOT copy from the adult timeline.
-
-OUTPUT JSON:
-{
-  "events": [
-    {"event_date": "Mon YYYY or Mon DD, YYYY", "event_label": "Max 10 words, kid-friendly language", "event_body": "1-2 sentences explaining what happened in kid-friendly terms. 20-40 words."}
-  ]
-}`;
-
-export const KID_QUIZ_PROMPT: string = `Generate 5 Quick Check questions for kids aged 8-14 about this article. Make them fun and engaging — not like a school test.
-
-RULES:
-- Use friendly, encouraging language ("Can you remember...", "What cool thing...", "Here's a tricky one...")
-- Questions should be answerable from the kid version of the article
-- 4 answer options each — make wrong answers plausible but clearly wrong if you read the article
-- Difficulty: Q1-Q2 easy (basic facts), Q3-Q4 medium (connections), Q5 a bit harder (understanding why)
-- Keep language simple — no jargon in questions or answers
-- Make it feel like a game, not a test
-
-OUTPUT JSON:
-{
-  "questions": [
-    {
-      "question_text": "...",
-      "options": [
-        { "text": "A" },
-        { "text": "B" },
-        { "text": "C" },
-        { "text": "D" }
-      ],
-      "correct_index": 0,
-      "section_hint": "..."
-    }
-  ]
-}`;
-
-// ═══════════════════════════════════════════════════════════════════════
-// PHASE 3 — BANDED KID PROMPTS (kids 7-9, tweens 10-12)
-//
-// The single-tier KID_* prompts above stay as defensive fallbacks. The
-// route uses the banded prompts below when an audience='kid' run is
-// dispatched with an explicit age_band. Phase 3 generates BOTH bands
-// per kid-safe cluster, producing two articles in `articles` (one
-// age_band='kids', one age_band='tweens'), so the kid iOS app can show
-// each profile the band-appropriate version via RLS.
-// ═══════════════════════════════════════════════════════════════════════
+// PHASE 3 — BANDED KID PROMPTS (kids 7-9, tweens 10-12). Generates both
+// bands per kid-safe cluster, producing two articles in `articles` (one
+// age_band='kids', one age_band='tweens'); kid iOS app shows each profile
+// the band-appropriate version via RLS.
 
 export const KIDS_HEADLINE_PROMPT: string = `Generate a headline and summary for an article aimed at children aged 7-9 (early-to-middle elementary readers).
 

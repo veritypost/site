@@ -476,7 +476,7 @@ function PromoInner() {
         onClose={() => setDestructive(null)}
         onConfirm={async ({ reason }: { reason?: string }) => {
           try { await destructive?.run?.({ reason }); setDestructive(null); }
-          catch { push({ message: 'Action failed. Please try again.', variant: 'danger' }); setDestructive(null); }
+          catch { push({ message: `Couldn't ${destructive?.confirmLabel?.toLowerCase() || 'finish that action'}. Please try again.`, variant: 'danger' }); setDestructive(null); }
         }}
       />
     </Page>

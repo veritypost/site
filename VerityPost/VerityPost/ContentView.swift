@@ -85,10 +85,14 @@ struct ContentView: View {
             } else if auth.needsEmailVerification {
                 VerifyEmailView()
                     .environmentObject(auth)
-            } else if auth.currentUser?.needsOnboarding == true {
+            } else if auth.currentUser?.needsOnboarding == true && !auth.bypassOnboardingLocally {
                 // WelcomeView handles the onboarding stamp + user reload
                 // itself. When the reload flips `needsOnboarding` false
                 // this branch is replaced by MainTabView automatically.
+                // T88 — `bypassOnboardingLocally` is the user-initiated
+                // "Continue anyway" escape after repeated stamp failures.
+                // Bypass is local-only; on next launch the welcome flow
+                // re-fires if `onboarding_completed_at IS NULL` server-side.
                 WelcomeView()
                     .environmentObject(auth)
             } else {
@@ -156,6 +160,9 @@ struct MainTabView: View {
             if auth.sessionExpired {
                 sessionExpiredBanner
             }
+            if let err = auth.deepLinkError {
+                deepLinkErrorBanner(message: err)
+            }
 
             adultTabView
         }
@@ -212,6 +219,15 @@ struct MainTabView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             TextTabBar(selected: $selectedTab, isLoggedIn: isLoggedIn)
         }
+        .onChange(of: auth.pendingHomeJump) { _, requested in
+            // T66 — BookmarksView's empty-state CTA requests a tab swap
+            // by flipping this flag. Apply the swap + clear the flag so a
+            // future request is observable.
+            if requested {
+                selectedTab = .home
+                auth.pendingHomeJump = false
+            }
+        }
         .onChange(of: isLoggedIn) { _, nowLoggedIn in
             if nowLoggedIn && showLogin {
                 showLogin = false
@@ -230,17 +246,22 @@ struct MainTabView: View {
                 .font(.system(.footnote, design: .default, weight: .medium))
                 .foregroundColor(.white)
             Spacer(minLength: 0)
-            Button("Sign in") { showLogin = true }
-                .font(.system(.footnote, design: .default, weight: .semibold))
-                .foregroundColor(.white)
-                .padding(.horizontal, 12)
-                .frame(minHeight: 44)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.white.opacity(0.18))
-                )
             Button {
-                auth.sessionExpired = false
+                auth.dismissSessionExpired()
+                showLogin = true
+            } label: {
+                Text("Sign in")
+                    .font(.system(.footnote, design: .default, weight: .semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 44)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.white.opacity(0.18))
+                    )
+            }
+            Button {
+                auth.dismissSessionExpired()
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(.caption, design: .default, weight: .bold))
@@ -254,6 +275,32 @@ struct MainTabView: View {
         .padding(.trailing, 4)
         .padding(.vertical, 4)
         .background(VP.accent)
+    }
+
+    // MARK: - T206 + T48 — Deep-link error banner
+
+    private func deepLinkErrorBanner(message: String) -> some View {
+        HStack(spacing: 10) {
+            Text(message)
+                .font(.system(.footnote, design: .default, weight: .medium))
+                .foregroundColor(.white)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            Button {
+                auth.dismissDeepLinkError()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(.caption, design: .default, weight: .bold))
+                    .foregroundColor(.white)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel("Dismiss link error banner")
+        }
+        .padding(.leading, 16)
+        .padding(.trailing, 4)
+        .padding(.vertical, 4)
+        .background(VP.danger)
     }
 }
 

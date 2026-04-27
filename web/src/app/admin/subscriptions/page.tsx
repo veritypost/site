@@ -754,7 +754,7 @@ function SubscriptionsInner() {
         onClose={() => setDestructive(null)}
         onConfirm={async ({ reason }: { reason?: string }) => {
           try { await destructive?.run?.({ reason }); setDestructive(null); }
-          catch { setLookupError('Action failed. Please try again.'); setDestructive(null); }
+          catch { setLookupError(`Couldn't ${destructive?.confirmLabel?.toLowerCase() || 'finish that action'}. Please try again.`); setDestructive(null); }
         }}
       />
 

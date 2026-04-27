@@ -9,6 +9,7 @@ import { trackServer } from '@/lib/trackServer';
 import { processSignupReferralAndCohort } from '@/lib/referralProcessing';
 import { checkSignupGate } from '@/lib/betaGate';
 import { REF_COOKIE_NAME } from '@/lib/referralCookie';
+import { isAsciiEmail } from '@/lib/emailNormalize';
 import { cookies } from 'next/headers';
 
 export async function POST(request) {
@@ -18,6 +19,16 @@ export async function POST(request) {
 
     if (!email || !password) {
       return NextResponse.json({ error: 'Email and password required' }, { status: 400 });
+    }
+    // T299 — reject homoglyph bypass attempts (Cyrillic 'а' vs Latin 'a'
+    // etc.). The downstream ban-check is `.ilike('email', email)` which
+    // ASCII-case-folds only — a Cyrillic letter would slip past. Gate at
+    // input so every stored email is pure ASCII.
+    if (!isAsciiEmail(email)) {
+      return NextResponse.json(
+        { error: 'We can only accept emails using standard letters and numbers.' },
+        { status: 400 }
+      );
     }
     if (!ageConfirmed) {
       return NextResponse.json({ error: 'Age confirmation required' }, { status: 400 });

@@ -215,7 +215,11 @@ struct BookmarksView: View {
                 .font(.system(.callout, design: .default, weight: .semibold))
                 .foregroundColor(VP.text)
             Button {
-                // Would navigate back to home; tab bar handles the actual swap.
+                // T66 — request a tab swap to Home. ContentView observes
+                // `auth.pendingHomeJump` and applies the switch + clears
+                // the flag (also pops this view's NavigationStack as a
+                // side effect of the parent re-render).
+                auth.pendingHomeJump = true
             } label: {
                 Text("Browse articles")
                     .font(.system(.footnote, design: .default, weight: .semibold))

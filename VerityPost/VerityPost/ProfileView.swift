@@ -55,6 +55,9 @@ struct ProfileView: View {
     @State private var canViewFollowers: Bool = false
     @State private var canViewFollowing: Bool = false
     @State private var permsLoaded: Bool = false
+    // T244 — handle for the in-flight pull-to-refresh load. Cancelled
+    // before each new pull so two fast drags don't race.
+    @State private var refreshTask: Task<Void, Never>? = nil
 
     // Tabs — 4-item set. Overview is the "profile card + my stuff" deeper
     // view; the hero/stats/streak/quick-actions all sit above the tab bar
@@ -170,7 +173,11 @@ struct ProfileView: View {
         .background(VP.bg.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarTitleDisplayMode(.inline)
-        .refreshable { await refreshAll() }
+        .refreshable {
+            refreshTask?.cancel()
+            refreshTask = Task { await refreshAll() }
+            _ = await refreshTask?.value
+        }
         .task { await SettingsService.shared.loadIfNeeded() }
         .task { await loadScoreTiers() }
         .task {

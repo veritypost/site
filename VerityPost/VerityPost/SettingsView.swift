@@ -313,6 +313,42 @@ private struct SettingsNote: View {
     }
 }
 
+/// Error banner for settings load/save failures. Renders a red-stroked card
+/// with optional action button (Retry / Dismiss). Used by subsurfaces to
+/// surface transient backend errors that previously logged silently.
+private struct SettingsErrorBanner: View {
+    let text: String
+    let actionLabel: String?
+    let action: (() -> Void)?
+
+    init(text: String, actionLabel: String? = nil, action: (() -> Void)? = nil) {
+        self.text = text
+        self.actionLabel = actionLabel
+        self.action = action
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text(text)
+                .font(.caption)
+                .foregroundColor(VP.text)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if let label = actionLabel, let action = action {
+                Button(label, action: action)
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(VP.accent)
+                    .buttonStyle(.plain)
+            }
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 10).fill(VP.card))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.wrong.opacity(0.45), lineWidth: 1))
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+    }
+}
+
 /// Standard filled primary button (VP.text bg + VP.bg text). Used inline
 /// in forms for Save / Submit / Update actions.
 private struct SettingsPrimaryButton: View {
@@ -600,6 +636,8 @@ struct SettingsView: View {
     @State private var searchQuery = ""
     @State private var searchDebouncer: Task<Void, Never>? = nil
     @State private var tapTick = 0
+    // T244 — handle for the in-flight pull-to-refresh load.
+    @State private var refreshTask: Task<Void, Never>? = nil
 
     // Permission gates — mirrored from web SECTIONS tree. Resolved by
     // PermissionService on mount and refreshed when perms.changeToken
@@ -649,7 +687,11 @@ struct SettingsView: View {
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarTitleDisplayMode(.inline)
         .scrollDismissesKeyboard(.interactively)
-        .refreshable { await refreshAll() }
+        .refreshable {
+            refreshTask?.cancel()
+            refreshTask = Task { await refreshAll() }
+            _ = await refreshTask?.value
+        }
         .sensoryFeedback(.selection, trigger: tapTick)
         .sheet(isPresented: $showFeedback) { FeedbackSheet().environmentObject(auth) }
         .task(id: perms.changeToken) { await loadPerms() }
@@ -1019,15 +1061,7 @@ struct SettingsView: View {
                            kind: .push(AnyView(VerificationRequestView())),
                            onTap: onTap))
         })
-        if canViewExpertSettings {
-            out.append(HubRowSpec(id: "expert-settings",
-                                  keywords: ["expert", "settings", "tag limit", "notifications"]) { isLast, onTap in
-                AnyView(HubRow(icon: "person.crop.circle.badge.checkmark", title: "Expert settings",
-                               showDivider: !isLast,
-                               kind: .push(AnyView(ExpertSettingsView())),
-                               onTap: onTap))
-            })
-        } else if canApplyExpert,
+        if canApplyExpert,
                   let url = URL(string: SupabaseManager.shared.siteURL
                                 .appendingPathComponent("signup/expert").absoluteString) {
             out.append(HubRowSpec(id: "apply-expert",
@@ -1434,9 +1468,16 @@ struct EmailSettingsView: View {
                                       keyboard: .emailAddress,
                                       autocap: .never,
                                       autocorrect: false)
+                    if !newEmail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        && !isValidEmail(newEmail) {
+                        Text("Invalid email")
+                            .font(.caption)
+                            .foregroundColor(VP.wrong)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                     SettingsPrimaryButton(title: submitting ? "Sending..." : "Send verification link",
                                           isLoading: submitting,
-                                          isDisabled: !newEmail.contains("@")) {
+                                          isDisabled: !isValidEmail(newEmail)) {
                         Task { await requestChange() }
                     }
                 }
@@ -1454,6 +1495,12 @@ struct EmailSettingsView: View {
             SettingsNote(text: "Supabase will send a verification link to your new address. Your email won\u{2019}t change until you click the link.")
                 .padding(.bottom, 8)
         }
+    }
+
+    private func isValidEmail(_ raw: String) -> Bool {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        return trimmed.range(of: #"^[^@\s]+@[^@\s]+\.[^@\s]+$"#, options: .regularExpression) != nil
     }
 
     private func requestChange() async {
@@ -1914,6 +1961,8 @@ struct NotificationsSettingsView: View {
     @State private var weeklyRecap = true
     @State private var loaded = false
     @State private var saving = false
+    @State private var loadError: String? = nil
+    @State private var saveError: String? = nil
     @StateObject private var push = PushPermission.shared
     @State private var showPushPrompt = false
 
@@ -1927,6 +1976,12 @@ struct NotificationsSettingsView: View {
             if !canViewPrefs {
                 SettingsNote(text: "Notifications preferences aren\u{2019}t available for your account.")
             } else {
+                if let err = loadError {
+                    SettingsErrorBanner(text: err, actionLabel: "Retry") {
+                        loadError = nil
+                        Task { await load() }
+                    }
+                }
                 if canTogglePush {
                     SettingsSectionHeader(title: "Push", tone: .normal)
                     SettingsCard {
@@ -1973,6 +2028,12 @@ struct NotificationsSettingsView: View {
                                           showDivider: false)
                     }
 
+                    if let err = saveError {
+                        SettingsErrorBanner(text: err, actionLabel: "Dismiss") {
+                            saveError = nil
+                        }
+                    }
+
                     VStack {
                         SettingsPrimaryButton(title: saving ? "Saving..." : "Save preferences",
                                               isLoading: saving,
@@ -2016,17 +2077,27 @@ struct NotificationsSettingsView: View {
         guard let userId = auth.currentUser?.id else { loaded = true; return }
         // Round 6 iOS-DATA: `preferences` is a phantom column; real jsonb
         // lives at `users.metadata` (writes go through update_own_profile).
+        // Error semantics: a nil/empty `metadata.notifications` is a valid
+        // first-load state (defaults render). A network/decode failure is
+        // surfaced via loadError + retry banner so the user knows their
+        // preferences may be stale rather than silently rendering defaults.
         struct Row: Decodable { let metadata: JSONValue? }
-        if let row: Row = try? await client.from("users")
-            .select("metadata")
-            .eq("id", value: userId)
-            .single().execute().value,
-           let prefs = row.metadata?["notifications"]?.objectValue {
-            breakingAlerts = prefs["breaking"]?.boolValue ?? true
-            morningDigest = prefs["digest"]?.boolValue ?? true
-            expertReplies = prefs["expert_reply"]?.boolValue ?? true
-            commentReplies = prefs["comment_reply"]?.boolValue ?? true
-            weeklyRecap = prefs["weekly_recap"]?.boolValue ?? true
+        do {
+            let row: Row = try await client.from("users")
+                .select("metadata")
+                .eq("id", value: userId)
+                .single().execute().value
+            if let prefs = row.metadata?["notifications"]?.objectValue {
+                breakingAlerts = prefs["breaking"]?.boolValue ?? true
+                morningDigest = prefs["digest"]?.boolValue ?? true
+                expertReplies = prefs["expert_reply"]?.boolValue ?? true
+                commentReplies = prefs["comment_reply"]?.boolValue ?? true
+                weeklyRecap = prefs["weekly_recap"]?.boolValue ?? true
+            }
+            loadError = nil
+        } catch {
+            loadError = "Couldn\u{2019}t load latest preferences. Defaults shown."
+            Log.d("Load notif prefs error:", error)
         }
         await push.refresh()
         loaded = true
@@ -2056,7 +2127,11 @@ struct NotificationsSettingsView: View {
                 "update_own_profile",
                 params: Args(p_fields: Patch(metadata: metadataValue))
             ).execute()
-        } catch { Log.d("Save notif prefs error:", error) }
+            saveError = nil
+        } catch {
+            saveError = "Couldn\u{2019}t save preferences. Try again."
+            Log.d("Save notif prefs error:", error)
+        }
     }
 }
 
@@ -2073,9 +2148,17 @@ struct FeedPreferencesSettingsView: View {
     @State private var compactDisplay = false
     @State private var loaded = false
     @State private var saving = false
+    @State private var loadError: String? = nil
+    @State private var saveError: String? = nil
 
     var body: some View {
         SettingsPageShell(title: "Feed") {
+            if let err = loadError {
+                SettingsErrorBanner(text: err, actionLabel: "Retry") {
+                    loadError = nil
+                    Task { await load() }
+                }
+            }
             SettingsSectionHeader(title: "What surfaces", tone: .normal)
             SettingsCard {
                 SettingsToggleRow(title: "Show breaking at top",
@@ -2106,6 +2189,12 @@ struct FeedPreferencesSettingsView: View {
                                   showDivider: false)
             }
 
+            if let err = saveError {
+                SettingsErrorBanner(text: err, actionLabel: "Dismiss") {
+                    saveError = nil
+                }
+            }
+
             VStack {
                 SettingsPrimaryButton(title: saving ? "Saving..." : "Save",
                                       isLoading: saving,
@@ -2121,15 +2210,24 @@ struct FeedPreferencesSettingsView: View {
 
     private func load() async {
         guard let userId = auth.currentUser?.id else { loaded = true; return }
+        // Error semantics match NotificationsSettings: a missing
+        // `metadata.feed` is a valid first-load state (defaults render); a
+        // network/decode failure surfaces via loadError + retry banner.
         struct Row: Decodable { let metadata: JSONValue? }
-        if let row: Row = try? await client.from("users")
-            .select("metadata").eq("id", value: userId).single().execute().value,
-           let feed = row.metadata?["feed"]?.objectValue {
-            showBreaking = feed["showBreaking"]?.boolValue ?? true
-            showTrending = feed["showTrending"]?.boolValue ?? true
-            showRecommended = feed["showRecommended"]?.boolValue ?? true
-            hideLowCred = feed["hideLowCred"]?.boolValue ?? false
-            compactDisplay = (feed["display"]?.stringValue ?? "comfortable") == "compact"
+        do {
+            let row: Row = try await client.from("users")
+                .select("metadata").eq("id", value: userId).single().execute().value
+            if let feed = row.metadata?["feed"]?.objectValue {
+                showBreaking = feed["showBreaking"]?.boolValue ?? true
+                showTrending = feed["showTrending"]?.boolValue ?? true
+                showRecommended = feed["showRecommended"]?.boolValue ?? true
+                hideLowCred = feed["hideLowCred"]?.boolValue ?? false
+                compactDisplay = (feed["display"]?.stringValue ?? "comfortable") == "compact"
+            }
+            loadError = nil
+        } catch {
+            loadError = "Couldn\u{2019}t load latest preferences. Defaults shown."
+            Log.d("Load feed prefs error:", error)
         }
         loaded = true
     }
@@ -2158,7 +2256,11 @@ struct FeedPreferencesSettingsView: View {
                 "update_own_profile",
                 params: Args(p_fields: Patch(metadata: metadataValue))
             ).execute()
-        } catch { Log.d("Save feed prefs error:", error) }
+            saveError = nil
+        } catch {
+            saveError = "Couldn\u{2019}t save preferences. Try again."
+            Log.d("Save feed prefs error:", error)
+        }
     }
 }
 
@@ -2346,115 +2448,6 @@ struct VerificationRequestView: View {
 
 // MARK: - Expert settings (role=expert)
 
-struct ExpertSettingsView: View {
-    @EnvironmentObject var auth: AuthViewModel
-    private let client = SupabaseManager.shared.client
-
-    @State private var tagLimit: Int = 5
-    @State private var notifPref: String = "tagged"
-    @State private var loaded = false
-    @State private var saving = false
-
-    private let notifOptions = [
-        ("all", "All queue questions"),
-        ("tagged", "Only questions tagged to me"),
-        ("both", "Both tagged and pool"),
-        ("none", "None"),
-    ]
-
-    var body: some View {
-        SettingsPageShell(title: "Expert") {
-            SettingsSectionHeader(title: "Daily tag limit", tone: .normal)
-            SettingsCard {
-                HStack {
-                    Text("\(tagLimit) / day")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(VP.text)
-                    Spacer()
-                    Stepper("", value: $tagLimit, in: 1...20).labelsHidden()
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .frame(minHeight: 44)
-            }
-
-            SettingsSectionHeader(title: "Question notifications", tone: .normal)
-            SettingsCard {
-                VStack(spacing: 0) {
-                    ForEach(Array(notifOptions.enumerated()), id: \.element.0) { idx, pair in
-                        Button { notifPref = pair.0 } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: notifPref == pair.0
-                                      ? "largecircle.fill.circle"
-                                      : "circle")
-                                    .font(.system(size: 18, weight: .regular))
-                                    .foregroundColor(notifPref == pair.0 ? VP.accent : VP.muted)
-                                Text(pair.1)
-                                    .font(.system(size: 15, weight: .regular))
-                                    .foregroundColor(VP.text)
-                                Spacer()
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
-                            .frame(minHeight: 44)
-                            .contentShape(Rectangle())
-                            .overlay(alignment: .bottom) {
-                                if idx < notifOptions.count - 1 {
-                                    Rectangle().fill(VP.border.opacity(0.6)).frame(height: 1).padding(.leading, 16)
-                                }
-                            }
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-
-            VStack {
-                SettingsPrimaryButton(title: saving ? "Saving..." : "Save",
-                                      isLoading: saving,
-                                      isDisabled: !loaded) {
-                    Task { await save() }
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 16)
-        }
-        .task { await load() }
-    }
-
-    private func load() async {
-        guard let userId = auth.currentUser?.id else { loaded = true; return }
-        struct Row: Decodable { let metadata: JSONValue? }
-        if let row: Row = try? await client.from("users")
-            .select("metadata").eq("id", value: userId).single().execute().value,
-           let expert = row.metadata?["expert"]?.objectValue {
-            tagLimit = expert["tagLimit"]?.intValue ?? 5
-            notifPref = expert["notifPref"]?.stringValue ?? "tagged"
-        }
-        loaded = true
-    }
-
-    private func save() async {
-        guard let userId = auth.currentUser?.id else { return }
-        saving = true
-        defer { saving = false }
-        struct Row: Decodable { let metadata: JSONValue? }
-        let existing: Row? = try? await client.from("users")
-            .select("metadata").eq("id", value: userId).single().execute().value
-        var merged: [String: Any] = existing?.metadata?.dictionary ?? [:]
-        merged["expert"] = ["tagLimit": tagLimit, "notifPref": notifPref]
-        do {
-            let data = try JSONSerialization.data(withJSONObject: merged)
-            let metadataValue = try JSONDecoder().decode(JSONValue.self, from: data)
-            struct Args: Encodable { let p_fields: Patch }
-            struct Patch: Encodable { let metadata: JSONValue }
-            try await client.rpc(
-                "update_own_profile",
-                params: Args(p_fields: Patch(metadata: metadataValue))
-            ).execute()
-        } catch { Log.d("Save expert prefs error:", error) }
-    }
-}
 
 // MARK: - Data & Privacy
 

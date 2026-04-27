@@ -18,6 +18,17 @@ final class PushRegistration: NSObject, UNUserNotificationCenterDelegate {
     private var lastUserId: String?
 
     func setCurrentUser(_ userId: String?) {
+        // T187 — validate UUID shape before storing. A garbage value would
+        // pass through to upsert_user_push_token and surface as a server
+        // 400; failing fast here makes the bug obvious in DEBUG and avoids
+        // a botched RPC in production.
+        if let raw = userId {
+            guard UUID(uuidString: raw) != nil else {
+                assertionFailure("PushRegistration.setCurrentUser got non-UUID string: \(raw)")
+                Log.d("PushRegistration: dropped non-UUID userId:", raw)
+                return
+            }
+        }
         lastUserId = userId
     }
 

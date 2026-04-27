@@ -27,6 +27,7 @@ import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import { truncateIpV4 } from '@/lib/apiErrors';
 import { isBotUserAgent } from '@/lib/botDetect';
 import { captureMessage } from '@/lib/observability';
+import { isAsciiEmail } from '@/lib/emailNormalize';
 
 const MIN_ELAPSED_MS = 1500; // below this = bot (form-open to submit)
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -90,7 +91,7 @@ export async function POST(request: NextRequest) {
 
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase().slice(0, 254) : '';
 
-  if (!email || email.length < 5 || !EMAIL_RE.test(email)) {
+  if (!email || email.length < 5 || !EMAIL_RE.test(email) || !isAsciiEmail(email)) {
     console.warn('[api/kids-waitlist] invalid_email', {
       len: email.length,
       has_at: email.includes('@'),

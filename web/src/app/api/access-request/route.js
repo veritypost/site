@@ -11,6 +11,7 @@ import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import { renderTemplate, sendEmail } from '@/lib/email';
 import { REQUEST_CONFIRM_TEMPLATE } from '@/lib/accessRequestEmail';
 import { getSiteUrl } from '@/lib/siteUrl';
+import { isAsciiEmail } from '@/lib/emailNormalize';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -51,6 +52,14 @@ export async function POST(request) {
 
     if (!email || !EMAIL_RE.test(email)) {
       return NextResponse.json({ error: 'A valid email is required.' }, { status: 400 });
+    }
+    // T299 — block homoglyph bypass at public intake. Same canonicalization
+    // gate every other email-write surface uses.
+    if (!isAsciiEmail(email)) {
+      return NextResponse.json(
+        { error: 'We can only accept emails using standard letters and numbers.' },
+        { status: 400 }
+      );
     }
 
     const userAgent = request.headers.get('user-agent') || null;
