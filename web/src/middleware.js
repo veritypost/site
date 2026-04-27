@@ -271,7 +271,15 @@ export async function middleware(request) {
   //
   // Exempts: /welcome itself, /preview, /api/*, /admin/* (still 404s for
   // non-staff via its own layout), /_next/*, and standard public files.
-  if (process.env.NEXT_PUBLIC_SITE_MODE === 'coming_soon') {
+  //
+  // NEXT_PUBLIC_BETA_GATE=1 supersedes coming-soon: closed beta IS the
+  // launch model, so the /login + invite-code flow is the entry point.
+  // Skip the coming-soon redirect when the beta gate is active so the
+  // beta-gate logic below can redirect anonymous visitors to /login.
+  if (
+    process.env.NEXT_PUBLIC_SITE_MODE === 'coming_soon' &&
+    process.env.NEXT_PUBLIC_BETA_GATE !== '1'
+  ) {
     const allowed =
       pathname === '/welcome' ||
       pathname === '/preview' ||
