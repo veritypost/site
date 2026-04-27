@@ -77,7 +77,10 @@ type LockModalProps = {
 
 export default function LockModal({ open, onClose, capability }: LockModalProps) {
   const router = useRouter();
-  const { user } = usePermissionsContext() as { user: unknown };
+  // T161 — `usePermissionsContext()` already returns
+  // `PermissionsContextValue`; the prior `as { user: unknown }` cast
+  // actively defeated that typing. Drop the cast.
+  const { user } = usePermissionsContext();
   const panelRef = useRef<HTMLDivElement | null>(null);
   const isOpen = !!(open && capability);
   useFocusTrap(isOpen, panelRef, { onEscape: onClose });

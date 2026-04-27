@@ -2,11 +2,19 @@
 // @feature-verified admin_api 2026-04-18
 'use client';
 
-import { useState, useEffect, createContext, useContext, CSSProperties, ReactNode } from 'react';
+import {
+  useState,
+  useEffect,
+  useRef,
+  createContext,
+  useContext,
+  CSSProperties,
+  ReactNode,
+} from 'react';
 import { usePathname } from 'next/navigation';
 import { createClient } from '../lib/supabase/client';
 import AccountStateBanner from '../components/AccountStateBanner';
-import { hasPermission, refreshAllPermissions, refreshIfStale } from '../lib/permissions';
+import { hasPermission, refreshAllPermissions } from '../lib/permissions';
 import type { Tables } from '@/types/database-helpers';
 import { Z } from '@/lib/zIndex';
 
@@ -151,6 +159,17 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
   // icon sits next to the wordmark — single discoverable entry point to
   // /search across every surface where the global chrome shows.
   const [canSearch, setCanSearch] = useState<boolean>(false);
+  // T220 — skip-ref for the permission hydrate. Supabase's
+  // onAuthStateChange fires on token refresh (not just real sign-in /
+  // sign-out transitions), and re-running refreshAllPermissions() on
+  // every refresh hammers the RPC. This ref tracks the last hydrate
+  // time per user-id; identical user inside a 60s window short-circuits
+  // straight to the cached `hasPermission()` reads. Real sign-in /
+  // sign-out (user-id change) always falls through and re-hydrates.
+  const lastHydrateRef = useRef<{ userId: string | null; at: number }>({
+    userId: null,
+    at: 0,
+  });
 
   useEffect(() => {
     setMounted(true);
@@ -168,9 +187,20 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
           setAuthLoaded(true);
           setCanSeeAdmin(false);
           setCanSearch(false);
+          lastHydrateRef.current = { userId: null, at: 0 };
         }
         return;
       }
+      // T220 — skip the full hydrate when the same user just refreshed
+      // their auth token (onAuthStateChange fires on token refresh too).
+      // 60s is the same staleness window refreshIfStale() uses, so we
+      // never serve perms that are more than a minute behind reality.
+      const now = Date.now();
+      const last = lastHydrateRef.current;
+      const sameUser = last.userId === authUser.id;
+      const fresh = now - last.at < 60_000;
+      if (sameUser && fresh) return;
+
       const { data: profile } = await supabase
         .from('users')
         .select(
@@ -179,8 +209,10 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
         .eq('id', authUser.id)
         .maybeSingle<ProfileRow>();
 
+      // T220 — refreshAllPermissions() repopulates the full cache; the
+      // follow-up refreshIfStale() was a guaranteed no-op (version was
+      // just bumped), so dropping it cuts one round-trip per hydrate.
       await refreshAllPermissions();
-      await refreshIfStale();
 
       if (!cancelled) {
         setUser(profile || null);
@@ -188,6 +220,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
         setAuthLoaded(true);
         setCanSeeAdmin(hasPermission('admin.dashboard.view'));
         setCanSearch(hasPermission('search.basic'));
+        lastHydrateRef.current = { userId: authUser.id, at: now };
       }
     }
 
@@ -213,8 +246,17 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
       try {
         const res = await fetch('/api/notifications?unread=1&limit=1');
         if (!res.ok) return;
-        const data = await res.json().catch(() => ({}));
-        if (!cancelled) setUnreadCount(data.unread_count || 0);
+        const raw: unknown = await res.json().catch(() => ({}));
+        // T155 — runtime guard: malformed responses (non-object or
+        // missing numeric `unread_count`) reset the badge to 0 rather
+        // than coercing an unknown shape through `data.unread_count`.
+        const unreadCount =
+          raw &&
+          typeof raw === 'object' &&
+          typeof (raw as { unread_count?: unknown }).unread_count === 'number'
+            ? (raw as { unread_count: number }).unread_count
+            : 0;
+        if (!cancelled) setUnreadCount(unreadCount);
       } catch (e) {
         console.error('[nav] notifications poll', e);
       }

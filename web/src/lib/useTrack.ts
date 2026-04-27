@@ -24,7 +24,13 @@ import type { EventCategory } from './events/types';
 
 type TrackOptions = Parameters<typeof track>[2];
 
-export function useTrack() {
+export type TrackFn = (
+  event_name: string,
+  event_category: EventCategory,
+  opts?: TrackOptions
+) => void;
+
+export function useTrack(): TrackFn {
   const { user, userTier, tenureDays } = useAuth();
   const userId = user?.id ?? null;
 
@@ -54,7 +60,7 @@ export function usePageViewTrack(
   content_type: string,
   extra: TrackOptions = {},
   deps: ReadonlyArray<unknown> = []
-) {
+): void {
   const trackEvent = useTrack();
   useEffect(
     () => {

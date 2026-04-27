@@ -343,9 +343,38 @@ async function lookupUserAndPlan(service, customerId, priceId, fallbackUserId) {
 const UUID_RX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function handleCheckoutCompleted(service, session) {
-  const claimedUserId = session.client_reference_id || session.metadata?.user_id;
+  const cri = session.client_reference_id || null;
+  const metaUserId = session.metadata?.user_id || null;
   const customerId = session.customer;
-  if (!claimedUserId || !UUID_RX.test(claimedUserId)) {
+
+  // T205 — our /api/stripe/checkout route sets BOTH client_reference_id AND
+  // metadata.user_id to the same authenticated user id (see lib/stripe.js
+  // createCheckoutSession). A session that arrives with only one set, or
+  // with the two set to different values, did NOT originate from our
+  // server-side checkout flow — it came from the Stripe Dashboard, a
+  // Payment Link, or a session minted via a leaked API key. Refuse to bind
+  // a customer→user mapping in that case. This is in addition to the
+  // F-016 defenses below (UUID shape check, prefer-existing-mapping,
+  // refuse-overwrite). Real-world impact: an attacker who exfiltrates the
+  // Stripe key cannot mint a session that attaches their card to a victim's
+  // account by setting only `client_reference_id`.
+  if (cri && metaUserId && cri !== metaUserId) {
+    throw new Error(
+      'checkout.session.completed: client_reference_id / metadata.user_id mismatch — ' +
+        'session not originated by our checkout route; refusing bind.'
+    );
+  }
+  if (!cri || !metaUserId) {
+    // One of the two missing means this didn't come from our checkout
+    // route. Log + skip to avoid binding via an externally-minted session.
+    console.warn(
+      '[stripe.webhook] checkout.session.completed missing paired user id; skipping bind.',
+      { has_client_reference_id: !!cri, has_metadata_user_id: !!metaUserId }
+    );
+    return;
+  }
+  const claimedUserId = cri; // === metaUserId at this point
+  if (!UUID_RX.test(claimedUserId)) {
     throw new Error('checkout.session.completed: missing or malformed client_reference_id');
   }
 

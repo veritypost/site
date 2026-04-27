@@ -42,6 +42,13 @@
  * this file MUST declare `export const runtime = 'nodejs'`.
  */
 
+// T223 — `cheerio` pulls in parse5 + a chunk of htmlparser2; bundling
+// it into the browser would silently add ~50KB to client routes that
+// happened to import this module. The doc comment above already says
+// "Server-only" — `import 'server-only'` makes that contract enforced
+// by the build instead of by convention.
+import 'server-only';
+
 import * as cheerio from 'cheerio';
 
 export async function scrapeArticle(url: string, timeoutMs: number = 15000): Promise<string | null> {

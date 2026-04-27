@@ -24,8 +24,11 @@ export default async function BetaLockedPage({
 }: {
   searchParams: Promise<{ reason?: string }> | { reason?: string };
 }) {
-  const sp = await Promise.resolve(searchParams as { reason?: string });
-  const reasonText = sp.reason && reasonCopy[sp.reason] ? reasonCopy[sp.reason] : null;
+  const sp = await Promise.resolve(searchParams);
+  // T157 — narrow without an `as` cast: only accept a string `reason`,
+  // anything else falls through to `undefined`.
+  const reason = typeof sp.reason === 'string' ? sp.reason : undefined;
+  const reasonText = reason && reasonCopy[reason] ? reasonCopy[reason] : null;
 
   return (
     <main

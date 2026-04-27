@@ -21,6 +21,12 @@
  * See F7-DECISIONS-LOCKED.md §3.2-3.3.
  */
 
+// T221 — `@anthropic-ai/sdk` + `openai` are ~400KB combined. Importing
+// this file from a client component would silently bundle both into the
+// browser. `import 'server-only'` makes Next.js throw at build time if
+// any client-side code path reaches this module.
+import 'server-only';
+
 // 1. Imports
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';

@@ -9,6 +9,10 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 const MAX_IDS_PER_PATCH = 200;
 
 // GET /api/notifications?unread=1&limit=50
+/**
+ * @param {import('next/server').NextRequest} request
+ * @returns {Promise<import('next/server').NextResponse>}
+ */
 export async function GET(request) {
   const blocked = await v2LiveGuard();
   if (blocked) return blocked;

@@ -7,6 +7,66 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (Parallel sweep wave 2 — 17 items across 5 clusters: admin email, penalty escalate, server security, perf, TS hardening) — _shipped, pushed to git/Vercel_
+
+Five implementer agents dispatched in parallel on non-overlapping file clusters (avoiding files touched in wave 1).
+
+### Cluster G — Admin EMAIL_SEQUENCES cleanup
+
+- **T9 + T10** — `web/src/app/admin/notifications/page.tsx`: deleted `EMAIL_SEQUENCES` constant entirely (Onboarding Day 0/1/3/5/7 + Re-engagement Day 30/37 hardcoded data). Removed `email_onboarding`/`email_reengagement` from `EMAIL_CONFIG`, `DEFAULT_TOGGLE_STATE`, `DEFAULT_NUMS`. Removed `'sequences'` from the tabs union + nav + render branch. Header subtitle updated. Zero remaining references to deleted symbols. DB `settings` rows preserved (UI no longer reads/writes them; can be cron-cleaned later).
+- Out-of-scope flag: `email_breaking` + `email_achievement` toggles still write to `settings`; tracing whether any sender consumes those is a separate verification pass.
+
+### Cluster H — Penalty auto-escalate
+
+- **T276** — `web/src/app/api/admin/moderation/users/[id]/penalty/route.js`: `level` now optional. `'auto'` / null / undefined / '' triggers escalation: count `user_warnings` rows for target within 60d, map count→level (0→1 warn, 1→2 mute24h, 2→3 mute7d, 3+→4 ban). Explicit `1..4` still honored as manual override. Audit metadata + response carry `auto_escalated` + `escalated_from_count`. RPC body untouched. Schema verified via MCP — `user_warnings` table exists with the right shape.
+
+### Cluster I — Server security hardening
+
+- **T203** — `web/src/lib/auth.js`: added `verifyBearerToken()` with HS256 verification against `SUPABASE_JWT_SECRET`, `aud=authenticated` + `iss` checks. Called before `createClientFromToken`; throws 401 on invalid/missing-secret. `jsonwebtoken@^9.0.3` already in deps; no new dep added. Defense-in-depth on top of GoTrue's own verification.
+- **T204** — `web/src/lib/authRedirect.js`: open-redirect / path-traversal hardening on `next=`. Pre-decode via `decodeURIComponent` (try/catch rejects invalid encoding); reject literal `..` traversal in raw + decoded forms; reject absolute URLs (`http://`, `https://`, case-insensitive); reject encoded-slash/backslash prefixes (`/%2f`, `/%5c`). Existing whitelist regex preserved.
+- **T205** — `web/src/app/api/stripe/webhook/route.js`: webhook fallback path now requires BOTH `client_reference_id` AND `metadata.user_id` to be present and equal. Our checkout route always sets both to the same authenticated user id; sessions arriving without one or with mismatched values didn't originate from our checkout (Dashboard, Payment Links, leaked API key) and are refused. Existing F-016 defenses preserved.
+- **T208 — POSTURE-NOTE** — `web/src/middleware.js`: comment block above `buildCsp()` documents why we don't add SRI to Stripe scripts (Stripe doesn't publish stable hashes), the current mitigation stack, and revisit triggers. CSP itself unchanged.
+
+### Cluster P — Performance small
+
+- **T219** — `web/src/app/api/ads/serve/route.js`: response now sets `Cache-Control: max-age=300, stale-while-revalidate=3600`. Browser + edge cache the per-article ad creative for up to 5 min.
+- **T220 — RE-SCOPED** — `web/src/app/NavWrapper.tsx`: audit's "fires 3 useEffects every route change" was stale (deps were `[]`). Real waste was `onAuthStateChange` re-hydrating on every token refresh. Added `lastHydrateRef` (60s skip window keyed on user-id; sign-in/sign-out always falls through). Dropped redundant `refreshIfStale()` call (the prior `refreshAllPermissions()` just bumped the version). Removed unused import.
+- **T221** — `web/src/lib/pipeline/call-model.ts`: added `import 'server-only';` above the `Anthropic` + `OpenAI` imports. Defends against accidental ~400KB browser bundle inclusion.
+- **T222** — `web/src/app/layout.js` + `web/src/app/globals.css`: extracted skip-link + form-focus inline `<style>` blocks to globals.css (rules transferred 1:1, top-level since globals doesn't use `@layer`). Visual rendering preserved.
+- **T223** — `web/src/lib/pipeline/render-body.ts` (sanitize-html) + `web/src/lib/pipeline/scrape-article.ts` (cheerio): added `import 'server-only';` to both. `dompurify` left alone (intentionally browser).
+
+### Cluster M — TS hardening
+
+- **T155** — `web/src/app/NavWrapper.tsx`: notifications-poll JSON parse now type-guarded — `typeof data?.unread_count === 'number'` else 0. Audit's "shape" claim was off (it's `unread_count: number`, not `loggedIn: boolean`); guard still warranted.
+- **T156** — `web/src/lib/useTrack.ts`: added explicit return-type annotations + exported `TrackFn` type alias.
+- **T157** — `web/src/app/beta-locked/page.tsx`: replaced `as { reason?: string }` cast with `typeof === 'string'` guard. Skipped zod (premature for one optional string).
+- **T161** — `web/src/components/LockModal.tsx`: dropped `as { user: unknown }` cast. `usePermissionsContext()` already returns `PermissionsContextValue` correctly typed; the cast was actively widening.
+- **T162** — `web/src/app/messages/page.tsx`: three `await res.json().catch(() => ({}))` sites now type-guarded before consumption. Lines shifted from audit's 495/531/570 to current 508/544/581 after T112/T113 — verified no overlap with DM-paywall work.
+- **T163** — `web/src/app/api/notifications/route.js`: added JSDoc `@param {NextRequest}` + `@returns {Promise<NextResponse>}` on GET. JS file kept (no TS conversion). Intellisense without rewrite.
+
+### Files touched
+
+- `web/src/app/NavWrapper.tsx`
+- `web/src/app/admin/notifications/page.tsx`
+- `web/src/app/api/admin/moderation/users/[id]/penalty/route.js`
+- `web/src/app/api/ads/serve/route.js`
+- `web/src/app/api/notifications/route.js`
+- `web/src/app/api/stripe/webhook/route.js`
+- `web/src/app/beta-locked/page.tsx`
+- `web/src/app/globals.css`
+- `web/src/app/layout.js`
+- `web/src/app/messages/page.tsx`
+- `web/src/components/LockModal.tsx`
+- `web/src/lib/auth.js`
+- `web/src/lib/authRedirect.js`
+- `web/src/lib/pipeline/call-model.ts`
+- `web/src/lib/pipeline/render-body.ts`
+- `web/src/lib/pipeline/scrape-article.ts`
+- `web/src/lib/useTrack.ts`
+- `web/src/middleware.js`
+
+---
+
 ## 2026-04-27 (Parallel sweep — 28 items shipped + 2 stale-confirmed across 6 clusters) — _shipped, pushed to git/Vercel_
 
 Six implementer agents dispatched in parallel covering non-overlapping file clusters. Each cluster summarized below.

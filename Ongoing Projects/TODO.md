@@ -411,16 +411,6 @@ The numbered items below retain their original section placement for readability
 **Fix:** Add a bottom-of-screen consent bar. Gate `ga4-loader`, `ga4-init`, `GAListener`, and the AdSense script on accepted consent. Reject keeps scripts off. Persist decision in localStorage or a cookie.
 **Recommendation:** Use a **TCF v2.2-compliant CMP** (Funding Choices is free and Google-supported, or Cookiebot/Osano). Hand-rolling is a maintenance burden once you ship to multiple jurisdictions. Critical that scripts are gated *before* consent — disclosure copy alone fails GDPR and AdSense audits.
 
-### T9 — Admin still ships 5-email onboarding sequence under transactional-only email policy — **MEDIUM** (re-graded — pre-launch hygiene, not gate)
-**File:** `web/src/app/admin/notifications/page.tsx:46-59` (verified — `EMAIL_SEQUENCES` has Onboarding (Day 0/1/3/5/7) + Re-engagement (Day 30/37) marked `status: 'active'`).
-**Problem:** Email policy is transactional-only (verification, password, security, compliance). Admin UI advertises lifecycle email programs that can't and shouldn't ship.
-**Fix:** Remove `EMAIL_SEQUENCES` constant + the UI that renders it. Also remove `users.metadata.notification_prefs` writes for newsletter/comment-reply (web settings card). Privacy policy (`web/src/app/privacy/page.tsx:65-79`) and Help (`web/src/app/help/page.tsx`) need matching copy edits.
-**Recommendation:** **One pass** — admin UI + settings card + public copy + iOS alert settings (T29) all need the same direction. Bundle as one PR so the public-facing story is consistent on the same day.
-
-### T10 — Admin still advertises Day 30/37 re-engagement email — **MEDIUM** (re-graded — pre-launch hygiene, not gate)
-**File:** Same as T9. `database.ts:8777-8778` has `win_back_eligible_at` / `win_back_sent_at` columns; cron has no re-engagement type.
-**Fix:** Bundle with T9. Remove the controls; if win-back outreach is still wanted, treat as push/in-app, not email.
-
 ---
 
 ## HIGH — close before launch quality bar
@@ -887,30 +877,6 @@ The numbered items below retain their original section placement for readability
 
 ### Senior Frontend (T155-T169)
 
-#### T155 — NavWrapper unsafe JSON shape assumption — **MEDIUM** (type safety)
-**File:** `web/src/app/NavWrapper.tsx:212`. `await res.json().catch(() => ({}))` then assumes `{ loggedIn: boolean }` shape.
-**Fix:** Runtime guard before consuming.
-
-#### T156 — `useTrack`/`usePageViewTrack` missing explicit return types — **MEDIUM** (TS hygiene)
-**File:** `web/src/lib/useTrack.ts:27,53`. Exported hooks rely on inference.
-**Fix:** Add return-type signatures.
-
-#### T157 — `searchParams as { reason?: string }` cast in beta-locked route — **MEDIUM** (TS)
-**File:** `web/src/app/beta-locked/page.tsx:27`. No runtime validation.
-**Fix:** Zod parse or shape guard.
-
-#### T161 — `usePermissionsContext() as { user: unknown }` defeats context typing — **MEDIUM** (TS)
-**File:** `web/src/components/LockModal.tsx:80`.
-**Fix:** Define `PermissionsContext` interface; type `createContext` with it.
-
-#### T162 — Multiple `await res.json().catch(() => ({}))` with `as` casts in messages — **MEDIUM** (TS)
-**File:** `web/src/app/messages/page.tsx:495,531,570`. Empty object cast as expected shape; downstream undefined access.
-**Fix:** Validate expected key before consuming; throw on shape mismatch.
-
-#### T163 — Notifications GET route lacks NextRequest/NextResponse typing — **LOW** (TS)
-**File:** `web/src/app/api/notifications/route.js:12`. `async function GET(request)` — no type hints.
-**Fix:** Add `NextRequest` parameter type + `Promise<NextResponse>` return.
-
 #### T165 — 90+ inline `CSSProperties` objects, no stylesheet/Tailwind/CSS modules — **LOW** (maintainability)
 **File:** Across `web/src/components/`, `web/src/app/`. Maintenance burden, bundle size cost.
 **Fix:** Migrate critical components to CSS modules; consider Tailwind for new work.
@@ -1028,18 +994,6 @@ Items below already moved to Pre-Launch Assessment (Apple/Sentry/COPPA-CRITICAL)
 
 ### Security (T202-T214)
 
-#### T203 — Bearer token from Authorization header used without JWT signature check — **HIGH**
-**File:** `web/src/lib/auth.js:17-35`. `createClientFromToken(token)` is called with raw bearer; no verification of issuer/audience/signature before using.
-**Fix:** Verify JWT signature server-side via `SUPABASE_JWT_SECRET` before creating the client. Wrap `getUser()` to fail closed on invalid tokens.
-
-#### T204 — Open-redirect / path-traversal hardening on `next=` param — **HIGH**
-**File:** `web/src/lib/authRedirect.js:23-42`. Regex permits `..` patterns; URL-encoded `%2e%2e` not pre-decoded before validation.
-**Fix:** Reject `..` literally; `decodeURIComponent` before regex; tighten path regex.
-
-#### T205 — Stripe webhook fallback trusts client_reference_id when no prior customer mapping — **HIGH**
-**File:** `web/src/app/api/stripe/webhook/route.js:332-374`. First checkout: attacker sets `client_reference_id = <victim-uuid>` with their own `customer_id` → webhook binds attacker's Stripe customer to victim's row.
-**Fix:** Require pre-signed metadata token in checkout session; reject webhook fallback to claimed UUID when no prior `stripe_customer_id` mapping exists.
-
 #### T206 — Deep-link `setSession()` not validated against Supabase issuer/audience — **HIGH**
 **File:** `VerityPost/VerityPost/AuthViewModel.swift:377-407`. `verity://` URL scheme is registered; attacker can craft a deep-link with fake `access_token`/`refresh_token` and the app calls `setSession()` blindly.
 **Fix:** After `setSession()`, immediately call `auth.getUser()` to validate; reject + clear session on failure. Validate `aud`/`iss` claims if available.
@@ -1047,10 +1001,6 @@ Items below already moved to Pre-Launch Assessment (Apple/Sentry/COPPA-CRITICAL)
 #### T207 — DOMPurify SSR fallback returns input unsanitized — **MEDIUM**
 **File:** `web/src/app/expert-queue/page.tsx:11-18`. `dompurify` is browser-only; if any future state path renders `dangerouslySetInnerHTML` server-side, sanitize is a no-op.
 **Fix:** Move markdown rendering to server-only path with `sanitize-html`, or always guard with `typeof window !== 'undefined'` at the inject point.
-
-#### T208 — CSP `'strict-dynamic'` permits Stripe-CDN-served scripts without SRI — **MEDIUM**
-**File:** `web/src/middleware.js:92`. If Stripe's CDN is compromised (BGP/DNS hijack), CSP doesn't catch it.
-**Fix:** Add Subresource Integrity hash on Stripe script tags, or remove `'strict-dynamic'` and explicitly nonce-tag Next.js bootstrap.
 
 #### T209 — Browser `Cache-Control` not set on POST / state-changing routes (replay risk) — **LOW**
 **File:** Sample: `web/src/app/api/stripe/portal/route.js`. Responses to state-changing endpoints should be `Cache-Control: no-store`. Pairs with T170 (broader cache header sweep).
@@ -1087,26 +1037,6 @@ Items below already moved to Pre-Launch Assessment (Apple/Sentry/COPPA-CRITICAL)
 #### T218 — Story page fires 9+ parallel queries on mount — **MEDIUM**
 **File:** `web/src/app/story/[slug]/page.tsx:468, 578-593, 602-626`. 9 round-trips on 3G = 9-15s load.
 **Fix:** Inline `timelines` + `sources` as joined rows; cache user plan in AuthContext.
-
-#### T219 — `Ad.jsx` fetches `/api/ads/serve` per article with no Cache-Control — **MEDIUM**
-**File:** `web/src/components/Ad.jsx:34-56`. N article views = N ad fetches, ~50ms each.
-**Fix:** Add `Cache-Control: max-age=300, stale-while-revalidate=3600` to ad serve route.
-
-#### T220 — NavWrapper fires 3 `useEffect`s every route change — **MEDIUM**
-**File:** `web/src/app/NavWrapper.tsx:151-202`. Permission hydrate re-fires on each navigation.
-**Fix:** Move permission hydrate to context provider; cache + sync on tab visibility.
-
-#### T221 — `@anthropic-ai/sdk` and `openai` in `dependencies` — **MEDIUM** (future-bloat)
-**File:** `web/package.json:31,40`. Server-only today, but accidental client import = ~400KB gzipped to browser.
-**Fix:** Add `import 'server-only';` at top of `web/src/lib/pipeline/call-model.ts`. Optionally move to devDeps.
-
-#### T222 — Inline `<style>` in `layout.js` (skip-link + form focus) ships on every page — **LOW**
-**File:** `web/src/app/layout.js:113-160`. Move to `globals.css` for tree-shake.
-
-#### T223 — `cheerio` + `dompurify` + `sanitize-html` in deps — **LOW** (audit)
-**File:** `web/package.json:35-36,44`. If client-imported by accident, ~50KB. Add `import 'server-only'` to whichever modules use them server-side.
-
-### DevOps / SRE (T224-T232)
 
 #### T231 — No CI integration test for `vercel.json` cron paths ↔ route handlers — **LOW**
 **File:** `web/vercel.json` vs `web/src/app/api/cron/*/route.*`.
@@ -1273,10 +1203,6 @@ Items below already moved to Pre-Launch Assessment (Apple/Sentry/COPPA-CRITICAL)
 **Fix:** Create `/privacy/kids` enumerating kid-specific data collection. Also tracked as Pre-Launch Assessment K11.
 
 ### Trust & Safety (T274-T287)
-
-#### T276 — Penalty levels don't auto-escalate on repeat violation — **HIGH**
-**File:** `web/src/app/api/admin/moderation/users/[id]/penalty/route.js:10-27`. Moderators must manually pick the next tier.
-**Fix:** Auto-escalate based on `user_warnings` history within 60d.
 
 #### T278 — No CSAM reporting / NCMEC path — **HIGH** (legal duty)
 **File:** Codebase-wide. `/api/reports` accepts free text; no urgent severity, no fast-lane, no NCMEC integration.

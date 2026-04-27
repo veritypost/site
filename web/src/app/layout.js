@@ -127,37 +127,13 @@ export default function RootLayout({ children }) {
         ))}
         {/* DA-050 — skip-to-main link. First focusable element; visible
             only when focused so keyboard users can bypass nav + banner +
-            category pills straight to article content. */}
+            category pills straight to article content. T222 — styling
+            for this element + the form-focus rules moved into
+            globals.css; the inline <style> previously here was being
+            re-shipped on every page render. */}
         <a href="#main-content" className="vp-skip-link">
           Skip to main content
         </a>
-        <style>{`
-          input, textarea, select { color: #111111; }
-          input::placeholder, textarea::placeholder { color: #999999; }
-          *:focus-visible { outline: 2px solid #111111; outline-offset: 2px; }
-          .vp-skip-link {
-            position: absolute;
-            left: -9999px;
-            top: auto;
-            width: 1px;
-            height: 1px;
-            overflow: hidden;
-          }
-          .vp-skip-link:focus {
-            position: fixed;
-            left: 8px;
-            top: 8px;
-            width: auto;
-            height: auto;
-            padding: 8px 12px;
-            background: #111111;
-            color: #ffffff;
-            text-decoration: none;
-            font-weight: 600;
-            z-index: 100000;
-            border-radius: 4px;
-          }
-        `}</style>
         {/* GA4 (gtag.js). Loaded afterInteractive so it doesn't block
             first paint. The GAListener component below subscribes to
             App Router navigation changes and fires page_view events,

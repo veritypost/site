@@ -22,6 +22,15 @@
 
 const NEXT_RX = /^\/[A-Za-z0-9\-_/.]*(?:\?[A-Za-z0-9\-_/.=&%]*)?(?:#[A-Za-z0-9\-_/.=&%]*)?$/;
 
+// T204 — path-traversal guard. Reject `..` segments after URL decode. The
+// regex above doesn't catch `..` because `.` is in the character class; an
+// attacker that gets a `..` past the regex (e.g. via `%2e%2e` decoded by a
+// downstream consumer) could traverse out of an expected base path.
+function containsTraversal(s) {
+  // Reject `..` in any form (literal, separator-bounded, or repeated).
+  return /\.\./.test(s);
+}
+
 /**
  * @param {unknown} raw
  * @param {string | null} [fallback]
@@ -30,13 +39,40 @@ const NEXT_RX = /^\/[A-Za-z0-9\-_/.]*(?:\?[A-Za-z0-9\-_/.=&%]*)?(?:#[A-Za-z0-9\-
 export function resolveNext(raw, fallback = null) {
   if (typeof raw !== 'string') return fallback;
   if (raw.length === 0 || raw.length > 500) return fallback;
-  // Reject explicit protocol-relative prefix and backslash tricks.
-  if (raw.startsWith('//') || raw.startsWith('\\') || raw.startsWith('/\\')) return fallback;
+
+  // T204 — reject absolute URLs and protocol-relative URLs up front, in
+  // addition to the existing `//` / backslash guards. Case-insensitive
+  // because some clients normalize `HTTP://` before we see it.
+  const lowered = raw.toLowerCase();
+  if (
+    lowered.startsWith('http://') ||
+    lowered.startsWith('https://') ||
+    raw.startsWith('//') ||
+    raw.startsWith('\\') ||
+    raw.startsWith('/\\') ||
+    raw.startsWith('/%2f') ||
+    raw.startsWith('/%5c')
+  ) {
+    return fallback;
+  }
+
   // Reject any non-ASCII char (covers Unicode slash homoglyphs).
   for (let i = 0; i < raw.length; i++) {
     const code = raw.charCodeAt(i);
     if (code < 0x20 || code > 0x7e) return fallback;
   }
+
+  // T204 — pre-decode and traversal-check before regex. Traversal in either
+  // the raw OR the decoded form is fatal. Invalid percent-encoding is also
+  // fatal (`decodeURIComponent` throws on `%` not followed by two hex chars).
+  let decoded;
+  try {
+    decoded = decodeURIComponent(raw);
+  } catch {
+    return fallback;
+  }
+  if (containsTraversal(raw) || containsTraversal(decoded)) return fallback;
+
   if (!NEXT_RX.test(raw)) return fallback;
   return raw;
 }

@@ -505,7 +505,7 @@ function MessagesPageInner() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ conversation_id: selected, body }),
     });
-    const payload = await res.json().catch(() => ({}) as { message?: MessageRow });
+    const payload: unknown = await res.json().catch(() => ({}));
     if (!res.ok) {
       // Soft error — restore the draft so the user can edit or retry.
       setInput(body);
@@ -513,7 +513,13 @@ function MessagesPageInner() {
       return;
     }
     toast.success('Message sent.');
-    const data = (payload as { message?: MessageRow }).message;
+    // T162 — runtime shape guard before consuming the row.
+    const maybeMessage =
+      payload && typeof payload === 'object'
+        ? (payload as { message?: unknown }).message
+        : undefined;
+    const data: MessageRow | undefined =
+      maybeMessage && typeof maybeMessage === 'object' ? (maybeMessage as MessageRow) : undefined;
 
     if (data) {
       setMessages((prev) => [...prev, data]);
@@ -541,8 +547,14 @@ function MessagesPageInner() {
 
     const params = new URLSearchParams({ q: searchQuery.trim(), role: roleFilter });
     const res = await fetch(`/api/messages/search?${params.toString()}`);
-    const data = await res.json().catch(() => ({}) as { users?: SearchUser[] });
-    setSearchResults(res.ok ? (data as { users?: SearchUser[] }).users || [] : []);
+    const raw: unknown = await res.json().catch(() => ({}));
+    // T162 — runtime guard: only consume `users` when it's actually an
+    // array; anything else falls through to an empty result set.
+    const users =
+      raw && typeof raw === 'object' && Array.isArray((raw as { users?: unknown }).users)
+        ? (raw as { users: SearchUser[] }).users
+        : [];
+    setSearchResults(res.ok ? users : []);
     setSearching(false);
   };
 
@@ -578,16 +590,25 @@ function MessagesPageInner() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ other_user_id: otherUserId }),
     });
-    const json = await res
-      .json()
-      .catch(() => ({}) as { conversation?: { id?: string }; error?: string });
+    const json: unknown = await res.json().catch(() => ({}));
+    // T162 — guard the conversation/error fields before reading.
+    const isObj = json && typeof json === 'object';
     if (!res.ok) {
-      console.error('start conversation failed', (json as { error?: string }).error);
+      const errMsg =
+        isObj && typeof (json as { error?: unknown }).error === 'string'
+          ? (json as { error: string }).error
+          : undefined;
+      console.error('start conversation failed', errMsg);
       setShowSearch(false);
       return;
     }
-    const convoId: string | undefined = (json as { conversation?: { id?: string } }).conversation
-      ?.id;
+    const conversation = isObj ? (json as { conversation?: unknown }).conversation : undefined;
+    const convoId: string | undefined =
+      conversation &&
+      typeof conversation === 'object' &&
+      typeof (conversation as { id?: unknown }).id === 'string'
+        ? (conversation as { id: string }).id
+        : undefined;
     if (!convoId) {
       setShowSearch(false);
       return;

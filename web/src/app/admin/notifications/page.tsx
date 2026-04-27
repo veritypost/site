@@ -39,24 +39,8 @@ const COALESCING_CONFIG: ConfigItem[] = [
   { k: 'coalesce_achievements', l: 'Coalesce achievements', desc: 'Bundle multiple achievements in the same session' },
 ];
 const EMAIL_CONFIG: ConfigItem[] = [
-  { k: 'email_onboarding', l: 'Onboarding sequence', desc: 'Email series for new signups', num: 'onboard_emails', unit: 'emails' },
-  { k: 'email_reengagement', l: 'Re-engagement emails', desc: 'Win back inactive users after N days', num: 'reengage_day', unit: 'days' },
   { k: 'email_breaking', l: 'Breaking news email', desc: 'Email in addition to push for breaking articles' },
   { k: 'email_achievement', l: 'Achievement emails', desc: 'Email summary of achievements earned' },
-];
-
-const EMAIL_SEQUENCES = [
-  { name: 'Onboarding', status: 'active', emails: [
-    { day: 0, subject: 'Welcome to Verity Post', desc: 'Account setup and first-quiz encouragement' },
-    { day: 1, subject: 'Your first daily briefing', desc: 'Top articles, how to use the timeline' },
-    { day: 3, subject: 'Understanding the score', desc: 'How scoring works, tiers, achievements' },
-    { day: 5, subject: 'Join the discussion', desc: 'Comments, quiz gate, community culture' },
-    { day: 7, subject: "You're building a streak", desc: 'Streak status, reading stats so far' },
-  ]},
-  { name: 'Re-engagement', status: 'active', emails: [
-    { day: 30, subject: 'We miss you', desc: 'What you missed, top articles, streak recovery' },
-    { day: 37, subject: 'Your reading streak could restart', desc: 'Pick up where you left off' },
-  ]},
 ];
 
 const DEFAULT_TOGGLE_STATE: Record<string, boolean> = {
@@ -64,14 +48,13 @@ const DEFAULT_TOGGLE_STATE: Record<string, boolean> = {
   push_reply: true, push_upvote_milestone: false, push_context_pinned: true,
   coalesce_enabled: true, coalesce_upvotes: true,
   coalesce_replies: true, coalesce_achievements: false,
-  email_onboarding: true, email_reengagement: true,
   email_breaking: false, email_achievement: false,
 };
 
 const DEFAULT_NUMS: Record<string, number> = {
   upvote_m1: 10, upvote_m2: 25, upvote_m3: 50, upvote_m4: 100,
   coalesce_window: 5,
-  onboard_emails: 5, reengage_day: 30, digest_hour: 7,
+  digest_hour: 7,
   digest_stories: 5,
 };
 
@@ -81,7 +64,7 @@ function NotificationsInner() {
   const { push } = useToast();
 
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'push' | 'coalescing' | 'email' | 'sequences' | 'log'>('push');
+  const [tab, setTab] = useState<'push' | 'coalescing' | 'email' | 'log'>('push');
   const [config, setConfig] = useState<Record<string, boolean>>(DEFAULT_TOGGLE_STATE);
   const [nums, setNums] = useState<Record<string, number>>(DEFAULT_NUMS);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -233,7 +216,7 @@ function NotificationsInner() {
     <Page maxWidth={960}>
       <PageHeader
         title="Notifications & email"
-        subtitle="Push, email sequences, coalescing, and a broadcast sender."
+        subtitle="Push, email, coalescing, and a broadcast sender."
       />
 
       <div style={{ display: 'flex', gap: S[1], marginBottom: S[4], flexWrap: 'wrap' }}>
@@ -241,7 +224,6 @@ function NotificationsInner() {
           { k: 'push', l: 'Push' },
           { k: 'coalescing', l: 'Coalescing' },
           { k: 'email', l: 'Email' },
-          { k: 'sequences', l: 'Sequences' },
           { k: 'log', l: `Log (${notifications.length})` },
         ] as const).map((t) => (
           <Button
@@ -290,41 +272,6 @@ function NotificationsInner() {
 
       {tab === 'email' && (
         <ConfigGroup title="Email" items={EMAIL_CONFIG} config={config} nums={nums} onToggle={toggle} onNum={updateNum} setNums={setNums} />
-      )}
-
-      {tab === 'sequences' && (
-        <PageSection title="Email sequences">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: S[3] }}>
-            {EMAIL_SEQUENCES.map((seq) => (
-              <div key={seq.name} style={{
-                padding: S[4], borderRadius: 8,
-                background: C.bg, border: `1px solid ${C.divider}`,
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: S[3], gap: S[2], flexWrap: 'wrap' }}>
-                  <div>
-                    <div style={{ fontSize: F.md, fontWeight: 600 }}>{seq.name}</div>
-                    <div style={{ fontSize: F.xs, color: C.dim }}>{seq.emails.length} email{seq.emails.length > 1 ? 's' : ''}</div>
-                  </div>
-                  <Badge variant="success" size="xs">{seq.status}</Badge>
-                </div>
-                {seq.emails.map((email, i) => (
-                  <div key={i} style={{
-                    display: 'flex', gap: S[3], padding: `${S[2]}px 0`,
-                    borderTop: `1px solid ${C.divider}`,
-                  }}>
-                    <div style={{ width: 60, fontSize: F.xs, color: C.dim, fontWeight: 600, flexShrink: 0 }}>
-                      Day {email.day}
-                    </div>
-                    <div>
-                      <div style={{ fontSize: F.base, fontWeight: 500 }}>{email.subject}</div>
-                      <div style={{ fontSize: F.xs, color: C.muted }}>{email.desc}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        </PageSection>
       )}
 
       {tab === 'log' && (

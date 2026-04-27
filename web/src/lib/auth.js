@@ -14,6 +14,63 @@ async function resolveClient(client) {
 // cookie-scoped client path and adds a bearer branch in front of it,
 // so both auth styles resolve through the same requireAuth / requirePermission
 // pipeline.
+// T203 — defense-in-depth JWT signature pre-check on the bearer token before
+// it's handed to a Supabase client. The Supabase client itself calls
+// `auth.getUser()` against the GoTrue REST API, which performs server-side
+// signature verification — but that round-trip happens later in the flow,
+// after the client has already been instantiated and (in some paths) used to
+// add the bearer to outbound headers. Verifying locally with the project's
+// JWT secret rejects forged / expired tokens at the boundary, gives us a
+// crisp throw → 401 in `requireAuth`, and avoids one network round-trip on
+// hostile traffic. NOT a replacement for the GoTrue verification — it runs
+// in addition to it.
+//
+// Validates: signature (HS256 against SUPABASE_JWT_SECRET), `aud=authenticated`
+// when claim present, `iss` is the Supabase auth URL when claim present,
+// and the standard `exp`/`nbf` time bounds (jsonwebtoken handles these).
+function verifyBearerToken(token) {
+  // Lazy-require so missing env / module never breaks unrelated paths.
+  // jsonwebtoken is already in package.json deps.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, global-require
+  const jwt = require('jsonwebtoken');
+  const secret = process.env.SUPABASE_JWT_SECRET;
+  if (!secret) {
+    // No secret configured — surface as auth failure so we never silently
+    // accept an unverified bearer. Throw cleanly so requireAuth -> 401.
+    const err = new Error('UNAUTHENTICATED');
+    err.status = 401;
+    err.detail = 'SUPABASE_JWT_SECRET not configured';
+    throw err;
+  }
+  let decoded;
+  try {
+    decoded = jwt.verify(token, secret, { algorithms: ['HS256'] });
+  } catch (e) {
+    const err = new Error('UNAUTHENTICATED');
+    err.status = 401;
+    err.detail = e?.message || 'jwt verify failed';
+    throw err;
+  }
+  if (decoded && typeof decoded === 'object') {
+    if (decoded.aud && decoded.aud !== 'authenticated') {
+      const err = new Error('UNAUTHENTICATED');
+      err.status = 401;
+      err.detail = `unexpected aud=${decoded.aud}`;
+      throw err;
+    }
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    if (decoded.iss && supabaseUrl) {
+      const expectedIss = `${supabaseUrl.replace(/\/+$/, '')}/auth/v1`;
+      if (decoded.iss !== expectedIss) {
+        const err = new Error('UNAUTHENTICATED');
+        err.status = 401;
+        err.detail = `unexpected iss=${decoded.iss}`;
+        throw err;
+      }
+    }
+  }
+}
+
 async function resolveAuthedClient(client) {
   if (client) return client;
   try {
@@ -25,11 +82,20 @@ async function resolveAuthedClient(client) {
     if (authHeader.toLowerCase().startsWith('bearer ')) {
       const token = authHeader.slice(7).trim();
       if (token) {
+        // T203 — verify signature/aud/iss BEFORE passing the bearer to the
+        // Supabase client. Throws on invalid → propagates to requireAuth's
+        // catch path → clean 401.
+        verifyBearerToken(token);
         const mod = await import('./supabase/server');
         return mod.createClientFromToken(token);
       }
     }
-  } catch {}
+  } catch (err) {
+    // Re-throw signature failures so requireAuth surfaces a 401. Any other
+    // resolution error (missing next/headers, etc.) falls through to the
+    // cookie-scoped client.
+    if (err && err.status === 401) throw err;
+  }
   const mod = await import('./supabase/server');
   return mod.createClient();
 }

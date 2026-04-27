@@ -52,5 +52,18 @@ export async function GET(request) {
     if (!isSafeAdUrl(safeUnit.creative_url)) safeUnit = { ...safeUnit, creative_url: null };
     if (!isSafeAdUrl(safeUnit.click_url)) safeUnit = { ...safeUnit, click_url: null };
   }
-  return NextResponse.json({ ad_unit: safeUnit });
+  // T219 — Browser + edge caching for ad creative. Ad.jsx fetches this
+  // route on every article render; without Cache-Control the response
+  // is uncacheable and re-hits Supabase per article. Creative is fine
+  // to serve stale for ~5 minutes (admin-side edits don't need to land
+  // instantly), and stale-while-revalidate keeps perceived latency at
+  // zero for the first hour after that.
+  return NextResponse.json(
+    { ad_unit: safeUnit },
+    {
+      headers: {
+        'Cache-Control': 'max-age=300, stale-while-revalidate=3600',
+      },
+    }
+  );
 }

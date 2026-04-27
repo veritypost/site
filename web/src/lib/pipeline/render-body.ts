@@ -20,6 +20,12 @@
  * Inline styles, scripts, iframes, and event handlers are dropped.
  */
 
+// T223 — `sanitize-html` is a Node-native sanitizer (~50KB + parse5
+// transitive deps); pulling it into a client bundle would be pure
+// dead weight. `import 'server-only'` makes Next.js throw at build
+// time if any client component reaches this module.
+import 'server-only';
+
 import { marked } from 'marked';
 import sanitizeHtml from 'sanitize-html';
 

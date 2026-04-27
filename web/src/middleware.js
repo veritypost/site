@@ -87,6 +87,18 @@ function buildCsp(nonce) {
   })();
   const supabaseWss = supabaseOrigin ? supabaseOrigin.replace('https://', 'wss://') : '';
 
+  // T208 — POSTURE-NOTE. `'strict-dynamic'` lets nonce-trusted scripts load
+  // additional scripts (including Stripe's js.stripe.com bundle) without an
+  // explicit URL allowlist or SRI hash. Stripe does NOT publish stable SRI
+  // hashes for js.stripe.com — they ship rolling builds. Adding `integrity=`
+  // attributes would either pin a hash that Stripe rotates (breaks Checkout)
+  // or fall back to no integrity check (no benefit). Mitigation today:
+  //   - per-response nonce on every script
+  //   - `'strict-dynamic'` only trusts scripts loaded by nonced ones
+  //   - explicit script-src-elem allowlist for Stripe origin
+  //   - `frame-src` limited to Stripe domains
+  // Revisit if Stripe begins publishing pinned SRI hashes for js.stripe.com,
+  // or if we move Stripe Elements behind a self-hosted shim we control.
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://js.stripe.com`,
