@@ -7,6 +7,39 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (wave 11 — T55 migration drafted; mid-edit reversal recorded) — _pending push to git_
+
+Caught a wrong-direction error mid-edit and reversed before commit.
+
+### What happened
+
+Started shipping T55 by adding INSERT-into-`ai_prompt_preset_versions` calls to the prompt-presets PATCH and DELETE routes (the original audit's recommendation). Then re-checked the locked direction and found the actual decision was the OPPOSITE: **drop the orphan table**, because T242 (pipeline-run prompt snapshot) already captures live preset state into `pipeline_runs.input_params.prompt_snapshot` at every pipeline-run start (per CHANGELOG 2026-04-23 cluster T235+T242+T241). The two T55 directions had been carried in parallel — original audit said "use the table"; locked decision said "drop it" — and I jumped on the audit text without re-checking the lock first.
+
+### What I did
+
+1. **Reverted the route edits** via `git checkout HEAD -- 'web/src/app/api/admin/prompt-presets/[id]/route.ts'`. Nothing committed.
+2. **Drafted the drop migration** at `Ongoing Projects/migrations/2026-04-27_T55_drop_ai_prompt_preset_versions.sql`. Pre-flight DO-block refuses to drop if any rows present (defensive — verified 0 rows via MCP before drafting, but the guard catches the case where some other code path lands a row between drafting and applying). Owner applies.
+3. **Removed the T55 body** from TODO (the OPEN-section body that contradicted the lock). Skip-list entry updated to point at the new migration file.
+
+### Lesson
+
+For LOCKED items: re-read the locked decision text BEFORE writing code. The original audit body and the locked decision can diverge — the lock wins.
+
+### Skipped this wave (with reasons)
+
+- **T57** (Stripe price auto-mint): no `/api/admin/plans` POST route exists — the admin page inserts plan rows via direct supabase client. Implementing T57 cleanly requires either (a) building a POST route + refactoring the admin page UI to use it, or (b) adding a separate "Mint Stripe price" button + helper route. Both are bigger than a same-turn ship; queueing for a focused session.
+- **T27 iOS portion** (`SettingsView.swift:1887-2040`): the iOS toggles aren't safely-inert like the web ones — push delivery IS wired and these toggles MIGHT feed it. Needs a careful audit of `alert_preferences` + push-cron consumption before deletion.
+- **T348** (perm memo): architecture decision deferred.
+
+### Files
+
+- `Ongoing Projects/migrations/2026-04-27_T55_drop_ai_prompt_preset_versions.sql` (new draft)
+- `Ongoing Projects/TODO.md` (T55 body deleted; skip-list entry annotated)
+- `Ongoing Projects/CHANGELOG.md` (this entry)
+- `web/src/app/api/admin/prompt-presets/[id]/route.ts` reverted (no diff vs HEAD)
+
+---
+
 ## 2026-04-27 (wave 10 — T354 closed via MCP audit, T-EMAIL-PRUNE shipped, T27 web partial) — _shipped, pushed to git_ (commit 6a1a5e8)
 
 ### Closed via MCP verification (1)

@@ -78,7 +78,7 @@ Do not pick up these IDs autonomously. The owner has explicitly reserved them. I
 LOCKED, awaiting "go" to ship code/migration:
 - **T19** — simplify home (categories nav + feed + Browse + occasional hero/breaking). See T19 body for impl spec.
 - **T26** — RPC migration adding `comment_reply` + `comment_mention` notifications via `create_notification`. Scope locked (in_app + push only).
-- **T55** — drop `ai_prompt_preset_versions` orphan table (T242 snapshot covers audit/replay).
+- **T55** — drop `ai_prompt_preset_versions` orphan table (T242 snapshot covers audit/replay). _Migration drafted 2026-04-27 at `Ongoing Projects/migrations/2026-04-27_T55_drop_ai_prompt_preset_versions.sql` — pre-flight DO-block refuses to drop if any rows present. Owner applies._
 - **T57** — auto-mint Stripe price API on plan create (option B).
 
 DEFERRED (owner returning to it later — no decision yet):
@@ -514,11 +514,6 @@ The numbered items below retain their original section placement for readability
 **File:** `web/src/app/leaderboard/page.tsx` has data; no cron diffs ranks.
 **Fix:** Weekly cron diffs each user's rank vs 7 days ago. In-app notification (not push) for moves of 3+ spots, top-10 entry/exit. Cap at 1/week.
 **Recommendation:** **Don't push** — rank changes are check-in-worthy, not ping-worthy. In-app surface only.
-
-### T55 — `ai_prompt_preset_versions` table designed but never written by routes — **MEDIUM** (admin foot-gun)
-**File:** Schema `currentschema:258-273` defines the versions table; `web/src/app/api/admin/prompt-presets/route.ts:131-137` and `[id]/route.ts:173-180` overwrite the active row directly. `recordAdminAction()` provides audit trail forensics, not rollback.
-**Fix:** Insert into `ai_prompt_preset_versions` on every prompt edit before mutating the active row. Add `/admin/prompt-presets/[id]/history` page that shows prior versions and a "Restore" action.
-**Recommendation:** **Keep the table you already designed.** Admin-editable LLM prompts without rollback = ship-the-hostage scenario. Lowest-effort versioning: `INSERT INTO versions ... ; UPDATE active ...` in the same transaction.
 
 ### T57 — Stripe `stripe_price_id` set manually per plan row — **MEDIUM** (operational risk)
 **File:** `web/src/app/api/stripe/checkout/route.js:62-66` fails with `"plan ... has no stripe_price_id configured"` if missing; field is not in admin PATCH `ALLOWED_FIELDS` (`api/admin/plans/[id]/route.js:14-24`).
