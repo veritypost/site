@@ -7,7 +7,7 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
-## 2026-04-27 (autonomous-fix wave 4 — T312 + T316 partial + T359 + 7 migration drafts) — _pending push to git_
+## 2026-04-27 (autonomous-fix wave 4 — T312 + T316 partial + T359 + 7 migration drafts) — _shipped, pushed to git_ (commit c0580b2)
 
 Fourth execution wave on the sixth-pass audit set. Three code-shippable items closed end-to-end + seven SQL migration files drafted for owner apply.
 
