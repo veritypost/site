@@ -179,6 +179,10 @@ type UserRow = Pick<
   | 'show_on_leaderboard'
   | 'created_at'
   | 'onboarding_completed_at'
+  | 'cohort'
+  | 'cohort_joined_at'
+  | 'comped_until'
+  | 'verify_locked_at'
 >;
 type CategoryRow = Pick<Tables<'categories'>, 'id' | 'name' | 'is_kids_safe'>;
 type AlertPrefRow = Tables<'alert_preferences'>;
@@ -582,7 +586,7 @@ function SettingsInner(): ReactElement {
     const { data, error } = await supabase
       .from('users')
       .select(
-        'id, email, email_verified, username, display_name, bio, avatar_url, avatar_color, banner_url, metadata, deletion_scheduled_for, is_expert, expert_title, expert_organization, is_verified_public_figure, allow_messages, dm_read_receipts_enabled, profile_visibility, show_activity, show_on_leaderboard, created_at, onboarding_completed_at'
+        'id, email, email_verified, username, display_name, bio, avatar_url, avatar_color, banner_url, metadata, deletion_scheduled_for, is_expert, expert_title, expert_organization, is_verified_public_figure, allow_messages, dm_read_receipts_enabled, profile_visibility, show_activity, show_on_leaderboard, created_at, onboarding_completed_at, cohort, cohort_joined_at, comped_until, verify_locked_at'
       )
       .eq('id', userId)
       .maybeSingle();
