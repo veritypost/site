@@ -21,7 +21,15 @@ import jwt from 'jsonwebtoken';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 
-const TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days — kid re-pairs weekly
+// T301 — reduced from 7 days to 24 hours. The JWT minted on a successful
+// pair grants kid_profile_id + parent_user_id full-session access; a 7-day
+// window meant a leaked code (SMS, screenshot, screen-share) could be
+// replayed for a week before the kid re-pairs. 24h cuts the leak window
+// 7× without breaking common kid usage (a long reading session in one day
+// stays signed in; the next day re-pair takes ~10 seconds with the parent
+// device). Pairs with the kids-security follow-up (parent out-of-band
+// confirmation + first-pair alert) — that's a separate item.
+const TOKEN_TTL_SECONDS = 60 * 60 * 24; // 24 hours
 
 export async function POST(request) {
   try {

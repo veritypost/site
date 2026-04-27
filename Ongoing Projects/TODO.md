@@ -590,10 +590,6 @@ Items below already moved to Pre-Launch Assessment (Apple/Sentry/COPPA-CRITICAL)
 
 ### Security (T202-T214)
 
-#### T233 — Hard-delete on articles, no soft-delete window — **HIGH**
-**File:** `web/src/app/api/admin/articles/[id]/route.ts:762`. `.delete()` removes permanently; `recordAdminAction` writes BEFORE the mutation, so audit lands but the article is irrecoverable. Schema already has `articles.deleted_at` (unused).
-**Fix:** Soft-delete via `deleted_at`; write audit before mutation; cron purges after 30 days.
-
 ---
 
 **Cross-cutting pattern: bundling opportunities surfaced**
@@ -618,19 +614,17 @@ Source: `Ongoing Projects/2026-04-27_AUTH_PERMS_SYSTEM_MAP.md`. 4 parallel Explo
 **File:** RLS policy on `users` is row-level: `id=auth.uid() OR profile_visibility='public' OR is_admin_or_above()`. When `profile_visibility='public'`, the entire row is readable via PostgREST `from('users').select('*')` — including `email, plan_id, stripe_customer_id, comped_until, cohort, frozen_at`, all kill-switch flags.
 **Fix:** Either (a) SECURITY DEFINER view `public_profiles_v` with whitelisted columns + RLS-revoke direct SELECT on `users`, or (b) split into a `public_profile` view + private internal `users` table. T5 schema change — halt and queue migration for owner.
 
-#### T301 — Kid pair-code grants 7-day full-session impersonation if leaked — **CRITICAL** (kids security)
-**File:** `web/src/app/api/kids/pair/route.js:24` (`TOKEN_TTL_SECONDS = 60*60*24*7`); :136-150 mints JWT with `is_kid_delegated: true`. If pair code shared via SMS/Slack/screenshot leaks, attacker reads kid reading log, quiz attempts, sibling kid_profiles for 7 days.
-**Fix:** Reduce TTL (1h proposed) + require out-of-band parent confirmation in iOS app before JWT issues + alert parent on first device pair. Bundle with kids-security pass.
+#### T301 partial — Kids-security follow-up (parent confirmation + first-pair alert) — **HIGH** (kids security)
+**Status:** TTL reduced 7d → 24h shipped 2026-04-27 (`web/src/app/api/kids/pair/route.js:24`). Two follow-up defenses still pending:
+- Out-of-band parent confirmation in iOS app before JWT issues (kid types code → parent gets push to confirm BEFORE JWT mints).
+- Push notification to the parent on first device pair (so a leaked code surfaces instantly to the actual parent).
+**Fix:** Bundle with the broader kids-security pass; both require iOS-side coordination (`KidsAuth.swift` + push trigger) plus a server-side `kid_pair_confirmed` flag on the pending pair-code row.
 
 ### Auth/Billing flow — HIGH
 
 #### T303 — Leaderboard hardcoded `.eq('email_verified', true)` filters — **HIGH** (truth-in-UI)
 **File:** `web/src/app/leaderboard/page.tsx:207, 242, 327`. Three identical hardcoded filters that override the public `leaderboard.view` perm grant. Pro-unverified beta users see top-3-only.
 **Fix:** Drop all three filters (perm-driven only) OR consolidate via the same allowlist gate that compute_effective_perms uses. Owner decision required.
-
-#### T304 — Stripe + cohort double-billing risk — **HIGH** (revenue/CX)
-**File:** `web/src/app/api/stripe/checkout/route.js` (and `web/src/lib/stripe.js`). No pre-checkout guard against `cohort='beta' + plan_id=verity_pro_monthly + comped_until > now()`. A beta user who clicks Upgrade pays $9.99 Stripe-side; `sweep_beta_expirations` only modifies local state, never cancels upstream Stripe.
-**Fix:** Pre-checkout 409 if cohort-Pro-active. Bundle with billing-state-machine work.
 
 #### T308 — Admin manual-sync downgrade ignores `frozen_at` — **HIGH** (state coherence)
 **File:** `web/src/app/api/admin/subscriptions/[id]/manual-sync/route.js:100-150` (downgrade branch). Comment at line 32 says "we leave verity_score / frozen_at alone" — frozen user downgraded to free remains frozen-on-free, logically incoherent (no plan to be frozen against).
@@ -734,14 +728,6 @@ These aren't bugs with a file:line — they're architectural decisions, sequenci
 ### DB performance / ops debt — surfaced from external DB-perf review 2026-04-27
 
 Five items below come from a follow-on DB-perf review pass on the auth/perms system map. None launch-blocking; all real ops debt. (A 6th item from that review — `compute_effective_perms` request-scoped memoization — is already captured as T348; not duplicated here.)
-
-#### T352 — `audit_log` has no retention policy — **MEDIUM** (DEBT, GDPR)
-**Source:** DB-perf review (post-5th-pass) finding #39. The `audit_log` table grows unbounded — every admin action, signup, mod action appends a row, none are reaped. Compliance angle: GDPR data-minimization expects retention windows on audit data tied to identity.
-**Fix:** Define retention (90d? 1y? indefinitely with PII redacted after N days?), add a cron that prunes or anonymizes old rows. T5 schema work — halt and queue migration. Owner picks the retention window.
-
-#### T353 — `webhook_log` has no retention policy — **MEDIUM** (DEBT)
-**Source:** DB-perf review #40. `webhook_log.event_id` is the Stripe-idempotency key (per system map §9). Table grows unbounded. Idempotency only needs ~24h of recent events; older rows are dead weight slowing the UNIQUE-constraint check.
-**Fix:** Cron that deletes rows older than 30 days. Verify no dashboards / replays read older entries before pruning.
 
 #### T354 — `events` table needs partition-drop retention cron — **MEDIUM** (DEBT, perf)
 **Source:** DB-perf review #41. The `events` table is at 5,846 rows in last 7 days (per system map §16 analytics findings) — extrapolates to ~300k/yr. Without retention, query performance degrades as the table grows. Standard pattern: monthly partitions + drop partitions older than N months.

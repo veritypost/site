@@ -759,7 +759,28 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
     oldValue: { title: prior.title, slug: prior.slug, status: prior.status },
   });
 
-  const { error } = await service.from('articles').delete().eq('id', id);
+  // T233 — soft-delete via the admin_soft_delete_article RPC. Schema
+  // already has `articles.deleted_at`; the RPC sets it to now() (instead
+  // of permanent .delete()) and writes its own audit_log row with
+  // action='admin:article_soft_delete'. The 30-day purge cron
+  // (purge_soft_deleted_articles) hard-deletes rows past the window.
+  // The recordAdminAction above keeps the legacy 'article.delete' audit
+  // string for any tooling that filters on it; the RPC's audit row is
+  // the structurally-canonical record going forward.
+  //
+  // `as never` cast: the RPC was added by migration after the last
+  // database-types regen. Same pattern lib/trackServer.ts uses for the
+  // events table. Drop the cast on the next types regeneration.
+  const { error } = await (
+    service.rpc as unknown as (
+      name: string,
+      args: Record<string, unknown>
+    ) => Promise<{ error: { message?: string } | null }>
+  )('admin_soft_delete_article', {
+    p_article_id: id,
+    p_admin_id: actor.id,
+    p_reason: null,
+  });
   if (error) {
     console.error('[admin.articles.delete]', error.message);
     return NextResponse.json({ error: 'Could not delete article' }, { status: 500 });

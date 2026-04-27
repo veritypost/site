@@ -7,6 +7,42 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (autonomous wave 7 — Vercel hotfix + 5 quick-win fixes) — _pending push to git_
+
+### Hotfix (commit bab1c82, already pushed)
+
+Vercel deploy started failing at commit 855dcf3 with `Module not found: Can't resolve '@/components/family/AddKidUpsellModal'`. The file existed locally but was untracked (along with its bundled API route counterpart). Local TypeScript resolved fine because the files are on disk; Vercel's clone only sees tracked files. Earlier deploys reused build cache for `kids/page.tsx`; the T54 KPI reorder in 855dcf3 invalidated that cache and surfaced the missing modules.
+
+Committed 5 untracked files that belong to the Phase 6 family-seat work:
+- `web/src/components/family/AddKidUpsellModal.tsx`
+- `web/src/app/api/family/add-kid-with-seat/route.ts`
+- 2 Phase 6 SQL migrations + the AI+Plan Implementation STATUS.md
+
+### Wave 7 — autonomous fixes shipped this turn
+
+- **T301 partial — kid pair-code TTL reduced 7d → 24h.** `web/src/app/api/kids/pair/route.js:24`. The JWT minted on a successful pair grants `kid_profile_id` + `parent_user_id` full-session access; a 7-day window meant a leaked code (SMS, screenshot) could be replayed for a week. 24h cuts the leak window 7× without breaking common kid usage. The two remaining defenses (out-of-band parent confirmation + first-pair push alert) re-scoped under T301 partial; bundled with the broader kids-security pass.
+
+- **T304 — Stripe + cohort double-billing pre-checkout guard shipped.** `web/src/app/api/stripe/checkout/route.js`. Added `cohort` + `comped_until` to the user-row select; refuses 409 with structured `beta_comp_active` reason + `comped_until` timestamp if the user is already on a comped beta window. Without this guard, a beta user who clicked Upgrade paid Stripe-side while `sweep_beta_expirations` never cancelled the upstream sub — double-billing on resume.
+
+- **T233 — articles delete now uses `admin_soft_delete_article` RPC.** `web/src/app/api/admin/articles/[id]/route.ts:762`. Replaced `service.from('articles').delete().eq('id', id)` with the SECURITY DEFINER soft-delete RPC. Articles get `deleted_at = now()` instead of hard-tombstone; the 30-day `purge_soft_deleted_articles` cron RPC hard-deletes after the window. Existing `recordAdminAction` audit-write preserved for legacy `action='article.delete'` consumers; the RPC writes its own `action='admin:article_soft_delete'` row alongside. Cast through `service.rpc as unknown as ...` because the RPC was added by migration after the last database-types regen — same pattern lib/trackServer.ts uses for the events table.
+
+- **T352 — audit_log retention crons registered.** Two new routes:
+  - `web/src/app/api/cron/anonymize-audit-log-pii/route.js` — calls `anonymize_audit_log_pii()`. Schedule: `30 3 * * *` (nightly).
+  - `web/src/app/api/cron/purge-audit-log/route.js` — calls `purge_audit_log()`. Schedule: `35 3 * * *` (nightly).
+  - `web/vercel.json` updated with both schedules.
+
+- **T353 — webhook_log retention cron registered.** `web/src/app/api/cron/purge-webhook-log/route.js`. Calls `purge_webhook_log()`. Schedule: `0 4 * * *` (daily). Stripe-idempotency only needs ~24h of recent events; the 30-day window is the safety margin.
+
+### Bookkeeping
+
+- TODO closures: T233 + T304 + T352 + T353 bodies deleted. T301 body re-scoped to "kids-security follow-up" since the TTL piece shipped.
+- TypeScript: 13 pre-existing errors unchanged.
+- Vercel cron registry now lists 18 jobs (was 15) — the 3 new audit/webhook retention crons are live as of this push.
+
+- **Files** — `web/src/app/api/kids/pair/route.js` (T301), `web/src/app/api/stripe/checkout/route.js` (T304), `web/src/app/api/admin/articles/[id]/route.ts` (T233), 3 new cron route files, `web/vercel.json` (3 schedule entries), `Ongoing Projects/TODO.md`, `Ongoing Projects/CHANGELOG.md`.
+
+---
+
 ## 2026-04-27 (corrected migrations applied — T319 + T352 idx + T362 verified live; T307 final half wired) — _shipped, pushed to git_ (commit 4e42bc2)
 
 Owner applied the 3 corrected migration files. MCP verified all three landed:

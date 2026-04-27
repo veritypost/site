@@ -68,9 +68,29 @@ export async function POST(request) {
 
   const { data: me } = await service
     .from('users')
-    .select('id, stripe_customer_id, email')
+    .select('id, stripe_customer_id, email, cohort, comped_until')
     .eq('id', user.id)
     .maybeSingle();
+
+  // T304 — refuse to mint a new Stripe checkout session for a user who is
+  // already on a comped beta-cohort window. Without this guard, a beta
+  // user with active `comped_until` who clicks Upgrade pays for a Stripe
+  // subscription on top of their free comp — and `sweep_beta_expirations`
+  // only mutates local state at end-of-comp, never cancels the upstream
+  // Stripe sub. The user ends up double-billed on resume. Returns 409 +
+  // a structured reason so the client can surface "you're already on a
+  // beta comp until X — upgrade after it ends."
+  if (me?.cohort === 'beta' && me?.comped_until && new Date(me.comped_until) > new Date()) {
+    return NextResponse.json(
+      {
+        error: 'beta_comp_active',
+        comped_until: me.comped_until,
+        message:
+          "You're on the beta cohort until your comp expires; upgrades are paused until then.",
+      },
+      { status: 409 }
+    );
+  }
 
   const origin = request.nextUrl.origin;
   try {

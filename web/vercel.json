@@ -59,6 +59,18 @@
     {
       "path": "/api/cron/pro-grandfather-notify",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/anonymize-audit-log-pii",
+      "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron/purge-audit-log",
+      "schedule": "35 3 * * *"
+    },
+    {
+      "path": "/api/cron/purge-webhook-log",
+      "schedule": "0 4 * * *"
     }
   ]
 }
