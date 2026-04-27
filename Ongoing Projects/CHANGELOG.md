@@ -7,6 +7,101 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (Phase 2 — plan structure rewrite, code shipped + migration staged) — _code shipped; migration staged for owner SQL editor apply_
+
+### Context
+
+Phase 2 of the AI + Plan Change Implementation roadmap. Decisions locked 2026-04-26:
+- Verity solo: $7.99/mo, $79.99/yr
+- Verity Family: $14.99/mo with 1 kid included; +$4.99/mo per extra kid up to 4 (Family annual: $149.99/yr; +$49.99/yr per extra kid)
+- Verity Pro retired: existing subs grandfather (auto-migrate to Verity at next renewal — Option B)
+- Verity Family XL retired permanently — per-kid model replaces it
+
+Subscriptions table has zero rows pre-migration (clean slate).
+
+### Cluster — DB migration staged
+
+`Ongoing Projects/migrations/2026-04-27_phase2_plan_structure_rewrite.sql`:
+- Update `verity_monthly` price_cents 399 → 799; `verity_annual` 3999 → 7999.
+- Update `verity_family_monthly` price_cents 1499 (unchanged) + metadata: `included_kids=1, max_kids=4, extra_kid_price_cents=499, max_total_seats=6`. `max_family_members` set to 6.
+- Insert `verity_family_annual` plan ($149.99/yr, same metadata + `is_annual=true`, `extra_kid_price_cents=4999` for annual).
+- Mark `verity_pro_monthly` + `verity_pro_annual` `is_active=false, is_visible=false` (grandfather behavior — existing subs keep working until renewal cron migrates them).
+- Mark any `verity_family_xl` rows `is_active=false, is_visible=false` (defensive — no rows seeded today, but lock anyway).
+- `ALTER TABLE subscriptions ADD COLUMN kid_seats_paid integer NOT NULL DEFAULT 1` with check 0..4.
+- `ALTER TABLE subscriptions ADD COLUMN platform text NOT NULL DEFAULT 'stripe'` with check (stripe|apple|google).
+- `ALTER TABLE subscriptions ADD COLUMN next_renewal_at timestamptz` + partial index.
+- Seed permissions: `family.seats.manage`, `family.kids.manage` (both surface=profile, deny_mode=allow_unless_blocked).
+
+### Cluster — server endpoints
+
+- **`web/src/app/api/family/config/route.js`** — DEFAULTS rewritten. Drops `verity_family_xl: 4` (retired permanently). Adds `included_kids`, `max_total_seats`, `extra_kid_price_cents` to defaults + response. Plans query narrowed to `tier='verity_family' AND is_active=true`. Response now includes the four metadata fields the iOS+web seat UI needs.
+- **`web/src/app/api/kids/route.js` POST** — pre-flight kid seat enforcement. Reads `kid_profiles` count + active subscription's `kid_seats_paid + plan metadata`. Returns 400 with `code='kid_cap_reached'` over `max_kids`; returns 402 with `code='kid_seat_required' + extra_kid_price_cents` when over paid seats (lets the client surface the per-kid upsell). Non-fatal on errors (transient DB issues don't block create; reconciliation cron catches drift).
+- **`web/src/app/api/kids/[id]/route.js` PATCH** — `date_of_birth` removed from `allowed[]` array; explicit 400 with `code='dob_locked'` if a client still posts it. Phase 4 builds the request-form path; this commit just locks down the direct edit per the Phase 2 decisions.
+- **`web/src/app/api/family/seats/route.ts` (NEW)** — GET returns full seat state (used, paid, included, max_kids, max_total_seats, extra_kid_price_cents, platform, has_active_family_sub). POST sets paid count with rate limit (10/60s), platform-conflict guard (Apple/Google subs redirected to platform-native edit), orphan-kids guard (can't reduce below active kid count). Audit log entry on every change. Permission: `family.seats.manage`.
+- **`web/src/app/api/stripe/webhook/route.js`** — `handleSubscriptionUpdated` extracts `kid_seats_paid` from subscription items by reading `price.metadata.seat_role` (`extra_kid` quantity → +N extras on top of the base 1 included). Persists `kid_seats_paid + platform='stripe' + stripe_subscription_id` on every webhook delivery. Best-effort — surrounding plan change handlers continue to do the canonical write.
+
+### Cluster — iOS
+
+- **`VerityPost/VerityPost/StoreManager.swift`** — full SKU lineup rewrite:
+  - Verity solo (monthly + annual) — same product IDs, repriced.
+  - Family tiered subscription group: 8 product IDs across 4 kid counts (1-4) × 2 billing periods.
+  - Pro IDs retained as `legacy*` constants for grandfather-detection only; no longer queried from App Store on launch.
+  - `priceCentsForProduct` updated to Phase 2 numbers.
+  - `planName(productID)` collapses Family-tiered SKUs to `verity_family`; Pro grandfathers as `verity_pro`.
+  - New `kidSeatsForProduct(productID)` extracts kid count from SKU.
+  - New `familyProductID(kidCount, period)` computes the SKU for a (count, period) pair — used by FamilyViews seat upgrade flow.
+  - `hasAccess(feature)` updated: ad-free / streak-freeze / Ask-an-Expert now ship with any paid plan (Verity solo OR Family) since Pro tier retired.
+- **`VerityPost/VerityPost/SubscriptionView.swift`** — paywall rewritten to 3 plan cards (Free / Verity / Family), drops Pro and XL cards. Pricing copy updated to $7.99 / $14.99. Family card highlights "1 kid included; add up to 3 more for $4.99/mo each." Apple Review 3.1.2 disclosure block updated to match new lineup.
+
+### Verification
+
+- `npx tsc --noEmit` clean.
+- `grep -rln "verity_family_xl|familyXl"` web/src returns zero matches in live code (one comment-only mention in StoreManager).
+- ESLint + Prettier via husky hook clean.
+
+### Files touched (8 + 1 new + 1 migration file)
+
+- NEW: `web/src/app/api/family/seats/route.ts`
+- `web/src/app/api/family/config/route.js`
+- `web/src/app/api/kids/route.js`
+- `web/src/app/api/kids/[id]/route.js`
+- `web/src/app/api/stripe/webhook/route.js`
+- `VerityPost/VerityPost/StoreManager.swift`
+- `VerityPost/VerityPost/SubscriptionView.swift`
+- NEW: `Ongoing Projects/migrations/2026-04-27_phase2_plan_structure_rewrite.sql`
+
+### Owner action items
+
+1. **Apple SBP enrollment.** Apply for Apple Small Business Program in App Store Connect to lock in 15% commission from launch.
+2. **Apple SKUs.** Create 10 product IDs in App Store Connect under one subscription group `Verity Subscriptions`:
+   - `com.veritypost.verity.monthly` ($7.99/mo)
+   - `com.veritypost.verity.annual` ($79.99/yr)
+   - `com.veritypost.family.1kid.monthly` ($14.99/mo)
+   - `com.veritypost.family.2kids.monthly` ($19.98/mo)
+   - `com.veritypost.family.3kids.monthly` ($24.97/mo)
+   - `com.veritypost.family.4kids.monthly` ($29.96/mo)
+   - `com.veritypost.family.1kid.annual` ($149.99/yr)
+   - `com.veritypost.family.2kids.annual` ($199.98/yr)
+   - `com.veritypost.family.3kids.annual` ($249.97/yr)
+   - `com.veritypost.family.4kids.annual` ($299.96/yr)
+3. **Stripe products.** Create 4 products + 6 prices in Stripe Dashboard:
+   - Verity (monthly $7.99, annual $79.99)
+   - Verity Family Base (monthly $14.99, annual $149.99) — metadata `seat_role: family_base`
+   - Verity Family Extra Kid (monthly $4.99, annual $49.99) — metadata `seat_role: extra_kid`
+   - Plus AdSense and AdMob applications.
+4. **Apply migration.** Paste `2026-04-27_phase2_plan_structure_rewrite.sql` into Supabase SQL editor.
+5. **Regenerate types.** `npm run types:gen` after migration so `kid_seats_paid` + `platform` + `next_renewal_at` columns appear in `web/src/types/database.ts` and the `as never` cast in `family/seats/route.ts` can be dropped.
+6. **Pro grandfather migration cron.** Phase 6 ships the cron that auto-migrates Pro subs at next renewal. Until then, existing Pro subs continue billing at their original rates.
+
+### What this DOESN'T do (deferred)
+
+- **AdSense + AdMob integration** — Phase 6 (after launch). Free-tier metered paywall is also still pending.
+- **Stripe Customer Portal allow-list configuration** — owner decides whitelist (currently disabled for plan changes per planning doc).
+- **iOS FamilyViews seat upgrade UI** — wires `StoreManager.familyProductID(...)` + StoreKit upgrade flow + `/api/family/seats` POST. Lands in Phase 5/6.
+- **Pro grandfather migration emails + cron** — Phase 6.
+
+---
+
 ## 2026-04-27 (Phase 1 — kid_articles consolidation, code shipped + migration staged) — _code shipped + pushed; migration file staged for owner SQL editor apply_
 
 ### Context

@@ -26,16 +26,25 @@ extension Notification.Name {
 
 /// StoreKit 2 subscription manager.
 ///
-/// Product IDs match the 8 v2 tiers (D10 / D34 / D42):
-///   Verity        — 3.99 / 39.99
-///   Verity Pro    — 9.99 / 99.99
-///   Verity Family — 14.99 / 149.99
-///   Verity Family XL — 19.99 / 199.99
+/// Phase 2 of AI + Plan Change Implementation locks the SKU lineup:
+///   Verity        — 7.99 / 79.99
+///   Verity Family — 14.99 / 149.99 (1 kid included)
+///     + per-additional-kid tiers:
+///       2 kids  — 19.98 / 199.98
+///       3 kids  — 24.97 / 249.97
+///       4 kids  — 29.96 / 299.96
 ///
-/// These IDs must match what's configured in App Store Connect. Purchases
-/// are synced to /api/ios/subscriptions/sync which updates users.plan_id
-/// (via plans.tier lookup) + users.plan_status + subscriptions rows;
-/// StoreKit remains the authority for entitlement state on device.
+/// Pro and Family XL are retired. Pro subs grandfather server-side via
+/// auto-migrate at next renewal (Option B). Family XL was never seeded
+/// in DB and is dropped permanently — per-kid model replaces it.
+///
+/// Family is implemented as a tiered subscription group with one SKU per
+/// kid count (1-4). Adding/removing a kid triggers an in-group SKU swap;
+/// Apple handles proration. Web mirrors this via Stripe quantity-based
+/// subscription_items.
+///
+/// Purchases are synced to /api/ios/subscriptions/sync which updates
+/// users.plan_id + users.plan_status + subscriptions rows.
 @MainActor
 final class StoreManager: ObservableObject {
     static let shared = StoreManager()
@@ -45,42 +54,66 @@ final class StoreManager: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
 
-    // MARK: - Product IDs
+    // MARK: - Product IDs (Phase 2: Verity solo + 8 Family-tier SKUs)
 
     static let verityMonthly       = "com.veritypost.verity.monthly"
     static let verityAnnual        = "com.veritypost.verity.annual"
-    static let verityProMonthly    = "com.veritypost.verity_pro.monthly"
-    static let verityProAnnual     = "com.veritypost.verity_pro.annual"
-    static let familyMonthly       = "com.veritypost.verity_family.monthly"
-    static let familyAnnual        = "com.veritypost.verity_family.annual"
-    static let familyXlMonthly     = "com.veritypost.verity_family_xl.monthly"
-    static let familyXlAnnual      = "com.veritypost.verity_family_xl.annual"
+
+    // Family base SKU — 1 kid included.
+    static let familyMonthly1Kid   = "com.veritypost.family.1kid.monthly"
+    static let familyAnnual1Kid    = "com.veritypost.family.1kid.annual"
+    // Family with 2 kids — base + 1 extra-seat add-on.
+    static let familyMonthly2Kids  = "com.veritypost.family.2kids.monthly"
+    static let familyAnnual2Kids   = "com.veritypost.family.2kids.annual"
+    // Family with 3 kids — base + 2 extra-seat add-ons.
+    static let familyMonthly3Kids  = "com.veritypost.family.3kids.monthly"
+    static let familyAnnual3Kids   = "com.veritypost.family.3kids.annual"
+    // Family with 4 kids (cap) — base + 3 extra-seat add-ons.
+    static let familyMonthly4Kids  = "com.veritypost.family.4kids.monthly"
+    static let familyAnnual4Kids   = "com.veritypost.family.4kids.annual"
+
+    // Legacy Pro IDs retained as constants ONLY for grandfather-detection
+    // in `tierFromProductID` — no longer in `productIDs` so Product.products()
+    // never asks the App Store about them. Existing Pro receipts coming
+    // back via Transaction.updates still resolve to a 'verity' tier post-
+    // grandfather (the server cron migrates them at next renewal).
+    static let legacyVerityProMonthly = "com.veritypost.verity_pro.monthly"
+    static let legacyVerityProAnnual  = "com.veritypost.verity_pro.annual"
+
+    // Legacy single-tier Family IDs from before Phase 2's tiered SKU group.
+    // Same handling — kept for in-flight receipt resolution; not loaded
+    // from App Store on launch.
+    static let legacyFamilyMonthly = "com.veritypost.verity_family.monthly"
+    static let legacyFamilyAnnual  = "com.veritypost.verity_family.annual"
 
     private let productIDs: Set<String> = [
         StoreManager.verityMonthly, StoreManager.verityAnnual,
-        StoreManager.verityProMonthly, StoreManager.verityProAnnual,
-        StoreManager.familyMonthly, StoreManager.familyAnnual,
-        StoreManager.familyXlMonthly, StoreManager.familyXlAnnual
+        StoreManager.familyMonthly1Kid, StoreManager.familyAnnual1Kid,
+        StoreManager.familyMonthly2Kids, StoreManager.familyAnnual2Kids,
+        StoreManager.familyMonthly3Kids, StoreManager.familyAnnual3Kids,
+        StoreManager.familyMonthly4Kids, StoreManager.familyAnnual4Kids
     ]
 
     /// Display order for the paywall.
     private let sortOrder: [String: Int] = [
         "com.veritypost.verity.monthly": 0,
         "com.veritypost.verity.annual": 1,
-        "com.veritypost.verity_pro.monthly": 2,
-        "com.veritypost.verity_pro.annual": 3,
-        "com.veritypost.verity_family.monthly": 4,
-        "com.veritypost.verity_family.annual": 5,
-        "com.veritypost.verity_family_xl.monthly": 6,
-        "com.veritypost.verity_family_xl.annual": 7
+        "com.veritypost.family.1kid.monthly": 2,
+        "com.veritypost.family.1kid.annual": 3,
+        "com.veritypost.family.2kids.monthly": 4,
+        "com.veritypost.family.2kids.annual": 5,
+        "com.veritypost.family.3kids.monthly": 6,
+        "com.veritypost.family.3kids.annual": 7,
+        "com.veritypost.family.4kids.monthly": 8,
+        "com.veritypost.family.4kids.annual": 9
     ]
 
     /// Plan priority for picking the "highest" active entitlement.
-    /// Family XL > Family > Verity Pro > Verity.
+    /// Family > Verity. Pro grandfathers as Verity (priority 1) per
+    /// Phase 2 Option B; the auto-migrate cron flips renewal to Verity.
     private let planPriority: [String: Int] = [
-        "verity_family_xl": 4,
         "verity_family": 3,
-        "verity_pro": 2,
+        "verity_pro": 1,   // grandfathered — same priority as Verity
         "verity": 1
     ]
 
@@ -346,13 +379,39 @@ final class StoreManager: ObservableObject {
         }
     }
 
-    /// Map a StoreKit product ID to the v2 `users.plan` string.
+    /// Map a StoreKit product ID to the `users.plan` string.
+    /// Phase 2 lineup: verity, verity_family. Pro grandfathers as
+    /// 'verity_pro' so the server-side migration cron can detect + flip.
     func planName(for productID: String) -> String {
-        if productID.contains("verity_family_xl") { return "verity_family_xl" }
-        if productID.contains("verity_family") { return "verity_family" }
+        if productID.contains(".family.") || productID.contains("verity_family") {
+            return "verity_family"
+        }
         if productID.contains("verity_pro") { return "verity_pro" }
         if productID.contains("verity") { return "verity" }
         return "free"
+    }
+
+    /// How many kid seats does this Family SKU correspond to?
+    /// Returns 0 for non-Family SKUs.
+    func kidSeatsForProduct(_ productID: String) -> Int {
+        if productID.contains(".1kid.") { return 1 }
+        if productID.contains(".2kids.") { return 2 }
+        if productID.contains(".3kids.") { return 3 }
+        if productID.contains(".4kids.") { return 4 }
+        // Legacy single-tier Family pre-Phase-2 — treat as 1 kid.
+        if productID == Self.legacyFamilyMonthly || productID == Self.legacyFamilyAnnual {
+            return 1
+        }
+        return 0
+    }
+
+    /// Compute the Family SKU for a given (kidCount, period) pair.
+    /// Used by the seat-management UI to upgrade/downgrade within the
+    /// subscription group.
+    func familyProductID(kidCount: Int, period: String) -> String? {
+        let n = max(1, min(4, kidCount))
+        let suffix = period == "annual" ? "annual" : "monthly"
+        return "com.veritypost.family.\(n)kid\(n == 1 ? "" : "s").\(suffix)"
     }
 
     func billingCycle(for productID: String) -> String {
@@ -360,17 +419,24 @@ final class StoreManager: ObservableObject {
     }
 
     /// Approximate fallback — the real price always comes from Product.price
-    /// at purchase/restore time. Numbers match D42 pricing.
+    /// at purchase/restore time. Numbers match Phase 2 pricing.
     private func priceCentsForProduct(_ productID: String) -> Int {
         switch productID {
-        case Self.verityMonthly: return 399
-        case Self.verityAnnual: return 3999
-        case Self.verityProMonthly: return 999
-        case Self.verityProAnnual: return 9999
-        case Self.familyMonthly: return 1499
-        case Self.familyAnnual: return 14999
-        case Self.familyXlMonthly: return 1999
-        case Self.familyXlAnnual: return 19999
+        case Self.verityMonthly: return 799
+        case Self.verityAnnual: return 7999
+        case Self.familyMonthly1Kid: return 1499
+        case Self.familyAnnual1Kid: return 14999
+        case Self.familyMonthly2Kids: return 1998
+        case Self.familyAnnual2Kids: return 19998
+        case Self.familyMonthly3Kids: return 2497
+        case Self.familyAnnual3Kids: return 24997
+        case Self.familyMonthly4Kids: return 2996
+        case Self.familyAnnual4Kids: return 29996
+        // Legacy fallbacks for in-flight grandfathered receipts
+        case Self.legacyVerityProMonthly: return 999
+        case Self.legacyVerityProAnnual: return 9999
+        case Self.legacyFamilyMonthly: return 1499
+        case Self.legacyFamilyAnnual: return 14999
         default: return 0
         }
     }
@@ -406,10 +472,12 @@ final class StoreManager: ObservableObject {
              "profile_banner", "profile_card":
             return isPaid
         case "ask_expert", "streak_freeze", "ad_free":
-            // Verity Pro and above.
+            // Phase 2 retired Pro tier. These features now travel with
+            // any paid plan (Verity solo or Family). Grandfathered Pro
+            // subs continue resolving through the legacy product IDs.
             for pid in purchasedProductIDs {
                 let plan = planName(for: pid)
-                if ["verity_pro", "verity_family", "verity_family_xl"].contains(plan) {
+                if ["verity", "verity_pro", "verity_family"].contains(plan) {
                     return true
                 }
             }
@@ -417,7 +485,7 @@ final class StoreManager: ObservableObject {
         case "kids_profiles", "family_leaderboard":
             for pid in purchasedProductIDs {
                 let plan = planName(for: pid)
-                if ["verity_family", "verity_family_xl"].contains(plan) { return true }
+                if plan == "verity_family" { return true }
             }
             return false
         default:

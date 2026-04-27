@@ -18,8 +18,16 @@ import { getSettings } from '@/lib/settings';
 
 // Hardcoded fallbacks — match the values FamilyViews.swift used pre-
 // extraction. Both surfaces use these if their respective lookups fail.
+//
+// Phase 2 of AI + Plan Change Implementation locked these values:
+//   - verity_family includes 1 kid; up to 4 kids total via per-kid add-on
+//   - verity_family_xl is retired permanently (per-kid model replaces it)
+//   - extra_kid_price_cents is the per-additional-kid monthly add-on
 const DEFAULTS = {
-  max_kids: { verity_family: 2, verity_family_xl: 4 },
+  max_kids: { verity_family: 4 },
+  included_kids: { verity_family: 1 },
+  max_total_seats: { verity_family: 6 },
+  extra_kid_price_cents: { verity_family: 499 },
   coppa_consent_version: '2026-04-15-v1',
   reading_levels: [
     { value: 'pre-reader', label: 'Pre-reader' },
@@ -38,18 +46,29 @@ export async function GET() {
 
   const service = createServiceClient();
 
-  // max_kids: read from plans.metadata->>'max_kids' for the family tiers
-  // when present. Falls back to DEFAULTS when the metadata key isn't set.
+  // max_kids / included_kids / max_total_seats / extra_kid_price_cents:
+  // read from plans.metadata for the verity_family tier. Falls back to
+  // DEFAULTS when missing.
   const maxKids = { ...DEFAULTS.max_kids };
+  const includedKids = { ...DEFAULTS.included_kids };
+  const maxTotalSeats = { ...DEFAULTS.max_total_seats };
+  const extraKidPriceCents = { ...DEFAULTS.extra_kid_price_cents };
   try {
     const { data: plans } = await service
       .from('plans')
       .select('tier, metadata')
-      .in('tier', ['verity_family', 'verity_family_xl']);
+      .eq('tier', 'verity_family')
+      .eq('is_active', true);
     for (const p of plans || []) {
-      const fromMeta = p.metadata?.max_kids;
-      const n = typeof fromMeta === 'number' ? fromMeta : Number(fromMeta);
-      if (Number.isFinite(n) && n > 0) maxKids[p.tier] = n;
+      const m = p.metadata || {};
+      const max = typeof m.max_kids === 'number' ? m.max_kids : Number(m.max_kids);
+      const inc = typeof m.included_kids === 'number' ? m.included_kids : Number(m.included_kids);
+      const seats = typeof m.max_total_seats === 'number' ? m.max_total_seats : Number(m.max_total_seats);
+      const price = typeof m.extra_kid_price_cents === 'number' ? m.extra_kid_price_cents : Number(m.extra_kid_price_cents);
+      if (Number.isFinite(max) && max > 0) maxKids[p.tier] = max;
+      if (Number.isFinite(inc) && inc >= 0) includedKids[p.tier] = inc;
+      if (Number.isFinite(seats) && seats > 0) maxTotalSeats[p.tier] = seats;
+      if (Number.isFinite(price) && price >= 0) extraKidPriceCents[p.tier] = price;
     }
   } catch (err) {
     console.error('[family.config] plans fetch failed:', err?.message || err);
@@ -82,6 +101,9 @@ export async function GET() {
   return NextResponse.json(
     {
       max_kids: maxKids,
+      included_kids: includedKids,
+      max_total_seats: maxTotalSeats,
+      extra_kid_price_cents: extraKidPriceCents,
       coppa_consent_version: coppaConsentVersion,
       reading_levels: readingLevels,
     },

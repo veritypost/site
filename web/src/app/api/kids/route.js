@@ -90,6 +90,60 @@ export async function POST(request) {
     pinCred = await buildPbkdf2Credential(b.pin);
   }
 
+  const service = createServiceClient();
+
+  // Phase 2 of AI + Plan Change Implementation: enforce kid seat budget.
+  // Family plan provides `included_kids` baseline + paid extras (tracked
+  // on subscriptions.kid_seats_paid). Reject create if at the cap with a
+  // 402 so the client can surface the per-kid upsell ($4.99/mo).
+  try {
+    const [{ count: activeKidCount }, subRes] = await Promise.all([
+      service
+        .from('kid_profiles')
+        .select('id', { count: 'exact', head: true })
+        .eq('parent_user_id', user.id)
+        .eq('is_active', true),
+      service
+        .from('subscriptions')
+        .select('kid_seats_paid, status, plan_id, plans!inner(tier, metadata)')
+        .eq('user_id', user.id)
+        .in('status', ['active', 'trialing'])
+        .maybeSingle(),
+    ]);
+    const seatsPaid = subRes?.data?.kid_seats_paid ?? 1;
+    const planMeta = (subRes?.data?.plans?.metadata ?? {});
+    const maxKids = Number(planMeta.max_kids) || 4;
+    const extraKidPriceCents = Number(planMeta.extra_kid_price_cents) || 499;
+    const next = (activeKidCount ?? 0) + 1;
+    if (next > maxKids) {
+      return NextResponse.json(
+        {
+          error: `Plan limit reached: up to ${maxKids} kid profiles per family.`,
+          code: 'kid_cap_reached',
+          max_kids: maxKids,
+        },
+        { status: 400 }
+      );
+    }
+    if (next > seatsPaid) {
+      return NextResponse.json(
+        {
+          error: `Adding this kid increases your subscription by $${(extraKidPriceCents / 100).toFixed(2)}/mo. Confirm seat purchase before retrying.`,
+          code: 'kid_seat_required',
+          current_kid_count: activeKidCount ?? 0,
+          kid_seats_paid: seatsPaid,
+          extra_kid_price_cents: extraKidPriceCents,
+        },
+        { status: 402 }
+      );
+    }
+  } catch (err) {
+    // Non-fatal: don't block create on a transient seat-check error,
+    // but log for observability. The webhook reconciliation cron will
+    // catch any over-quota write retroactively.
+    console.error('[kids.seat_check]', err?.message || err);
+  }
+
   const nowIso = now.toISOString();
   const consentMetadata = {
     coppa_consent: {
@@ -100,7 +154,6 @@ export async function POST(request) {
     },
   };
 
-  const service = createServiceClient();
   const { data, error } = await service
     .from('kid_profiles')
     .insert({

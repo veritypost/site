@@ -492,6 +492,56 @@ async function handleSubscriptionUpdated(service, sub) {
   const { userRow, planRow } = await lookupUserAndPlan(service, customerId, priceId);
   if (!userRow) throw new Error(`no user for customer=${customerId}`);
 
+  // Phase 2 of AI + Plan Change Implementation: Family subs use a base
+  // item + an "extra kid seat" item with quantity-based billing. Compute
+  // kid_seats_paid = 1 (the included kid in base) + quantity of any item
+  // whose price metadata flags it as the extra-kid line. Cap at 4.
+  let kidSeatsPaid = null;
+  try {
+    const items = sub.items?.data ?? [];
+    let extras = 0;
+    let hasFamilyBase = false;
+    for (const it of items) {
+      const meta = it?.price?.metadata || it?.price?.product?.metadata || {};
+      const role = (meta.seat_role || meta.role || '').toLowerCase();
+      if (role === 'extra_kid' || role === 'kid_seat') {
+        extras += Math.max(0, Number(it.quantity) || 0);
+      } else if (role === 'family_base') {
+        hasFamilyBase = true;
+      } else if (it?.price?.id && planRow?.tier === 'verity_family') {
+        // Fallback heuristic: if no explicit metadata role and the priced
+        // line resolved to verity_family tier, treat as base.
+        hasFamilyBase = true;
+      }
+    }
+    if (hasFamilyBase) {
+      kidSeatsPaid = Math.min(4, 1 + extras);
+    }
+  } catch (extractErr) {
+    console.error('[stripe.webhook.kid_seats_extract]', extractErr?.message || extractErr);
+  }
+
+  // Persist kid_seats_paid + platform alongside the standard fields. The
+  // subscriptions row UPDATE is best-effort here — the canonical row write
+  // happens further down in billing_change_plan / handleCheckoutCompleted;
+  // this just keeps kid_seats_paid in sync on quantity-only updates.
+  if (kidSeatsPaid != null) {
+    try {
+      await service
+        .from('subscriptions')
+        .update({
+          kid_seats_paid: kidSeatsPaid,
+          platform: 'stripe',
+          stripe_subscription_id: sub.id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', userRow.id)
+        .in('status', ['active', 'trialing']);
+    } catch (seatErr) {
+      console.error('[stripe.webhook.kid_seats_persist]', seatErr?.message || seatErr);
+    }
+  }
+
   // `cancel_at_period_end=true` means user clicked cancel in portal.
   if (sub.cancel_at_period_end && !userRow.plan_grace_period_ends_at) {
     await service.rpc('billing_cancel_subscription', {

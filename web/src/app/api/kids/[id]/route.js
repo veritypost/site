@@ -37,15 +37,30 @@ export async function PATCH(request, { params }) {
   }
 
   const b = await request.json().catch(() => ({}));
+  // Phase 2 of AI + Plan Change Implementation: date_of_birth is locked
+  // post-creation. Corrections route through the request form (Phase 4
+  // builds /api/kids/[id]/dob-correction). DOB stays editable only via
+  // the admin RPC `admin_apply_dob_correction` which sets a session var
+  // to bypass the immutability trigger.
   const allowed = [
     'display_name',
     'avatar_color',
-    'date_of_birth',
     'max_daily_minutes',
     'reading_level',
   ];
   const update = {};
   for (const k of allowed) if (b[k] !== undefined) update[k] = b[k];
+  // If a client still posts date_of_birth, return a clear 400 instead of
+  // silently dropping the field.
+  if (b.date_of_birth !== undefined) {
+    return NextResponse.json(
+      {
+        error: 'date_of_birth is locked after profile creation. Submit a correction request if you entered the wrong date.',
+        code: 'dob_locked',
+      },
+      { status: 400 }
+    );
+  }
   if (b.paused !== undefined) {
     update.paused_at = b.paused ? new Date().toISOString() : null;
   }

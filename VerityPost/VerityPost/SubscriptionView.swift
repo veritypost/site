@@ -31,9 +31,7 @@ struct SubscriptionView: View {
                     billingToggle
                     planCard(plan: "free")
                     planCard(plan: "verity")
-                    planCard(plan: "verity_pro")
                     planCard(plan: "verity_family")
-                    planCard(plan: "verity_family_xl")
                     promoSection
                     restoreSection
                     manageLink
@@ -65,22 +63,17 @@ struct SubscriptionView: View {
             disclosureRow(
                 title: "Verity",
                 length: isAnnual ? "Annual" : "Monthly",
-                price: isAnnual ? "$39.99 per year" : "$3.99 per month"
+                price: isAnnual ? "$79.99 per year" : "$7.99 per month"
             )
             disclosureRow(
-                title: "Verity Pro",
-                length: isAnnual ? "Annual" : "Monthly",
-                price: isAnnual ? "$99.99 per year" : "$9.99 per month"
-            )
-            disclosureRow(
-                title: "Verity Family",
+                title: "Verity Family (1 kid included)",
                 length: isAnnual ? "Annual" : "Monthly",
                 price: isAnnual ? "$149.99 per year" : "$14.99 per month"
             )
             disclosureRow(
-                title: "Verity Family XL",
+                title: "Each additional kid",
                 length: isAnnual ? "Annual" : "Monthly",
-                price: isAnnual ? "$199.99 per year" : "$19.99 per month"
+                price: isAnnual ? "$49.99 per year" : "$4.99 per month"
             )
 
             Text("Subscriptions automatically renew unless auto-renew is turned off at least 24 hours before the end of the current period. Your account will be charged for renewal within 24 hours prior to the end of the current period at the price shown above. You can manage your subscription and turn off auto-renewal in your Apple ID account settings after purchase.")
@@ -399,7 +392,7 @@ struct SubscriptionView: View {
         switch plan {
         case "free":
             return [
-                "Read every article",
+                "Read up to 5 articles per month",
                 "Take quizzes, join discussions",
                 "10 bookmarks",
                 "One breaking-news alert per day",
@@ -408,53 +401,40 @@ struct SubscriptionView: View {
         case "verity":
             return [
                 "Everything in Free",
+                "Unlimited reading",
                 "Unlimited bookmarks + collections",
                 "Direct messages, follows, mentions",
                 "Advanced search + filters",
                 "Listen to articles (TTS)",
-                "Category leaderboards",
+                "Ad-free",
+                "Ask an Expert",
+                "Streak freezes (2 per week)",
                 "Weekly recap quizzes",
                 "Shareable profile card"
             ]
-        case "verity_pro":
-            return [
-                "Everything in Verity",
-                "Ask an Expert",
-                "Streak freezes (2 per week)",
-                "Ad-free",
-                "Priority support"
-            ]
         case "verity_family":
             return [
-                "Everything in Verity Pro",
-                "Up to 2 adults + up to 2 kids",
-                "Family leaderboard",
-                "Shared achievements",
+                "Everything in Verity",
+                "Up to 2 adults + 1 kid (included)",
+                "Add up to 3 more kids for $4.99/mo each",
+                "Family leaderboard + shared achievements",
                 "Weekly family report",
                 "Kid expert sessions"
-            ]
-        case "verity_family_xl":
-            return [
-                "Everything in Verity Family",
-                "Up to 4 kids"
             ]
         default:
             return []
         }
     }
 
-    /// D42 pricing (~17% annual savings on clean round numbers).
+    /// Phase 2 pricing — locked 2026-04-26.
+    /// Annual is ~10× monthly across the ladder.
     private func planPrice(_ plan: String) -> String {
         switch plan {
         case "free": return "Free"
         case "verity":
-            return isAnnual ? "$39.99/yr" : "$3.99/mo"
-        case "verity_pro":
-            return isAnnual ? "$99.99/yr" : "$9.99/mo"
+            return isAnnual ? "$79.99/yr" : "$7.99/mo"
         case "verity_family":
             return isAnnual ? "$149.99/yr" : "$14.99/mo"
-        case "verity_family_xl":
-            return isAnnual ? "$199.99/yr" : "$19.99/mo"
         default: return ""
         }
     }
@@ -463,12 +443,10 @@ struct SubscriptionView: View {
         switch plan {
         case "verity":
             return isAnnual ? StoreManager.verityAnnual : StoreManager.verityMonthly
-        case "verity_pro":
-            return isAnnual ? StoreManager.verityProAnnual : StoreManager.verityProMonthly
         case "verity_family":
-            return isAnnual ? StoreManager.familyAnnual : StoreManager.familyMonthly
-        case "verity_family_xl":
-            return isAnnual ? StoreManager.familyXlAnnual : StoreManager.familyXlMonthly
+            // Default Family entry SKU is the 1-kid tier. Adding kids
+            // upgrades within the subscription group via FamilyViews.
+            return isAnnual ? StoreManager.familyAnnual1Kid : StoreManager.familyMonthly1Kid
         default:
             return nil
         }
@@ -479,9 +457,7 @@ struct SubscriptionView: View {
         switch plan {
         case "free": return "Free"
         case "verity": return "Verity"
-        case "verity_pro": return "Verity Pro"
         case "verity_family": return "Verity Family"
-        case "verity_family_xl": return "Verity Family XL"
         default: return plan.capitalized
         }
     }
