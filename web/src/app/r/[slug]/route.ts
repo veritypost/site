@@ -1,9 +1,9 @@
 // Public referral capture: /r/<slug>
 //
 // On hit: set HMAC-signed `vp_ref` cookie carrying { code_id, issued_at,
-//         cohort_snapshot } and 302 to /signup.
+//         cohort_snapshot } and 302 to /login?mode=create.
 // On miss / disabled / expired / rate-limited / wrong-context: same 302
-//         to /signup with NO cookie. Identical response shape so an
+//         to /login?mode=create with NO cookie. Identical response shape so an
 //         attacker can't enumerate valid slugs.
 //
 // Hardening:
@@ -11,7 +11,7 @@
 //  - IP rate limit at 60/10min closes the bulk-scan vector.
 //  - `Sec-Fetch-Dest: document` enforcement prevents CSRF-style forced
 //    attribution via <img src> / <iframe> / fetch.
-//  - No query params forwarded to /signup — open-redirect safe.
+//  - No query params forwarded to /login?mode=create — open-redirect safe.
 //  - Cookie always identical shape on hit; never reveals "exists".
 
 import { NextResponse, type NextRequest } from 'next/server';
@@ -27,7 +27,7 @@ const SLUG_RE = /^[a-z0-9]{8,12}$/;
 
 function redirectToSignup(siteUrl: string): NextResponse {
   // Status 302 (not 307) — no body, no cookies on miss path.
-  return NextResponse.redirect(`${siteUrl}/signup`, 302);
+  return NextResponse.redirect(`${siteUrl}/login?mode=create`, 302);
 }
 
 export async function GET(
@@ -102,7 +102,7 @@ export async function GET(
     return redirectToSignup(siteUrl);
   }
 
-  const res = NextResponse.redirect(`${siteUrl}/signup`, 302);
+  const res = NextResponse.redirect(`${siteUrl}/login?mode=create`, 302);
   res.cookies.set(REF_COOKIE_NAME, signed, {
     httpOnly: true,
     sameSite: 'lax',

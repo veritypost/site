@@ -65,7 +65,16 @@ function LoginPageInner() {
   // Closed-beta invite redemption: paste a slug or full /r/<code> URL.
   // POSTs to /api/access-redeem; on success the server sets vp_ref and
   // we route to /signup so the user can create their account.
-  const [mode, setMode] = useState<'signin' | 'invite'>('signin');
+  // 'signin'  → existing user enters email+password to log in
+  // 'invite'  → new user pastes their access code to set the vp_ref cookie
+  // 'create'  → user with valid vp_ref cookie creates account (email+password)
+  // /r/<slug> and /api/access-redeem both redirect to /login?mode=create
+  // after setting the cookie, so first-time invitees land directly in
+  // 'create'. The visible toggle has 2 tabs (Sign in / Use access code);
+  // 'create' is treated as a sub-state of "Use access code".
+  const initialMode: 'signin' | 'invite' | 'create' =
+    searchParams?.get('mode') === 'create' ? 'create' : 'signin';
+  const [mode, setMode] = useState<'signin' | 'invite' | 'create'>(initialMode);
   const [inviteCode, setInviteCode] = useState<string>('');
   const [inviteBusy, setInviteBusy] = useState<boolean>(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
@@ -97,11 +106,58 @@ function LoginPageInner() {
         setInviteError(inviteReasonText[json.reason] || 'Could not redeem that invite.');
         return;
       }
-      window.location.href = json.redirect_to || '/signup';
+      // Cookie is set; flip into 'create' mode so the same form swaps
+      // into email+password create-account fields without a hard reload.
+      setInviteCode('');
+      setMode('create');
     } catch {
       setInviteError('Network issue. Please try again.');
     } finally {
       setInviteBusy(false);
+    }
+  };
+
+  // Used by mode='create' to call the existing signup API (which is
+  // gated on vp_ref via checkSignupGate). On success the response sets
+  // the supabase auth cookie via the GoTrue session that signUp returns,
+  // and we route the user into the post-signup chain.
+  const submitCreate = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: identifier.trim(),
+          password,
+          ageConfirmed: true,
+          agreedToTerms: true,
+        }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        redirect_to?: string;
+        needsEmailConfirmation?: boolean;
+      };
+      if (!res.ok) {
+        if (res.status === 403 && body?.redirect_to) {
+          window.location.href = body.redirect_to;
+          return;
+        }
+        setError(body.error || "Couldn't create account. Try again.");
+        setLoading(false);
+        return;
+      }
+      // Account created. Owner-link signups are auto-Pro and skip
+      // /verify-email; user-tier signups have verify_locked_at stamped
+      // until they verify. Either way, ship them through the welcome
+      // chain — pick-username → /welcome — same as OAuth callback flow.
+      window.location.href = '/signup/pick-username';
+    } catch {
+      setError('Network issue. Please try again.');
+      setLoading(false);
     }
   };
 
@@ -341,7 +397,11 @@ function LoginPageInner() {
         </a>
 
         <h1 style={{ fontSize: '26px', fontWeight: 700, color: C.text, margin: '0 0 16px 0' }}>
-          {mode === 'signin' ? 'Welcome back.' : 'Have an invite?'}
+          {mode === 'signin'
+            ? 'Welcome back.'
+            : mode === 'create'
+              ? 'Set up your account.'
+              : 'Have an access code?'}
         </h1>
 
         {/* Segmented toggle between sign-in (existing users) and invite-code
@@ -361,7 +421,8 @@ function LoginPageInner() {
           }}
         >
           {(['signin', 'invite'] as const).map((m) => {
-            const active = mode === m;
+            const active =
+              m === 'signin' ? mode === 'signin' : mode === 'invite' || mode === 'create';
             return (
               <button
                 key={m}
@@ -369,7 +430,11 @@ function LoginPageInner() {
                 role="tab"
                 aria-selected={active}
                 onClick={() => {
-                  setMode(m);
+                  // Keep the user inside 'create' if they already
+                  // redeemed; they shouldn't be sent back to the paste
+                  // form on a stray tap of the same tab.
+                  if (m === 'invite' && mode !== 'create') setMode('invite');
+                  else if (m === 'signin') setMode('signin');
                   setError(null);
                   setInviteError(null);
                 }}
@@ -387,7 +452,7 @@ function LoginPageInner() {
                   transition: 'background 120ms, color 120ms',
                 }}
               >
-                {m === 'signin' ? 'Sign in' : 'Use invite code'}
+                {m === 'signin' ? 'Sign in' : 'Use access code'}
               </button>
             );
           })}
@@ -576,6 +641,97 @@ function LoginPageInner() {
                 />
               )}
               {loading ? 'Signing in…' : 'Sign in'}
+            </button>
+          </form>
+        )}
+
+        {mode === 'create' && (
+          <form onSubmit={submitCreate} style={{ marginBottom: 12 }}>
+            <p
+              style={{
+                fontSize: 13,
+                color: C.dim,
+                marginTop: 0,
+                marginBottom: 16,
+                lineHeight: 1.5,
+              }}
+            >
+              Your invite is good. Pick the email + password you want to use here.
+            </p>
+            <div style={{ marginBottom: '14px' }}>
+              <label
+                htmlFor="create-email"
+                style={{
+                  display: 'block',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  color: C.text,
+                  marginBottom: '7px',
+                }}
+              >
+                Email
+              </label>
+              <input
+                id="create-email"
+                type="email"
+                required
+                autoComplete="email"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                onFocus={() => setFocused('identifier')}
+                onBlur={() => setFocused(null)}
+                style={field('identifier')}
+                placeholder="you@example.com"
+              />
+            </div>
+            <div style={{ marginBottom: '14px' }}>
+              <label
+                htmlFor="create-password"
+                style={{
+                  display: 'block',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  color: C.text,
+                  marginBottom: '7px',
+                }}
+              >
+                Password
+              </label>
+              <input
+                id="create-password"
+                type={showPassword ? 'text' : 'password'}
+                required
+                autoComplete="new-password"
+                minLength={8}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onFocus={() => setFocused('password')}
+                onBlur={() => setFocused(null)}
+                style={field('password')}
+                placeholder="At least 8 characters"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={loading || !identifier.trim() || password.length < 8}
+              style={{
+                width: '100%',
+                minHeight: '48px',
+                padding: '13px',
+                fontSize: '15px',
+                fontWeight: 600,
+                color: '#fff',
+                backgroundColor:
+                  loading || !identifier.trim() || password.length < 8 ? '#cccccc' : C.accent,
+                border: 'none',
+                borderRadius: '10px',
+                cursor:
+                  loading || !identifier.trim() || password.length < 8 ? 'not-allowed' : 'pointer',
+                fontFamily: 'inherit',
+                marginBottom: 8,
+              }}
+            >
+              {loading ? 'Creating account…' : 'Create account'}
             </button>
           </form>
         )}

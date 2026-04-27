@@ -88,7 +88,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, reason: 'server_misconfig' }, { status: 500 });
     }
 
-    const res = NextResponse.json({ ok: true, redirect_to: '/signup' });
+    const res = NextResponse.json({ ok: true, redirect_to: '/login?mode=create' });
     res.cookies.set(REF_COOKIE_NAME, signed, {
       httpOnly: true,
       sameSite: 'lax',

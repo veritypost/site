@@ -14,7 +14,7 @@ import { cookies } from 'next/headers';
 export async function POST(request) {
   try {
     const supabase = await createClient();
-    const { email, password, ageConfirmed, agreedToTerms, fullName } = await request.json();
+    const { email, password, ageConfirmed, agreedToTerms } = await request.json();
 
     if (!email || !password) {
       return NextResponse.json({ error: 'Email and password required' }, { status: 400 });
@@ -69,7 +69,7 @@ export async function POST(request) {
       password,
       options: {
         emailRedirectTo: `${siteUrl}/api/auth/callback`,
-        data: { age_confirmed_at: nowIso, full_name: fullName || null },
+        data: { age_confirmed_at: nowIso },
       },
     });
 
@@ -80,7 +80,6 @@ export async function POST(request) {
 
     const userId = authData.user?.id;
     if (userId) {
-      const trimmedName = typeof fullName === 'string' ? fullName.trim() : '';
       // Round A: C-03, C-05, C-06 — user-row upsert, user_roles INSERT,
       // and audit_log INSERT are no longer granted to authenticated.
       // Route all three writes through service-role.
@@ -120,12 +119,10 @@ export async function POST(request) {
           id: userId,
           email,
           email_verified: false,
-          display_name: trimmedName || null,
           metadata: {
             age_confirmed_at: nowIso,
             terms_accepted_at: nowIso,
             terms_version: '2026-01',
-            full_name: trimmedName || null,
           },
         },
         { onConflict: 'id' }
