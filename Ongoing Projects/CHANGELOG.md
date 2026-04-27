@@ -7,6 +7,31 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (T300 follow-up — T300b drafted to close 2 gaps) — _pending push to git_
+
+### MCP audit caught 2 gaps after owner applied T300
+
+- **`users_select` policy survived.** My original `DROP POLICY IF EXISTS "users_public_read"` targeted the wrong name; the actual pre-existing policy was named `users_select`. PERMISSIVE policies UNION, so the broad `id=auth.uid() OR profile_visibility='public' OR is_admin_or_above()` policy still grants authenticated reads of other-user rows on `public.users`. T300's column-level leak isn't fully closed for authenticated viewers (anon WAS correctly revoked).
+- **`is_frozen` column missing from `public_profiles_v`.** I added the derived column late in the original draft; owner applied an earlier version. Leaderboard's `eq('is_frozen', false)` filter shipped in commit 09c550f currently fails silently.
+
+### T300b drafted
+
+`Ongoing Projects/migrations/2026-04-27_T300b_finish_public_profile_lockdown.sql`. Two operations:
+1. `DROP POLICY IF EXISTS "users_select" ON public.users` — closes the leak.
+2. `CREATE OR REPLACE VIEW public_profiles_v ...` with `(u.frozen_at IS NOT NULL) AS is_frozen` derived boolean.
+
+`users_self_read` + `users_admin_read` (added by original T300) cover legitimate read paths after `users_select` drops. `users_select_block_kid_jwt` (RESTRICTIVE) stays — it's orthogonal (blocks kid-delegated JWTs from reading users entirely).
+
+All 8 caller paths already pre-swapped (commits 540f2df + 09c550f) so T300b applies cleanly. Owner pastes into Supabase SQL editor.
+
+### Files
+
+- `Ongoing Projects/migrations/2026-04-27_T300b_finish_public_profile_lockdown.sql` (new)
+- `Ongoing Projects/TODO.md` (T300 body re-scoped from "ready to apply" to "partial — T300b follow-up drafted")
+- `Ongoing Projects/CHANGELOG.md` (this entry)
+
+---
+
 ## 2026-04-27 (wave 15 — T300 caller-side sweep COMPLETE; migration ready to apply) — _shipped, pushed to git_ (commit 09c550f)
 
 ### Shipped (3 remaining caller swaps + 1 migration update)
