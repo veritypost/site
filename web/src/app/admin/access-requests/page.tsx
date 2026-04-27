@@ -23,7 +23,14 @@ import { ToastProvider, useToast } from '@/components/admin/Toast';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 import type { Tables } from '@/types/database-helpers';
 
-type Req = Tables<'access_requests'>;
+// Extending Tables<'access_requests'> with the email-confirm columns
+// added in 2026-04-26_access_request_email_confirm.sql until types
+// regenerate post-apply.
+type Req = Tables<'access_requests'> & {
+  email_confirmed_at: string | null;
+  email_confirm_token: string | null;
+  email_confirm_expires_at: string | null;
+};
 
 function RequestsInner() {
   const router = useRouter();
@@ -63,9 +70,16 @@ function RequestsInner() {
     setRows((data || []) as Req[]);
   }
 
-  const filtered = rows.filter((r) => tab === 'all' || r.status === tab);
+  // Pending tab hides email-unconfirmed rows so admin only spends time on
+  // requests where the requester has clicked the email-confirm link.
+  // 'all' shows everything including unconfirmed for visibility.
+  const filtered = rows.filter((r) => {
+    if (tab === 'all') return true;
+    if (tab === 'pending') return r.status === 'pending' && !!r.email_confirmed_at;
+    return r.status === tab;
+  });
   const counts = {
-    pending: rows.filter((r) => r.status === 'pending').length,
+    pending: rows.filter((r) => r.status === 'pending' && !!r.email_confirmed_at).length,
     approved: rows.filter((r) => r.status === 'approved').length,
     rejected: rows.filter((r) => r.status === 'rejected').length,
     total: rows.length,
@@ -130,25 +144,20 @@ function RequestsInner() {
 
   const cols = [
     {
-      key: 'requester', header: 'Requester', sortable: false,
+      key: 'email', header: 'Email', sortable: false,
       render: (r: Req) => (
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontWeight: 600, color: C.white }}>{r.name || r.email}</div>
-          {r.name && <div style={{ fontSize: F.xs, color: C.dim }}>{r.email}</div>}
-        </div>
+        <div style={{ fontWeight: 600, color: C.white, fontFamily: 'ui-monospace, monospace' }}>{r.email}</div>
       ),
     },
     {
-      key: 'reason', header: 'Why', truncate: true,
-      render: (r: Req) => r.reason || <span style={{ color: C.muted }}>—</span>,
-    },
-    {
-      key: 'referral_source', header: 'Heard from', truncate: true,
-      render: (r: Req) => r.referral_source || <span style={{ color: C.muted }}>—</span>,
-    },
-    {
       key: 'created_at', header: 'Submitted',
-      render: (r: Req) => r.created_at ? new Date(r.created_at).toLocaleDateString() : '—',
+      render: (r: Req) => r.created_at ? new Date(r.created_at).toLocaleString() : '—',
+    },
+    {
+      key: 'email_confirmed_at', header: 'Email confirmed',
+      render: (r: Req) => r.email_confirmed_at
+        ? <Badge variant="success" size="xs">Yes</Badge>
+        : <Badge variant="warn" size="xs">Awaiting</Badge>,
     },
     {
       key: 'status', header: 'Status',
@@ -173,7 +182,7 @@ function RequestsInner() {
     <Page>
       <PageHeader
         title="Access requests"
-        subtitle="Review beta access requests. Approve mints a one-time 7-day invite link and emails it."
+        subtitle="Email-confirmed requests show under Pending. Approve mints a one-time 7-day invite link and emails it."
       />
 
       <div style={{
@@ -234,7 +243,13 @@ function RequestsInner() {
               <Button variant="danger" disabled={busy} onClick={() => setShowReject(true)}>
                 Reject
               </Button>
-              <Button variant="primary" loading={busy} onClick={() => active && approve(active)}>
+              <Button
+                variant="primary"
+                loading={busy}
+                disabled={!active.email_confirmed_at}
+                title={!active.email_confirmed_at ? 'Awaiting email confirmation from requester' : undefined}
+                onClick={() => active && approve(active)}
+              >
                 Approve & email link
               </Button>
             </>
@@ -251,19 +266,12 @@ function RequestsInner() {
               </Badge>
             </DetailRow>
             <DetailRow label="Email"><code>{active.email}</code></DetailRow>
-            {active.name && <DetailRow label="Name">{active.name}</DetailRow>}
+            <DetailRow label="Email confirmed">
+              {active.email_confirmed_at
+                ? <Badge variant="success" size="xs">{new Date(active.email_confirmed_at).toLocaleString()}</Badge>
+                : <Badge variant="warn" size="xs">Not yet — link not clicked</Badge>}
+            </DetailRow>
             <DetailRow label="Submitted">{active.created_at ? new Date(active.created_at).toLocaleString() : '—'}</DetailRow>
-            {active.referral_source && <DetailRow label="Heard from">{active.referral_source}</DetailRow>}
-            {active.reason && (
-              <div>
-                <div style={{ fontSize: F.xs, fontWeight: 600, color: C.dim, marginBottom: S[1], textTransform: 'uppercase', letterSpacing: '0.04em' }}>Why</div>
-                <div style={{
-                  padding: S[3], background: C.bg, borderRadius: 8,
-                  border: `1px solid ${C.divider}`, fontSize: F.sm, color: C.white,
-                  whiteSpace: 'pre-wrap', lineHeight: 1.5,
-                }}>{active.reason}</div>
-              </div>
-            )}
             {active.ip_address && <DetailRow label="IP"><code style={{ fontSize: F.xs }}>{active.ip_address}</code></DetailRow>}
             {active.user_agent && <DetailRow label="User-Agent" small><code style={{ fontSize: F.xs, wordBreak: 'break-all' }}>{active.user_agent}</code></DetailRow>}
             {active.access_code_id && (

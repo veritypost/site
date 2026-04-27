@@ -1,21 +1,32 @@
-// Public access-request intake. During closed beta, anyone without
-// an invite link can submit name + email + reason. Lands in
-// access_requests; admin reviews at /admin/access-requests; on approve
-// they get a one-time owner-link via email.
+// Public access-request intake. Email-only. After submission we email
+// the requester a confirm link; only after they click does the row's
+// email_confirmed_at flip and the admin queue surfaces it for review.
 //
-// Reactivates the route that was 410'd by Ext-AA1 (2026-04-25). The
-// route is intentionally permissive on insert (RLS policy with_check
-// is `true`) so unauthenticated visitors can submit; rate-limited by IP
-// to make scraping/spamming uneconomic.
+// Reactivates the route that was 410'd by Ext-AA1 (2026-04-25).
 
 import { NextResponse } from 'next/server';
+import crypto from 'node:crypto';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { renderTemplate, sendEmail } from '@/lib/email';
+import { REQUEST_CONFIRM_TEMPLATE } from '@/lib/accessRequestEmail';
+import { getSiteUrl } from '@/lib/siteUrl';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const TOKEN_TTL_HOURS = 24;
+
+function newToken() {
+  // 32 url-safe bytes — 256 bits. Resists guessing.
+  return crypto
+    .randomBytes(32)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
 
 export async function POST(request) {
   try {
@@ -37,10 +48,6 @@ export async function POST(request) {
 
     const body = await request.json().catch(() => ({}));
     const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
-    const name = typeof body.name === 'string' ? body.name.trim().slice(0, 120) : null;
-    const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 1500) : null;
-    const referral_source =
-      typeof body.referral_source === 'string' ? body.referral_source.trim().slice(0, 200) : null;
 
     if (!email || !EMAIL_RE.test(email)) {
       return NextResponse.json({ error: 'A valid email is required.' }, { status: 400 });
@@ -48,31 +55,7 @@ export async function POST(request) {
 
     const userAgent = request.headers.get('user-agent') || null;
 
-    // Idempotency: if a pending request from the same email already exists,
-    // refresh its updated_at + reason and return success without creating
-    // duplicates.
-    const { data: existing } = await service
-      .from('access_requests')
-      .select('id, status')
-      .eq('email', email)
-      .in('status', ['pending'])
-      .maybeSingle();
-
-    if (existing) {
-      await service
-        .from('access_requests')
-        .update({
-          name: name ?? undefined,
-          reason: reason ?? undefined,
-          referral_source: referral_source ?? undefined,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', existing.id);
-      return NextResponse.json({ ok: true, status: 'pending_existing' });
-    }
-
-    // If a previously-approved request exists, the user already has a
-    // link in their inbox; tell them so without re-queueing.
+    // Already approved? Tell them to check their inbox for the invite.
     const { data: approved } = await service
       .from('access_requests')
       .select('id')
@@ -87,22 +70,87 @@ export async function POST(request) {
       });
     }
 
-    const { error } = await service.from('access_requests').insert({
-      email,
-      name,
-      type: 'beta',
-      reason,
-      referral_source,
-      status: 'pending',
-      ip_address: ip || null,
-      user_agent: userAgent,
+    const token = newToken();
+    const expires = new Date(Date.now() + TOKEN_TTL_HOURS * 60 * 60 * 1000).toISOString();
+    const siteUrl = getSiteUrl();
+    const confirmUrl = `${siteUrl}/api/access-request/confirm?token=${encodeURIComponent(token)}`;
+    const expiresHuman = new Date(expires).toLocaleString(undefined, {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
     });
-    if (error) {
-      console.error('[access-request]', error.message);
+
+    // Idempotency: if there's an existing pending row for this email,
+    // refresh the token (don't create dups). The user might have lost
+    // the prior email or it expired.
+    const { data: existing } = await service
+      .from('access_requests')
+      .select('id, status, email_confirmed_at')
+      .eq('email', email)
+      .in('status', ['pending'])
+      .maybeSingle();
+
+    let upsertErr = null;
+    if (existing) {
+      const { error } = await service
+        .from('access_requests')
+        .update({
+          email_confirm_token: token,
+          email_confirm_expires_at: expires,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existing.id);
+      upsertErr = error;
+    } else {
+      const { error } = await service.from('access_requests').insert({
+        email,
+        type: 'beta',
+        status: 'pending',
+        email_confirm_token: token,
+        email_confirm_expires_at: expires,
+        ip_address: ip || null,
+        user_agent: userAgent,
+      });
+      upsertErr = error;
+    }
+
+    if (upsertErr) {
+      console.error('[access-request]', upsertErr.message);
       return NextResponse.json({ error: 'Could not submit request' }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, status: 'submitted' });
+    // Send the confirm email. Failure here is recoverable — user can
+    // re-submit to get a new token.
+    try {
+      const tpl = renderTemplate(REQUEST_CONFIRM_TEMPLATE, {
+        confirm_url: confirmUrl,
+        expires_at: expiresHuman,
+      });
+      await sendEmail({
+        to: email,
+        subject: tpl.subject,
+        html: tpl.html,
+        text: tpl.text,
+        fromName: tpl.fromName,
+        fromEmail: tpl.fromEmail,
+        replyTo: undefined,
+        unsubscribeUrl: undefined,
+      });
+    } catch (e) {
+      console.error('[access-request] sendEmail failed:', e);
+      return NextResponse.json(
+        { error: 'Could not send confirmation email. Please try again.' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      ok: true,
+      status: existing ? 'pending_existing' : 'submitted',
+      message: 'Check your email for a confirmation link.',
+    });
   } catch (err) {
     console.error('[access-request]', err);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });

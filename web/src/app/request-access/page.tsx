@@ -4,10 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 
 export default function RequestAccessPage() {
-  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [reason, setReason] = useState('');
-  const [source, setSource] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -24,12 +21,7 @@ export default function RequestAccessPage() {
       const res = await fetch('/api/access-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: email.trim(),
-          name: name.trim() || null,
-          reason: reason.trim() || null,
-          referral_source: source.trim() || null,
-        }),
+        body: JSON.stringify({ email: email.trim() }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -38,10 +30,10 @@ export default function RequestAccessPage() {
       }
       if (json.status === 'already_approved') {
         setDone(json.message || 'You were already approved. Check your inbox for the invite link.');
-      } else if (json.status === 'pending_existing') {
-        setDone("We already have your request. We'll get back to you soon.");
       } else {
-        setDone("Request submitted. We'll review and email you if approved.");
+        setDone(
+          'Check your email — we just sent you a link. Click it to confirm your address and put your request in the queue.'
+        );
       }
     } catch {
       setError('Network issue. Please try again.');
@@ -74,16 +66,15 @@ export default function RequestAccessPage() {
             marginBottom: 16,
           }}
         >
-          Verity Post — Request access
+          verity post — request access
         </div>
 
         <h1 style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.2, marginBottom: 12 }}>
-          Tell us a little about yourself.
+          Drop your email.
         </h1>
 
         <p style={{ fontSize: 15, lineHeight: 1.55, color: '#4b5563', marginBottom: 28 }}>
-          We&apos;re reading every request. If you&apos;re a fit for the beta, we&apos;ll email you
-          a personal invite link.
+          We&apos;ll send you a confirmation link. Click it and your request lands in the queue.
         </p>
 
         {done && (
@@ -119,52 +110,44 @@ export default function RequestAccessPage() {
                 {error}
               </div>
             )}
-            <Field label="Email" required>
+            <label style={{ display: 'block' }}>
+              <span
+                style={{
+                  display: 'block',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: 6,
+                }}
+              >
+                Email <span style={{ color: '#dc2626', marginLeft: 4 }}>*</span>
+              </span>
               <input
                 type="email"
                 required
                 autoComplete="email"
+                autoFocus
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={submitting}
-                style={inputStyle}
+                placeholder="you@example.com"
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  border: '1px solid #d1d5db',
+                  fontSize: 15,
+                  background: '#ffffff',
+                  color: '#111111',
+                  fontFamily: 'inherit',
+                }}
               />
-            </Field>
-            <Field label="Name (optional)">
-              <input
-                type="text"
-                autoComplete="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                disabled={submitting}
-                style={inputStyle}
-              />
-            </Field>
-            <Field label="Why do you want in? (optional)">
-              <textarea
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                disabled={submitting}
-                rows={4}
-                maxLength={1500}
-                style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}
-                placeholder="What you're hoping to do here, what you read, anything that helps us decide."
-              />
-            </Field>
-            <Field label="How did you hear about us? (optional)">
-              <input
-                type="text"
-                value={source}
-                onChange={(e) => setSource(e.target.value)}
-                disabled={submitting}
-                style={inputStyle}
-              />
-            </Field>
+            </label>
             <button
               type="submit"
               disabled={submitting || !email.trim()}
               style={{
-                marginTop: 8,
+                marginTop: 4,
                 padding: '12px 18px',
                 borderRadius: 10,
                 background: '#111111',
@@ -176,7 +159,7 @@ export default function RequestAccessPage() {
                 opacity: submitting || !email.trim() ? 0.6 : 1,
               }}
             >
-              {submitting ? 'Sending…' : 'Submit request'}
+              {submitting ? 'Sending…' : 'Send confirmation link'}
             </button>
           </form>
         )}
@@ -198,44 +181,5 @@ export default function RequestAccessPage() {
         </div>
       </div>
     </main>
-  );
-}
-
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '10px 12px',
-  borderRadius: 8,
-  border: '1px solid #d1d5db',
-  fontSize: 15,
-  background: '#ffffff',
-  color: '#111111',
-  fontFamily: 'inherit',
-};
-
-function Field({
-  label,
-  required,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <label style={{ display: 'block' }}>
-      <span
-        style={{
-          display: 'block',
-          fontSize: 13,
-          fontWeight: 600,
-          color: '#374151',
-          marginBottom: 6,
-        }}
-      >
-        {label}
-        {required && <span style={{ color: '#dc2626', marginLeft: 4 }}>*</span>}
-      </span>
-      {children}
-    </label>
   );
 }

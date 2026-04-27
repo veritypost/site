@@ -6,8 +6,8 @@
 import Link from 'next/link';
 
 export const metadata = {
-  title: 'Verity Post — Closed Beta',
-  description: 'Verity Post is in closed beta. Access is by invite only.',
+  title: 'verity post — Closed Beta',
+  description: 'verity post is in closed beta. Access is by invite only.',
 };
 
 const reasonCopy: Record<string, string> = {
@@ -51,7 +51,7 @@ export default async function BetaLockedPage({
             marginBottom: 16,
           }}
         >
-          Verity Post
+          verity post
         </div>
 
         <h1 style={{ fontSize: 32, fontWeight: 800, lineHeight: 1.15, marginBottom: 16 }}>
@@ -59,7 +59,7 @@ export default async function BetaLockedPage({
         </h1>
 
         <p style={{ fontSize: 17, lineHeight: 1.5, color: '#374151', marginBottom: 12 }}>
-          Verity Post is invite-only right now. New accounts need a personal invite link from
+          verity post is invite-only right now. New accounts need a personal invite link from
           someone in the beta.
         </p>
 

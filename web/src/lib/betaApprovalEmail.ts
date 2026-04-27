@@ -8,14 +8,14 @@ export type ApprovalEmailVars = {
 };
 
 export const APPROVAL_TEMPLATE = {
-  subject: "You're approved for the Verity Post beta",
+  subject: "You're approved for the verity post beta",
   body_html: `<!doctype html>
 <html><body style="margin:0;padding:0;background:#fafafa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111;">
   <div style="max-width:560px;margin:0 auto;padding:32px 20px;">
-    <div style="font-size:12px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:#6b7280;margin-bottom:16px;">Verity Post</div>
+    <div style="font-size:12px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:#6b7280;margin-bottom:16px;">verity post</div>
     <h1 style="font-size:24px;font-weight:800;line-height:1.2;margin:0 0 16px 0;">You&rsquo;re in.</h1>
     <p style="font-size:16px;line-height:1.55;color:#374151;margin:0 0 16px 0;">
-      Hi{{name_with_space}}, thanks for requesting access to the Verity Post beta. You&rsquo;re approved.
+      Hi{{name_with_space}}, thanks for requesting access to the verity post beta. You&rsquo;re approved.
     </p>
     <p style="font-size:16px;line-height:1.55;color:#374151;margin:0 0 24px 0;">
       Your invite link is below. It&rsquo;s good for one signup and expires on {{expires_at}}.
@@ -30,16 +30,16 @@ export const APPROVAL_TEMPLATE = {
     </p>
   </div>
 </body></html>`,
-  body_text: `Verity Post — You're in.
+  body_text: `verity post — You're in.
 
-Hi{{name_with_space}}, thanks for requesting access to the Verity Post beta. You're approved.
+Hi{{name_with_space}}, thanks for requesting access to the verity post beta. You're approved.
 
 Your invite link is below. It's good for one signup and expires on {{expires_at}}.
 
 {{invite_url}}
 
 Once you're in, you'll get two share links of your own — for friends or anyone you think should be here.`,
-  from_name: 'Verity Post',
+  from_name: 'verity post',
   from_email: process.env.EMAIL_FROM || 'beta@veritypost.com',
 };
 
