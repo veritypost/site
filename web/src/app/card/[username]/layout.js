@@ -7,8 +7,9 @@ export async function generateMetadata({ params }) {
   const { username } = await params;
   const supabase = createClient();
 
+  // T300 — read via public_profiles_v (whitelisted + filtered to public).
   const { data: target } = await supabase
-    .from('users')
+    .from('public_profiles_v')
     .select('username, display_name, bio, verity_score, profile_visibility')
     .eq('username', username)
     .maybeSingle();
@@ -19,7 +20,13 @@ export async function generateMetadata({ params }) {
   // title rather than leaking the display name via metadata. `noindex`
   // applies across every branch — the card page should never rank above
   // canonical article content for a person's name in search.
-  if (!target || target.profile_visibility === 'private') {
+  // 'hidden' is the safety lockdown tier; same handling as 'private' on
+  // every public read path.
+  if (
+    !target ||
+    target.profile_visibility === 'private' ||
+    target.profile_visibility === 'hidden'
+  ) {
     return {
       title: 'Profile card — Verity Post',
       robots: { index: false, follow: false },

@@ -19,8 +19,9 @@ export default async function Image({ params }) {
   const { username } = await params;
   const supabase = createClient();
 
+  // T300 — read via public_profiles_v (whitelisted + filtered to public).
   const { data: target } = await supabase
-    .from('users')
+    .from('public_profiles_v')
     .select(
       'id, username, display_name, bio, avatar_color, verity_score, streak_current, profile_visibility'
     )
@@ -51,7 +52,12 @@ export default async function Image({ params }) {
     </div>
   );
 
-  if (!target || target.profile_visibility === 'private') {
+  // 'hidden' is the safety lockdown tier; render the brand plate too.
+  if (
+    !target ||
+    target.profile_visibility === 'private' ||
+    target.profile_visibility === 'hidden'
+  ) {
     return new ImageResponse(brandPlate, { ...size });
   }
 

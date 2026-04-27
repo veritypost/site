@@ -42,8 +42,11 @@ export default function CardPage() {
       // anon recipients of shared card links must be able to render the
       // card and its OG image. Target-side checks (user exists, not
       // deleted, not `profile_visibility='private'`) remain below.
+      // T300 — read via public_profiles_v (whitelisted + filtered to public).
+      // The view excludes private/hidden/banned users; they fall into the
+      // !targetRow branch below.
       const { data: targetRow } = await supabase
-        .from('users')
+        .from('public_profiles_v')
         .select(
           'id, username, display_name, bio, avatar_url, avatar_color, verity_score, streak_current, is_expert, expert_title, expert_organization, profile_visibility'
         )
@@ -54,7 +57,9 @@ export default function CardPage() {
         setState('not_found');
         return;
       }
-      if (targetRow.profile_visibility === 'private') {
+      // 'hidden' is the safety lockdown tier; treat the same as 'private'
+      // on this public read path.
+      if (targetRow.profile_visibility === 'private' || targetRow.profile_visibility === 'hidden') {
         setState('private');
         return;
       }

@@ -173,12 +173,23 @@ export default function ProfilePage() {
         return;
       }
 
+      // T300 — read through the public_profiles_v SECURITY DEFINER view
+      // instead of the users table. The view exposes only whitelisted
+      // columns and pre-filters profile_visibility='public' + not-banned
+      // + not-deletion-scheduled, so private/hidden/banned users return
+      // no row (caught by the !targetRow branch below). Sensitive columns
+      // (email, plan_id, stripe_customer_id, cohort, frozen_at, kill-
+      // switch flags) never reach this surface.
+      //
+      // Cast through `as never` because the view was added by migration
+      // after the last database-types regen — same pattern lib/trackServer.ts
+      // uses for the events table. Drop the cast on next types regeneration.
       const { data: targetRow } = await supabase
-        .from('users')
+        .from('public_profiles_v' as never)
         .select(
           'id, username, display_name, bio, avatar_url, avatar_color, banner_url, verity_score, followers_count, following_count, articles_read_count, quizzes_completed_count, comment_count, profile_visibility, show_activity, is_expert, expert_title, expert_organization, is_verified_public_figure'
         )
-        .eq('username', username as string)
+        .eq('username' as never, username as never)
         .maybeSingle<TargetRow>();
       if (!targetRow) {
         setNotFoundFlag(true);

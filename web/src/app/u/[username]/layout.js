@@ -7,8 +7,11 @@ export async function generateMetadata({ params }) {
   const { username } = await params;
   const supabase = createClient();
 
+  // T300 — read via public_profiles_v (whitelisted + filtered to public).
+  // Private/hidden/banned/deletion-scheduled users return no row, which
+  // falls into the !target branch below for the noindex metadata.
   const { data: target } = await supabase
-    .from('users')
+    .from('public_profiles_v')
     .select('username, display_name, bio, profile_visibility')
     .eq('username', username)
     .maybeSingle();
@@ -20,7 +23,9 @@ export async function generateMetadata({ params }) {
     };
   }
 
-  if (target.profile_visibility === 'private') {
+  // 'hidden' is the safety lockdown tier; treat it the same as 'private' on
+  // every public read path so non-followers never see a hint of the profile.
+  if (target.profile_visibility === 'private' || target.profile_visibility === 'hidden') {
     return {
       title: 'Profile — Verity Post',
       robots: { index: false, follow: false },
