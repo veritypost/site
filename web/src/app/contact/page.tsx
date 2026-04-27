@@ -85,8 +85,12 @@ export default function ContactPage() {
     setSubmitting(false);
   };
 
+  // T297 — `email.includes('@')` accepted "a@" / "@b" / "@" alone. Use a
+  // standard email-shape regex (matches HTML5's input type=email validity
+  // closely enough for client-side gating; server still re-validates).
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const canSubmit = Boolean(
-    topic && subject.trim() && body.trim() && email.trim() && email.includes('@')
+    topic && subject.trim() && body.trim() && email.trim() && EMAIL_RE.test(email.trim())
   );
 
   return (

@@ -144,8 +144,7 @@ export default function IdeasIndex() {
         </div>
 
         <div style={{ marginTop: 80, fontSize: 13, color: S.dim, lineHeight: 1.6 }}>
-          Currently rendering at <code>localhost:3333/ideas</code>. Hidden from search engines. Not
-          linked from the main site.
+          Hidden from search engines. Not linked from the main site.
         </div>
       </div>
     </main>

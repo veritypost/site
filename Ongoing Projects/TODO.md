@@ -1500,25 +1500,9 @@ Items below already moved to Pre-Launch Assessment (Apple/Sentry/COPPA-CRITICAL)
 **File:** `web/src/app/admin/page.tsx:32`. F7 is a project-internal codename.
 **Fix:** Replace with plain "integrated editor" or "newsroom editor."
 
-#### T293 — Notifications without `action_url` render dead anchors `href="#"` — **LOW**
-**File:** `web/src/app/notifications/page.tsx:419`. Tappable but goes nowhere.
-**Fix:** Render as button (not link) when `action_url` is null.
-
-#### T294 — Reset-password hash detection allows query-string match — **MEDIUM**
-**File:** `web/src/app/reset-password/page.tsx:69`. `hash.includes('access_token=')` matches `?access_token=foo` in query string too.
-**Fix:** Parse `window.location.hash` strictly.
-
 #### T295 — Help page price fallback hides Stripe-fetch failure — **MEDIUM**
 **File:** `web/src/app/help/page.tsx:28-31`. Falls back silently to hardcoded `$3.99/$9.99/$14.99`.
 **Fix:** Log the fetch failure to Sentry / banner; don't ship stale prices unnoticed.
-
-#### T296 — `/ideas` page hardcodes `localhost:3333` reference — **LOW** (info leak)
-**File:** `web/src/app/ideas/page.tsx:147`. Visible string referencing dev port.
-**Fix:** Make environment-aware or remove the line.
-
-#### T297 — Contact form email validation is `email.includes('@')` — **LOW**
-**File:** `web/src/app/contact/page.tsx:89`. `a@` and `@b` pass.
-**Fix:** Use `<input type="email">` HTML validation OR a proper regex.
 
 ---
 

@@ -66,7 +66,14 @@ export default function ResetPasswordPage() {
       try {
         const supabase = createClient();
         const hash = typeof window !== 'undefined' ? window.location.hash : '';
-        const hasRecoveryHash = hash.includes('type=recovery') || hash.includes('access_token=');
+        // T294 — strict parse of the hash fragment Supabase auth round-trips
+        // recovery tokens through. `hash.includes('access_token=')` matches
+        // any substring (e.g. a hash that happens to contain that text from
+        // an unrelated source); use URLSearchParams against the trimmed hash
+        // so we only treat well-formed recovery returns as authentic.
+        const hashParams = new URLSearchParams(hash.startsWith('#') ? hash.slice(1) : hash);
+        const hasRecoveryHash =
+          hashParams.get('type') === 'recovery' || hashParams.has('access_token');
         const {
           data: { session },
         } = await supabase.auth.getSession();

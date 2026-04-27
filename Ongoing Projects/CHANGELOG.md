@@ -7,6 +7,18 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-26 (T293 + T294 + T296 + T297 — page-walkthrough hardening pass) — _shipped, pushed to git/Vercel_
+
+### Four small hardening fixes across notifications/reset-password/contact/ideas
+
+- **T293** — `web/src/app/notifications/page.tsx:419`: notification rows without `action_url` were rendered as `<a href="#">` with `e.preventDefault()` — tappable but URL bar shows `#`, semantically a dead anchor. Now: `href={n.action_url || undefined}` (omits the attribute when null) plus `role="button"` + `tabIndex={0}` + `onKeyDown` handler so keyboard users can still mark-as-read with Enter/Space. Items with `action_url` retain native anchor semantics.
+- **T294** — `web/src/app/reset-password/page.tsx:69`: detection of Supabase auth recovery tokens in the URL hash was using `hash.includes('access_token=')` — matches any substring. Replaced with strict `URLSearchParams(hash.slice(1))` parse; only treats well-formed `type=recovery` or `access_token=*` hashes as authentic. Stops false positives from any unrelated content in the hash fragment.
+- **T296** — `web/src/app/ideas/page.tsx:147`: page footer hardcoded `Currently rendering at localhost:3333/ideas` — leaked dev-port info in production. Replaced with environment-neutral `Hidden from search engines. Not linked from the main site.`
+- **T297** — `web/src/app/contact/page.tsx:89`: form-submit gate was `email.includes('@')` — accepted `a@`, `@b`, `@` alone. Replaced with a standard email-shape regex `/^[^\s@]+@[^\s@]+\.[^\s@]+$/` (matches HTML5 `input type=email` validity closely enough for client-side gating; server still re-validates).
+- **Files** — `web/src/app/notifications/page.tsx`, `web/src/app/reset-password/page.tsx`, `web/src/app/contact/page.tsx`, `web/src/app/ideas/page.tsx`.
+
+---
+
 ## 2026-04-26 (T124 + T134 shipped on /login; T123 + T132 + T135 + T138 deleted as stale) — _shipped, pushed to git/Vercel_
 
 ### T124 + T134 — Login page autofocus + 44×44 password-toggle touch target

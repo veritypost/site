@@ -416,7 +416,15 @@ export default function NotificationsInbox() {
             {sectionItems.map((n) => (
               <a
                 key={n.id}
-                href={n.action_url || '#'}
+                href={n.action_url || undefined}
+                role={n.action_url ? undefined : 'button'}
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (!n.action_url && (e.key === 'Enter' || e.key === ' ')) {
+                    e.preventDefault();
+                    markOne(n.id);
+                  }
+                }}
                 onClick={(e) => {
                   if (!n.action_url) e.preventDefault();
                   markOne(n.id);
