@@ -201,42 +201,69 @@ $function$;
 
 -- ---------------------------------------------------------------------
 -- C. Drop kid_* RLS policies (14 policies)
+--
+-- IDEMPOTENT: each DROP POLICY is guarded by to_regclass(...) so a
+-- partial-replay (where the table itself was already dropped in a prior
+-- run) doesn't error on the missing relation.
 -- ---------------------------------------------------------------------
-DROP POLICY IF EXISTS kid_articles_admin_all ON public.kid_articles;
-DROP POLICY IF EXISTS kid_articles_block_adult_jwt ON public.kid_articles;
-DROP POLICY IF EXISTS kid_articles_read_kid_jwt ON public.kid_articles;
-
-DROP POLICY IF EXISTS kid_sources_admin_all ON public.kid_sources;
-DROP POLICY IF EXISTS kid_sources_block_adult_jwt ON public.kid_sources;
-DROP POLICY IF EXISTS kid_sources_read_kid_jwt ON public.kid_sources;
-
-DROP POLICY IF EXISTS kid_timelines_admin_all ON public.kid_timelines;
-DROP POLICY IF EXISTS kid_timelines_block_adult_jwt ON public.kid_timelines;
-DROP POLICY IF EXISTS kid_timelines_read_kid_jwt ON public.kid_timelines;
-
-DROP POLICY IF EXISTS kid_quizzes_admin_all ON public.kid_quizzes;
-DROP POLICY IF EXISTS kid_quizzes_block_adult_jwt ON public.kid_quizzes;
-DROP POLICY IF EXISTS kid_quizzes_read_kid_jwt ON public.kid_quizzes;
-
-DROP POLICY IF EXISTS kid_discovery_items_block_adult_jwt ON public.kid_discovery_items;
-DROP POLICY IF EXISTS kid_discovery_items_select_editor ON public.kid_discovery_items;
+DO $$
+BEGIN
+  IF to_regclass('public.kid_articles') IS NOT NULL THEN
+    EXECUTE 'DROP POLICY IF EXISTS kid_articles_admin_all ON public.kid_articles';
+    EXECUTE 'DROP POLICY IF EXISTS kid_articles_block_adult_jwt ON public.kid_articles';
+    EXECUTE 'DROP POLICY IF EXISTS kid_articles_read_kid_jwt ON public.kid_articles';
+  END IF;
+  IF to_regclass('public.kid_sources') IS NOT NULL THEN
+    EXECUTE 'DROP POLICY IF EXISTS kid_sources_admin_all ON public.kid_sources';
+    EXECUTE 'DROP POLICY IF EXISTS kid_sources_block_adult_jwt ON public.kid_sources';
+    EXECUTE 'DROP POLICY IF EXISTS kid_sources_read_kid_jwt ON public.kid_sources';
+  END IF;
+  IF to_regclass('public.kid_timelines') IS NOT NULL THEN
+    EXECUTE 'DROP POLICY IF EXISTS kid_timelines_admin_all ON public.kid_timelines';
+    EXECUTE 'DROP POLICY IF EXISTS kid_timelines_block_adult_jwt ON public.kid_timelines';
+    EXECUTE 'DROP POLICY IF EXISTS kid_timelines_read_kid_jwt ON public.kid_timelines';
+  END IF;
+  IF to_regclass('public.kid_quizzes') IS NOT NULL THEN
+    EXECUTE 'DROP POLICY IF EXISTS kid_quizzes_admin_all ON public.kid_quizzes';
+    EXECUTE 'DROP POLICY IF EXISTS kid_quizzes_block_adult_jwt ON public.kid_quizzes';
+    EXECUTE 'DROP POLICY IF EXISTS kid_quizzes_read_kid_jwt ON public.kid_quizzes';
+  END IF;
+  IF to_regclass('public.kid_discovery_items') IS NOT NULL THEN
+    EXECUTE 'DROP POLICY IF EXISTS kid_discovery_items_block_adult_jwt ON public.kid_discovery_items';
+    EXECUTE 'DROP POLICY IF EXISTS kid_discovery_items_select_editor ON public.kid_discovery_items';
+  END IF;
+END $$;
 
 -- ---------------------------------------------------------------------
 -- D. Drop tables (verify zero rows once more inline; CASCADE for FK refs)
+--
+-- IDEMPOTENT: each table is checked-then-dropped via to_regclass(...) so
+-- partial-replay scenarios (table already dropped in a prior partial run)
+-- don't error out. Safe to re-run end-to-end.
 -- ---------------------------------------------------------------------
 DO $$
 DECLARE
-  v_kid_articles_count int;
-  v_kid_sources_count int;
-  v_kid_timelines_count int;
-  v_kid_quizzes_count int;
-  v_kid_discovery_count int;
+  v_kid_articles_count int := 0;
+  v_kid_sources_count int := 0;
+  v_kid_timelines_count int := 0;
+  v_kid_quizzes_count int := 0;
+  v_kid_discovery_count int := 0;
 BEGIN
-  SELECT count(*) INTO v_kid_articles_count FROM public.kid_articles;
-  SELECT count(*) INTO v_kid_sources_count FROM public.kid_sources;
-  SELECT count(*) INTO v_kid_timelines_count FROM public.kid_timelines;
-  SELECT count(*) INTO v_kid_quizzes_count FROM public.kid_quizzes;
-  SELECT count(*) INTO v_kid_discovery_count FROM public.kid_discovery_items;
+  IF to_regclass('public.kid_articles') IS NOT NULL THEN
+    EXECUTE 'SELECT count(*) FROM public.kid_articles' INTO v_kid_articles_count;
+  END IF;
+  IF to_regclass('public.kid_sources') IS NOT NULL THEN
+    EXECUTE 'SELECT count(*) FROM public.kid_sources' INTO v_kid_sources_count;
+  END IF;
+  IF to_regclass('public.kid_timelines') IS NOT NULL THEN
+    EXECUTE 'SELECT count(*) FROM public.kid_timelines' INTO v_kid_timelines_count;
+  END IF;
+  IF to_regclass('public.kid_quizzes') IS NOT NULL THEN
+    EXECUTE 'SELECT count(*) FROM public.kid_quizzes' INTO v_kid_quizzes_count;
+  END IF;
+  IF to_regclass('public.kid_discovery_items') IS NOT NULL THEN
+    EXECUTE 'SELECT count(*) FROM public.kid_discovery_items' INTO v_kid_discovery_count;
+  END IF;
   IF v_kid_articles_count + v_kid_sources_count + v_kid_timelines_count
      + v_kid_quizzes_count + v_kid_discovery_count > 0 THEN
     RAISE EXCEPTION
