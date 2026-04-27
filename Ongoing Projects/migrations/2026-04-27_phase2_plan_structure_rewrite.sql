@@ -123,10 +123,13 @@ CREATE INDEX IF NOT EXISTS idx_subscriptions_next_renewal
 -- ---------------------------------------------------------------------
 -- F. Permission seeds (Phase 2 + Phase 4 prep)
 -- ---------------------------------------------------------------------
+-- deny_mode is varchar(10): valid values are 'hidden' or 'locked'.
+-- Use 'locked' for parent-controlled actions so unauthorized users see
+-- the gated CTA and a lock-message rather than the option being hidden.
 INSERT INTO public.permissions (key, display_name, category, ui_section, deny_mode)
 VALUES
-  ('family.seats.manage', 'Manage family seats (add/remove kid seats)', 'family', 'profile', 'allow_unless_blocked'),
-  ('family.kids.manage', 'Manage kid profiles on family plan', 'family', 'profile', 'allow_unless_blocked')
+  ('family.seats.manage', 'Manage family seats (add/remove kid seats)', 'family', 'profile', 'locked'),
+  ('family.kids.manage', 'Manage kid profiles on family plan', 'family', 'profile', 'locked')
 ON CONFLICT (key) DO NOTHING;
 
 COMMIT;

@@ -319,13 +319,16 @@ GRANT EXECUTE ON FUNCTION public.admin_apply_dob_correction(uuid, text, text) TO
 -- ---------------------------------------------------------------------
 -- G. Permission seed: admin.kids.dob_corrections.review
 -- ---------------------------------------------------------------------
+-- deny_mode is varchar(10): valid values are 'hidden' or 'locked'.
+-- Admin permissions hide rather than lock — unauthorized users shouldn't
+-- see the queue surface at all.
 INSERT INTO public.permissions (key, display_name, category, ui_section, deny_mode)
 VALUES (
   'admin.kids.dob_corrections.review',
   'Review kid DOB correction requests',
   'admin',
   'admin',
-  'allow_unless_blocked'
+  'hidden'
 )
 ON CONFLICT (key) DO NOTHING;
 
