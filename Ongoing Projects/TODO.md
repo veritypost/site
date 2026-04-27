@@ -581,15 +581,6 @@ Source: `Ongoing Projects/2026-04-27_AUTH_PERMS_SYSTEM_MAP.md`. 4 parallel Explo
 **File:** `web/src/app/api/auth/signup/route.js:57`. `.ilike('email', email)` does ASCII case-folding only — Unicode homoglyphs (Cyrillic 'а' U+0430 vs Latin 'a' U+0061) bypass the banned-account match.
 **Fix:** NFKD-normalize both sides before compare; or use a homoglyph-aware library; or normalize at insert time so the DB only stores canonical form. 5-line change.
 
-#### T300 partial — original migration applied; T300b follow-up drafted to close 2 gaps — **CRITICAL** (privacy/PII)
-**Status:** Original `2026-04-27_T300_public_profile_view.sql` applied; MCP audit caught two gaps that the follow-up migration fixes.
-**Gaps:**
-1. The pre-existing policy was named `users_select` (not `users_public_read` as my original DROP IF EXISTS targeted), so the broad `id=auth.uid() OR profile_visibility='public' OR is_admin_or_above()` policy survived. PERMISSIVE policies UNION; the broad public read still works for authenticated viewers reading other-user rows.
-2. `is_frozen` derived column missing from the view (added late in the original draft; owner applied an earlier version). Leaderboard's `eq('is_frozen', false)` filter fails silently.
-**Anon GRANT was correctly revoked** (verified `anon_can_select_users=false`), so unauthenticated callers ARE blocked. The remaining gap is authenticated-but-not-self-not-admin viewers.
-**Follow-up migration drafted:** `Ongoing Projects/migrations/2026-04-27_T300b_finish_public_profile_lockdown.sql`. Drops `users_select` + CREATE OR REPLACE the view with `is_frozen`. Owner applies.
-**All 8 caller paths already pre-swapped** (commits 540f2df + 09c550f) so T300b applies cleanly.
-
 #### T301 partial — Kids-security follow-up (parent confirmation + first-pair alert) — **HIGH** (kids security)
 **Status:** TTL reduced 7d → 24h shipped 2026-04-27 (`web/src/app/api/kids/pair/route.js:24`). Two follow-up defenses still pending:
 - Out-of-band parent confirmation in iOS app before JWT issues (kid types code → parent gets push to confirm BEFORE JWT mints).

@@ -7,6 +7,19 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (T300 closed — T300b verified live; column-level leak fully sealed) — _pending push to git_
+
+Owner applied T300b. MCP-verified:
+- `users_select` policy gone (the surviving broad `profile_visibility='public'` read path that left T300's leak open)
+- `is_frozen` column on `public_profiles_v` (leaderboard `eq('is_frozen', false)` filter now works)
+- Remaining policies on `public.users`: `users_self_read` + `users_admin_read` (PERMISSIVE) + `users_insert` + `users_update` + `users_select_block_kid_jwt` (RESTRICTIVE blocker for kid-delegated JWTs)
+
+T300 is fully closed. Public-profile column-level PII leak (email, plan_id, stripe_customer_id, cohort, frozen_at, kill-switch flags) is sealed. Body deleted from TODO.
+
+39 real items remain (was 40).
+
+---
+
 ## 2026-04-27 (wave 16 — T322 partial: 3 more events wired) — _shipped, pushed to git_ (commit 98f232f)
 
 6 of 19 KnownEventName types now fire (was 3): added `comment_post` (after `post_comment` RPC + scoring), `bookmark_add` (after row insert; skips on dedup), `verify_email_complete` (transition-only, not per-login). All `void trackServer` fire-and-forget. T322 body re-scoped to "6 of 19 wired; 13 remain." Deferred this wave: `subscribe_complete` (Stripe webhook 80+ lines deep), client-side mounts (`signup_start`, `article_read_start`), scroll/ad/quiz events (need sampling design).
