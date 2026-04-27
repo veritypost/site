@@ -8,6 +8,7 @@ import {
   useRef,
   createContext,
   useContext,
+  Suspense,
   CSSProperties,
   ReactNode,
 } from 'react';
@@ -412,7 +413,13 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
         tenureDays: daysSince(user?.created_at ?? null),
       }}
     >
-      <PageViewTrackListener />
+      {/* PageViewTrackListener calls useSearchParams() which triggers
+          client-side bailout during prerendering. Wrap in Suspense
+          (mirrors GAListener's pattern in layout.js) so the whole
+          route tree doesn't bail out of SSG. */}
+      <Suspense fallback={null}>
+        <PageViewTrackListener />
+      </Suspense>
       {loggedIn && user && <AccountStateBanner user={user} />}
       <div
         style={{
