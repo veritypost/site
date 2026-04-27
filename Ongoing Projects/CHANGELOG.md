@@ -7,6 +7,17 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (T16 — recipient allow_messages enforced at RPC + uniform 403 collapse) — _shipped, pushed to git/Vercel_
+
+### T16 — start_conversation honors recipient opt-out
+
+- **Migration applied** (owner): `Ongoing Projects/migrations/2026-04-27_T16_start_conversation_allow_messages.sql` adds a recipient-allow-messages check to `start_conversation(uuid, uuid)`. New error code `[DM_RECIPIENT_OPTED_OUT]`. MCP verified post-apply (`pg_get_functiondef LIKE '%DM_RECIPIENT_OPTED_OUT%'` returns true).
+- **Route patch:** `web/src/app/api/conversations/route.js` extends the T283 error-code-collapse to include `DM_RECIPIENT_OPTED_OUT` alongside `DM_PAID_PLAN`/`DM_MUTED`/`USER_NOT_FOUND`. All four collapse to a uniform `403 { error: 'cannot_dm' }` so response shape doesn't leak the recipient's opt-out preference.
+- **Closes the privacy hole** the audit flagged: third-party clients with the anon key can no longer force-create conversations with users who toggled `allow_messages` off — the data layer enforces it now, not just the UI.
+- **Files** — `Ongoing Projects/migrations/2026-04-27_T16_start_conversation_allow_messages.sql` (applied), `web/src/app/api/conversations/route.js`.
+
+---
+
 ## 2026-04-27 (Phase 3 — age banding, code shipped + migration staged) — _code shipped; migration staged for owner SQL editor apply_
 
 ### Context

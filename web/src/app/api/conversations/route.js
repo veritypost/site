@@ -73,16 +73,23 @@ export async function POST(request) {
     // Prefix is server-internal (never shipped to the client).
     const codeMatch = msg.match(/^\[([A-Z_]+)\]/);
     const code = codeMatch?.[1] || null;
-    // T283 — collapse USER_NOT_FOUND / DM_PAID_PLAN / DM_MUTED into a
-    // single `cannot_dm` 403. Distinguishing them by status code lets a
-    // caller enumerate which user_ids exist (404 vs 403) and which are
-    // on a paid tier vs blocked. Keep the granular reason in server
-    // logs only; the client-facing surface is uniform. Self-message and
-    // missing-ids are caller-input shape errors and stay as 400 — they
-    // don't leak target-user state.
+    // T283 + T16 — collapse USER_NOT_FOUND / DM_PAID_PLAN / DM_MUTED /
+    // DM_RECIPIENT_OPTED_OUT into a single `cannot_dm` 403.
+    // Distinguishing them by status code lets a caller enumerate which
+    // user_ids exist (404 vs 403), which are on a paid tier vs blocked,
+    // and now (post T16 RPC patch) which recipients have toggled
+    // allow_messages off. Keep the granular reason in server logs only;
+    // the client-facing surface is uniform. Self-message and missing-ids
+    // are caller-input shape errors and stay as 400 — they don't leak
+    // target-user state.
     let status;
     let userMsg;
-    if (code === 'DM_PAID_PLAN' || code === 'DM_MUTED' || code === 'USER_NOT_FOUND') {
+    if (
+      code === 'DM_PAID_PLAN' ||
+      code === 'DM_MUTED' ||
+      code === 'USER_NOT_FOUND' ||
+      code === 'DM_RECIPIENT_OPTED_OUT'
+    ) {
       status = 403;
       userMsg = 'cannot_dm';
     } else if (code === 'SELF_CONV') {
