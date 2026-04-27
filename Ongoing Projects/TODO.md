@@ -33,7 +33,8 @@ Do not pick up these IDs autonomously. The owner has explicitly reserved them. I
 
 **TODO.md items requiring owner decision/action:**
 - **T2** — Cookie consent banner: **OWNER DECIDED 2026-04-27 → Funding Choices (option A)**. Implementation deferred until AdSense console access is available; ready to ship as soon as owner signals "go."
-- **T17, T26, T173** — MCP `pg_proc` queries (require DB-read permission grant)
+- **T17** — VERIFIED 2026-04-27 — block enforcement missing from both DM RPCs. Migration drafted at `Ongoing Projects/migrations/2026-04-27_T17_dm_block_enforcement.sql`. Awaiting owner apply.
+- **T26, T173** — MCP `pg_proc` queries (require DB-read permission grant)
 - **T19** — Home feed prefs: wire vs. delete decision (owner direction)
 - **T20** — iOS expert application schema match (depends on editor process tolerance — owner)
 - **T34, T35, T54** — trust-positioning calls (downvotes, rank notifications, kids volume framing)
@@ -428,7 +429,12 @@ The numbered items below retain their original section placement for readability
 **Fix:** When `streak_current === 0 && streak_best > 0 && streak_freeze_remaining > 0` → "Your streak ended. Use a freeze to restore it? ([N] remaining)" with one button. Otherwise: "Streak reset — start a new one today."
 **Recommendation:** Mirror the kid surface presentation — already designed and shipping there.
 
-### T17 — Blocked-user DM protection appears UI-only — **CRITICAL** *pending MCP verify* (safety)
+### T17 — Blocked-user DM protection IS UI-only — **CRITICAL** (verified 2026-04-27, migration drafted, awaiting owner apply)
+**MCP verify 2026-04-27:** CONFIRMED REAL. `start_conversation` (post-T16) checks DM access + mute/ban + recipient allow_messages but NOT blocked_users. `post_message` checks DM access + mute/ban + participant + length + rate limit but NOT blocked_users between participants.
+**Net hole:** a blocked user can still (1) call `start_conversation` against the user who blocked them, (2) keep messaging in an existing conversation that pre-dates the block. UI hides; third-party clients bypass.
+**Migration drafted:** `Ongoing Projects/migrations/2026-04-27_T17_dm_block_enforcement.sql` adds bidirectional `blocked_users` checks to both RPCs + new error code `[DM_BLOCKED]`. For `post_message`, only direct (1:1) convos are gated; group convos (future shape) skip the check (block-in-multi-party is a per-message UX hide, not a send reject).
+**Apply order:** (1) owner runs migration, (2) extend `web/src/app/api/conversations/route.js` + `web/src/app/api/messages/route.js` to fold `DM_BLOCKED` into the existing T283 / T16 collapse so 403 stays uniform.
+**Status:** awaiting owner migration apply.
 **File:** `web/src/app/messages/page.tsx:232-264,1177-1183` (web filters via `blockedUserIds` for menu label only), `MessagesView.swift:494-499` (iOS filters locally because server returns blocked convos).
 **Fix:** Enforce blocks in `start_conversation` / `post_message` RPCs (or RLS). Apply server-side filter to conversation list reads on both platforms.
 **Recommendation:** Same principle as T16. **Safety logic at the boundary.** Pair with T16 — same RPC bodies, same review pass.
