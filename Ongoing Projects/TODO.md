@@ -810,10 +810,6 @@ System map §22 ("Cutover plan — taking the redesign live") was added after th
 **Coupling:** Co-ships with the T357 cutover OR ships earlier as a `/redesign/u/[username]` build that the T357 cutover then renames to `/u/[username]`. Either way, T330 (just-shipped 'hidden' check) AND T331 + T359 (iOS parallel) must all be in place before `PUBLIC_PROFILE_ENABLED` flips.
 **Estimated:** Multi-session build. T4 review (cross-surface, security-sensitive — leaks public PII if wrong).
 
-#### T362 — `update_metadata` RPC with JSONB merge semantics — **MEDIUM** (T5)
-**Source:** Half of the T307 spec — re-stamping `metadata.terms_accepted_at` after an email change requires merging into the existing JSONB column, not overwriting it. A plain `.update({ metadata: {...} })` clobbers other keys (`age_confirmed_at`, `terms_version`, etc.).
-**Fix:** SECURITY DEFINER RPC `update_metadata(p_user_id uuid, p_keys jsonb)` that does `UPDATE users SET metadata = COALESCE(metadata, '{}'::jsonb) || p_keys WHERE id = p_user_id`. Then call from `email-change/route.js` after the email-flip succeeds. T5 — halt and queue migration.
-
 #### T361 — Standardize `billing_period` strings to `'month'` / `'year'` — **MEDIUM** (T5 schema)
 **Source:** Half of the locked T56 spec — the 'lifetime' drop shipped, the string-standardize half remains. Current state: `web/src/app/admin/plans/page.tsx:56` writes `'monthly'` / `'annual'`; DB-side reads (e.g., `web/src/app/profile/settings/page.tsx:4253` checks `billing_period === 'year'`) and Stripe glue (`web/src/lib/plans.js:58,78`) use `'month'` / `'year'`. Existing plan rows likely carry `'monthly'`/`'annual'` from the admin form; some carry `'month'`/`'year'` from direct seeding.
 **Fix:** (1) Update admin BILLING_PERIODS to `['', 'month', 'year']`. (2) Migration to `UPDATE plans SET billing_period = CASE WHEN 'monthly' THEN 'month' WHEN 'annual' THEN 'year' ELSE billing_period END;` (idempotent). (3) Sweep all callers to read only the canonical strings. (4) Optional CHECK constraint on `plans.billing_period IN ('month','year')`. T5 — halt and queue migration.

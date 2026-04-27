@@ -122,12 +122,6 @@ export async function POST(request) {
   //                           stale until the trigger fired
   //   verify_locked_at=null  a previously locked user (failed-verify lockout)
   //                           changing email gets a clean slate at the new address
-  //
-  // The third half of T307 — re-stamping `metadata.terms_accepted_at` so the
-  // user re-acknowledges ToS at the new identity — is deferred to T362
-  // because a plain `metadata: {...}` PATCH would clobber the other JSONB
-  // keys (age_confirmed_at, terms_version, etc.). Needs an `update_metadata`
-  // RPC with `metadata || $1` semantics to merge cleanly.
   const { error: updErr } = await service
     .from('users')
     .update({
@@ -153,6 +147,18 @@ export async function POST(request) {
         '[auth.email-change] bump_user_perms_version failed:',
         bumpErr.message || bumpErr
       );
+    }
+
+    // T307 final half — re-stamp metadata.terms_accepted_at so the user
+    // re-acknowledges ToS at the new identity. Uses the update_metadata
+    // RPC (T362) which JSONB-merges into the existing metadata object,
+    // preserving age_confirmed_at / terms_version / etc. Best-effort.
+    const { error: metaErr } = await service.rpc('update_metadata', {
+      p_user_id: user.id,
+      p_keys: { terms_accepted_at: new Date().toISOString() },
+    });
+    if (metaErr) {
+      console.error('[auth.email-change] update_metadata failed:', metaErr.message || metaErr);
     }
   }
 

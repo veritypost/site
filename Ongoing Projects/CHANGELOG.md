@@ -7,6 +7,27 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (corrected migrations applied — T319 + T352 idx + T362 verified live; T307 final half wired) — _pending push to git_
+
+Owner applied the 3 corrected migration files. MCP verified all three landed:
+- `family_xl_remaining = 0` — T319 done (2 rows + 60 dependent rows cleared)
+- `audit_log_created_at_idx` exists — T352 index done
+- `update_metadata` function exists — T362 done
+
+### T307 final half wired now that T362 RPC exists
+
+`web/src/app/api/auth/email-change/route.js` — added the deferred `metadata.terms_accepted_at` re-stamp via the new `update_metadata` RPC. Best-effort: failure logs but doesn't block the email-change response (auth.updateUser already kicked off the confirmation email). Comment block in the route updated to remove the "deferred to T362" note since T362 is now live. T362 body deleted from TODO.
+
+### T307 spec is now fully shipped:
+- **(a) `verify_locked_at = NULL`** ✓ (shipped earlier today)
+- **(b) `public.users.email = normalized`** ✓ (shipped earlier today)
+- **(c) `metadata.terms_accepted_at = now()` via JSONB merge** ✓ (this commit, unblocked by T362)
+- Plus the perms-version bump (T306) ✓
+
+- **Files** — `web/src/app/api/auth/email-change/route.js`, `Ongoing Projects/TODO.md` (T362 body deleted), `Ongoing Projects/CHANGELOG.md` (this entry).
+
+---
+
 ## 2026-04-27 (post-migration audit — diagnose what landed, write 4 corrected migration files) — _shipped, pushed to git_ (commit 7f716b2)
 
 Owner reported "applied all 8 migrations but some failed." Ran an MCP audit. **4 of the 8 had issues; 4 landed cleanly.**
