@@ -234,17 +234,24 @@ export default function LeaderboardPage() {
 
       if (activeTab === 'Rising Stars') {
         const thirty = periodSince('This month')!;
+        // T300 — read via public_profiles_v. The view pre-filters
+        // is_banned=false + deletion_scheduled_for IS NULL, so those
+        // explicit filters are dropped. `is_frozen` is a derived
+        // boolean on the view; filter out frozen users without leaking
+        // the timestamp.
+        // `as never` casts: public_profiles_v was added by migration after
+        // the last database-types regen; same pattern lib/trackServer.ts
+        // uses for the events table. Drop on next types regeneration.
         const { data, error: rsErr } = await supabase
-          .from('users')
+          .from('public_profiles_v' as never)
           .select(
             'id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert, verity_score, streak_current, quizzes_completed_count, articles_read_count, comment_count'
           )
-          .eq('email_verified', true)
-          .eq('is_banned', false)
-          .eq('show_on_leaderboard', true)
-          .is('frozen_at', null)
-          .gte('created_at', thirty.toISOString())
-          .order('verity_score', { ascending: false })
+          .eq('email_verified' as never, true as never)
+          .eq('show_on_leaderboard' as never, true as never)
+          .eq('is_frozen' as never, false as never)
+          .gte('created_at' as never, thirty.toISOString() as never)
+          .order('verity_score' as never, { ascending: false })
           .limit(50);
         if (rsErr) {
           console.error('[leaderboard] rising stars load failed', rsErr);
@@ -301,12 +308,14 @@ export default function LeaderboardPage() {
         // The RPC already applied the privacy filters; we still re-select
         // user rows here because the RPC returns only (user_id, reads_count)
         // and the UI needs avatars, badges, and the broader stat columns.
+        // T300 — read via public_profiles_v (whitelisted columns only).
+        // `as never` cast: see comment on first occurrence above.
         const { data } = await supabase
-          .from('users')
+          .from('public_profiles_v' as never)
           .select(
             'id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert, verity_score, streak_current, quizzes_completed_count, articles_read_count, comment_count'
           )
-          .in('id', ids);
+          .in('id' as never, ids as never);
         const rows = (data as LeaderUser[] | null) || [];
         const sorted = rows.slice().sort((a, b) => (counts[b.id] || 0) - (counts[a.id] || 0));
         setUsers(sorted.map((u) => ({ ...u, displayScore: counts[u.id] || 0 })));
@@ -319,16 +328,19 @@ export default function LeaderboardPage() {
       const orderBy: 'articles_read_count' | 'verity_score' =
         activeTab === 'Top Readers' ? 'articles_read_count' : 'verity_score';
       const pageLimit = me ? 50 : 3;
+      // T300 — read via public_profiles_v. is_banned + deletion already
+      // pre-filtered by the view; `is_frozen` derived boolean filters
+      // frozen users without exposing the timestamp.
+      // `as never` cast: see comment on first occurrence above.
       const { data, error: defErr } = await supabase
-        .from('users')
+        .from('public_profiles_v' as never)
         .select(
           'id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert, verity_score, streak_current, quizzes_completed_count, articles_read_count, comment_count'
         )
-        .eq('email_verified', true)
-        .eq('is_banned', false)
-        .eq('show_on_leaderboard', true)
-        .is('frozen_at', null)
-        .order(orderBy, { ascending: false })
+        .eq('email_verified' as never, true as never)
+        .eq('show_on_leaderboard' as never, true as never)
+        .eq('is_frozen' as never, false as never)
+        .order(orderBy as never, { ascending: false })
         .limit(pageLimit);
       if (defErr) {
         console.error('[leaderboard] default load failed', defErr);

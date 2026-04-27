@@ -7,6 +7,30 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (wave 15 — T300 caller-side sweep COMPLETE; migration ready to apply) — _pending push to git_
+
+### Shipped (3 remaining caller swaps + 1 migration update)
+
+- **`/leaderboard/page.tsx`** — 3 of 4 reads swapped to `public_profiles_v` (Rising Stars at line 235, RPC re-select at line 304, Default rank at line 322). The 4th read at line 167 is a self-row read that needs `email_verified` + `plan_status` columns not in the view; stays as `from('users')` because RLS allows `id=auth.uid()`. Existing inline filters (`is_banned=false`, `frozen_at IS NULL`) replaced — the view pre-filters `is_banned` + `deletion_scheduled_for`, and the new `is_frozen` derived boolean filters frozen users without exposing the timestamp.
+
+- **`/components/CommentThread.tsx`** — refactored from `users!user_id(...)` relation embed to a separate `public_profiles_v` batch + client-side merge. The embed would have 403'd post-T300 because PostgREST applies RLS to each table in an embed, and the tightened users RLS denies non-self/non-admin reads. The separate batch through the view sidesteps it entirely while preserving the existing `comment.users.username` shape that `CommentRow` renders.
+
+- **`VerityPost/VerityPost/PublicProfileView.swift:360`** — swapped to `public_profiles_v`. Dropped `is_banned` from the column list (the view excludes banned users so the column isn't needed). All other columns stay — they're all in the view's whitelist.
+
+- **Migration update — `is_frozen` derived boolean added.** `Ongoing Projects/migrations/2026-04-27_T300_public_profile_view.sql`. Adds `(u.frozen_at IS NOT NULL) AS is_frozen` to the view's SELECT. Lets leaderboard hide frozen users without exposing the freeze timestamp (which would defeat T300's purpose). Filters happen client-side via `eq('is_frozen', false)`.
+
+### T300 is now safe to apply
+
+All 8 caller paths swapped. Apply order: paste the migration → verify `public_profiles_v` exists + RLS tightened on `public.users` (`anon` SELECT revoked, `authenticated` policy = self-or-admin) → monitor.
+
+T300 body re-scoped from "migration drafted + 5 of 7 caller swaps" to "ready to apply — all swaps complete."
+
+TypeScript clean. `as never` casts on the view name + `.eq` arg names in 4 occurrences (leaderboard × 3, CommentThread × 1) — same pattern lib/trackServer.ts uses for the events table; drop on next types regen.
+
+- **Files** — `web/src/app/leaderboard/page.tsx`, `web/src/components/CommentThread.tsx`, `VerityPost/VerityPost/PublicProfileView.swift`, `Ongoing Projects/migrations/2026-04-27_T300_public_profile_view.sql`, `Ongoing Projects/TODO.md`, `Ongoing Projects/CHANGELOG.md`.
+
+---
+
 ## 2026-04-27 (wave 14 — T300 caller-side sweep, 5 of 7 paths swapped) — _shipped, pushed to git_ (commit 540f2df)
 
 5 public-facing read paths now use `public_profiles_v` instead of `from('users').select(...)`:

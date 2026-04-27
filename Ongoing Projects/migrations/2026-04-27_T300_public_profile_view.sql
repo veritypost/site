@@ -99,7 +99,11 @@ SELECT
   u.show_on_leaderboard,
   u.profile_visibility,
   u.email_verified,
-  u.created_at
+  u.created_at,
+  -- Derived booleans for caller-side filtering without leaking
+  -- timestamps. `is_frozen` lets the leaderboard hide frozen users
+  -- without exposing the freeze date.
+  (u.frozen_at IS NOT NULL) AS is_frozen
 FROM public.users u
 WHERE
   u.profile_visibility = 'public'

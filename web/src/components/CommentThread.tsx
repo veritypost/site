@@ -112,11 +112,21 @@ export default function CommentThread({
 
   const loadAll = useCallback(async () => {
     setLoading(true);
+    // T300 — author info now fetched via a separate public_profiles_v
+    // batch instead of a relation embed. Pre-T300, we used
+    // `users!user_id(...)` to embed author display data in the same
+    // round-trip; PostgREST applies RLS to each table in an embed, so
+    // post-T300 (RLS on users tightened to self/admin) the embed would
+    // 403 for normal viewers reading other authors' comments. The
+    // separate batch through public_profiles_v sidesteps that — the
+    // view's whitelisted columns are exactly the ones the comment row
+    // needs for render. Authors who've been deleted/banned/private
+    // since posting won't appear in the batch; the merge below produces
+    // `users: null` for them, which the existing `user.username || 'user'`
+    // fallback in CommentRow handles.
     const { data: rows, error: loadErr } = await supabase
       .from('comments')
-      .select(
-        '*, users!user_id(id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert)'
-      )
+      .select('*')
       .eq('article_id', articleId)
       .eq('status', 'visible')
       .is('deleted_at', null)
@@ -129,9 +139,32 @@ export default function CommentThread({
       return;
     }
     const rowsSafe = (rows || []) as CommentWithAuthor[];
-    setComments(rowsSafe);
 
     const userIds = Array.from(new Set(rowsSafe.map((c) => c.user_id).filter(Boolean)));
+
+    // Fetch authors via public_profiles_v + merge into the comment rows
+    // so the existing CommentRow render (`comment.users.username` etc.)
+    // keeps working without further changes. `as never` cast: view added
+    // by migration after the last database-types regen.
+    type AuthorRow = NonNullable<CommentWithAuthor['users']>;
+    let authorById = new Map<string, AuthorRow>();
+    if (userIds.length > 0) {
+      const { data: authorRows } = await supabase
+        .from('public_profiles_v' as never)
+        .select('id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert')
+        .in('id' as never, userIds as never);
+      authorById = new Map(
+        ((authorRows as unknown as AuthorRow[]) || [])
+          .filter((a): a is AuthorRow & { id: string } => typeof a?.id === 'string')
+          .map((a) => [a.id, a])
+      );
+    }
+    const enriched = rowsSafe.map((c) => ({
+      ...c,
+      users: c.user_id ? (authorById.get(c.user_id) ?? undefined) : undefined,
+    }));
+    setComments(enriched);
+
     const commentIds = rowsSafe.map((c) => c.id);
 
     if (currentUserId) {

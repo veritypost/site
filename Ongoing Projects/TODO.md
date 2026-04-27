@@ -581,14 +581,14 @@ Source: `Ongoing Projects/2026-04-27_AUTH_PERMS_SYSTEM_MAP.md`. 4 parallel Explo
 **File:** `web/src/app/api/auth/signup/route.js:57`. `.ilike('email', email)` does ASCII case-folding only — Unicode homoglyphs (Cyrillic 'а' U+0430 vs Latin 'a' U+0061) bypass the banned-account match.
 **Fix:** NFKD-normalize both sides before compare; or use a homoglyph-aware library; or normalize at insert time so the DB only stores canonical form. 5-line change.
 
-#### T300 partial — migration drafted + 5 of 7 caller swaps shipped — **CRITICAL** (privacy/PII)
-**Migration:** `Ongoing Projects/migrations/2026-04-27_T300_public_profile_view.sql` (drafted 2026-04-27, awaiting owner apply).
-**Caller swaps shipped 2026-04-27 (commit 540f2df):** `/u/[username]/page.tsx`, `/u/[username]/layout.js`, `/card/[username]/page.js`, `/card/[username]/layout.js`, `/card/[username]/opengraph-image.js`. All read via `public_profiles_v`; column lists within whitelisted set; existing `'private'/'hidden'` branches now dead code (view filters them) but harmless.
-**Still pending caller swaps:**
-- `web/src/app/leaderboard/page.tsx` (4 occurrences at lines 168/238/305/327) — needs column-list audit; some leaderboard projections may select fields outside the view.
-- `web/src/components/CommentThread.tsx` — `users!user_id(...)` relation embed; needs runtime verification post-apply (embed may bypass RLS via the comments-side relation).
-- `VerityPost/VerityPost/PublicProfileView.swift:360` — iOS read.
-**Apply order:** ship the remaining 3 swaps first, then apply the migration.
+#### T300 ready to apply — migration drafted + ALL 8 caller swaps shipped — **CRITICAL** (privacy/PII)
+**Migration:** `Ongoing Projects/migrations/2026-04-27_T300_public_profile_view.sql`. Updated 2026-04-27 to add `is_frozen` derived boolean column to the view (lets the leaderboard hide frozen users without exposing the timestamp). Owner applies.
+**Caller swaps complete:**
+- `/u/[username]/page.tsx`, `/u/[username]/layout.js`, `/card/[username]/page.js`, `/card/[username]/layout.js`, `/card/[username]/opengraph-image.js` (commit 540f2df)
+- `/leaderboard/page.tsx` Rising Stars / RPC re-select / Default rank queries (3 of 4 reads — line 167 self-row stays as `from('users')` because it needs `email_verified` + `plan_status` columns not in the view; that read is allowed by RLS via `id=auth.uid()`)
+- `/components/CommentThread.tsx` — refactored from `users!user_id(...)` relation embed to a separate `public_profiles_v` batch + client-side merge. Embed-via-RLS gotcha sidestepped.
+- iOS `VerityPost/VerityPost/PublicProfileView.swift:360`
+**Safe to apply now.** Apply order: paste the migration into Supabase SQL editor → verify `public_profiles_v` exists + RLS tightened → monitor.
 
 #### T301 partial — Kids-security follow-up (parent confirmation + first-pair alert) — **HIGH** (kids security)
 **Status:** TTL reduced 7d → 24h shipped 2026-04-27 (`web/src/app/api/kids/pair/route.js:24`). Two follow-up defenses still pending:

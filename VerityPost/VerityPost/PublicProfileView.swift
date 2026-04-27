@@ -356,8 +356,18 @@ struct PublicProfileView: View {
             // still has table-level SELECT today, but future column REVOKE
             // sweeps would break SELECT * silently. Matches the anon GRANT
             // list from migration 092b + public_user_profiles view shape.
-            let row: VPUser? = try await client.from("users")
-                .select("id, username, display_name, bio, avatar_url, avatar_color, banner_url, verity_score, streak_current, is_expert, expert_title, expert_organization, is_verified_public_figure, articles_read_count, quizzes_completed_count, comment_count, followers_count, following_count, show_activity, profile_visibility, is_banned, email_verified, show_on_leaderboard, created_at")
+            // T300 — read via public_profiles_v. The view pre-filters
+            // profile_visibility='public' + is_banned=false +
+            // deletion_scheduled_for IS NULL, so private/hidden/banned/
+            // deletion-scheduled users return no row (caught by the
+            // `notFound = true` branch below). Sensitive columns
+            // (email, plan_id, stripe_customer_id, cohort, frozen_at,
+            // kill-switch flags) never reach this surface.
+            //
+            // Dropped `is_banned` from the column list — the view
+            // already excludes banned users so the column isn't needed.
+            let row: VPUser? = try await client.from("public_profiles_v")
+                .select("id, username, display_name, bio, avatar_url, avatar_color, banner_url, verity_score, streak_current, is_expert, expert_title, expert_organization, is_verified_public_figure, articles_read_count, quizzes_completed_count, comment_count, followers_count, following_count, show_activity, profile_visibility, email_verified, show_on_leaderboard, created_at")
                 .eq("username", value: username)
                 .limit(1)
                 .single()
