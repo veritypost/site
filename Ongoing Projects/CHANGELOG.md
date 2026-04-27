@@ -7,7 +7,7 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
-## 2026-04-27 (wave 15 — T300 caller-side sweep COMPLETE; migration ready to apply) — _pending push to git_
+## 2026-04-27 (wave 15 — T300 caller-side sweep COMPLETE; migration ready to apply) — _shipped, pushed to git_ (commit 09c550f)
 
 ### Shipped (3 remaining caller swaps + 1 migration update)
 
