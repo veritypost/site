@@ -198,13 +198,11 @@ async function handle() {
   };
 }
 
-export async function GET(request: Request) {
+export const GET = withCronLog(CRON_NAME, async (request: Request) => {
   if (!verifyCronAuth(request)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
-  return withCronLog(CRON_NAME, async () => {
-    const result = await handle();
-    await logCronHeartbeat(CRON_NAME, result);
-    return NextResponse.json(result);
-  });
-}
+  const result = await handle();
+  await logCronHeartbeat(CRON_NAME, result);
+  return NextResponse.json(result);
+});
