@@ -7,7 +7,7 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
-## 2026-04-27 (wave 12 — T26 migration drafted, T348 partial, T57 backend shipped) — _pending push to git_
+## 2026-04-27 (wave 12 — T26 migration drafted, T348 partial, T57 backend shipped) — _shipped, pushed to git_ (commit 17b4679)
 
 ### Shipped (2 backend, 1 migration draft)
 
