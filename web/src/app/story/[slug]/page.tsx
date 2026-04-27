@@ -28,6 +28,18 @@ import { ARTICLE_REPORT_REASONS } from '@/lib/reportReasons';
 // relation gives us a single shape consumers can index off without unions.
 type ArticleRow = Tables<'articles'> & {
   categories: { name: string | null; slug: string | null } | null;
+  // T243 — joined author profile via `fk_articles_author_id` so the byline
+  // renders without a second roundtrip. FK is dual-targeted (users +
+  // public_user_profiles); the disambiguated join in the fetch picks `users`
+  // explicitly. Null when the article has no author_id (legacy or
+  // pipeline-authored content).
+  author: {
+    id: string;
+    username: string | null;
+    display_name: string | null;
+    is_expert: boolean | null;
+    expert_title: string | null;
+  } | null;
   // Legacy UI flag: the badge reads `is_developing`, but the column was never
   // added to the table. Keep optional so the render path still compiles and
   // behaves exactly as before (branch stays false at runtime).
@@ -83,6 +95,74 @@ const LAUNCH_HIDE_ANON_INTERSTITIAL = true;
 // profile-report dialog import from the same module so admin triage
 // sees one consistent enum across surfaces.
 const REPORT_CATEGORIES = ARTICLE_REPORT_REASONS;
+
+// T216 — module-level style objects. The story page's render path
+// allocates a long tail of inline style objects on every render; a few
+// shapes repeat 3-5+ times. Lifting them out of the component body
+// keeps each `<div style={…}>` reference identity-stable across
+// renders, which lets React skip the style-prop diff and avoids
+// per-render allocations. Only patterns that are fully static OR have
+// a clean static base + dynamic override live here. One-off styles
+// stay inline.
+// Uppercase tiny headers — "Timeline", "More in [Category]". Two
+// fixed bottom-margin variants because the override-with-spread
+// pattern re-allocates per render and erases the gain.
+const SECTION_LABEL_STYLE_MB16: React.CSSProperties = {
+  fontSize: 11,
+  textTransform: 'uppercase',
+  fontWeight: 600,
+  color: 'var(--dim)',
+  marginBottom: 16,
+  letterSpacing: '0.04em',
+  fontFamily: 'var(--font-sans)',
+};
+const SECTION_LABEL_STYLE_MB10: React.CSSProperties = {
+  fontSize: 11,
+  textTransform: 'uppercase',
+  fontWeight: 600,
+  color: 'var(--dim)',
+  marginBottom: 10,
+  letterSpacing: '0.04em',
+  fontFamily: 'var(--font-sans)',
+};
+const LOCK_TITLE_STYLE: React.CSSProperties = {
+  fontSize: 14,
+  fontWeight: 700,
+  color: 'var(--text-primary)',
+  marginBottom: 6,
+};
+const LOCK_BODY_STYLE: React.CSSProperties = {
+  fontSize: 13,
+  color: 'var(--dim)',
+  lineHeight: 1.5,
+};
+// Save / Share / TTS row buttons. Static base; the Save button overrides
+// `color`, `cursor`, and `opacity` per at-cap state via spread.
+const ACTION_BUTTON_STYLE: React.CSSProperties = {
+  padding: '10px 14px',
+  borderRadius: 8,
+  minHeight: 44,
+  border: '1px solid var(--border)',
+  background: 'transparent',
+  color: 'var(--dim)',
+  fontSize: 13,
+  cursor: 'pointer',
+  fontFamily: 'var(--font-sans)',
+};
+// Anonymous "free reads" pill on the article header.
+const FREE_READS_PILL_STYLE: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  marginBottom: 12,
+  padding: '4px 10px',
+  borderRadius: 20,
+  background: 'var(--card)',
+  border: '1px solid var(--border)',
+  fontSize: 11,
+  fontWeight: 600,
+  color: 'var(--dim)',
+  fontFamily: 'var(--font-sans)',
+};
 
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return '';
@@ -482,14 +562,35 @@ export default function StoryPage() {
 
   useEffect(() => {
     if (!slug) return;
+    // T217 — cancellation flag. The article-load effect chains many
+    // awaits (article → settings → auth → user row → quiz RPC →
+    // Promise.all of timelines/sources/quiz/related → bookmarks →
+    // plan cap). If the user navigates to another story mid-flight,
+    // every state setter that fires after the new effect runs would
+    // overwrite the next article's data with this one's stale results
+    // — a classic race that surfaced as "wrong title flashes" on
+    // back-button + immediate forward. The Supabase JS client has no
+    // AbortController surface, so we gate every setter on a stable
+    // `cancelled` ref local to this effect run. Cleanup flips it.
+    // The /api/stories/read POST gets a real AbortController since
+    // it's a raw fetch.
+    let cancelled = false;
+    const ac = new AbortController();
     (async () => {
       setLoading(true);
       try {
         const { data: storyData, error: storyErr } = await supabase
           .from('articles')
-          .select('*, categories!fk_articles_category_id(name, slug)')
+          .select(
+            // T243 — disambiguate author join: `fk_articles_author_id`
+            // points at both `users` and `public_user_profiles`; pin the
+            // alias to `users!fk_articles_author_id` so PostgREST picks
+            // the writable base table.
+            '*, categories!fk_articles_category_id(name, slug), author:users!fk_articles_author_id(id, username, display_name, is_expert, expert_title)'
+          )
           .eq('slug', slug)
           .single();
+        if (cancelled) return;
         if (storyErr) console.error('[story] load failed', storyErr);
         if (!storyData) {
           setLoading(false);
@@ -501,6 +602,7 @@ export default function StoryPage() {
           console.error('[story] settings load failed', err);
           return {};
         });
+        if (cancelled) return;
 
         // T234 — read the AI-disclosure master switch alongside the
         // existing settings consumers (free_article_limit, registration_wall,
@@ -511,6 +613,7 @@ export default function StoryPage() {
         const {
           data: { user: authUser },
         } = await supabase.auth.getUser();
+        if (cancelled) return;
         if (authUser) setCurrentUser(authUser as AuthUser);
 
         if (!authUser) {
@@ -550,15 +653,23 @@ export default function StoryPage() {
           }
         }
 
+        // T218 — single user fetch covers tier, ttsDefault metadata,
+        // AND plan_id for the bookmark-cap resolution below. Previously
+        // the bookmark-cap branch issued a second `users` SELECT for
+        // `plan_id`; folding it here drops one round-trip on every
+        // authenticated story load.
+        let planIdForCap: string | null = null;
         if (authUser) {
           const { data: userData } = await supabase
             .from('users')
-            .select('email_verified, metadata, plans(tier)')
+            .select('email_verified, metadata, plan_id, plans(tier)')
             .eq('id', authUser.id)
             .single();
+          if (cancelled) return;
           const userRow = userData as {
             email_verified?: boolean | null;
             metadata?: { a11y?: { ttsDefault?: boolean } } | null;
+            plan_id?: string | null;
             plans?: { tier?: string | null } | null;
           } | null;
           setUserTier(userRow?.plans?.tier || 'free');
@@ -566,9 +677,11 @@ export default function StoryPage() {
           // this on mount, gated by canListenTts and a per-article
           // sessionStorage key to fire once per page load.
           setTtsAutoStart(!!userRow?.metadata?.a11y?.ttsDefault);
+          planIdForCap = userRow?.plan_id ?? null;
 
           await refreshAllPermissions();
           await refreshIfStale();
+          if (cancelled) return;
           setCanBookmarkAdd(hasPermission('article.bookmark.add'));
           setCanListenTts(hasPermission('article.listen_tts'));
           setCanViewBody(hasPermission('article.view.body'));
@@ -578,11 +691,18 @@ export default function StoryPage() {
 
           // Record the open now (completed: false) — server won't score or
           // bump view_count until a real engagement signal flips it to true.
+          // T217 — abort signal: if the user navigates away mid-load
+          // we cancel the in-flight write so a stale "open" event
+          // doesn't trail the new story load. AbortError is silent.
           fetch('/api/stories/read', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ articleId: storyData.id, completed: false }),
-          }).catch((err) => console.error('[story] read-open signal failed', err));
+            signal: ac.signal,
+          }).catch((err) => {
+            if (err?.name === 'AbortError') return;
+            console.error('[story] read-open signal failed', err);
+          });
         }
 
         const storyId = storyData.id;
@@ -600,6 +720,7 @@ export default function StoryPage() {
             'user_passed_article_quiz',
             { p_user_id: authUser.id, p_article_id: storyId }
           );
+          if (cancelled) return;
           if (passErr) {
             console.error('[story.user_passed_article_quiz]', passErr.message);
             setQuizPassError(true);
@@ -642,6 +763,7 @@ export default function StoryPage() {
             .eq('article_id', storyId),
           relatedQuery,
         ]);
+        if (cancelled) return;
         setTimeline((timelineRes.data as TimelineRow[] | null) || []);
         setSources((sourcesRes.data as SourceRow[] | null) || []);
         setQuizPoolSize(quizPoolRes.count || 0);
@@ -657,6 +779,7 @@ export default function StoryPage() {
             .eq('user_id', authUser.id)
             .eq('article_id', storyId)
             .maybeSingle();
+          if (cancelled) return;
           if (bookmarkRes) {
             setBookmarked(true);
             setBookmarkId(bookmarkRes.id);
@@ -669,22 +792,17 @@ export default function StoryPage() {
             .from('bookmarks')
             .select('id', { count: 'exact', head: true })
             .eq('user_id', authUser.id);
+          if (cancelled) return;
           if (typeof bookmarkCount === 'number') setBookmarkTotal(bookmarkCount);
           // T-016: resolve the DB-side bookmark cap for the user's plan.
-          const { data: planProfile } = await supabase
-            .from('users')
-            .select('plan_id')
-            .eq('id', authUser.id)
-            .maybeSingle();
-          const cap = await getPlanLimitValue(
-            supabase,
-            planProfile?.plan_id ?? null,
-            'bookmarks',
-            10
-          );
+          // T218 — plan_id captured by the earlier user fetch above; the
+          // dedicated `users.select('plan_id')` round-trip is gone.
+          const cap = await getPlanLimitValue(supabase, planIdForCap, 'bookmarks', 10);
+          if (cancelled) return;
           if (typeof cap === 'number') setBookmarkCap(cap);
         }
       } catch (err) {
+        if (cancelled) return;
         console.error('Story load error:', err);
         // On a transient perms/users fetch failure, fail-open so a
         // logged-in reader with a valid article doesn't see the locked
@@ -694,9 +812,13 @@ export default function StoryPage() {
         setCanViewSources(true);
         setCanViewTimeline(true);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
+    return () => {
+      cancelled = true;
+      ac.abort();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
@@ -744,6 +866,10 @@ export default function StoryPage() {
   useEffect(() => {
     if (!story || !currentUser || completedSentRef.current) return;
 
+    // T217 — abort signal so a navigation away mid-fetch cancels the
+    // in-flight read-complete write. AbortError is silenced; any
+    // other error is logged as before.
+    const ac = new AbortController();
     const markComplete = (readPercentage: number | null) => {
       if (completedSentRef.current) return;
       completedSentRef.current = true;
@@ -755,7 +881,11 @@ export default function StoryPage() {
           completed: true,
           readPercentage: readPercentage ?? null,
         }),
-      }).catch((err) => console.error('[story] read-complete signal failed', err));
+        signal: ac.signal,
+      }).catch((err) => {
+        if (err?.name === 'AbortError') return;
+        console.error('[story] read-complete signal failed', err);
+      });
     };
 
     // M-09: gate the dwell-timer behind visibility so a tab that has
@@ -777,6 +907,7 @@ export default function StoryPage() {
     return () => {
       clearTimeout(dwellTimer);
       window.removeEventListener('scroll', onScroll);
+      ac.abort();
     };
   }, [story, currentUser]);
 
@@ -1114,11 +1245,7 @@ export default function StoryPage() {
             textAlign: 'center',
           }}
         >
-          <div
-            style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}
-          >
-            Every article has a comprehension quiz.
-          </div>
+          <div style={LOCK_TITLE_STYLE}>Every article has a comprehension quiz.</div>
           <div style={{ fontSize: 13, color: 'var(--dim)', lineHeight: 1.5, marginBottom: 14 }}>
             Pass it and the discussion opens — your comment shows you actually read the story.
           </div>
@@ -1180,19 +1307,7 @@ export default function StoryPage() {
   const emptyStateRelated =
     relatedInCategory.length > 0 ? (
       <div>
-        <div
-          style={{
-            fontSize: 11,
-            textTransform: 'uppercase',
-            fontWeight: 600,
-            color: 'var(--dim)',
-            marginBottom: 10,
-            letterSpacing: '0.04em',
-            fontFamily: 'var(--font-sans)',
-          }}
-        >
-          More in {categoryName || 'this section'}
-        </div>
+        <div style={SECTION_LABEL_STYLE_MB10}>More in {categoryName || 'this section'}</div>
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 6 }}>
           {relatedInCategory.map((r) => (
             <li key={r.id}>
@@ -1224,9 +1339,7 @@ export default function StoryPage() {
     // hasn't passed — surface a retry. Server-side post_comment will
     // still enforce the gate independently if they try to post.
     <div style={lockPanelStyle}>
-      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
-        Couldn&rsquo;t check your quiz status.
-      </div>
+      <div style={LOCK_TITLE_STYLE}>Couldn&rsquo;t check your quiz status.</div>
       <div style={{ fontSize: 13, color: 'var(--dim)', lineHeight: 1.5, marginBottom: 12 }}>
         We&rsquo;ll know once we can reach the server again.
       </div>
@@ -1252,10 +1365,8 @@ export default function StoryPage() {
     // an informational panel instead of silence. D6 still holds — actual
     // comment content stays hidden; only the gating copy is shown.
     <div style={lockPanelStyle}>
-      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
-        Pass the quiz to join the discussion.
-      </div>
-      <div style={{ fontSize: 13, color: 'var(--dim)', lineHeight: 1.5 }}>
+      <div style={LOCK_TITLE_STYLE}>Pass the quiz to join the discussion.</div>
+      <div style={LOCK_BODY_STYLE}>
         5 questions about what you just read. Get 3 right and the conversation opens.
       </div>
     </div>
@@ -1265,9 +1376,7 @@ export default function StoryPage() {
     // the locked-panel shape so every tab state has visible content,
     // and surface the Create-free-account CTA inline.
     <div style={lockPanelStyle}>
-      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
-        Discussion is for signed-in readers.
-      </div>
+      <div style={LOCK_TITLE_STYLE}>Discussion is for signed-in readers.</div>
       <div style={{ fontSize: 13, color: 'var(--dim)', lineHeight: 1.5, marginBottom: 12 }}>
         Create a free account, then pass a short quiz to join the comments on any article.
       </div>
@@ -1483,21 +1592,7 @@ export default function StoryPage() {
                     it never reads "6 of 5". NOT gated by LAUNCH_HIDE_ANON_INTERSTITIAL
                     — the interstitial and the pill are independent features. */}
                 {!currentUser && anonViewCount > 0 && (
-                  <div
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      marginBottom: 12,
-                      padding: '4px 10px',
-                      borderRadius: 20,
-                      background: 'var(--card)',
-                      border: '1px solid var(--border)',
-                      fontSize: 11,
-                      fontWeight: 600,
-                      color: 'var(--dim)',
-                      fontFamily: 'var(--font-sans)',
-                    }}
-                  >
+                  <div style={FREE_READS_PILL_STYLE}>
                     {Math.min(anonViewCount, freeReadLimit)} of {freeReadLimit} free reads
                   </div>
                 )}
@@ -1641,6 +1736,53 @@ export default function StoryPage() {
                   </div>
                 )}
 
+                {/* T243 — author byline. Renders only when the article has a
+                    resolved author (author_id non-null + the joined row came
+                    back). Expert flag adds a subtle inline badge. Pipeline-
+                    authored / legacy articles with no author_id render
+                    nothing here, preserving the original layout. */}
+                {story.author && (
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: 'var(--dim)',
+                      marginBottom: 8,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <span>
+                      By{' '}
+                      <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                        {story.author.display_name || story.author.username || 'Verity Post'}
+                      </span>
+                    </span>
+                    {story.author.is_expert && (
+                      <span
+                        title={story.author.expert_title || 'Verified expert'}
+                        style={{
+                          display: 'inline-block',
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: 'var(--accent)',
+                          background: 'var(--card)',
+                          border: '1px solid var(--border)',
+                          padding: '2px 8px',
+                          borderRadius: 999,
+                          letterSpacing: '0.02em',
+                          fontFamily: 'var(--font-sans)',
+                        }}
+                      >
+                        {story.author.expert_title
+                          ? `Expert · ${story.author.expert_title}`
+                          : 'Expert'}
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 <div
                   style={{
                     fontSize: 13,
@@ -1698,20 +1840,7 @@ export default function StoryPage() {
                         </button>
                       );
                     })()}
-                    <button
-                      onClick={handleShare}
-                      style={{
-                        padding: '10px 14px',
-                        borderRadius: 8,
-                        minHeight: 44,
-                        border: '1px solid var(--border)',
-                        background: 'transparent',
-                        color: 'var(--dim)',
-                        fontSize: 13,
-                        cursor: 'pointer',
-                        fontFamily: 'var(--font-sans)',
-                      }}
-                    >
+                    <button onClick={handleShare} style={ACTION_BUTTON_STYLE}>
                       {shareMsg || 'Share'}
                     </button>
                   </div>
@@ -1877,18 +2006,7 @@ export default function StoryPage() {
                 so the tab is never an empty pane. */}
             {showMobileTimeline && (
               <div>
-                <div
-                  style={{
-                    fontSize: 11,
-                    textTransform: 'uppercase',
-                    fontWeight: 600,
-                    color: 'var(--dim)',
-                    marginBottom: 16,
-                    letterSpacing: '0.04em',
-                  }}
-                >
-                  Timeline
-                </div>
+                <div style={SECTION_LABEL_STYLE_MB16}>Timeline</div>
                 {canViewTimeline ? (
                   <Timeline events={timeline} />
                 ) : (
@@ -1955,18 +2073,7 @@ export default function StoryPage() {
                 alignSelf: 'flex-start',
               }}
             >
-              <div
-                style={{
-                  fontSize: 11,
-                  textTransform: 'uppercase',
-                  fontWeight: 600,
-                  color: 'var(--dim)',
-                  marginBottom: 16,
-                  letterSpacing: '0.04em',
-                }}
-              >
-                Timeline
-              </div>
+              <div style={SECTION_LABEL_STYLE_MB16}>Timeline</div>
               <Timeline events={timeline} />
             </aside>
           )}
@@ -2013,19 +2120,7 @@ export default function StoryPage() {
               borderTop: '1px solid var(--border)',
             }}
           >
-            <div
-              style={{
-                fontSize: 11,
-                textTransform: 'uppercase',
-                fontWeight: 600,
-                color: 'var(--dim)',
-                marginBottom: 16,
-                letterSpacing: '0.04em',
-                fontFamily: 'var(--font-sans)',
-              }}
-            >
-              More in {categoryName || 'this section'}
-            </div>
+            <div style={SECTION_LABEL_STYLE_MB16}>More in {categoryName || 'this section'}</div>
             <ul
               style={{
                 listStyle: 'none',

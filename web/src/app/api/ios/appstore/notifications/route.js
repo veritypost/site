@@ -118,6 +118,15 @@ export async function POST(request) {
   // above. If the stuck row is younger than 5min, assume it's a
   // concurrent duplicate and short-circuit; older than 5min, treat
   // it as abandoned and re-run the handler against the existing id.
+  //
+  // T174 — pattern aligned with the Stripe webhook's stuck-row reclaim
+  // (see web/src/app/api/stripe/webhook/route.js, the in_flight branch
+  // gated by STUCK_PROCESSING_SECONDS = 5 * 60). Stripe uses a conditional
+  // UPDATE with .in('processing_status', ['processing', 'received']) to
+  // race-safely reclaim — Apple's path here only needs to inspect 'received'
+  // because Apple's claim path doesn't transition through 'processing' (the
+  // INSERT lands directly at 'received'). The 5-minute window is identical
+  // on both sides; defense-in-depth and behavior is unchanged.
   if (prior?.processing_status === 'received') {
     const ageMs = prior.created_at ? Date.now() - Date.parse(prior.created_at) : 0;
     if (ageMs < 5 * 60 * 1000) {

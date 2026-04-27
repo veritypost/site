@@ -1329,6 +1329,61 @@ Return JSON:
       const flaggedOutlets = plagResult.results
         .filter((r) => r.similarity >= settings.plagiarism_rewrite_pct)
         .map((r) => r.outlet);
+      // T236 — capture the exact additionalInstructions value passed to the
+      // plagiarism rewrite under a distinct key in input_params.prompt_snapshot.
+      // The run-wide `overrides` map already contains `plagiarism_check`, but
+      // this records the value as actually consumed at the call site so the
+      // audit trail survives any future refactor that decouples the override
+      // map from per-step consumption. Read-modify-write merges into the
+      // existing snapshot. Fail-OPEN: snapshot is observability, not gating.
+      const plagAdditional = promptOverrides.get('plagiarism_check') ?? null;
+      try {
+        const { data: snapCur, error: snapErr } = await service
+          .from('pipeline_runs')
+          .select('input_params')
+          .eq('id', runId)
+          .maybeSingle();
+        if (!snapErr) {
+          const curParams =
+            snapCur?.input_params &&
+            typeof snapCur.input_params === 'object' &&
+            !Array.isArray(snapCur.input_params)
+              ? (snapCur.input_params as Record<string, unknown>)
+              : {};
+          const curSnap =
+            curParams.prompt_snapshot &&
+            typeof curParams.prompt_snapshot === 'object' &&
+            !Array.isArray(curParams.prompt_snapshot)
+              ? (curParams.prompt_snapshot as Record<string, unknown>)
+              : {};
+          const curOverrides =
+            curSnap.overrides &&
+            typeof curSnap.overrides === 'object' &&
+            !Array.isArray(curSnap.overrides)
+              ? (curSnap.overrides as Record<string, unknown>)
+              : {};
+          const nextOverrides = {
+            ...curOverrides,
+            'plagiarism.additional_instructions': plagAdditional,
+          };
+          const nextParams: Record<string, unknown> = {
+            ...curParams,
+            prompt_snapshot: { ...curSnap, overrides: nextOverrides },
+          };
+          await service
+            .from('pipeline_runs')
+            .update({ input_params: nextParams as Json })
+            .eq('id', runId);
+        }
+      } catch (snapWriteErr) {
+        pipelineLog.warn('newsroom.generate.plagiarism_snapshot_failed', {
+          run_id: runId,
+          cluster_id,
+          audience,
+          error_message:
+            snapWriteErr instanceof Error ? snapWriteErr.message : String(snapWriteErr),
+        });
+      }
       const rewriteRes = await rewriteForPlagiarism({
         body: finalBodyMarkdown,
         sourceTexts: sourceTexts.map((s) => ({ outlet: s.outlet, text: s.text })),
@@ -1337,7 +1392,7 @@ Return JSON:
         pipeline_run_id: runId,
         cluster_id,
         signal: req.signal,
-        additionalInstructions: promptOverrides.get('plagiarism_check'),
+        additionalInstructions: plagAdditional ?? undefined,
       });
       totalCostUsd += rewriteRes.cost_usd;
       if (rewriteRes.rewrite_status === 'failed') {

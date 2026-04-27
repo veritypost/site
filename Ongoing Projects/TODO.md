@@ -506,10 +506,6 @@ The numbered items below retain their original section placement for readability
 **Fix:** Weekly cron diffs each user's rank vs 7 days ago. In-app notification (not push) for moves of 3+ spots, top-10 entry/exit. Cap at 1/week.
 **Recommendation:** **Don't push** — rank changes are check-in-worthy, not ping-worthy. In-app surface only.
 
-### T36 — Profile opens on metric dashboard for new users — **MEDIUM**
-**File:** `web/src/app/profile/page.tsx:623-701`, `VerityPost/VerityPost/ProfileView.swift:557-576,727-728`
-**Fix:** When all activity metrics are zero, show one onboarding card: "Read an article and pass the quiz to start building your score." Link to home/browse.
-
 ### T37 — iOS browse is a subset of web browse — **MEDIUM**
 **File:** `VerityPost/VerityPost/HomeView.swift:577-657` (plain category list); web shows counts + top-3 trending + filter + Latest strip.
 **Fix:** Add article count + 1-2 article previews per category row on iOS.
@@ -610,27 +606,9 @@ The numbered items below retain their original section placement for readability
 
 ## OPERATIONAL DEBT
 
-### T70 — `currentschema` artifact untracked at repo root — **DEBT**
-**Fix:** Either commit it as a reference snapshot, or add to `.gitignore`. Today it's noise in `git status`.
-**Recommendation:** **Commit** + add `npm run schema:dump` script that re-generates it. Schema as code → easier code review of structural changes.
-
-### T71 — CHANGELOG references nonexistent paths — **DEBT**
-**Files:** Top entry "IA shift bundle" cites `Ongoing Projects/migrations/2026-04-26_profile_categories_canonical_binding.sql` (dir doesn't exist) and `Ongoing Projects/Sessions-Pending/BrowseView_iOS_Session_Prep.md` (empty dir).
-**Fix:** Either restore the missing files from git (likely deleted in the recent restructure sweep) or update the CHANGELOG entry to reflect actual state.
-**Recommendation:** Apply the migration directly via MCP (current pattern per memory) and update CHANGELOG to drop the file reference. The Browse session-prep doc is moot — the iOS Browse swap didn't ship to ContentView (still on `case .mostInformed`).
-
 ### T72 — iOS Browse-tab commit/code drift — **DEBT** (investigate)
 **Files:** Commits `79fd8ae` + `0826728` claim Browse swap; `ContentView.swift:182,194` still has `case .mostInformed`. No `BrowseView.swift`.
 **Fix:** Read full `ContentView.swift` + `git log -p ContentView.swift` to determine whether the swap landed under a different name, was reverted, or was never applied.
-
-### T73 — Wave 1 → Wave 2 permissions migration both paths still live — **DEBT** (architectural)
-**File:** `web/src/lib/permissions.js` — legacy `get_my_capabilities(section)` + new `compute_effective_perms()` both used.
-**Risk:** Callers on different paths can drift within the 60s poll window on perm-state changes.
-**Fix:** Inventory remaining `getCapabilities` / `useCapabilities` call sites. Plan a Wave 1 retirement window OR document why both stay.
-**Recommendation:** **Retire Wave 1.** Section-scoped caching is an obsolete optimization once the full resolver lands. One sweep, then delete `get_my_capabilities` RPC.
-
-### T75 — `web/src/lib/password.js` is legacy PBKDF2 hashing — **DEBT**
-**Fix:** Grep for imports. If zero, delete. If non-zero, the call sites are also legacy and should migrate to Supabase Auth.
 
 ### T77 — `MASTER-6` (password verification) needs SHIPPED marker — **DEBT** (owner action)
 **Status:** `web/src/app/api/auth/verify-password/route.js` exists with `requireAuth`, 5/hour rate limit, ephemeral client, `record_failed_login_by_email`. Settings password card calls it. **No code change needed.**
@@ -692,12 +670,6 @@ The numbered items below retain their original section placement for readability
 **Recommendation:** Standard PWA push stack. Dedicated session — not bundleable with T1.
 
 ### MEDIUM — quality and parity
-
-#### T97 — Web signup email-availability check fails silently on network error — **MEDIUM**
-**File:** `web/src/app/signup/page.tsx:77-100` (catch block sets status to `'idle'`).
-**Problem:** Debounced availability check times out → state reverts to "idle" with no UX signal. User submits with potentially-duplicate email and only sees rejection at submit time.
-**Fix:** On catch, set a dedicated `'check_failed'` state and render a small "Couldn't verify availability — we'll check on submit" hint.
-**Recommendation:** Truth-in-UI. Consistent with T19 / T44.
 
 #### T102 — iOS splash 10s timeout has no slow-network grace — **MEDIUM**
 **File:** `VerityPost/VerityPost/AuthViewModel.swift:80` (hard 10-second timeout).
@@ -821,15 +793,6 @@ The numbered items below retain their original section placement for readability
 **File:** `web/src/app/api/comments/route.js` — verification: no app-layer length check; the `post_comment` RPC may enforce length but its body wasn't inspected. **MCP-verify-first** before deciding whether app-layer cap is duplicative or genuinely missing.
 **Fix:** If RPC enforces, mirror at app layer with same threshold for fast-fail UX. If RPC doesn't enforce, app-layer cap is required.
 
-#### T174 — Apple App Store webhook idempotency pattern differs from Stripe — **LOW** (defense)
-**File:** `web/src/app/api/ios/appstore/notifications/route.js:121-126`. Verification: the route checks `prior.processing_status === 'received'` and reclaims only if `ageMs < 5 * 60 * 1000` (i.e., still in concurrent window). Older rows short-circuit. Original "can re-run" framing was imprecise. The substantive gap is just consistency with Stripe's `in('processing_status', [...])` guard pattern at `webhook/route.js:130-136`.
-**Fix:** Align with Stripe pattern for consistency, even though current behavior is safe. Pure defense-in-depth.
-
-#### T177 — Sensitive routes don't enforce recent re-auth (`auth_time`) — **LOW** (OWASP-class hardening)
-**File:** `/api/auth/email-change`, `/api/billing/cancel`, etc. Hours-old session can mutate sensitive state.
-**Fix:** Reject sensitive routes if `auth_time > 15min`. Requires `/api/auth/re-verify` route.
-**Note:** Magic-link auth shape changes this — see AUTH-MIGRATION; revisit post-migration.
-
 #### T182 — `EventsClient.shared` observer never removed — **MEDIUM** (anti-pattern)
 **File:** `VerityPost/VerityPost/EventsClient.swift:18-23`. Singleton OK today, but `[weak self]` + deinit hygiene lacking.
 **Fix:** Block-based observer with `[weak self]`; explicit deinit removal.
@@ -901,47 +864,9 @@ Items below already moved to Pre-Launch Assessment (Apple/Sentry/COPPA-CRITICAL)
 
 ### Performance (T215-T223)
 
-#### T215 — Home page is full client component, blocks first paint — **HIGH**
-**File:** `web/src/app/page.tsx:3` (`'use client'`). All data fetches in `useEffect`. Anon LCP ~2-3s on 3G.
-**Fix:** Convert to async server component; server-render stories + categories; gate dynamic in `<Suspense>`.
-
-#### T216 — Story page has 102 inline style objects recreated each render — **MEDIUM**
-**File:** `web/src/app/story/[slug]/page.tsx`. 102 `style={{...}}` literals; static styles re-allocated on every render.
-**Fix:** Extract `const headingStyle = {...}` for repeated objects.
-
-#### T217 — Story page has 10 `useEffect` hooks with mixed deps — **HIGH**
-**File:** `web/src/app/story/[slug]/page.tsx:376-734`. Stale-closure risk on session rotation; silent comment/bookmark write failures possible.
-**Fix:** Consolidate to 2-3 effects; AbortController for in-flight cleanup.
-
-#### T218 — Story page fires 9+ parallel queries on mount — **MEDIUM**
-**File:** `web/src/app/story/[slug]/page.tsx:468, 578-593, 602-626`. 9 round-trips on 3G = 9-15s load.
-**Fix:** Inline `timelines` + `sources` as joined rows; cache user plan in AuthContext.
-
 #### T233 — Hard-delete on articles, no soft-delete window — **HIGH**
 **File:** `web/src/app/api/admin/articles/[id]/route.ts:611`. `.delete()` removes permanently; audit log writes after delete (orphan if persist fails).
 **Fix:** Soft-delete via `deleted_at`; write audit before mutation; cron purges after 30 days.
-
-#### T236 — Plagiarism rewrite prompt overrides not audited per-run — **MEDIUM**
-**File:** `web/src/lib/pipeline/plagiarism-check.ts:82-84`. Admin `additionalInstructions` appended silently; no record of which override was active.
-**Fix:** Snapshot override into `pipeline_runs.metadata` at run start; surface in audit log.
-
-#### T237 — Cost-cap fail-closed has no audit trail — **MEDIUM**
-**File:** `web/src/lib/pipeline/cost-tracker.ts:154-175`. RPC error = throw; caller rethrows but no observable event.
-**Fix:** Emit explicit log entry / Sentry breadcrumb on fail-closed with `pipeline_run_id`.
-
-#### T238 — Hard-delete on users orphans authored content — **MEDIUM**
-**File:** `web/src/app/api/admin/users/[id]/route.ts:54`. Comments/articles still reference deleted user_id.
-**Fix:** Soft-delete via `deleted_at`; RLS hides deleted user's content from public queries.
-
-#### T239 — Featured/trending curation logic opaque — **MEDIUM**
-**File:** `web/src/app/browse/page.tsx:164-165`. "Most recent 3" hardcoded client-side; `is_featured` schema column never set or surfaced.
-**Fix:** Admin pin UI; "Featured by editors" label; track in audit log.
-
-#### T243 — Article author byline not rendered — **LOW** (trust)
-**File:** `web/src/app/story/[slug]/page.tsx`. `articles.author_id` never displayed; readers don't see author/expert/AI status.
-**Fix:** Fetch author on story load; render author card with expert badge + verification status.
-
-### Mobile QA / Edge Cases (T244-T254)
 
 #### T244 — Pull-to-refresh stacks parallel network calls — **MEDIUM**
 **File:** `HomeView.swift:180`, `ProfileView.swift:173`, `SettingsView.swift:652`. `.refreshable` doesn't cancel prior in-flight load.

@@ -21,6 +21,7 @@
  */
 
 import { createServiceClient } from '@/lib/supabase/server';
+import { captureMessage } from '@/lib/observability';
 import { CostCapExceededError, type Provider } from './errors';
 
 // ----------------------------------------------------------------------------
@@ -151,8 +152,33 @@ export async function estimateCostUsd(
 
 const FAIL_CLOSED_SENTINEL = -1;
 
-export async function checkCostCap(estimated_cost_usd: number): Promise<void> {
+// T237 — caller-supplied context for fail-closed observability.
+// All fields optional so older call sites continue to compile; callModel()
+// wires {pipeline_run_id, step_name, cluster_id, provider, model} through.
+export interface CheckCostCapContext {
+  pipeline_run_id?: string | null;
+  step_name?: string | null;
+  cluster_id?: string | null;
+  provider?: string | null;
+  model?: string | null;
+}
+
+export async function checkCostCap(
+  estimated_cost_usd: number,
+  context: CheckCostCapContext = {}
+): Promise<void> {
   if (!Number.isFinite(estimated_cost_usd) || estimated_cost_usd < 0) {
+    // T237 — observable: bad estimates indicate caller bug, not policy
+    // breach. Emit before throwing so the audit trail captures it.
+    await captureMessage('pipeline cost-cap fail-closed', 'error', {
+      reason: 'invalid_estimate',
+      attempted_cost: estimated_cost_usd,
+      pipeline_run_id: context.pipeline_run_id ?? null,
+      step_name: context.step_name ?? null,
+      cluster_id: context.cluster_id ?? null,
+      provider: context.provider ?? null,
+      model: context.model ?? null,
+    });
     throw new CostCapExceededError(
       `[cost-tracker] invalid estimate: ${estimated_cost_usd}`,
       estimated_cost_usd,
@@ -167,6 +193,18 @@ export async function checkCostCap(estimated_cost_usd: number): Promise<void> {
   } catch (err) {
     // Fail CLOSED — F7-DECISIONS invariant #3
     console.error('[cost-tracker:checkCostCap] fail-closed', err);
+    // T237 — emit observable event before re-throwing so cap-check
+    // outages are visible in Sentry, not just Vercel function logs.
+    await captureMessage('pipeline cost-cap fail-closed', 'error', {
+      reason: 'cap_check_unavailable',
+      attempted_cost: estimated_cost_usd,
+      underlying_error: err instanceof Error ? err.message : String(err),
+      pipeline_run_id: context.pipeline_run_id ?? null,
+      step_name: context.step_name ?? null,
+      cluster_id: context.cluster_id ?? null,
+      provider: context.provider ?? null,
+      model: context.model ?? null,
+    });
     throw new CostCapExceededError(
       `[cost-tracker] cap check unavailable; failing closed`,
       estimated_cost_usd,
@@ -175,6 +213,18 @@ export async function checkCostCap(estimated_cost_usd: number): Promise<void> {
   }
 
   if (estimated_cost_usd > caps.per_run_usd) {
+    // T237 — observable: real per-run cap breach. Same event name as
+    // infra-miss path; `reason` discriminates so dashboards can split.
+    await captureMessage('pipeline cost-cap fail-closed', 'error', {
+      reason: 'per_run_cap_breach',
+      attempted_cost: estimated_cost_usd,
+      cap_usd: caps.per_run_usd,
+      pipeline_run_id: context.pipeline_run_id ?? null,
+      step_name: context.step_name ?? null,
+      cluster_id: context.cluster_id ?? null,
+      provider: context.provider ?? null,
+      model: context.model ?? null,
+    });
     throw new CostCapExceededError(
       `[cost-tracker] per-run cap breached: est=$${estimated_cost_usd.toFixed(
         6
@@ -186,6 +236,19 @@ export async function checkCostCap(estimated_cost_usd: number): Promise<void> {
 
   const projected = today_usd + estimated_cost_usd;
   if (projected > caps.daily_usd) {
+    // T237 — observable: real daily cap breach.
+    await captureMessage('pipeline cost-cap fail-closed', 'error', {
+      reason: 'daily_cap_breach',
+      attempted_cost: estimated_cost_usd,
+      today_usd,
+      projected_usd: projected,
+      cap_usd: caps.daily_usd,
+      pipeline_run_id: context.pipeline_run_id ?? null,
+      step_name: context.step_name ?? null,
+      cluster_id: context.cluster_id ?? null,
+      provider: context.provider ?? null,
+      model: context.model ?? null,
+    });
     throw new CostCapExceededError(
       `[cost-tracker] daily cap breached: today=$${today_usd.toFixed(
         6

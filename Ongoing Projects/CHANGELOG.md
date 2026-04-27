@@ -7,6 +7,74 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (Parallel sweep wave 5 — 15 items + 4 stale-confirmed across 6 clusters) — _shipped, pushed to git/Vercel_
+
+### Cluster — Small UX (T36 + T243; T97 stale)
+
+- **T36** — `web/src/app/profile/page.tsx`: when `articles_read_count + comment_count === 0`, single onboarding card renders above the tabs ("Welcome to Verity Post — read an article and pass the quiz to start building your score." + Find-an-article CTA). Auto-hides once user has any activity. Tabs unchanged.
+- **T243** — `web/src/app/story/[slug]/page.tsx`: extended `ArticleRow` with typed `author` field, augmented existing single-roundtrip article fetch with `author:users!fk_articles_author_id(...)` (disambiguated FK explicitly to `users` due to dual-target). Byline render added above the date/sources/read-time meta line: "By <displayName or username>" with inline "Expert · <title>" pill when `is_expert`.
+- **T97 STALE-OBSOLETE** — `/signup` is a redirect to `/login`; the email-availability check no longer exists in either page (closed-beta refactor removed it).
+
+### Cluster — DEBT cleanup (T70 + T71 + T73 + T75)
+
+- **T70 STALE-RESOLVED** — `currentschema` is git-tracked (committed 2026-04-26 in restructure). Optional `npm run schema:dump` script skipped (no clean Supabase CLI recipe matches the existing format).
+- **T71 STALE** — historical CHANGELOG entries describe shipped work; their file paths reflect repo state at the time. Correctly historical.
+- **T73 RESOLVED (inventory delivered)** — new `Ongoing Projects/migrations/T73_permissions_wave1_retirement.md`. Key finding: legacy `getCapabilities` path has only 2 consumers (`PermissionGate` + `PermissionGateInline`); tree-wide grep for `<PermissionGate` JSX returns ZERO consumer sites. Components themselves are dead code. Retirement may be a straight delete rather than migration. Doc lays out the swap-safety analysis and 5-step recommended sequencing.
+- **T75 STALE (premise wrong)** — `web/src/lib/password.js` contains zero PBKDF2 hashing. File is exclusively policy/strength helpers (`PASSWORD_MIN_LENGTH`, `PASSWORD_REQS`, `validatePasswordServer`, `passwordStrength`, etc.). The PBKDF2 hashing the audit was thinking of lives in `web/src/lib/kidPin.js` — that's the active kids COPPA flow with documented `pin_hash_algo: 'sha256' → 'pbkdf2'` rehash-on-verify migration. Not legacy. Not a candidate for retirement.
+
+### Cluster — Backend defense (T174 + T177)
+
+- **T174** — `web/src/app/api/ios/appstore/notifications/route.js`: comment block above the `received` reclaim guard cross-references the Stripe webhook's stuck-row reclaim (`STUCK_PROCESSING_SECONDS = 5*60`, `.in('processing_status', ['processing', 'received'])`). Explains why Apple only inspects `'received'` — Apple's path doesn't transition through `'processing'`. Comment-only.
+- **T177 TODO-MARKERS-ONLY** — `web/src/app/api/auth/email-change/route.js` + `web/src/app/api/billing/cancel/route.js` got TODO blocks describing what auth_time-based recent-auth gate would look like under magic-link (`session.last_sign_in_at` 15min threshold + `/api/auth/re-verify` route owed). Defer until AUTH-MIGRATION ships.
+
+### Cluster — Story page perf (T216 + T217 + T218)
+
+NOTE: this cluster integrated cleanly with all 6 prior-wave story-page edits (T13/T30/T63/T130/T141/T234/T243/T11).
+
+- **T216** — extracted 5 module-level `React.CSSProperties` constants (SECTION_LABEL_STYLE_MB16/MB10, LOCK_TITLE_STYLE, LOCK_BODY_STYLE, ACTION_BUTTON_STYLE, FREE_READS_PILL_STYLE). 9 style-object allocations per render eliminated on the hot render path. Spread+override patterns deliberately left inline (re-allocation would erase the gain).
+- **T217** — article-load effect now has `let cancelled = false` + AbortController; every `await` is gated by `if (cancelled) return;` before its state setter. Kills the "wrong story flashes" race when slug changes mid-flight. Two more AbortControllers added on the read-open + read-complete fetch effects. 10 effects NOT consolidated (each is scoped + minimal-deps).
+- **T218** — eliminated the second `users.select('plan_id')` round-trip by folding `plan_id` into the existing first user fetch. Did NOT inline timelines/sources into the article fetch (PostgREST nested-resource ordering quirks + RLS risk; current `Promise.all` shape is fine). Did NOT replace user fetch with AuthContext (AuthContext doesn't expose `metadata.a11y.ttsDefault` per T63 wiring + has different `userTier` semantics).
+
+### Cluster — Home page → server component (T215)
+
+This is a substantial refactor. Full conversion shipped:
+
+- **`web/src/app/page.tsx` rewritten** as async server component. All three Supabase queries (today's stories, breaking row, categories) run on the server in parallel via cookie-bearing `createClient()`. HTML for masthead + hero + 19 supporting cards streams on first byte. `export const dynamic = 'force-dynamic'` so Next never statically caches the freshness-critical "today" feed.
+- **NEW `web/src/app/_homeShared.ts`** — shared types/constants/timeShort. Non-`'use client'` so importable by both server + client tree.
+- **NEW `web/src/app/_HomeBreakingStrip.tsx`** — client island, runs `refreshAllPermissions` + perm checks for `home.breaking_banner.view`/`.paid`.
+- **NEW `web/src/app/_HomeFooter.tsx`** — client island for auth-aware CTA + `usePageViewTrack`.
+- **NEW `web/src/app/_HomeFetchFailed.tsx`** — client island retry button (`router.refresh`).
+
+Page went from ~825 lines all-client to ~445 server + ~270 across 3 small client islands. Expected anon LCP improvement on 3G: ~1.5-2.5s (cuts roughly half) — masthead + hero now paint in TTFB+layout time, not TTFB+JS+RTT time. T110 timezone disclosure preserved verbatim. Home-cap removal preserved.
+
+### Cluster — Editorial integrity (T236 + T237 + T238 + T239)
+
+- **T236** — `web/src/app/api/admin/pipeline/generate/route.ts`: snapshots `additionalInstructions` passed to `rewriteForPlagiarism()` into `pipeline_runs.input_params.prompt_snapshot.overrides['plagiarism.additional_instructions']` at the call site. Fail-OPEN on snapshot-write error.
+- **T237** — `web/src/lib/pipeline/cost-tracker.ts`: emits `await captureMessage('pipeline cost-cap fail-closed', 'error', {...})` before each of the four throw paths (invalid estimate, cap-check unavailable, per-run cap breach, daily cap breach), with reason discriminator + attempted_cost + run_id + step/cluster/provider/model context. Throw behavior unchanged. Optional `CheckCostCapContext` arg threaded through `call-model.ts`.
+- **T238** — `web/src/app/api/admin/users/[id]/route.ts`: replaced hard `.delete()` with soft-delete UPDATE — `deleted_at = now()`, `display_name = 'deleted'`, `email = 'deleted-<id>@deleted.invalid'`, `is_banned = true`, `is_active = false`, PII null-out on username/avatar_url/banner_url/bio/first_name/last_name/phone. Idempotent. `recordAdminAction` logs `newValue: { soft_deleted: true }`. Two TODOs: (1) RLS verification on public reads (needs migration), (2) future GDPR hard-purge cron at 30d.
+- **T239** — `web/src/app/browse/page.tsx`: separate Supabase fetch ordered `is_featured DESC, published_at DESC LIMIT 3`. `FeaturedCard` gained `isFeatured` flag; `hasEditorPick` state swaps section title from "Latest" → "Featured by editors" when any displayed card is editor-pinned. `articles.is_featured` schema column verified to exist. Admin pin UI deliberately not built (separate task).
+
+### Files touched
+
+- web/src/app/api/admin/pipeline/generate/route.ts
+- web/src/app/api/admin/users/[id]/route.ts
+- web/src/app/api/auth/email-change/route.js
+- web/src/app/api/billing/cancel/route.js
+- web/src/app/api/ios/appstore/notifications/route.js
+- web/src/app/browse/page.tsx
+- web/src/app/page.tsx (substantial rewrite)
+- web/src/app/profile/page.tsx
+- web/src/app/story/[slug]/page.tsx
+- web/src/lib/pipeline/call-model.ts
+- web/src/lib/pipeline/cost-tracker.ts
+- web/src/app/_homeShared.ts (NEW)
+- web/src/app/_HomeBreakingStrip.tsx (NEW)
+- web/src/app/_HomeFooter.tsx (NEW)
+- web/src/app/_HomeFetchFailed.tsx (NEW)
+- Ongoing Projects/migrations/T73_permissions_wave1_retirement.md (NEW)
+
+---
+
 ## 2026-04-27 (Parallel sweep wave 4 — 15 items + 1 deferred across 6 clusters) — _shipped, pushed to git/Vercel_
 
 ### Cluster — Story page (T234 + T11)

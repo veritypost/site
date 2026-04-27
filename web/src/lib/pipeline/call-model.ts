@@ -356,7 +356,13 @@ export async function callModel(params: CallModelParams): Promise<CallModelResul
     params.max_tokens,
     pricing
   );
-  await checkCostCap(estimated);
+  await checkCostCap(estimated, {
+    pipeline_run_id: params.pipeline_run_id,
+    step_name: params.step_name,
+    cluster_id: params.cluster_id ?? null,
+    provider: params.provider,
+    model: params.model,
+  });
 
   let retry_count = 0;
   let text = '';

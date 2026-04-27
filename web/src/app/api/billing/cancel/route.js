@@ -14,6 +14,15 @@ import { listCustomerSubscriptions, cancelSubscriptionAtPeriodEnd } from '@/lib/
 // stop. Reconciliation order: Stripe FIRST (so we never flip local
 // state without the upstream change landing). If Stripe fails, the
 // local DB stays untouched and the user can retry.
+//
+// TODO(T177) — sensitive-action recent-auth gate.
+// Under magic-link auth, the natural recency token is the most recent
+// signInWithOtp completion timestamp (Supabase exposes session.last_sign_in_at).
+// For high-stakes actions (email change, billing cancel, account deletion),
+// reject if `now() - last_sign_in_at > 15min` and require a fresh
+// magic-link round-trip via /api/auth/re-verify (route owed).
+// Defer until AUTH-MIGRATION ships; it would block on a magic-link
+// re-verify endpoint that doesn't exist yet.
 export async function POST(request) {
   let user;
   try {

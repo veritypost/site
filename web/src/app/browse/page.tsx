@@ -58,7 +58,7 @@ const FEATURED_COLORS = ['#111111', '#6ee7b7', '#fca5a5', '#fcd34d', '#cccccc'] 
 type CategoryRow = Pick<Tables<'categories'>, 'id' | 'name' | 'slug'>;
 type ArticleRow = Pick<
   Tables<'articles'>,
-  'id' | 'title' | 'slug' | 'category_id' | 'published_at'
+  'id' | 'title' | 'slug' | 'category_id' | 'published_at' | 'is_featured'
 >;
 
 interface TrendingItem {
@@ -79,6 +79,7 @@ interface FeaturedCard {
   color: string;
   icon: string;
   timeAgo: string;
+  isFeatured: boolean;
 }
 
 function timeAgo(dateString: string | null | undefined): string {
@@ -96,6 +97,7 @@ export default function BrowsePage() {
   const [expandedCat, setExpandedCat] = useState<string | null>(null);
 
   const [featured, setFeatured] = useState<FeaturedCard[]>([]);
+  const [hasEditorPick, setHasEditorPick] = useState<boolean>(false);
   const [categories, setCategories] = useState<EnrichedCategory[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [loadFailed, setLoadFailed] = useState<boolean>(false);
@@ -108,7 +110,13 @@ export default function BrowsePage() {
     // Fetch categories. Pass 17 / UJ-507: adult /browse filters out
     // any `kids-*` slug so kid-only categories don't leak into the
     // adult catalogue.
-    const [catsRes, storiesRes] = await Promise.all([
+    // T239 — fetch a separate "featured" slice ordered is_featured DESC then
+    // published_at DESC, falling back to "most recent 3" when no editor pick
+    // exists. Kept distinct from the bulk fetch (used for category counts +
+    // per-category trending lists) so changing the featured-card ordering
+    // never reshuffles category counts. The bulk fetch keeps the original
+    // recency-only sort.
+    const [catsRes, storiesRes, featuredRes] = await Promise.all([
       supabase
         .from('categories')
         .select('id, name, slug')
@@ -117,23 +125,38 @@ export default function BrowsePage() {
       // Fetch recent published stories (cap to prevent unbounded load).
       supabase
         .from('articles')
-        .select('id, title, slug, category_id, published_at')
+        .select('id, title, slug, category_id, published_at, is_featured')
         .eq('status', 'published')
         .order('published_at', { ascending: false })
         .limit(500),
+      // Featured: editor-pinned first, then most-recent fallback.
+      supabase
+        .from('articles')
+        .select('id, title, slug, category_id, published_at, is_featured')
+        .eq('status', 'published')
+        .order('is_featured', { ascending: false })
+        .order('published_at', { ascending: false })
+        .limit(3),
     ]);
 
     if (catsRes.error || storiesRes.error) {
       console.error('[browse.fetch]', catsRes.error?.message || storiesRes.error?.message);
       setCategories([]);
       setFeatured([]);
+      setHasEditorPick(false);
       setLoadFailed(true);
       setLoading(false);
       return;
     }
+    // featuredRes errors are non-fatal — fall back to storyList.slice(0,3).
+    if (featuredRes.error) {
+      console.error('[browse.fetch.featured]', featuredRes.error.message);
+    }
 
     const storyList = (storiesRes.data as ArticleRow[] | null) || [];
     const catList = (catsRes.data as CategoryRow[] | null) || [];
+    const featuredSource: ArticleRow[] =
+      (featuredRes.data as ArticleRow[] | null) || storyList.slice(0, 3);
 
     // Build a map of category id → category
     const catById: Record<string, CategoryRow> = {};
@@ -161,8 +184,12 @@ export default function BrowsePage() {
       };
     });
 
-    // Build featured: 3 most recent published stories across all categories
-    const featuredStories: FeaturedCard[] = storyList.slice(0, 3).map((s, i) => {
+    // T239 — Featured: prefer is_featured=true rows (server-side
+    // is_featured DESC, published_at DESC) and fall back to most-recent
+    // when no editor pick exists. Track whether ANY card on screen is
+    // an editor pick so the section can show a "Featured by editors"
+    // label.
+    const featuredStories: FeaturedCard[] = featuredSource.slice(0, 3).map((s, i) => {
       const cat = s.category_id ? catById[s.category_id] : undefined;
       const style = cat ? (cat.slug ? CAT_STYLE[cat.slug] : null) || DEFAULT_STYLE : DEFAULT_STYLE;
       return {
@@ -173,11 +200,13 @@ export default function BrowsePage() {
         color: FEATURED_COLORS[i % FEATURED_COLORS.length],
         icon: style.icon,
         timeAgo: timeAgo(s.published_at),
+        isFeatured: Boolean(s.is_featured),
       };
     });
 
     setCategories(enrichedCats);
     setFeatured(featuredStories);
+    setHasEditorPick(featuredStories.some((f) => f.isFeatured));
     setLoading(false);
   }, []);
 
@@ -278,13 +307,13 @@ export default function BrowsePage() {
             {/* Trending Now */}
             <div style={{ marginBottom: 28 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-                {/* Audit fix: section was titled "Trending Now" but
-                    actually showed `featured` = the 3 most-recent
-                    published articles. Renamed to match the data
-                    shape; switching to real trending requires
-                    view_count tracking, deferred to Phase B. */}
+                {/* T239 — section title swaps to "Featured by editors" when
+                    any of the displayed cards is_featured=true; otherwise
+                    falls back to "Latest" (recency-only). When admins
+                    surface the is_featured pin UI later, the label flips
+                    automatically with no extra wiring. */}
                 <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, letterSpacing: '-0.02em' }}>
-                  Latest
+                  {hasEditorPick ? 'Featured by editors' : 'Latest'}
                 </h2>
               </div>
               {featured.length === 0 ? (

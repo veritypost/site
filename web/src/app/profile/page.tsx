@@ -462,6 +462,12 @@ function ProfilePageInner() {
 
   const tierInfo = tierFor(user.verity_score, scoreTiers);
 
+  // T36 — brand-new users (zero articles read AND zero comments) land on a
+  // metric-heavy dashboard with nothing in any of the cards. Show a single
+  // onboarding card above the tabs that names the next action; once the
+  // user has any activity at all, this hides and the dashboard takes over.
+  const hasNoActivity = (user.articles_read_count ?? 0) + (user.comment_count ?? 0) === 0;
+
   return (
     <Page maxWidth={960}>
       <PageHeader
@@ -481,6 +487,44 @@ function ProfilePageInner() {
           </div>
         }
       />
+
+      {hasNoActivity && (
+        <PageSection>
+          <div
+            style={{
+              border: `1px solid ${ADMIN_C.divider}`,
+              borderRadius: 12,
+              background: ADMIN_C.bg,
+              padding: S[4],
+              display: 'flex',
+              gap: S[4],
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div style={{ flex: 1, minWidth: 240 }}>
+              <div
+                style={{
+                  fontSize: F.lg,
+                  fontWeight: 600,
+                  color: ADMIN_C.white,
+                  letterSpacing: '-0.01em',
+                  marginBottom: S[1],
+                }}
+              >
+                Welcome to Verity Post
+              </div>
+              <div style={{ fontSize: F.sm, color: ADMIN_C.dim, lineHeight: 1.5 }}>
+                Read an article and pass the quiz to start building your score.
+              </div>
+            </div>
+            <Button variant="primary" onClick={() => router.push('/')}>
+              Find an article
+            </Button>
+          </div>
+        </PageSection>
+      )}
 
       <Tabs tab={tab} onChange={switchTab} />
 
