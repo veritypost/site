@@ -135,6 +135,53 @@ export async function updateSubscriptionPrice(subscriptionId, itemId, newPriceId
   });
 }
 
+// Adjust the quantity on an existing subscription item — used for the
+// per-extra-kid seat add-on on Verity Family. Caller passes the live
+// subscription id, the seat-add-on item id, and the new total quantity
+// (e.g. 1 baseline + 1 extra = quantity 2 on the seat item, or a
+// separate item dedicated to extras with its own quantity).
+//
+// We pass an `idempotencyKey` so a retry from /api/family/add-kid-with-seat
+// (network stall, double-tap) doesn't double-charge — Stripe replays the
+// same response for the same key within ~24h.
+export async function updateSubscriptionItemQuantity(
+  subscriptionId,
+  itemId,
+  newQuantity,
+  { idempotencyKey } = {}
+) {
+  return stripeFetch(`/subscription_items/${itemId}`, {
+    method: 'POST',
+    body: {
+      quantity: String(newQuantity),
+      proration_behavior: 'create_prorations',
+    },
+    idempotencyKey,
+  });
+}
+
+// Attach a new item (price + quantity) to an existing subscription —
+// used when the per-extra-kid add-on price hasn't been added to the
+// subscription yet (first extra kid). For subsequent extras, prefer
+// updateSubscriptionItemQuantity.
+export async function addSubscriptionItem(
+  subscriptionId,
+  priceId,
+  quantity,
+  { idempotencyKey } = {}
+) {
+  return stripeFetch(`/subscription_items`, {
+    method: 'POST',
+    body: {
+      subscription: subscriptionId,
+      price: priceId,
+      quantity: String(quantity),
+      proration_behavior: 'create_prorations',
+    },
+    idempotencyKey,
+  });
+}
+
 // Verify webhook signature per Stripe spec. Returns the parsed event
 // or throws. Accepts the raw request body as a string.
 export function verifyWebhook(rawBody, signatureHeader) {
