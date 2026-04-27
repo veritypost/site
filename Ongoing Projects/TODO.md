@@ -411,12 +411,6 @@ The numbered items below retain their original section placement for readability
 **Fix:** Add a bottom-of-screen consent bar. Gate `ga4-loader`, `ga4-init`, `GAListener`, and the AdSense script on accepted consent. Reject keeps scripts off. Persist decision in localStorage or a cookie.
 **Recommendation:** Use a **TCF v2.2-compliant CMP** (Funding Choices is free and Google-supported, or Cookiebot/Osano). Hand-rolling is a maintenance burden once you ship to multiple jurisdictions. Critical that scripts are gated *before* consent — disclosure copy alone fails GDPR and AdSense audits.
 
-### T3 — Regwall fires on article mount, not at end — **CRITICAL**
-**File:** `web/src/app/story/[slug]/page.tsx:519` (verified — `setShowRegWall(true)` inside data-fetch effect).
-**Problem:** Reader gets a full-viewport modal with body scroll lock before reading a word. Currently dormant (DB flag default false), but must be fixed before the flag is enabled.
-**Fix:** Move `setShowRegWall(true)` into the 80%-scroll handler at line 717. View count still bumps at load; modal triggers at completion.
-**Recommendation:** **Show value before asking for commitment.** Same logic applies to T17 (anon interstitial) and the existing free-tier paywall — count on load, prompt at end-of-article.
-
 ### T9 — Admin still ships 5-email onboarding sequence under transactional-only email policy — **MEDIUM** (re-graded — pre-launch hygiene, not gate)
 **File:** `web/src/app/admin/notifications/page.tsx:46-59` (verified — `EMAIL_SEQUENCES` has Onboarding (Day 0/1/3/5/7) + Re-engagement (Day 30/37) marked `status: 'active'`).
 **Problem:** Email policy is transactional-only (verification, password, security, compliance). Admin UI advertises lifecycle email programs that can't and shouldn't ship.
@@ -663,14 +657,6 @@ The numbered items below retain their original section placement for readability
 ---
 
 ## LOW — opportunistic
-
-### T64 — `vp_article_views` localStorage not cleared on auth — **LOW**
-**File:** `web/src/lib/session.js:17-23` (verified — only one usage; no clear-on-auth handler).
-**Fix:** Clear `vp_article_views` from localStorage on successful auth state transition. Pre-emptive fix for when regwall flips on.
-
-### T65 — Anon interstitial trigger same load-time bug as regwall — **LOW**
-**File:** `web/src/app/story/[slug]/page.tsx:501` (`LAUNCH_HIDE_ANON_INTERSTITIAL = true` — currently dormant).
-**Fix:** Move `setShowAnonInterstitial(true)` into 80%-scroll handler before constant flips to `false`. **Do this when fixing T3 — same handler.**
 
 ### T66 — iOS bookmarks empty-state CTA is a dead button — **LOW**
 **File:** `VerityPost/VerityPost/BookmarksView.swift:212-228` (verified — button action is just `// Would navigate back to home; tab bar handles the actual swap.`).

@@ -20,6 +20,7 @@ import {
   invalidate,
 } from '../lib/permissions';
 import { onRlsLocked } from '../lib/rlsErrorHandler';
+import { clearAnonArticleViews } from '../lib/session';
 import LockModal from './LockModal';
 import type { PermissionCapability } from './PermissionGate';
 
@@ -67,6 +68,13 @@ export function PermissionsProvider({ children }: PermissionsProviderProps) {
       setUser(session?.user ?? null);
       invalidate();
       setTick((n) => n + 1);
+      // T64 — drop the anon article-view counter on every auth transition.
+      // Sign-in: stale anon count would still pre-load the regwall the next
+      // time the user logs out and reads as anon. Sign-out: same hygiene
+      // from the other direction. Cheap, idempotent.
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+        clearAnonArticleViews();
+      }
       if (session?.user) {
         refreshAllPermissions()
           .then(() => setTick((n) => n + 1))

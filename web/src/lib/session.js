@@ -22,6 +22,20 @@ export function bumpArticleViewCount() {
   return n;
 }
 
+// T64 — clear the anon view counter on auth-state transitions so a user
+// who signs up doesn't carry their pre-auth read count forward (and so
+// a later sign-out resumes from zero, not from the previous anon high
+// water mark). Pre-emptive hygiene for when the regwall flag flips on.
+export function clearAnonArticleViews() {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem('vp_article_views');
+  } catch (e) {
+    // localStorage can throw under quota / private-mode; safe to swallow.
+    console.error('[session] clearAnonArticleViews', e);
+  }
+}
+
 // Session quiz-completion counter for the D23 "interstitial every 3rd quiz".
 export function bumpQuizCount() {
   if (typeof window === 'undefined') return 0;

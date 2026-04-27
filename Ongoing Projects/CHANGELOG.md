@@ -7,6 +7,24 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-26 (T3 + T64 + T65 — Phase 0A regwall preventative bundle) — _shipped, pushed to git/Vercel_
+
+### T3 + T65 — Anon regwall and sign-up interstitial deferred to 80% scroll
+
+- **What** — Both modals were firing inside the article-mount data-fetch effect on `web/src/app/story/[slug]/page.tsx` — line 504 `setShowAnonInterstitial(true)` (gated by `LAUNCH_HIDE_ANON_INTERSTITIAL=true` for now) and line 519 `setShowRegWall(true)` (gated by DB flag `registration_wall=false`). Currently dormant under launch-hide flags, but if/when either flag flipped on, anyone arriving deep in their free quota would get a full-viewport modal before reading a word.
+- **Why I did this even though it's dormant** — The principle behind the fix ("show value before asking for commitment") matches the trust positioning, and the regwall flag flip is a one-bit change in admin settings — landing the fix preemptively means the flag flip doesn't ship a regression.
+- **Approach** — Two new refs at component scope: `anonInterstitialPendingRef`, `regWallPendingRef`. The mount effect now records *intent* (sets refs) instead of triggering modals. A new dedicated effect adds an anon-scoped scroll listener (gated `if (!story) return; if (currentUser) return; if (!ref.current && !ref.current) return;`) — fires the pending modals when scrolled past 80%. Initial-check call inside the listener-set handles short articles already past 80% on mount. Refs (not state) so the scroll handler reads the latest value without re-binding on every change.
+- **Why a separate effect** — The existing read-complete 80%-scroll handler at line 692 short-circuits on `!currentUser`, so it never fires for anons (the audience the regwall actually applies to). Folding the regwall trigger into that handler would be wrong; anons need their own scroll-engagement listener.
+- **Why I did NOT touch** — Nothing else. View-count `bumpArticleViewCount()` still increments on mount (it's a counter, not a trigger). `vp:regwall-dismissed` per-session bypass still works. Authed read-complete signal at `/api/stories/read` still gated by `currentUser`. `setRegWallDismissed` from a previous-session dismissal still fires at mount (purely UI state, no modal).
+
+### T64 — Clear vp_article_views on auth state transitions
+
+- **What** — `web/src/lib/session.js` exports a new `clearAnonArticleViews()` helper (localStorage.removeItem under try/catch for quota/private-mode safety). `web/src/components/PermissionsProvider.tsx` (the global `onAuthStateChange` subscriber) calls it on `SIGNED_IN` and `SIGNED_OUT` events.
+- **Why both directions** — Sign-in: a stale anon count would still be at "5" after the user signs up, so a future sign-out resumes anon reading already past the regwall threshold. Sign-out: same hygiene from the other direction. Cheap, idempotent.
+- **Files** — `web/src/app/story/[slug]/page.tsx` (refs + new scroll effect; line 504 + 519 changed from immediate-trigger to ref-set), `web/src/lib/session.js` (new export), `web/src/components/PermissionsProvider.tsx` (import + call site inside the existing auth-state subscriber).
+
+---
+
 ## 2026-04-26 (T15 — kill-switched /u/[username] linkers redirected to /card/) — _shipped, pushed to git/Vercel_
 
 ### T15 — Live surfaces stop dead-ending into the gated public-profile route

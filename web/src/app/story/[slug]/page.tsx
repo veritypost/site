@@ -346,6 +346,13 @@ export default function StoryPage() {
   // the current showing. Next session the wall returns as normal.
   const [regWallDismissed, setRegWallDismissed] = useState<boolean>(false);
   const [showAnonInterstitial, setShowAnonInterstitial] = useState<boolean>(false);
+  // T3 + T65 — defer anon regwall / sign-up interstitial firing until the
+  // reader has actually engaged (>=80% scroll). Mounting them on article
+  // load short-circuits anyone who arrived deep in their free quota with
+  // a modal before reading a word. Refs (not state) so the scroll handler
+  // can read the latest value without re-binding on every change.
+  const anonInterstitialPendingRef = useRef<boolean>(false);
+  const regWallPendingRef = useRef<boolean>(false);
   const [userPassedQuiz, setUserPassedQuiz] = useState<boolean>(false);
   const [quizPassError, setQuizPassError] = useState<boolean>(false);
   // Signature moment per Future Projects/13_QUIZ_UNLOCK_MOMENT.md.
@@ -501,7 +508,9 @@ export default function StoryPage() {
           const freeLimit = getNumber(allSettings, 'free_article_limit', 5);
           setAnonViewCount(views);
           setFreeReadLimit(freeLimit);
-          if (views >= 2 && !LAUNCH_HIDE_ANON_INTERSTITIAL) setShowAnonInterstitial(true);
+          if (views >= 2 && !LAUNCH_HIDE_ANON_INTERSTITIAL) {
+            anonInterstitialPendingRef.current = true;
+          }
           if (isEnabled(allSettings, 'registration_wall', false)) {
             const limit = freeLimit;
             // R13-C5 Fix 5 — honor per-session dismissal so a user who
@@ -516,7 +525,7 @@ export default function StoryPage() {
               console.error('[story] regwall dismiss read', e);
             }
             if (dismissed) setRegWallDismissed(true);
-            if (views >= limit && !dismissed) setShowRegWall(true);
+            if (views >= limit && !dismissed) regWallPendingRef.current = true;
           }
         }
 
@@ -726,6 +735,35 @@ export default function StoryPage() {
       clearTimeout(dwellTimer);
       window.removeEventListener('scroll', onScroll);
     };
+  }, [story, currentUser]);
+
+  // T3 + T65 — anon-scoped 80% scroll trigger for the regwall + sign-up
+  // interstitial. The authed `markComplete` effect above bails on
+  // `!currentUser`, so anons never reach its scroll handler. This effect
+  // is the dedicated anon path: fire pending modals only after engagement.
+  useEffect(() => {
+    if (!story) return;
+    if (currentUser) return;
+    if (!anonInterstitialPendingRef.current && !regWallPendingRef.current) return;
+
+    const onScroll = () => {
+      if (typeof window === 'undefined' || typeof document === 'undefined') return;
+      const doc = document.documentElement;
+      const scrolled = (window.scrollY + window.innerHeight) / Math.max(doc.scrollHeight, 1);
+      if (scrolled < 0.8) return;
+      if (anonInterstitialPendingRef.current) {
+        setShowAnonInterstitial(true);
+        anonInterstitialPendingRef.current = false;
+      }
+      if (regWallPendingRef.current) {
+        setShowRegWall(true);
+        regWallPendingRef.current = false;
+      }
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    // Initial check — short articles can land already past 80%.
+    onScroll();
+    return () => window.removeEventListener('scroll', onScroll);
   }, [story, currentUser]);
 
   // Reading-progress ribbon scroll listener. Independent of the read-complete
