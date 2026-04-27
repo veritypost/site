@@ -7,6 +7,32 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (TODO cleanup — close 4 fully-shipped items) — _pending push to git_
+
+Owner applied all 4 of the pending migrations + the REINDEX. MCP-verified live state matches expected. Closing the bodies of items that are now fully done in BOTH code and SQL so the autonomous loop doesn't re-evaluate them.
+
+### Closed (bodies + skip-list entries removed)
+
+- **T26** — `post_comment` reply + mention notifications RPC migration applied; live function body contains both `'comment_reply'` and `'comment_mention'` INSERTs (verified via `pg_proc`). Locked direction fully shipped — body deleted from TODO; LOCKED skip-list entry removed; verify-via-MCP-first reference removed; priority-changes reference removed.
+
+- **T334** — `lockdown_self()` SECURITY DEFINER RPC migration applied (`pg_proc` confirms function present). The caller-side change in `redesign/profile/settings/_cards/PrivacyCard.tsx` (replace two-statement client flow with single rpc call) lives in the untracked redesign tree and rolls up with T357 cutover; tracked by T357 scope, not a separate TODO entry. Body deleted.
+
+- **T356** — `permission_set_perms` REINDEX completed in low-traffic window; index continues serving traffic (`idx_scan` counter steady at ~277k). One-shot maintenance command, no follow-up. Body deleted.
+
+- **T361** — billing_period standardize migration applied; `pg_constraint` shows `plans_billing_period_check` live, `DISTINCT billing_period` returns `['month', 'year', null]` (no `'monthly'`/`'annual'`/`'lifetime'`). Code-side already reads canonical strings (verified via T57 mint endpoint shipping). Body deleted.
+
+### TODO state
+
+- **39 real items remain** (was 43). Tier classification rubric headers (T1-T5) are not items; they're scaffolding.
+- LOCKED skip-list down to **T19** (simplify home).
+- Owner-decision queue from earlier: T303, T308, T328, T345, T346.
+- DEFERRED parked: T14, T34, T35, T79, T84.
+- Migration drafts queued for owner: none currently — the 8 from waves 4/8/11/12 all applied + verified.
+
+- **Files** — `Ongoing Projects/TODO.md` (4 bodies + skip-list trims), `Ongoing Projects/CHANGELOG.md` (this entry).
+
+---
+
 ## 2026-04-27 (wave 12 — T26 migration drafted, T348 partial, T57 backend shipped) — _shipped, pushed to git_ (commit 17b4679)
 
 ### Shipped (2 backend, 1 migration draft)

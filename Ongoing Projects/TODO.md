@@ -27,7 +27,7 @@
 >
 > ### How to handle each TODO category
 >
-> - **LOCKED items** (T19, T26): owner has decided. (T55 + T57 backend shipped — see CHANGELOG.) Body section contains the impl spec. When owner says "ship T<N>" or "go on locked items," execute the spec. Don't re-ask the decision. If a sub-question surfaces during impl that the spec didn't anticipate, ask once with a recommendation, then proceed.
+> - **LOCKED items** (T19): owner has decided. Body section contains the impl spec. When owner says "ship T<N>" or "go on locked items," execute the spec. Don't re-ask the decision. If a sub-question surfaces during impl that the spec didn't anticipate, ask once with a recommendation, then proceed.
 > - **LAUNCH BLOCKERS in `Pre-Launch Assessment.md`** (T2 — Funding Choices CMP; T271 — Maine governing-law TOS section): owner-touch only. Don't pick from the autonomous loop. Owner ships these in coordination with AdSense console access + legal sign-off windows.
 > - **DEFERRED items** (T14, T34, T35, T79, T84): owner has parked these. Don't pick them up. Don't re-recommend them. Don't tell the owner "next" includes them.
 > - **OPEN items in the body sections** (T27, T92, T165, T166, T233, T285): no owner decision needed; pick by priority and ship under the autonomous runbook. Each has audit evidence + recommended fix; verify the audit against current code before editing.
@@ -77,7 +77,6 @@ Do not pick up these IDs autonomously. The owner has explicitly reserved them. I
 
 LOCKED, awaiting "go" to ship code/migration:
 - **T19** — simplify home (categories nav + feed + Browse + occasional hero/breaking). See T19 body for impl spec.
-- **T26** — RPC migration adding `comment_reply` + `comment_mention` notifications via `create_notification`. Scope locked (in_app + push only).
 - **T55** — drop `ai_prompt_preset_versions` orphan table (T242 snapshot covers audit/replay). _Migration drafted 2026-04-27 at `Ongoing Projects/migrations/2026-04-27_T55_drop_ai_prompt_preset_versions.sql` — pre-flight DO-block refuses to drop if any rows present. Owner applies._
 
 DEFERRED (owner returning to it later — no decision yet):
@@ -354,7 +353,6 @@ The minimal launch-unblock set, execution plan, and MCP-verify items below stand
 ### Verify-via-MCP-first (collapse or escalate)
 
 - **T16/T17** — `pg_proc` for `start_conversation` / `post_message`. If RPCs don't enforce recipient `allow_messages` + blocks → escalate to CRITICAL pre-launch (privacy hole).
-- **T26** — `pg_proc` for `post_comment`. If it doesn't insert into `notifications`, reply notifications are silently broken — biggest single return-visit lever in the file.
 
 ---
 
@@ -460,7 +458,6 @@ The first-pass priorities ranked items by raw severity. Re-graded to reflect lau
 - **T9, T10** demoted CRITICAL → **MEDIUM**. Email programs aren't wired up; user-facing impact today is zero. Pre-launch hygiene, not a review gate.
 - **T15** upgraded HIGH → **CRITICAL**. Leaderboard is anon-visible; "View profile" → placeholder kills first impression.
 - **T16, T17** upgraded HIGH → **CRITICAL** *pending MCP verify*. If RPC doesn't enforce, third-party clients bypass UI entirely (privacy hole).
-- **T26** upgraded HIGH → **CRITICAL** *pending MCP verify*. If `post_comment` doesn't insert notification rows, the single biggest return-visit lever is broken.
 
 The numbered items below retain their original section placement for readability, but the tags reflect the new priorities.
 
@@ -484,18 +481,6 @@ The numbered items below retain their original section placement for readability
 **Problem:** Settings save `users.metadata.feed` flags (preferred categories, `showBreaking`, `showTrending`, `showRecommended`, `minScore`, display mode). Home reads zero of them. Save success message is a lie.
 **Fix:** Either (a) keep the editorial hero, but bias supporting slots based on category preferences + `minScore` / `kidSafe` filters, or (b) **remove the settings cards** if the product is intentionally editorial-only.
 **Recommendation:** **Decision required from owner.** Don't promise personalization you don't deliver. If editorial-only is the answer, ship the deletion this week. If personalization is on roadmap, keep + relabel as "Coming soon" with the cards disabled.
-
-### T26 — `post_comment` RPC does NOT insert notifications — **CRITICAL** (verified 2026-04-27, awaiting owner direction)
-**MCP verify 2026-04-27:** CONFIRMED REAL. The `post_comment(p_user_id, p_article_id, p_body, p_parent_id, p_mentions)` RPC body inserts the comment row + bumps `reply_count` on parent + bumps user `comment_count`, but **never inserts into `notifications`** for either replies or mentions. Verified zero triggers on the `comments` table (`information_schema.triggers` returns 0 rows). Email templates, preference UI, push cron all exist for `comment_reply` — but the source-of-truth INSERT that those downstream consumers read never fires. Audit's "biggest single return-visit lever" claim is correct.
-**Two-part gap:**
-- (a) **Reply notifications** — when `p_parent_id IS NOT NULL`, the parent comment's author should receive a `comment_reply` notification. Currently silent.
-- (b) **Mention notifications** — when `mentions` jsonb has entries (paid-tier authors only — free-tier mentions are stripped at line ~30 of the RPC), each mentioned user should receive a `comment_mention` notification. Currently silent.
-**Open questions for owner:**
-1. **Scope** — fix both (a) + (b) in one migration, or strict T26 = replies only and queue mentions as a separate item?
-2. **Notification schema** — `notifications.type` enum already includes `comment_reply` (and likely `comment_mention`). Confirm any additional fields needed (e.g., `action_url` shape, `metadata` jsonb keys consumed by client).
-3. **Self-reply guard** — should a user replying to their own comment fire a notification to themselves? Standard answer is no — defer the INSERT when `parent.user_id = p_user_id`. Confirming.
-4. **Muted/blocked sender** — should a reply from a user the parent-author has blocked still create a notification? Standard answer: no notification (silent block). Confirming.
-**Status:** awaiting owner answers; no migration drafted yet, no code changed.
 
 ### T27 partial — web email-notifications subsection removed; iOS still pending — **HIGH**
 **Status:** Web settings page email-notifications subsection (3 switches: newsletter / commentReplies / securityAlerts that wrote to `metadata.notification_prefs` which nothing consumed) deleted 2026-04-27. iOS `SettingsView.swift:1887-2040` still writes `metadata.notifications`; same fix needed there. Defer iOS portion to a focused Swift session — it requires careful struct editing + verifying no other Swift surface depends on the keys being readable.
@@ -656,10 +641,6 @@ These items live in `web/src/app/redesign/*` (currently dev-mounted at `localhos
 #### T333 partial — middleware NODE_ENV guard shipped; redesign ProfileApp still pending — **LOW** (defense-in-depth)
 **Status:** `web/src/middleware.js` `_isRedesignPort` check now `&&`'s `process.env.NODE_ENV !== 'production'` — shipped 2026-04-27. The mirror in `web/src/app/redesign/profile/_components/ProfileApp.tsx:117-121` is in the untracked redesign tree; ships with the redesign-cutover commit (T357).
 
-#### T334 partial — `lockdown_self()` RPC migration drafted (T5, awaiting owner apply) — **HIGH** (auth/security)
-**File:** `Ongoing Projects/migrations/2026-04-27_T334_lockdown_self_rpc.sql` — SECURITY DEFINER function that atomically (a) flips `profile_visibility='hidden'`, (b) deletes the user's followers, (c) writes audit_log row, (d) bumps perms_version. Includes self-only auth.uid() check inside the function so RLS drift on follows can't compromise it.
-**Caller-side change needed AFTER apply:** `web/src/app/redesign/profile/settings/_cards/PrivacyCard.tsx` at ~lines 168-178 — replace the two-statement client flow with a single `supabase.rpc('lockdown_self', { p_user_id: authUser.id })` call. PrivacyCard is in the untracked redesign tree; the change ships with the redesign-cutover commit (T357).
-
 #### T335 — `Field.tsx` declares CSS transitions but never wires `:focus`/`:hover` — **HIGH** (a11y)
 **File:** `web/src/app/redesign/_components/Field.tsx:62`. Transition rule present; `focusRing` helper exists in `palette.ts:124` but isn't applied. Keyboard users get no focus feedback in any settings card.
 **Fix:** Add `onFocus`/`onBlur` handlers toggling `boxShadow: SH.ring`; `:hover` background changes for button variants.
@@ -710,9 +691,6 @@ These aren't bugs with a file:line — they're architectural decisions, sequenci
 
 Five items below come from a follow-on DB-perf review pass on the auth/perms system map. None launch-blocking; all real ops debt. (A 6th item from that review — `compute_effective_perms` request-scoped memoization — is already captured as T348; not duplicated here.)
 
-#### T356 — `permission_set_perms` REINDEX script ready (owner runs once, low-traffic window) — **LOW** (DEBT)
-**File:** `Ongoing Projects/migrations/2026-04-27_T356_permission_set_perms_reindex.sql` — single `REINDEX TABLE CONCURRENTLY public.permission_set_perms;` command + a pre-flight bloat-check query so owner can decide whether the bloat is worth the rebuild. **NOT** runnable via `apply_migration` (CONCURRENTLY can't run in a transaction); paste into Supabase SQL editor in a low-traffic window.
-
 ### Cutover plan — surfaced from system map §22 (added 2026-04-27)
 
 System map §22 ("Cutover plan — taking the redesign live") was added after the 5th-pass audit and contains the file-by-file migration playbook for taking `/redesign/*` live on web AND porting the same shell to SwiftUI. The plan introduces 4 net-new items not previously captured:
@@ -754,10 +732,6 @@ System map §22 ("Cutover plan — taking the redesign live") was added after th
 **Per its own placeholder copy, the rebuild needs:** new hero, member-since, expert badge with organization, tier expression (plain text per the no-color-per-tier rule), paginated followers/following lists, real report sheet (matching the legacy `PROFILE_REPORT_REASONS` enum already in code at `lib/reportReasons`), and a working block-from-public action. The preview fixture at `redesign/preview/page.tsx` doesn't cover the public-profile shape — only the user-own-profile shape — so the design spec needs to be drawn before this can ship.
 **Coupling:** Co-ships with the T357 cutover OR ships earlier as a `/redesign/u/[username]` build that the T357 cutover then renames to `/u/[username]`. Either way, T330 (just-shipped 'hidden' check) AND T331 + T359 (iOS parallel) must all be in place before `PUBLIC_PROFILE_ENABLED` flips.
 **Estimated:** Multi-session build. T4 review (cross-surface, security-sensitive — leaks public PII if wrong).
-
-#### T361 — Standardize `billing_period` strings to `'month'` / `'year'` — **MEDIUM** (T5 schema)
-**Source:** Half of the locked T56 spec — the 'lifetime' drop shipped, the string-standardize half remains. Current state: `web/src/app/admin/plans/page.tsx:56` writes `'monthly'` / `'annual'`; DB-side reads (e.g., `web/src/app/profile/settings/page.tsx:4253` checks `billing_period === 'year'`) and Stripe glue (`web/src/lib/plans.js:58,78`) use `'month'` / `'year'`. Existing plan rows likely carry `'monthly'`/`'annual'` from the admin form; some carry `'month'`/`'year'` from direct seeding.
-**Fix:** (1) Update admin BILLING_PERIODS to `['', 'month', 'year']`. (2) Migration to `UPDATE plans SET billing_period = CASE WHEN 'monthly' THEN 'month' WHEN 'annual' THEN 'year' ELSE billing_period END;` (idempotent). (3) Sweep all callers to read only the canonical strings. (4) Optional CHECK constraint on `plans.billing_period IN ('month','year')`. T5 — halt and queue migration.
 
 #### T351 partial — Redesign §21.3 polish bundle (5 sub-items remain) — **LOW** (polish)
 **Source:** System map §21.3, deliberately skipped in the main verification pass. **2 of 7 sub-items shipped** alongside Wave B (rail search placeholder `Search settings` → `Search profile`, LockedSection `{title} is part of premium` → `Upgrade to unlock {title}`). 5 remain — bundle as one cleanup PR after redesign cutover stabilizes:
