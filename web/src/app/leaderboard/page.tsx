@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { createClient } from '../../lib/supabase/client';
 import Avatar from '../../components/Avatar';
 import VerifiedBadge from '../../components/VerifiedBadge';
+import ErrorState from '../../components/ErrorState';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import { usePageViewTrack } from '@/lib/useTrack';
 import { PERIOD_LABELS, periodSince, type Period } from '@/lib/leaderboardPeriod';
@@ -119,8 +120,15 @@ export default function LeaderboardPage() {
 
   const [users, setUsers] = useState<LeaderUser[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string>('');
+  // Bumping `reloadKey` re-runs the load effect — used by the retry CTA.
+  const [reloadKey, setReloadKey] = useState<number>(0);
   const [me, setMe] = useState<MeRow | null>(null);
   const [myRank, setMyRank] = useState<number | null>(null);
+  // T282 — block scope expansion. Bidirectional set: any user the viewer
+  // has blocked OR who has blocked the viewer is hidden from the
+  // leaderboard. Matches CommentThread's mutual-visibility model.
+  const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
   // Permission-driven flags (replace former `email_verified` + plan_status
   // reads used to gate UI affordances). `fullAccess` → leaderboard.view;
   // `canCategories` → leaderboard.category.view.
@@ -164,6 +172,20 @@ export default function LeaderboardPage() {
           .eq('id', authRes.data.user.id)
           .single<MeRow>();
         setMe(meRow || null);
+
+        // T282 — load bidirectional block set. Anonymous viewers don't
+        // have a block list to apply, so the fetch is gated on auth.
+        const viewerId = authRes.data.user.id;
+        const { data: blockRows } = await supabase
+          .from('blocked_users')
+          .select('blocker_id, blocked_id')
+          .or(`blocker_id.eq.${viewerId},blocked_id.eq.${viewerId}`);
+        const blocks = new Set<string>();
+        (blockRows || []).forEach((row) => {
+          if (row.blocker_id === viewerId && row.blocked_id) blocks.add(row.blocked_id);
+          if (row.blocked_id === viewerId && row.blocker_id) blocks.add(row.blocker_id);
+        });
+        setBlockedIds(blocks);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -172,10 +194,11 @@ export default function LeaderboardPage() {
   useEffect(() => {
     async function load() {
       setLoading(true);
+      setLoadError('');
 
       // Category score path: rank by category_scores.score for the selected category.
       if (activeCat) {
-        const { data: csRows } = await supabase
+        const { data: csRows, error: csErr } = await supabase
           .from('category_scores')
           .select(
             'user_id, score, users!inner ( id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert, verity_score, streak_current, quizzes_completed_count, articles_read_count, comment_count, email_verified, is_banned, show_on_leaderboard, frozen_at )'
@@ -187,6 +210,13 @@ export default function LeaderboardPage() {
           .is('users.frozen_at', null)
           .order('score', { ascending: false })
           .limit(50);
+        if (csErr) {
+          console.error('[leaderboard] category_scores load failed', csErr);
+          setUsers([]);
+          setLoadError("Couldn't load this category's leaderboard.");
+          setLoading(false);
+          return;
+        }
         const scored = (csRows as unknown as CategoryScoreRow[] | null) || [];
         setUsers(scored.map((r) => ({ ...r.users, displayScore: r.score })));
         setLoading(false);
@@ -204,7 +234,7 @@ export default function LeaderboardPage() {
 
       if (activeTab === 'Rising Stars') {
         const thirty = periodSince('This month')!;
-        const { data } = await supabase
+        const { data, error: rsErr } = await supabase
           .from('users')
           .select(
             'id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert, verity_score, streak_current, quizzes_completed_count, articles_read_count, comment_count'
@@ -216,6 +246,13 @@ export default function LeaderboardPage() {
           .gte('created_at', thirty.toISOString())
           .order('verity_score', { ascending: false })
           .limit(50);
+        if (rsErr) {
+          console.error('[leaderboard] rising stars load failed', rsErr);
+          setUsers([]);
+          setLoadError("Couldn't load the leaderboard.");
+          setLoading(false);
+          return;
+        }
         const rows = (data as LeaderUser[] | null) || [];
         setUsers(rows.map((u) => ({ ...u, displayScore: u.verity_score || 0 })));
         setLoading(false);
@@ -244,6 +281,7 @@ export default function LeaderboardPage() {
         if (rpcErr) {
           console.error('[leaderboard] leaderboard_period_counts failed', rpcErr);
           setUsers([]);
+          setLoadError("Couldn't load the leaderboard.");
           setLoading(false);
           return;
         }
@@ -281,7 +319,7 @@ export default function LeaderboardPage() {
       const orderBy: 'articles_read_count' | 'verity_score' =
         activeTab === 'Top Readers' ? 'articles_read_count' : 'verity_score';
       const pageLimit = me ? 50 : 3;
-      const { data } = await supabase
+      const { data, error: defErr } = await supabase
         .from('users')
         .select(
           'id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert, verity_score, streak_current, quizzes_completed_count, articles_read_count, comment_count'
@@ -292,23 +330,38 @@ export default function LeaderboardPage() {
         .is('frozen_at', null)
         .order(orderBy, { ascending: false })
         .limit(pageLimit);
+      if (defErr) {
+        console.error('[leaderboard] default load failed', defErr);
+        setUsers([]);
+        setLoadError("Couldn't load the leaderboard.");
+        setLoading(false);
+        return;
+      }
       const rows = (data as LeaderUser[] | null) || [];
       setUsers(rows.map((u) => ({ ...u, displayScore: (u[orderBy] as number | null) || 0 })));
       setLoading(false);
     }
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, period, activeCat, me]);
+  }, [activeTab, period, activeCat, me, reloadKey]);
 
-  // Compute my rank relative to the loaded list (best-effort; full rank needs a server side count).
+  // T282 — bidirectional block filter applied post-fetch. The viewer's
+  // own row is NEVER filtered (self can't appear in their own block set,
+  // but defense-in-depth excludes it explicitly). Filter is applied
+  // BEFORE rank computation so myRank reflects what the viewer sees.
+  const visibleUsers = blockedIds.size === 0 ? users : users.filter((u) => !blockedIds.has(u.id));
+
+  // Compute my rank relative to the visible list (best-effort; full rank
+  // needs a server side count). Uses visibleUsers so blocked users don't
+  // shift the viewer's perceived rank.
   useEffect(() => {
-    if (!me || users.length === 0) {
+    if (!me || visibleUsers.length === 0) {
       setMyRank(null);
       return;
     }
-    const i = users.findIndex((u) => u.id === me.id);
+    const i = visibleUsers.findIndex((u) => u.id === me.id);
     setMyRank(i >= 0 ? i + 1 : null);
-  }, [me, users]);
+  }, [me, visibleUsers]);
 
   const activeSubs = activeCat ? subcats.filter((s) => s.category_id === activeCat) : [];
   // Permission-driven: replaces the former `plan_status === 'active' &&
@@ -348,7 +401,7 @@ export default function LeaderboardPage() {
                       changing tab/category/period would surface their rank. */}
                   {myRank
                     ? `#${myRank}`
-                    : `not in the top ${users.length || 'list'} for ${activeTab}`}
+                    : `not in the top ${visibleUsers.length || 'list'} for ${activeTab}`}
                 </span>
               </div>
             </div>
@@ -526,7 +579,10 @@ export default function LeaderboardPage() {
               Loading...
             </div>
           )}
-          {!loading && users.length === 0 && (
+          {!loading && loadError && (
+            <ErrorState message={loadError} onRetry={() => setReloadKey((k) => k + 1)} />
+          )}
+          {!loading && !loadError && visibleUsers.length === 0 && (
             <div style={{ padding: 30, textAlign: 'center' }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: '#111', marginBottom: 6 }}>
                 No results
@@ -562,9 +618,9 @@ export default function LeaderboardPage() {
               Rows 4+ render blurred behind a sign-up CTA so anon visitors
               know there's more to see. Previously every row rendered
               blurred, which contradicted the comment and the spec. */}
-          {!me && users.length > 0 && (
+          {!me && visibleUsers.length > 0 && (
             <>
-              {users.slice(0, 3).map((u, i) => (
+              {visibleUsers.slice(0, 3).map((u, i) => (
                 <LeaderRow
                   key={u.id}
                   user={u}
@@ -572,13 +628,13 @@ export default function LeaderboardPage() {
                   rankColor={rankAccentColor(i + 1)}
                   isPodium
                   streak={u.streak_current || 0}
-                  isLast={i === Math.min(2, users.length - 1) && users.length <= 3}
+                  isLast={i === Math.min(2, visibleUsers.length - 1) && visibleUsers.length <= 3}
                 />
               ))}
-              {users.length > 3 && (
+              {visibleUsers.length > 3 && (
                 <div style={{ position: 'relative', overflow: 'hidden' }}>
                   <div style={{ filter: 'blur(6px)', pointerEvents: 'none', userSelect: 'none' }}>
-                    {users.slice(3, 8).map((u, i) => (
+                    {visibleUsers.slice(3, 8).map((u, i) => (
                       <div
                         key={u.id}
                         style={{
@@ -673,7 +729,7 @@ export default function LeaderboardPage() {
 
           {/* Top 3 — visible to anyone signed in */}
           {me &&
-            users
+            visibleUsers
               .slice(0, 3)
               .map((u, i) => (
                 <LeaderRow
@@ -688,7 +744,7 @@ export default function LeaderboardPage() {
 
           {/* Positions 4+ — verified only */}
           {fullAccess
-            ? users
+            ? visibleUsers
                 .slice(3)
                 .map((u, i) => (
                   <LeaderRow
@@ -697,16 +753,16 @@ export default function LeaderboardPage() {
                     rank={i + 4}
                     rankColor="var(--dim)"
                     streak={u.streak_current || 0}
-                    isLast={i === users.length - 4 - 1}
+                    isLast={i === visibleUsers.length - 4 - 1}
                     showVerityScore
                   />
                 ))
             : me &&
-              users.length > 3 && (
+              visibleUsers.length > 3 && (
                 /* Unverified: blur 4+ with upgrade lock */
                 <div style={{ position: 'relative', overflow: 'hidden' }}>
                   <div style={{ filter: 'blur(6px)', pointerEvents: 'none', userSelect: 'none' }}>
-                    {users.slice(3, 8).map((u, i) => (
+                    {visibleUsers.slice(3, 8).map((u, i) => (
                       <div
                         key={u.id}
                         style={{

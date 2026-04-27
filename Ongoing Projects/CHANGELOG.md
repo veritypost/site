@@ -7,6 +7,84 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (Parallel sweep wave 6 — 9 items + 1 NEEDS-SCHEMA across 6 clusters) — _shipped, pushed to git/Vercel_
+
+### Cluster — Return-visit + read-state (T91 + T109)
+
+- **T91** — `web/src/app/_HomeVisitTimestamp.tsx` (NEW client island writes `vp_last_home_visit_at` cookie 90-day after first paint). `web/src/app/page.tsx` reads cookie via `next/headers`, computes `isNewStory(story)` predicate. Hero + supporting cards render a "New" pill (white-on-black inverted on hero, white-on-black on supporting) when `published_at > last_visit`. Cookie path chosen over localStorage so the SERVER can compute "New" at render time without flashing on hydration. First-time visit: no cookie → no badges + plant cookie for next visit.
+- **T109** — same `page.tsx`: server-side `reading_log` query for authenticated viewer (last 30 days, limit 200, ordered desc), built into `Set<articleId>`. Hero + supporting cards render "Read" tag + dim-color title when `id` in set. Anon viewers short-circuit (no `reading_log` query, no extra round-trip).
+- LCP impact: no extra round-trip for anon (auth.getUser short-circuits). Signed-in: one extra query in same Promise.all window.
+
+### Cluster — Kids/family fetch separation (T51)
+
+- **`web/src/app/profile/kids/page.tsx`** + **`web/src/app/profile/family/page.tsx`**: distinguished load-error from empty state. Sentinel symbol pattern (`Symbol('fetch-failed')`) replaces silent `.catch(() => empty)`. New `loadError` state separate from CRUD `error`. Error banner with Retry button. CTAs (Add kid, etc.) gated on `!loadError` so users don't get nudged to add a profile while fetch failed. Family page extraction of inline IIFE into `useCallback load` so Retry can re-fire it.
+
+### Cluster — Palette consolidation (T82)
+
+- 24 of 27 files migrated. Each file's inline `const C = { bg: '#fff', card: '#f7f7f7', border: '#e5e5e5', text: '#111', dim: '#666', accent: '#111', success: ..., danger: ... }` swapped to `const C = { bg: 'var(--bg)', card: 'var(--card)', border: 'var(--border)', text: 'var(--text)', dim: 'var(--dim)', accent: 'var(--accent)', success: 'var(--success)', danger: 'var(--danger)' }`. Audit said 15 files; reality was 27 (drift since audit).
+- Files left untouched (3): admin pages already use `ADMIN_C` from centralized `web/src/lib/adminPalette.js` (separate admin theme by design); `web/src/components/profile/InviteFriendsCard.tsx` is fully bespoke dark theme with no globals match.
+- Drift findings: `dim` token jumps from `#666` → globals' `#5a5a5a` (AA contrast improvement, ~5.13:1 → ~5.95:1). `success/warn/danger` deeper-variant pattern (`#16a34a`/`#b45309`/`#dc2626`) widespread in ~10 files; doesn't match canonical `--success`/`--warn`/`--danger`. Adding `--success-deep` etc. to globals would unify.
+
+### Cluster — DOMPurify SSR + AI disclosure (T207 + T267)
+
+- **T207 STALE-RESOLVED** — `web/src/app/expert-queue/page.tsx` already has the `typeof window === 'undefined' ? '' : DOMPurify.sanitize(...)` guard from W1 T202 hardening. SSR returns empty (not unsanitized input). Header comment accurately documents the state. No change.
+- **T267** — `web/src/app/privacy/page.tsx` Section 3 (Content Processing): EU AI Act Article 50 + California AB 2655 disclosure sentence appended inside the existing AI-related bullet. Pairs with W4 T234 story-page AI-synthesized pill.
+
+### Cluster — Block scope + expert revoke (T282 + T284)
+
+- **T282 PARTIAL** — Block scope expanded to 2 surfaces:
+  - **Leaderboard** (`web/src/app/leaderboard/page.tsx`): bidirectional `blockedIds` set populated in init via `blocked_users` `.or(...)`, `visibleUsers = users.filter(u => !blockedIds.has(u.id))` applied at render. `myRank` computed from `visibleUsers` so viewer's perceived rank matches what they see. Trade-off noted inline: post-fetch filter on `limit(50)` query can under-fill if many blocks intersect top 50; acceptable scale.
+  - **Expert queue** (`web/src/app/api/expert/queue/route.js`): server-side bidirectional filter on the listing API. Asker IDs never leave the server when blocked. Client-side `expert-queue/page.tsx` consumes pre-filtered items.
+- Surfaces deferred (TODO): `CommentRow.tsx` `renderBody` plain-text fallback for blocked-user mentions; `expert-sessions/[id]/questions` per-session question filter; iOS surfaces.
+- **T284 NEEDS-SCHEMA** — schema reality verified: `users.is_expert: boolean` exists but `users.expert_verified_at` and `users.expert_revoked_at` DO NOT. The verification + expiry timestamps live on `expert_applications` (`credential_verified_at`, `credential_expires_at`, `status`, `revoked_reason`, `reverification_notified_at`). Halted per task instruction. Three owner decisions needed before implementation: (A) lighter schema-free path using `expert_applications.status='revoked'` + `audit_log`, vs (B) add `users.expert_revoked_at`/`expert_verified_at` columns, (C) confirm 35-day grace math, (D) confirm whether to flip `is_expert` AND `expert_applications.status` or just badge.
+
+### Cluster — ErrorState primitive (T117)
+
+- **NEW `web/src/components/ErrorState.tsx`** — `<ErrorState message? onRetry? inline? children? style? />`. Internal `busy` state during async retry, `role="alert"`, `aria-busy`. Hero + inline layouts. CSS-var styling with safe fallbacks.
+- 6 sites migrated to use it: `search/page.tsx`, `bookmarks/page.tsx`, `notifications/page.tsx`, `messages/page.tsx`, `leaderboard/page.tsx`, `profile/page.tsx` (per-tab error states with retry that resets the tab's `loaded` flag).
+- Profile page: added `activityError` / `categoriesError` / `milestonesError` per-tab states. Each tab renders `<ErrorState>` ahead of its empty/list branch.
+- Kids page deliberately skipped (T51 was shipping in parallel and already added inline retry).
+
+### Files touched (~32)
+
+- web/src/app/_HomeVisitTimestamp.tsx (NEW)
+- web/src/app/page.tsx
+- web/src/app/profile/kids/page.tsx
+- web/src/app/profile/family/page.tsx
+- web/src/app/profile/page.tsx
+- web/src/app/profile/kids/[id]/page.tsx
+- web/src/app/profile/settings/expert/page.tsx
+- web/src/app/leaderboard/page.tsx
+- web/src/app/api/expert/queue/route.js
+- web/src/app/expert-queue/page.tsx
+- web/src/app/privacy/page.tsx
+- web/src/app/login/page.tsx
+- web/src/app/welcome/page.tsx
+- web/src/app/recap/page.tsx
+- web/src/app/recap/[id]/page.tsx
+- web/src/app/notifications/page.tsx
+- web/src/app/forgot-password/page.tsx
+- web/src/app/reset-password/page.tsx
+- web/src/app/verify-email/page.tsx
+- web/src/app/logout/page.js
+- web/src/app/signup/expert/page.tsx
+- web/src/app/signup/pick-username/page.tsx
+- web/src/app/signup/pick-categories/page.tsx
+- web/src/app/u/[username]/page.tsx
+- web/src/app/card/[username]/page.js
+- web/src/app/browse/page.tsx
+- web/src/app/messages/page.tsx
+- web/src/app/search/page.tsx
+- web/src/app/bookmarks/page.tsx
+- web/src/components/ErrorState.tsx (NEW)
+- web/src/components/UnderConstruction.tsx
+- web/src/components/AccountStateBanner.tsx
+- web/src/components/ArticleQuiz.tsx
+- web/src/components/profile/BetaStatusBanner.tsx
+- web/src/components/kids/PairDeviceButton.tsx
+
+---
+
 ## 2026-04-27 (Parallel sweep wave 5 — 15 items + 4 stale-confirmed across 6 clusters) — _shipped, pushed to git/Vercel_
 
 ### Cluster — Small UX (T36 + T243; T97 stale)

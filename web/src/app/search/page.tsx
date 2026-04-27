@@ -8,6 +8,7 @@ import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/perm
 import { usePageViewTrack } from '@/lib/useTrack';
 import type { Tables } from '@/types/database-helpers';
 import { formatDate } from '@/lib/dates';
+import ErrorState from '@/components/ErrorState';
 
 // D26: basic keyword search for everyone; advanced filters (date, category,
 // subcategory, source) at Verity+. The server ignores filters from free
@@ -235,7 +236,9 @@ export default function SearchPage() {
         </div>
       )}
 
-      {error && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 10 }}>{error}</div>}
+      {error && (
+        <ErrorState inline message={error} onRetry={runSearch} style={{ marginBottom: 10 }} />
+      )}
 
       <div style={{ fontSize: 11, color: '#999', marginBottom: 6 }}>
         {results.length > 0 ? `${results.length} result${results.length === 1 ? '' : 's'}` : null}

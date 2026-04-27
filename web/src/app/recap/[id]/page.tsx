@@ -52,12 +52,15 @@ interface LoadResponse {
   error?: string;
 }
 
+// T82 — values point at globals.css CSS vars so brand-color edits cascade.
+// `success` + `danger` keep inline hex (no matching var values; this surface
+// uses deeper variants than `--success` `#22c55e` / `--danger` `#b91c1c`).
 const C = {
-  card: '#f7f7f7',
-  border: '#e5e5e5',
-  text: '#111',
-  dim: '#666',
-  accent: '#111',
+  card: 'var(--card)',
+  border: 'var(--border)',
+  text: 'var(--text)',
+  dim: 'var(--dim)',
+  accent: 'var(--accent)',
   success: '#16a34a',
   danger: '#dc2626',
 } as const;

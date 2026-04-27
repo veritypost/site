@@ -20,16 +20,17 @@ import { resolveNext } from '../../lib/authRedirect';
 // `auth.users.email_confirmed_at` — Supabase can auto-set the latter at
 // signup when "Confirm email" is OFF.
 
+// T82 — values point at globals.css CSS vars so brand-color edits cascade.
+// `danger` was already locked to canonical `--danger` (#b91c1c) per DA-055.
 const C = {
-  bg: '#ffffff',
-  card: '#f7f7f7',
-  border: '#e5e5e5',
-  text: '#111111',
-  dim: '#666666',
-  accent: '#111111',
-  success: '#22c55e',
-  // DA-055 — canonical `--danger` (AA-contrast).
-  danger: '#b91c1c',
+  bg: 'var(--bg)',
+  card: 'var(--card)',
+  border: 'var(--border)',
+  text: 'var(--text)',
+  dim: 'var(--dim)',
+  accent: 'var(--accent)',
+  success: 'var(--success)',
+  danger: 'var(--danger)',
 } as const;
 
 // H1 — `rate_limited` is distinct from `expired`. Pre-fix the 429

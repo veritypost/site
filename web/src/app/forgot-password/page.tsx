@@ -7,16 +7,17 @@ import { useEffect, useRef, useState, FormEvent } from 'react';
 // This page has no role/plan/tier/verify gates — it's a pre-auth
 // reset-password request form. Permission migration adds types only.
 
+// T82 — values point at globals.css CSS vars so brand-color edits cascade.
+// `danger` was already locked to canonical `--danger` (#b91c1c) per DA-055.
 const C = {
-  bg: '#ffffff',
-  card: '#f7f7f7',
-  border: '#e5e5e5',
-  text: '#111111',
-  dim: '#666666',
-  accent: '#111111',
-  success: '#22c55e',
-  // DA-055 — canonical `--danger` (AA-contrast on #fef2f2).
-  danger: '#b91c1c',
+  bg: 'var(--bg)',
+  card: 'var(--card)',
+  border: 'var(--border)',
+  text: 'var(--text)',
+  dim: 'var(--dim)',
+  accent: 'var(--accent)',
+  success: 'var(--success)',
+  danger: 'var(--danger)',
 } as const;
 
 const RESEND_COOLDOWN_SECS = 30;

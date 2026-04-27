@@ -12,6 +12,9 @@ import type { Tables } from '@/types/database-helpers';
 
 type UserRow = Partial<Tables<'users'>>;
 
+// T82 — `cta` points at the canonical `--accent` so brand changes cascade.
+// The warn/err banner tokens are bespoke severity variants (no matching
+// global vars; would need new tokens to consolidate, out of scope here).
 const C = {
   warnBg: '#fffbeb',
   warnBorder: '#d97706',
@@ -19,7 +22,7 @@ const C = {
   errBg: '#fef2f2',
   errBorder: '#dc2626',
   errText: '#991b1b',
-  cta: '#111111',
+  cta: 'var(--accent)',
 } as const;
 
 type Banner = {

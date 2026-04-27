@@ -554,10 +554,6 @@ The numbered items below retain their original section placement for readability
 **File:** `VerityPost/VerityPost/MessagesView.swift:600-658,1041-1107`
 **Fix:** Keep compose/search surface open on failure. Show error state mapping common HTTP failures to actionable copy.
 
-### T51 — Family/kids surfaces collapse fetch failure into empty state — **MEDIUM**
-**File:** `web/src/app/profile/kids/page.tsx:99-150,410-425`; `web/src/app/profile/family/page.tsx:56-105,149-257`; `VerityPost/VerityPost/FamilyViews.swift:423-442,537-565,571-709`.
-**Fix:** Separate load failure from true empty state. Show retry/error before showing creation/destructive actions.
-
 ### T52 — Trust header missing on iOS comments — **MEDIUM**
 **File:** `VerityPost/VerityPost/StoryDetailView.swift:1093-1151`. Web has "Every reader here passed the quiz." (`CommentThread.tsx`); iOS jumps straight to composer.
 **Fix:** Add the trust header on iOS, conditional on `visible.length > 0`.
@@ -627,9 +623,6 @@ The numbered items below retain their original section placement for readability
 **Scope:** Web saves `users.metadata.tts_per_article`; iOS has no row to toggle whether the listen button appears.
 **Fix:** Add Article-audio toggle to iOS Preferences. Gate on `settings.a11y.tts_per_article` perm. Read/write `users.metadata.tts_per_article` via `update_own_profile`. Bundle with TTS player QA.
 
-### T82 — Inline palette token consolidation (20+ files) — **DEFERRED** (verification: actual count is 15 files with inline `const C = {...}` palettes, not 20+. Scope still real, just smaller than claimed.)
-**Scope:** `const C` and `PALETTE` redefined inline across the codebase. Single global pass; isolated changes drift.
-
 ### T84 — "Please try again" copy sweep (T-013) — **DEFERRED**
 **Scope:** Settings is the largest cluster. Bundle with global T-013 sweep across remaining surfaces.
 
@@ -656,12 +649,6 @@ The numbered items below retain their original section placement for readability
 **Problem:** Reading still works; only the profile surface is gated. Inconsistent — web doesn't gate profile this hard.
 **Fix:** Show profile with a non-blocking "verify your email to comment and save" banner. Keep hard gates only on actions that require verification (commenting, save).
 **Recommendation:** Becomes moot post-AUTH-MIGRATION (every signed-in user is inherently verified under magic-link). Decide whether to ship now or wait.
-
-#### T91 — No "what's new since last visit" indicator on home — **HIGH** (return-visit)
-**File:** `web/src/app/page.tsx` (no last-visit tracking on cards).
-**Problem:** Returning user has no signal which articles are new since their last session. Breaks the reason-to-return loop.
-**Fix:** Persist `last_home_visit_at` per user. Tag article cards with a "New" marker when `published_at > last_home_visit_at`. Bump on home unmount.
-**Recommendation:** Editorial framing — "X new since you last visited" header strip. Newspaper voice, not gamified streak voice.
 
 #### T92 — No web push at all — **HIGH** (return-visit)
 **File:** Repo grep: no VAPID keys, no service worker, no push subscription routes. Confirmed in TODO.md NOTES.
@@ -707,23 +694,11 @@ The numbered items below retain their original section placement for readability
 **Fix:** Branch the copy: `quizPassed == false` → "Pass the quiz above to join the discussion." Otherwise keep current copy.
 **Recommendation:** Frame the quiz as the price of entry — matches the trust principle.
 
-#### T109 — No read/unread state on home feed cards — **MEDIUM** (return-visit)
-**File:** `web/src/app/page.tsx` (no read-state metadata on supporting cards); iOS `HomeView.swift` same.
-**Problem:** Returning user can't tell at a glance which articles they've already read. Wastes scan time.
-**Fix:** When `read_state` row exists for the user, render the article card title in dimmer color + a subtle "Read" tag. Persist on quiz attempt or 80%-scroll.
-**Recommendation:** Already have `reading_log` data; surface it visually. Pair with T91.
-
 #### T116 — iOS comment rate-limit shows "Wait" without countdown — **MEDIUM**
 **File:** `VerityPost/VerityPost/StoryDetailView.swift:2404-2420` (rate-limit flag flips, no duration shown).
 **Problem:** User taps Send, gets "Wait", retries, gets "Wait" again. Same friction as kids pair-code lockout.
 **Fix:** Track `comment_rate_sec` server response and render "Try again in Xs" countdown.
 **Recommendation:** Apply the same UX pattern across the app — every rate-limited action gets a visible countdown.
-
-#### T117 — Inconsistent retry-button presence across error states — **MEDIUM** (re-scoped: original claim "search has retry, others don't" was wrong — search at `search/page.tsx:106` does NOT have a retry button either, and there is no `<ErrorState>` primitive. The kernel — that error states across `web/src/app/**/page.tsx` are inconsistent (some have retry, some don't, some are inert text divs) — still holds. Need a fresh audit before sequencing.)
-**File:** `web/src/app/search/page.tsx:106` has retry; DM paywall and other surfaces don't.
-**Problem:** Some error states have "Try again", others have "Couldn't load" with no recovery affordance.
-**Fix:** Audit error renderers across `web/src/app/**/page.tsx`; standardize on the `<ErrorState>` primitive that ships with retry by default.
-**Recommendation:** Bundle with T84 ("Please try again" copy sweep).
 
 #### T118 — Adult iOS deep-link handler has no article routing — **MEDIUM**
 **File:** `VerityPost/VerityPost/VerityPostApp.swift:15-17` (`auth.handleDeepLink(url)` only handles auth deep links; no article navigation).
@@ -855,10 +830,6 @@ Items below already moved to Pre-Launch Assessment (Apple/Sentry/COPPA-CRITICAL)
 **File:** `VerityPost/VerityPost/AuthViewModel.swift:377-407`. `verity://` URL scheme is registered; attacker can craft a deep-link with fake `access_token`/`refresh_token` and the app calls `setSession()` blindly.
 **Fix:** After `setSession()`, immediately call `auth.getUser()` to validate; reject + clear session on failure. Validate `aud`/`iss` claims if available.
 
-#### T207 — DOMPurify SSR fallback returns input unsanitized — **MEDIUM**
-**File:** `web/src/app/expert-queue/page.tsx:11-18`. `dompurify` is browser-only; if any future state path renders `dangerouslySetInnerHTML` server-side, sanitize is a no-op.
-**Fix:** Move markdown rendering to server-only path with `sanitize-html`, or always guard with `typeof window !== 'undefined'` at the inject point.
-
 #### T214 — Keychain `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` for tokens — **LOW** (acceptable, monitor)
 **File:** `VerityPost/VerityPost/Keychain.swift:20`. Correct level, but document acceptance + revisit if Apple changes guidance.
 
@@ -952,10 +923,6 @@ Items below already moved to Pre-Launch Assessment (Apple/Sentry/COPPA-CRITICAL)
 
 ### Attorney / Legal (T264-T273)
 
-#### T267 — AI-generated content disclosure missing (EU AI Act + CA AB 2655) — **HIGH**
-**File:** `privacy/page.tsx:85-88` mentions AI processing but no end-user-facing disclosure on stories.
-**Fix:** Wire `is_ai_generated` flag to a story-page label "Summary generated with AI assistance"; update privacy policy to cite EU AI Act Article 50 + AB 2655 compliance.
-
 #### T268 — DMCA designated agent registration with US Copyright Office unverified — **HIGH** (safe harbor)
 **File:** `dmca/page.tsx:119`. Lists `legal@veritypost.com` only; no Copyright Office registration number cited.
 **Fix:** Register agent at copyright.gov/dmca-agent (free, ~10 min); update DMCA page with registration number.
@@ -967,14 +934,6 @@ Items below already moved to Pre-Launch Assessment (Apple/Sentry/COPPA-CRITICAL)
 #### T272 — Accessibility statement page absent (ADA defense) — **MEDIUM**
 **File:** `web/src/app/accessibility/page.tsx` exists but lacks formal Accessibility Statement (WCAG commitment + known limitations + contact).
 **Fix:** Add statement section: WCAG 2.1 AA commitment + accessibility@veritypost.com contact.
-
-#### T282 — Block scope hides DMs/comments only, not leaderboard/profile/expert-Q&A — **MEDIUM**
-**File:** `web/src/app/api/users/blocked/route.js`. Pairs with T17.
-**Fix:** Extend block to hide mentions, expert responses, leaderboard, public profile.
-
-#### T284 — Expert credential expiry has no auto-revoke — **MEDIUM**
-**File:** `web/src/app/api/cron/flag-expert-reverifications/route.js:13-16`. Flags only; expired experts keep badge.
-**Fix:** Second cron at expiry+35d auto-revokes; require re-approval.
 
 #### T285 — Web comment report uses free text; iOS uses structured — **MEDIUM** *(pairs with T32)*
 **File:** `web/src/app/api/comments/[id]/report/route.js:45-46`. Pairs with T32.

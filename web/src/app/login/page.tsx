@@ -15,17 +15,17 @@ import type { Tables } from '@/types/database-helpers';
 // (first-time sign-ins land on /welcome), NOT a permission gate.
 // Permission migration adds types only.
 
+// T82 — values point at globals.css CSS vars so brand-color edits cascade.
+// `danger` was already locked to canonical `--danger` (#b91c1c) per DA-055.
 const C = {
-  bg: '#ffffff',
-  card: '#f7f7f7',
-  border: '#e5e5e5',
-  text: '#111111',
-  dim: '#666666',
-  accent: '#111111',
-  success: '#22c55e',
-  // DA-055 — canonical `--danger`. `#ef4444` fails AA on `#fef2f2` bg;
-  // `#b91c1c` pushes above 7:1 contrast and matches web globals.css.
-  danger: '#b91c1c',
+  bg: 'var(--bg)',
+  card: 'var(--card)',
+  border: 'var(--border)',
+  text: 'var(--text)',
+  dim: 'var(--dim)',
+  accent: 'var(--accent)',
+  success: 'var(--success)',
+  danger: 'var(--danger)',
 } as const;
 
 type FocusField = 'identifier' | 'password' | null;

@@ -7,6 +7,7 @@ import { createClient } from '../../lib/supabase/client';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import { useFocusTrap } from '../../lib/useFocusTrap';
 import { useToast } from '@/components/Toast';
+import ErrorState from '@/components/ErrorState';
 import type { Tables } from '@/types/database-helpers';
 import type { User } from '@supabase/supabase-js';
 import { Z } from '@/lib/zIndex';
@@ -823,29 +824,7 @@ function MessagesPageInner() {
           padding: 20,
         }}
       >
-        <div style={{ maxWidth: 380, textAlign: 'center' }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: '#111', marginBottom: 8 }}>
-            Couldn&rsquo;t load messages
-          </div>
-          <div style={{ fontSize: 13, color: '#666', marginBottom: 20, lineHeight: 1.5 }}>
-            {loadError}
-          </div>
-          <button
-            onClick={loadMessages}
-            style={{
-              padding: '10px 22px',
-              background: '#111',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 10,
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            Try again
-          </button>
-        </div>
+        <ErrorState message={loadError} onRetry={loadMessages} />
       </div>
     );
   }

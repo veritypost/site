@@ -10,17 +10,17 @@ import { PASSWORD_REQS as REQS, passwordStrength as strengthScore } from '../../
 // password reset completion form. The "gate" here is the Supabase recovery
 // token itself, not a permission key. Permission migration adds types only.
 
+// T82 — values point at globals.css CSS vars so brand-color edits cascade.
+// `danger` was already locked to canonical `--danger` (#b91c1c) per DA-055.
 const C = {
-  bg: '#ffffff',
-  card: '#f7f7f7',
-  border: '#e5e5e5',
-  text: '#111111',
-  dim: '#666666',
-  accent: '#111111',
-  success: '#22c55e',
-  // DA-055 — canonical `--danger`. Raised from #ef4444 for AA contrast
-  // against #fef2f2 background; matches web globals.css.
-  danger: '#b91c1c',
+  bg: 'var(--bg)',
+  card: 'var(--card)',
+  border: 'var(--border)',
+  text: 'var(--text)',
+  dim: 'var(--dim)',
+  accent: 'var(--accent)',
+  success: 'var(--success)',
+  danger: 'var(--danger)',
 } as const;
 
 type FocusedField = 'pw' | 'cpw' | null;

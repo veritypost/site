@@ -22,6 +22,7 @@
 // because `cookies()` is read inside the supabase server client.
 
 import Link from 'next/link';
+import { cookies } from 'next/headers';
 import { Fragment, type CSSProperties } from 'react';
 import { createClient } from '../lib/supabase/server';
 import type { Tables } from '@/types/database-helpers';
@@ -35,6 +36,7 @@ import {
 import HomeBreakingStrip from './_HomeBreakingStrip';
 import HomeFooter from './_HomeFooter';
 import HomeFetchFailed from './_HomeFetchFailed';
+import HomeVisitTimestamp from './_HomeVisitTimestamp';
 
 // Hand-curated front page per Future Projects/09_HOME_FEED_REBUILD.md.
 // 1 hero + up to 7 supporting, dated, page ends. No category pills, no
@@ -142,7 +144,45 @@ export default async function HomePage() {
   const supabase = createClient();
   const today = editorialToday();
 
-  const [storiesRes, breakingRes, catsRes] = await Promise.all([
+  // T91 — last-visit cookie. Stories published after this timestamp get
+  // a "New" pill on the next render. Cookie is written by the
+  // <HomeVisitTimestamp /> client island after first paint (cookies set
+  // from a server component's render pass throw in App Router). On the
+  // first ever visit there's no cookie, so we render no "New" tags and
+  // just let the island plant the cookie for next time.
+  const lastVisitRaw = cookies().get('vp_last_home_visit_at')?.value;
+  let lastVisitMs: number | null = null;
+  if (lastVisitRaw) {
+    const t = Date.parse(lastVisitRaw);
+    if (Number.isFinite(t)) lastVisitMs = t;
+  }
+
+  // T109 — read-state for signed-in viewers. We pull the 200 most-recent
+  // reading_log rows for this user from the last 30 days and use that set
+  // to dim cards already read. Anon viewers have no reading_log; the
+  // chained .then() turns auth.getUser() into a single thenable that
+  // either yields the read-set or resolves to an empty payload, so the
+  // whole flow stays parallel with the article + category fetches and
+  // doesn't add a serial round-trip for signed-in viewers vs anon.
+  const thirtyDaysAgoIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const readLogPromise: Promise<{ data: Array<{ article_id: string }> | null }> = supabase.auth
+    .getUser()
+    .then(({ data }) => {
+      const u = data.user;
+      if (!u) return { data: null };
+      return supabase
+        .from('reading_log')
+        .select('article_id')
+        .eq('user_id', u.id)
+        .gte('created_at', thirtyDaysAgoIso)
+        .order('created_at', { ascending: false })
+        .limit(200)
+        .then((r) => ({
+          data: (r.data as Array<{ article_id: string }> | null) ?? null,
+        }));
+    });
+
+  const [storiesRes, breakingRes, catsRes, readLogRes] = await Promise.all([
     supabase
       .from('articles')
       .select(SELECT_COLS)
@@ -166,7 +206,14 @@ export default async function HomePage() {
         ascending: true,
         nullsFirst: false,
       }),
+    readLogPromise,
   ]);
+
+  const readArticleIds = new Set<string>();
+  const readRows = (readLogRes.data as Array<{ article_id: string | null }> | null) || [];
+  for (const row of readRows) {
+    if (row?.article_id) readArticleIds.add(row.article_id);
+  }
 
   // If the primary fetch errored we don't know whether today is empty or
   // the request failed — surface a retry banner instead of an empty-state
@@ -200,6 +247,15 @@ export default async function HomePage() {
 
   const hero = stories[0] || null;
   const supporting = stories.slice(1);
+
+  // T91 — "New since last visit" predicate. If we have no prior cookie
+  // value, isNew is always false (first-time visitor sees no badges).
+  const isNewStory = (story: HomeStory): boolean => {
+    if (lastVisitMs == null) return false;
+    if (!story.published_at) return false;
+    const t = Date.parse(story.published_at);
+    return Number.isFinite(t) && t > lastVisitMs;
+  };
 
   return (
     <div style={{ background: C.bg, color: C.text, minHeight: '100vh' }}>
@@ -242,6 +298,8 @@ export default async function HomePage() {
           <Hero
             story={hero}
             category={hero.category_id ? categoryById[hero.category_id] : undefined}
+            isNew={isNewStory(hero)}
+            isRead={readArticleIds.has(hero.id)}
           />
         )}
 
@@ -253,6 +311,8 @@ export default async function HomePage() {
                 <SupportingCard
                   story={story}
                   category={story.category_id ? categoryById[story.category_id] : undefined}
+                  isNew={isNewStory(story)}
+                  isRead={readArticleIds.has(story.id)}
                 />
               </Fragment>
             ))}
@@ -261,6 +321,11 @@ export default async function HomePage() {
 
         {!fetchFailed && hero && <HomeFooter />}
       </main>
+
+      {/* T91 — refresh the last-visit cookie after first paint. Never
+          renders any DOM; just owns the side-effect of writing the
+          cookie so the next render can compute "since last visit". */}
+      <HomeVisitTimestamp />
     </div>
   );
 }
@@ -268,6 +333,60 @@ export default async function HomePage() {
 // ============================================================================
 // Components (server-renderable — no hooks, no client APIs)
 // ============================================================================
+
+// T91 — small white-on-black "New" pill. Server-rendered (no JS), styled
+// to match the masthead palette. Sits inline next to other meta so the
+// supporting card's existing 24px vertical rhythm doesn't shift.
+function NewPill() {
+  return (
+    <span
+      aria-label="New since your last visit"
+      style={{
+        display: 'inline-block',
+        background: '#111111',
+        color: '#ffffff',
+        fontFamily: serifStack,
+        fontSize: 10,
+        fontWeight: 700,
+        letterSpacing: '0.08em',
+        textTransform: 'uppercase',
+        padding: '2px 6px',
+        borderRadius: 2,
+        lineHeight: 1.2,
+        verticalAlign: 'middle',
+      }}
+    >
+      New
+    </span>
+  );
+}
+
+// T109 — small "Read" tag for cards the signed-in viewer has already
+// opened. Lower contrast than the "New" pill — read-state is reference
+// information, not a call to attention.
+function ReadTag() {
+  return (
+    <span
+      aria-label="Already read"
+      style={{
+        display: 'inline-block',
+        color: C.muted,
+        fontFamily: serifStack,
+        fontSize: 10,
+        fontWeight: 600,
+        letterSpacing: '0.08em',
+        textTransform: 'uppercase',
+        padding: '2px 6px',
+        border: `1px solid ${C.rule}`,
+        borderRadius: 2,
+        lineHeight: 1.2,
+        verticalAlign: 'middle',
+      }}
+    >
+      Read
+    </span>
+  );
+}
 
 function Eyebrow({ category }: { category: CategoryRow | undefined }) {
   if (!category) return null;
@@ -303,8 +422,22 @@ function MetaLine({ story }: { story: HomeStory }) {
   );
 }
 
-function Hero({ story, category }: { story: HomeStory; category: CategoryRow | undefined }) {
+function Hero({
+  story,
+  category,
+  isNew,
+  isRead,
+}: {
+  story: HomeStory;
+  category: CategoryRow | undefined;
+  isNew: boolean;
+  isRead: boolean;
+}) {
   const bg = heroBg(category);
+  // T109 — soften the hero title when the user has read it. The hero sits
+  // on a dark band, so we drop title opacity rather than swap to grey
+  // (which would clash with the band color).
+  const heroTitleColor = isRead ? 'rgba(255,255,255,0.72)' : '#ffffff';
   return (
     <article style={{ marginBottom: 32 }}>
       <Link
@@ -328,20 +461,70 @@ function Hero({ story, category }: { story: HomeStory; category: CategoryRow | u
         >
           {/* Inner column mirrors the 720px reading column */}
           <div style={{ maxWidth: 720, margin: '0 auto', padding: '0 20px' }}>
-            {category && (
-              <div style={{ marginBottom: 16 }}>
-                <span
-                  style={{
-                    fontFamily: serifStack,
-                    fontSize: 11,
-                    fontWeight: 600,
-                    letterSpacing: '0.12em',
-                    textTransform: 'uppercase' as const,
-                    color: 'rgba(255,255,255,0.65)',
-                  }}
-                >
-                  {category.name}
-                </span>
+            {(category || isNew || isRead) && (
+              <div
+                style={{
+                  marginBottom: 16,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  flexWrap: 'wrap',
+                }}
+              >
+                {category && (
+                  <span
+                    style={{
+                      fontFamily: serifStack,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      letterSpacing: '0.12em',
+                      textTransform: 'uppercase' as const,
+                      color: 'rgba(255,255,255,0.65)',
+                    }}
+                  >
+                    {category.name}
+                  </span>
+                )}
+                {isNew && (
+                  <span
+                    aria-label="New since your last visit"
+                    style={{
+                      display: 'inline-block',
+                      background: '#ffffff',
+                      color: '#111111',
+                      fontFamily: serifStack,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      letterSpacing: '0.08em',
+                      textTransform: 'uppercase',
+                      padding: '2px 6px',
+                      borderRadius: 2,
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    New
+                  </span>
+                )}
+                {isRead && (
+                  <span
+                    aria-label="Already read"
+                    style={{
+                      display: 'inline-block',
+                      color: 'rgba(255,255,255,0.65)',
+                      fontFamily: serifStack,
+                      fontSize: 10,
+                      fontWeight: 600,
+                      letterSpacing: '0.08em',
+                      textTransform: 'uppercase',
+                      padding: '2px 6px',
+                      border: '1px solid rgba(255,255,255,0.30)',
+                      borderRadius: 2,
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    Read
+                  </span>
+                )}
               </div>
             )}
             <h2
@@ -352,7 +535,7 @@ function Hero({ story, category }: { story: HomeStory; category: CategoryRow | u
                 lineHeight: 1.1,
                 letterSpacing: '-0.02em',
                 margin: 0,
-                color: '#ffffff',
+                color: heroTitleColor,
               }}
             >
               {story.title}
@@ -392,10 +575,19 @@ function Hero({ story, category }: { story: HomeStory; category: CategoryRow | u
 function SupportingCard({
   story,
   category,
+  isNew,
+  isRead,
 }: {
   story: HomeStory;
   category: CategoryRow | undefined;
+  isNew: boolean;
+  isRead: boolean;
 }) {
+  // T109 — read titles dim to #888 (vs #111 default). Excerpt tone is
+  // intentionally left alone — it's already C.soft (#444), and dimming
+  // it further would hurt scannability for sighted users with the
+  // article reopened.
+  const titleColor = isRead ? '#888888' : C.text;
   return (
     <article style={{ padding: '24px 0' }}>
       <Link
@@ -406,8 +598,18 @@ function SupportingCard({
           display: 'block',
         }}
       >
-        <div style={{ marginBottom: 8 }}>
+        <div
+          style={{
+            marginBottom: 8,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            flexWrap: 'wrap',
+          }}
+        >
           <Eyebrow category={category} />
+          {isNew && <NewPill />}
+          {isRead && <ReadTag />}
         </div>
         <h3
           style={{
@@ -417,7 +619,7 @@ function SupportingCard({
             lineHeight: 1.2,
             letterSpacing: '-0.01em',
             margin: 0,
-            color: C.text,
+            color: titleColor,
           }}
         >
           {story.title}

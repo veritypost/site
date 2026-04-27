@@ -27,12 +27,15 @@ interface RecapListResponse {
   paid?: boolean;
 }
 
+// T82 — values point at globals.css CSS vars so brand-color edits cascade.
+// `success` keeps its inline hex (no matching `--success` value; `--success`
+// is `#22c55e`, this surface uses the deeper `#16a34a`).
 const C = {
-  card: '#f7f7f7',
-  border: '#e5e5e5',
-  text: '#111',
-  dim: '#666',
-  accent: '#111',
+  card: 'var(--card)',
+  border: 'var(--border)',
+  text: 'var(--text)',
+  dim: 'var(--dim)',
+  accent: 'var(--accent)',
   success: '#16a34a',
 } as const;
 

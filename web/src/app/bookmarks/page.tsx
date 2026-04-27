@@ -1,11 +1,12 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified bookmarks 2026-04-18
 'use client';
-import { useState, useEffect, useRef, CSSProperties, ReactNode } from 'react';
+import { useState, useEffect, useRef, CSSProperties } from 'react';
 import Link from 'next/link';
 import { createClient } from '../../lib/supabase/client';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import EmptyState from '@/components/EmptyState';
+import ErrorState from '@/components/ErrorState';
 import LockedFeatureCTA from '@/components/LockedFeatureCTA';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import { getPlanLimitValue } from '@/lib/plans';
@@ -42,12 +43,6 @@ type CollectionRow = Pick<Tables<'bookmark_collections'>, 'id' | 'name'> & {
 interface PendingDelete {
   id: string;
   name: string;
-}
-
-interface BannerProps {
-  tone?: 'warn' | 'danger';
-  title: string;
-  children?: ReactNode;
 }
 
 // Same strip-the-Kids-tag rule used across the site.
@@ -487,9 +482,7 @@ export default function BookmarksPage() {
           />
         )}
         {error && (
-          <Banner tone="danger" title="Problem">
-            {error}
-          </Banner>
+          <ErrorState inline message={error} onRetry={() => load()} style={{ marginBottom: 16 }} />
         )}
 
         {showNewCollection && (
@@ -769,28 +762,6 @@ export default function BookmarksPage() {
         onClose={() => !deleteBusy && setPendingDelete(null)}
       />
     </main>
-  );
-}
-
-function Banner({ tone, title, children }: BannerProps) {
-  const map: Record<string, { bg: string; border: string; color: string }> = {
-    warn: { bg: '#fffbeb', border: '#fde68a', color: '#b45309' },
-    danger: { bg: '#fef2f2', border: '#fca5a5', color: '#dc2626' },
-  };
-  const s = (tone && map[tone]) || { bg: '#f7f7f7', border: '#e5e5e5', color: '#111' };
-  return (
-    <div
-      style={{
-        background: s.bg,
-        border: `1px solid ${s.border}`,
-        borderRadius: 10,
-        padding: '12px 14px',
-        marginBottom: 16,
-      }}
-    >
-      <div style={{ fontSize: 13, fontWeight: 700, color: s.color }}>{title}</div>
-      <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>{children}</div>
-    </div>
   );
 }
 

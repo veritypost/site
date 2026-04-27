@@ -11,12 +11,14 @@ import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/perm
 import type { Tables } from '@/types/database-helpers';
 import { formatDate, formatDateTime } from '@/lib/dates';
 
+// T82 — values point at globals.css CSS vars so brand-color edits cascade.
+// `success`/`warn`/`danger` keep inline hex (deeper variants than canonical).
 const C = {
-  card: '#f7f7f7',
-  border: '#e5e5e5',
-  text: '#111',
-  dim: '#666',
-  accent: '#111',
+  card: 'var(--card)',
+  border: 'var(--border)',
+  text: 'var(--text)',
+  dim: 'var(--dim)',
+  accent: 'var(--accent)',
   success: '#16a34a',
   warn: '#b45309',
   danger: '#dc2626',

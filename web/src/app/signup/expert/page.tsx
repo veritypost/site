@@ -15,14 +15,15 @@ import { createClient } from '../../../lib/supabase/client';
 // pre-fill the email read-only, and jump straight to the credentials form.
 // Settings page "Start application" CTA routes here for authed free users.
 
+// T82 — values point at globals.css CSS vars so brand-color edits cascade.
 const C = {
-  bg: '#ffffff',
-  card: '#f7f7f7',
-  border: '#e5e5e5',
-  text: '#111111',
-  dim: '#666666',
-  accent: '#111111',
-  success: '#22c55e',
+  bg: 'var(--bg)',
+  card: 'var(--card)',
+  border: 'var(--border)',
+  text: 'var(--text)',
+  dim: 'var(--dim)',
+  accent: 'var(--accent)',
+  success: 'var(--success)',
 } as const;
 
 const EXPERTISE_FIELDS: string[] = [

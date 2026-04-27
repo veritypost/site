@@ -6,6 +6,9 @@ import type { Tables } from '@/types/database-helpers';
 
 type UserRow = Partial<Tables<'users'>>;
 
+// T82 — `cta` points at the canonical `--accent` so brand changes cascade.
+// The red/amber banner tokens are bespoke severity variants (no matching
+// global vars; would need new tokens to consolidate, out of scope here).
 const C = {
   redBg: '#fef2f2',
   redBorder: '#dc2626',
@@ -13,7 +16,7 @@ const C = {
   amberBg: '#fffbeb',
   amberBorder: '#d97706',
   amberText: '#92400e',
-  cta: '#111111',
+  cta: 'var(--accent)',
 } as const;
 
 interface BannerState {

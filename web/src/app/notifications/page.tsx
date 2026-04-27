@@ -5,6 +5,7 @@ import { useState, useEffect, CSSProperties } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import { useToast } from '@/components/Toast';
+import ErrorState from '@/components/ErrorState';
 import type { Tables } from '@/types/database-helpers';
 import { formatDateTime } from '@/lib/dates';
 
@@ -51,12 +52,13 @@ function groupNotifications(
   return groups;
 }
 
+// T82 — values point at globals.css CSS vars so brand-color edits cascade.
 const C = {
-  card: '#f7f7f7',
-  border: '#e5e5e5',
-  text: '#111',
-  dim: '#666',
-  accent: '#111',
+  card: 'var(--card)',
+  border: 'var(--border)',
+  text: 'var(--text)',
+  dim: 'var(--dim)',
+  accent: 'var(--accent)',
 } as const;
 
 export default function NotificationsInbox() {
@@ -350,35 +352,7 @@ export default function NotificationsInbox() {
       </div>
 
       {error ? (
-        <div
-          style={{
-            padding: 20,
-            background: '#fef2f2',
-            border: '1px solid #fecaca',
-            borderRadius: 10,
-            color: '#991b1b',
-            fontSize: 13,
-            marginBottom: 12,
-          }}
-        >
-          {error}
-          <button
-            onClick={load}
-            style={{
-              marginLeft: 10,
-              padding: '4px 10px',
-              borderRadius: 6,
-              border: '1px solid #fca5a5',
-              background: '#fff',
-              color: '#991b1b',
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            Retry
-          </button>
-        </div>
+        <ErrorState inline message={error} onRetry={load} style={{ marginBottom: 12 }} />
       ) : items.length === 0 ? (
         <div
           style={{

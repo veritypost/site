@@ -28,13 +28,15 @@ function daysRemaining(iso: string | null | undefined): number {
   return Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000));
 }
 
+// T82 — values point at globals.css CSS vars so brand-color edits cascade.
+// `success`/`warn`/`danger` keep inline hex (deeper variants than canonical).
 const C = {
-  bg: '#fff',
-  card: '#f7f7f7',
-  border: '#e5e5e5',
-  text: '#111',
-  dim: '#666',
-  accent: '#111',
+  bg: 'var(--bg)',
+  card: 'var(--card)',
+  border: 'var(--border)',
+  text: 'var(--text)',
+  dim: 'var(--dim)',
+  accent: 'var(--accent)',
   success: '#16a34a',
   warn: '#b45309',
   danger: '#dc2626',
@@ -74,6 +76,7 @@ export default function ParentKidsPage() {
   const [kids, setKids] = useState<KidRow[]>([]);
   const [kpis, setKpis] = useState<KpiPayload>(null);
   const [error, setError] = useState<string>('');
+  const [loadError, setLoadError] = useState<boolean>(false);
   const [flash, setFlash] = useState<string>('');
   const [denied, setDenied] = useState<boolean>(false);
   const [canAdd, setCanAdd] = useState<boolean>(false);
@@ -99,6 +102,7 @@ export default function ParentKidsPage() {
   async function load() {
     setLoading(true);
     setError('');
+    setLoadError(false);
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -128,18 +132,24 @@ export default function ParentKidsPage() {
       .maybeSingle();
     setMe(meRow);
 
+    // Sentinel returned by the kids/trial catch handlers when the request
+    // fails outright. Distinguishes a fetch failure from a successful
+    // response that legitimately contains no kids / no trial state — without
+    // it, the empty-state CTA fires on a network error and pushes the
+    // parent to "Add a kid" when their data just failed to load.
+    const FAILED = Symbol('fetch-failed');
     const [kidsRes, trialRes, kpiRes] = await Promise.all([
       fetch('/api/kids', { credentials: 'include' })
-        .then((r) => r.json())
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
         .catch((err) => {
           console.error('[profile/kids] kids list', err);
-          return { kids: [] };
+          return FAILED;
         }),
       fetch('/api/kids/trial', { credentials: 'include' })
-        .then((r) => r.json())
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
         .catch((err) => {
           console.error('[profile/kids] trial', err);
-          return {};
+          return FAILED;
         }),
       hasPermission('kids.parent.household_kpis')
         ? fetch('/api/kids/household-kpis', { credentials: 'include' })
@@ -150,9 +160,21 @@ export default function ParentKidsPage() {
             })
         : Promise.resolve(null),
     ]);
-    setKids(kidsRes?.kids || []);
-    setTrial(trialRes || {});
-    setKpis(kpiRes || null);
+
+    const kidsFailed = kidsRes === FAILED;
+    const trialFailed = trialRes === FAILED;
+    if (kidsFailed || trialFailed) {
+      setLoadError(true);
+      setKids([]);
+      setTrial({});
+      setKpis(null);
+      setLoading(false);
+      return;
+    }
+
+    setKids((kidsRes as { kids?: KidRow[] })?.kids || []);
+    setTrial((trialRes as TrialPayload) || {});
+    setKpis((kpiRes as KpiPayload) || null);
     setLoading(false);
   }
   useEffect(() => {
@@ -367,8 +389,43 @@ export default function ParentKidsPage() {
         </div>
       )}
 
-      {trialActive && <TrialHero endsAt={trial.kid_trial_ends_at || null} />}
-      {trialExpired && (
+      {loadError && (
+        <div
+          style={{
+            background: '#fef2f2',
+            border: `1px solid ${C.danger}`,
+            borderRadius: 10,
+            padding: 12,
+            marginBottom: 12,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ flex: 1, minWidth: 220, fontSize: 13, color: C.danger }}>
+            Couldn&rsquo;t load your kids profiles. Check your connection and retry.
+          </div>
+          <button
+            onClick={() => load()}
+            style={{
+              padding: '8px 14px',
+              borderRadius: 8,
+              border: 'none',
+              background: C.danger,
+              color: '#fff',
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {!loadError && trialActive && <TrialHero endsAt={trial.kid_trial_ends_at || null} />}
+      {!loadError && trialExpired && (
         <TrialExpiredHero
           // Trial limit is 1 kid, so the trial-expired kid is kids[0]
           // when present. If the array is empty (kid was already
@@ -378,11 +435,11 @@ export default function ParentKidsPage() {
         />
       )}
 
-      {canViewKpis && (canAdd || trialActive) && <KpiRow kpis={kpis} />}
+      {!loadError && canViewKpis && (canAdd || trialActive) && <KpiRow kpis={kpis} />}
 
-      <KidsAppBanner />
+      {!loadError && <KidsAppBanner />}
 
-      {kids.length > 0 && (
+      {!loadError && kids.length > 0 && (
         <div
           style={{
             display: 'grid',
@@ -407,7 +464,7 @@ export default function ParentKidsPage() {
         </div>
       )}
 
-      {kids.length === 0 && canAdd && (
+      {!loadError && kids.length === 0 && canAdd && (
         <div
           style={{
             background: C.card,
@@ -425,7 +482,8 @@ export default function ParentKidsPage() {
         </div>
       )}
 
-      {!canAdd &&
+      {!loadError &&
+        !canAdd &&
         canStartTrial &&
         !trialActive &&
         !trialExpired &&
@@ -466,7 +524,7 @@ export default function ParentKidsPage() {
           </div>
         )}
 
-      {!showForm && canAdd && canCreateMore && (
+      {!loadError && !showForm && canAdd && canCreateMore && (
         <button
           onClick={() => setShowForm('full')}
           style={{
@@ -488,7 +546,7 @@ export default function ParentKidsPage() {
         </button>
       )}
 
-      {showForm && (
+      {!loadError && showForm && (
         <CreateKidForm
           form={form}
           setForm={setForm}

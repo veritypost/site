@@ -89,13 +89,14 @@ interface FollowingRowShape {
 
 // Q1 — color palette used by the anon CTA hero. Mirrors `/notifications`
 // (R13) so the two anon tabs feel like one system.
+// T82 — values point at globals.css CSS vars so brand-color edits cascade.
 const C = {
-  bg: '#ffffff',
-  card: '#f7f7f7',
-  border: '#e5e5e5',
-  text: '#111111',
-  dim: '#666666',
-  accent: '#111111',
+  bg: 'var(--bg)',
+  card: 'var(--card)',
+  border: 'var(--border)',
+  text: 'var(--text)',
+  dim: 'var(--dim)',
+  accent: 'var(--accent)',
 } as const;
 
 export default function ProfilePage() {

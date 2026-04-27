@@ -59,5 +59,32 @@ export async function GET(request) {
   const { data, error } = await q;
   if (error)
     return safeErrorResponse(NextResponse, error, { route: 'expert.queue', fallbackStatus: 400 });
-  return NextResponse.json({ items: data || [] });
+
+  // T282 — bidirectional block filter. Hide queue items whose asker is in
+  // the viewer's block set OR who has blocked the viewer. Mutual-visibility
+  // model matches CommentThread (web/src/components/CommentThread.tsx:158).
+  // Filter is applied post-query because expert_queue_items.asking_user_id
+  // is denormalized via the embedded asker join, so we'd need a second
+  // round-trip to filter at the SQL layer; the lists are bounded.
+  const items = data || [];
+  const askerIds = items
+    .map((it) => it?.asking_user_id)
+    .filter((id) => typeof id === 'string' && id.length > 0);
+  let visibleItems = items;
+  if (askerIds.length > 0) {
+    const { data: blockRows } = await service
+      .from('blocked_users')
+      .select('blocker_id, blocked_id')
+      .or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`);
+    const blocked = new Set();
+    (blockRows || []).forEach((row) => {
+      if (row.blocker_id === user.id && row.blocked_id) blocked.add(row.blocked_id);
+      if (row.blocked_id === user.id && row.blocker_id) blocked.add(row.blocker_id);
+    });
+    if (blocked.size > 0) {
+      visibleItems = items.filter((it) => !it.asking_user_id || !blocked.has(it.asking_user_id));
+    }
+  }
+
+  return NextResponse.json({ items: visibleItems });
 }

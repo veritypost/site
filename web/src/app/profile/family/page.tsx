@@ -1,17 +1,19 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified family_admin 2026-04-18
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '../../../lib/supabase/client';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import { formatDate } from '@/lib/dates';
 
+// T82 — values point at globals.css CSS vars so brand-color edits cascade.
+// `success` keeps inline hex (this surface uses deeper #16a34a, not `--success`).
 const C = {
-  card: '#f7f7f7',
-  border: '#e5e5e5',
-  text: '#111',
-  dim: '#666',
-  accent: '#111',
+  card: 'var(--card)',
+  border: 'var(--border)',
+  text: 'var(--text)',
+  dim: 'var(--dim)',
+  accent: 'var(--accent)',
   success: '#16a34a',
 } as const;
 
@@ -48,64 +50,94 @@ export default function FamilyDashboard() {
   const [achievements, setAchievements] = useState<SharedAchievement[]>([]);
   const [report, setReport] = useState<WeeklyReport | null>(null);
   const [error, setError] = useState<string>('');
+  const [loadError, setLoadError] = useState<boolean>(false);
   const [denied, setDenied] = useState<boolean>(false);
   const [canViewLeaderboard, setCanViewLeaderboard] = useState<boolean>(false);
   const [canViewAchievements, setCanViewAchievements] = useState<boolean>(false);
   const [canViewReport, setCanViewReport] = useState<boolean>(false);
 
-  useEffect(() => {
-    (async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        setDenied(true);
-        setLoading(false);
-        return;
-      }
-
-      await refreshAllPermissions();
-      await refreshIfStale();
-
-      const leaderboardOk = hasPermission('family.view_leaderboard');
-      const achievementsOk =
-        hasPermission('family.shared_achievements') || hasPermission('kids.achievements.view');
-      const reportOk = hasPermission('kids.parent.weekly_report.view');
-      setCanViewLeaderboard(leaderboardOk);
-      setCanViewAchievements(achievementsOk);
-      setCanViewReport(reportOk);
-
-      if (!leaderboardOk && !achievementsOk && !reportOk) {
-        setDenied(true);
-        setLoading(false);
-        return;
-      }
-
-      const [lb, ach, rep] = await Promise.all([
-        leaderboardOk
-          ? fetch('/api/family/leaderboard', { credentials: 'include' })
-              .then((r) => r.json())
-              .catch(() => ({}))
-          : Promise.resolve({}),
-        achievementsOk
-          ? fetch('/api/family/achievements', { credentials: 'include' })
-              .then((r) => r.json())
-              .catch(() => ({}))
-          : Promise.resolve({}),
-        reportOk
-          ? fetch('/api/family/weekly-report', { credentials: 'include' })
-              .then((r) => r.json())
-              .catch(() => ({}))
-          : Promise.resolve({}),
-      ]);
-      if (lb && (lb as { error?: string }).error) setError((lb as { error?: string }).error || '');
-      setMembers((lb && (lb as { members?: LeaderboardMember[] }).members) || []);
-      setAchievements((ach && (ach as { achievements?: SharedAchievement[] }).achievements) || []);
-      setReport((rep as WeeklyReport) || null);
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    setLoadError(false);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setDenied(true);
       setLoading(false);
-    })();
+      return;
+    }
+
+    await refreshAllPermissions();
+    await refreshIfStale();
+
+    const leaderboardOk = hasPermission('family.view_leaderboard');
+    const achievementsOk =
+      hasPermission('family.shared_achievements') || hasPermission('kids.achievements.view');
+    const reportOk = hasPermission('kids.parent.weekly_report.view');
+    setCanViewLeaderboard(leaderboardOk);
+    setCanViewAchievements(achievementsOk);
+    setCanViewReport(reportOk);
+
+    if (!leaderboardOk && !achievementsOk && !reportOk) {
+      setDenied(true);
+      setLoading(false);
+      return;
+    }
+
+    // Sentinel distinguishes a fetch failure from a successful response
+    // that legitimately contains an empty leaderboard / no achievements /
+    // no weekly activity. Without it, a network error renders the same
+    // "no activity logged" copy as a real empty household.
+    const FAILED = Symbol('fetch-failed');
+    const [lb, ach, rep] = await Promise.all([
+      leaderboardOk
+        ? fetch('/api/family/leaderboard', { credentials: 'include' })
+            .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+            .catch((err) => {
+              console.error('[profile/family] leaderboard', err);
+              return FAILED;
+            })
+        : Promise.resolve({}),
+      achievementsOk
+        ? fetch('/api/family/achievements', { credentials: 'include' })
+            .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+            .catch((err) => {
+              console.error('[profile/family] achievements', err);
+              return FAILED;
+            })
+        : Promise.resolve({}),
+      reportOk
+        ? fetch('/api/family/weekly-report', { credentials: 'include' })
+            .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+            .catch((err) => {
+              console.error('[profile/family] weekly-report', err);
+              return FAILED;
+            })
+        : Promise.resolve({}),
+    ]);
+
+    if (lb === FAILED || ach === FAILED || rep === FAILED) {
+      setLoadError(true);
+      setMembers([]);
+      setAchievements([]);
+      setReport(null);
+      setLoading(false);
+      return;
+    }
+
+    if (lb && (lb as { error?: string }).error) setError((lb as { error?: string }).error || '');
+    setMembers((lb && (lb as { members?: LeaderboardMember[] }).members) || []);
+    setAchievements((ach && (ach as { achievements?: SharedAchievement[] }).achievements) || []);
+    setReport((rep as WeeklyReport) || null);
+    setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   if (loading) return <div style={{ padding: 40, color: C.dim }}>Loading{'\u2026'}</div>;
   if (denied) {
@@ -146,7 +178,42 @@ export default function FamilyDashboard() {
 
       {error && <div style={{ color: '#dc2626', fontSize: 12, marginBottom: 10 }}>{error}</div>}
 
-      {canViewLeaderboard && (
+      {loadError && (
+        <div
+          style={{
+            background: '#fef2f2',
+            border: '1px solid #dc2626',
+            borderRadius: 10,
+            padding: 12,
+            marginBottom: 12,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ flex: 1, minWidth: 220, fontSize: 13, color: '#dc2626' }}>
+            Couldn&rsquo;t load your family dashboard. Check your connection and retry.
+          </div>
+          <button
+            onClick={() => load()}
+            style={{
+              padding: '8px 14px',
+              borderRadius: 8,
+              border: 'none',
+              background: '#dc2626',
+              color: '#fff',
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {!loadError && canViewLeaderboard && (
         <>
           <h2 style={{ fontSize: 15, fontWeight: 700, margin: '12px 0 8px' }}>Most Informed</h2>
           <div
@@ -197,7 +264,7 @@ export default function FamilyDashboard() {
         </>
       )}
 
-      {canViewReport && (
+      {!loadError && canViewReport && (
         <>
           <h2 style={{ fontSize: 15, fontWeight: 700, margin: '12px 0 8px' }}>
             This week ({formatDate(report?.week_ending)})
@@ -245,7 +312,7 @@ export default function FamilyDashboard() {
         </>
       )}
 
-      {canViewAchievements && (
+      {!loadError && canViewAchievements && (
         <>
           <h2 style={{ fontSize: 15, fontWeight: 700, margin: '12px 0 8px' }}>
             Shared achievements

@@ -86,7 +86,9 @@ export default function PrivacyPage() {
           <ul style={listStyle}>
             <li>
               We process articles to generate summaries, quiz questions, and content analysis under
-              human editorial oversight.
+              human editorial oversight. Articles synthesized with AI assistance are labeled
+              &quot;AI-synthesized&quot; on the article page in compliance with the EU Artificial
+              Intelligence Act (Regulation (EU) 2024/1689) Article 50 and California AB 2655.
             </li>
             <li>
               Your reading patterns may be used in aggregate to inform recommendation features, and

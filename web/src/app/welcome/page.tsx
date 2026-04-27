@@ -28,17 +28,20 @@ function forwardNextQs(): string {
 // this page is single-purpose: the 3-screen welcome tour for newly
 // signed-up users, redirecting on `onboarding_completed_at`.
 
+// T82 — values point at globals.css CSS vars so brand-color edits cascade.
+// `quiz`/`quizBg`/`quizBorder` keep inline hex (no globals var — the violet
+// quiz wash is unique to /welcome's onboarding moment).
 const C = {
-  bg: '#ffffff',
-  card: '#f7f7f7',
-  border: '#e5e5e5',
-  text: '#111111',
-  dim: '#666666',
-  accent: '#111111',
+  bg: 'var(--bg)',
+  card: 'var(--card)',
+  border: 'var(--border)',
+  text: 'var(--text)',
+  dim: 'var(--dim)',
+  accent: 'var(--accent)',
   quiz: '#8b5cf6',
   quizBg: '#f5f3ff',
   quizBorder: '#ddd6fe',
-  success: '#22c55e',
+  success: 'var(--success)',
 } as const;
 
 type FeedStory = {

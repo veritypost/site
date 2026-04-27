@@ -22,6 +22,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 import Avatar from '@/components/Avatar';
+import ErrorState from '@/components/ErrorState';
 import Page, { PageHeader } from '@/components/admin/Page';
 import PageSection from '@/components/admin/PageSection';
 import Badge from '@/components/admin/Badge';
@@ -164,6 +165,7 @@ function ProfilePageInner() {
 
   // Tab-specific state
   const [activityLoaded, setActivityLoaded] = useState(false);
+  const [activityError, setActivityError] = useState<string>('');
   const [reads, setReads] = useState<ReadingLogJoined[]>([]);
   const [comments, setComments] = useState<CommentJoined[]>([]);
   const [bookmarks, setBookmarks] = useState<BookmarkJoined[]>([]);
@@ -173,11 +175,13 @@ function ProfilePageInner() {
   const [categoryScores, setCategoryScores] = useState<CategoryScoreRow[]>([]);
   const [preferredCategoryIds, setPreferredCategoryIds] = useState<Set<string>>(new Set());
   const [categoriesLoaded, setCategoriesLoaded] = useState(false);
+  const [categoriesError, setCategoriesError] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<CategoryRow | null>(null);
 
   const [achievements, setAchievements] = useState<AchievementRow[]>([]);
   const [earnedMap, setEarnedMap] = useState<Record<string, string>>({});
   const [milestonesLoaded, setMilestonesLoaded] = useState(false);
+  const [milestonesError, setMilestonesError] = useState<string>('');
 
   // Tier data — DB-backed via `score_tiers` (see @/lib/scoreTiers). 60s
   // cache in the helper means most navs don't hit the DB here.
@@ -289,6 +293,7 @@ function ProfilePageInner() {
   // -------------------------------------------------------------
   const loadActivity = useCallback(
     async (uid: string) => {
+      setActivityError('');
       const [r, c, b] = await Promise.all([
         supabase
           .from('reading_log')
@@ -312,6 +317,13 @@ function ProfilePageInner() {
           .limit(50),
       ]);
 
+      if (r.error || c.error || b.error) {
+        console.error('[profile] activity load failed', r.error || c.error || b.error);
+        setActivityError("Couldn't load your activity. Try again.");
+        setActivityLoaded(true);
+        return;
+      }
+
       setReads((r.data ?? []) as unknown as ReadingLogJoined[]);
       setComments((c.data ?? []) as unknown as CommentJoined[]);
       setBookmarks((b.data ?? []) as unknown as BookmarkJoined[]);
@@ -322,6 +334,7 @@ function ProfilePageInner() {
 
   const loadCategories = useCallback(
     async (uid: string) => {
+      setCategoriesError('');
       const [cats, scores, prefs] = await Promise.all([
         supabase
           .from('categories')
@@ -334,6 +347,16 @@ function ProfilePageInner() {
         supabase.from('user_preferred_categories').select('category_id').eq('user_id', uid),
       ]);
 
+      if (cats.error || scores.error || prefs.error) {
+        console.error(
+          '[profile] categories load failed',
+          cats.error || scores.error || prefs.error
+        );
+        setCategoriesError("Couldn't load your categories. Try again.");
+        setCategoriesLoaded(true);
+        return;
+      }
+
       setCategories((cats.data ?? []) as CategoryRow[]);
       setCategoryScores((scores.data ?? []) as CategoryScoreRow[]);
       setPreferredCategoryIds(new Set((prefs.data ?? []).map((r) => r.category_id)));
@@ -344,6 +367,7 @@ function ProfilePageInner() {
 
   const loadMilestones = useCallback(
     async (uid: string) => {
+      setMilestonesError('');
       const [all, mine] = await Promise.all([
         supabase
           .from('achievements')
@@ -358,6 +382,13 @@ function ProfilePageInner() {
           .eq('user_id', uid)
           .is('kid_profile_id', null),
       ]);
+
+      if (all.error || mine.error) {
+        console.error('[profile] milestones load failed', all.error || mine.error);
+        setMilestonesError("Couldn't load your milestones. Try again.");
+        setMilestonesLoaded(true);
+        return;
+      }
 
       setAchievements((all.data ?? []) as AchievementRow[]);
       const map: Record<string, string> = {};
@@ -546,6 +577,12 @@ function ProfilePageInner() {
         (perms.activity ? (
           <ActivityTab
             loaded={activityLoaded}
+            error={activityError}
+            onRetry={() => {
+              if (!authUserId) return;
+              setActivityLoaded(false);
+              loadActivity(authUserId);
+            }}
             reads={reads}
             comments={comments}
             bookmarks={bookmarks}
@@ -559,6 +596,12 @@ function ProfilePageInner() {
         (perms.categories ? (
           <CategoriesTab
             loaded={categoriesLoaded}
+            error={categoriesError}
+            onRetry={() => {
+              if (!authUserId) return;
+              setCategoriesLoaded(false);
+              loadCategories(authUserId);
+            }}
             categories={categories}
             scores={categoryScores}
             preferred={preferredCategoryIds}
@@ -572,6 +615,12 @@ function ProfilePageInner() {
         (perms.milestones ? (
           <MilestonesTab
             loaded={milestonesLoaded}
+            error={milestonesError}
+            onRetry={() => {
+              if (!authUserId) return;
+              setMilestonesLoaded(false);
+              loadMilestones(authUserId);
+            }}
             achievements={achievements}
             earnedMap={earnedMap}
             tierInfo={tierInfo}
@@ -1106,6 +1155,8 @@ function ProfileCardPreview({ user, tierInfo }: { user: UserRow; tierInfo: Score
 // ===============================================================
 function ActivityTab({
   loaded,
+  error,
+  onRetry,
   reads,
   comments,
   bookmarks,
@@ -1113,6 +1164,8 @@ function ActivityTab({
   setFilter,
 }: {
   loaded: boolean;
+  error: string;
+  onRetry: () => void;
   reads: ReadingLogJoined[];
   comments: CommentJoined[];
   bookmarks: BookmarkJoined[];
@@ -1206,7 +1259,9 @@ function ActivityTab({
         </div>
       )}
 
-      {loaded && items.length === 0 && (
+      {loaded && error && <ErrorState message={error} onRetry={onRetry} />}
+
+      {loaded && !error && items.length === 0 && (
         <EmptyState
           title="No activity yet"
           description="Read an article, leave a comment, or save a bookmark to see it here."
@@ -1218,7 +1273,7 @@ function ActivityTab({
         />
       )}
 
-      {loaded && items.length > 0 && (
+      {loaded && !error && items.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {items.map((it) => (
             <ActivityRow key={it.id} item={it} />
@@ -1291,6 +1346,8 @@ function ActivityRow({ item }: { item: ActivityItem }) {
 // ===============================================================
 function CategoriesTab({
   loaded,
+  error,
+  onRetry,
   categories,
   scores,
   preferred,
@@ -1298,6 +1355,8 @@ function CategoriesTab({
   setSelected,
 }: {
   loaded: boolean;
+  error: string;
+  onRetry: () => void;
   categories: CategoryRow[];
   scores: CategoryScoreRow[];
   preferred: Set<string>;
@@ -1331,6 +1390,14 @@ function CategoriesTab({
             </div>
           ))}
         </div>
+      </PageSection>
+    );
+  }
+
+  if (error) {
+    return (
+      <PageSection title="Your categories">
+        <ErrorState message={error} onRetry={onRetry} />
       </PageSection>
     );
   }
@@ -1561,6 +1628,8 @@ function CategoryDrillModal({
 // ===============================================================
 function MilestonesTab({
   loaded,
+  error,
+  onRetry,
   achievements,
   earnedMap,
   tierInfo,
@@ -1568,6 +1637,8 @@ function MilestonesTab({
   verityScore,
 }: {
   loaded: boolean;
+  error: string;
+  onRetry: () => void;
   achievements: AchievementRow[];
   earnedMap: Record<string, string>;
   tierInfo: ScoreTier | null;
@@ -1659,7 +1730,9 @@ function MilestonesTab({
           </div>
         )}
 
-        {loaded && achievements.length === 0 && (
+        {loaded && error && <ErrorState message={error} onRetry={onRetry} />}
+
+        {loaded && !error && achievements.length === 0 && (
           <EmptyState
             title="No achievements yet"
             description="Complete a quiz or hit your first streak to start collecting badges."
@@ -1672,6 +1745,7 @@ function MilestonesTab({
         )}
 
         {loaded &&
+          !error &&
           grouped.map(([group, items]) => (
             <div key={group} style={{ marginBottom: S[6] }}>
               <div

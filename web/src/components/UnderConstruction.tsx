@@ -8,13 +8,14 @@
 
 import Link from 'next/link';
 
+// T82 — values point at globals.css CSS vars so brand-color edits cascade.
 const C = {
-  bg: '#ffffff',
-  card: '#f7f7f7',
-  border: '#e5e5e5',
-  text: '#111111',
-  dim: '#666666',
-  accent: '#111111',
+  bg: 'var(--bg)',
+  card: 'var(--card)',
+  border: 'var(--border)',
+  text: 'var(--text)',
+  dim: 'var(--dim)',
+  accent: 'var(--accent)',
 } as const;
 
 export default function UnderConstruction({ surface = 'this page' }: { surface?: string }) {

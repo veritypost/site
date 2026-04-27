@@ -14,14 +14,15 @@ import type { Tables } from '@/types/database-helpers';
 // currently exists in the resolver seed, and RLS already enforces the
 // equivalent access, so no hasPermission() call is added here.
 
+// T82 — values point at globals.css CSS vars so brand-color edits cascade.
 const PALETTE = {
-  bg: '#ffffff',
-  card: '#f7f7f7',
-  border: '#e5e5e5',
-  text: '#111111',
-  dim: '#666666',
-  accent: '#111111',
-  success: '#22c55e',
+  bg: 'var(--bg)',
+  card: 'var(--card)',
+  border: 'var(--border)',
+  text: 'var(--text)',
+  dim: 'var(--dim)',
+  accent: 'var(--accent)',
+  success: 'var(--success)',
 } as const;
 
 interface CategoryStyle {
