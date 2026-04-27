@@ -7,7 +7,7 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
-## 2026-04-27 (preview-fixture audit — 1 new TODO item, 2 confirmed-already-built) — _no code; bookkeeping only_ — _pending push to git_
+## 2026-04-27 (preview-fixture audit — 1 new TODO item, 2 confirmed-already-built) — _no code; bookkeeping only_ — _shipped, pushed to git_ (commit 82d51d1)
 
 Owner asked whether the redesign preview fixture (`web/src/app/redesign/preview/page.tsx` at `localhost:3333/redesign/preview`) had UI patterns not yet accounted for in TODO. Audited every section in the fixture against its corresponding live `_sections/` component. Result: 1 real gap, 2 confirmed-built, 2 already-tracked.
 
