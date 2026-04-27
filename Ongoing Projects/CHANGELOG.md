@@ -7,7 +7,7 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
-## 2026-04-27 (owner-queue cleared — T117 closed, T338 closed, Confirm-email=OFF logged, T366 spawned) — _pending push to git_
+## 2026-04-27 (owner-queue cleared — T117 closed, T338 closed, Confirm-email=OFF logged, T366 spawned) — _shipped, pushed to git_ (commit 13248fb)
 
 Owner cleared all four remaining queue items: T117 (option A), T338 (option A), `/admin/auth-recovery/` (option C), and confirmed Supabase "Confirm email" project setting is currently **OFF**.
 
