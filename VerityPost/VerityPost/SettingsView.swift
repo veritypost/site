@@ -857,7 +857,7 @@ struct SettingsView: View {
         var out: [HubRowSpec] = []
         if canEditProfile {
             out.append(HubRowSpec(id: "profile",
-                                  keywords: ["profile", "account", "username", "bio", "avatar", "location", "website"]) { isLast, onTap in
+                                  keywords: ["profile", "account", "username", "bio", "avatar"]) { isLast, onTap in
                 AnyView(HubRow(icon: "person.fill", title: "Profile",
                                subtitle: "Username, bio, avatar",
                                showDivider: !isLast,
@@ -1183,14 +1183,21 @@ struct AccountSettingsView: View {
 
     @State private var username = ""
     @State private var bio = ""
-    @State private var location = ""
-    @State private var website = ""
 
     // Two-tone avatar
     @State private var avatarOuter = "#818cf8"
     @State private var avatarInner: String? = nil
     @State private var avatarInitials = ""
     @State private var initialsError: String? = nil
+
+    // Dirty-state baselines: seeded in .onAppear so save() can omit
+    // unchanged keys and avoid wiping web-set values (notably bio)
+    // when the user edits only their avatar on iOS.
+    @State private var originalUsername = ""
+    @State private var originalBio = ""
+    @State private var originalAvatarOuter = "#818cf8"
+    @State private var originalAvatarInner: String? = nil
+    @State private var originalAvatarInitials = ""
 
     @State private var saving = false
     @State private var savedBanner: String? = nil
@@ -1285,15 +1292,6 @@ struct AccountSettingsView: View {
                                       text: $username,
                                       autocap: .never,
                                       autocorrect: false)
-                    SettingsTextField(label: "Location",
-                                      placeholder: "City, Country",
-                                      text: $location)
-                    SettingsTextField(label: "Website",
-                                      placeholder: "https://",
-                                      text: $website,
-                                      keyboard: .URL,
-                                      autocap: .never,
-                                      autocorrect: false)
                 }
                 .padding(16)
             }
@@ -1330,8 +1328,17 @@ struct AccountSettingsView: View {
             .padding(.top, 16)
         }
         .onAppear {
-            username = auth.currentUser?.username ?? ""
-            avatarOuter = auth.currentUser?.avatarColor ?? "#818cf8"
+            let u = auth.currentUser
+            username = u?.username ?? ""
+            bio = u?.bio ?? ""
+            avatarOuter = u?.avatarColor ?? "#818cf8"
+            avatarInner = u?.avatar?.inner
+            avatarInitials = u?.avatar?.initials ?? ""
+            originalUsername = username
+            originalBio = bio
+            originalAvatarOuter = avatarOuter
+            originalAvatarInner = avatarInner
+            originalAvatarInitials = avatarInitials
         }
     }
 
@@ -1340,39 +1347,51 @@ struct AccountSettingsView: View {
         saving = true
         defer { saving = false }
 
-        // Round 5 Item 2: server-side metadata merge via update_own_profile
-        // (SECDEF, allowlist). Routes location/website/avatar into metadata.
+        // update_own_profile uses jsonb `p_fields ? 'key'` per column, so
+        // any key we omit is preserved on the row. Building the patch
+        // from only-changed fields prevents an iOS save with a stale
+        // baseline (e.g. a web-set bio) from silently overwriting it.
+        // Swift's synthesized Encodable uses encodeIfPresent for
+        // optionals, so nil fields drop out of the JSON entirely.
         struct AvatarJSON: Encodable { let outer: String; let inner: String?; let initials: String }
-        struct MetadataPatch: Encodable {
-            let avatar: AvatarJSON
-            let location: String
-            let website: String
-        }
+        struct MetadataPatch: Encodable { let avatar: AvatarJSON }
         struct ProfilePatch: Encodable {
-            let username: String
-            let bio: String
-            let avatar_color: String
-            let avatar_url: String?
-            let metadata: MetadataPatch
+            var username: String? = nil
+            var bio: String? = nil
+            var avatar_color: String? = nil
+            var metadata: MetadataPatch? = nil
         }
         struct Args: Encodable { let p_fields: ProfilePatch }
+
         let initials = avatarInitials.isEmpty
             ? String((username.first.map { String($0) } ?? "?")).uppercased()
             : avatarInitials
 
+        let usernameChanged = username != originalUsername
+        let bioChanged      = bio != originalBio
+        let avatarChanged   = avatarOuter != originalAvatarOuter
+                           || avatarInner != originalAvatarInner
+                           || avatarInitials != originalAvatarInitials
+
+        guard usernameChanged || bioChanged || avatarChanged else {
+            savedBanner = "No changes to save."
+            try? await Task.sleep(nanoseconds: 900_000_000)
+            dismiss()
+            return
+        }
+
+        var patch = ProfilePatch()
+        if usernameChanged { patch.username = username }
+        if bioChanged      { patch.bio = bio }
+        if avatarChanged {
+            patch.avatar_color = avatarOuter
+            patch.metadata = MetadataPatch(
+                avatar: AvatarJSON(outer: avatarOuter, inner: avatarInner, initials: initials)
+            )
+        }
+
         do {
-            let args = Args(p_fields: ProfilePatch(
-                username: username,
-                bio: bio,
-                avatar_color: avatarOuter,
-                avatar_url: nil,
-                metadata: MetadataPatch(
-                    avatar: AvatarJSON(outer: avatarOuter, inner: avatarInner, initials: initials),
-                    location: location,
-                    website: website
-                )
-            ))
-            try await client.rpc("update_own_profile", params: args).execute()
+            try await client.rpc("update_own_profile", params: Args(p_fields: patch)).execute()
         } catch {
             Log.d("Save profile error:", error)
             savedBanner = "Couldn\u{2019}t save. Try again."
