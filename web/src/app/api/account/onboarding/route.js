@@ -2,9 +2,39 @@
 // @feature-verified profile_settings 2026-04-18
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { safeErrorResponse } from '@/lib/apiErrors';
 import { trackServer } from '@/lib/trackServer';
+
+// T324 — derive the user's tier server-side for analytics. Mirrors the client
+// `deriveTier` in NavWrapper.tsx so the bucket label is consistent across
+// surfaces. Returns one of: 'anon' / 'free_verified' / 'verity' /
+// 'verity_pro' / 'verity_family' / 'verity_family_xl'.
+async function deriveServerTier(userId) {
+  if (!userId) return 'anon';
+  try {
+    const service = createServiceClient();
+    const { data } = await service
+      .from('users')
+      .select('email_verified, plans:plan_id(tier)')
+      .eq('id', userId)
+      .maybeSingle();
+    if (!data?.email_verified) return 'anon';
+    const tier = data.plans?.tier || null;
+    if (
+      tier === 'verity_family_xl' ||
+      tier === 'verity_family' ||
+      tier === 'verity_pro' ||
+      tier === 'verity'
+    ) {
+      return tier;
+    }
+    return 'free_verified';
+  } catch (err) {
+    console.error('[onboarding.deriveServerTier] failed', err);
+    return null;
+  }
+}
 
 // T170/T209 — onboarding completion is an authenticated state-changing
 // write; never cache the response.
@@ -39,8 +69,13 @@ export async function POST(request) {
     });
 
   // Fire onboarding_complete after the authoritative write succeeds.
+  // T324 — pass user_tier so the event isn't NULL on every onboarding
+  // completion (the previous shape lost the entire conversion-funnel
+  // tier bucketing).
+  const userTier = await deriveServerTier(authUser?.id);
   void trackServer('onboarding_complete', 'product', {
     user_id: authUser?.id ?? null,
+    user_tier: userTier,
     request,
   });
 

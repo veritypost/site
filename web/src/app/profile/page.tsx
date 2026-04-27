@@ -1842,6 +1842,10 @@ function MilestonesTab({
 // to `/profile/settings/billing` (tracked alongside Story Task 6, Bookmarks
 // Task 4, Messages Task 8, Notifications Task 5, Search Note A).
 function LockedTab({ name, emailVerified }: { name: string; emailVerified: boolean }) {
+  // T313 — copy already branches on emailVerified; the original audit complaint
+  // was that the verified-unpaid copy ("part of paid plans") was rendering for
+  // unverified users too. The branch is in place; this comment makes the
+  // contract explicit so future agents don't collapse the two arms.
   if (!emailVerified) {
     return (
       <PageSection>
@@ -1861,7 +1865,7 @@ function LockedTab({ name, emailVerified }: { name: string; emailVerified: boole
     <PageSection>
       <EmptyState
         title={`${name} is unavailable`}
-        description="This tab is part of paid plans."
+        description="Upgrade your plan to unlock this tab."
         cta={
           <Button
             variant="primary"

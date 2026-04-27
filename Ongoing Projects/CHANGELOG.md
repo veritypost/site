@@ -7,6 +7,45 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (autonomous-fix wave 2: 7 T2 items shipped, 3 deferred with reasons) — _pending push to git_
+
+Second execution wave on the sixth-pass audit set. 7 T2 items shipped end-to-end. 3 T2 items deferred with explicit reasons (homoglyph library install, T5 retry-table, NavWrapper coupling). 3 T2 items in untracked redesign files held for the redesign-cutover commit.
+
+### Shipped (T2, tracked files)
+
+- **T307 — `/api/auth/email-change` clears stale `verify_locked_at` + writes `public.users.email`.** `web/src/app/api/auth/email-change/route.js`. The single .update now sets `email_verified=false`, `email=normalized`, `verify_locked_at=null` in one round-trip after `auth.updateUser` succeeds. Previously a locked user changing email kept the lockout AND lost 21 perms; the displayed email column drifted until the on_auth_user_updated trigger eventually fired. Third half of the spec (re-stamping `metadata.terms_accepted_at`) deferred to **new T362** because a plain `.update({ metadata: {...} })` clobbers other JSONB keys — needs a `UPDATE ... SET metadata = metadata || $1` RPC.
+
+- **T313 — `LockedTab` copy is now branch-correct.** `web/src/app/profile/page.tsx:1844-1880`. The verified-but-unpaid arm now reads "Upgrade your plan to unlock this tab." instead of "This tab is part of paid plans." (which conflated verify-gate vs pay-gate). The unverified arm was already correct ("Confirm your email to unlock this tab."); annotated the contract so future agents don't collapse the two arms.
+
+- **T315 — Comment composer lock copy unified.** `web/src/app/story/[slug]/page.tsx:1337-1398`. Replaced the 3-arm ternary with a single `discussionLockState` ('error' | 'anon' | 'unverified' | 'quiz' | null) computed once + a single panel render that interpolates copy and the next-action CTA. Adds explicit handling for the previously-missing 'unverified' state (signed-in but `email_confirmed_at` null) — those users were getting the anon copy. Each gate now has one clear next action.
+
+- **T323 — `signup_complete` event no longer hardcoded `user_tier: 'anon'`.** `web/src/app/api/auth/signup/route.js:215-227`. Dropped the field entirely; the dashboard now infers active tier from later events (`verify_email_complete` → next `page_view` carries the resolved tier). Was polluting cohort analytics by labelling every signup as anon for the funnel join.
+
+- **T324 — `onboarding_complete` now passes `user_tier`.** `web/src/app/api/account/onboarding/route.js`. New `deriveServerTier(userId)` helper mirrors `NavWrapper.deriveTier` so the server-side bucket label matches the client-side one. Falls back to null on errors (preserves the prior NULL-tier semantics if the lookup fails). Fires after `update_own_profile` succeeds so the tier is the post-onboarding state.
+
+- **T325 — `usePageViewTrack` now defers fire until `authLoaded`.** `web/src/lib/useTrack.ts:59-79`. Pulls `authLoaded` from useAuth and gates the useEffect body on it. The mount-time race that captured signed-in viewers as `userTier='anon'` for the first 30-150ms is closed. Existing 10+ callers (`_HomeFooter`, leaderboard, search, browse, login, etc.) inherit the fix automatically.
+
+- **T327 — TrackEvent shape adds `cohort` + `via_owner_link`.** `web/src/lib/events/types.ts`. Both nullable, snake_case. The fields are now part of the typed contract; `trackServer.ts` already accepts the same shape via `ServerTrackOptions` union (extension picked up automatically). Beta-cohort vs open-signup + owner-link vs user-link retention can be distinguished going forward.
+
+### Deferred from this wave (with reasons)
+
+- **T299 — homoglyph bypass on ban-evasion email check.** Deferred. The genuine fix needs a Unicode-confusables library (NFKC normalization alone doesn't merge Cyrillic 'а' U+0430 with Latin 'a' U+0061; only a TR39-backed table does). Shipping NFKC-only would be a half-fix; per the project's "genuine fixes, never patches" rule, this needs a separate session that picks + installs the library.
+
+- **T310 — audit-log try/catch sweep across 4 routes.** Deferred. The current best-effort + console.error pattern is acceptable hygiene; the genuine fix is either (a) a retry-table + cron processor (T5 schema work) or (b) Sentry `captureException` upgrade (paired with the Sentry DSN decision in `Pre-Launch Assessment.md` S1/S2). Both options need owner direction and don't fit a 2-agent T2 wave.
+
+- **T312 — perms cache realtime push (60s lag).** Deferred. The lib itself can't add hooks; the fix lives in the callers (NavWrapper.tsx + redesign ProfileApp.tsx) — a `setInterval(refreshIfStale, 60_000)` polling effect, OR a Supabase realtime subscription on `users.perms_version`. Better paired with the NavWrapper tier resolver simplification (T302) since both touch the same useEffect block. Queued for the next caller-side wave.
+
+- **T331 / T342 / T343** — all in untracked redesign files (`PrivacyCard.tsx`, `PublicProfileSection.tsx`, redesign `ProfileApp.tsx`, `ExpertApplyForm.tsx`). Same constraint as T332/T340 from wave 1: included in the redesign-cutover commit, not this T2 batch.
+
+### Verification
+
+- TypeScript: `npx tsc --noEmit -p tsconfig.json` — no new errors introduced. 13 pre-existing errors in unrelated paths (ScoreTier mismatches, AvatarEditor/PrivacyCard Json types, ExpertProfileSection field name) unchanged.
+- TODO closures: bodies for T307, T313, T315, T323, T324, T325, T327 deleted from the file. New T362 added for the deferred metadata-merge piece of T307.
+
+- **Files touched** — `web/src/app/api/auth/email-change/route.js`, `web/src/app/profile/page.tsx`, `web/src/app/story/[slug]/page.tsx`, `web/src/app/api/auth/signup/route.js`, `web/src/app/api/account/onboarding/route.js`, `web/src/lib/events/types.ts`, `web/src/lib/useTrack.ts`, `Ongoing Projects/TODO.md`, `Ongoing Projects/CHANGELOG.md`.
+
+---
+
 ## 2026-04-27 (autonomous-fix wave: 7 trivials + 3 locked-ready shipped) — _pending push to git_
 
 First execution wave on the sixth-pass audit set. 10 items shipped end-to-end (code + verification + TODO/CHANGELOG bookkeeping in lockstep). All edits typecheck against the existing baseline (no new TS errors introduced; pre-existing `ScoreTier`/Json/AvatarEditor errors unchanged). No DB migrations applied; no Stripe API calls made; no tests added (none exist for the touched surfaces yet).

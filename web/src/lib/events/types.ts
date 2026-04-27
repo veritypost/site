@@ -28,6 +28,13 @@ export interface TrackEvent {
   device_id?: string | null;
   user_tier?: string | null;
   user_tenure_days?: number | null;
+  // T327 — cohort + signup_source separate retention bucketing for
+  // beta-cohort vs open-signup users + owner-link recipients vs
+  // user-link recipients. Both are nullable; populated by trackServer
+  // from the user record (cohort) and the signup-event metadata
+  // (signup_source). Snake_case; nullable until backfill complete.
+  cohort?: string | null;
+  via_owner_link?: boolean | null;
 
   // --- Page context ---
   page?: string | null;

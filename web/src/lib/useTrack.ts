@@ -61,15 +61,23 @@ export function usePageViewTrack(
   extra: TrackOptions = {},
   deps: ReadonlyArray<unknown> = []
 ): void {
+  const { authLoaded } = useAuth();
   const trackEvent = useTrack();
   useEffect(
     () => {
+      // T325 — defer the page_view fire until auth has hydrated. Without
+      // this gate, the AuthContext default (`userTier: 'anon'`) was what
+      // every mount-time page_view captured — fixed-bucket pollution that
+      // labelled signed-in viewers as anon for the first ~30-150ms after
+      // navigation. Now the event fires once, on the authoritative tier
+      // value (or once for genuinely-anon viewers).
+      if (!authLoaded) return;
       trackEvent('page_view', 'product', {
         content_type,
         ...extra,
       });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [trackEvent, content_type, ...deps]
+    [authLoaded, trackEvent, content_type, ...deps]
   );
 }

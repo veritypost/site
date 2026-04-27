@@ -1334,57 +1334,75 @@ export default function StoryPage() {
       </div>
     ) : null;
 
-  const discussionSection = quizPassError ? (
-    // RPC failed (network blip / schema drift). Don't pretend the user
-    // hasn't passed — surface a retry. Server-side post_comment will
-    // still enforce the gate independently if they try to post.
-    <div style={lockPanelStyle}>
-      <div style={LOCK_TITLE_STYLE}>Couldn&rsquo;t check your quiz status.</div>
-      <div style={{ fontSize: 13, color: 'var(--dim)', lineHeight: 1.5, marginBottom: 12 }}>
-        We&rsquo;ll know once we can reach the server again.
+  // T315 — unified discussion-lock panel. Single source of state-driven copy
+  // so each gate ("can't check quiz" / "haven't passed" / "anon" / "verify
+  // email") gets ONE clear next action. Stacked-gate cases (e.g., unverified
+  // user who also fails quiz pre-check) compose by ordering: signed-in-state
+  // is the outermost branch since it controls which CTA the user can act on.
+  const discussionLockState: 'error' | 'anon' | 'unverified' | 'quiz' | null = quizPassError
+    ? 'error'
+    : userPassedQuiz
+      ? null
+      : quizPoolSize < 10
+        ? null
+        : !currentUser
+          ? 'anon'
+          : !currentUser.email_confirmed_at
+            ? 'unverified'
+            : 'quiz';
+
+  const discussionSection =
+    discussionLockState === null && userPassedQuiz ? (
+      <CommentThread
+        articleId={story.id}
+        articleCategoryId={story.category_id}
+        currentUserId={currentUser?.id}
+        currentUserTier={userTier}
+        justRevealed={justRevealedThisSession}
+        emptyStateExtra={emptyStateRelated}
+      />
+    ) : discussionLockState === null ? null : (
+      <div style={lockPanelStyle}>
+        <div style={LOCK_TITLE_STYLE}>
+          {discussionLockState === 'error'
+            ? 'Couldn’t check your quiz status.'
+            : discussionLockState === 'anon'
+              ? 'Discussion is for signed-in readers.'
+              : discussionLockState === 'unverified'
+                ? 'Confirm your email to join the discussion.'
+                : 'Pass the quiz to join the discussion.'}
+        </div>
+        <div style={LOCK_BODY_STYLE}>
+          {discussionLockState === 'error'
+            ? 'We’ll know once we can reach the server again.'
+            : discussionLockState === 'anon'
+              ? 'Create a free account, then pass a short quiz to join the comments on any article.'
+              : discussionLockState === 'unverified'
+                ? 'A confirmation link is in your inbox. Once you click it, the quiz unlocks the conversation.'
+                : '5 questions about what you just read. Get 3 right and the conversation opens.'}
+        </div>
+        {discussionLockState === 'error' ? (
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            style={{ ...lockCtaStyle, border: 'none', cursor: 'pointer' }}
+          >
+            Try again
+          </button>
+        ) : discussionLockState === 'anon' ? (
+          <a
+            href={`/signup?next=${encodeURIComponent('/story/' + story.slug)}`}
+            style={lockCtaStyle}
+          >
+            Create free account
+          </a>
+        ) : discussionLockState === 'unverified' ? (
+          <a href="/verify-email" style={lockCtaStyle}>
+            Open verify-email
+          </a>
+        ) : null}
       </div>
-      <button
-        type="button"
-        onClick={() => window.location.reload()}
-        style={{ ...lockCtaStyle, border: 'none', cursor: 'pointer' }}
-      >
-        Try again
-      </button>
-    </div>
-  ) : userPassedQuiz ? (
-    <CommentThread
-      articleId={story.id}
-      articleCategoryId={story.category_id}
-      currentUserId={currentUser?.id}
-      currentUserTier={userTier}
-      justRevealed={justRevealedThisSession}
-      emptyStateExtra={emptyStateRelated}
-    />
-  ) : quizPoolSize < 10 ? null : currentUser && currentUser.email_confirmed_at ? (
-    // Pass 17 / UJ-1102: verified users who haven't passed the quiz see
-    // an informational panel instead of silence. D6 still holds — actual
-    // comment content stays hidden; only the gating copy is shown.
-    <div style={lockPanelStyle}>
-      <div style={LOCK_TITLE_STYLE}>Pass the quiz to join the discussion.</div>
-      <div style={LOCK_BODY_STYLE}>
-        5 questions about what you just read. Get 3 right and the conversation opens.
-      </div>
-    </div>
-  ) : (
-    // H-16: anon (or verified-no-email) readers previously got `null`
-    // here, which rendered an empty Discussion tab on mobile. Mirror
-    // the locked-panel shape so every tab state has visible content,
-    // and surface the Create-free-account CTA inline.
-    <div style={lockPanelStyle}>
-      <div style={LOCK_TITLE_STYLE}>Discussion is for signed-in readers.</div>
-      <div style={{ fontSize: 13, color: 'var(--dim)', lineHeight: 1.5, marginBottom: 12 }}>
-        Create a free account, then pass a short quiz to join the comments on any article.
-      </div>
-      <a href={`/signup?next=${encodeURIComponent('/story/' + story.slug)}`} style={lockCtaStyle}>
-        Create free account
-      </a>
-    </div>
-  );
+    );
 
   const showMobileDiscussion = !isDesktop && activeTab === 'Discussion';
   const showMobileTimeline = !isDesktop && activeTab === 'Timeline';

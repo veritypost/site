@@ -214,10 +214,16 @@ export async function POST(request) {
 
     // Server-side signup_complete event. Fire-and-forget — telemetry
     // failures must not block the signup response.
+    //
+    // T323 — `user_tier` intentionally omitted on signup_complete. At this
+    // moment the user is unverified-and-unpaid; the dashboard infers the
+    // active tier from later events (verify_email_complete → page_view with
+    // 'free_verified' / 'verity_pro' / etc). Hardcoding 'anon' here was
+    // polluting cohort analytics by labeling every signup as anon for the
+    // signup-funnel join.
     if (userId) {
       void trackServer('signup_complete', 'product', {
         user_id: userId,
-        user_tier: 'anon', // not verified yet
         request,
         payload: {
           method: 'email',

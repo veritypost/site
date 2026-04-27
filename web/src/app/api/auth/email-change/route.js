@@ -114,15 +114,30 @@ export async function POST(request) {
   // on_auth_user_updated DB trigger will set email_verified=true once
   // they click the link — so don't fail the request, just log.
   const service = createServiceClient();
+  // T306 + T307 — flip the local verified state AND clear two more columns
+  // that previously drifted stale across an email-change:
+  //   email_verified=false   keeps verified-only features locked
+  //   email                  previously only updated by the on_auth_user_updated
+  //                           trigger; fall-through cases left public.users.email
+  //                           stale until the trigger fired
+  //   verify_locked_at=null  a previously locked user (failed-verify lockout)
+  //                           changing email gets a clean slate at the new address
+  //
+  // The third half of T307 — re-stamping `metadata.terms_accepted_at` so the
+  // user re-acknowledges ToS at the new identity — is deferred to T362
+  // because a plain `metadata: {...}` PATCH would clobber the other JSONB
+  // keys (age_confirmed_at, terms_version, etc.). Needs an `update_metadata`
+  // RPC with `metadata || $1` semantics to merge cleanly.
   const { error: updErr } = await service
     .from('users')
-    .update({ email_verified: false })
+    .update({
+      email_verified: false,
+      email: normalized,
+      verify_locked_at: null,
+    })
     .eq('id', user.id);
   if (updErr) {
-    console.error(
-      '[auth.email-change] users.email_verified flip failed:',
-      updErr.message || updErr
-    );
+    console.error('[auth.email-change] users state flip failed:', updErr.message || updErr);
   } else {
     // T306 — bump perms_version so the 21 `requires_verified=true` perms
     // re-evaluate to `granted=false` on the user's next request. Without

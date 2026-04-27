@@ -707,10 +707,6 @@ Source: `Ongoing Projects/2026-04-27_AUTH_PERMS_SYSTEM_MAP.md`. 4 parallel Explo
 **File:** `web/src/components/AccountStateBanner.tsx` `pickState` lines 35-102 returns the first matching state. A banned + frozen user sees only the ban banner. Resolved in `web/src/app/redesign/_lib/states.ts` (returns sorted-severity stack) — pending redesign cutover.
 **Fix:** Either accelerate redesign cutover to pick up `deriveAccountStates()`, or backport the multi-state stack to the legacy banner. Tracked alongside Bundle 5.
 
-#### T307 — `/api/auth/email-change` leaves stale state in 3 columns — **HIGH** (correctness)
-**File:** `web/src/app/api/auth/email-change/route.js`. Three side effects unhandled: (a) `verify_locked_at` not cleared (locked user changing email stays locked + loses 21 perms on top); (b) `public.users.email` never updated — Supabase trigger only writes `email_verified=true`, the displayed email column drifts until/unless trigger does it elsewhere; (c) `terms_accepted_at` not stamped (user doesn't re-agree on identity change).
-**Fix:** Update all 3 columns transactionally with the auth.updateUser call. Add UPDATE for `public.users.email` after auth confirm trigger.
-
 #### T308 — Admin manual-sync downgrade ignores `frozen_at` — **HIGH** (state coherence)
 **File:** `web/src/app/api/admin/subscriptions/[id]/manual-sync/route.js:100-150` (downgrade branch). Comment at line 32 says "we leave verity_score / frozen_at alone" — frozen user downgraded to free remains frozen-on-free, logically incoherent (no plan to be frozen against).
 **Fix:** Branch on `frozen_at` — admin downgrade should either unfreeze or surface a confirmation that frozen state will persist.
@@ -729,13 +725,6 @@ Source: `Ongoing Projects/2026-04-27_AUTH_PERMS_SYSTEM_MAP.md`. 4 parallel Explo
 **File:** `web/src/lib/permissions.js:81-99`. `refreshIfStale` polls `my_perms_version()` only on page navigation. Plan upgrade in another tab doesn't unlock UI until refresh.
 **Fix:** Wire 60s `setInterval` polling into ProfileApp + comment composer host pages, OR Supabase realtime subscription on `users.perms_version`.
 
-#### T313 — Locked profile tabs say "part of paid plans" not "verify your email" — **MEDIUM** (truth-in-UI)
-**File:** `web/src/app/profile/page.tsx:1844-1875` (`LockedTab`). Verified-but-unpaid path renders `description="This tab is part of paid plans."` for unverified users too — conflates verify-gate with pay-gate.
-**Fix:** Branch copy on `emailVerified` — show "Confirm your email to unlock" for unverified, "Upgrade to unlock" for verified-unpaid. Note: rescoped under magic-link — most users post-migration won't hit this state.
-
-#### T315 — Comment composer lock copy is inconsistent across states — **MEDIUM** (truth-in-UI)
-**File:** `web/src/app/story/[slug]/page.tsx:1337-1387`. Three different lock messages ("Couldn't check your quiz status", "Pass the quiz to join the discussion", "Discussion is for signed-in readers") and no unified "what to do next" when stacked gates apply (verify + quiz).
-**Fix:** Unify into one state-driven copy that shows the next action. Bundle with T173 (PATCH length cap) under comment-route hardening.
 
 #### T316 — No Pro pride-of-status surface — **MEDIUM** (retention/upsell)
 **Status:** CONFIRMED-ABSENT. No tier-badge code in `web/src/components/CommentThread.tsx`, no Pro pill on profile header, no nav indicator.
@@ -766,22 +755,6 @@ Source: `Ongoing Projects/2026-04-27_AUTH_PERMS_SYSTEM_MAP.md`. 4 parallel Explo
 #### T322 — Most defined event types never fire (3 of 19 wired) — **HIGH** (analytics fidelity)
 **File:** `web/src/lib/events/types.ts:67-101` defines 19 event names. Sixth-pass recount of `trackServer\(` + `trackEvent\(` call sites in `web/src/` finds only 3 distinct events firing: `signup_complete, onboarding_complete, page_view` (the last via `usePageViewTrack('home')`). `quiz_started` / `quiz_completed` not actually wired despite earlier audit. Missing: `signup_start, verify_email_complete, subscribe_start, subscribe_complete, comment_post, bookmark_add, article_read_start, article_read_complete, scroll_depth, score_earned`, all ad/quiz events, etc.
 **Fix:** Wire the unwired event types at their natural call sites. Precondition for any meaningful conversion-funnel work.
-
-#### T323 — `signup_complete` hardcoded `user_tier: 'anon'` — **MEDIUM** (analytics)
-**File:** `web/src/app/api/auth/signup/route.js:220`. Every signup event tagged 'anon' regardless of cohort/plan that fires immediately after. Live: 21 events in last 7 days, all 'anon'.
-**Fix:** Drop `user_tier` from the signup_complete event entirely (let dashboard infer from later events) OR fire a follow-up `tier_resolved` event after verify completes.
-
-#### T324 — `onboarding_complete` doesn't pass `user_tier` — **MEDIUM** (analytics)
-**File:** `web/src/app/api/account/onboarding/route.js:42-45` (no `user_tier` arg) → `web/src/lib/events/trackServer.ts:94` defaults to null. Live: 11/13 events in last 7 days have NULL tier.
-**Fix:** Pass `user_tier` through (server has the user record at hand).
-
-#### T325 — NavWrapper hydration race causes early `page_view` events to mis-tag as `'anon'` — **MEDIUM** (analytics)
-**File:** `web/src/app/NavWrapper.tsx:68` (`userTier: 'anon'` default) + `useEffect` line 178+ async hydration. `usePageViewTrack` (e.g., `web/src/app/_HomeFooter.tsx:23`) fires on mount before hydration completes.
-**Fix:** Defer `trackEvent` until `authLoaded=true`, or fire a corrective `tier_resolved` event after hydration. Bundles with T302 (tier resolver simplification).
-
-#### T327 — `cohort` + `via_owner_link` not tracked in events — **MEDIUM** (retention analysis)
-**Source:** TrackEvent interface in `web/src/lib/events/types.ts` has no cohort field. Beta-cohort retention vs open-signup retention can't be distinguished. Owner-link recipient retention can't be distinguished from user-link recipient retention.
-**Fix:** Add `cohort` + `via_owner_link` (or `signup_source`) to TrackEvent shape; plumb through `useTrack`.
 
 #### T328 — GA4 + custom-events pipelines fire in parallel, page_view only on home for custom — **MEDIUM** (analytics integrity)
 **File:** `web/src/components/GAListener.tsx:45` (GA4 page_view on every route) vs `web/src/app/_HomeFooter.tsx:23` (custom page_view on home only). Story / leaderboard / settings views never captured in custom events pipeline.
@@ -928,6 +901,10 @@ System map §22 ("Cutover plan — taking the redesign live") was added after th
 - Build `MilestonesSection.tsx` showing earned + still-ahead achievements with countdown ("76 days to go", "253 articles to go") per the `/redesign/preview` fixture.
 - Replace the two `LinkOutSection` entries in `ProfileApp.tsx` with the new section components.
 **Estimated:** Each section is ~300-400 LoC against existing data sources (`category_scores` and `user_achievements`). Single PR, T3 review.
+
+#### T362 — `update_metadata` RPC with JSONB merge semantics — **MEDIUM** (T5)
+**Source:** Half of the T307 spec — re-stamping `metadata.terms_accepted_at` after an email change requires merging into the existing JSONB column, not overwriting it. A plain `.update({ metadata: {...} })` clobbers other keys (`age_confirmed_at`, `terms_version`, etc.).
+**Fix:** SECURITY DEFINER RPC `update_metadata(p_user_id uuid, p_keys jsonb)` that does `UPDATE users SET metadata = COALESCE(metadata, '{}'::jsonb) || p_keys WHERE id = p_user_id`. Then call from `email-change/route.js` after the email-flip succeeds. T5 — halt and queue migration.
 
 #### T361 — Standardize `billing_period` strings to `'month'` / `'year'` — **MEDIUM** (T5 schema)
 **Source:** Half of the locked T56 spec — the 'lifetime' drop shipped, the string-standardize half remains. Current state: `web/src/app/admin/plans/page.tsx:56` writes `'monthly'` / `'annual'`; DB-side reads (e.g., `web/src/app/profile/settings/page.tsx:4253` checks `billing_period === 'year'`) and Stripe glue (`web/src/lib/plans.js:58,78`) use `'month'` / `'year'`. Existing plan rows likely carry `'monthly'`/`'annual'` from the admin form; some carry `'month'`/`'year'` from direct seeding.
