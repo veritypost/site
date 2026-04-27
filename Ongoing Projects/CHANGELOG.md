@@ -7,6 +7,27 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (wave 13 — T57 button + T300 migration + T333 mirror + T339 type + T341 CTAs) — _shipped, pushed to git_ (commit c006e5f; 4 redesign files in untracked tree roll with T357)
+
+### Shipped (5 items + 1 migration draft)
+
+- **T57 follow-up — admin UI button.** `web/src/app/admin/plans/page.tsx`. New `mintStripePrice` handler + "Mint Stripe price" button next to "Save pricing" when the selected plan has no `stripe_price_id`. Disabled when `price_cents===0` or `billing_period` empty. Refreshes local state on success so the button hides. Closes T57.
+
+- **T300 migration drafted.** `Ongoing Projects/migrations/2026-04-27_T300_public_profile_view.sql`. Creates `public_profiles_v` SECURITY DEFINER view with whitelisted columns (no email/plan_id/stripe_customer_id/cohort/frozen_at/kill-switch flags); revokes anon SELECT on `public.users`; tightens RLS to `id=auth.uid() OR is_admin_or_above()`. Caller-side sweep (5 web sites + iOS) documented in file footer — separate code commit AFTER migration applies, BEFORE deploy.
+
+- **T333 redesign mirror.** `web/src/app/redesign/profile/_components/ProfileApp.tsx`. `isDev3333` now also gates on `process.env.NODE_ENV !== 'production'` (matches middleware mirror). Untracked redesign tree.
+
+- **T339 — proper Avatar types, drop `as never`.** `web/src/components/Avatar.tsx` exports `AvatarUser` + `AvatarShape`. `BlockedSection.tsx` and `PrivacyCard.tsx` cast through the type instead of `as never`. Index signature on `AvatarUser` accommodates broader query rows.
+
+- **T341 — YouSection internal CTAs.** Outbound nudges (`/`, `/bookmarks`, etc.) replaced with profile-internal `?section=identity`/`?section=public-profile`/`?section=privacy` etc. Heading "What's next" → "Polish your profile".
+
+### Bookkeeping
+
+- TODO closures: T57 + T333 + T339 + T341 bodies deleted. T300 re-scoped to partial. **34 real items remain** (was 39).
+- TypeScript clean.
+
+---
+
 ## 2026-04-27 (TODO cleanup — close 4 fully-shipped items) — _shipped, pushed to git_ (commit 004026e)
 
 Owner applied all 4 of the pending migrations + the REINDEX. MCP-verified live state matches expected. Closing the bodies of items that are now fully done in BOTH code and SQL so the autonomous loop doesn't re-evaluate them.
