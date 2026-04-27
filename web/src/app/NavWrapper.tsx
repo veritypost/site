@@ -119,6 +119,10 @@ const AUTH_HIDE = [
   '/api/auth/callback',
   '/logout',
   '/welcome',
+  // Closed-beta surfaces — no nav chrome on the invite-only entry path
+  '/beta-locked',
+  '/request-access',
+  '/request-access/confirmed',
 ];
 const isAdmin = (p: string) => p.startsWith('/admin');
 const isIdeasPreview = (p: string) => p.startsWith('/ideas');
