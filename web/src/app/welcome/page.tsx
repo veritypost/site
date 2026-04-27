@@ -23,51 +23,10 @@ function forwardNextQs(): string {
   return safe ? `?next=${encodeURIComponent(safe)}` : '';
 }
 
-// Dual-purpose page:
-//   - When NEXT_PUBLIC_SITE_MODE=coming_soon → renders the holding card
-//     (no auth, no carousel, no nav). The middleware redirects every
-//     non-exempt public path here while holding mode is on.
-//   - Otherwise → first-login onboarding 3-screen tour that redirects on
-//     `onboarding_completed_at` (a UX state flag, not a permission).
-
-// Beta gate supersedes coming-soon: when BETA_GATE=1 the launch model is
-// closed-beta-with-onboarding, so /welcome should render the first-login
-// carousel even if SITE_MODE=coming_soon is still set in env.
-const IS_COMING_SOON =
-  process.env.NEXT_PUBLIC_SITE_MODE === 'coming_soon' && process.env.NEXT_PUBLIC_BETA_GATE !== '1';
-
-function HoldingCard() {
-  // Coming-soon mode: only text on the page is the domain itself. No brand
-  // name, no tagline, no status copy — anything here is scrape-able by
-  // Google as snippet fallback, so keep it bare. Restore a proper holding
-  // card (wordmark + tagline + status) when coming-soon flips off.
-  return (
-    <main
-      style={{
-        minHeight: '100vh',
-        background: '#ffffff',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '24px',
-      }}
-    >
-      <div
-        style={{
-          fontSize: 'clamp(18px, 3vw, 28px)',
-          fontWeight: 600,
-          color: '#111111',
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-          letterSpacing: '-0.01em',
-          userSelect: 'none',
-        }}
-      >
-        veritypost.com
-      </div>
-    </main>
-  );
-}
+// First-login onboarding carousel. Beta gate (NEXT_PUBLIC_BETA_GATE=1)
+// owns the "block uninvited visitors" job at the middleware level, so
+// this page is single-purpose: the 3-screen welcome tour for newly
+// signed-up users, redirecting on `onboarding_completed_at`.
 
 const C = {
   bg: '#ffffff',
@@ -90,34 +49,22 @@ type FeedStory = {
 };
 
 export default function WelcomePage() {
-  if (IS_COMING_SOON) return <HoldingCard />;
-
-  // eslint-disable-next-line react-hooks/rules-of-hooks -- launch-hide pattern; remove when feature unhides (FIX_SESSION_1 launch-hides)
   const router = useRouter();
-  // eslint-disable-next-line react-hooks/rules-of-hooks -- launch-hide pattern; remove when feature unhides (FIX_SESSION_1 launch-hides)
   const supabase = useMemo(() => createClient(), []);
-  // eslint-disable-next-line react-hooks/rules-of-hooks -- launch-hide pattern; remove when feature unhides (FIX_SESSION_1 launch-hides)
   const trackEvent = useTrack();
-  // eslint-disable-next-line react-hooks/rules-of-hooks -- launch-hide pattern; remove when feature unhides (FIX_SESSION_1 launch-hides)
   const [index, setIndex] = useState<number>(0);
-  // eslint-disable-next-line react-hooks/rules-of-hooks -- launch-hide pattern; remove when feature unhides (FIX_SESSION_1 launch-hides)
   const [loading, setLoading] = useState<boolean>(true);
-  // eslint-disable-next-line react-hooks/rules-of-hooks -- launch-hide pattern; remove when feature unhides (FIX_SESSION_1 launch-hides)
   const [busy, setBusy] = useState<boolean>(false);
-  // eslint-disable-next-line react-hooks/rules-of-hooks -- launch-hide pattern; remove when feature unhides (FIX_SESSION_1 launch-hides)
   const [finishError, setFinishError] = useState<string | null>(null);
-  // eslint-disable-next-line react-hooks/rules-of-hooks -- launch-hide pattern; remove when feature unhides (FIX_SESSION_1 launch-hides)
   const [stories, setStories] = useState<FeedStory[]>([]);
 
   // page_view fires once loading resolves so we don't count the bounce-out
   // branches (unverified, already-onboarded) as carousel views.
-  // eslint-disable-next-line react-hooks/rules-of-hooks -- launch-hide pattern; remove when feature unhides (FIX_SESSION_1 launch-hides)
   useEffect(() => {
     if (loading) return;
     trackEvent('page_view', 'product', { content_type: 'welcome' });
   }, [loading, trackEvent]);
 
-  // eslint-disable-next-line react-hooks/rules-of-hooks -- launch-hide pattern; remove when feature unhides (FIX_SESSION_1 launch-hides)
   useEffect(() => {
     (async () => {
       const {
@@ -129,10 +76,15 @@ export default function WelcomePage() {
       }
       const { data: me } = await supabase
         .from('users')
-        .select('onboarding_completed_at, email_verified, username')
+        .select('onboarding_completed_at, email_verified, username, cohort, plan_id')
         .eq('id', user.id)
         .maybeSingle();
-      if (!me?.email_verified) {
+      // Closed-beta owner-link signups land here with email_verified=false
+      // but plan_id already set to Pro (apply_signup_cohort grants on
+      // via_owner_link=true). Let them through onboarding without the
+      // /verify-email bounce — they can verify later when they choose.
+      const isBetaOwnerLinkSignup = me?.cohort === 'beta' && !!me?.plan_id;
+      if (!me?.email_verified && !isBetaOwnerLinkSignup) {
         router.replace('/verify-email');
         return;
       }
