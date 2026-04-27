@@ -441,6 +441,21 @@ export default function KidDashboardPage() {
         </div>
       )}
 
+      {/* Phase 5 of AI + Plan Change Implementation: band-advance + graduation panel.
+          Reads reading_band + birthday_prompt_at off the kid row. Cast is
+          temporary until generated types regen post-Phase 5 migration. */}
+      <BandPanel
+        kid={
+          kid as unknown as KidRow & { reading_band?: string; birthday_prompt_at?: string | null }
+        }
+        kidId={id}
+        onAdvanced={(msg) => {
+          setFlash(msg);
+          load();
+        }}
+        onError={(msg) => setError(msg)}
+      />
+
       <div
         style={{
           display: 'grid',
@@ -748,5 +763,286 @@ function TimelineRow({ event }: { event: TimelineEvent }) {
     </a>
   ) : (
     <div style={style}>{body}</div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Phase 5 — Band-advance + graduation panel
+// ---------------------------------------------------------------------------
+
+function BandPanel({
+  kid,
+  kidId,
+  onAdvanced,
+  onError,
+}: {
+  kid: KidRow & { reading_band?: string; birthday_prompt_at?: string | null };
+  kidId: string;
+  onAdvanced: (msg: string) => void;
+  onError: (msg: string) => void;
+}) {
+  const [confirmAction, setConfirmAction] = useState<'tweens' | 'graduated' | null>(null);
+  const [email, setEmail] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [claimUrl, setClaimUrl] = useState<string | null>(null);
+
+  const band = kid.reading_band || 'kids';
+  const promptAt = kid.birthday_prompt_at;
+  const promptKind: 'tweens' | 'graduated' | null =
+    promptAt && band === 'kids' ? 'tweens' : promptAt && band === 'tweens' ? 'graduated' : null;
+
+  const submit = async (target: 'tweens' | 'graduated') => {
+    setBusy(true);
+    onError('');
+    try {
+      const body: Record<string, unknown> = { to: target };
+      if (target === 'graduated') body.email = email.trim().toLowerCase();
+      const res = await fetch(`/api/kids/${kidId}/advance-band`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        onError(j.error || `HTTP ${res.status}`);
+        setBusy(false);
+        return;
+      }
+      if (target === 'tweens') {
+        onAdvanced('Reading band advanced to Tweens.');
+        setConfirmAction(null);
+      } else {
+        // Graduation returned a one-time claim URL. Show it to the parent;
+        // they pass it to the kid (or the kid claims via email link in
+        // the email template that ships in Phase 6).
+        setClaimUrl(j.claim_url || null);
+        onAdvanced('Graduation token issued. Share the claim link with your kid.');
+      }
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Request failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const cardStyle: CSSProperties = {
+    background: C.card,
+    border: `1px solid ${C.border}`,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+  };
+
+  if (claimUrl) {
+    return (
+      <div style={cardStyle}>
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Graduation claim link</div>
+        <div style={{ fontSize: 12, color: C.dim, marginBottom: 10 }}>
+          Share this single-use link with your child. It expires in 24 hours. They&apos;ll set their
+          adult-account password when they claim it.
+        </div>
+        <div
+          style={{
+            background: 'var(--bg)',
+            border: `1px solid ${C.border}`,
+            padding: 8,
+            borderRadius: 6,
+            fontSize: 12,
+            fontFamily: 'monospace',
+            wordBreak: 'break-all',
+            marginBottom: 10,
+          }}
+        >
+          {claimUrl}
+        </div>
+        <button
+          onClick={() => {
+            navigator.clipboard?.writeText(claimUrl);
+          }}
+          style={{
+            padding: '6px 12px',
+            border: `1px solid ${C.border}`,
+            borderRadius: 6,
+            background: 'transparent',
+            cursor: 'pointer',
+            fontSize: 12,
+            fontWeight: 600,
+          }}
+        >
+          Copy link
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={cardStyle}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 700 }}>
+            Reading band: <span style={{ textTransform: 'capitalize' }}>{band}</span>
+          </div>
+          <div style={{ fontSize: 12, color: C.dim, marginTop: 2 }}>
+            {band === 'kids' && 'Ages 7-9. Move to Tweens (10-12) when ready.'}
+            {band === 'tweens' && 'Ages 10-12. Graduate to the adult app at 13.'}
+            {band === 'graduated' && 'Graduated. This profile is retired.'}
+          </div>
+        </div>
+        {band === 'kids' && (
+          <button
+            onClick={() => setConfirmAction('tweens')}
+            style={{
+              padding: '8px 14px',
+              borderRadius: 9,
+              border: `1px solid ${C.accent}`,
+              background: 'transparent',
+              color: C.accent,
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            Advance to Tweens
+          </button>
+        )}
+        {band === 'tweens' && (
+          <button
+            onClick={() => setConfirmAction('graduated')}
+            style={{
+              padding: '8px 14px',
+              borderRadius: 9,
+              border: `1px solid ${C.accent}`,
+              background: 'transparent',
+              color: C.accent,
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            Move to adult app
+          </button>
+        )}
+      </div>
+
+      {promptKind && (
+        <div
+          style={{
+            marginTop: 10,
+            padding: 10,
+            background: '#fef3c7',
+            border: '1px solid #b45309',
+            borderRadius: 8,
+            fontSize: 12,
+          }}
+        >
+          🎂 Birthday milestone reached. Time to{' '}
+          {promptKind === 'tweens' ? 'advance to Tweens' : 'graduate to the adult app'}.
+        </div>
+      )}
+
+      {confirmAction === 'tweens' && (
+        <div style={{ marginTop: 12, padding: 12, background: 'var(--bg)', borderRadius: 8 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Advance to Tweens?</div>
+          <div style={{ fontSize: 12, color: C.dim, marginBottom: 10 }}>
+            Your child will see articles for ages 10-12. <strong>This cannot be undone.</strong>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => submit('tweens')}
+              disabled={busy}
+              style={{
+                padding: '8px 14px',
+                borderRadius: 8,
+                border: 'none',
+                background: C.accent,
+                color: '#fff',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: busy ? 'default' : 'pointer',
+              }}
+            >
+              {busy ? 'Advancing…' : 'Confirm'}
+            </button>
+            <button
+              onClick={() => setConfirmAction(null)}
+              style={{
+                padding: '8px 14px',
+                borderRadius: 8,
+                border: `1px solid ${C.border}`,
+                background: 'transparent',
+                fontSize: 13,
+                cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {confirmAction === 'graduated' && (
+        <div style={{ marginTop: 12, padding: 12, background: 'var(--bg)', borderRadius: 8 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+            Move to the adult app?
+          </div>
+          <div style={{ fontSize: 12, color: C.dim, marginBottom: 10 }}>
+            <ul style={{ margin: '4px 0 0 18px', padding: 0 }}>
+              <li>Kid profile retires permanently (cannot be undone).</li>
+              <li>New adult account created on your family plan.</li>
+              <li>Reading history, streaks, and quiz scores will not carry over.</li>
+              <li>Category preferences carry over.</li>
+              <li>You&apos;ll get a one-time claim link to share with your child.</li>
+            </ul>
+          </div>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Email for the new adult account"
+            style={{
+              width: '100%',
+              padding: 8,
+              fontSize: 13,
+              border: `1px solid ${C.border}`,
+              borderRadius: 6,
+              boxSizing: 'border-box',
+              marginBottom: 10,
+            }}
+          />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => submit('graduated')}
+              disabled={busy || !email.trim()}
+              style={{
+                padding: '8px 14px',
+                borderRadius: 8,
+                border: 'none',
+                background: C.accent,
+                color: '#fff',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: busy || !email.trim() ? 'default' : 'pointer',
+                opacity: busy || !email.trim() ? 0.5 : 1,
+              }}
+            >
+              {busy ? 'Issuing token…' : 'Confirm graduation'}
+            </button>
+            <button
+              onClick={() => setConfirmAction(null)}
+              style={{
+                padding: '8px 14px',
+                borderRadius: 8,
+                border: `1px solid ${C.border}`,
+                background: 'transparent',
+                fontSize: 13,
+                cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

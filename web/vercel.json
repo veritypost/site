@@ -47,6 +47,10 @@
     {
       "path": "/api/cron/dob-correction-cooldown",
       "schedule": "30 6 * * *"
+    },
+    {
+      "path": "/api/cron/birthday-band-check",
+      "schedule": "15 6 * * *"
     }
   ]
 }

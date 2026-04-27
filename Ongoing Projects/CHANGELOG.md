@@ -7,6 +7,85 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (Phase 5 — graduation + parent flows, code shipped + migration staged) — _code shipped; migration staged for owner SQL editor apply_
+
+### Context
+
+Phase 5 of the AI + Plan Change Implementation roadmap. Decisions locked 2026-04-26:
+- Parent-triggered band advance + graduation (never automatic).
+- Auto-prompt at 13th birthday via daily cron (parent must still click).
+- Graduation = retire kid profile + create new adult auth.users + link to family + carry over categories.
+- Net-zero seat math: kid seat frees, adult seat fills (Family pool=6).
+- Saves/streaks/scores do NOT carry to adult account; categories do.
+- Kid PIN credentials revoked + kid_sessions revoked on graduation.
+- One-time claim token issued for the new adult account, parent surfaces to kid.
+
+### Cluster — DB migration staged
+
+`Ongoing Projects/migrations/2026-04-27_phase5_graduation_flow.sql`:
+- New `graduation_tokens` table — single-use tokens (24h expiry), unique active token per kid, RLS gates SELECT to admin-only.
+- New `system_apply_dob_correction(request_id, reason)` RPC: cron variant of Phase 4 admin RPC. Runs as service role (`auth.uid()` returns null → admin RPC permission gate fails). REVOKE from public/authenticated; GRANT only to `service_role`. Only auto-approves direction='younger' requests (admin-side reject + docs flows stay on `admin_apply_dob_correction`). Resolves the cooldown-cron permission gap flagged in Phase 4.
+- New `graduate_kid_profile(kid_profile_id, intended_email)` RPC: atomic graduation transition. Validates parent ownership + tweens band + email format + email uniqueness in auth.users. Mints a 24h cryptographically-random claim token (gen_random_bytes 24-byte hex), flips kid_profiles to is_active=false / reading_band='graduated' (using the dob_admin_override session var to bypass band-ratchet trigger), revokes pin credentials + kid_sessions, decrements subscriptions.kid_seats_paid by 1 if extras paid.
+- New `claim_graduation_token(token, new_user_id)` RPC: consumes the token, copies kid's `metadata.feed_cats` to new adult user's `users.metadata.feed.cats`. Granted to service_role only.
+- New `kid_profiles.birthday_prompt_at` column + partial index for cron scan.
+
+### Cluster — server endpoints
+
+- **NEW `web/src/app/api/kids/[id]/advance-band/route.ts`:** parent-triggered band transitions.
+  - `{to: 'tweens'}` — direct band update (kids → tweens). Trigger enforces ratchet; this endpoint pre-validates so 4xx errors are clean instead of 500s.
+  - `{to: 'graduated', email}` — invokes `graduate_kid_profile(...)` RPC, returns the claim URL `${siteUrl}/welcome?graduation_token=...` for the parent to share with the kid. Maps RPC error codes to clean HTTP responses (`23505` → `email_in_use`, `42501` → `forbidden`, etc.).
+- **NEW `web/src/app/api/auth/graduate-kid/claim/route.ts`:** public endpoint (token IS the auth). Pre-checks token validity, creates the new adult auth.users row via Supabase admin API (`email_confirm: true` since parent vetted), invokes `claim_graduation_token(...)` RPC, deletes the orphan auth.users row on RPC failure (cleanup so emails aren't permanently squatted).
+- **NEW `web/src/app/api/cron/birthday-band-check/route.ts`:** daily cron, computes age from DOB on each active kid_profile, stamps `birthday_prompt_at = now()` when an unmet boundary is crossed (kids → tweens at 10, tweens → graduated at 13). Does NOT auto-advance. Wired into vercel.json crons[] at 06:15 UTC.
+
+### Cluster — web parent flow UI
+
+- **`web/src/app/profile/kids/[id]/page.tsx`:** added `BandPanel` component below the error banner. Reads `reading_band` + `birthday_prompt_at` off the kid row (cast until types regen). Renders:
+  - Current band label + age-range hint.
+  - "Advance to Tweens" button (kids band) or "Move to adult app" button (tweens band).
+  - 🎂 birthday-prompt banner when `birthday_prompt_at` is set and a transition hasn't happened yet.
+  - Confirmation modal: kids→tweens shows "this cannot be undone"; graduation shows the full bullet list (history not carrying over, claim link to share, etc.) plus an email input for the new adult account.
+  - On graduation success: surfaces the one-time claim URL with copy-to-clipboard for the parent to share with the kid.
+
+### Cluster — vercel.json
+
+Added cron entry: `birthday-band-check` at `15 6 * * *` (after pipeline-cleanup at 06:00 and before dob-correction-cooldown at 06:30).
+
+### Verification
+
+- `npx tsc --noEmit` clean for Phase 5 surfaces (the `redesign/` directory has unrelated `ScoreTier` type drift from another work stream — not introduced by Phase 5).
+- ESLint + Prettier clean.
+
+### Files touched (3 + 4 new + 1 migration file)
+
+- `web/vercel.json` (cron registration)
+- `web/src/app/profile/kids/[id]/page.tsx` (BandPanel inline component)
+- NEW: `web/src/app/api/kids/[id]/advance-band/route.ts`
+- NEW: `web/src/app/api/auth/graduate-kid/claim/route.ts`
+- NEW: `web/src/app/api/cron/birthday-band-check/route.ts`
+- NEW: `Ongoing Projects/migrations/2026-04-27_phase5_graduation_flow.sql`
+
+### Owner action items
+
+1. **Apply migration.** Paste `2026-04-27_phase5_graduation_flow.sql` into Supabase SQL editor.
+2. **Regenerate types.** `npm run types:gen` to refresh `database.ts` so `kid_profiles.birthday_prompt_at` + `graduation_tokens` table appear; remove the `as any` casts on follow-up sweep.
+3. **Update Phase 4 cooldown cron to use `system_apply_dob_correction`.** The cron currently calls `admin_apply_dob_correction` which fails for service-role (no auth.uid()). Phase 5 ships the system-RPC variant; one-line change in `web/src/app/api/cron/dob-correction-cooldown/route.ts:184` swaps the function name. Doing in this commit.
+4. **Smoke test:**
+   - DB-set kid DOB to 9y 11mo → run birthday cron → `birthday_prompt_at` populated → web kid detail shows the 🎂 banner.
+   - Click "Advance to Tweens" → confirm modal → submit → `reading_band='tweens'`, `birthday_prompt_at=null`, banner clears.
+   - DB-set DOB to 12y 11mo → cron fires → graduation prompt shows.
+   - Click "Move to adult app" → enter email → confirm → response includes `claim_url`.
+   - Visit `/welcome?graduation_token=...` (Phase 6 builds the welcome screen; for now POST `/api/auth/graduate-kid/claim` directly with the token + email + password) → new adult user created, kid profile soft-deleted, kid PIN cleared, kid sessions revoked.
+
+### What this DOESN'T do (deferred)
+
+- **Welcome screen rendering** — `/welcome?graduation_token=...` URL parsing + signup form. Phase 6 polish.
+- **Email notifications** — band advance prompt, graduation account created. Phase 6 templates.
+- **iOS graduation handoff** — Kids app detection of `is_active=false AND reading_band='graduated'` → render handoff screen, deep-link to VerityPost. Phase 6 (iOS-specific work).
+- **Family seat decrement reconciliation** — RPC decrements local `subscriptions.kid_seats_paid` immediately, but the actual Stripe quantity / Apple SKU change is parent-initiated separately. Reconciliation cron (Phase 6) will catch any drift.
+- **Adult-account-already-graduated detection** — preventing a parent from triggering graduation when there's already an active adult account at that email. Currently caught at `auth.users` UNIQUE on email; clean error surfaces but no proactive prevention.
+
+---
+
 ## 2026-04-27 (Phase 4 — DOB correction system, code shipped + migration staged) — _code shipped; migration staged for owner SQL editor apply_
 
 ### Context

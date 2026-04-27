@@ -180,13 +180,14 @@ async function handle() {
         continue;
       }
 
-      // Auto-approve via RPC. Cast: RPC is new in Phase 4 migration;
-      // generated types regenerate post-deploy.
+      // Auto-approve via the system RPC (Phase 5 introduced the
+      // system_apply_dob_correction variant that's grantable to
+      // service_role; the admin variant gates on auth.uid() which
+      // returns null for cron / service role).
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const rpc = service.rpc as any;
-      await rpc('admin_apply_dob_correction', {
+      await rpc('system_apply_dob_correction', {
         p_request_id: row.id,
-        p_decision: 'approved',
         p_decision_reason: 'cooldown_auto_approval',
       });
       approved++;
