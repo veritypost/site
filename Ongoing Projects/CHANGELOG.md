@@ -7,6 +7,16 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-26 (T201 + T224 — .env.example caught up to code-required vars) — _shipped, pushed to git/Vercel_
+
+### T201 + T224 — Three missing vars added to web/.env.example
+
+- **What** — Added three env vars that code reads but `web/.env.example` didn't document: `REFERRAL_COOKIE_SECRET` (used by `web/src/lib/referralCookie.ts:24` for HMAC signing of the `vp_ref` attribution cookie), `APPLE_BUNDLE_ID` (used by `web/src/lib/appleReceipt.js:27` for JWS signed-transaction verification), and `RATE_LIMIT_ALLOW_FAIL_OPEN` (read by `web/src/lib/rateLimit.js:47` as a dev-only escape hatch). Each entry has a one-line "what + when to set + how to generate" comment. `RATE_LIMIT_ALLOW_FAIL_OPEN` is commented-out by default — production fails closed.
+- **Why** — Closed-beta gate would silently fail to set the cookie if `REFERRAL_COOKIE_SECRET` is unset (signRef returns null + /r/<slug> redirects to /signup with no attribution captured). Apple receipt validation falls back to a hard-coded bundle ID without `APPLE_BUNDLE_ID` — fine in dev, but enterprise re-signing would break it silently. New developer clones the repo, copies env to .env.local, ships staging — no surface to know these are missing.
+- **Files** — `web/.env.example`.
+
+---
+
 ## 2026-04-26 (T67 — privacy copy aligned to transactional-only email policy) — _shipped, pushed to git/Vercel_
 
 ### T67 — Drop "optional newsletter communications" from privacy policy

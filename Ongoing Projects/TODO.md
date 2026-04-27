@@ -1166,11 +1166,6 @@ The numbered items below retain their original section placement for readability
 **File:** `VerityPost/VerityPost/VerityPostApp.swift:28-32`. Force-close mid-StoreKit-restore abandons pending work.
 **Fix:** `.background` handler to flush pending writes.
 
-#### T201 — `REFERRAL_COOKIE_SECRET` missing from `.env.example` — **DEBT** (deploy hygiene)
-**Source:** Gap-finder sweep (CHANGELOG audit).
-**Why:** CHANGELOG entry 2026-04-26 (Closed-beta gate flip) added a new required env var `REFERRAL_COOKIE_SECRET` for the referral-cookie verification path. `.env.example` doesn't list it. New devs cloning the repo won't know the var is required; closed-beta gate breaks silently in staging if forgotten.
-**Fix:** Add `REFERRAL_COOKIE_SECRET=` to `web/.env.example` with one-line comment ("Used by /api/auth/callback to verify the referral cookie hash. Set in Vercel before flipping the closed-beta gate.").
-
 #### T200 — Signup username retry loop wastes 300ms on permanent errors — **LOW** (UX)
 **File:** `VerityPost/VerityPost/AuthViewModel.swift:312-331`. Verification: early-break logic exists (`guard msg.contains("p0002") || msg.contains("not found") else { break }`), so non-transient errors break after first attempt. Remaining waste is 300ms on the first attempt before the break — minor. Pre-AUTH-MIGRATION concern only; magic-link reshapes the signup flow.
 **Fix:** Skip the initial 300ms sleep entirely on permanent errors; match error message for "reserved"/"taken" pre-RPC.
@@ -1264,10 +1259,6 @@ Items below already moved to Pre-Launch Assessment (Apple/Sentry/COPPA-CRITICAL)
 **File:** `web/package.json:35-36,44`. If client-imported by accident, ~50KB. Add `import 'server-only'` to whichever modules use them server-side.
 
 ### DevOps / SRE (T224-T232)
-
-#### T224 — `.env.example` missing 3 vars used by code — **HIGH**
-**Vars:** `RATE_LIMIT_ALLOW_FAIL_OPEN` (read at `web/src/lib/rateLimit.js:47`), `APPLE_BUNDLE_ID` (read at `web/src/lib/appleReceipt.js:27`), and per T201 `REFERRAL_COOKIE_SECRET`.
-**Fix:** Add all to `.env.example` with one-line descriptions.
 
 #### T225 — pipeline-cleanup cron swallows per-sweep errors with `console.error` only — **MEDIUM**
 **File:** `web/src/app/api/cron/pipeline-cleanup/route.ts:69-91, 98-114, 124-139, 156-226`.
