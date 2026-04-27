@@ -7,7 +7,7 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
-## 2026-04-27 (autonomous-fix wave 5 — Wave B redesign batch, 4-of-8 shipped) — _pending push to git_ (CODE in untracked redesign files; rolls up with T357 cutover commit)
+## 2026-04-27 (autonomous-fix wave 5 — Wave B redesign batch, 4-of-8 shipped) — _shipped, pushed to git_ (commit c70fc8a; CODE itself in untracked redesign files, rolls up with T357 cutover)
 
 Fifth execution wave on the redesign batch. **4 of the 8 redesign-cutover items shipped to disk** — code lives in `web/src/app/redesign/*` which is currently untracked, so the changes commit when the larger T357 cutover lands. TODO + CHANGELOG bookkeeping commits now (those files ARE tracked).
 
