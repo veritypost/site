@@ -658,10 +658,6 @@ The numbered items below retain their original section placement for readability
 **File:** `VerityPost/VerityPost/BookmarksView.swift:212-228` (verified — button action is just `// Would navigate back to home; tab bar handles the actual swap.`).
 **Fix:** Wire the button to switch tabs to Home/Find, OR replace with static guidance.
 
-### T67 — Privacy policy still mentions newsletter communications — **LOW**
-**File:** `web/src/app/privacy/page.tsx:65-79` ("optional newsletter communications").
-**Fix:** Update to describe only transactional categories. Bundle with **T9/T10**.
-
 ---
 
 ## OPERATIONAL DEBT

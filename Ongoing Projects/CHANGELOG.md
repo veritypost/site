@@ -7,6 +7,16 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-26 (T67 — privacy copy aligned to transactional-only email policy) — _shipped, pushed to git/Vercel_
+
+### T67 — Drop "optional newsletter communications" from privacy policy
+
+- **What** — `web/src/app/privacy/page.tsx:77` Section 2 bullet "To send transactional emails, security alerts, and optional newsletter communications." → "To send transactional emails and security alerts." Removes the newsletter promise that contradicts the locked transactional-only email policy.
+- **Scope** — Privacy copy only. Companion items T9/T10/T27 (admin notifications EMAIL_SEQUENCES UI, web/iOS inert email-digest settings cards, comment-reply notification prefs) are still pending — those need the same direction applied across admin + settings surfaces in a dedicated email-cleanup pass. T67 ships solo because the privacy copy is the public-facing claim and shouldn't drift further while the admin/settings cleanup is still scoped.
+- **Files** — `web/src/app/privacy/page.tsx`.
+
+---
+
 ## 2026-04-26 (T13 — achievement unlock toast on web quiz pass) — _shipped, pushed to git/Vercel_
 
 ### T13 — Web surfaces newly-earned achievements after quiz pass

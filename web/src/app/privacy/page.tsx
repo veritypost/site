@@ -73,9 +73,7 @@ export default function PrivacyPage() {
               To calculate Verity Scores, generate recommendations, and power community features.
             </li>
             <li>To detect and prevent fraud, abuse, and violations of our terms of service.</li>
-            <li>
-              To send transactional emails, security alerts, and optional newsletter communications.
-            </li>
+            <li>To send transactional emails and security alerts.</li>
           </ul>
         </div>
 
