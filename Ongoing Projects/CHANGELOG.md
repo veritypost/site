@@ -7,7 +7,7 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
-## 2026-04-27 (autonomous wave 7 — Vercel hotfix + 5 quick-win fixes) — _pending push to git_
+## 2026-04-27 (autonomous wave 7 — Vercel hotfix + 5 quick-win fixes) — _shipped, pushed to git_ (hotfix bab1c82 + features b1625f9)
 
 ### Hotfix (commit bab1c82, already pushed)
 
