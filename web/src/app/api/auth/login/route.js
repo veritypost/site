@@ -39,6 +39,58 @@ export async function POST(_request) {
 
     const userId = user.id;
     const service = createServiceClient();
+
+    // T274 + T275 — ban + mute gate. Client-side signInWithPassword
+    // already created the session by the time this route runs, so we
+    // must invalidate it before returning a non-OK response; otherwise
+    // the cookie sits in the browser and the user is effectively
+    // signed in despite the 403.
+    //
+    // is_banned: hard block, no time bound. Permanent until cleared.
+    // is_muted + muted_until: time-bounded soft block. Even though
+    // mute today is enforced at comment-compose via permissions, an
+    // active mute should also block login per audit T275 — a muted
+    // user reading victim profiles + notifications is the harassment
+    // pattern the penalty is meant to interrupt.
+    //
+    // iOS caveat (T23-class): native Supabase Auth bypasses this
+    // route entirely. compute_effective_perms already strips
+    // permissions for banned users at the RPC layer; mute at the
+    // RPC layer is a separate hardening pass.
+    {
+      const { data: gateRow } = await service
+        .from('users')
+        .select('is_banned, ban_reason, is_muted, muted_until')
+        .eq('id', userId)
+        .maybeSingle();
+      const now = Date.now();
+      const muteActive =
+        gateRow?.is_muted && gateRow.muted_until && new Date(gateRow.muted_until).getTime() > now;
+      if (gateRow?.is_banned || muteActive) {
+        try {
+          await supabase.auth.signOut();
+        } catch (signOutErr) {
+          console.error('[auth.login] signOut after gate denial failed:', signOutErr);
+        }
+        if (gateRow.is_banned) {
+          return NextResponse.json(
+            {
+              error: 'account_suspended',
+              reason: gateRow.ban_reason || null,
+            },
+            { status: 403 }
+          );
+        }
+        return NextResponse.json(
+          {
+            error: 'account_muted',
+            muted_until: gateRow.muted_until,
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     {
       // Round A: N-02 revokes authenticated INSERT/UPDATE on last_login_ip;
       // C-06 revokes authenticated INSERT on audit_log. Route both writes

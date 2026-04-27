@@ -44,6 +44,27 @@ export async function POST(request) {
       );
     }
 
+    // T274 — ban-evasion check: reject signup attempts using an email
+    // that's already attached to a banned account. Operationally narrow
+    // (a determined attacker switches emails), but catches the lazy
+    // case + makes the gate explicit. IP-correlation isn't viable here
+    // — no historical-IP table exists to correlate against.
+    {
+      const service = createServiceClient();
+      const { data: prior } = await service
+        .from('users')
+        .select('id, is_banned')
+        .ilike('email', email)
+        .eq('is_banned', true)
+        .maybeSingle();
+      if (prior?.is_banned) {
+        return NextResponse.json(
+          { error: 'This email is associated with an account that has been suspended.' },
+          { status: 403 }
+        );
+      }
+    }
+
     // Closed-beta gate: during beta_active=true, signup requires a valid
     // vp_ref cookie pointing at an active referral code (owner or user
     // tier). Existing authenticated users log in unaffected — only new

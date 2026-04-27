@@ -7,6 +7,25 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-26 (T274 + T275 — server-side ban-evasion + mute gate at signup/login) — _shipped, pushed to git/Vercel_
+
+### T274 — Signup rejects emails attached to banned accounts
+
+- **What** — `web/src/app/api/auth/signup/route.js`: added a pre-`auth.signUp()` query (service client, case-insensitive `ilike` on `email` + `is_banned = true`). Returns 403 "This email is associated with an account that has been suspended." when matched.
+- **Scope** — Email-only check. IP-correlation deliberately skipped: no historical-IP correlation table exists in the schema; the `audit_log.metadata.ip` field would require building a banned-IP-rollup before signup, which is premature without an actual abuse pattern. Operationally narrow but explicit; defeats the lazy ban-evasion pattern (same email on a fresh device/IP).
+- **Position** — After password/age/terms validation + IP rate-limit, before `checkSignupGate` (closed-beta gate). Order matters: an existing banned email shouldn't even waste a referral-code redemption slot.
+
+### T275 — Login blocks banned + actively-muted users
+
+- **What** — `web/src/app/api/auth/login/route.js`: after `auth.getUser()` resolves the just-signed-in user but before bookkeeping, queries the user row (`is_banned, ban_reason, is_muted, muted_until`). If banned or muted-and-still-active, calls `supabase.auth.signOut()` to invalidate the cookie session that the client's prior `signInWithPassword` already created, then returns 403 with `{error: 'account_suspended' | 'account_muted', reason | muted_until}`.
+- **Why sign-out before 403** — Web flow does `signInWithPassword` client-side first, then POSTs `/api/auth/login` for bookkeeping; the auth cookie is already set by the time this route runs. Returning 403 alone leaves the user effectively signed in. Explicit sign-out wraps in try/catch — failure to sign out shouldn't mask the 403 (the gate still fires).
+- **Mute semantics** — Muted users can technically only fail at comment-compose via permissions today (`comments.post` denial). TODO graded T275 CRITICAL because a muted user reading victim profiles + watching notifications is the harassment-pattern the penalty is supposed to interrupt. Login-time block enforces the spirit.
+- **Existing helper unused** — `web/src/lib/auth.js:85-98` already exports `requireNotBanned()` with correct semantics. Inlined the focused query here instead of calling the helper to avoid the extra round-trip from `requireAuth → getUser → full users SELECT * with role join` — login already holds the user-id and only needs four columns.
+- **iOS bypass — flagged, not solved** — Native iOS Supabase Auth bypasses the server `/login` route entirely (T23-class architectural gap). The bans gate IS already enforced at the perms layer (`compute_effective_perms` strips banned users to the appeal/account/login allowlist per the closed-beta migration). Mute is NOT yet enforced at the perms layer; that's a separate hardening pass once iOS auth is routed through the server (or `compute_effective_perms` is taught about active mutes).
+- **Files** — `web/src/app/api/auth/login/route.js`, `web/src/app/api/auth/signup/route.js`.
+
+---
+
 ## 2026-04-26 (T68 + T264 — deletion-contract copy aligned to live 30-day grace) — _shipped, pushed to git/Vercel_
 
 ### T68 + T264 — Terms + Help match the live deletion contract

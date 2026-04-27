@@ -1475,14 +1475,6 @@ Items below already moved to Pre-Launch Assessment (Apple/Sentry/COPPA-CRITICAL)
 
 ### Trust & Safety (T274-T287)
 
-#### T274 — No ban-evasion check at signup — **CRITICAL**
-**File:** `web/src/app/api/auth/signup/route.js`. Signup IP-rate-limited but doesn't check banned-user email/IP.
-**Fix:** Pre-signup: query `users.is_banned` by email/IP; reject 403.
-
-#### T275 — Login allows muted users (mute only fires on compose) — **CRITICAL**
-**File:** `web/src/app/api/auth/login/route.js:13-111`. Muted user can log in, read victim profile, watch notifications.
-**Fix:** Post-login: 403 with "muted until [date]" if `users.muted_until > NOW()`.
-
 #### T276 — Penalty levels don't auto-escalate on repeat violation — **HIGH**
 **File:** `web/src/app/api/admin/moderation/users/[id]/penalty/route.js:10-27`. Moderators must manually pick the next tier.
 **Fix:** Auto-escalate based on `user_warnings` history within 60d.
