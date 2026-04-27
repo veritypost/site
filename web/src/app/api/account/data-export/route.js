@@ -24,6 +24,10 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
 
+// T170/T209 — data export requests carry per-user state and are
+// state-changing writes; never cache.
+const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
+
 export async function POST() {
   let user;
   try {
@@ -33,10 +37,10 @@ export async function POST() {
       console.error('[account.data_export.permission]', err?.message || err);
       return NextResponse.json(
         { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
-        { status: err.status }
+        { status: err.status, headers: NO_STORE }
       );
     }
-    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401, headers: NO_STORE });
   }
 
   const service = createServiceClient();
@@ -54,7 +58,10 @@ export async function POST() {
   if (rate.limited) {
     return NextResponse.json(
       { error: 'You can request at most one export per day.' },
-      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 86400) } }
+      {
+        status: 429,
+        headers: { ...NO_STORE, 'Retry-After': String(rate.windowSec ?? 86400) },
+      }
     );
   }
 
@@ -69,12 +76,15 @@ export async function POST() {
     .in('status', ['pending', 'processing'])
     .maybeSingle();
   if (existing?.id) {
-    return NextResponse.json({
-      ok: true,
-      id: existing.id,
-      status: existing.status,
-      deduped: true,
-    });
+    return NextResponse.json(
+      {
+        ok: true,
+        id: existing.id,
+        status: existing.status,
+        deduped: true,
+      },
+      { headers: NO_STORE }
+    );
   }
 
   const { data, error } = await service
@@ -91,8 +101,9 @@ export async function POST() {
       route: 'account.data_export',
       fallbackStatus: 400,
       fallbackMessage: 'Could not queue export',
+      headers: NO_STORE,
     });
   }
 
-  return NextResponse.json({ ok: true, id: data.id, status: data.status });
+  return NextResponse.json({ ok: true, id: data.id, status: data.status }, { headers: NO_STORE });
 }

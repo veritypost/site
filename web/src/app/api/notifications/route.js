@@ -8,6 +8,11 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 
 const MAX_IDS_PER_PATCH = 200;
 
+// T170/T209 — notification inbox is strictly per-user state. Block any
+// CDN/proxy from caching responses by tagging private/no-store on every
+// path (success + error + 4xx).
+const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
+
 // GET /api/notifications?unread=1&limit=50
 /**
  * @param {import('next/server').NextRequest} request
@@ -24,10 +29,10 @@ export async function GET(request) {
       console.error('[notifications.permission]', err?.message || err);
       return NextResponse.json(
         { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
-        { status: err.status }
+        { status: err.status, headers: NO_STORE }
       );
     }
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal error' }, { status: 500, headers: NO_STORE });
   }
 
   const url = new URL(request.url);
@@ -48,6 +53,7 @@ export async function GET(request) {
     return safeErrorResponse(NextResponse, error, {
       route: 'notifications.get',
       fallbackStatus: 400,
+      headers: NO_STORE,
     });
 
   const { count } = await service
@@ -56,7 +62,10 @@ export async function GET(request) {
     .eq('user_id', user.id)
     .eq('is_read', false);
 
-  return NextResponse.json({ notifications: data || [], unread_count: count || 0 });
+  return NextResponse.json(
+    { notifications: data || [], unread_count: count || 0 },
+    { headers: NO_STORE }
+  );
 }
 
 // PATCH /api/notifications — body: { ids?: [], mark: 'read'|'seen', all?: bool }
@@ -71,10 +80,10 @@ export async function PATCH(request) {
       console.error('[notifications.permission]', err?.message || err);
       return NextResponse.json(
         { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
-        { status: err.status }
+        { status: err.status, headers: NO_STORE }
       );
     }
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal error' }, { status: 500, headers: NO_STORE });
   }
 
   const { ids, mark, all } = await request.json().catch(() => ({}));
@@ -94,18 +103,19 @@ export async function PATCH(request) {
     if (ids.length > MAX_IDS_PER_PATCH) {
       return NextResponse.json(
         { error: `Too many ids (max ${MAX_IDS_PER_PATCH} per request)` },
-        { status: 413 }
+        { status: 413, headers: NO_STORE }
       );
     }
     q = q.in('id', ids);
   } else {
-    return NextResponse.json({ error: 'ids or all required' }, { status: 400 });
+    return NextResponse.json({ error: 'ids or all required' }, { status: 400, headers: NO_STORE });
   }
   const { error } = await q;
   if (error)
     return safeErrorResponse(NextResponse, error, {
       route: 'notifications.patch',
       fallbackStatus: 400,
+      headers: NO_STORE,
     });
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true }, { headers: NO_STORE });
 }

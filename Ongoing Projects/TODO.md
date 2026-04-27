@@ -601,10 +601,6 @@ The numbered items below retain their original section placement for readability
 **File:** `VerityPost/VerityPost/FindView.swift` — search-result rows. Web search rows show category + date; iOS Find doesn't.
 **Fix:** Add category name + relative date to each `FindView` story row.
 
-### T59 — No back-navigation from admin sub-pages on mobile — **MEDIUM**
-**File:** Admin layout is auth-gate-only at `web/src/app/admin/layout.tsx`; no persistent nav primitive at `web/src/components/admin/Page`.
-**Fix:** Add a back button to admin `Page` primitive when not on the admin hub. Links to `/admin` or browser back.
-
 ### T60 — iOS Expert settings save to nowhere — **MEDIUM** (likely dead UI)
 **File:** `VerityPost/VerityPost/SettingsView.swift:2330-2436` writes `users.metadata.expert`. Web expert queue / back-channel only consult permissions/categories — no consumer for `metadata.expert` outside this settings page.
 **Fix:** Wire queue routing / expert notifications to `metadata.expert`, OR remove the screen.
@@ -621,10 +617,6 @@ The numbered items below retain their original section placement for readability
 ---
 
 ## OPERATIONAL DEBT
-
-### T69 — Legacy `/api/ai/generate/route.js:124` writes raw OpenAI output to `body_html` — **DEBT** (XSS-shape)
-**Fix:** Either (a) delete the route — F7 pipeline at `/api/admin/pipeline/generate` supersedes; or (b) port it to use `renderBodyHtml()` from `web/src/lib/pipeline/render-body.ts`.
-**Recommendation:** **Delete.** Grep callers first. If zero, drop the file.
 
 ### T70 — `currentschema` artifact untracked at repo root — **DEBT**
 **Fix:** Either commit it as a reference snapshot, or add to `.gitignore`. Today it's noise in `git status`.
@@ -644,9 +636,6 @@ The numbered items below retain their original section placement for readability
 **Risk:** Callers on different paths can drift within the 60s poll window on perm-state changes.
 **Fix:** Inventory remaining `getCapabilities` / `useCapabilities` call sites. Plan a Wave 1 retirement window OR document why both stay.
 **Recommendation:** **Retire Wave 1.** Section-scoped caching is an obsolete optimization once the full resolver lands. One sweep, then delete `get_my_capabilities` RPC.
-
-### T74 — `web/src/lib/counters.js` and `mentions.js` likely dead — **RE-SCOPED** (verification: `counters.js` IS used — `web/src/app/api/stories/read/route.js` imports `incrementField` from `@/lib/counters`. NOT dead. `mentions.js` still appears unused — verify and delete just that one.)
-**Fix:** Grep for imports. If zero, delete.
 
 ### T75 — `web/src/lib/password.js` is legacy PBKDF2 hashing — **DEBT**
 **Fix:** Grep for imports. If zero, delete. If non-zero, the call sites are also legacy and should migrate to Supabase Auth.
@@ -766,12 +755,6 @@ The numbered items below retain their original section placement for readability
 **Fix:** Either (a) accept editorial-zone framing and add "Today's edition (NYT time)" subtitle, or (b) shift to user's local zone for "today" filtering with editorial lock at NYT publish time.
 **Recommendation:** Option (a) is consistent with the newspaper-of-record positioning. One-line copy.
 
-#### T111 — Browse filter pills are decorative — **MEDIUM**
-**File:** `web/src/app/browse/page.tsx:53,241-246` (FILTERS rendered, `activeFilter` never read; comment acknowledges removal pending Phase B).
-**Problem:** Click pill → nothing happens. Liar UI; user loses faith in the rest of the surface.
-**Fix:** Remove now. Restore when filter pipeline + `view_count` tracking ship.
-**Recommendation:** Better to ship absence than fake presence.
-
 #### T116 — iOS comment rate-limit shows "Wait" without countdown — **MEDIUM**
 **File:** `VerityPost/VerityPost/StoryDetailView.swift:2404-2420` (rate-limit flag flips, no duration shown).
 **Problem:** User taps Send, gets "Wait", retries, gets "Wait" again. Same friction as kids pair-code lockout.
@@ -803,12 +786,6 @@ The numbered items below retain their original section placement for readability
 **Recommendation:** Standard iOS lifecycle pattern.
 
 ### LOW — opportunistic
-
-#### T125 — Browse category title slug-null edge case still renders non-clickable — **LOW**
-**File:** `web/src/app/browse/page.tsx:437-577` (slug-null rows fall back to plain text).
-**Problem:** Rare but real — categories without slug render dead-looking titles inside otherwise-clickable rows.
-**Fix:** Either guarantee every category has a slug (data fix) or hide slug-null rows entirely.
-**Recommendation:** Tackle the data, not the UI.
 
 #### T126 — iOS onboarding "Skip" on every screen — **LOW**
 **File:** `VerityPost/VerityPost/WelcomeView.swift:35` (Skip button visible on all 3 screens unconditionally).
@@ -847,14 +824,6 @@ The numbered items below retain their original section placement for readability
 **File:** `web/src/components/ArticleQuiz.tsx` — claim line `:72` was off; problem is real but actual CTA-rendering location TBD. Stage = 'passed' celebrates with no path forward to discussion or related reads.
 **Fix:** Add "View Discussion" + "More in [Category]" buttons in the passed state. Bundles with T11/T53.
 
-#### T143 — Messages empty state buries Ask-an-Expert discovery — **MEDIUM** (engagement)
-**File:** `web/src/app/messages/page.tsx:86-150`. New user lands on empty inbox with no first-action hook.
-**Fix:** Hero card "Browse experts and ask questions" with link to expert discovery.
-
-#### T145 — Profile zero-state shows three separate empty states without prioritization — **MEDIUM** (activation)
-**File:** `web/src/app/profile/page.tsx:853, 1166, 1730`. Activity/categories/achievements all empty independently.
-**Fix:** Consolidated single empty state: "Read an article. Pass the quiz to unlock comments and build your score."
-
 #### T148 — iOS Alerts shows Manage tab to anon, lands on disabled state — **MEDIUM** (UX)
 **File:** `VerityPost/VerityPost/AlertsView.swift:137-150,29-32`. Two tabs visible; Manage tab is disabled placeholder.
 **Fix:** Hide Manage for anon. On signed-in first visit, jump to Manage to onboard category selection.
@@ -889,18 +858,6 @@ The numbered items below retain their original section placement for readability
 **Example:** `web/src/components/CommentComposer.tsx:97` — "Mentions are available on paid plans...".
 **Fix:** Move to a constants module; foundation for future i18n.
 
-#### T170 — No `Cache-Control: private, no-store` on authenticated API routes — **MEDIUM** (privacy)
-**File:** ~30 routes including `web/src/app/api/comments/route.js:128`, `messages/route.js:62`, `bookmarks/route.js`. CDN/proxy could cache auth-scoped data.
-**Fix:** Add `Cache-Control: 'private, no-cache, no-store, max-age=0'` to all authenticated endpoint responses.
-
-#### T171 — JSON parse swallow pattern doesn't bound request size — **MEDIUM** (DoS)
-**File:** `web/src/app/api/comments/route.js:56`, `messages/route.js:26`, `bookmark-collections/route.js:56`. `await request.json().catch(() => ({}))` doesn't cap body size before parsing.
-**Fix:** Cap with `request.text()` size guard before JSON.parse (Stripe webhook has the pattern at lines 71-72).
-
-#### T172 — Promo redeem regex escape suggests prior fragility — **MEDIUM** (defense)
-**File:** `web/src/app/api/promo/redeem/route.js:49-52`. The escape works, but the comment history implies the route was once fragile.
-**Fix:** Validate codes server-side to alphanumeric + hyphens before storage.
-
 #### T173 — Comment body length not capped at app layer — **LOW** (defense-in-depth)
 **File:** `web/src/app/api/comments/route.js` — verification: no app-layer length check; the `post_comment` RPC may enforce length but its body wasn't inspected. **MCP-verify-first** before deciding whether app-layer cap is duplicative or genuinely missing.
 **Fix:** If RPC enforces, mirror at app layer with same threshold for fast-fail UX. If RPC doesn't enforce, app-layer cap is required.
@@ -909,32 +866,10 @@ The numbered items below retain their original section placement for readability
 **File:** `web/src/app/api/ios/appstore/notifications/route.js:121-126`. Verification: the route checks `prior.processing_status === 'received'` and reclaims only if `ageMs < 5 * 60 * 1000` (i.e., still in concurrent window). Older rows short-circuit. Original "can re-run" framing was imprecise. The substantive gap is just consistency with Stripe's `in('processing_status', [...])` guard pattern at `webhook/route.js:130-136`.
 **Fix:** Align with Stripe pattern for consistency, even though current behavior is safe. Pure defense-in-depth.
 
-#### T175 — `EVENT_HASH_SALT` falls back to empty string in production — **MEDIUM** (privacy)
-**File:** `web/src/app/api/events/batch/route.ts:44-46`. If env var unset in prod, salt becomes `''`. Rainbow-table-friendly.
-**Fix:** Throw on startup if NODE_ENV=production && !EVENT_HASH_SALT.
-
-#### T176 — Rate-limit fail-open dev flag has no startup validation — **LOW** (config safety)
-**File:** `web/src/lib/rateLimit.js:35-46`. Documented well but no runtime check that prod path is fail-closed.
-**Fix:** Layout/middleware startup check; warn loudly if env is inconsistent.
-
 #### T177 — Sensitive routes don't enforce recent re-auth (`auth_time`) — **LOW** (OWASP-class hardening)
 **File:** `/api/auth/email-change`, `/api/billing/cancel`, etc. Hours-old session can mutate sensitive state.
 **Fix:** Reject sensitive routes if `auth_time > 15min`. Requires `/api/auth/re-verify` route.
 **Note:** Magic-link auth shape changes this — see AUTH-MIGRATION; revisit post-migration.
-
-#### T179 — RPC error mapping inconsistent across routes — **LOW** (DX)
-**File:** `web/src/app/api/comments/route.js:87-112` (good); `web/src/app/api/promo/redeem/route.js:57-58` (returns raw).
-**Fix:** Shared `mapRpcError(error)` helper.
-
-#### T180 — `Stripe webhook charge.customer` not strictly type-guarded — **LOW** (defense)
-**File:** `web/src/app/api/stripe/webhook/route.js:270-275,524-526`. Stripe is reliable but defense-in-depth.
-**Fix:** `typeof charge.customer === 'string'` check before use.
-
-#### T181 — Cron auth pattern not commented in each cron handler — **LOW** (docs)
-**File:** All `web/src/app/api/cron/*/route.{ts,js}`. Single source comment in `cronAuth.js` references prior timing-leak.
-**Fix:** One-line comment per cron route documenting the auth contract.
-
-### Senior iOS (T182-T200)
 
 #### T182 — `EventsClient.shared` observer never removed — **MEDIUM** (anti-pattern)
 **File:** `VerityPost/VerityPost/EventsClient.swift:18-23`. Singleton OK today, but `[weak self]` + deinit hygiene lacking.
@@ -1002,21 +937,6 @@ Items below already moved to Pre-Launch Assessment (Apple/Sentry/COPPA-CRITICAL)
 **File:** `web/src/app/expert-queue/page.tsx:11-18`. `dompurify` is browser-only; if any future state path renders `dangerouslySetInnerHTML` server-side, sanitize is a no-op.
 **Fix:** Move markdown rendering to server-only path with `sanitize-html`, or always guard with `typeof window !== 'undefined'` at the inject point.
 
-#### T209 — Browser `Cache-Control` not set on POST / state-changing routes (replay risk) — **LOW**
-**File:** Sample: `web/src/app/api/stripe/portal/route.js`. Responses to state-changing endpoints should be `Cache-Control: no-store`. Pairs with T170 (broader cache header sweep).
-
-#### T210 — Admin settings PATCH key allowlist missing — **LOW**
-**File:** `web/src/app/api/admin/settings/route.js:72-75`. Validates `value` is string; doesn't whitelist keys. Settings poisoning vector.
-**Fix:** `ALLOWED_KEYS` constant; reject unknown keys.
-
-#### T211 — Stripe webhook event-replay rate limit absent — **LOW**
-**File:** `web/src/app/api/stripe/webhook/route.js:86-100`. Idempotency via PK, but no rate limit per `event.id` or source IP.
-**Fix:** Add per-event-id and per-IP rate limit on the webhook endpoint.
-
-#### T212 — TOCTOU race on user profile fetch after `auth.getUser()` — **LOW**
-**File:** `web/src/lib/auth.js:37-60`. Defense-in-depth; RLS should already enforce `auth.uid() = id` but no app-layer assertion.
-**Fix:** Confirm RLS on `users` enforces `auth.uid() = id`. Add `if (authUser.id !== profile.id) throw` belt-and-suspenders check.
-
 #### T214 — Keychain `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` for tokens — **LOW** (acceptable, monitor)
 **File:** `VerityPost/VerityPost/Keychain.swift:20`. Correct level, but document acceptance + revisit if Apple changes guidance.
 
@@ -1041,12 +961,6 @@ Items below already moved to Pre-Launch Assessment (Apple/Sentry/COPPA-CRITICAL)
 #### T231 — No CI integration test for `vercel.json` cron paths ↔ route handlers — **LOW**
 **File:** `web/vercel.json` vs `web/src/app/api/cron/*/route.*`.
 **Fix:** CI step: assert `count(crons in vercel.json) == count(handler files)`.
-
-#### T232 — No deploy/rollback/secret-rotation scripts — **LOW**
-**File:** `web/scripts/` does not exist. All ops via Vercel UI.
-**Fix:** `web/scripts/deploy.sh`, `emergency-rollback.sh`. Document in runbook.
-
-### Product / Editorial (T233-T243)
 
 #### T233 — Hard-delete on articles, no soft-delete window — **HIGH**
 **File:** `web/src/app/api/admin/articles/[id]/route.ts:611`. `.delete()` removes permanently; audit log writes after delete (orphan if persist fails).
@@ -1186,10 +1100,6 @@ Items below already moved to Pre-Launch Assessment (Apple/Sentry/COPPA-CRITICAL)
 **File:** `dmca/page.tsx:119`. Lists `legal@veritypost.com` only; no Copyright Office registration number cited.
 **Fix:** Register agent at copyright.gov/dmca-agent (free, ~10 min); update DMCA page with registration number.
 
-#### T269 — Auto-renewal disclosure not at point of purchase (FTC ROSCA) — **MEDIUM**
-**File:** `terms/page.tsx:98-99` discloses auto-renewal but only at TOS page, not at checkout/billing UI.
-**Fix:** Inline disclosure at checkout: "Subscription auto-renews at $X.XX/[period] unless cancelled." Affirmative confirm before purchase button activates.
-
 #### T271 — Missing choice-of-law clause — **LOW** (contract enforceability)
 **File:** `terms/page.tsx`. No "Governing Law" section.
 **Fix:** Add: "Governed by laws of [Delaware/California], exclusive jurisdiction in [county/state]."
@@ -1226,26 +1136,10 @@ Items below already moved to Pre-Launch Assessment (Apple/Sentry/COPPA-CRITICAL)
 
 ### Page Walkthrough (T288-T297)
 
-#### T288 — Cookies page describes UI that doesn't exist — **HIGH**
-**File:** `web/src/app/cookies/page.tsx:117`. Promises "consent banner appears on first visit" — no banner exists. Pairs with T2 (cookie consent).
-**Fix:** Bundle copy edit with T2 implementation.
-
-#### T289 — Accessibility page claims "skip-to-content links provided on every page" — false — **MEDIUM**
-**File:** `web/src/app/accessibility/page.tsx:134-135`. Repo grep finds no skip-link implementation.
-**Fix:** Implement `<a href="#main">Skip to content</a>` in layout, OR remove the claim.
-
-#### T290 — Accessibility page directs users to "display settings" for high-contrast (wrong) — **MEDIUM**
-**File:** `web/src/app/accessibility/page.tsx:93`. Setting actually lives in `/profile/settings`.
-**Fix:** "Enable in Account Settings → Display → High Contrast." Pairs with T63.
-
 #### T291 — Help page omits Ask-an-Expert from Verity tier feature list — **MEDIUM** (truth-in-pricing)
 **File:** `web/src/app/help/page.tsx:96-98`. Lists ads/bookmarks/quiz/TTS/DMs/follows; no expert access mentioned.
 **Fix:** Confirm whether Verity tier includes expert access; update copy to match.
 
-
-#### T295 — Help page price fallback hides Stripe-fetch failure — **MEDIUM**
-**File:** `web/src/app/help/page.tsx:28-31`. Falls back silently to hardcoded `$3.99/$9.99/$14.99`.
-**Fix:** Log the fetch failure to Sentry / banner; don't ship stale prices unnoticed.
 
 ---
 

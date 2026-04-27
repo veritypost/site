@@ -22,6 +22,24 @@ import type { Tables } from '@/types/database-helpers';
 // User-centric moderation console. Look up a user, apply penalties,
 // grant/revoke roles, and resolve pending appeals. The report-triage
 // queue lives at /admin/reports.
+//
+// TODO(T230): comment hide/unhide currently has no per-comment audit
+// trail — only user-level penalties land in `audit_log`. A future
+// migration should introduce:
+//
+//   create table moderation_actions (
+//     id           bigserial primary key,
+//     comment_id   uuid not null references comments(id) on delete cascade,
+//     moderator_id uuid not null references users(id),
+//     action       text not null check (action in ('hide','unhide','context_tag','remove')),
+//     reason       text,
+//     created_at   timestamptz not null default now()
+//   );
+//
+// with an index on (comment_id, created_at desc). Insert one row per
+// hide/unhide/context-tag from the moderation + comments admin pages,
+// and surface the latest entry in the comment row's hover state. This
+// is T5 schema work — halted per the runbook until owner approval.
 
 const ROLES = ['moderator', 'editor', 'admin', 'expert', 'educator', 'journalist'] as const;
 const PENALTY_LABELS: Record<number, string> = { 1: 'Warn', 2: '24h comment mute', 3: '7-day mute', 4: 'Ban' };

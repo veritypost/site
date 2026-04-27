@@ -1,7 +1,14 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified ai 2026-04-18
+// TODO(T69): Legacy single-shot AI route. F7 pipeline at
+// /api/admin/pipeline/generate is the canonical path. Two callers remain:
+// admin/story-manager (generate/timeline) and admin/kids-story-manager
+// (kids_story/timeline/simplify). When those migrate to the F7 orchestrator,
+// delete this file. Until then, body_html is sanitized via renderBodyHtml()
+// to prevent raw OpenAI output from being written to the DOM untreated.
 import { createClient } from '@/lib/supabase/server';
 import { requirePermission } from '@/lib/auth';
+import { renderBodyHtml } from '@/lib/pipeline/render-body';
 import { NextResponse } from 'next/server';
 
 export async function POST(request) {
@@ -117,11 +124,15 @@ export async function POST(request) {
 
     // Save based on action
     if (action === 'generate') {
+      // T69 — model output is markdown-ish HTML; pipe through the shared
+      // sanitizer so we never write raw model output to body_html. Matches
+      // the F7 orchestrator's persist path.
+      const sanitizedHtml = renderBodyHtml(generated);
       await supabase
         .from('articles')
         .update({
           body: generated,
-          body_html: generated,
+          body_html: sanitizedHtml,
           is_ai_generated: true,
           ai_model: model,
           ai_provider: 'openai',

@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { mapRpcError } from '@/lib/rpcError';
 
 // POST /api/follows — toggle follow (paid-only, D28).
 // Body: { target_user_id }
@@ -44,7 +45,11 @@ export async function POST(request) {
   });
   if (error) {
     console.error('[follows.POST]', error);
-    return NextResponse.json({ error: 'Could not update follow' }, { status: 400 });
+    const { status, body } = mapRpcError(error, {
+      fallback: 'Could not update follow',
+      fallbackStatus: 400,
+    });
+    return NextResponse.json(body, { status });
   }
   return NextResponse.json(data);
 }

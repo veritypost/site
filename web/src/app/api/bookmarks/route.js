@@ -7,6 +7,10 @@ import { v2LiveGuard } from '@/lib/featureFlags';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
 
+// T170/T209 — bookmarks are per-user state; never cacheable by a CDN
+// or shared proxy.
+const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
+
 // POST /api/bookmarks — create. Cap enforced by trigger.
 // Body: { article_id, collection_id?, notes? }
 export async function POST(request) {
@@ -18,13 +22,17 @@ export async function POST(request) {
   } catch (err) {
     console.error('[bookmarks.POST]', err);
     if (err.status) {
-      return NextResponse.json({ error: 'Not allowed to bookmark' }, { status: err.status });
+      return NextResponse.json(
+        { error: 'Not allowed to bookmark' },
+        { status: err.status, headers: NO_STORE }
+      );
     }
-    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401, headers: NO_STORE });
   }
 
   const { article_id, collection_id, notes } = await request.json().catch(() => ({}));
-  if (!article_id) return NextResponse.json({ error: 'article_id required' }, { status: 400 });
+  if (!article_id)
+    return NextResponse.json({ error: 'article_id required' }, { status: 400, headers: NO_STORE });
 
   const service = createServiceClient();
 
@@ -37,7 +45,7 @@ export async function POST(request) {
   if (rate.limited) {
     return NextResponse.json(
       { error: 'Too many requests' },
-      { status: 429, headers: { 'Retry-After': '60' } }
+      { status: 429, headers: { ...NO_STORE, 'Retry-After': '60' } }
     );
   }
 
@@ -65,7 +73,8 @@ export async function POST(request) {
         .eq('user_id', user.id)
         .eq('article_id', article_id)
         .maybeSingle();
-      if (existing?.id) return NextResponse.json({ id: existing.id, deduped: true });
+      if (existing?.id)
+        return NextResponse.json({ id: existing.id, deduped: true }, { headers: NO_STORE });
       // Fall through to generic handling if we somehow can't fetch the
       // colliding row (e.g. RLS gap). Shouldn't happen under correct
       // policies but be defensive.
@@ -79,7 +88,8 @@ export async function POST(request) {
       route: 'bookmarks.POST',
       fallbackStatus: 400,
       fallbackMessage: 'Could not save bookmark',
+      headers: NO_STORE,
     });
   }
-  return NextResponse.json({ id: data.id });
+  return NextResponse.json({ id: data.id }, { headers: NO_STORE });
 }

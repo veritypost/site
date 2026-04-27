@@ -74,6 +74,34 @@ export async function PATCH(request) {
     return NextResponse.json({ error: 'key + value (string) required' }, { status: 400 });
   }
 
+  // T210 — deny-list dangerous key prefixes. Settings keys are seeded ad-hoc
+  // across many features (pipeline, reader, newsroom, beta, billing, etc.),
+  // so a strict allowlist would lock out every new feature until this file
+  // is updated. The deny-list closes the obvious poisoning vectors —
+  // anything that smells like a credential, internal-only flag, or auth
+  // override — and leaves the existing `is_sensitive` column as the
+  // authoritative per-row gate for everything else. Comparison is
+  // case-insensitive against the leading segment because settings keys
+  // here are conventionally lowercased + dot/underscore-prefixed.
+  const FORBIDDEN_KEY_PREFIXES = [
+    'auth_',
+    'auth.',
+    'secret_',
+    'secret.',
+    'internal_',
+    'internal.',
+    'service_',
+    'service.',
+    'jwt_',
+    'jwt.',
+    'stripe_secret',
+    'supabase_service',
+  ];
+  const lowerKey = String(key).toLowerCase();
+  if (FORBIDDEN_KEY_PREFIXES.some((p) => lowerKey.startsWith(p))) {
+    return NextResponse.json({ error: 'setting key is not editable' }, { status: 403 });
+  }
+
   const { data: existing } = await service
     .from('settings')
     .select('id, value, value_type, is_sensitive')

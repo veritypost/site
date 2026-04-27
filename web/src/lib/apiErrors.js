@@ -37,6 +37,7 @@ export function safeErrorResponse(NextResponse, err, options = {}) {
     route = 'unknown',
     fallbackStatus = 500,
     fallbackMessage = 'Internal server error',
+    headers: extraHeaders = null,
   } = options;
   const code = err?.code || err?.details?.code;
   const mapped = code && PG_ERROR_MAP[code];
@@ -50,6 +51,11 @@ export function safeErrorResponse(NextResponse, err, options = {}) {
   };
   console.error('[api.error]', JSON.stringify(serverPayload));
 
+  // T170/T209 — error responses on authenticated routes deserve the same
+  // no-store treatment as success responses. Callers can pass a headers
+  // object via options.headers; merge it into every branch's response.
+  const responseInit = (status) => (extraHeaders ? { status, headers: extraHeaders } : { status });
+
   if (mapped) {
     const rawMessage = typeof err?.message === 'string' ? err.message.trim() : '';
     // L18: sanitize P0001 passthrough. Trigger authors write user-facing
@@ -60,9 +66,9 @@ export function safeErrorResponse(NextResponse, err, options = {}) {
     const safeMessage = rawMessage.replace(/\s+/g, ' ').slice(0, 240);
     const clientMessage =
       mapped.client === PASSTHROUGH ? safeMessage || fallbackMessage : mapped.client;
-    return NextResponse.json({ error: clientMessage, code }, { status: mapped.status });
+    return NextResponse.json({ error: clientMessage, code }, responseInit(mapped.status));
   }
-  return NextResponse.json({ error: fallbackMessage }, { status: fallbackStatus });
+  return NextResponse.json({ error: fallbackMessage }, responseInit(fallbackStatus));
 }
 
 // Truncate an IP to a /24 for logs — enough for abuse correlation,

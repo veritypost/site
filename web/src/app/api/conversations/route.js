@@ -5,6 +5,10 @@ import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 
+// T170/T209 — conversation state is per-user; never cacheable by a CDN
+// or shared proxy. Apply to every response on this route.
+const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
+
 // POST /api/conversations -- authoritative convo-create path. Pairs with
 // POST /api/messages. Replaces direct `conversations.insert` +
 // `conversation_participants.insert` that let free accounts create empty
@@ -21,15 +25,18 @@ export async function POST(request) {
       console.error('[conversations.permission]', err?.message || err);
       return NextResponse.json(
         { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
-        { status: err.status }
+        { status: err.status, headers: NO_STORE }
       );
     }
-    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401, headers: NO_STORE });
   }
 
   const { other_user_id } = await request.json().catch(() => ({}));
   if (!other_user_id) {
-    return NextResponse.json({ error: 'other_user_id required' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'other_user_id required' },
+      { status: 400, headers: NO_STORE }
+    );
   }
 
   const service = createServiceClient();
@@ -49,7 +56,10 @@ export async function POST(request) {
   if (rate.limited) {
     return NextResponse.json(
       { error: 'Too many conversation starts. Slow down.' },
-      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+      {
+        status: 429,
+        headers: { ...NO_STORE, 'Retry-After': String(rate.windowSec ?? 60) },
+      }
     );
   }
 
@@ -86,7 +96,7 @@ export async function POST(request) {
       userMsg = 'Could not start conversation';
     }
     console.error('[conversations.post]', { code, message: msg });
-    return NextResponse.json({ error: userMsg }, { status });
+    return NextResponse.json({ error: userMsg }, { status, headers: NO_STORE });
   }
-  return NextResponse.json({ conversation: data });
+  return NextResponse.json({ conversation: data }, { headers: NO_STORE });
 }

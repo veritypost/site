@@ -6,6 +6,10 @@ import { createClient } from '@/lib/supabase/server';
 import { safeErrorResponse } from '@/lib/apiErrors';
 import { trackServer } from '@/lib/trackServer';
 
+// T170/T209 — onboarding completion is an authenticated state-changing
+// write; never cache the response.
+const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
+
 // POST — mark onboarding complete (either finished or skipped).
 // Idempotent: second call is a no-op.
 //
@@ -19,7 +23,7 @@ export async function POST(request) {
   try {
     authUser = await requireAuth();
   } catch {
-    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401, headers: NO_STORE });
   }
 
   const authed = createClient();
@@ -31,6 +35,7 @@ export async function POST(request) {
     return safeErrorResponse(NextResponse, error, {
       route: 'account.onboarding',
       fallbackStatus: 500,
+      headers: NO_STORE,
     });
 
   // Fire onboarding_complete after the authoritative write succeeds.
@@ -39,5 +44,5 @@ export async function POST(request) {
     request,
   });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true }, { headers: NO_STORE });
 }

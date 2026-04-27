@@ -4,6 +4,11 @@ import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 
+// T170/T209 — DM send is per-user authoritative state; never let a CDN
+// or shared proxy hold any of it. Apply private/no-store to every
+// response (success + error + 429 with Retry-After).
+const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
+
 // POST /api/messages — authoritative send path. Bug 83 replaced the
 // browser's direct `messages.insert` with this route so paid-tier,
 // mute/ban, participant, rate-limit, and length checks all run server-
@@ -17,15 +22,32 @@ export async function POST(request) {
       console.error('[messages.permission]', err?.message || err);
       return NextResponse.json(
         { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
-        { status: err.status }
+        { status: err.status, headers: NO_STORE }
       );
     }
-    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401, headers: NO_STORE });
   }
 
-  const { conversation_id, body } = await request.json().catch(() => ({}));
+  // T171 — bound the request size before JSON.parse so a hostile caller
+  // can't force the runtime to buffer/parse an unbounded body. 50 KB is
+  // ample for any legitimate DM payload (post_message RPC enforces a
+  // tighter content cap downstream).
+  const text = await request.text().catch(() => '');
+  if (text.length > 50_000) {
+    return NextResponse.json({ error: 'payload too large' }, { status: 413, headers: NO_STORE });
+  }
+  let parsed = {};
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    /* malformed JSON falls through to the empty-object validation below */
+  }
+  const { conversation_id, body } = parsed;
   if (!conversation_id || !body) {
-    return NextResponse.json({ error: 'conversation_id and body required' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'conversation_id and body required' },
+      { status: 400, headers: NO_STORE }
+    );
   }
 
   const service = createServiceClient();
@@ -55,9 +77,9 @@ export async function POST(request) {
           ? 'You cannot send messages in this conversation.'
           : 'Could not send message';
     console.error('[messages.post]', error);
-    const headers = status === 429 ? { 'Retry-After': '60' } : undefined;
+    const headers = status === 429 ? { ...NO_STORE, 'Retry-After': '60' } : NO_STORE;
     return NextResponse.json({ error: userMsg }, { status, headers });
   }
 
-  return NextResponse.json({ message: data });
+  return NextResponse.json({ message: data }, { headers: NO_STORE });
 }

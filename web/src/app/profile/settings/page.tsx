@@ -4315,6 +4315,29 @@ function BillingBundle({
             </div>
           </div>
 
+          {/* T269 — FTC ROSCA / state auto-renewal laws require the
+              auto-renew terms be disclosed at the point of purchase, not
+              only in TOS. Renders once above the plan grid so it's
+              visible before any Upgrade/Switch button is reached. Cycle
+              wording mirrors the active monthly/annual toggle. */}
+          <div
+            role="note"
+            style={{
+              border: `1px solid ${C.border}`,
+              borderRadius: 8,
+              background: C.card,
+              padding: `${S[2]}px ${S[3]}px`,
+              marginBottom: S[3],
+              fontSize: F.xs,
+              color: C.dim,
+              lineHeight: 1.5,
+            }}
+          >
+            Subscriptions auto-renew at the listed price each{' '}
+            {cycle === 'annual' ? 'year' : 'month'} until cancelled. You can cancel anytime in
+            Settings &rsaquo; Billing.
+          </div>
+
           <div
             style={{
               display: 'grid',

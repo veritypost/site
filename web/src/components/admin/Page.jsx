@@ -82,16 +82,28 @@ export function PageHeader({
             marginBottom: S[2],
             display: 'flex',
             alignItems: 'center',
-            gap: S[1],
+            gap: S[2],
           }}
         >
+          {/* T59 — explicit back-button (40x40 tap target) so mobile
+              admins can leave a sub-page without relying on browser
+              chrome. The Link still acts as a breadcrumb crumb for
+              screen readers; visually it's a tappable arrow + label. */}
           <Link
             href={backHref}
+            aria-label={`Back to ${backLabel}`}
             style={{
               color: ADMIN_C.dim,
               textDecoration: 'none',
-              padding: '2px 4px',
-              borderRadius: 4,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              minHeight: 40,
+              minWidth: 40,
+              padding: '0 10px',
+              borderRadius: 8,
+              border: `1px solid ${ADMIN_C.border}`,
+              background: 'transparent',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.color = ADMIN_C.accent;
@@ -100,7 +112,10 @@ export function PageHeader({
               e.currentTarget.style.color = ADMIN_C.dim;
             }}
           >
-            {backLabel}
+            <span aria-hidden="true" style={{ fontSize: 16, lineHeight: 1 }}>
+              {'←'}
+            </span>
+            <span>{backLabel}</span>
           </Link>
           <span aria-hidden="true" style={{ color: ADMIN_C.muted }}>
             /

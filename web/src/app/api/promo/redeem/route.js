@@ -3,6 +3,7 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { requirePermission } from '@/lib/auth';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { mapRpcError } from '@/lib/rpcError';
 import { NextResponse } from 'next/server';
 
 // F-013 — Plan upgrades from a 100% promo must write to `users.plan_id`
@@ -33,9 +34,15 @@ export async function POST(request) {
       );
     }
 
-    const { code } = await request.json();
-    if (!code?.trim()) {
-      return NextResponse.json({ error: 'Code is required' }, { status: 400 });
+    const body = await request.json().catch(() => ({}));
+    // T172 — server-side shape validation BEFORE the DB hit. Restrict to
+    // alphanumeric + hyphens, 3-32 chars (uppercased on input). Anything
+    // outside that shape can't be a real promo code, so reject early. The
+    // LIKE-metachar escape on the `.ilike` call below stays as
+    // defense-in-depth.
+    const code = (body.code || '').trim().toUpperCase();
+    if (!/^[A-Z0-9-]{3,32}$/.test(code)) {
+      return NextResponse.json({ error: 'invalid code' }, { status: 400 });
     }
 
     const now = new Date().toISOString();
@@ -203,10 +210,11 @@ export async function POST(request) {
         .update({ current_uses: promo.current_uses })
         .eq('id', promo.id)
         .eq('current_uses', promo.current_uses + 1);
-      return NextResponse.json(
-        { error: 'Could not apply plan change. Please try again.' },
-        { status: 500 }
-      );
+      const { status, body } = mapRpcError(rpcErr, {
+        fallback: 'Could not apply plan change. Please try again.',
+        fallbackStatus: 500,
+      });
+      return NextResponse.json(body, { status });
     }
 
     // F-013 — audit every promo-driven plan upgrade for abuse review.

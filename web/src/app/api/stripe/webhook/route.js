@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { verifyWebhook, retrieveSubscription } from '@/lib/stripe';
 import { captureMessage } from '@/lib/observability';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 // Auth: Stripe HMAC signature on raw body via verifyWebhook (see lib/stripe.js).
 // Raw body is read before JSON parse; signature is verified BEFORE any DB write.
@@ -93,6 +94,27 @@ export async function POST(request) {
   }
 
   const service = createServiceClient();
+
+  // T211 — per-event-id rate limit. The PK on webhook_log.event_id already
+  // gives us idempotency, but a flood of retries against the same event id
+  // (whether from Stripe's exponential backoff misbehaving or hostile
+  // replay traffic that survived signature verify) still costs the lookup
+  // + conditional UPDATE work. 5 attempts per 5 minutes per event id is
+  // far above Stripe's documented retry cadence (3 retries over 3 days)
+  // and chokes a tight loop. Fail-closed 429 — Stripe will keep retrying
+  // on its own schedule, which is the intended behavior.
+  const evtRate = await checkRateLimit(service, {
+    key: `stripe-event:${event.id}`,
+    policyKey: 'stripe_event_replay',
+    max: 5,
+    windowSec: 300,
+  });
+  if (evtRate.limited) {
+    return NextResponse.json(
+      { error: 'event-replay rate limited' },
+      { status: 429, headers: { 'Retry-After': String(evtRate.windowSec ?? 300) } }
+    );
+  }
 
   // Step A: try to INSERT and claim processing in one step.
   let logId = null;
@@ -278,12 +300,20 @@ async function resolveUserFromEvent(service, event) {
 
   // Most billing events carry `customer` on the top-level object. Charge /
   // dispute events nest one level deeper through the charge object.
-  const customerId =
-    typeof obj.customer === 'string'
-      ? obj.customer
-      : typeof obj.charge === 'object'
-        ? obj.charge?.customer
-        : null;
+  // T180 — strict-string guard on the nested path so a Stripe API shape
+  // change (or a synthetic event) that ships `charge.customer` as anything
+  // other than a string id (object expansion, null, etc.) doesn't silently
+  // poison `lookupUserAndPlan` with a non-string filter value.
+  let customerId = null;
+  if (typeof obj.customer === 'string') {
+    customerId = obj.customer;
+  } else if (
+    obj.charge &&
+    typeof obj.charge === 'object' &&
+    typeof obj.charge.customer === 'string'
+  ) {
+    customerId = obj.charge.customer;
+  }
 
   const fallbackUserId = obj.client_reference_id || obj.metadata?.user_id || null;
 
@@ -562,6 +592,10 @@ async function handleSubscriptionUpdated(service, sub) {
 // subscriptions/sync re-validates Apple receipts on launch and can
 // undo state changes unless both sides agree.
 async function handleChargeRefunded(service, charge) {
+  // T180 — strict-string guard. If Stripe ever expands `charge.customer`
+  // into the full Customer object (or sends null), the downstream
+  // lookupUserAndPlan must not see a non-string filter value.
+  if (typeof charge.customer !== 'string') return;
   const customerId = charge.customer;
   if (!customerId) return;
   const { userRow } = await lookupUserAndPlan(service, customerId, null);
@@ -666,8 +700,13 @@ async function handleChargeRefunded(service, charge) {
 // out of scope for this chunk; we write to audit_log + create an
 // admin-visible notification via the existing notification RPC.
 async function handleChargeDispute(service, dispute) {
+  // T180 — strict-string guard on the nested `charge.customer` access.
   const customerId =
-    dispute.charge && typeof dispute.charge === 'object' ? dispute.charge.customer : null;
+    dispute.charge &&
+    typeof dispute.charge === 'object' &&
+    typeof dispute.charge.customer === 'string'
+      ? dispute.charge.customer
+      : null;
 
   let userRow = null;
   if (customerId) {
@@ -722,8 +761,13 @@ async function handleChargeDispute(service, dispute) {
 // Losses stay frozen (merchant paid); warnings + charge_refunded are
 // pre-existing cases already handled by other events.
 async function handleDisputeClosed(service, dispute) {
+  // T180 — strict-string guard on the nested `charge.customer` access.
   const customerId =
-    dispute.charge && typeof dispute.charge === 'object' ? dispute.charge.customer : null;
+    dispute.charge &&
+    typeof dispute.charge === 'object' &&
+    typeof dispute.charge.customer === 'string'
+      ? dispute.charge.customer
+      : null;
   const chargeId = typeof dispute.charge === 'string' ? dispute.charge : dispute.charge?.id;
 
   let userRow = null;
@@ -812,7 +856,11 @@ async function handleRefundUpdated(service, refund) {
     return;
   }
   const chargeId = typeof refund.charge === 'string' ? refund.charge : refund.charge?.id;
-  const customerId = typeof refund.charge === 'object' ? refund.charge?.customer : null;
+  // T180 — strict-string guard on the nested `charge.customer` access.
+  const customerId =
+    refund.charge && typeof refund.charge === 'object' && typeof refund.charge.customer === 'string'
+      ? refund.charge.customer
+      : null;
 
   // Prefer the customer id from the embedded charge object (Stripe sends
   // it when expand is set). Fall back to refetching via metadata.user_id

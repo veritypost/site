@@ -12,6 +12,7 @@ import type { CSSProperties } from 'react';
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { formatCents } from '@/lib/plans';
+import { captureMessage } from '@/lib/observability';
 
 export const metadata: Metadata = {
   title: 'Help — Verity Post',
@@ -32,6 +33,11 @@ export default async function HelpPage() {
   let verityMonthly = '$3.99';
   let proMonthly = '$9.99';
   let familyMonthly = '$14.99';
+  // T295 — track whether the live-price fetch actually populated all
+  // three tiers. If any tier falls back, we render an inline
+  // "approximate" hint next to the prices and emit a Sentry warning
+  // so we know if the help page is drifting from real Stripe pricing.
+  let pricesAreFallback = false;
   try {
     const supabase = createClient();
     const { data } = await supabase.auth.getUser();
@@ -45,12 +51,24 @@ export default async function HelpPage() {
       if (p?.name && typeof p.price_cents === 'number') byName[p.name] = p.price_cents;
     }
     if (byName.verity_monthly != null) verityMonthly = formatCents(byName.verity_monthly);
+    else pricesAreFallback = true;
     if (byName.verity_pro_monthly != null) proMonthly = formatCents(byName.verity_pro_monthly);
+    else pricesAreFallback = true;
     if (byName.verity_family_monthly != null)
       familyMonthly = formatCents(byName.verity_family_monthly);
-  } catch {
+    else pricesAreFallback = true;
+    if (pricesAreFallback) {
+      await captureMessage('help page price fetch incomplete', 'warning', {
+        verityMonthly: byName.verity_monthly ?? null,
+        proMonthly: byName.verity_pro_monthly ?? null,
+        familyMonthly: byName.verity_family_monthly ?? null,
+      });
+    }
+  } catch (err) {
     // Page must render for anon visitors even if Supabase is misconfigured.
     isAuthed = false;
+    pricesAreFallback = true;
+    await captureMessage('help page price fetch failed', 'warning', { error: String(err) });
   }
 
   const sectionStyle: CSSProperties = { marginBottom: '28px' };
@@ -97,6 +115,14 @@ export default async function HelpPage() {
           retakes, text-to-speech, DMs, and follows. Pro ({proMonthly}/mo) is ad-free and adds
           Ask-an-Expert and streak freezes. Family ({familyMonthly}/mo) covers two adults and up to
           two kid profiles with age-tiered content and a family leaderboard.
+          {pricesAreFallback && (
+            <>
+              {' '}
+              <span style={{ fontSize: 11, color: '#999' }}>
+                (approximate; sign in to see live pricing)
+              </span>
+            </>
+          )}
         </span>
       ),
     },

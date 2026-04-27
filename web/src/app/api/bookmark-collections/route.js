@@ -53,7 +53,20 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 
-  const { name, description } = await request.json().catch(() => ({}));
+  // T171 — bound the request size before JSON.parse so a hostile caller
+  // can't force the runtime to buffer/parse an unbounded body. 50 KB is
+  // ample for a collection name + description.
+  const text = await request.text().catch(() => '');
+  if (text.length > 50_000) {
+    return NextResponse.json({ error: 'payload too large' }, { status: 413 });
+  }
+  let parsed = {};
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    /* malformed JSON falls through to the RPC's own validation */
+  }
+  const { name, description } = parsed;
   const service = createServiceClient();
 
   // H27 — cap collection creation so a paid user can't spam the

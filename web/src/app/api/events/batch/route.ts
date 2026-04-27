@@ -38,6 +38,16 @@ const MAX_EVENT_NAME_LEN = 64;
 const MAX_STRING_LEN = 512;
 const MAX_PAYLOAD_BYTES = 4096;
 
+// T175 — fail loudly at module load if EVENT_HASH_SALT is missing in
+// production. Without it the prior fallback was an empty string, which
+// produces deterministic, rainbow-table-friendly hashes for every UA + IP
+// pair. Throwing here aborts the route on cold start; a 500 to the client
+// is preferable to silently weak hashes that leak per-IP / per-UA identity
+// across the events table.
+if (process.env.NODE_ENV === 'production' && !process.env.EVENT_HASH_SALT) {
+  throw new Error('EVENT_HASH_SALT must be set in production');
+}
+
 // Salt for hashing UA + IP. In production set EVENT_HASH_SALT; the dev
 // fallback is deterministic so local dashboards show stable hashes
 // across restarts, but rotates with any code change to the literal.

@@ -7,6 +7,11 @@ import { scoreCommentPost } from '@/lib/scoring';
 import { v2LiveGuard } from '@/lib/featureFlags';
 import { checkRateLimit } from '@/lib/rateLimit';
 
+// T170/T209 — authenticated user data must never be cacheable by a CDN
+// or shared proxy. Apply private/no-store to every response on this
+// route (success + error paths).
+const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
+
 // POST /api/comments — create a top-level comment or threaded reply.
 // Body: { article_id, body, parent_id?, mentions? }
 // mentions is an array of { user_id, username }; the RPC strips it
@@ -26,10 +31,13 @@ export async function POST(request) {
   } catch (err) {
     if (err.status) {
       console.error('[comments.POST]', err);
-      return NextResponse.json({ error: 'Unauthenticated' }, { status: err.status });
+      return NextResponse.json(
+        { error: 'Unauthenticated' },
+        { status: err.status, headers: NO_STORE }
+      );
     }
     console.error('[comments.POST]', err);
-    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401, headers: NO_STORE });
   }
 
   const service = createServiceClient();
@@ -44,18 +52,37 @@ export async function POST(request) {
     const retryAfter = String(rate.windowSec ?? 60);
     return NextResponse.json(
       { error: 'Posting too quickly. Wait a moment and try again.' },
-      { status: 429, headers: { 'Retry-After': retryAfter } }
+      { status: 429, headers: { ...NO_STORE, 'Retry-After': retryAfter } }
     );
   }
 
   const allowed = await hasPermissionServer('comments.post');
   if (!allowed) {
-    return NextResponse.json({ error: 'Not allowed to post comments' }, { status: 403 });
+    return NextResponse.json(
+      { error: 'Not allowed to post comments' },
+      { status: 403, headers: NO_STORE }
+    );
   }
 
-  const { article_id, body, parent_id, mentions } = await request.json().catch(() => ({}));
+  // T171 — bound the request size before JSON.parse so a hostile caller
+  // can't force the runtime to buffer/parse an unbounded body. 50 KB is
+  // ample for any legitimate comment / reply payload.
+  const text = await request.text().catch(() => '');
+  if (text.length > 50_000) {
+    return NextResponse.json({ error: 'payload too large' }, { status: 413, headers: NO_STORE });
+  }
+  let parsed = {};
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    /* malformed JSON falls through to the empty-object validation below */
+  }
+  const { article_id, body, parent_id, mentions } = parsed;
   if (!article_id || !body) {
-    return NextResponse.json({ error: 'article_id and body required' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'article_id and body required' },
+      { status: 400, headers: NO_STORE }
+    );
   }
 
   // H4 — surface the quiz-gate failure as a specific 403 before
@@ -70,7 +97,7 @@ export async function POST(request) {
     } else if (!passed) {
       return NextResponse.json(
         { error: 'Pass the quiz on this article to join the discussion.' },
-        { status: 403 }
+        { status: 403, headers: NO_STORE }
       );
     }
   }
@@ -91,24 +118,24 @@ export async function POST(request) {
     if (code === 'P0001' && (msg.includes('quiz') || msg.includes('not allowed'))) {
       return NextResponse.json(
         { error: 'Pass the quiz on this article to join the discussion.' },
-        { status: 403 }
+        { status: 403, headers: NO_STORE }
       );
     }
     if (code === '23505' || msg.includes('duplicate')) {
       return NextResponse.json(
         { error: 'Looks like that comment already posted.' },
-        { status: 409 }
+        { status: 409, headers: NO_STORE }
       );
     }
     if (msg.includes('parent')) {
       return NextResponse.json(
         { error: 'Reply target not found — it may have been removed.' },
-        { status: 404 }
+        { status: 404, headers: NO_STORE }
       );
     }
     return NextResponse.json(
       { error: 'Could not post comment. Try again in a moment.' },
-      { status: 400 }
+      { status: 400, headers: NO_STORE }
     );
   }
 
@@ -125,8 +152,11 @@ export async function POST(request) {
     .eq('id', data.id)
     .maybeSingle();
 
-  return NextResponse.json({
-    comment: full || { id: data.id },
-    scoring: scoring?.error ? null : scoring,
-  });
+  return NextResponse.json(
+    {
+      comment: full || { id: data.id },
+      scoring: scoring?.error ? null : scoring,
+    },
+    { headers: NO_STORE }
+  );
 }

@@ -115,6 +115,15 @@ export async function getUser(client) {
 
   if (!profile) return null;
 
+  // T212 — belt-and-suspenders identity check. RLS on `users` already
+  // restricts the row this query can return, but if RLS is ever
+  // misconfigured, a service-key client is passed in, or a future bug
+  // widens the policy, this assert turns "wrong row returned" into a
+  // loud failure instead of a silent identity confusion. Cheap.
+  if (authUser.id !== profile.id) {
+    throw new Error('AUTH_PROFILE_ID_MISMATCH');
+  }
+
   const { data: roleRows } = await supabase
     .from('user_roles')
     .select('roles(name, hierarchy_level)')

@@ -24,6 +24,8 @@ const BUCKET = 'data-exports';
 const SIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 
 async function run(request) {
+  // Cron auth — must verify CRON_SECRET header before any work; see
+  // web/src/lib/cronAuth.js for the timing-safe compare history.
   if (!verifyCronAuth(request).ok) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }

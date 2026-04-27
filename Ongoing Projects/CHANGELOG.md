@@ -7,6 +7,81 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (Parallel sweep wave 3 — 22 items shipped + 4 stale across 6 clusters) — _shipped, pushed to git/Vercel_
+
+### Cluster — Walkthrough copy
+
+- **T288** — `web/src/app/cookies/page.tsx`: replaced misleading "consent banner appears on first visit" copy with truthful current-state guidance (browser settings, mobile privacy controls, in-app banner coming).
+- **T289 STALE-CONFIRMED** — skip-link is alive at `web/src/app/layout.js:134-136` + `web/src/app/globals.css:177-198` (T222 extraction preserved it). No change.
+- **T290** — `web/src/app/accessibility/page.tsx`: high-contrast pointer rewritten to "Account Settings → Display preferences (Coming soon — reader will honor this once wired)" + note that OS-level high-contrast is honored meanwhile.
+- **T295** — `web/src/app/help/page.tsx`: `captureMessage` warning emitted on partial-data + catch paths of the Stripe price fetch. Inline `(approximate; sign in to see live pricing)` hint shown when fallback prices are in play.
+
+### Cluster — Cache-Control on auth routes (T170 + T209)
+
+`Cache-Control: 'private, no-store, max-age=0'` added to all responses (success + error paths) on:
+- `web/src/app/api/comments/route.js`
+- `web/src/app/api/messages/route.js`
+- `web/src/app/api/bookmarks/route.js`
+- `web/src/app/api/conversations/route.js`
+- `web/src/app/api/notifications/route.js`
+- `web/src/app/api/stripe/portal/route.js`
+- `web/src/app/api/account/onboarding/route.js`
+- `web/src/app/api/account/data-export/route.js`
+- `web/src/app/api/account/delete/route.js`
+- `web/src/lib/apiErrors.js`: `safeErrorResponse` extended to thread `options.headers` (backward compatible).
+
+Pattern-spread flagged for follow-up: ~20 more authenticated routes (admin/*, profile/*, follow/*, votes/*, kids/*, push/*) need the same treatment in a future pass. `v2LiveGuard()` 503 response also needs the header — one-line fix that buys coverage across many callers.
+
+### Cluster — Backend security misc
+
+- **T171** — body-size cap (50 KB) before JSON parse on `web/src/app/api/comments/route.js`, `messages/route.js`, `bookmark-collections/route.js`. Returns 413 over cap. Mirrors the Stripe webhook pattern.
+- **T172** — `web/src/app/api/promo/redeem/route.js`: `^[A-Z0-9-]{3,32}$` shape check before any DB hit; existing escape kept as defense-in-depth.
+- **T175** — `web/src/app/api/events/batch/route.ts`: module-level throw if `NODE_ENV=production && !EVENT_HASH_SALT`. Cold-start fail-loud.
+- **T176** — `web/src/lib/rateLimit.js`: module-level throw if `RATE_LIMIT_ALLOW_FAIL_OPEN=1` in production / preview.
+- **T210** — `web/src/app/api/admin/settings/route.js`: deny-list (not allowlist) for settings keys (`auth_*`, `secret_*`, `internal_*`, `service_*`, `jwt_*`, `stripe_secret*`, `supabase_service*`). Existing `is_sensitive` per-row gate preserved as authoritative check.
+- **T180** — `web/src/app/api/stripe/webhook/route.js`: 5 sites where `charge.customer` is consumed as string now have explicit `typeof === 'string'` guards.
+- **T181** — cron auth comment added above `verifyCronAuth` in 6 of 13 cron routes (freeze-grace, check-user-achievements, process-data-exports, flag-expert-reverifications, cleanup-data-exports, rate-limit-cleanup). 7 remaining flagged for pattern-spread.
+- **T211** — `web/src/app/api/stripe/webhook/route.js`: per-event-id replay rate-limit (`stripe-event:${event.id}`, max 5 per 5min). 429 with Retry-After over cap.
+- **T212** — `web/src/lib/auth.js`: `if (authUser.id !== profile.id) throw 'AUTH_PROFILE_ID_MISMATCH'` belt-and-suspenders check after profile fetch in `getUser()`.
+
+### Cluster — Backend DX
+
+- **T179** — new `web/src/lib/rpcError.js` helper (`mapRpcError(error, context)` → `{ status, body }` mapping common PG codes 23505→409, 23514→400, 42501→403, P0001→400, 22023→400). Applied to `api/promo/redeem/route.js` (RPC error path) + `api/follows/route.js` (toggle_follow). Pattern documented; consolidation with `safeErrorResponse` flagged for later.
+- **T232** — new `web/scripts/deploy.sh` + `web/scripts/emergency-rollback.sh` (executable) + `web/scripts/README.md` runbook entry.
+- **T287 TODO-COMMENT-ONLY** — `web/src/lib/featureFlags.js` block above `v2LiveGuard` describing the future `/admin/system-controls` page surface. No logic shipped.
+- **T230 TODO-COMMENT-ONLY** — `web/src/app/admin/moderation/page.tsx` block proposing `moderation_actions` schema. T5 schema, halted.
+
+### Cluster — Dead code / UI polish
+
+- **T59** — `web/src/components/admin/Page.jsx`: existing `backHref` prop's button reworked to a 40×40 minimum tap target with `←` glyph + label + `aria-label="Back to <X>"`. All `<PageHeader backHref="…">` callers inherit.
+- **T69** — `web/src/app/api/ai/generate/route.js`: 2 admin callers found via grep, can't delete. Patched to write `renderBodyHtml(generated)` (sanitize-html pipeline) instead of raw OpenAI output. TODO at top notes the F7 supersession path.
+- **T74 STALE** — `web/src/lib/mentions.js` is live (`MENTION_RE` imported by `CommentRow.tsx:9` + `CommentComposer.tsx:7`). No deletion.
+- **T75 OWNER-DECISION** — `web/src/lib/password.js` has 3 live callers (`api/settings/password-policy/route.js`, `api/auth/signup/route.js`, `reset-password/page.tsx` for `PASSWORD_REQS`/`passwordStrength`). May export both legacy hashing AND policy/strength helpers. Owner decides cleanup direction.
+- **T111** — `web/src/app/browse/page.tsx`: removed dead `FILTERS` const + `FilterKey` type + `activeFilter` state + placeholder comment. JSX rendering pills was already gone; only the dead state/const remained.
+- **T125** — `web/src/app/browse/page.tsx`: `filtered` predicate at line 188 now requires `c.slug`. Slug-null categories skipped before render so the broken-looking non-clickable card is gone.
+
+### Cluster — UX
+
+- **T269** — `web/src/app/profile/settings/page.tsx`: inline auto-renewal disclosure renders once between the cycle toggle and the plan grid, above all Upgrade/Switch CTAs. Copy adapts to cycle. FTC ROSCA compliance.
+- **T143** — `web/src/app/messages/page.tsx`: empty inbox now leads with "Have a question? Ask an expert." hero card pointing to article comments where `expert.ask` is gated, with a `/browse` CTA. Pre-existing "New message" search CTA preserved as secondary path.
+- **T145 STALE-PARTIAL** — profile zero-state. The three "empty states" are inside three separate tabs (Activity / Categories / Milestones) rendered exclusively, plus the `categoriesLength==0` path is a system-wide signal not a user signal. Consolidating across tabs would require eager-loading three datasets on mount (perf regression). Left as-is.
+
+### Files touched (35 total)
+
+- accessibility/page.tsx, admin/moderation/page.tsx, admin/Page.jsx, admin/settings/route.js
+- api/account/{data-export,delete,onboarding}/route.js
+- api/ai/generate/route.js, api/bookmark-collections/route.js, api/bookmarks/route.js
+- api/comments/route.js, api/conversations/route.js
+- api/cron/{check-user-achievements,cleanup-data-exports,flag-expert-reverifications,freeze-grace,process-data-exports,rate-limit-cleanup}/route.{js,ts}
+- api/events/batch/route.ts, api/follows/route.js, api/messages/route.js
+- api/notifications/route.js, api/promo/redeem/route.js
+- api/stripe/{portal,webhook}/route.js
+- browse/page.tsx, cookies/page.tsx, help/page.tsx, messages/page.tsx, profile/settings/page.tsx
+- lib/{apiErrors,auth,featureFlags,rateLimit,rpcError}.js, lib/observability.js
+- web/scripts/deploy.sh, emergency-rollback.sh, README.md
+
+---
+
 ## 2026-04-27 (Parallel sweep wave 2 — 17 items across 5 clusters: admin email, penalty escalate, server security, perf, TS hardening) — _shipped, pushed to git/Vercel_
 
 Five implementer agents dispatched in parallel on non-overlapping file clusters (avoiding files touched in wave 1).

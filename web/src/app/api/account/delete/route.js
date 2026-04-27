@@ -6,6 +6,12 @@ import { hasPermissionServer } from '@/lib/auth';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
 
+// T170/T209 — account deletion is the most replay-sensitive operation
+// on the platform. Every response (POST + DELETE, success + error)
+// must be private/no-store so a CDN or shared proxy can't surface a
+// cached response to a different session.
+const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
+
 // Phase 19.2: user self-initiates account deletion. Schedules the
 // 30-day grace timer + writes a data_requests row. Cron anonymizes
 // after the timer expires.
@@ -71,10 +77,12 @@ async function resolveAuth(request) {
 
 export async function POST(request) {
   const { user, authClient } = await resolveAuth(request);
-  if (!user) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+  if (!user)
+    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401, headers: NO_STORE });
 
   const allowed = await hasPermissionServer('settings.data.request_deletion', authClient);
-  if (!allowed) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!allowed)
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403, headers: NO_STORE });
 
   const service = createServiceClient();
 
@@ -91,7 +99,7 @@ export async function POST(request) {
   if (rate.limited) {
     return NextResponse.json(
       { error: 'Too many deletion requests. Try again later.' },
-      { status: 429, headers: { 'Retry-After': '3600' } }
+      { status: 429, headers: { ...NO_STORE, 'Retry-After': '3600' } }
     );
   }
 
@@ -115,6 +123,7 @@ export async function POST(request) {
       return safeErrorResponse(NextResponse, schedErr, {
         route: 'account.delete.immediate.schedule',
         fallbackStatus: 400,
+        headers: NO_STORE,
       });
 
     // 2. Back-date the grace timer so the anonymize RPC accepts the
@@ -134,7 +143,7 @@ export async function POST(request) {
       console.error('[account.delete.immediate] anonymize', anonErr);
       return NextResponse.json(
         { error: 'Could not complete immediate deletion. Try again or use the 30-day option.' },
-        { status: 500 }
+        { status: 500, headers: NO_STORE }
       );
     }
 
@@ -170,11 +179,14 @@ export async function POST(request) {
       console.error('[account.delete.immediate] signOut', e?.message);
     }
 
-    return NextResponse.json({
-      deleted: true,
-      mode: 'immediate',
-      completed_at: new Date().toISOString(),
-    });
+    return NextResponse.json(
+      {
+        deleted: true,
+        mode: 'immediate',
+        completed_at: new Date().toISOString(),
+      },
+      { headers: NO_STORE }
+    );
   }
 
   // Default: 30-day grace.
@@ -183,22 +195,32 @@ export async function POST(request) {
     p_reason: reason || null,
   });
   if (error)
-    return safeErrorResponse(NextResponse, error, { route: 'account.delete', fallbackStatus: 400 });
-  return NextResponse.json(data);
+    return safeErrorResponse(NextResponse, error, {
+      route: 'account.delete',
+      fallbackStatus: 400,
+      headers: NO_STORE,
+    });
+  return NextResponse.json(data, { headers: NO_STORE });
 }
 
 export async function DELETE(request) {
   const { user, authClient } = await resolveAuth(request);
-  if (!user) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+  if (!user)
+    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401, headers: NO_STORE });
 
   const allowed = await hasPermissionServer('settings.data.deletion.cancel', authClient);
-  if (!allowed) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!allowed)
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403, headers: NO_STORE });
 
   const service = createServiceClient();
   const { data, error } = await service.rpc('cancel_account_deletion', {
     p_user_id: user.id,
   });
   if (error)
-    return safeErrorResponse(NextResponse, error, { route: 'account.delete', fallbackStatus: 400 });
-  return NextResponse.json({ cancelled: !!data });
+    return safeErrorResponse(NextResponse, error, {
+      route: 'account.delete',
+      fallbackStatus: 400,
+      headers: NO_STORE,
+    });
+  return NextResponse.json({ cancelled: !!data }, { headers: NO_STORE });
 }

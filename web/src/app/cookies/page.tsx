@@ -114,17 +114,22 @@ export default function CookiesPage() {
           <p style={textStyle}>You can manage your cookie preferences at any time:</p>
           <ul style={listStyle}>
             <li>
-              Use the cookie consent banner that appears on your first visit to enable or disable
-              non-essential cookies.
+              Configure your browser settings to block or delete cookies. Most browsers let you
+              control cookies on a per-site basis under their Privacy or Security settings. Note
+              that blocking essential cookies may prevent the platform from functioning correctly.
             </li>
             <li>
-              Visit your account settings to adjust personalization and analytics preferences.
+              On mobile devices, you can manage cookies through your device privacy settings or your
+              mobile browser&apos;s site-data controls.
             </li>
             <li>
-              Configure your browser settings to block or delete cookies. Note that blocking
-              essential cookies may prevent the platform from functioning correctly.
+              Visit your account settings to adjust personalization and analytics preferences once
+              signed in.
             </li>
-            <li>On mobile devices, you can manage cookies through your device privacy settings.</li>
+            <li>
+              An in-app cookie consent banner is coming. Until then, please use the browser-level
+              controls above to opt out of non-essential cookies.
+            </li>
           </ul>
         </div>
 

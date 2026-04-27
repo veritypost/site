@@ -49,9 +49,11 @@ const DEFAULT_STYLE: CategoryStyle = { icon: '', color: '#f3f4f6', accent: '#6b7
 // Featured card accent colors cycle for stories that have no category style match
 const FEATURED_COLORS = ['#111111', '#6ee7b7', '#fca5a5', '#fcd34d', '#cccccc'] as const;
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const FILTERS = ['Most Recent', 'Most Verified', 'Trending'] as const;
-type FilterKey = (typeof FILTERS)[number];
+// T111 — Most Recent / Most Verified / Trending filter pills were
+// removed: the JSX rendering them was already commented out (data
+// fetch never read activeFilter). Killing the dead constant + state
+// per "no parallel paths" — restore as a real wired-up control when
+// view_count tracking ships (Phase B), not as fake-functional UI.
 
 type CategoryRow = Pick<Tables<'categories'>, 'id' | 'name' | 'slug'>;
 type ArticleRow = Pick<
@@ -91,8 +93,6 @@ function timeAgo(dateString: string | null | undefined): string {
 export default function BrowsePage() {
   usePageViewTrack('browse');
   const [search, setSearch] = useState<string>('');
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [activeFilter, setActiveFilter] = useState<FilterKey>('Most Recent');
   const [expandedCat, setExpandedCat] = useState<string | null>(null);
 
   const [featured, setFeatured] = useState<FeaturedCard[]>([]);
@@ -185,8 +185,13 @@ export default function BrowsePage() {
     fetchData();
   }, [fetchData]);
 
+  // T125 — drop slug-null rows from the rendered list. A category
+  // without a slug has no /category/<slug> destination and would
+  // render as a plain-text card that looks broken on tap. Filtering
+  // here keeps the rest of the data-flow intact (counts/featured
+  // upstream are unaffected).
   const filtered = categories.filter(
-    (c) => !search || (c.name || '').toLowerCase().includes(search.toLowerCase())
+    (c) => c.slug && (!search || (c.name || '').toLowerCase().includes(search.toLowerCase()))
   );
 
   const shell: CSSProperties = {
@@ -237,13 +242,6 @@ export default function BrowsePage() {
               }}
             />
           </div>
-
-          {/* Filters removed: the Most Recent / Most Verified / Trending
-              pills were rendered but `activeFilter` state was never
-              read by the data fetch — pure UI noise that lied about
-              being interactive. Restore when filter wiring + view_count
-              tracking ships (Phase B). State + FILTERS const left in
-              place so re-enable is a one-line revert. */}
         </div>
       </div>
 

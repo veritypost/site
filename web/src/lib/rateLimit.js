@@ -1,5 +1,21 @@
 import { headers } from 'next/headers';
 
+// T176 — hard fail at module load if the dev fail-open flag was somehow
+// shipped to production. The intent of RATE_LIMIT_ALLOW_FAIL_OPEN is
+// strictly "let local dev sign in before migration 057 lands"; if it
+// ever leaks into a prod env it silently disables rate limiting on every
+// brute-force-sensitive surface (login, signup, reset-password, etc).
+// Crash on boot rather than serve traffic with rate limits effectively
+// off. Mirrors the IS_PROD check below.
+if (
+  (process.env.VERCEL_ENV === 'production' ||
+    process.env.VERCEL_ENV === 'preview' ||
+    process.env.NODE_ENV === 'production') &&
+  process.env.RATE_LIMIT_ALLOW_FAIL_OPEN === '1'
+) {
+  throw new Error('RATE_LIMIT_ALLOW_FAIL_OPEN must NOT be set in production');
+}
+
 export async function getClientIp() {
   const h = await headers();
   return h.get('x-forwarded-for')?.split(',')[0]?.trim() || h.get('x-real-ip') || '127.0.0.1';

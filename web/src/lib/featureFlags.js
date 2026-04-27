@@ -54,6 +54,17 @@ export async function isV2Live(client) {
 // when v2_live is off, or null when traffic should pass. Lazy-imports
 // the service client + NextResponse so this module stays importable
 // from non-route code (tests, scripts).
+//
+// TODO(T287): no admin-facing UI yet for the system-wide kill switches
+// (`v2_live`, plus per-feature flags for comments / expert Q&A / DMs).
+// Toggling currently requires direct DB access. A future PR should add
+// `/admin/system-controls`:
+//   - One toggle per kill-switch flag with a confirmation modal.
+//   - Append to `audit_log` on every toggle (actor_id, flag key, old ->
+//     new, optional reason). The page reads recent toggles back below
+//     the controls so the team can see who flipped what.
+//   - Permission-gated to a narrow admin role (e.g. `system.kill_switch`).
+// Out of scope for this pass; tracked as T287.
 export async function v2LiveGuard() {
   const { createServiceClient } = await import('@/lib/supabase/server');
   const { NextResponse } = await import('next/server');

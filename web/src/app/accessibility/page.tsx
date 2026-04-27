@@ -89,8 +89,11 @@ export default function AccessibilityPage() {
               High Contrast Mode
             </h3>
             <p style={{ fontSize: '13px', color: '#666666', margin: '0' }}>
-              A high contrast theme is available that increases the contrast ratio of all text and
-              UI elements to meet or exceed a 7:1 ratio. Enable it in your display settings.
+              A high contrast preference will be available under Account Settings &rarr; Display
+              preferences (Coming soon — the reader will honor this setting once it&apos;s wired
+              up). In the meantime, OS-level high-contrast modes (Windows High Contrast, macOS
+              Increase Contrast, iOS Increase Contrast) are respected through the platform&apos;s
+              system styling.
             </p>
           </div>
 
