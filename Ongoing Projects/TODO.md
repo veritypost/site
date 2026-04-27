@@ -1,16 +1,57 @@
 # TODO
 
-> **🟢 CLAUDE: IF THE OWNER OPENS A SESSION AND SAYS "REVIEW THE TODO FILE" / "START THE RUNBOOK" / "GO" — START EXECUTING THE AUTONOMOUS EXECUTION RUNBOOK BELOW IMMEDIATELY.**
+> ## 🟢 SESSION BOOTSTRAP PROMPT (read this first, every session)
 >
-> **The owner is away. Work every non-skipped item to completion, one at a time, in priority + cluster order. When ANYTHING surfaces that needs owner input — a decision, a permission, an ambiguity, a BLOCK, a schema change, a hallucination concern — write the literal question into "QUEUED FOR OWNER REVIEW" with options listed and your recommended pick, then immediately move to the next item. THE LOOP NEVER STOPS ON OWNER INPUT — the queue absorbs every blocker. Only halt when all remaining items are on the SKIP list. CHANGELOG every fix as you go (`_pending push to git_`). Do not push to git autonomously. Do not touch anything on the SKIP list. Read the runbook fully before starting.**
+> **You are the lead developer on Verity Post (see `CLAUDE.md` at repo root for operating model).** This file is the single source of truth for outstanding web + cross-cutting work. iOS-only work lives in `Pre-Launch Assessment.md` under the "IOS SESSION CLUSTER" section — don't pick those items unless you're explicitly in an iOS-build session.
 >
-> **Owner-locked direction (do not re-litigate):** magic-link auth only · no password · no social · no MFA · no passkey v1 · 90-day sliding session · 8-article home cap removed · email transactional-only · kids = iOS only · admin = no keyboard shortcuts · AdSense + Apple are eventual gates, not active yet · beta is on hold.
+> ### What to do when the owner opens a session
+>
+> 1. **Owner says "go" / "review the TODO file" / "start the runbook":** boot the autonomous loop below (read CLAUDE.md → this file → SYSTEM_NOTES.md → recent CHANGELOG → pick next non-skipped item).
+>
+> 2. **Owner asks "what's left" / "what's next" / "give me the questions":** read the SKIP LIST (line ~30 below). Every LOCKED item has a documented decision + impl spec in its body; every DEFERRED item is parked. Tell the owner the count + offer the first one. **Do NOT re-derive decisions that are already locked.**
+>
+> 3. **Owner asks an ambiguous question:** assume they want a single best-practice answer with the actual code state verified. Read the cited files. Run MCP queries if it's a schema/RPC question. Then ask one clean question with A/B/C + a recommendation + reasoning. Don't dump multiple questions unless they specifically asked for a batch.
+>
+> 4. **Owner says "do all of them" / "go through everything":** dispatch parallel Explore agents in clusters of 3-7 items (group by file-overlap to avoid edit conflicts) so wall time is half what serial would be. After each agent returns, synthesize, commit, push, dispatch the next wave. Trust but verify — read the agent's diff before commit.
+>
+> ### Hard rules — never violate
+>
+> - **Genuine fixes, never patches.** No parallel paths, no half-implementations, no `// TODO` comments left in code, no force-unwraps as crutches. If shipping a partial change creates an inconsistent state with another part of the codebase (e.g., one route handles a new error code while a sibling route falls through to a generic 400), finish both — that's the same fix, not two.
+> - **Verify before acting.** Audit claims drift. Before editing a cited file:line, read it. Before drafting a migration, MCP-query the schema (`information_schema`, `pg_proc`, `pg_constraint`). About a third of audit findings have turned out stale this past month — don't be the agent that ships work for a problem that doesn't exist.
+> - **Never push to git without explicit owner authorization.** Default behavior is commit locally + leave commits as `_pending push to git_` in CHANGELOG. The owner pushes (or says "push everything" giving you authorization for the session).
+> - **Never run destructive git** (`reset --hard`, `push --force`, `checkout --`, `branch -D`) without an explicit ask.
+> - **Never re-introduce removed surfaces** (passwords, social signin, MFA TOTP enrollment, lifetime billing, engagement-class email).
+> - **Never edit the SKIP LIST items autonomously.** Owner reserves them. If a non-skipped item turns out to need owner input mid-investigation, add it to the skip list with the question + your recommendation + skip to the next item. The loop never stops on owner-input blockers; the skip list absorbs them.
+> - **Update state in-flight, not at session end.** When you ship a fix: same turn = remove TODO entry + add CHANGELOG entry + push (if authorized). Don't batch bookkeeping; cross-session continuity breaks if state lags.
+> - **Right-size the agent count per item.** T1 trivial = direct fix, no agents. T3 medium = 4 agents (investigator + planner + adversary + verifier). T5 schema = HALT, draft migration, queue for owner. See "Tier classification" table below.
+>
+> ### How to handle each TODO category
+>
+> - **LOCKED items** (T2, T19, T26, T40, T54, T55, T56, T57, T117, T173, T271, T-EMAIL-PRUNE): owner has decided. Body section contains the impl spec. When owner says "ship T<N>" or "go on locked items," execute the spec. Don't re-ask the decision. If a sub-question surfaces during impl that the spec didn't anticipate, ask once with a recommendation, then proceed.
+> - **DEFERRED items** (T14, T34, T35, T79, T84): owner has parked these. Don't pick them up. Don't re-recommend them. Don't tell the owner "next" includes them.
+> - **OPEN items in the body sections** (T27, T92, T165, T166, T233, T285): no owner decision needed; pick by priority and ship under the autonomous runbook. Each has audit evidence + recommended fix; verify the audit against current code before editing.
+> - **iOS items moved to Pre-Launch Assessment**: don't pick during a web session. They need a Swift build + iOS-Xcode environment to verify.
+> - **Pre-Launch Assessment owner-touch items** (Apple console walkthrough, Sentry DSN decision, COPPA VPC method, etc.): owner-driven. Don't auto-queue.
+>
+> ### Owner-locked direction (do not re-litigate)
+>
+> magic-link auth only · no password · no social · no MFA · no passkey v1 · 90-day sliding session · 8-article home cap removed · email transactional-only (only `data_export_ready` / `kid_trial_expired` / `expert_reverification_due` survive in `send-emails` cron, plus auth-flow emails via Supabase Auth) · kids = iOS only · admin = no keyboard shortcuts · AdSense + Apple are eventual gates, not active yet · beta = closed-invite, owner mints links via `/admin/referrals` · home page = simplified editorial (categories nav + feed + Browse + occasional hero/breaking) · governing law = Maine.
+>
+> ### Where to put what
+>
+> - **Outstanding work + locked-pending-impl items** → THIS FILE.
+> - **Shipped work + decision-log closures** → `CHANGELOG.md`. Format: `## YYYY-MM-DD (description) — _shipped, pushed to git/Vercel_` per entry.
+> - **Architecture reference + system knowledge** → `SYSTEM_NOTES.md`. Update when a fix changes architecture (new route, removed module, dep change).
+> - **iOS items + Apple submission + Sentry + COPPA** → `Pre-Launch Assessment.md`.
+> - **Schema migrations awaiting owner apply** → `Ongoing Projects/migrations/<YYYY-MM-DD>_<short_name>.sql`. Idempotent CREATE OR REPLACE; include rollback statement + verification query in header comment.
+>
+> ### Numbering convention
+>
+> T-IDs are sequential, gaps are intentional (preserve external references; CLOSED items are deleted, not renumbered). Priority tags: **CRITICAL** / **HIGH** / **MEDIUM** / **LOW** / **DEBT** / **DEFERRED**. Status tags: **OWNER DECIDED** / **VERIFIED** / **DEFERRED** / **OPEN**.
 
-Single source of truth for outstanding work on Verity Post. Consolidated from prior audit + review docs (now retired) plus 13 specialist sweeps. Every item below has been verified against current code on 2026-04-26 — items that turned out to be already-fixed, opinion-only, or false were dropped.
+Single source of truth for outstanding work on Verity Post. Every item below was verified against current code at the time it was added. Items that turned out already-fixed / opinion-only / false were dropped, not preserved.
 
-Numbering is sequential across the file (T1, T2, …). Priority tag per item: **CRITICAL** / **HIGH** / **MEDIUM** / **LOW** / **DEBT** / **DEFERRED** / **CLOSED** / **RE-SCOPED** / **MOVED**.
-
-Companion files in `Ongoing Projects/`: `CHANGELOG.md` (work history), `SYSTEM_NOTES.md` (architecture reference), `Pre-Launch Assessment.md` (Sentry + Apple submission gates).
+Companion files: `CHANGELOG.md` (work history), `SYSTEM_NOTES.md` (architecture reference), `Pre-Launch Assessment.md` (Sentry + Apple submission gates + IOS SESSION CLUSTER).
 
 ---
 
