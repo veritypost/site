@@ -21,7 +21,7 @@ type Body = {
 export async function POST(request: Request) {
   let actor;
   try {
-    actor = await requirePermission('admin.access.create');
+    actor = await requirePermission('admin.access_codes.create');
   } catch (err) {
     return permissionError(err);
   }

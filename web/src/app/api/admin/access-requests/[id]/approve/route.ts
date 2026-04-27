@@ -24,7 +24,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
 
   let actor;
   try {
-    actor = await requirePermission('admin.access.create');
+    actor = await requirePermission('admin.access_requests.approve');
   } catch (err) {
     return permissionError(err);
   }
