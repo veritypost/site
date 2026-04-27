@@ -828,6 +828,10 @@ final class AuthViewModel: ObservableObject {
             Log.d("signOut failed: \(error)")
             authError = "Signed out locally, but the server session may still be active."
         }
+        // Order: server signout → local cache purge → @Published state flip.
+        // If caches were cleared first and signOut threw, we'd have wiped
+        // local state for a logout that didn't actually take effect server-side.
+        await clearLocalCaches()
         // Reset every @Published auth-adjacent field so a subsequent login
         // as a different account doesn't inherit stale state (Bug 27).
         currentUser = nil
@@ -838,6 +842,34 @@ final class AuthViewModel: ObservableObject {
         bypassOnboardingLocally = false
         pendingHomeJump = false
         dismissDeepLinkError()
+    }
+
+    /// T3.11 — purge per-user state from singletons + the URL response cache
+    /// so the next signed-in user doesn't inherit the prior account's
+    /// permissions, blocks, or paywalled article responses cached against
+    /// `URLSession.shared`.
+    ///
+    /// `URLCache.shared` holds responses from the authenticated PostgREST
+    /// + web-API calls; without a purge, a quickly-following login as a
+    /// different account could read paid content out of cache while the
+    /// new account's permission set is still loading.
+    ///
+    /// Singleton resets:
+    ///   - `PermissionService` — `compute_effective_perms` cache + version
+    ///     watermarks. The auth-state listener already invalidates on
+    ///     `signedIn`, but doing it here too guarantees a clean slate even
+    ///     if the listener is delayed by URLSession reachability churn.
+    ///   - `BlockService` — bidirectional block-set is per-viewer; calling
+    ///     `refresh(currentUserId: nil)` collapses it to empty.
+    ///   - `StoreManager.purchasedProductIDs` — StoreKit re-derives this
+    ///     from `Transaction.currentEntitlements` on next sign-in via the
+    ///     transaction listener; clearing it here prevents the in-between
+    ///     window where the prior user's tier badge is still showing.
+    private func clearLocalCaches() async {
+        URLCache.shared.removeAllCachedResponses()
+        await PermissionService.shared.invalidate()
+        await BlockService.shared.refresh(currentUserId: nil)
+        StoreManager.shared.purchasedProductIDs = []
     }
 
     // MARK: - Login hooks

@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { recordAdminAction } from '@/lib/adminMutation';
 import { safeErrorResponse } from '@/lib/apiErrors';
 
 const ALLOWED = ['article_id', 'question_text', 'options', 'explanation', 'sort_order'];
@@ -38,12 +39,24 @@ export async function PATCH(request, { params }) {
   const b = await request.json().catch(() => ({}));
   const update = {};
   for (const k of ALLOWED) if (b[k] !== undefined) update[k] = b[k];
+  const { data: prior } = await service
+    .from('weekly_recap_questions')
+    .select(ALLOWED.join(', '))
+    .eq('id', params.id)
+    .maybeSingle();
   const { error } = await service.from('weekly_recap_questions').update(update).eq('id', params.id);
   if (error)
     return safeErrorResponse(NextResponse, error, {
       route: 'admin.recap.questions.id',
       fallbackStatus: 400,
     });
+  await recordAdminAction({
+    action: 'recap.question.update',
+    targetTable: 'weekly_recap_questions',
+    targetId: params.id,
+    oldValue: prior ?? null,
+    newValue: update,
+  });
   return NextResponse.json({ ok: true });
 }
 
@@ -74,11 +87,22 @@ export async function DELETE(_request, { params }) {
       { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
     );
   }
+  const { data: prior } = await service
+    .from('weekly_recap_questions')
+    .select('id, recap_quiz_id, question_text, article_id')
+    .eq('id', params.id)
+    .maybeSingle();
   const { error } = await service.from('weekly_recap_questions').delete().eq('id', params.id);
   if (error)
     return safeErrorResponse(NextResponse, error, {
       route: 'admin.recap.questions.id',
       fallbackStatus: 400,
     });
+  await recordAdminAction({
+    action: 'recap.question.delete',
+    targetTable: 'weekly_recap_questions',
+    targetId: params.id,
+    oldValue: prior ?? null,
+  });
   return NextResponse.json({ ok: true });
 }

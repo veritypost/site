@@ -78,6 +78,10 @@ struct StoryDetailView: View {
     // Replaces the old boolean `commentRateLimited`.
     @State private var commentRateRemainingSec: Int = 0
     @State private var commentRateTask: Task<Void, Never>? = nil
+    // T12 — when a Reply is tapped on an existing comment, this holds the
+    // parent comment so the composer can stamp `parent_id` on submit and
+    // render an inline "Replying to @user" header with a cancel affordance.
+    @State private var replyingTo: VPComment? = nil
 
     // Cancellable 350ms auto-advance after a quiz option tap. Cancelled on
     // option re-tap, on view disappear, and on stage transition.
@@ -1243,18 +1247,54 @@ struct StoryDetailView: View {
                     .padding(.vertical, 24)
                     .padding(.horizontal, 20)
             } else {
-                VStack(spacing: 0) {
-                    // Apple Guideline 1.2 — filter blocked users client-side
-                    // before render. The block-set is bidirectional (either
-                    // party's block hides the other) so this honours both
-                    // outgoing and incoming blocks even though the server
-                    // RLS policy doesn't yet filter on the user's behalf.
-                    ForEach(comments.filter { !blocks.isBlocked($0.userId) }) { c in commentRow(c) }
-                }
-                .padding(.top, 8)
+                threadedCommentList
+                    .padding(.top, 8)
             }
         }
     }
+
+    /// T12 — flatten the visible comments into a depth-aware render order.
+    /// Top-level comments preserve the existing pinned/upvote sort; replies
+    /// under each top-level are inserted depth-first by created_at ascending
+    /// so a thread reads chronologically. Apple Guideline 1.2 — bidirectional
+    /// block filter applied before threading so blocked-user replies don't
+    /// reveal a parent thread structure to the viewer.
+    private var threadedCommentList: some View {
+        let visible = comments.filter { !blocks.isBlocked($0.userId) }
+        var childrenByParent: [String: [VPComment]] = [:]
+        var topLevel: [VPComment] = []
+        for c in visible {
+            if let pid = c.parentId, !pid.isEmpty {
+                childrenByParent[pid, default: []].append(c)
+            } else {
+                topLevel.append(c)
+            }
+        }
+        for key in childrenByParent.keys {
+            childrenByParent[key]?.sort { (a, b) in
+                (a.createdAt ?? .distantPast) < (b.createdAt ?? .distantPast)
+            }
+        }
+        var ordered: [(VPComment, Int)] = []
+        func walk(_ c: VPComment, depth: Int) {
+            ordered.append((c, min(depth, StoryDetailView.maxThreadDepth)))
+            for child in childrenByParent[c.id] ?? [] {
+                walk(child, depth: depth + 1)
+            }
+        }
+        for top in topLevel { walk(top, depth: 0) }
+
+        return VStack(spacing: 0) {
+            ForEach(ordered, id: \.0.id) { entry in
+                commentRow(entry.0, depth: entry.1)
+            }
+        }
+    }
+
+    /// Web parity: depth cap matches the iOS-side product decision (3) and
+    /// keeps the render list stable when threads grow long. Beyond depth 3,
+    /// further replies render at depth-3 indent without additional nesting.
+    private static let maxThreadDepth = 3
 
     // MARK: - Mute state (pre-submit banner)
     struct MuteState: Equatable {
@@ -1313,6 +1353,29 @@ struct StoryDetailView: View {
                     .font(.system(.subheadline, design: .default, weight: .bold))
                     .foregroundColor(VP.text)
                     .padding(.bottom, 8)
+            }
+
+            // T12 — reply context header. Surfaces which comment the next
+            // post will reply to; cancel reverts to a top-level post.
+            if let parent = replyingTo {
+                HStack(spacing: 8) {
+                    Text("Replying to ")
+                        .font(.caption)
+                        .foregroundColor(VP.dim)
+                    + Text("@\(parent.users?.username ?? "user")")
+                        .font(.system(.caption, design: .default, weight: .semibold))
+                        .foregroundColor(VP.text)
+                    Spacer()
+                    Button {
+                        replyingTo = nil
+                    } label: {
+                        Text("Cancel")
+                            .font(.system(.caption, design: .default, weight: .semibold))
+                            .foregroundColor(VP.accent)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.bottom, 8)
             }
 
             // D21: paid-only @mention autocomplete dropdown.
@@ -1463,11 +1526,14 @@ struct StoryDetailView: View {
         mentionSuggestions = []
     }
 
-    private func commentRow(_ comment: VPComment) -> some View {
+    private func commentRow(_ comment: VPComment, depth: Int = 0) -> some View {
         let u = comment.users
         let initials = u?.avatar?.initials
             ?? u?.username?.prefix(1).description
             ?? "?"
+        // 16pt-per-level indent + 1pt left rule from depth 1 onward,
+        // matching the web threaded-replies treatment.
+        let indent = CGFloat(depth) * 16
         return HStack(alignment: .top, spacing: 8) {
             AvatarView(
                 outerHex: u?.avatar?.outer ?? u?.avatarColor,
@@ -1526,13 +1592,40 @@ struct StoryDetailView: View {
                     ) {
                         Task { await voteOnComment(comment, type: downvotedComments.contains(comment.id) ? "clear" : "downvote") }
                     }
+                    // T12 — Reply opens the composer with `parent_id` stamped
+                    // to this comment. Server allows nested replies; the iOS
+                    // render caps visible depth at `maxThreadDepth` so beyond
+                    // that, replies render at the cap indent without further
+                    // nesting (matches the web collapse-style treatment).
+                    // Hidden for anon (no composer) and for muted/banned users
+                    // (the composer is replaced by an appeal banner).
+                    if auth.isLoggedIn && muteState == nil {
+                        Button {
+                            startReply(to: comment)
+                        } label: {
+                            Text("Reply")
+                                .font(.system(.caption, design: .default, weight: .semibold))
+                                .foregroundColor(VP.accent)
+                        }
+                        .buttonStyle(.plain)
+                    }
                     Spacer()
                 }
                 .padding(.top, 4)
             }
         }
         .padding(.vertical, 12)
-        .padding(.horizontal, 20)
+        .padding(.trailing, 20)
+        .padding(.leading, 20 + indent)
+        .overlay(alignment: .leading) {
+            if depth > 0 {
+                Rectangle()
+                    .fill(VP.dim.opacity(0.35))
+                    .frame(width: 1)
+                    .padding(.leading, 20 + indent - 8)
+                    .padding(.vertical, 6)
+            }
+        }
         .overlay(alignment: .bottom) {
             Rectangle().fill(VP.rule).frame(height: 1)
         }
@@ -1553,6 +1646,13 @@ struct StoryDetailView: View {
                 }
             }
         }
+    }
+
+    /// T12 — bind the composer to a parent comment so the next post stamps
+    /// `parent_id` and the inline header shows "Replying to @user".
+    private func startReply(to parent: VPComment) {
+        replyingTo = parent
+        composerFocused = true
     }
 
     private var expertInsights: some View {
@@ -2397,11 +2497,16 @@ struct StoryDetailView: View {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
         // POST /api/comments expects { article_id, body, parent_id?, mentions? }.
-        // parent_id is omitted here — iOS UI doesn't expose threaded reply yet
-        // (tracked separately). mentions is empty; free-tier mentions are
-        // stripped server-side per D21.
-        struct Payload: Encodable { let article_id: String; let body: String }
-        req.httpBody = try? JSONEncoder().encode(Payload(article_id: story.id, body: body))
+        // mentions is empty; free-tier mentions are stripped server-side per D21.
+        struct Payload: Encodable {
+            let article_id: String
+            let body: String
+            let parent_id: String?
+        }
+        let parentId = replyingTo?.id
+        req.httpBody = try? JSONEncoder().encode(
+            Payload(article_id: story.id, body: body, parent_id: parentId)
+        )
 
         do {
             let (data, response) = try await URLSession.shared.data(for: req)
@@ -2418,6 +2523,7 @@ struct StoryDetailView: View {
                     await MainActor.run {
                         comments.insert(decoded.comment, at: 0)
                         commentText = ""
+                        replyingTo = nil
                         composerFocused = false
                         // Light selection haptic to confirm the send. Matches the
                         // quiz-answer tap pattern — discrete, single-action.

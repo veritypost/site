@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { recordAdminAction } from '@/lib/adminMutation';
 import { safeErrorResponse } from '@/lib/apiErrors';
 
 export async function POST(request, { params }) {
@@ -49,5 +50,11 @@ export async function POST(request, { params }) {
       route: 'admin.expert.applications.id.reject',
       fallbackStatus: 400,
     });
+  await recordAdminAction({
+    action: 'expert.application.reject',
+    targetTable: 'expert_applications',
+    targetId: params.id,
+    reason: rejection_reason,
+  });
   return NextResponse.json({ ok: true });
 }

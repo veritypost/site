@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { recordAdminAction } from '@/lib/adminMutation';
 import { safeErrorResponse } from '@/lib/apiErrors';
 
 // Manually run the expired-grace sweeper. Production will call
@@ -43,5 +44,11 @@ export async function POST() {
       route: 'admin.billing.sweep_grace',
       fallbackStatus: 400,
     });
+  await recordAdminAction({
+    action: 'billing.sweep_grace',
+    targetTable: 'subscriptions',
+    targetId: null,
+    newValue: { frozen_count: data, manual_run: true },
+  });
   return NextResponse.json({ frozen_count: data });
 }

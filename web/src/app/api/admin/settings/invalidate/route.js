@@ -3,6 +3,7 @@
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { recordAdminAction } from '@/lib/adminMutation';
 import { clearSettingsCache } from '@/lib/settings';
 import { NextResponse } from 'next/server';
 
@@ -35,6 +36,11 @@ export async function POST() {
   }
   try {
     clearSettingsCache();
+    await recordAdminAction({
+      action: 'settings.cache_invalidate',
+      targetTable: 'settings',
+      targetId: null,
+    });
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { recordAdminAction } from '@/lib/adminMutation';
 import { safeErrorResponse } from '@/lib/apiErrors';
 import { isSafeAdUrl } from '@/lib/adUrlValidation';
 
@@ -107,5 +108,18 @@ export async function POST(request) {
     .single();
   if (error)
     return safeErrorResponse(NextResponse, error, { route: 'admin.ad_units', fallbackStatus: 400 });
+  await recordAdminAction({
+    action: 'ad_unit.create',
+    targetTable: 'ad_units',
+    targetId: data.id,
+    newValue: {
+      name: b.name,
+      ad_network: b.ad_network,
+      ad_format: b.ad_format,
+      placement_id: b.placement_id,
+      campaign_id: b.campaign_id || null,
+      approval_status: b.approval_status || 'pending',
+    },
+  });
   return NextResponse.json({ id: data.id });
 }

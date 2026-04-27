@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { recordAdminAction } from '@/lib/adminMutation';
 import { safeErrorResponse } from '@/lib/apiErrors';
 
 export async function GET() {
@@ -88,5 +89,17 @@ export async function POST(request) {
       route: 'admin.ad_placements',
       fallbackStatus: 400,
     });
+  await recordAdminAction({
+    action: 'ad_placement.create',
+    targetTable: 'ad_placements',
+    targetId: data.id,
+    newValue: {
+      name: b.name,
+      placement_type: b.placement_type,
+      page: b.page,
+      position: b.position,
+      is_kids_safe: b.is_kids_safe || false,
+    },
+  });
   return NextResponse.json({ id: data.id });
 }

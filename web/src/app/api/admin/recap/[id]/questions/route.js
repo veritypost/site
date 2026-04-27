@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { recordAdminAction } from '@/lib/adminMutation';
 import { safeErrorResponse } from '@/lib/apiErrors';
 
 // POST /api/admin/recap/[id]/questions — add a question.
@@ -64,5 +65,15 @@ export async function POST(request, { params }) {
       route: 'admin.recap.id.questions',
       fallbackStatus: 400,
     });
+  await recordAdminAction({
+    action: 'recap.question.create',
+    targetTable: 'weekly_recap_questions',
+    targetId: data.id,
+    newValue: {
+      recap_quiz_id: params.id,
+      question_text: b.question_text,
+      article_id: b.article_id || null,
+    },
+  });
   return NextResponse.json({ id: data.id });
 }

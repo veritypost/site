@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { recordAdminAction } from '@/lib/adminMutation';
 import { safeErrorResponse } from '@/lib/apiErrors';
 
 export async function GET() {
@@ -91,5 +92,18 @@ export async function POST(request) {
       route: 'admin.ad_campaigns',
       fallbackStatus: 400,
     });
+  await recordAdminAction({
+    action: 'ad_campaign.create',
+    targetTable: 'ad_campaigns',
+    targetId: data.id,
+    newValue: {
+      name: b.name,
+      advertiser_name: b.advertiser_name,
+      campaign_type: b.campaign_type,
+      status: b.status || 'draft',
+      start_date: b.start_date,
+      end_date: b.end_date || null,
+    },
+  });
   return NextResponse.json({ id: data.id });
 }

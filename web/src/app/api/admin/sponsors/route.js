@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { recordAdminAction } from '@/lib/adminMutation';
 import { safeErrorResponse } from '@/lib/apiErrors';
 
 export async function GET() {
@@ -79,5 +80,11 @@ export async function POST(request) {
     .single();
   if (error)
     return safeErrorResponse(NextResponse, error, { route: 'admin.sponsors', fallbackStatus: 400 });
+  await recordAdminAction({
+    action: 'sponsor.create',
+    targetTable: 'sponsors',
+    targetId: data.id,
+    newValue: { name: b.name, slug: b.slug },
+  });
   return NextResponse.json({ id: data.id });
 }

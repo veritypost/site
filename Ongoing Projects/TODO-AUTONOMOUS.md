@@ -151,7 +151,7 @@ Extracted shared `<ConfirmDialog>` at `web/src/app/redesign/_components/ConfirmD
 
 See `CHANGELOG-AUTONOMOUS.md` Wave 15.
 
-## T360 — Build redesign `CategoriesSection` + `MilestonesSection` — MEDIUM
+## T360 — Build redesign `CategoriesSection` + `MilestonesSection` — SHIPPED 2026-04-27 (Wave 20)
 
 **Verified:** 2026-04-27 — neither file exists under `web/src/app/redesign/`. `ProfileApp.tsx:295-305, 315-322` uses `LinkOutSection` for both with hand-off links to `/profile?tab=categories` and `/profile?tab=milestones`.
 **Fix:**
@@ -240,7 +240,7 @@ Wave 10 adversary review collapsed T48 into T206 since they target the same surf
 
 ## iOS — comments + voting + quiz
 
-## T12 — iOS comment threading missing — HIGH
+## T12 — iOS comment threading missing — SHIPPED 2026-04-27 (Wave 20)
 
 **Verified:** 2026-04-27 against `VerityPost/VerityPost/StoryDetailView.swift:2370-2371` (TODO comment "iOS UI doesn't expose threaded reply yet") + 1921, 2077 (`parent_id` IS fetched).
 **Fix:** Surface a Reply button per comment. Pass `parent_id` on submit. Indent replies with a left border. Cap depth at 3 (matches web's collapsed-deeper UI).
@@ -369,7 +369,7 @@ Closed by T44 + T45 + T60 in Wave 4. All surviving settings subsurfaces now use 
 
 ## iOS — engagement / browse / search
 
-## T37 — iOS browse subset of web — MEDIUM
+## T37 — iOS browse subset of web — SHIPPED 2026-04-27 (Wave 20)
 
 **Verified:** 2026-04-27 against `HomeView.swift:577-657`. Plain category list, no counts, no top-3 trending preview.
 **Fix:** Add article count + 1-2 article previews per category row. Mirror web Browse's pattern.
@@ -494,7 +494,7 @@ Wave 3 verification: `@State` per-article scope is the intended design — tease
 **Tier:** T3 (cross-surface — iOS + server RPC + COPPA-adjacent kid device re-pair).
 **Cross-link:** T1.3 in TODO-PRE-LAUNCH (Apple Review gate). Same fix; this entry is the iOS code half.
 
-## T251 — Kids quiz pending writes lost when backgrounded — MEDIUM
+## T251 — Kids quiz pending writes lost when backgrounded — SHIPPED 2026-04-27 (Wave 20)
 
 **Verified:** 2026-04-27 against `KidQuizEngineView.swift:62-68` + `KidsAppState.swift:187-200`. Pending writes Tasks cancelled; counter not persisted; "success" celebration fires on stale state.
 **Fix:** Wait for all pending writes (with timeout) before showing result. Show "Couldn't save — try again" path on timeout.
@@ -579,7 +579,7 @@ Extracted `isSafeAdUrl` to `web/src/lib/adUrlValidation.js` (was inline in POST 
 **Status:** Becomes moot under magic-link AUTH-MIGRATION (no password to change). Listed for traceability — DO NOT ship as a defense-in-depth pre-migration patch since AUTH-MIGRATION will delete the entire password change surface.
 **If owner indicates AUTH-MIGRATION will be delayed >2 months:** revisit. Pre-migration fix is iOS calling `/api/auth/verify-password` (already exists, rate-limited) before `client.auth.update(password:)`. Surface error in UI.
 
-## T2.6 — 21 admin routes skip audit_log — MEDIUM (RBAC trail)
+## T2.6 — Admin routes skip audit_log — SHIPPED 2026-04-27 (Wave 20)
 
 **Verified:** 2026-04-27 — REMEDIATION enumerated the 21 routes including expert approve/reject (changes user role), billing/sweep-grace, broadcasts/breaking, sponsors POST/PATCH, ad-* POST/PATCH, recap mutations, settings/invalidate. RPC-level: `admin_apply_dob_correction` writes `kid_dob_history` but not `audit_log` (COPPA RBAC trail gap).
 **What's wrong:** No traceable record of who changed what. RBAC audit trail incomplete.
@@ -600,7 +600,7 @@ Extracted `isSafeAdUrl` to `web/src/lib/adUrlValidation.js` (was inline in POST 
 **Test:** Click Generate with audience=kid → two `pipeline_runs` rows, two `articles` rows (`age_band='kids'` + `'tweens'`), `feed_clusters` has both sibling FKs populated.
 **Cost note:** Roughly doubles per-kid-cluster generation cost. Acceptable.
 
-## T3.3 — DOB correction younger-direction abuse path — MEDIUM (kid safety)
+## T3.3 — DOB correction younger-direction abuse path — SHIPPED 2026-04-27 (Wave 20)
 
 **Verified:** 2026-04-27 against `web/src/app/api/dob-correction-cooldown/route.ts`.
 **What's wrong:** Cooldown evaluates 4 fraud signals with loose thresholds. A parent with >30-day-old profile, no prior correction, sub >14 days, can submit a 2-year-younger DOB (must be `> 2y` to flag — boundary loophole) and silently downgrade their tween to kids-band after 7-day cooldown.
@@ -626,7 +626,7 @@ Extracted `isSafeAdUrl` to `web/src/lib/adUrlValidation.js` (was inline in POST 
 **Tier:** T4 (kids surface — COPPA payload review needed).
 **Cross-link:** TODO-PRE-LAUNCH K15 (kids push payload PII review). After this lands, K15 owner-side review pass before Apple Kids submission.
 
-## T3.11 — iOS logout cleanup leaves caches — MEDIUM
+## T3.11 — iOS logout cleanup leaves caches — SHIPPED 2026-04-27 (Wave 20)
 
 **Verified:** 2026-04-27 — `AuthViewModel.logout()` clears @Published fields but NOT: `PermissionService` cache, `BlockService`, `StoreManager.purchasedProductIDs`, several UserDefaults keys.
 **What's wrong:** Next user inherits stale state — sees prior user's permissions, blocks, IAP entitlements.

@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { recordAdminAction } from '@/lib/adminMutation';
 import { safeErrorResponse } from '@/lib/apiErrors';
 
 // POST /api/admin/broadcasts/breaking
@@ -53,5 +54,11 @@ export async function POST(request) {
       route: 'admin.broadcasts.breaking',
       fallbackStatus: 400,
     });
+  await recordAdminAction({
+    action: 'breaking_news.send',
+    targetTable: 'articles',
+    targetId: article_id,
+    newValue: { title, body: body || null, sent_count: data },
+  });
   return NextResponse.json({ sent_count: data });
 }

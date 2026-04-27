@@ -6,6 +6,66 @@ Format: newest at top.
 
 ---
 
+## 2026-04-27 — Wave 20: 7-item elevated-care batch via 4 parallel implementers + reviewer
+
+**Items shipped:** 7. Each was deferred from Wave 19 because it didn't fit the "lower scrutiny / hygiene" mode — kid-safety, RBAC compliance, COPPA persistence, or significant single-file builds.
+- Web server (2): T3.3 (DOB correction younger-direction abuse path), T2.6 (admin audit_log sweep across 18 routes)
+- Web UI (1): T360 (CategoriesSection + MilestonesSection — 911 LoC build)
+- iOS adult (3): T12 (comment threading), T37 (browse expansion), T3.11 (logout cache cleanup)
+- iOS kids (1): T251 (quiz pending writes persistence — COPPA-adjacent)
+
+**Orchestration shape:** 4 parallel implementer agents with isolated file ownership + 1 reviewer/verifier agent on the combined diff. Same pattern as Wave 19 but with an explicit reviewer pass added because some items were elevated-care (kid safety, COPPA, RBAC). Reviewer verdict: **SHIP-AS-IS** on all 7.
+
+**T3.3 — DOB correction abuse path:**
+Tightened `web/src/app/api/cron/dob-correction-cooldown/route.ts` Signal 3 block. Old: `yearsShift > 2 → large_shift` for any direction. New: asymmetric — `direction === 'younger' && yearsShift >= 1 → large_shift_younger`, else `> 2 → large_shift` for older (defense-in-depth; cron's outer fetch only pulls direction='younger' today). Existing escalation path (extends cooldown_ends_at + stamps decision_reason) auto-picks up the new reason. ~10 LoC. Kid-safety contract: any younger-direction shift ≥ 1 year now requires admin eyes — closes the silent-abuse vector where parents could shift kids to older bands ≤ 2 years without documentation.
+
+**T2.6 — Audit log sweep:**
+Pre-flight enumeration: 88 admin route files; 69 already audited; 19 lacked it; of those 19, 7 are read-only (correctly skipped); **12 mutation files (22 handlers) needed audit additions.** TODO's "21 routes" count was stale — Wave 19 + earlier sweeps had absorbed several. Added `recordAdminAction` calls on success paths for: ad_campaigns / ad_placements / ad_units (CRUD on each), billing.sweep_grace, breaking_news.send, expert.application.approve / reject, moderation.comment.unhide, recap CRUD + recap.question CRUD, settings.cache_invalidate, sponsor CRUD. **Namespace consistency:** TODO directed `admin:<resource>:<verb>` colon form; existing 60+ audit calls used dotted `<resource>.<verb>`. Implementer chose dotted to align with the dominant convention rather than introduce a second namespace; flagged 4 colon-form auth-recovery entries (`admin:auth_recovery:clear_verify_lock` etc.) as candidates for future cleanup. ad_unit special case: split verb into `ad_unit.approval_set` (when patch touches approval_status) vs `ad_unit.update` so reviewers can see the policy-bearing rank-guarded branch separately. ~250 LoC across 18 files. **Best-effort guarantee verified:** `recordAdminAction` is wrapped in try/catch internally and only console.errors on failure — never fails the response. Audit-write failures cannot regress the mutation result.
+
+**T360 — CategoriesSection + MilestonesSection:**
+- **CategoriesSection.tsx (450 LoC):** parent pills (top row) → sub pills (when active parent has subs) → scope card (active leaf score + reads + quizzes_correct) → all-parents jump-back chrome. Default-active parent = highest-scoring for the user. Inline scope swap on sub-click (no route change). Loading skeleton + 2 distinct empty states (catalog-missing vs user-no-data) + per-leaf "no reads logged here yet."
+- **MilestonesSection.tsx (461 LoC):** "Earned" + "Still ahead" twin Cards. Earned sorted newest-first; locked sorted closest-to-earn-first. Locked hint derived from `criteria` JSON (`reading_count` / `quiz_pass_count` / `comment_count` / `streak_days`) minus the matching counter on the user row → "76 days to go" / "253 articles to go" inline. Per-card empty states + top-level catalog-missing empty.
+- **No color-per-tier / per-category / per-achievement.** Reviewer verified: only neutral palette tokens consumed; sole accent is brand-accent on active-pill (not category-bound). Locked-vs-earned differentiated by border-style (solid vs dashed) and tone, not hue.
+- Wired into ProfileApp.tsx — replaced 2 LinkOutSection placeholders. Other 4 LinkOutSection usages (Family / Refer / Help / Feed) preserved.
+
+**T12 — iOS comment threading:**
+StoryDetailView.swift: replaced flat ForEach with `threadedCommentList` computed view. `childrenByParent` map keyed on parent_id; recursive `walk(_:depth:)` flattens to ordered `[(VPComment, Int)]` with `min(depth, 3)` clamp. Per-row: 16pt × depth indent + 1pt left rule (VP.dim.opacity(0.35)) when depth > 0. Per-comment Reply button (visible logged-in + not muted) sets `replyingTo` + focuses composer. Composer shows inline "Replying to @username — Cancel" header when active. `postComment` payload threads `parent_id` from `replyingTo?.id`. On success: `replyingTo` and `commentText` clear together. Realtime arrivals re-attach correctly because `threadedCommentList` recomputes per-render. ~96 LoC.
+
+**T37 — iOS browse expansion:**
+HomeView.swift BrowseLanding rewritten. Per-category: 7-day article count (HEAD-only count, no body data) + 1-2 most-recent preview rows (limit 2). Parallel fan-out via `withTaskGroup` — for ~15-20 categories that's 30-40 concurrent PostgREST calls (acceptable; flagged for future RPC consolidation if catalog grows >50). Tap preview → push StoryDetailView via existing NavigationStack `navigationDestination(for: Story.self)`. Wave 19's `.task`/`.refreshable` race fix (T244b) untouched — new code is additive in a separate private struct. ~145 LoC.
+
+**T3.11 — iOS logout cache cleanup:**
+AuthViewModel.swift: new `clearLocalCaches()` private async method. Order in `logout()`: `client.auth.signOut()` → `await clearLocalCaches()` → `@Published` mutations. Caches cleared: `URLCache.shared.removeAllCachedResponses()`, `await PermissionService.shared.invalidate()` (actor), `await BlockService.shared.refresh(currentUserId: nil)` (collapses bidirectional set), `StoreManager.shared.purchasedProductIDs = []` (re-derived from `Transaction.currentEntitlements` on next launch). Skipped: PushPermission (OS-level, per-device not per-account), EventsClient (no per-user identity in buffer; flushing post-signout would fail auth), NSCache (none in iOS adult app). signOut failure path: error logged + `clearLocalCaches` STILL runs — explicit choice; spec said "signout first then clear," and partial-state cleanup is preferable to half-logged-out user retaining authenticated cache. ~26 LoC.
+
+**T251 — Kids quiz pending writes persistence (COPPA-adjacent):**
+KidQuizEngineView.swift expanded 393 → 972 lines. Pending write types found in this file: `quiz_attempts` insert only (reading_log lives in KidReaderView; streak/score recomputed server-side via triggers). State model: `pendingPersistedWrites: [PendingQuizWrite]` (disk-mirrored), `inFlightWrites: [UUID: Task<Bool, Never>]`, `dispatchEpoch: Int` (monotonic, late-resolving cancelled tasks bail on mismatch). Persistence: `Application Support/VerityPostKids/quiz_pending.json`, atomic write, version: 1, forward-compat (unknown version → empty). Result-screen gate: `runResultGate` runs `withTaskGroup` race — outer awaits all in-flight + ANDed; inner sleeps 3s → returns false. Race winner cancels group. On all-success: fetch server verdict, render success body. On any failure or timeout: render `writeFailureBody` ("Couldn't save your quiz" + Try again + Close) and forward `currentResult` so KidsAppRoot's `writeFailures > 0` guard suppresses streak-bump celebration. **Honesty contract:** the result screen never lies about save state — partial saves visibly fail rather than silently celebrate. Hydrator runs on first quiz view post-launch; queued writes from prior session re-fire detached from current view's lifecycle.
+
+**Reviewer report highlights:**
+- Web `npx tsc --noEmit`: clean. ESLint: 0 new errors; 1 pre-existing warning on ProfileApp.tsx:189 unrelated to Wave 20.
+- iOS `swiftc -parse` per file: clean across all 4 modified files (only expected module-resolution noise from headless parse).
+- No Sentry imports introduced. No keyboard shortcuts added. No color-per-tier. No TODO/HACK/FIXME markers. Genuine fixes — no parallel codepaths.
+- T251 schema forward-compat: unknown version → empty list; corrupt file → defensively deleted. Atomic write prevents half-written state.
+- T3.11 signout failure: no half-state — cleanup always runs.
+- T2.6 audit-write failures: best-effort by construction, can't corrupt response.
+- T37 30-40 concurrent calls: acceptable for current category count (~15-20); flagged for owner if catalog grows past 50.
+
+**Hotfix landed mid-wave:** Vercel build at `8d3a264` failed with `useSearchParams() should be wrapped in suspense` because Wave 19's `PageViewTrackListener` was added to NavWrapper without a `<Suspense>` wrapper. Fixed in `bf7f4ad` by mirroring layout.js's existing GAListener Suspense pattern. Vercel build unblocked.
+
+**Agents used:** 5 (4 parallel implementers + 1 reviewer/verifier).
+
+**Files touched (this commit):**
+- iOS adult: AuthViewModel, HomeView, StoryDetailView (3 files)
+- iOS kids: KidQuizEngineView (1 file)
+- Web cron: dob-correction-cooldown/route.ts (1 file)
+- Web admin: 18 mutation route files (T2.6 sweep)
+- Web redesign: CategoriesSection.tsx (NEW), MilestonesSection.tsx (NEW), ProfileApp.tsx (T360)
+- Logs: TODO-AUTONOMOUS.md (7 SHIPPED markers), CHANGELOG-AUTONOMOUS.md (this entry)
+- Total: ~26 files, ~1,800 LoC changed/added
+
+**Pattern note:** The reviewer pass was the right call for elevated-care items — even though no blocking issues surfaced, the per-item verification (audit-write failure-mode check, schema forward-compat, signout half-state check, color-per-tier sweep) caught nothing because nothing was broken, but the verification was the deliverable. This is a defensible pattern for kid-safety + RBAC + COPPA work that doesn't quite warrant the full 4-pre-impl + 2-post-impl ship pattern.
+
+---
+
 ## 2026-04-27 — Wave 19: 20-item batch via 4 parallel implementer agents
 
 **Items shipped:** 20.

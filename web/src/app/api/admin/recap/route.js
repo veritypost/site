@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { recordAdminAction } from '@/lib/adminMutation';
 import { safeErrorResponse } from '@/lib/apiErrors';
 
 // GET — list recaps. POST — create a new recap skeleton.
@@ -80,5 +81,16 @@ export async function POST(request) {
     .single();
   if (error)
     return safeErrorResponse(NextResponse, error, { route: 'admin.recap', fallbackStatus: 400 });
+  await recordAdminAction({
+    action: 'recap.create',
+    targetTable: 'weekly_recap_quizzes',
+    targetId: data.id,
+    newValue: {
+      title: b.title,
+      week_start: b.week_start,
+      week_end: b.week_end,
+      category_id: b.category_id || null,
+    },
+  });
   return NextResponse.json({ id: data.id });
 }

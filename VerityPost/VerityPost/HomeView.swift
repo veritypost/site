@@ -586,15 +586,29 @@ struct HomeView: View {
     }
 }
 
-// MARK: - Browse landing (placeholder destination for Browse all categories)
+// MARK: - Browse landing (destination for "Browse all categories")
 //
-// Lightweight category list. The full /sections route per
-// Future Projects/09_HOME_FEED_REBUILD.md is deferred; this provides a
-// real destination so the front-page link isn’t a dangling CTA.
+// Per-category card with a 7-day article count + 1-2 most-recent previews,
+// mirroring web /sections. Tapping a preview pushes StoryDetailView; tapping
+// the category header (or its chevron) pushes the full CategoryDetailView.
+//
+// Fetch shape: one categories query for the list, then a parallel fan-out
+// — one count + one limit-2 preview per category. Category count is small
+// (~15-20), so 2N fanout against PostgREST is acceptable and keeps each
+// query cleanly scoped to a single index.
 private struct BrowseLanding: View {
     @State private var categories: [VPCategory] = []
     @State private var loading = true
+    @State private var categoryPreviews: [String: [Story]] = [:]
+    @State private var categoryCounts7d: [String: Int] = [:]
     private let client = SupabaseManager.shared.client
+
+    private static let timeShortFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US")
+        f.dateFormat = "MMM d"
+        return f
+    }()
 
     var body: some View {
         ScrollView {
@@ -622,25 +636,11 @@ private struct BrowseLanding: View {
                         .frame(maxWidth: .infinity)
                 } else {
                     ForEach(categories) { cat in
-                        NavigationLink(value: cat) {
-                            HStack {
-                                Text(cat.displayName)
-                                    .font(.system(size: 18, weight: .medium, design: .serif))
-                                    .foregroundColor(VP.text)
-                                Spacer(minLength: 8)
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundColor(VP.dim)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .contentShape(Rectangle())
-                            .padding(.vertical, 14)
-                        }
-                        .buttonStyle(.plain)
-
+                        categoryBlock(cat)
                         Rectangle()
                             .fill(VP.rule)
                             .frame(height: 1)
+                            .padding(.vertical, 4)
                     }
                 }
             }
@@ -656,6 +656,88 @@ private struct BrowseLanding: View {
         .task { await load() }
     }
 
+    @ViewBuilder
+    private func categoryBlock(_ cat: VPCategory) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            NavigationLink(value: cat) {
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(cat.displayName)
+                            .font(.system(size: 20, weight: .semibold, design: .serif))
+                            .foregroundColor(VP.text)
+                        Text(countLabel(for: cat))
+                            .font(.system(size: 12, weight: .regular, design: .serif))
+                            .foregroundColor(VP.dim)
+                    }
+                    Spacer(minLength: 8)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(VP.dim)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                .padding(.vertical, 12)
+            }
+            .buttonStyle(.plain)
+
+            let previews = categoryPreviews[cat.id] ?? []
+            if !previews.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(previews) { story in
+                        NavigationLink(value: story) {
+                            previewRow(story)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.bottom, 10)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func previewRow(_ story: Story) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(story.title ?? "Untitled")
+                .font(.system(size: 15, weight: .semibold, design: .serif))
+                .foregroundColor(VP.text)
+                .multilineTextAlignment(.leading)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+            if let excerpt = story.excerpt, !excerpt.isEmpty {
+                Text(excerpt)
+                    .font(.system(size: 13, weight: .regular, design: .serif))
+                    .foregroundColor(VP.soft)
+                    .lineLimit(1)
+                    .multilineTextAlignment(.leading)
+            }
+            Text(timeShort(story.publishedAt))
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(VP.muted)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+    }
+
+    private func countLabel(for cat: VPCategory) -> String {
+        switch categoryCounts7d[cat.id] {
+        case nil: return "—"
+        case .some(0): return "No articles this week"
+        case .some(1): return "1 article this week"
+        case .some(let n): return "\(n) articles this week"
+        }
+    }
+
+    private func timeShort(_ date: Date?) -> String {
+        guard let date else { return "" }
+        let mins = Int(Date().timeIntervalSince(date) / 60)
+        if mins < 1 { return "just now" }
+        if mins < 60 { return "\(mins)m ago" }
+        let hours = mins / 60
+        if hours < 24 { return "\(hours)h ago" }
+        return BrowseLanding.timeShortFmt.string(from: date)
+    }
+
     private func load() async {
         do {
             let cats: [VPCategory] = try await client.from("categories")
@@ -666,9 +748,55 @@ private struct BrowseLanding: View {
                 .value
             categories = cats
             loading = false
+
+            await loadPreviewsAndCounts(for: cats)
         } catch {
             Log.d("Browse load failed: \(error)")
             loading = false
+        }
+    }
+
+    private func loadPreviewsAndCounts(for cats: [VPCategory]) async {
+        // 7-day window so the count reflects "this week" copy. ISO-8601 since
+        // PostgREST gte on timestamp columns expects RFC3339.
+        let weekAgo = Date().addingTimeInterval(-7 * 24 * 60 * 60)
+        let weekAgoIso = ISO8601DateFormatter().string(from: weekAgo)
+
+        await withTaskGroup(of: (String, [Story], Int).self) { group in
+            for cat in cats {
+                let catId = cat.id
+                let client = self.client
+                group.addTask {
+                    async let previewReq: [Story] = client.from("articles")
+                        .select()
+                        .eq("category_id", value: catId)
+                        .eq("status", value: "published")
+                        .eq("visibility", value: "public")
+                        .order("published_at", ascending: false)
+                        .limit(2)
+                        .execute()
+                        .value
+                    // `count: .exact, head: true` returns a HEAD response with
+                    // the row count in the Content-Range header — no payload
+                    // body shipped, so this stays cheap even on hot categories.
+                    async let countReq: PostgrestResponse<Void> = client.from("articles")
+                        .select("id", head: true, count: .exact)
+                        .eq("category_id", value: catId)
+                        .eq("status", value: "published")
+                        .eq("visibility", value: "public")
+                        .gte("published_at", value: weekAgoIso)
+                        .execute()
+
+                    let previews = (try? await previewReq) ?? []
+                    let countResp = try? await countReq
+                    let count = countResp?.count ?? 0
+                    return (catId, previews, count)
+                }
+            }
+            for await (id, previews, count) in group {
+                categoryPreviews[id] = previews
+                categoryCounts7d[id] = count
+            }
         }
     }
 }

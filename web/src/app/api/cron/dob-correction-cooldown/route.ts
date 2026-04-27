@@ -94,12 +94,27 @@ async function checkFraudSignals(
     console.error('[dob-cooldown.signals.parent_prior]', err);
   }
 
-  // Signal 3: large DOB shift (>2 years).
+  // Signal 3: DOB shift size, asymmetric by direction.
+  //
+  // T3.3 (kid-safety): younger-direction shifts are the silent abuse path
+  // — there is no documentation gate at submission, so a parent can
+  // re-band a tween down to kids without uploading anything. Older-
+  // direction shifts already require a birth-cert review at submission
+  // for any meaningful jump, so the >2y boundary still suffices there.
+  // For younger, any >=1y shift goes to manual admin review.
+  //
+  // The cron only pulls direction='younger' rows, so in practice the
+  // older branch never fires here today; we keep it for defense-in-depth
+  // in case the fetch filter is ever broadened.
   try {
     const cur = new Date(row.current_dob);
     const req = new Date(row.requested_dob);
     const yearsShift = Math.abs(req.getUTCFullYear() - cur.getUTCFullYear());
-    if (yearsShift > 2) reasons.push('large_shift');
+    if (row.direction === 'younger' && yearsShift >= 1) {
+      reasons.push('large_shift_younger');
+    } else if (yearsShift > 2) {
+      reasons.push('large_shift');
+    }
   } catch (err) {
     console.error('[dob-cooldown.signals.shift]', err);
   }

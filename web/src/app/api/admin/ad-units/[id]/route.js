@@ -5,7 +5,7 @@ import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
-import { requireAdminOutranks } from '@/lib/adminMutation';
+import { recordAdminAction, requireAdminOutranks } from '@/lib/adminMutation';
 import { isSafeAdUrl } from '@/lib/adUrlValidation';
 
 const ALLOWED = [
@@ -91,12 +91,28 @@ export async function PATCH(request, { params }) {
   const update = {};
   for (const k of ALLOWED) if (b[k] !== undefined) update[k] = b[k];
   if (b.approval_status === 'approved') update.approved_by = user.id;
+  const updatedKeys = Object.keys(update);
+  const { data: prior } = await service
+    .from('ad_units')
+    .select(updatedKeys.length ? updatedKeys.join(', ') : 'id')
+    .eq('id', params.id)
+    .maybeSingle();
   const { error } = await service.from('ad_units').update(update).eq('id', params.id);
   if (error)
     return safeErrorResponse(NextResponse, error, {
       route: 'admin.ad_units.id',
       fallbackStatus: 400,
     });
+  // Approval-status changes get a distinct verb — they're the
+  // policy-bearing branch (rank-guarded above) and reviewers will want
+  // them surfaced separately from generic creative edits.
+  await recordAdminAction({
+    action: b.approval_status !== undefined ? 'ad_unit.approval_set' : 'ad_unit.update',
+    targetTable: 'ad_units',
+    targetId: params.id,
+    oldValue: prior ?? null,
+    newValue: update,
+  });
   return NextResponse.json({ ok: true });
 }
 
@@ -127,11 +143,22 @@ export async function DELETE(_request, { params }) {
       { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
     );
   }
+  const { data: prior } = await service
+    .from('ad_units')
+    .select('id, name, ad_network, ad_format, placement_id, campaign_id, approval_status')
+    .eq('id', params.id)
+    .maybeSingle();
   const { error } = await service.from('ad_units').delete().eq('id', params.id);
   if (error)
     return safeErrorResponse(NextResponse, error, {
       route: 'admin.ad_units.id',
       fallbackStatus: 400,
     });
+  await recordAdminAction({
+    action: 'ad_unit.delete',
+    targetTable: 'ad_units',
+    targetId: params.id,
+    oldValue: prior ?? null,
+  });
   return NextResponse.json({ ok: true });
 }

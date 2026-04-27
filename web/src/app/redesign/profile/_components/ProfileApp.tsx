@@ -20,12 +20,14 @@ import { deriveAccountStates, isHardBlock } from '../../_lib/states';
 import { ActivitySection } from '../_sections/ActivitySection';
 import { BlockedSection } from '../_sections/BlockedSection';
 import { BookmarksSection } from '../_sections/BookmarksSection';
+import { CategoriesSection } from '../_sections/CategoriesSection';
 import { DataSection } from '../_sections/DataSection';
 import { ExpertProfileSection } from '../_sections/ExpertProfileSection';
 import { ExpertQueueSection } from '../_sections/ExpertQueueSection';
 import { IdentitySection } from '../_sections/IdentitySection';
 import { LinkOutSection } from '../_sections/LinkOutSection';
 import { MessagesSection } from '../_sections/MessagesSection';
+import { MilestonesSection } from '../_sections/MilestonesSection';
 import { NotificationsSection } from '../_sections/NotificationsSection';
 import { PlanSection } from '../_sections/PlanSection';
 import { PrivacySection } from '../_sections/PrivacySection';
@@ -294,17 +296,7 @@ export function ProfileApp({ defaultSection }: Props) {
       locked: !perms.categories && !preview,
       reason: 'Your strongest topics and where to grow.',
       keywords: ['topics', 'subjects', 'interests', 'feed'],
-      render: () => (
-        <LinkOutSection
-          glyph="◇"
-          title="Per-topic breakdown"
-          body="Your category-by-category score, your strongest areas, and where to grow next. Open the full breakdown to drill in."
-          actions={[
-            { label: 'Open categories', href: '/profile?tab=categories' },
-            { label: 'Edit feed preferences', href: '/profile?section=feed', variant: 'secondary' },
-          ]}
-        />
-      ),
+      render: () => <CategoriesSection authUserId={authUserId} preview={preview} />,
     },
     {
       id: 'milestones',
@@ -314,14 +306,7 @@ export function ProfileApp({ defaultSection }: Props) {
       locked: !perms.milestones && !preview,
       reason: 'The badges you’ve earned and what’s next on the ladder.',
       keywords: ['achievements', 'badges', 'awards', 'streak'],
-      render: () => (
-        <LinkOutSection
-          glyph="✺"
-          title="Your milestones"
-          body="Every badge you’ve earned plus the ones still ahead."
-          actions={[{ label: 'See all milestones', href: '/profile?tab=milestones' }]}
-        />
-      ),
+      render: () => <MilestonesSection authUserId={authUserId} preview={preview} user={user} />,
     },
 
     // ── Family + expert (conditional) ────────────────────────────────────
