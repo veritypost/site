@@ -2120,78 +2120,17 @@ function EmailsCard({
   // C6: `/api/account/emails` is not built in this repo — disable the
   // add-secondary button with a tooltip until the endpoint exists.
   // Verified via `find site/src/app/api/account/emails -type f` (empty).
-
-  // Email notifications block (C5). No dedicated `notification_prefs`
-  // column on `users`, so we persist the three flags under
-  // metadata.notification_prefs — flagged for owner.
-  const [newsletter, setNewsletter] = useState(true);
-  const [commentReplies, setCommentReplies] = useState(true);
-  const [securityAlerts, setSecurityAlerts] = useState(true);
-  const [savingNotif, setSavingNotif] = useState(false);
-  const notifSnap = useRef('');
-
-  useEffect(() => {
-    if (!user) return;
-    const np = readMeta(user).notification_prefs || {};
-    const n = np.newsletter !== false;
-    const r = np.commentReplies !== false;
-    const s = np.securityAlerts !== false;
-    setNewsletter(n);
-    setCommentReplies(r);
-    setSecurityAlerts(s);
-    notifSnap.current = JSON.stringify({ n, r, s });
-  }, [user]);
-
-  const notifCurrent = JSON.stringify({
-    n: newsletter,
-    r: commentReplies,
-    s: securityAlerts,
-  });
-  const notifDirty = notifCurrent !== notifSnap.current;
-
-  const saveNotifs = async () => {
-    if (!user) return;
-    setSavingNotif(true);
-    // C2 — M16 now happens at the notification_prefs subtree: read the
-    // CURRENT subtree from the DB immediately before write so
-    // simultaneous edits to unrelated notification_prefs subkeys don't
-    // clobber us, then send just the notification_prefs delta (not the
-    // full metadata blob). Top-level merge is handled server-side by
-    // update_own_profile's `||` operator.
-    const { data: fresh } = await supabase
-      .from('users')
-      .select('metadata')
-      .eq('id', userId)
-      .maybeSingle();
-    const freshPrefs =
-      ((fresh as { metadata?: Record<string, unknown> } | null)?.metadata as SettingsMeta | null)
-        ?.notification_prefs || {};
-    const { error } = await supabase.rpc('update_own_profile', {
-      p_fields: {
-        metadata: {
-          notification_prefs: {
-            ...freshPrefs,
-            newsletter,
-            commentReplies,
-            securityAlerts,
-          },
-        },
-      },
-    });
-    setSavingNotif(false);
-    if (error) {
-      pushToast({
-        message: 'Could not save notification settings. Please try again.',
-        variant: 'danger',
-      });
-      return;
-    }
-    pushToast({ message: 'Email notifications saved.', variant: 'success' });
-    notifSnap.current = notifCurrent;
-    await onSaved();
-    // H8 — refresh perms cache so any preference-derived gate updates next render
-    await refreshAllPermissions();
-  };
+  //
+  // T27 / T-EMAIL-PRUNE — engagement-class email controls removed
+  // 2026-04-27. Per the memory-locked direction, email is transactional-
+  // only on Verity Post: Supabase Auth handles signup/login/password
+  // emails, Stripe handles receipts, the send-emails cron handles 3
+  // transactional types (data_export_ready / kid_trial_expired /
+  // expert_reverification_due) — none of which the user can reasonably
+  // opt out of. The previous newsletter / commentReplies / securityAlerts
+  // switches wrote to `metadata.notification_prefs` which nothing
+  // consumed for delivery; they were promising controls that didn't
+  // actually gate anything. Removed entirely so the UI doesn't lie.
 
   return (
     <Card
@@ -2232,58 +2171,6 @@ function EmailsCard({
           </span>
         </Row>
       )}
-
-      {/* C5: Email notification preferences. */}
-      <div
-        style={{
-          borderTop: `1px solid ${C.border}`,
-          paddingTop: S[3],
-          marginTop: S[2],
-          display: 'flex',
-          flexDirection: 'column',
-          gap: S[3],
-        }}
-      >
-        <div
-          style={{
-            fontSize: F.sm,
-            fontWeight: 700,
-            color: C.text,
-            textTransform: 'uppercase',
-            letterSpacing: '0.04em',
-          }}
-        >
-          Email notifications
-        </div>
-        <Switch
-          checked={newsletter}
-          onChange={setNewsletter}
-          label="Weekly newsletter"
-          hint="Best reads and new features, once a week."
-        />
-        <Switch
-          checked={commentReplies}
-          onChange={setCommentReplies}
-          label="Replies to my comments"
-          hint="Email me when someone replies to a comment I wrote."
-        />
-        <Switch
-          checked={securityAlerts}
-          onChange={setSecurityAlerts}
-          label="Security alerts"
-          hint="New-device sign-ins, password changes, and deletion notices."
-        />
-        <div>
-          <Button
-            variant="primary"
-            onClick={saveNotifs}
-            loading={savingNotif}
-            disabled={!notifDirty}
-          >
-            Save changes
-          </Button>
-        </div>
-      </div>
     </Card>
   );
 }

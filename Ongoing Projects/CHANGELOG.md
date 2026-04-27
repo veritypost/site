@@ -7,6 +7,31 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (wave 10 — T354 closed via MCP audit, T-EMAIL-PRUNE shipped, T27 web partial) — _pending push to git_
+
+### Closed via MCP verification (1)
+
+- **T354 — events partition retention.** MCP-queried `cron.job` and found two active pg_cron jobs already managing the daily-partition lifecycle:
+  - `events-create-next-partition` daily at 00:05 — calls `public.create_events_partition_for(current_date + 1)`.
+  - `events-drop-old-partitions` daily at 00:15 — calls `public.drop_old_events_partitions(90)` (90-day retention).
+  Both functions exist in production with naming conventions matching the existing `events_<YYYYMMDD>` daily partitions (verified earlier this session). Goal already met — both creation AND retention are scheduled. Body deleted from TODO; no migration needed.
+
+### Shipped (2)
+
+- **T-EMAIL-PRUNE — `send-emails` cron pruned to 3 transactional types.** `web/src/app/api/cron/send-emails/route.js:21-32`. `TYPE_TO_TEMPLATE` reduced from 7 entries to 3: `data_export_ready`, `kid_trial_expired`, `expert_reverification_due`. The 4 dropped types (`breaking_news`, `comment_reply`, `expert_answer_posted`, `kid_trial_day6`) align with the memory-locked direction (no engagement-class email; only password reset / email verify / billing receipts / deletion notices ship — Supabase Auth + Stripe handle those non-cron paths). The `notifications.type` enum still allows the dropped values for in-app/push delivery; only the EMAIL channel is pruned. Removed from skip list.
+
+- **T27 partial — web email-notifications subsection removed.** `web/src/app/profile/settings/page.tsx`. Deleted the entire "Email notifications" subsection (3 switches: `newsletter` / `commentReplies` / `securityAlerts`) plus the supporting state (`useState` × 4, `useEffect`, `notifSnap`, `saveNotifs` handler — ~75 lines total). Those switches wrote to `metadata.notification_prefs` which nothing consumed for delivery — the UI was promising controls that didn't gate anything real. Per the memory-locked transactional-only email direction, the controls are gone (Supabase Auth handles signup/login/password emails; Stripe handles receipts; `send-emails` cron handles 3 transactional types — none user-toggleable). iOS `SettingsView.swift:1887-2040` mirror still pending; needs a focused Swift session to verify no other surface depends on the metadata keys.
+
+### Deferred from this wave
+
+- **T299 (homoglyph)** — needs an npm install of a TR39-aware confusables library. I can't run npm in-session; queued as the next focused install + integration session.
+
+TypeScript clean (13 pre-existing errors unchanged).
+
+- **Files** — `web/src/app/api/cron/send-emails/route.js` (T-EMAIL-PRUNE), `web/src/app/profile/settings/page.tsx` (T27 web partial), `Ongoing Projects/TODO.md`, `Ongoing Projects/CHANGELOG.md`.
+
+---
+
 ## 2026-04-27 (autonomous wave 9 — T333 middleware + T366 admin auth-recovery page) — _shipped, pushed to git_ (commit 1b206e1)
 
 ### Shipped (2)

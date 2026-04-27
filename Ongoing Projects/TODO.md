@@ -27,7 +27,7 @@
 >
 > ### How to handle each TODO category
 >
-> - **LOCKED items** (T19, T26, T55, T57, T-EMAIL-PRUNE): owner has decided. Body section contains the impl spec. When owner says "ship T<N>" or "go on locked items," execute the spec. Don't re-ask the decision. If a sub-question surfaces during impl that the spec didn't anticipate, ask once with a recommendation, then proceed.
+> - **LOCKED items** (T19, T26, T55, T57): owner has decided. Body section contains the impl spec. When owner says "ship T<N>" or "go on locked items," execute the spec. Don't re-ask the decision. If a sub-question surfaces during impl that the spec didn't anticipate, ask once with a recommendation, then proceed.
 > - **LAUNCH BLOCKERS in `Pre-Launch Assessment.md`** (T2 — Funding Choices CMP; T271 — Maine governing-law TOS section): owner-touch only. Don't pick from the autonomous loop. Owner ships these in coordination with AdSense console access + legal sign-off windows.
 > - **DEFERRED items** (T14, T34, T35, T79, T84): owner has parked these. Don't pick them up. Don't re-recommend them. Don't tell the owner "next" includes them.
 > - **OPEN items in the body sections** (T27, T92, T165, T166, T233, T285): no owner decision needed; pick by priority and ship under the autonomous runbook. Each has audit evidence + recommended fix; verify the audit against current code before editing.
@@ -80,7 +80,6 @@ LOCKED, awaiting "go" to ship code/migration:
 - **T26** — RPC migration adding `comment_reply` + `comment_mention` notifications via `create_notification`. Scope locked (in_app + push only).
 - **T55** — drop `ai_prompt_preset_versions` orphan table (T242 snapshot covers audit/replay).
 - **T57** — auto-mint Stripe price API on plan create (option B).
-- **T-EMAIL-PRUNE** — drop 4 engagement types from `send-emails` cron; keep `data_export_ready` + `kid_trial_expired` + `expert_reverification_due`. Verified 2026-04-27: `web/src/app/api/cron/send-emails/route.js:21-29` currently maps 7 types. Concrete drops: `breaking_news`, `comment_reply`, `expert_answer_posted`, `kid_trial_day6`.
 
 DEFERRED (owner returning to it later — no decision yet):
 - **T34** — downvotes ranking decision.
@@ -499,10 +498,8 @@ The numbered items below retain their original section placement for readability
 4. **Muted/blocked sender** — should a reply from a user the parent-author has blocked still create a notification? Standard answer: no notification (silent block). Confirming.
 **Status:** awaiting owner answers; no migration drafted yet, no code changed.
 
-### T27 — Iframe of inert email/alert settings on iOS + web — **HIGH** (paired with T9/T10)
-**File:** iOS `SettingsView.swift:1887-2040` writes `users.metadata.notifications` (different keys from web); web `profile/settings/page.tsx:2112-2167` writes `users.metadata.notification_prefs`; backend reads `alert_preferences`. Repo-wide search shows no consumer for `metadata.notifications` or `metadata.notification_prefs` outside settings pages.
-**Fix:** Make iOS use the same storage/backend as web. Remove email-digest/lifecycle controls. If anything from `metadata.notifications` is worth migrating, do a one-time read-fallback.
-**Recommendation:** Bundle with **T9/T10** (transactional-only email cleanup). Same direction, same PR.
+### T27 partial — web email-notifications subsection removed; iOS still pending — **HIGH**
+**Status:** Web settings page email-notifications subsection (3 switches: newsletter / commentReplies / securityAlerts that wrote to `metadata.notification_prefs` which nothing consumed) deleted 2026-04-27. iOS `SettingsView.swift:1887-2040` still writes `metadata.notifications`; same fix needed there. Defer iOS portion to a focused Swift session — it requires careful struct editing + verifying no other Swift surface depends on the keys being readable.
 
 ---
 
@@ -719,10 +716,6 @@ These aren't bugs with a file:line — they're architectural decisions, sequenci
 ### DB performance / ops debt — surfaced from external DB-perf review 2026-04-27
 
 Five items below come from a follow-on DB-perf review pass on the auth/perms system map. None launch-blocking; all real ops debt. (A 6th item from that review — `compute_effective_perms` request-scoped memoization — is already captured as T348; not duplicated here.)
-
-#### T354 — `events` table needs partition-drop retention cron — **MEDIUM** (DEBT, perf)
-**Source:** DB-perf review #41. The `events` table is at 5,846 rows in last 7 days (per system map §16 analytics findings) — extrapolates to ~300k/yr. Without retention, query performance degrades as the table grows. Standard pattern: monthly partitions + drop partitions older than N months.
-**Fix:** Convert to PARTITION BY RANGE on `created_at`; cron drops partitions > 12 months old. T5 schema work — halt and queue. Coordinate with T329 (admin events dashboard) to define query patterns first.
 
 #### T356 — `permission_set_perms` REINDEX script ready (owner runs once, low-traffic window) — **LOW** (DEBT)
 **File:** `Ongoing Projects/migrations/2026-04-27_T356_permission_set_perms_reindex.sql` — single `REINDEX TABLE CONCURRENTLY public.permission_set_perms;` command + a pre-flight bloat-check query so owner can decide whether the bloat is worth the rebuild. **NOT** runnable via `apply_migration` (CONCURRENTLY can't run in a transaction); paste into Supabase SQL editor in a low-traffic window.

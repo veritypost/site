@@ -18,13 +18,18 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
+// T-EMAIL-PRUNE — transactional-only direction (per memory + AUTH DIRECTION).
+// Engagement types (breaking_news, comment_reply, expert_answer_posted,
+// kid_trial_day6) dropped 2026-04-27. Only the 3 transactional types remain;
+// they fire on real account events the user can't reasonably opt out of:
+//   data_export_ready          — GDPR-class request fulfilled
+//   kid_trial_expired          — paid-feature countdown landed
+//   expert_reverification_due  — verified-expert lifecycle deadline
+// Auth-flow emails (signup confirm, password reset, magic-link) are sent
+// by Supabase Auth, not this cron. Stripe receipts are sent by Stripe.
 const TYPE_TO_TEMPLATE = {
-  breaking_news: 'breaking_news_alert',
-  comment_reply: 'comment_reply',
-  expert_answer_posted: 'expert_answer_posted',
-  kid_trial_day6: 'kid_trial_day6',
-  kid_trial_expired: 'kid_trial_expired',
   data_export_ready: 'data_export_ready',
+  kid_trial_expired: 'kid_trial_expired',
   expert_reverification_due: 'expert_reverification_due',
 };
 
