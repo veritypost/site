@@ -768,9 +768,8 @@ These items live in `web/src/app/redesign/*` (currently dev-mounted at `localhos
 **File:** `web/src/app/redesign/_components/Field.tsx:62`. Transition rule present; `focusRing` helper exists in `palette.ts:124` but isn't applied. Keyboard users get no focus feedback in any settings card.
 **Fix:** Add `onFocus`/`onBlur` handlers toggling `boxShadow: SH.ring`; `:hover` background changes for button variants.
 
-#### T336 — `AppShell.tsx` mobile drawer lacks Escape handler + focus trap — **HIGH** (a11y + visibility)
-**File:** `web/src/app/redesign/_components/AppShell.tsx:93-94` only has Cmd+K listener. Drawer at z-30 stacks below banners at z-40 — banned user on mobile can't see ban banner above an open drawer.
-**Fix:** Add Escape-to-close + focus trap; promote banners to z-50.
+#### T336 partial — focus trap + banner z-index promotion — **HIGH** (a11y)
+**File:** `web/src/app/redesign/_components/AppShell.tsx`. Escape-to-close drawer shipped (rolls up with redesign-cutover commit). Focus trap when drawer is open + banner z-index promotion (drawer z-30 below banners z-40 — banned user on mobile can't see ban banner above open drawer) deferred to a follow-up since both involve scope expansion (focus trap needs a small `useFocusTrap` hook integration; banner promotion needs auditing every banner caller's z-index).
 
 #### T337 — Native `window.confirm()` in 3 redesign components — **MEDIUM** (visual consistency)
 **File:** `web/src/app/redesign/_components/BillingCard.tsx`, `MFACard.tsx`, `SessionsSection.tsx`. Inconsistent with the rest of the redesign's modal style.
@@ -788,14 +787,6 @@ These items live in `web/src/app/redesign/*` (currently dev-mounted at `localhos
 #### T341 — `YouSection` action cards drive users out of profile — **MEDIUM** (retention)
 **File:** `web/src/app/redesign/profile/YouSection.tsx:86-119`. ActionCards link to `/`, `/bookmarks`, `/messages`, `/expert-queue`, `/profile/family` — primary abandonment vector for users who came to edit profile.
 **Fix:** Replace with profile-internal CTAs ("Polish your profile: avatar / bio / privacy"); move outbound nudges into a discrete onboarding card only when `articles_read_count === 0`.
-
-#### T342 — ProfileApp loads perms once; no realtime refresh — **MEDIUM** (CX, redesign mirror of T312)
-**File:** `web/src/app/redesign/profile/ProfileApp.tsx:60-78`. `useEffect` loads on mount; no polling on `my_perms_version()`.
-**Fix:** 60s polling OR Supabase realtime subscription. Bundle with T312.
-
-#### T343 — Expert application form has no required-field markers — **MEDIUM** (UX)
-**File:** `web/src/app/redesign/_components/ExpertApplyForm.tsx:185-197` (and similar). Submit handler enforces required fields but UI shows no asterisk/pill — user discovers requirements on submit failure.
-**Fix:** Red asterisk or "(required)" pill on Full name / Bio / Areas / Sample 1.
 
 ### Architectural / sequencing concerns surfaced from system map (non-finding considerations)
 
@@ -897,15 +888,15 @@ System map §22 ("Cutover plan — taking the redesign live") was added after th
 **Source:** Half of the locked T56 spec — the 'lifetime' drop shipped, the string-standardize half remains. Current state: `web/src/app/admin/plans/page.tsx:56` writes `'monthly'` / `'annual'`; DB-side reads (e.g., `web/src/app/profile/settings/page.tsx:4253` checks `billing_period === 'year'`) and Stripe glue (`web/src/lib/plans.js:58,78`) use `'month'` / `'year'`. Existing plan rows likely carry `'monthly'`/`'annual'` from the admin form; some carry `'month'`/`'year'` from direct seeding.
 **Fix:** (1) Update admin BILLING_PERIODS to `['', 'month', 'year']`. (2) Migration to `UPDATE plans SET billing_period = CASE WHEN 'monthly' THEN 'month' WHEN 'annual' THEN 'year' ELSE billing_period END;` (idempotent). (3) Sweep all callers to read only the canonical strings. (4) Optional CHECK constraint on `plans.billing_period IN ('month','year')`. T5 — halt and queue migration.
 
-#### T351 — Redesign §21.3 polish bundle (7 sub-items) — **LOW** (polish)
-**Source:** System map §21.3, deliberately skipped in the main verification pass. All real, all small. Bundle as one cleanup PR after redesign cutover stabilizes:
+#### T351 partial — Redesign §21.3 polish bundle (5 sub-items remain) — **LOW** (polish)
+**Source:** System map §21.3, deliberately skipped in the main verification pass. **2 of 7 sub-items shipped** alongside Wave B (rail search placeholder `Search settings` → `Search profile`, LockedSection `{title} is part of premium` → `Upgrade to unlock {title}`). 5 remain — bundle as one cleanup PR after redesign cutover stabilizes:
 - **Spacing literals** drift to S-tokens — `gap: 1` / `padding: '0 4px'` / `padding: '0 6px'` scattered across `AppShell.tsx`, `MessagesSection.tsx`, `PasswordCard.tsx`, `preview/page.tsx`. Snap every literal to `S[N]`.
 - **Tier badge has 3 visual treatments** (rail identity card / stat tile / public-profile preview). One canonical pill component.
 - **PasswordCard rule checklist** uses green dot on pass + inert gray on fail. Add red dot when typed-but-unmet for bidirectional signal.
 - **PrivacyCard followers list no Retry on load failure.** Currently shows toast; add retry button in empty/error state.
-- **Microcopy passes** — "Data & danger" → "Your data" (rail title); LockedSection "X is part of premium" → "Upgrade to unlock {section}"; rail search placeholder "Search settings" → "Search profile"; PublicProfileSection "Add a bio below" → use placeholder text inside textarea.
 - **PrivacyCard Hidden-confirm copy** doesn't say count of followers being removed. Inject `{count}` into the confirmation.
 - **Expert queue back-channel empty state** misleads non-expert admins — when `isAdminScope && categories.length === 0`, copy says "Apply for expert verification" (wrong CTA for someone with admin perms). Branch the copy.
+- **Microcopy still pending:** "Data & danger" → "Your data" (rail title) — section title rather than placeholder; PublicProfileSection "Add a bio below" → use placeholder text inside textarea.
 
 ---
 

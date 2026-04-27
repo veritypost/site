@@ -7,6 +7,37 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (autonomous-fix wave 5 — Wave B redesign batch, 4-of-8 shipped) — _pending push to git_ (CODE in untracked redesign files; rolls up with T357 cutover commit)
+
+Fifth execution wave on the redesign batch. **4 of the 8 redesign-cutover items shipped to disk** — code lives in `web/src/app/redesign/*` which is currently untracked, so the changes commit when the larger T357 cutover lands. TODO + CHANGELOG bookkeeping commits now (those files ARE tracked).
+
+### Shipped (code on disk in untracked redesign files)
+
+- **T336 partial — Escape-to-close on AppShell mobile drawer.** `web/src/app/redesign/_components/AppShell.tsx`. The existing keydown listener (Cmd+K rail search focus) now also handles Escape — closes the drawer when open. Focus trap + banner z-index promotion (currently drawer z-30 sits below banners z-40) deferred since both expand scope (focus trap needs a `useFocusTrap` integration; banner promotion needs auditing every banner caller). T336 body re-scoped to mark Escape as shipped.
+
+- **T342 — ProfileApp 60s perms polling.** `web/src/app/redesign/profile/_components/ProfileApp.tsx`. Long-lived SPA shell now fires `setInterval(refreshIfStale, 60_000)` and bumps a `permsTick` state on each tick. The `perms` `useMemo` depends on `permsTick`, so admin perm flips / plan upgrades / cohort grants force a re-render of the section list / locked badges / nav items without a full page nav. Mirrors the T312 fix in NavWrapper for the redesign sub-shell.
+
+- **T343 — Required-field markers on ExpertApplyForm.** `web/src/app/redesign/_components/Field.tsx` gained a `required?: boolean` prop that renders a red asterisk next to the label (mutually exclusive with the existing `optional` prop). 5 fields in `web/src/app/redesign/profile/_sections/ExpertApplyForm.tsx` updated: "I'm applying as", "Full name", "Credentials", "Short bio", "Areas of expertise". User now sees the requirement before they hit submit.
+
+- **T351 partial — 2 of 7 microcopy items.** `web/src/app/redesign/_components/AppShell.tsx`. Rail search placeholder `"Search settings"` → `"Search profile"` (matches the section's actual scope). LockedSection title `"{title} is part of premium"` → `"Upgrade to unlock {title}"` (action-oriented copy). 5 sub-items remain (spacing literals, tier-badge consolidation, PasswordCard red-dot, PrivacyCard Retry/Hidden-count, expert-queue empty state, "Data & danger" rail title, PublicProfileSection bio placeholder).
+
+### Deferred from Wave B (will pick up in a future redesign-batch pass)
+
+- **T331** — `profile_visibility` enum write mismatch between `PrivacyCard` ('hidden') and `PublicProfileSection` ('public'/'private'). Needs careful caller analysis to unify the tri-state cleanly across both surfaces; not in this pass.
+- **T335** — `Field.tsx` focus styles. CSS pseudo-class can't override inline styles cleanly without restructuring the component to use className-based styling + a global `<style>` block. Deserves its own pass.
+- **T337** — replace 3 native `window.confirm()` calls (BillingCard cancel, MFACard disable, SessionsSection revoke-others) with a Card-variant modal. Needs a new modal primitive built first; out of scope as an autonomous fix.
+- **T339** — `as never` Avatar casts in PrivacyCard + BlockedSection. Needs the Avatar component's prop type tightened (define a proper `AvatarUser` shape). Coordinates with the iOS Avatar work + Models.swift.
+
+### Bookkeeping
+
+- TODO closures: T342 + T343 bodies deleted. T336 body re-scoped to "focus trap + z-index" since Escape shipped. T351 body re-scoped from 7 sub-items to 5 + tracking note for the 2 microcopy items shipped.
+- TypeScript: 13 pre-existing errors unchanged; my edits compile clean.
+- The 4 untracked redesign files touched (`AppShell.tsx`, `Field.tsx`, `ExpertApplyForm.tsx`, `ProfileApp.tsx`) join the existing redesign WIP. Their changes ride along the eventual T357 cutover commit.
+
+- **Files** — `web/src/app/redesign/_components/AppShell.tsx` (untracked), `web/src/app/redesign/_components/Field.tsx` (untracked), `web/src/app/redesign/profile/_sections/ExpertApplyForm.tsx` (untracked), `web/src/app/redesign/profile/_components/ProfileApp.tsx` (untracked), `Ongoing Projects/TODO.md` (tracked, this commit), `Ongoing Projects/CHANGELOG.md` (tracked, this commit).
+
+---
+
 ## 2026-04-27 (autonomous-fix wave 4 — T312 + T316 partial + T359 + 7 migration drafts) — _shipped, pushed to git_ (commit c0580b2)
 
 Fourth execution wave on the sixth-pass audit set. Three code-shippable items closed end-to-end + seven SQL migration files drafted for owner apply.
