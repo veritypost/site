@@ -30,12 +30,15 @@ const PAGES: HubGroup[] = [
     { href: '/admin/prompt-presets', title: 'Prompt presets', desc: 'Reusable generation instructions — adult, kid, or both' },
     { href: '/admin/feeds', title: 'Feeds', desc: 'RSS sources — outlets, audience routing, health, last poll' },
     { href: '/admin/stories', title: 'Articles', desc: 'Browse all articles; click into a row to review, edit, and publish through the integrated newsroom editor' },
+    { href: '/admin/kids-story-manager', title: 'Kids Story Manager', desc: 'Edit articles for ages 7-9 (kids reading band)' },
+    { href: '/admin/tweens-story-manager', title: 'Tweens Story Manager', desc: 'Edit articles for ages 10-12 (tweens reading band)' },
   ]},
   { group: 'Community & Moderation', desc: 'User-generated content, discussion rules, and content moderation', items: [
     { href: '/admin/comments', title: 'Discussion Settings', desc: 'Quiz gate, AI tagging, role badges, threading depth, health scoring' },
     { href: '/admin/reports', title: 'Reports & Moderation', desc: 'Flagged content queue, supervisor fast-lane' },
     { href: '/admin/moderation', title: 'Moderation Console', desc: 'User lookup, penalty stack, role grants, appeal review' },
     { href: '/admin/expert-sessions', title: 'Kid Expert Sessions', desc: 'Schedule live Q&A windows for kid profiles' },
+    { href: '/admin/kids-dob-corrections', title: 'Kid DOB Corrections', desc: 'Review parent-submitted DOB correction requests; approve/reject with audit trail' },
   ]},
   { group: 'Users & Identity', desc: 'Who is on the platform, how they get in, and how trust is built', items: [
     { href: '/admin/users', title: 'User Management', desc: 'Users, devices, manual actions, ban/unban, roles, plans — per-user Permissions console on each row' },

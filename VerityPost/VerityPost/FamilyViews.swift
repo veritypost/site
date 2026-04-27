@@ -45,9 +45,11 @@ struct FamilyDashboardView: View {
     // The hardcoded fallbacks below match what was here pre-extraction
     // so the UI keeps working if the config call fails / first render
     // races the fetch.
+    // Phase 2 of AI + Plan Change Implementation: Family XL retired
+    // permanently. Verity Family is now a single tier with 1 kid included
+    // and per-kid add-ons up to 4 total.
     @State private var familyConfigMaxKids: [String: Int] = [
-        "verity_family": 2,
-        "verity_family_xl": 4,
+        "verity_family": 4,
     ]
     private func maxKids(for tier: String?) -> Int {
         guard let t = tier, let n = familyConfigMaxKids[t] else { return 0 }
@@ -917,17 +919,9 @@ struct AddKidSheet: View {
     @State private var pinConfirm = ""
     @State private var parentName = ""
     @State private var consentAck = false
-    @State private var readingLevel: String = ""
 
     @State private var saving = false
     @State private var error: String = ""
-
-    private let readingLevels: [(String, String)] = [
-        ("", "Not specified"),
-        ("early", "Early reader (5-7)"),
-        ("intermediate", "Intermediate (8-10)"),
-        ("advanced", "Advanced (11-12)"),
-    ]
 
     private let dobFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -977,11 +971,11 @@ struct AddKidSheet: View {
                 }
 
                 Section {
-                    Picker("Reading level", selection: $readingLevel) {
-                        ForEach(readingLevels, id: \.0) { val, label in
-                            Text(label).tag(val)
-                        }
-                    }
+                    // Phase 3 of AI + Plan Change Implementation: reading_band
+                    // is now system-derived from DOB ('kids' 7-9 / 'tweens'
+                    // 10-12 / 'graduated' 13+). The parent-set reading_level
+                    // picker that used to live here has been retired — band
+                    // is computed automatically.
                     LabeledContent("Avatar color") {
                         HStack(spacing: 6) {
                             ForEach(VP.kidColors, id: \.self) { hex in
@@ -1075,12 +1069,14 @@ struct AddKidSheet: View {
         saving = true
         error = ""
         defer { saving = false }
+        // Phase 3: reading_level is system-derived (reading_band) from DOB now;
+        // no longer collected at create time.
         let input = KidsAPI.CreateKidInput(
             displayName: displayName.trimmingCharacters(in: .whitespaces),
             dateOfBirth: dobFormatter.string(from: dob),
             avatarColor: avatarColor,
             pin: setPinNow ? pin : nil,
-            readingLevel: readingLevel.isEmpty ? nil : readingLevel,
+            readingLevel: nil,
             parentName: parentName.trimmingCharacters(in: .whitespaces)
         )
         do {

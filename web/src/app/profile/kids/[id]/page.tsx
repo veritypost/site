@@ -452,6 +452,14 @@ export default function KidDashboardPage() {
         onError={(msg) => setError(msg)}
       />
 
+      {/* Phase 4 of AI + Plan Change Implementation: DOB correction request entry point. */}
+      <DobCorrectionRequest
+        kid={kid}
+        kidId={id}
+        onSubmitted={(msg) => setFlash(msg)}
+        onError={(msg) => setError(msg)}
+      />
+
       <div
         style={{
           display: 'grid',
@@ -1025,6 +1033,225 @@ function BandPanel({
             </button>
             <button
               onClick={() => setConfirmAction(null)}
+              style={{
+                padding: '8px 14px',
+                borderRadius: 8,
+                border: `1px solid ${C.border}`,
+                background: 'transparent',
+                fontSize: 13,
+                cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Phase 4 — DOB correction request modal
+// ---------------------------------------------------------------------------
+
+function DobCorrectionRequest({
+  kid,
+  kidId,
+  onSubmitted,
+  onError,
+}: {
+  kid: KidRow;
+  kidId: string;
+  onSubmitted: (msg: string) => void;
+  onError: (msg: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [requestedDob, setRequestedDob] = useState('');
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [history, setHistory] = useState<
+    Array<{ id: string; status: string; requested_dob: string; created_at: string }>
+  >([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/kids/${kidId}/dob-correction`, { credentials: 'include' });
+        if (!res.ok) return;
+        const j = await res.json();
+        if (!cancelled) setHistory(j.requests ?? []);
+      } catch {
+        // non-fatal
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [kidId, open]);
+
+  const submit = async () => {
+    if (reason.trim().length < 10) {
+      onError('Reason must be at least 10 characters.');
+      return;
+    }
+    if (!requestedDob) {
+      onError('Pick the corrected date of birth.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/kids/${kidId}/dob-correction`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requested_dob: requestedDob,
+          reason: reason.trim(),
+        }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        onError(j.error || `HTTP ${res.status}`);
+        setBusy(false);
+        return;
+      }
+      onSubmitted(j.auto_review || 'Request submitted. We will review and respond.');
+      setOpen(false);
+      setRequestedDob('');
+      setReason('');
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Submit failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const cardStyle: CSSProperties = {
+    background: C.card,
+    border: `1px solid ${C.border}`,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+  };
+
+  const pendingOrApproved = history.find((h) =>
+    ['pending', 'documentation_requested', 'approved'].includes(h.status)
+  );
+
+  return (
+    <div style={cardStyle}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 700 }}>
+            Date of birth: {kid.date_of_birth || '—'}
+          </div>
+          <div style={{ fontSize: 12, color: C.dim, marginTop: 2 }}>
+            DOB is locked after profile creation. Was this entered incorrectly?
+          </div>
+        </div>
+        {!open && !pendingOrApproved && (
+          <button
+            onClick={() => setOpen(true)}
+            style={{
+              padding: '8px 14px',
+              borderRadius: 9,
+              border: `1px solid ${C.border}`,
+              background: 'transparent',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Request correction
+          </button>
+        )}
+      </div>
+
+      {pendingOrApproved && !open && (
+        <div
+          style={{
+            marginTop: 10,
+            padding: 10,
+            background: 'var(--bg)',
+            borderRadius: 8,
+            fontSize: 12,
+            color: C.dim,
+          }}
+        >
+          {pendingOrApproved.status === 'approved'
+            ? `Correction already used for this profile. Contact support if there's another issue.`
+            : `Request pending review (submitted ${new Date(pendingOrApproved.created_at).toLocaleDateString()}). One pending request at a time.`}
+        </div>
+      )}
+
+      {open && (
+        <div style={{ marginTop: 12, padding: 12, background: 'var(--bg)', borderRadius: 8 }}>
+          <div style={{ fontSize: 12, color: C.dim, marginBottom: 10, lineHeight: 1.5 }}>
+            One correction per profile. We don&apos;t approve corrections that move your child to an
+            older reading band without birth-certificate documentation. Younger-band corrections are
+            reviewed within 7 days.
+          </div>
+          <label style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>
+            Corrected date of birth
+          </label>
+          <input
+            type="date"
+            value={requestedDob}
+            onChange={(e) => setRequestedDob(e.target.value)}
+            style={{
+              width: '100%',
+              padding: 8,
+              fontSize: 13,
+              border: `1px solid ${C.border}`,
+              borderRadius: 6,
+              boxSizing: 'border-box',
+              marginBottom: 10,
+            }}
+          />
+          <label style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>
+            Reason (10-280 characters)
+          </label>
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={3}
+            placeholder="e.g. Typo at signup — entered 2019 instead of 2018."
+            style={{
+              width: '100%',
+              padding: 8,
+              fontSize: 13,
+              border: `1px solid ${C.border}`,
+              borderRadius: 6,
+              fontFamily: 'inherit',
+              boxSizing: 'border-box',
+              marginBottom: 10,
+            }}
+          />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={submit}
+              disabled={busy}
+              style={{
+                padding: '8px 14px',
+                borderRadius: 8,
+                border: 'none',
+                background: C.accent,
+                color: '#fff',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: busy ? 'default' : 'pointer',
+                opacity: busy ? 0.5 : 1,
+              }}
+            >
+              {busy ? 'Submitting…' : 'Submit request'}
+            </button>
+            <button
+              onClick={() => {
+                setOpen(false);
+                setRequestedDob('');
+                setReason('');
+              }}
               style={{
                 padding: '8px 14px',
                 borderRadius: 8,

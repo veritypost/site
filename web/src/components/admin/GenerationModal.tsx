@@ -50,7 +50,12 @@ const DISCOVERY_TIMEOUT_MS = 30_000;
 
 type Audience = 'adult' | 'kid';
 type AudienceMode = 'preset' | 'picker';
-type AudienceChoice = 'adult' | 'kid' | 'both';
+/**
+ * Phase 3 of AI + Plan Change Implementation introduced age-banded kid
+ * generation. Picker now offers four choices: adult, kids (7-9 band),
+ * tweens (10-12 band), and "both" (legacy = adult + tweens kid lane).
+ */
+type AudienceChoice = 'adult' | 'kids' | 'tweens' | 'both';
 type LanePhase = 'idle' | 'starting' | 'discovering' | 'polling' | 'completed' | 'failed' | 'error';
 
 type RunRow = {
@@ -94,8 +99,17 @@ type RunDetailResponse = {
   totals: Totals;
 };
 
+type AgeBand = 'kids' | 'tweens';
+
 type Lane = {
   audience: Audience;
+  /**
+   * Phase 3 of AI + Plan Change Implementation: kid lanes carry a band
+   * (kids 7-9 vs tweens 10-12). Adult lanes leave it undefined; the route
+   * defaults kid runs without an explicit band to 'tweens'. The picker
+   * surfaces the choice so operators can generate either or both bands.
+   */
+  ageBand?: AgeBand;
   phase: LanePhase;
   runId: string;
   run: RunRow | null;
@@ -105,9 +119,10 @@ type Lane = {
   errorMessage: string;
 };
 
-function blankLane(audience: Audience): Lane {
+function blankLane(audience: Audience, ageBand?: AgeBand): Lane {
   return {
     audience,
+    ageBand,
     phase: 'idle',
     runId: '',
     run: null,
@@ -306,12 +321,20 @@ export default function GenerationModal({
 
     updateLane(audienceKey, { phase: 'starting', errorType: '', errorMessage: '' });
 
+    // Phase 3: forward age_band for kid runs. Lane carries the band picked
+    // in the audience picker; falls back to 'tweens' (legacy single-tier
+    // kid voice) if somehow undefined.
+    const lane = lanesRef.current.find((l) => l.audience === audienceKey);
+    const ageBand: AgeBand | undefined =
+      audienceKey === 'kid' ? (lane?.ageBand ?? 'tweens') : undefined;
+
     const generatePromise = fetch('/api/admin/pipeline/generate', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         cluster_id: clusterId,
         audience: audienceKey,
+        ...(ageBand ? { age_band: ageBand } : {}),
         provider,
         model,
         ...(trimmedFreeform ? { freeform_instructions: trimmedFreeform } : {}),
@@ -473,17 +496,26 @@ export default function GenerationModal({
     onGenerateClick?.();
     setShowPicker(false);
     if (choice === 'both') {
-      setLanes([blankLane('adult'), blankLane('kid')]);
-      // Defer the POSTs until after state lands so lanesRef.current is fresh.
+      // Legacy "both" = adult + tweens-band kid (the default single-tier
+      // voice). Operators wanting kids 7-9 specifically pick that band.
+      setLanes([blankLane('adult'), blankLane('kid', 'tweens')]);
       setTimeout(() => {
         void startLane('adult');
         void startLane('kid');
         ensureTimer();
       }, 0);
-    } else {
-      setLanes([blankLane(choice)]);
+    } else if (choice === 'adult') {
+      setLanes([blankLane('adult')]);
       setTimeout(() => {
-        void startLane(choice);
+        void startLane('adult');
+        ensureTimer();
+      }, 0);
+    } else {
+      // 'kids' (7-9) or 'tweens' (10-12) band
+      const band: AgeBand = choice;
+      setLanes([blankLane('kid', band)]);
+      setTimeout(() => {
+        void startLane('kid');
         ensureTimer();
       }, 0);
     }
@@ -559,8 +591,9 @@ export default function GenerationModal({
             lineHeight: 1.5,
           }}
         >
-          Pick which articles to generate from this cluster. Both fires the adult and kid pipelines
-          in parallel.
+          Pick which article(s) to generate from this cluster. Kid runs are band-tagged: Kids (7-9)
+          writes for early elementary; Tweens (10-12) writes for upper elementary / middle school.
+          Both fires the adult pipeline + a tweens-band kid pipeline in parallel.
         </div>
         {pickerMissing && (
           <div
@@ -579,7 +612,7 @@ export default function GenerationModal({
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
             gap: S[2],
           }}
         >
@@ -591,18 +624,25 @@ export default function GenerationModal({
             Adult
           </Button>
           <Button
-            variant="secondary"
-            disabled={pickerMissing}
-            onClick={() => void handleChoose('kid')}
-          >
-            Kid
-          </Button>
-          <Button
             variant="primary"
             disabled={pickerMissing}
             onClick={() => void handleChoose('both')}
           >
-            Both
+            Adult + Tweens
+          </Button>
+          <Button
+            variant="secondary"
+            disabled={pickerMissing}
+            onClick={() => void handleChoose('kids')}
+          >
+            Kids (7-9)
+          </Button>
+          <Button
+            variant="secondary"
+            disabled={pickerMissing}
+            onClick={() => void handleChoose('tweens')}
+          >
+            Tweens (10-12)
           </Button>
         </div>
         <div
