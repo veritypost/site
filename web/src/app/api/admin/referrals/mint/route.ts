@@ -76,8 +76,21 @@ export async function POST(request: Request) {
     p_expires_at: expires_at ?? undefined,
   });
   if (error || !data || !Array.isArray(data) || data.length === 0) {
-    console.error('[admin.referrals.mint]', error?.message);
-    return NextResponse.json({ error: 'Could not mint link' }, { status: 500 });
+    console.error('[admin.referrals.mint]', error);
+    // Admin-gated route → safe to surface the underlying RPC error to
+    // the response so the admin UI can show what's wrong instead of a
+    // generic "Could not mint link." Fields lifted from PostgrestError.
+    return NextResponse.json(
+      {
+        error: 'Could not mint link',
+        rpc_message: error?.message || null,
+        rpc_code: error?.code || null,
+        rpc_details: error?.details || null,
+        rpc_hint: error?.hint || null,
+        rows: Array.isArray(data) ? data.length : null,
+      },
+      { status: 500 }
+    );
   }
   const minted = data[0] as { id: string; code: string };
 
