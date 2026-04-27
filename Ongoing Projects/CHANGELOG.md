@@ -7,6 +7,12 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (wave 16 — T322 partial: 3 more events wired) — _shipped, pushed to git_ (commit 98f232f)
+
+6 of 19 KnownEventName types now fire (was 3): added `comment_post` (after `post_comment` RPC + scoring), `bookmark_add` (after row insert; skips on dedup), `verify_email_complete` (transition-only, not per-login). All `void trackServer` fire-and-forget. T322 body re-scoped to "6 of 19 wired; 13 remain." Deferred this wave: `subscribe_complete` (Stripe webhook 80+ lines deep), client-side mounts (`signup_start`, `article_read_start`), scroll/ad/quiz events (need sampling design).
+
+---
+
 ## 2026-04-27 (T300 follow-up — T300b drafted to close 2 gaps) — _shipped, pushed to git_ (commit 689dafa)
 
 ### MCP audit caught 2 gaps after owner applied T300
