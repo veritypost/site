@@ -555,6 +555,43 @@ export async function POST(req: Request) {
     );
   }
 
+  // T242 — capture an active-prompt-preset snapshot at run start so a
+  // generation run can be re-derived from its captured prompt regardless
+  // of what the active row says now (an admin can edit a preset between
+  // run start and audit). We also snapshot the resolved Layer-1 prompt
+  // override map post-cluster-load (below). Together these two writes
+  // produce a complete `input_params.prompt_snapshot` blob.
+  //
+  // Fail-OPEN: if the snapshot fetch errors, the snapshot key is omitted
+  // and the run still starts. The snapshot is observability, not gating.
+  // Pairs with T55 (full prompt-versioning UI) which is on the owner skip
+  // list — this is the minimum viable audit trail until that lands.
+  let presetSnapshot: Json | null = null;
+  try {
+    const { data: presetRows, error: presetErr } = await service
+      .from('ai_prompt_presets')
+      .select('id, name, body, audience, category_id, is_active, sort_order, version, updated_at')
+      .eq('is_active', true)
+      .in('audience', [audience, 'both'])
+      .order('sort_order', { ascending: true })
+      .order('name', { ascending: true });
+    if (presetErr) {
+      pipelineLog.warn('newsroom.generate.preset_snapshot_failed', {
+        cluster_id,
+        audience,
+        error_message: presetErr.message,
+      });
+    } else {
+      presetSnapshot = (presetRows ?? []) as unknown as Json;
+    }
+  } catch (err) {
+    pipelineLog.warn('newsroom.generate.preset_snapshot_threw', {
+      cluster_id,
+      audience,
+      error_message: err instanceof Error ? err.message : String(err),
+    });
+  }
+
   // 6. Create pipeline_runs row
   const startedAtDate = new Date();
   const startedAtMs = startedAtDate.getTime();
@@ -583,6 +620,19 @@ export async function POST(req: Request) {
         ...(sourceUrlsOverridden
           ? { source_urls_overridden: true, source_urls: sourceUrlOverride }
           : {}),
+        // T242 — frozen-at-run-start prompt material. `presets` is the
+        // full active list for this audience (operator-curated reusable
+        // blurbs surfaced in the Newsroom prompt picker). `freeform`
+        // mirrors the freeform_instructions column so a single jsonb
+        // read reconstructs the run's prompt context. `overrides` is
+        // appended in a follow-up UPDATE once cluster.category_id is
+        // known.
+        prompt_snapshot: {
+          captured_at: startedAtDate.toISOString(),
+          freeform: freeform_instructions ?? null,
+          presets: presetSnapshot,
+          overrides: null,
+        },
       } as Json,
       output_summary: {} as Json,
       step_timings_ms: {} as Json,
@@ -612,6 +662,58 @@ export async function POST(req: Request) {
   if (clusterErr || !clusterRow) {
     await failRun(service, runId, startedAtMs, 'unknown', 'Cluster not found', 0);
     return NextResponse.json({ error: 'Cluster not found' }, { status: 404 });
+  }
+
+  // T242 — second half of prompt snapshot. Now that cluster.category_id
+  // is resolved, fetch the Layer-1 ai_prompt_overrides map and splice it
+  // into input_params.prompt_snapshot.overrides via read-modify-write.
+  // The composed map (step → additional_instructions) is what the
+  // pipeline actually feeds each LLM call, so capturing it lets us
+  // reconstruct the exact system prompt for any past run. Fail-OPEN:
+  // skip on error.
+  try {
+    const overrideMap = await fetchPromptOverrides(
+      service,
+      clusterRow.category_id ?? null,
+      null,
+      audience
+    );
+    const overridesObj: Record<string, string> = {};
+    for (const [step, text] of overrideMap) overridesObj[step] = text;
+    const { data: cur, error: curErr } = await service
+      .from('pipeline_runs')
+      .select('input_params')
+      .eq('id', runId)
+      .maybeSingle();
+    if (!curErr) {
+      const curParams =
+        cur?.input_params &&
+        typeof cur.input_params === 'object' &&
+        !Array.isArray(cur.input_params)
+          ? (cur.input_params as Record<string, unknown>)
+          : {};
+      const curSnap =
+        curParams.prompt_snapshot &&
+        typeof curParams.prompt_snapshot === 'object' &&
+        !Array.isArray(curParams.prompt_snapshot)
+          ? (curParams.prompt_snapshot as Record<string, unknown>)
+          : {};
+      const nextParams: Record<string, unknown> = {
+        ...curParams,
+        prompt_snapshot: { ...curSnap, overrides: overridesObj },
+      };
+      await service
+        .from('pipeline_runs')
+        .update({ input_params: nextParams as Json })
+        .eq('id', runId);
+    }
+  } catch (err) {
+    pipelineLog.warn('newsroom.generate.override_snapshot_failed', {
+      cluster_id,
+      audience,
+      run_id: runId,
+      error_message: err instanceof Error ? err.message : String(err),
+    });
   }
 
   // The unified-feed pivot removed the adult-only-cluster guard: the operator

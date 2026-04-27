@@ -13,6 +13,7 @@ import { useToast } from '@/components/Toast';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import { getScoreTiers, tierFor, type ScoreTier } from '@/lib/scoreTiers';
 import type { Tables } from '@/types/database-helpers';
+import { PROFILE_REPORT_REASONS } from '@/lib/reportReasons';
 
 // Kill-switched while public profile is being polished. Owner flips
 // PUBLIC_PROFILE_ENABLED back to true to restore the real UI; all
@@ -514,6 +515,10 @@ export default function ProfilePage() {
             <div style={{ fontSize: 13, fontWeight: 700, color: '#111', marginBottom: 8 }}>
               Report @{target.username}
             </div>
+            {/* T278 — Profile-report reasons centralized in
+                @/lib/reportReasons. Urgent / 18 U.S.C. § 2258A trio
+                (csam, child_exploitation, grooming) leads the list so
+                victims see them first. */}
             <select
               value={reportReason}
               onChange={(e) => setReportReason(e.target.value)}
@@ -530,11 +535,11 @@ export default function ProfilePage() {
                 fontFamily: 'inherit',
               }}
             >
-              <option value="spam">Spam</option>
-              <option value="harassment">Harassment</option>
-              <option value="impersonation">Impersonation</option>
-              <option value="hate">Hate speech</option>
-              <option value="other">Other</option>
+              {PROFILE_REPORT_REASONS.map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label}
+                </option>
+              ))}
             </select>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button

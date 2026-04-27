@@ -415,14 +415,6 @@ The numbered items below retain their original section placement for readability
 
 ## HIGH — close before launch quality bar
 
-### T11 — Web has zero post-article exit path; iOS has Up Next that auto-fires — **HIGH** (engagement)
-**File:** `web/src/app/story/[slug]/page.tsx` (no related-articles section); `VerityPost/VerityPost/StoryDetailView.swift:1733-1743` (auto-pop at 95% scroll), `:2320-2325` (post-comment auto-pop).
-**Problem:** Web reader finishes article → home feed they already saw. iOS has Up Next data + sheet, but it pops automatically (twice).
-**Fix:**
-- Web: add a static "More in [Category]" strip after discussion / paywall, 1-3 same-category articles, editorially curated (not algorithmic).
-- iOS: remove both auto-triggers. Surface Up Next as a static card at article end or a button in the nav bar.
-**Recommendation:** **Editorial, not algorithmic** — matches the trust-product positioning. Same component on both surfaces. No personalization until home-feed personalization is fixed (T19).
-
 ### T12 — iOS comment threading missing — **HIGH**
 **File:** `VerityPost/VerityPost/StoryDetailView.swift:2371` (TODO comment: "parent_id is omitted here — iOS UI doesn't expose threaded reply yet"); `parent_id` IS fetched at lines 1921, 2077.
 **Fix:** Surface a Reply button per comment. Indent replies (left border). Pass `parent_id` on submit.
@@ -749,12 +741,6 @@ The numbered items below retain their original section placement for readability
 **Fix:** When `read_state` row exists for the user, render the article card title in dimmer color + a subtle "Read" tag. Persist on quiz attempt or 80%-scroll.
 **Recommendation:** Already have `reading_log` data; surface it visually. Pair with T91.
 
-#### T110 — Home editorial day is hard-coded America/New_York — **MEDIUM**
-**File:** `web/src/app/page.tsx:34,100` (`EDITORIAL_TZ = 'America/New_York'`).
-**Problem:** Pacific users at 9 PM PT (midnight ET) see "today's" content that's already old. International users see worse skew.
-**Fix:** Either (a) accept editorial-zone framing and add "Today's edition (NYT time)" subtitle, or (b) shift to user's local zone for "today" filtering with editorial lock at NYT publish time.
-**Recommendation:** Option (a) is consistent with the newspaper-of-record positioning. One-line copy.
-
 #### T116 — iOS comment rate-limit shows "Wait" without countdown — **MEDIUM**
 **File:** `VerityPost/VerityPost/StoryDetailView.swift:2404-2420` (rate-limit flag flips, no duration shown).
 **Problem:** User taps Send, gets "Wait", retries, gets "Wait" again. Same friction as kids pair-code lockout.
@@ -815,36 +801,9 @@ The numbered items below retain their original section placement for readability
 
 ### Engagement / Retention (T140-T154)
 
-#### T140 — No category-picker step in post-signup flow — **HIGH** (activation)
-**Surface:** `/signup/pick-username` → home redirect (no interstitial).
-**Problem:** New user lands on bare feed instead of personalized starting point.
-**Fix:** Lightweight category/topic picker between username + home.
-
-#### T141 — Quiz "passed" state has no next-action CTA — **MEDIUM** (recirc)
-**File:** `web/src/components/ArticleQuiz.tsx` — claim line `:72` was off; problem is real but actual CTA-rendering location TBD. Stage = 'passed' celebrates with no path forward to discussion or related reads.
-**Fix:** Add "View Discussion" + "More in [Category]" buttons in the passed state. Bundles with T11/T53.
-
 #### T148 — iOS Alerts shows Manage tab to anon, lands on disabled state — **MEDIUM** (UX)
 **File:** `VerityPost/VerityPost/AlertsView.swift:137-150,29-32`. Two tabs visible; Manage tab is disabled placeholder.
 **Fix:** Hide Manage for anon. On signed-in first visit, jump to Manage to onboard category selection.
-
-#### T149 — Quiz pool exhaustion has no recovery path — **MEDIUM** (engagement)
-**File:** `web/src/components/ArticleQuiz.tsx:100-104`. "You have seen every question in this article's pool" terminates engagement with no alt.
-**Fix:** "Try a different article" + same-category recommendations.
-
-#### T151 — Pick-username form doesn't explain handles unlock follower discovery + sharing — **LOW** (activation)
-**File:** `web/src/app/signup/pick-username/page.tsx`. Says "Your public profile card uses your username" only.
-**Fix:** Supporting copy: "This is how other readers find and follow you."
-
-#### T152 — Browse category cards static, no "trending now" subtext — **LOW** (engagement)
-**File:** `web/src/app/browse/page.tsx:62-80`. Category card shows count only, not signal of activity.
-**Fix:** "Trending: [Article title]" subtitle per category.
-
-#### T153 — Message deep-link `?to=<userId>` accepts invalid IDs without validation — **LOW** (UX)
-**File:** `web/src/app/messages/page.tsx:115-116,173`. Stale/invalid user IDs show compose form into the void.
-**Fix:** Resolve user on mount; "User not found" if invalid.
-
-### Senior Frontend (T155-T169)
 
 #### T165 — 90+ inline `CSSProperties` objects, no stylesheet/Tailwind/CSS modules — **LOW** (maintainability)
 **File:** Across `web/src/components/`, `web/src/app/`. Maintenance burden, bundle size cost.
@@ -958,21 +917,9 @@ Items below already moved to Pre-Launch Assessment (Apple/Sentry/COPPA-CRITICAL)
 **File:** `web/src/app/story/[slug]/page.tsx:468, 578-593, 602-626`. 9 round-trips on 3G = 9-15s load.
 **Fix:** Inline `timelines` + `sources` as joined rows; cache user plan in AuthContext.
 
-#### T231 — No CI integration test for `vercel.json` cron paths ↔ route handlers — **LOW**
-**File:** `web/vercel.json` vs `web/src/app/api/cron/*/route.*`.
-**Fix:** CI step: assert `count(crons in vercel.json) == count(handler files)`.
-
 #### T233 — Hard-delete on articles, no soft-delete window — **HIGH**
 **File:** `web/src/app/api/admin/articles/[id]/route.ts:611`. `.delete()` removes permanently; audit log writes after delete (orphan if persist fails).
 **Fix:** Soft-delete via `deleted_at`; write audit before mutation; cron purges after 30 days.
-
-#### T234 — `is_ai_generated` flag never rendered to readers — **HIGH** (trust)
-**File:** Admin `system/page.tsx:45` defines `show_ai_label`; story page never reads `is_ai_generated`. Pairs with EU AI Act / CA AB 2655 disclosure (T245 below).
-**Fix:** Story page renders "AI-synthesized" badge when `is_ai_generated=true && show_ai_label=true`.
-
-#### T235 — Admin article PATCH uses non-transactional `.delete()` + `.insert()` for sources/timeline/quizzes — **MEDIUM**
-**File:** `web/src/app/api/admin/articles/[id]/route.ts:440-512`. Mid-operation failure leaves child rows inconsistent; audit fires on success only.
-**Fix:** Wrap in RPC or PostgreSQL transaction; audit only on commit.
 
 #### T236 — Plagiarism rewrite prompt overrides not audited per-run — **MEDIUM**
 **File:** `web/src/lib/pipeline/plagiarism-check.ts:82-84`. Admin `additionalInstructions` appended silently; no record of which override was active.
@@ -989,18 +936,6 @@ Items below already moved to Pre-Launch Assessment (Apple/Sentry/COPPA-CRITICAL)
 #### T239 — Featured/trending curation logic opaque — **MEDIUM**
 **File:** `web/src/app/browse/page.tsx:164-165`. "Most recent 3" hardcoded client-side; `is_featured` schema column never set or surfaced.
 **Fix:** Admin pin UI; "Featured by editors" label; track in audit log.
-
-#### T240 — Comment hide has no comment-level audit log — **LOW**
-**File:** `web/src/app/admin/moderation/page.tsx`. Penalty-level audit exists; comment-hide / hide-reason not tracked granularly.
-**Fix:** `moderation_actions` table (comment_id, moderator_id, action, reason, created_at).
-
-#### T241 — Sources have no broken-link verification — **LOW**
-**File:** `web/src/app/story/[slug]/page.tsx:108-200`. No `last_verified_at`/`status_code` on sources.
-**Fix:** Add columns; weekly cron checks links; flag dead in admin article view.
-
-#### T242 — Prompt preset versioning timestamp/version missing — **MEDIUM**
-**File:** `web/src/app/api/admin/prompt-presets/route.ts`. Pairs with T55. Re-running cluster with different prompt yields different output; no diff in audit.
-**Fix:** Snapshot prompt body into `pipeline_runs.metadata` at start; diff in audit on retry.
 
 #### T243 — Article author byline not rendered — **LOW** (trust)
 **File:** `web/src/app/story/[slug]/page.tsx`. `articles.author_id` never displayed; readers don't see author/expert/AI status.
@@ -1107,16 +1042,6 @@ Items below already moved to Pre-Launch Assessment (Apple/Sentry/COPPA-CRITICAL)
 #### T272 — Accessibility statement page absent (ADA defense) — **MEDIUM**
 **File:** `web/src/app/accessibility/page.tsx` exists but lacks formal Accessibility Statement (WCAG commitment + known limitations + contact).
 **Fix:** Add statement section: WCAG 2.1 AA commitment + accessibility@veritypost.com contact.
-
-#### T273 — Missing kids-specific privacy policy URL — **HIGH** (COPPA + Apple Kids)
-**File:** Privacy policy has COPPA section but no `/privacy/kids` page or kids-app-linkable URL. Apple Kids Category requires distinct kids notice.
-**Fix:** Create `/privacy/kids` enumerating kid-specific data collection. Also tracked as Pre-Launch Assessment K11.
-
-### Trust & Safety (T274-T287)
-
-#### T278 — No CSAM reporting / NCMEC path — **HIGH** (legal duty)
-**File:** Codebase-wide. `/api/reports` accepts free text; no urgent severity, no fast-lane, no NCMEC integration.
-**Fix:** Add `reason: 'csam' | 'child_exploitation' | 'grooming'` enum on kids-surface reports; auto-prioritize + on-call alert; CyberTipline footer link.
 
 #### T282 — Block scope hides DMs/comments only, not leaderboard/profile/expert-Q&A — **MEDIUM**
 **File:** `web/src/app/api/users/blocked/route.js`. Pairs with T17.

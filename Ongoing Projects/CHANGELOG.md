@@ -7,6 +7,81 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (Parallel sweep wave 4 — 15 items + 1 deferred across 6 clusters) — _shipped, pushed to git/Vercel_
+
+### Cluster — Story page (T234 + T11)
+
+- **T234** — `web/src/app/story/[slug]/page.tsx`: `is_ai_generated` flag now rendered as a small "AI-synthesized" pill below excerpt, gated by `settings.show_ai_label !== false` (defaults true). Long EU AI Act / CA AB 2655 explanation in the `title=` tooltip on hover. Integrates cleanly with prior-wave T13/T30/T130/T63 edits.
+- **T11 (web piece)** — same file: post-article "More in [Category]" strip below the discussion section (3-card stacked grid, title + published date, top-bordered). Same-category articles fetched alongside existing timelines/sources/quizzes (no extra round-trip). Empty discussion state gets a compact same-category list via new `emptyStateExtra` prop on `<CommentThread>`. Silent absence when article has no `category_id` or no siblings. iOS Up Next removal still owed (T11 iOS piece) — separate task.
+
+### Cluster — Kids privacy URL (T273)
+
+- New `web/src/app/privacy/kids/page.tsx` — full COPPA notice with 7 sections (collect / don't-collect / VPC / parental rights / retention / no-third-party / contact). Server component, no auth gate. Style matches main privacy page.
+- `web/src/app/privacy/page.tsx` Section 7 (COPPA) gains a final bullet linking to `/privacy/kids`.
+- `web/src/app/NavWrapper.tsx` footer adds `Kids Privacy → /privacy/kids` between Privacy and the California Privacy Rights link.
+
+### Cluster — CSAM reporting (T278)
+
+- New `web/src/lib/reportReasons.js` — single source of truth for report reasons. Exports `URGENT_REPORT_REASONS` (`csam`, `child_exploitation`, `grooming`), three reason lists (`COMMENT_REPORT_REASONS`, `ARTICLE_REPORT_REASONS`, `PROFILE_REPORT_REASONS`), `isUrgentReason()` + `assertReportReason()` for server-side enum validation.
+- New `web/src/lib/ncmec.ts` — `reportToNCMEC()` stub + `ncmecConfigured()` env-flag helper. Header is operator runbook with 18 U.S.C. § 2258A context, NCMEC field requirements, full registration checklist (`NCMEC_ESP_ID` / `NCMEC_API_TOKEN` env vars).
+- `web/src/app/api/comments/[id]/report/route.js`: urgent reasons (a) bypass T281 per-target rate limit (victim never silenced), (b) insert with `is_escalated=true` + `metadata={severity:'urgent', legal_basis, reason_code}`, (c) emit `captureMessage('urgent report submitted', 'error', ...)`, (d) attempt `reportToNCMEC()` if `ncmecConfigured()`.
+- `web/src/app/api/reports/route.js`: same enum check + urgent-flag flow on article-level reports.
+- `web/src/components/CommentThread.tsx`, `web/src/app/story/[slug]/page.tsx`, `web/src/app/u/[username]/page.tsx` — all import shared `*_REPORT_REASONS` so urgent options surface in every report dropdown.
+- `web/src/app/dmca/page.tsx` + `web/src/app/help/page.tsx` — CyberTipline footer block (https://report.cybertipline.org, 1-800-843-5678, § 2258A citation).
+- **NCMEC API wire is SCAFFOLDED ONLY** — operator must register Verity Post as an ESP at cybertipline.org/registration, store credentials, then implement `reportToNCMEC()` body. In-app urgent path (escalation flag + Sentry page + rate-limit bypass) works today regardless.
+- Out-of-scope flag: iOS `BlockService.swift ReportReason` enum needs the same three values added.
+
+### Cluster — Article admin + pipeline (T235 + T242 + T241 + T231 + T240 verify)
+
+- **T235** — `web/src/app/api/admin/articles/[id]/route.ts`: per-table delete-then-insert sequences wrapped in try/catch with `captureMessage('admin article PATCH inconsistent state', 'error', ...)` on partial-failure. Begin/commit audit_log pair (`article.edit.begin` / `article.edit.commit`) — operators detect failed mid-flight PATCHes by scanning for begins without matching commits. TODO(T5) comment references the future `update_admin_article_with_children` RPC.
+- **T242** — `web/src/app/api/admin/pipeline/generate/route.ts`: snapshot active `ai_prompt_presets` + `ai_prompt_overrides` into `pipeline_runs.input_params.prompt_snapshot` jsonb at run start. Existing `input_params` reused — no schema change. Failure of snapshot capture fails-OPEN; pipeline still runs.
+- **T231** — new executable `web/scripts/check-crons.mjs` reads `vercel.json` + walks `web/src/app/api/cron/*/route.{js,ts}`, asserts bidirectional 1:1. Wired as `npm run check-crons`. Already finds 2 real drifts (`cleanup-data-exports`, `rate-limit-cleanup` exist on disk but missing schedules) — flagged for owner triage.
+- **T241** — TODO(T241) block added to `web/src/app/api/cron/pipeline-cleanup/route.ts` header documenting proposed schema (`sources.last_verified_at`, `sources.status_code`) + cron route + weekly cadence. T5 schema halt; no migration drafted.
+- **T240** — already-done in W3; verified TODO comment still in place at `web/src/app/admin/moderation/page.tsx`.
+
+### Cluster — Post-signup category picker (T140)
+
+- New `web/src/app/signup/pick-categories/page.tsx` — client component, 8-12 category chips, MIN_PICKS=3 / MAX_PICKS=7, "Skip" option. Saves selected category IDs into `users.metadata.feed.cats` via `update_own_profile` RPC (preserves other `feed.*` keys via fresh-read merge). Redirects to `/welcome` on submit/skip. Idempotent: returning user with `onboarding_completed_at` set OR `feed.cats.length >= 3` bounces to `/welcome`. Forwards `?next=` through.
+- `web/src/app/signup/pick-username/page.tsx`: 3 redirect targets switched from `/welcome` to `/signup/pick-categories` (returning-user-with-username branch, successful submit, skip path).
+- Used existing `users.metadata.feed.cats` key (the live key in production), NOT the `metadata.feed.preferred_categories` the audit suggested. Aligned to existing storage to avoid forking a parallel store.
+- Flow: signup → email-verify/OAuth callback → `/signup/pick-username` → `/signup/pick-categories` (3-7) → `/welcome` carousel → first story (T39).
+
+### Cluster — Web small UX (T110 + T141 + T149 + T151 + T153)
+
+- **T110** — `web/src/app/page.tsx`: home masthead now renders the date + small "Today's edition (Eastern Time)" 11px disclosure under it. Timezone logic untouched.
+- **T141** — `web/src/components/ArticleQuiz.tsx` passed-stage: single-line "Jump to discussion · Browse for your next article" CTA below the existing pass message. Adult-only (skipped for kids). Required adding `id="discussion"` anchor on the discussion section in `web/src/app/story/[slug]/page.tsx`.
+- **T149** — `web/src/components/ArticleQuiz.tsx`: new `poolExhausted` state set when API returns "pool exhausted." Renders "Try a different article — browse more." recovery line in the idle stage below the existing terminal-error message.
+- **T151** — `web/src/app/signup/pick-username/page.tsx`: supporting line below the existing copy: "This is how other readers find and follow you. Choose carefully — usernames are permanent."
+- **T153** — `web/src/app/messages/page.tsx`: `?to=<userId>` deep-link now UUID-shape regex-checked. Invalid shape → `toast.error('User not found.')` and bail without firing the compose-prefill.
+- **T152 DEFERRED-TOO-LARGE** — per-category "trending now" subtitles on browse cards require either N parallel fetches or a denormalized aggregate column. Real feature work, not copy edit. Left for future session.
+
+### Files touched
+
+- web/src/app/api/admin/articles/[id]/route.ts
+- web/src/app/api/admin/pipeline/generate/route.ts
+- web/src/app/api/comments/[id]/report/route.js
+- web/src/app/api/cron/pipeline-cleanup/route.ts
+- web/src/app/api/reports/route.js
+- web/src/app/dmca/page.tsx
+- web/src/app/help/page.tsx (already touched W3)
+- web/src/app/messages/page.tsx
+- web/src/app/NavWrapper.tsx
+- web/src/app/page.tsx
+- web/src/app/privacy/kids/page.tsx (NEW)
+- web/src/app/privacy/page.tsx
+- web/src/app/signup/pick-categories/page.tsx (NEW)
+- web/src/app/signup/pick-username/page.tsx
+- web/src/app/story/[slug]/page.tsx
+- web/src/app/u/[username]/page.tsx
+- web/src/components/ArticleQuiz.tsx
+- web/src/components/CommentThread.tsx
+- web/src/lib/ncmec.ts (NEW)
+- web/src/lib/reportReasons.js (NEW)
+- web/scripts/check-crons.mjs (NEW)
+- web/package.json (npm script)
+
+---
+
 ## 2026-04-27 (Parallel sweep wave 3 — 22 items shipped + 4 stale across 6 clusters) — _shipped, pushed to git/Vercel_
 
 ### Cluster — Walkthrough copy

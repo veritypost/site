@@ -24,6 +24,10 @@ export default function PrivacyPage() {
     color: '#111111',
     lineHeight: '1.8',
   };
+  const linkStyle: CSSProperties = {
+    color: '#2563eb',
+    textDecoration: 'underline',
+  };
 
   return (
     <div style={{ minHeight: '100vh', background: '#ffffff', padding: '20px' }}>
@@ -165,6 +169,14 @@ export default function PrivacyPage() {
             <li>
               Parents may review, modify, or delete their child&apos;s data by contacting
               legal@veritypost.com.
+            </li>
+            <li>
+              For complete details on what we collect from kid profiles, parental rights, and our
+              retention policy, see the{' '}
+              <a href="/privacy/kids" style={linkStyle}>
+                Kids Privacy Notice
+              </a>
+              .
             </li>
           </ul>
         </div>

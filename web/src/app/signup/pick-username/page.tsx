@@ -93,9 +93,12 @@ export default function PickUsernamePage() {
             display_name: string | null;
             username: string | null;
           }>();
-        // If they already have a username, skip straight to /welcome.
+        // If they already have a username, jump to the next onboarding hop.
+        // /signup/pick-categories handles its own idempotence (skips to
+        // /welcome if categories already saved or onboarding is complete),
+        // so it's the safe always-route target here.
         if (me?.username) {
-          router.replace(`/welcome${readValidatedNext()}`);
+          router.replace(`/signup/pick-categories${readValidatedNext()}`);
           return;
         }
         setSuggestions(buildSuggestions(me?.email || user.email, me?.display_name));
@@ -189,7 +192,7 @@ export default function PickUsernamePage() {
     try {
       const ok = await persistUsername(username);
       if (ok) {
-        router.replace(`/welcome${readValidatedNext()}`);
+        router.replace(`/signup/pick-categories${readValidatedNext()}`);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save username. Please try again.');
@@ -208,7 +211,7 @@ export default function PickUsernamePage() {
       try {
         const ok = await persistUsername(candidate);
         if (ok) {
-          router.replace(`/welcome${readValidatedNext()}`);
+          router.replace(`/signup/pick-categories${readValidatedNext()}`);
           return;
         }
       } catch (err) {
@@ -279,8 +282,13 @@ export default function PickUsernamePage() {
         >
           Pick a username.
         </h1>
-        <p style={{ fontSize: '14px', color: C.dim, margin: '0 0 28px 0', lineHeight: 1.55 }}>
+        <p style={{ fontSize: '14px', color: C.dim, margin: '0 0 12px 0', lineHeight: 1.55 }}>
           This is how other readers will know you.
+        </p>
+        {/* T151 — surface the stakes: handles drive follower discovery +
+            sharing, and they don't change. One sentence, same dim color. */}
+        <p style={{ fontSize: '13px', color: C.dim, margin: '0 0 28px 0', lineHeight: 1.55 }}>
+          This is how other readers find and follow you. Choose carefully — usernames are permanent.
         </p>
 
         {error && (

@@ -5,6 +5,8 @@ import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { getSettings } from '@/lib/settings';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { assertReportReason, isUrgentReason } from '@/lib/reportReasons';
+import { captureMessage } from '@/lib/observability';
 
 export async function POST(request) {
   try {
@@ -34,6 +36,15 @@ export async function POST(request) {
         { status: 400 }
       );
     }
+    // T278 — Server-side enum validation. The article-level reports
+    // route used to accept any string; now we lock it to the same
+    // closed enum the comment route uses, which also rejects free-text
+    // bypasses of the urgent / NCMEC code path.
+    try {
+      assertReportReason(reason);
+    } catch (err) {
+      return NextResponse.json({ error: 'invalid reason' }, { status: err.status || 400 });
+    }
     if (description && description.length > 1000) {
       console.error('[reports] input_too_long', {
         field: 'description',
@@ -43,20 +54,52 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Input too long' }, { status: 400 });
     }
 
+    const urgent = isUrgentReason(reason);
+
+    const insertRow = {
+      reporter_id: user.id,
+      target_type: targetType,
+      target_id: targetId,
+      reason,
+      description: description || null,
+    };
+    if (urgent) {
+      // T278 — Same urgent treatment as comment reports. NCMEC
+      // submission for non-comment targets (article body, profile
+      // banner, message attachment) lives in the moderator UI for now;
+      // the in-DB escalation + observability page are the durable
+      // signals admins triage on. See web/src/lib/ncmec.ts for the
+      // full operator checklist.
+      insertRow.is_escalated = true;
+      insertRow.metadata = {
+        severity: 'urgent',
+        legal_basis: '18_usc_2258a',
+        reason_code: reason,
+      };
+    }
+
     const { data: report, error: insertError } = await supabase
       .from('reports')
-      .insert({
-        reporter_id: user.id,
-        target_type: targetType,
-        target_id: targetId,
-        reason,
-        description: description || null,
-      })
+      .insert(insertRow)
       .select()
       .single();
 
     if (insertError) {
       return NextResponse.json({ error: 'Could not file report' }, { status: 500 });
+    }
+
+    if (urgent) {
+      try {
+        await captureMessage('urgent report submitted', 'error', {
+          report_id: report.id,
+          target_type: targetType,
+          target_id: targetId,
+          reason,
+          reporter_user_id: user.id,
+        });
+      } catch (obsErr) {
+        console.error('[reports] observability_failed', obsErr);
+      }
     }
 
     // Auto-hide comment if report count meets threshold

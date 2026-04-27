@@ -87,6 +87,10 @@ export default function ArticleQuiz({
   const [result, setResult] = useState<QuizResult | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [showInterstitial, setShowInterstitial] = useState<boolean>(false);
+  // T149 — flag the dead-end "you've seen every question" path so the
+  // result block can render a recovery CTA below it instead of leaving
+  // the reader stuck on a terminal message.
+  const [poolExhausted, setPoolExhausted] = useState<boolean>(false);
   const trackEvent = useTrack();
 
   const canStart = hasPermission('quiz.attempt.start');
@@ -97,6 +101,7 @@ export default function ArticleQuiz({
   async function startAttempt() {
     setStage('loading-start');
     setError('');
+    setPoolExhausted(false);
     try {
       const res = await fetch('/api/quiz/start', {
         method: 'POST',
@@ -108,8 +113,10 @@ export default function ArticleQuiz({
         const msg = data?.error || 'Could not start quiz';
         if (/pool not ready/i.test(msg))
           throw new Error('Quiz is not yet available for this article.');
-        if (/pool exhausted/i.test(msg))
+        if (/pool exhausted/i.test(msg)) {
+          setPoolExhausted(true);
           throw new Error('You have seen every question in this article\u2019s pool.');
+        }
         throw new Error(msg);
       }
       setQuestions(data.questions || []);
@@ -234,6 +241,27 @@ export default function ArticleQuiz({
               ? 'Great reading! You got it.'
               : 'You\u2019ve passed the quiz on this article. The discussion is below.'}
           </div>
+          {/* T141 \u2014 give passed-state a forward path. One line, two
+              targets: jump to the unlocked thread, or go pick the next
+              read. Same-category recirc is owned by T11; this is just
+              the "what now?" beat. */}
+          {!isKid && (
+            <div style={{ fontSize: 12, color: C.dim, marginTop: 10, lineHeight: 1.5 }}>
+              <a
+                href="#discussion"
+                style={{ color: C.accent, textDecoration: 'underline', fontWeight: 600 }}
+              >
+                Jump to discussion
+              </a>
+              {' \u00b7 '}
+              <a
+                href="/browse"
+                style={{ color: C.accent, textDecoration: 'underline', fontWeight: 600 }}
+              >
+                Browse for your next article
+              </a>
+            </div>
+          )}
         </div>
       </>
     );
@@ -261,6 +289,21 @@ export default function ArticleQuiz({
             : ' Unlimited attempts on your plan.'}
         </div>
         {error && <div style={{ fontSize: 12, color: C.danger, marginBottom: 10 }}>{error}</div>}
+        {/* T149 — pool exhaustion is engagement-terminal otherwise. Give
+            the reader a one-line escape hatch back to the catalog. T11
+            owns same-category recommendations; this stays minimal. */}
+        {poolExhausted && (
+          <div style={{ fontSize: 12, color: C.dim, marginBottom: 12, lineHeight: 1.5 }}>
+            Try a different article —{' '}
+            <a
+              href="/browse"
+              style={{ color: C.accent, textDecoration: 'underline', fontWeight: 600 }}
+            >
+              browse more
+            </a>
+            .
+          </div>
+        )}
         <button
           onClick={startAttempt}
           disabled={stage === 'loading-start'}

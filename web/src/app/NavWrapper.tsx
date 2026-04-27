@@ -435,6 +435,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
                 // { label: 'Help', href: '/help' },
                 { label: 'Contact', href: '/contact' },
                 { label: 'Privacy', href: '/privacy' },
+                { label: 'Kids Privacy', href: '/privacy/kids' },
                 { label: 'Your California Privacy Rights', href: '/privacy#california' },
                 { label: 'Terms', href: '/terms' },
                 { label: 'Cookies', href: '/cookies' },

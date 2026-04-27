@@ -275,6 +275,25 @@ export default function HomePage() {
           padding: '32px 20px 64px',
         }}
       >
+        {/* T110 — disclose editorial timezone. The newsroom day is anchored
+            to America/New_York; readers in other zones should know what
+            "today" means here. Subtle masthead line, not a banner. */}
+        <div style={{ marginBottom: 24, lineHeight: 1.3 }}>
+          <div
+            style={{
+              fontFamily: serifStack,
+              fontSize: 13,
+              color: C.dim,
+              fontWeight: 500,
+            }}
+          >
+            {today.humanDate}
+          </div>
+          <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
+            Today&rsquo;s edition (Eastern Time)
+          </div>
+        </div>
+
         {loading && <FrontPageSkeleton />}
 
         {!loading && loadFailed && <FetchFailed onRetry={() => setReloadKey((k) => k + 1)} />}

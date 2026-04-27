@@ -21,6 +21,7 @@ import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/perm
 import { getPlanLimitValue } from '@/lib/plans';
 import type { Tables } from '@/types/database-helpers';
 import { Z } from '@/lib/zIndex';
+import { ARTICLE_REPORT_REASONS } from '@/lib/reportReasons';
 
 // ------- Local shape helpers -------
 // `articles` is joined with a slim `categories` projection; Row plus the nested
@@ -70,25 +71,18 @@ interface SourcePill {
   url?: string | null;
 }
 
-interface ReportCategory {
-  value: string;
-  label: string;
-}
-
 // LAUNCH: anonymous "Keep reading, free" signup interstitial hidden
 // pre-launch. Flip to false when sign-ups open. Trigger logic and
 // component stay alive — see companion revert guide in
 // Sessions/04-21-2026.
 const LAUNCH_HIDE_ANON_INTERSTITIAL = true;
 
-const REPORT_CATEGORIES: ReportCategory[] = [
-  { value: 'harassment', label: 'Harassment' },
-  { value: 'misinformation', label: 'Misinformation' },
-  { value: 'spam', label: 'Spam' },
-  { value: 'hate_speech', label: 'Hate speech' },
-  { value: 'off_topic', label: 'Off topic' },
-  { value: 'impersonation', label: 'Impersonation' },
-];
+// T278 — Article-level report categories now lead with the urgent /
+// 18 U.S.C. § 2258A trio (csam, child_exploitation, grooming). Source
+// of truth lives in @/lib/reportReasons; the comment-report dialog and
+// profile-report dialog import from the same module so admin triage
+// sees one consistent enum across surfaces.
+const REPORT_CATEGORIES = ARTICLE_REPORT_REASONS;
 
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return '';
@@ -377,6 +371,24 @@ export default function StoryPage() {
   const [isDesktop, setIsDesktop] = useState<boolean>(true);
   const [bookmarkError, setBookmarkError] = useState<string>('');
 
+  // T234 — AI-disclosure pill. `is_ai_generated` is set by the synthesis
+  // pipeline; `show_ai_label` is the admin master switch (admin/system
+  // page → Transparency). Default to true when the setting is missing so
+  // a fresh DB defaults to disclosed (EU AI Act / CA AB 2655 alignment).
+  const [showAiLabel, setShowAiLabel] = useState<boolean>(true);
+
+  // T11 — post-article exit path. Up to three most-recent same-category
+  // articles, excluding the current one. Editorial selection (no
+  // engagement-weighted ranking). Empty when the article has no
+  // category_id or the query returns nothing.
+  type RelatedArticle = {
+    id: string;
+    slug: string | null;
+    title: string | null;
+    published_at: string | null;
+  };
+  const [relatedInCategory, setRelatedInCategory] = useState<RelatedArticle[]>([]);
+
   // Reading-progress ribbon. Drives a `transform: scaleX(value)` bar fixed at
   // the top of the document. Updated on scroll via a passive listener; clamped
   // 0..1 so the bar never overshoots when the page is shorter than the
@@ -490,6 +502,12 @@ export default function StoryPage() {
           return {};
         });
 
+        // T234 — read the AI-disclosure master switch alongside the
+        // existing settings consumers (free_article_limit, registration_wall,
+        // tts_default). Default true when the row is missing so disclosure
+        // is the safe default; admin can flip to hide.
+        setShowAiLabel(isEnabled(allSettings, 'show_ai_label', true));
+
         const {
           data: { user: authUser },
         } = await supabase.auth.getUser();
@@ -592,7 +610,22 @@ export default function StoryPage() {
           }
         }
 
-        const [timelineRes, sourcesRes, quizPoolRes] = await Promise.all([
+        // T11 — same-category article fetch piggybacks the existing
+        // Promise.all so it doesn't add a roundtrip. Skipped when the
+        // article has no category_id (the strip silently absents itself
+        // rather than rendering an empty header).
+        const relatedQuery = storyData.category_id
+          ? supabase
+              .from('articles')
+              .select('id, slug, title, published_at')
+              .eq('status', 'published')
+              .eq('category_id', storyData.category_id)
+              .neq('id', storyId)
+              .order('published_at', { ascending: false })
+              .limit(3)
+          : Promise.resolve({ data: [] as RelatedArticle[], error: null });
+
+        const [timelineRes, sourcesRes, quizPoolRes, relatedRes] = await Promise.all([
           supabase
             .from('timelines')
             .select('*')
@@ -607,10 +640,12 @@ export default function StoryPage() {
             .from('quizzes')
             .select('id', { count: 'exact', head: true })
             .eq('article_id', storyId),
+          relatedQuery,
         ]);
         setTimeline((timelineRes.data as TimelineRow[] | null) || []);
         setSources((sourcesRes.data as SourceRow[] | null) || []);
         setQuizPoolSize(quizPoolRes.count || 0);
+        setRelatedInCategory((relatedRes.data as RelatedArticle[] | null) || []);
 
         // Comments live inside <CommentThread/>, which does its own
         // fetch + realtime once the user has passed the quiz (D6).
@@ -1137,6 +1172,53 @@ export default function StoryPage() {
     textDecoration: 'none',
   };
 
+  // T11 — compact "More in [Category]" node for the discussion empty-state.
+  // Same data the bottom strip uses; trimmed to a single-line list so it
+  // sits gracefully under the "start the conversation" copy without
+  // duplicating the bottom strip's visual weight. Null when there are no
+  // siblings (CommentThread skips the wrapper).
+  const emptyStateRelated =
+    relatedInCategory.length > 0 ? (
+      <div>
+        <div
+          style={{
+            fontSize: 11,
+            textTransform: 'uppercase',
+            fontWeight: 600,
+            color: 'var(--dim)',
+            marginBottom: 10,
+            letterSpacing: '0.04em',
+            fontFamily: 'var(--font-sans)',
+          }}
+        >
+          More in {categoryName || 'this section'}
+        </div>
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 6 }}>
+          {relatedInCategory.map((r) => (
+            <li key={r.id}>
+              <a
+                href={`/story/${r.slug || ''}`}
+                style={{
+                  display: 'block',
+                  padding: '8px 10px',
+                  borderRadius: 8,
+                  border: '1px solid var(--border)',
+                  background: 'var(--card)',
+                  color: 'var(--text-primary)',
+                  textDecoration: 'none',
+                  fontFamily: 'var(--font-serif)',
+                  fontSize: 14,
+                  lineHeight: 1.35,
+                }}
+              >
+                {r.title || 'Untitled'}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+    ) : null;
+
   const discussionSection = quizPassError ? (
     // RPC failed (network blip / schema drift). Don't pretend the user
     // hasn't passed — surface a retry. Server-side post_comment will
@@ -1163,6 +1245,7 @@ export default function StoryPage() {
       currentUserId={currentUser?.id}
       currentUserTier={userTier}
       justRevealed={justRevealedThisSession}
+      emptyStateExtra={emptyStateRelated}
     />
   ) : quizPoolSize < 10 ? null : currentUser && currentUser.email_confirmed_at ? (
     // Pass 17 / UJ-1102: verified users who haven't passed the quiz see
@@ -1532,6 +1615,32 @@ export default function StoryPage() {
                   </p>
                 )}
 
+                {/* T234 — AI-disclosure pill. Renders only when the
+                    article was synthesized by the pipeline AND the admin
+                    master switch is on. Companion to the privacy-policy
+                    EU AI Act / CA AB 2655 disclosure (T267). */}
+                {story.is_ai_generated && showAiLabel && (
+                  <div style={{ marginBottom: 16 }}>
+                    <span
+                      title="This article was synthesized from multiple wire-source publications using AI assistance."
+                      style={{
+                        display: 'inline-block',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: 'var(--dim)',
+                        background: 'var(--card)',
+                        border: '1px solid var(--border)',
+                        padding: '3px 8px',
+                        borderRadius: 999,
+                        letterSpacing: '0.02em',
+                        fontFamily: 'var(--font-sans)',
+                      }}
+                    >
+                      AI-synthesized
+                    </span>
+                  </div>
+                )}
+
                 <div
                   style={{
                     fontSize: 13,
@@ -1870,7 +1979,7 @@ export default function StoryPage() {
             from the launch-hide era was removed in the 2026-04-23 quiz
             gate ship — top nav + the home page already cover navigation. */}
         {(isDesktop || showMobileDiscussion) && (
-          <div ref={discussionRef} style={{ marginTop: isDesktop ? 48 : 0 }}>
+          <div id="discussion" ref={discussionRef} style={{ marginTop: isDesktop ? 48 : 0 }}>
             {justPassedCeremony && (
               <div
                 style={{
@@ -1886,6 +1995,83 @@ export default function StoryPage() {
             )}
             {quizNode}
             {discussionSection}
+          </div>
+        )}
+
+        {/* T11 — post-article exit path. Up to three most-recent same-category
+            stories, excluding the current one. Editorial-only (newest first,
+            no algorithmic ranking) so it doesn't read as "trending now". Sits
+            after the discussion + paywall in the existing render tree;
+            silently absent when the article has no category_id or there are
+            no siblings. The matching iOS Up Next removal is out of scope
+            for this pass. */}
+        {relatedInCategory.length > 0 && (
+          <div
+            style={{
+              marginTop: 48,
+              paddingTop: 24,
+              borderTop: '1px solid var(--border)',
+            }}
+          >
+            <div
+              style={{
+                fontSize: 11,
+                textTransform: 'uppercase',
+                fontWeight: 600,
+                color: 'var(--dim)',
+                marginBottom: 16,
+                letterSpacing: '0.04em',
+                fontFamily: 'var(--font-sans)',
+              }}
+            >
+              More in {categoryName || 'this section'}
+            </div>
+            <ul
+              style={{
+                listStyle: 'none',
+                padding: 0,
+                margin: 0,
+                display: 'grid',
+                gap: 12,
+              }}
+            >
+              {relatedInCategory.map((r) => (
+                <li
+                  key={r.id}
+                  style={{
+                    border: '1px solid var(--border)',
+                    borderRadius: 10,
+                    background: 'var(--card)',
+                  }}
+                >
+                  <a
+                    href={`/story/${r.slug || ''}`}
+                    style={{
+                      display: 'block',
+                      padding: '14px 16px',
+                      color: 'var(--text-primary)',
+                      textDecoration: 'none',
+                      fontFamily: 'var(--font-sans)',
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontFamily: 'var(--font-serif)',
+                        fontSize: 16,
+                        fontWeight: 600,
+                        lineHeight: 1.3,
+                        marginBottom: 4,
+                      }}
+                    >
+                      {r.title || 'Untitled'}
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--dim)' }}>
+                      {formatDate(r.published_at)}
+                    </div>
+                  </a>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </div>

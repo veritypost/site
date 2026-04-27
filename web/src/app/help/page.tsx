@@ -351,6 +351,53 @@ export default async function HelpPage() {
             </>
           )}
         </div>
+
+        {/* T278 — CyberTipline shortcut. Distinct from the support
+            inbox above because CSAM reports have a federal-law path
+            (18 U.S.C. § 2258A) that runs through NCMEC; reporters
+            should never feel funneled into a generic ticket queue when
+            a child is at risk. */}
+        <div
+          style={{
+            background: '#fff7f7',
+            border: '1px solid #f1c0c0',
+            borderRadius: 12,
+            padding: 20,
+            marginTop: 24,
+          }}
+        >
+          <h2
+            style={{
+              fontSize: 16,
+              fontWeight: 700,
+              color: '#111111',
+              margin: '0 0 8px',
+            }}
+          >
+            Suspected child sexual abuse material
+          </h2>
+          <p
+            style={{
+              fontSize: 13,
+              color: '#333333',
+              lineHeight: '1.7',
+              margin: 0,
+            }}
+          >
+            In addition to reporting it through Verity Post, you can also report directly to
+            NCMEC&apos;s CyberTipline at{' '}
+            <a
+              href="https://report.cybertipline.org"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={linkStyle}
+            >
+              report.cybertipline.org
+            </a>{' '}
+            or call 1-800-843-5678. We are required by U.S. law (18 U.S.C. § 2258A) to report
+            apparent CSAM to NCMEC.
+          </p>
+        </div>
       </div>
     </div>
   );

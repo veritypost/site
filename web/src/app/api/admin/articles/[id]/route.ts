@@ -43,6 +43,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction, requireAdminOutranks } from '@/lib/adminMutation';
 import { renderBodyHtml } from '@/lib/pipeline/render-body';
+import { captureMessage } from '@/lib/observability';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
 
@@ -417,6 +418,40 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   const hasChildrenUpdates =
     body.sources !== undefined || body.timeline !== undefined || body.quizzes !== undefined;
 
+  // T235 — non-transactional children mutation observability.
+  // The article-row update + per-child-table delete/insert pairs are NOT
+  // wrapped in a single DB transaction (Supabase JS client cannot start
+  // one). A failure mid-flight can leave the article row updated but its
+  // children half-deleted or half-reinserted. The proper fix is a single
+  // RPC that runs the whole patch in a Postgres transaction — that's T5
+  // schema work, halted per the runbook until owner approval.
+  //
+  // Until then: emit a `captureMessage` on every partial-failure path so
+  // we observe inconsistencies in Sentry, AND emit a "begin" / "commit"
+  // pair of audit_log rows around the children mutations. A "begin"
+  // without a matching "commit" in audit_log is the signature of a
+  // failed mid-flight PATCH.
+  // TODO(T5): replace with `update_admin_article_with_children(...)` RPC.
+  const PATCH_TXN_BEGIN_ACTION = 'article.edit.begin';
+  const PATCH_TXN_COMMIT_ACTION = 'article.edit.commit';
+
+  if (hasChildrenUpdates) {
+    await recordAdminAction({
+      action: PATCH_TXN_BEGIN_ACTION,
+      targetTable: t.articles,
+      targetId: id,
+      newValue: {
+        audience,
+        intent: 'begin',
+        children_pending: {
+          sources: body.sources !== undefined,
+          timeline: body.timeline !== undefined,
+          quizzes: body.quizzes !== undefined,
+        },
+      },
+    });
+  }
+
   if (hasRowUpdates) {
     // Supabase's generated update() type is a strict union across every
     // column; since our `update` shape is conditionally built we cast
@@ -429,6 +464,15 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       .eq('id', id);
     if (upErr) {
       console.error('[admin.articles.patch] row update failed:', upErr.message);
+      if (hasChildrenUpdates) {
+        await captureMessage('admin article PATCH inconsistent state', 'error', {
+          article_id: id,
+          audience,
+          table: t.articles,
+          phase: 'row_update',
+          error: upErr.message,
+        });
+      }
       return NextResponse.json({ error: 'Could not update article' }, { status: 500 });
     }
   }
@@ -437,78 +481,199 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   // passed. An omitted array means "leave as-is"; an empty array means
   // "clear all rows". This mirrors how the caller would mutate a
   // collection in a form UI.
+  //
+  // Each delete-then-insert pair is wrapped in a try/catch that surfaces
+  // partial-failure paths (delete succeeded but insert failed → child
+  // rows lost; delete failed → unknown row count) into Sentry via
+  // captureMessage. The route still returns 500 to the caller so the UI
+  // can recover, but operators get a paged-quality signal that the
+  // article is in an inconsistent state and needs manual reconciliation.
   if (body.sources !== undefined) {
-    await service.from(t.sources).delete().eq('article_id', id);
-    if (body.sources.length > 0) {
-      const rows = body.sources.map((s, i) => ({
-        article_id: id,
-        title: s.title ?? null,
-        url: s.url ?? null,
-        publisher: s.publisher ?? null,
-        author_name: s.author_name ?? null,
-        published_date: s.published_date ?? null,
-        source_type: s.source_type ?? null,
-        quote: s.quote ?? null,
-        sort_order: s.sort_order ?? i,
-      }));
-      const { error: sErr } = await service.from(t.sources).insert(rows);
-      if (sErr) {
-        console.error('[admin.articles.patch] sources insert failed:', sErr.message);
+    try {
+      const { error: sDelErr } = await service.from(t.sources).delete().eq('article_id', id);
+      if (sDelErr) {
+        await captureMessage('admin article PATCH inconsistent state', 'error', {
+          article_id: id,
+          audience,
+          table: t.sources,
+          phase: 'delete',
+          error: sDelErr.message,
+        });
+        console.error('[admin.articles.patch] sources delete failed:', sDelErr.message);
         return NextResponse.json({ error: 'Could not save sources' }, { status: 500 });
       }
+      if (body.sources.length > 0) {
+        const rows = body.sources.map((s, i) => ({
+          article_id: id,
+          title: s.title ?? null,
+          url: s.url ?? null,
+          publisher: s.publisher ?? null,
+          author_name: s.author_name ?? null,
+          published_date: s.published_date ?? null,
+          source_type: s.source_type ?? null,
+          quote: s.quote ?? null,
+          sort_order: s.sort_order ?? i,
+        }));
+        const { error: sErr } = await service.from(t.sources).insert(rows);
+        if (sErr) {
+          // Partial failure — delete already succeeded, all sources gone.
+          await captureMessage('admin article PATCH inconsistent state', 'error', {
+            article_id: id,
+            audience,
+            table: t.sources,
+            phase: 'insert_after_delete',
+            row_count: rows.length,
+            error: sErr.message,
+          });
+          console.error('[admin.articles.patch] sources insert failed:', sErr.message);
+          return NextResponse.json({ error: 'Could not save sources' }, { status: 500 });
+        }
+      }
+    } catch (err) {
+      await captureMessage('admin article PATCH inconsistent state', 'error', {
+        article_id: id,
+        audience,
+        table: t.sources,
+        phase: 'thrown',
+        error: err instanceof Error ? err.message : String(err),
+      });
+      console.error('[admin.articles.patch] sources block threw:', err);
+      return NextResponse.json({ error: 'Could not save sources' }, { status: 500 });
     }
   }
 
   if (body.timeline !== undefined) {
-    await service.from(t.timelines).delete().eq('article_id', id);
-    if (body.timeline.length > 0) {
-      const rows = body.timeline.map((tl, i) => ({
-        article_id: id,
-        title: tl.title ?? null,
-        description: tl.description ?? null,
-        event_date: tl.event_date,
-        event_label: tl.event_label,
-        event_body: tl.event_body ?? null,
-        event_image_url: tl.event_image_url ?? null,
-        source_url: tl.source_url ?? null,
-        sort_order: tl.sort_order ?? i,
-      }));
-      const { error: tErr } = await service.from(t.timelines).insert(rows);
-      if (tErr) {
-        console.error('[admin.articles.patch] timeline insert failed:', tErr.message);
+    try {
+      const { error: tDelErr } = await service.from(t.timelines).delete().eq('article_id', id);
+      if (tDelErr) {
+        await captureMessage('admin article PATCH inconsistent state', 'error', {
+          article_id: id,
+          audience,
+          table: t.timelines,
+          phase: 'delete',
+          error: tDelErr.message,
+        });
+        console.error('[admin.articles.patch] timeline delete failed:', tDelErr.message);
         return NextResponse.json({ error: 'Could not save timeline' }, { status: 500 });
       }
+      if (body.timeline.length > 0) {
+        const rows = body.timeline.map((tl, i) => ({
+          article_id: id,
+          title: tl.title ?? null,
+          description: tl.description ?? null,
+          event_date: tl.event_date,
+          event_label: tl.event_label,
+          event_body: tl.event_body ?? null,
+          event_image_url: tl.event_image_url ?? null,
+          source_url: tl.source_url ?? null,
+          sort_order: tl.sort_order ?? i,
+        }));
+        const { error: tErr } = await service.from(t.timelines).insert(rows);
+        if (tErr) {
+          await captureMessage('admin article PATCH inconsistent state', 'error', {
+            article_id: id,
+            audience,
+            table: t.timelines,
+            phase: 'insert_after_delete',
+            row_count: rows.length,
+            error: tErr.message,
+          });
+          console.error('[admin.articles.patch] timeline insert failed:', tErr.message);
+          return NextResponse.json({ error: 'Could not save timeline' }, { status: 500 });
+        }
+      }
+    } catch (err) {
+      await captureMessage('admin article PATCH inconsistent state', 'error', {
+        article_id: id,
+        audience,
+        table: t.timelines,
+        phase: 'thrown',
+        error: err instanceof Error ? err.message : String(err),
+      });
+      console.error('[admin.articles.patch] timeline block threw:', err);
+      return NextResponse.json({ error: 'Could not save timeline' }, { status: 500 });
     }
   }
 
   if (body.quizzes !== undefined) {
-    await service.from(t.quizzes).delete().eq('article_id', id);
-    if (body.quizzes.length > 0) {
-      const rows = body.quizzes.map((q, i) => {
-        // correct_index stays server-side only — stashed in metadata so
-        // the public reader query (which selects options) can't echo
-        // the answer key back to clients.
-        const optionsForDb = q.options.map((o) => ({ text: o.text }));
-        return {
+    try {
+      const { error: qDelErr } = await service.from(t.quizzes).delete().eq('article_id', id);
+      if (qDelErr) {
+        await captureMessage('admin article PATCH inconsistent state', 'error', {
           article_id: id,
-          title: q.title ?? 'Quiz',
-          question_text: q.question_text,
-          question_type: q.question_type ?? 'multiple_choice',
-          options: optionsForDb,
-          explanation: q.explanation ?? null,
-          difficulty: q.difficulty ?? null,
-          points: q.points ?? 1,
-          pool_group: q.pool_group ?? 0,
-          sort_order: q.sort_order ?? i,
-          metadata: { correct_index: q.correct_index },
-        };
-      });
-      const { error: qErr } = await service.from(t.quizzes).insert(rows);
-      if (qErr) {
-        console.error('[admin.articles.patch] quizzes insert failed:', qErr.message);
+          audience,
+          table: t.quizzes,
+          phase: 'delete',
+          error: qDelErr.message,
+        });
+        console.error('[admin.articles.patch] quizzes delete failed:', qDelErr.message);
         return NextResponse.json({ error: 'Could not save quizzes' }, { status: 500 });
       }
+      if (body.quizzes.length > 0) {
+        const rows = body.quizzes.map((q, i) => {
+          // correct_index stays server-side only — stashed in metadata so
+          // the public reader query (which selects options) can't echo
+          // the answer key back to clients.
+          const optionsForDb = q.options.map((o) => ({ text: o.text }));
+          return {
+            article_id: id,
+            title: q.title ?? 'Quiz',
+            question_text: q.question_text,
+            question_type: q.question_type ?? 'multiple_choice',
+            options: optionsForDb,
+            explanation: q.explanation ?? null,
+            difficulty: q.difficulty ?? null,
+            points: q.points ?? 1,
+            pool_group: q.pool_group ?? 0,
+            sort_order: q.sort_order ?? i,
+            metadata: { correct_index: q.correct_index },
+          };
+        });
+        const { error: qErr } = await service.from(t.quizzes).insert(rows);
+        if (qErr) {
+          await captureMessage('admin article PATCH inconsistent state', 'error', {
+            article_id: id,
+            audience,
+            table: t.quizzes,
+            phase: 'insert_after_delete',
+            row_count: rows.length,
+            error: qErr.message,
+          });
+          console.error('[admin.articles.patch] quizzes insert failed:', qErr.message);
+          return NextResponse.json({ error: 'Could not save quizzes' }, { status: 500 });
+        }
+      }
+    } catch (err) {
+      await captureMessage('admin article PATCH inconsistent state', 'error', {
+        article_id: id,
+        audience,
+        table: t.quizzes,
+        phase: 'thrown',
+        error: err instanceof Error ? err.message : String(err),
+      });
+      console.error('[admin.articles.patch] quizzes block threw:', err);
+      return NextResponse.json({ error: 'Could not save quizzes' }, { status: 500 });
     }
+  }
+
+  // T235 commit marker — paired with article.edit.begin above. Operators
+  // looking for half-applied PATCHes scan for begin rows that have no
+  // matching commit row for the same article_id within a short window.
+  if (hasChildrenUpdates) {
+    await recordAdminAction({
+      action: PATCH_TXN_COMMIT_ACTION,
+      targetTable: t.articles,
+      targetId: id,
+      newValue: {
+        audience,
+        intent: 'commit',
+        children_committed: {
+          sources: body.sources !== undefined,
+          timeline: body.timeline !== undefined,
+          quizzes: body.quizzes !== undefined,
+        },
+      },
+    });
   }
 
   // Audit — one row per logical action. Content edits always audit; a

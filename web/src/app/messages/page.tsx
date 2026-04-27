@@ -644,11 +644,23 @@ function MessagesPageInner() {
   // ?to=<userId> auto-open. Waits for auth + conversations + canCompose,
   // then runs startConversation once. Replaces the phantom /messages/new
   // route. See `dmIntentHandled` ref above.
+  //
+  // T153 — gate the auto-open on a UUID shape check. Stale or malformed
+  // deep-links (?to=foo, ?to=123, copy-paste truncation) used to drop
+  // straight into a compose-against-nothing flow. The shape check
+  // catches the obvious-malformed cases without the cost of a server
+  // round-trip; non-existent-but-well-shaped IDs still fail at the
+  // start_conversation RPC and surface that error path instead.
   useEffect(() => {
     if (!toParam) return;
     if (!currentUser || !canCompose || loading) return;
     if (dmIntentHandled.current === toParam) return;
     dmIntentHandled.current = toParam;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(toParam);
+    if (!isUuid) {
+      toast.error('User not found.');
+      return;
+    }
     startConversation(toParam);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toParam, currentUser, canCompose, loading]);

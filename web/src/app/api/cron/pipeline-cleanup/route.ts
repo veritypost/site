@@ -35,6 +35,27 @@
  * archive_cluster RPC / archived_at column). Until applied, updates fail
  * silently and the affected sweep no-ops — acceptable while the pipeline
  * is itself STAGED.
+ *
+ * TODO(T241) — Source broken-link verification cron. Sources have no
+ * expiry-checking today; URLs go stale silently. The proposed cron is a
+ * weekly sweep (separate route from this one — schedule e.g. "0 7 * * 0")
+ * that HEADs each `sources.url` (and `kid_sources.url`), updates a
+ * `last_verified_at timestamptz` column with now(), and stores the HTTP
+ * `status_code int`. Admin source-list view then surfaces 4xx/5xx flagged
+ * rows for manual review. T5 schema halt blocks implementation until the
+ * two columns + an idempotent backfill migration are approved:
+ *
+ *   alter table sources         add column last_verified_at timestamptz;
+ *   alter table sources         add column status_code      int;
+ *   alter table kid_sources     add column last_verified_at timestamptz;
+ *   alter table kid_sources     add column status_code      int;
+ *   create index sources_status_code_idx     on sources     (status_code) where status_code >= 400;
+ *   create index kid_sources_status_code_idx on kid_sources (status_code) where status_code >= 400;
+ *
+ * Cron route would live at `web/src/app/api/cron/verify-sources/route.ts`
+ * with cap = 500 URLs/run, 5s timeout per HEAD, AbortController, and the
+ * same verifyCronAuth + logCronHeartbeat envelope as this file. Pair with
+ * a vercel.json crons[] entry once shipped.
  */
 
 import { NextResponse } from 'next/server';

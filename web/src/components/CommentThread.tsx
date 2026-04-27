@@ -19,22 +19,20 @@ import { MOD_ROLES } from '@/lib/roles';
 import type { Database } from '@/types/database';
 import { Z } from '@/lib/zIndex';
 import Skeleton from './Skeleton';
+import { COMMENT_REPORT_REASONS } from '@/lib/reportReasons';
 
 type CommentDb = Database['public']['Tables']['comments']['Row'];
 
 // T32 — Web comment-report categories must mirror the iOS ReportReason
 // enum at VerityPost/VerityPost/BlockService.swift so reports landing in
 // the `reports` table from either surface use the same set of strings.
-// Keep this list in sync with that enum (spam, harassment, off_topic,
-// misinformation, other). Server-side enum validation is tracked under
-// T285 — for now the API accepts any string.
-const REPORT_REASONS: ReadonlyArray<{ value: string; label: string }> = [
-  { value: 'spam', label: 'Spam' },
-  { value: 'harassment', label: 'Harassment or hate' },
-  { value: 'off_topic', label: 'Off-topic' },
-  { value: 'misinformation', label: 'Misinformation' },
-  { value: 'other', label: 'Other' },
-];
+// T278 — Centralized in @/lib/reportReasons. The list now leads with
+// the three urgent / 18 U.S.C. § 2258A categories (csam,
+// child_exploitation, grooming) so a victim sees the most actionable
+// option first; server-side enum validation lives in
+// `assertReportReason` and the urgent code path is handled by the
+// comment-report route.
+const REPORT_REASONS = COMMENT_REPORT_REASONS;
 
 type CommentWithAuthor = CommentDb & {
   users?: {
@@ -58,6 +56,12 @@ interface CommentThreadProps {
   // Subsequent visits (already-passed reader returning) render instantly.
   // Honored only when prefers-reduced-motion: no-preference.
   justRevealed?: boolean;
+  // T11 — optional editorial follow-up shown ONLY in the empty-state
+  // (passed-quiz user, zero comments yet). Rendered below the
+  // "start the conversation" copy so the reader has somewhere to go
+  // when they don't want to be the first to post. Story page passes a
+  // compact "More in [Category]" list.
+  emptyStateExtra?: React.ReactNode;
 }
 
 type DialogAction = 'delete' | 'report' | 'flag' | 'hide' | 'block';
@@ -79,6 +83,7 @@ export default function CommentThread({
   currentUserId,
   currentUserTier,
   justRevealed = false,
+  emptyStateExtra,
 }: CommentThreadProps) {
   const supabase = createClient();
   const [comments, setComments] = useState<CommentWithAuthor[]>([]);
@@ -969,6 +974,9 @@ export default function CommentThread({
         // app/story/[slug]/page.tsx). So the empty-state here only ever
         // addresses the auth+passed reader: name the unlock and invite
         // them to start the conversation rather than reciting the rule.
+        // T11 — when the article has same-category siblings, the story
+        // page passes them in via `emptyStateExtra` so the passed-but-
+        // alone reader has an editorial follow-up rather than a dead end.
         <div
           style={{
             fontSize: 13,
@@ -977,7 +985,10 @@ export default function CommentThread({
             padding: '30px 0',
           }}
         >
-          No comments yet. You passed the quiz &mdash; start the conversation.
+          <div>No comments yet. You passed the quiz &mdash; start the conversation.</div>
+          {emptyStateExtra && (
+            <div style={{ marginTop: 24, textAlign: 'left' }}>{emptyStateExtra}</div>
+          )}
         </div>
       ) : (
         <>
