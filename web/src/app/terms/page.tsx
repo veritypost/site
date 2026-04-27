@@ -170,8 +170,9 @@ export default function TermsPage() {
               or without prior notice.
             </li>
             <li>
-              You may delete your account at any time through your account settings. Deletion is
-              permanent and cannot be reversed.
+              You may delete your account at any time through your account settings. Deletion runs
+              with a thirty-day grace period — sign back in any time during that window to cancel.
+              After the grace period your data is permanently anonymized and cannot be restored.
             </li>
             <li>
               Upon termination, your right to access the platform ceases immediately, though certain

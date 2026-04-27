@@ -666,11 +666,6 @@ The numbered items below retain their original section placement for readability
 **File:** `web/src/app/privacy/page.tsx:65-79` ("optional newsletter communications").
 **Fix:** Update to describe only transactional categories. Bundle with **T9/T10**.
 
-### T68 — Help/Terms/Settings disagree on deletion contract — **LOW** (legal hygiene)
-**File:** `help/page.tsx:142-166` (7-day grace, anonymization); `terms/page.tsx:165-175` (permanent, irreversible); `profile/settings/page.tsx:5096-5188` + `/api/account/delete` (30-day grace + cancel action).
-**Fix:** Make Help, Terms, and policy copy match the live 30-day grace + cancel. Reuse the settings copy verbatim.
-**Recommendation:** **Single source of truth for legal-shape copy** — pick one (the settings page wording, since it's the live contract) and reference everywhere else.
-
 ---
 
 ## OPERATIONAL DEBT
@@ -1441,10 +1436,6 @@ Items below already moved to Pre-Launch Assessment (Apple/Sentry/COPPA-CRITICAL)
 **Fix:** Add `PrivacyInfo.xcprivacy` for both apps; declare APIs used (file timestamp, system boot time, disk space, etc.) and tracking domains (none, ideally).
 
 ### Attorney / Legal (T264-T273)
-
-#### T264 — Deletion-grace-period mismatch (Terms vs Help vs Settings) — **CRITICAL** (regulatory)
-**File:** `terms/page.tsx:174` ("permanent and cannot be reversed"), `help/page.tsx:161` ("seven-day grace"), `settings/page.tsx:5156` ("30-day grace"), `/api/account/delete/route.js:100-106` (30-day + immediate). All disagree.
-**Fix:** Single source of truth at 30-day grace + cancel; sync Terms + Help. Pairs with T68 (already in TODO).
 
 #### T265 — Missing CCPA "Do Not Sell or Share My Personal Information" link — **HIGH** (CPRA)
 **File:** `privacy/page.tsx:186` mentions California rights but no opt-out link/page exists.

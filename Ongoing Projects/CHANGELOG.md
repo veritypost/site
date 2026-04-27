@@ -7,6 +7,19 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-26 (T68 + T264 — deletion-contract copy aligned to live 30-day grace) — _shipped, pushed to git/Vercel_
+
+### T68 + T264 — Terms + Help match the live deletion contract
+
+- **What** — Settings UI + `/api/account/delete` route are the live contract: 30-day grace period (default) with cancel-via-DELETE during the window, plus an optional `immediate: true` Apple-accepted instant-removal path. Help page said "seven-day grace." Terms said "permanent and cannot be reversed." Both wrong, both fixed.
+- **Help** (`web/src/app/help/page.tsx:161`) — copy now reads "thirty-day grace period — sign back in any time during that window to cancel. Direct messages are cut off immediately."
+- **Terms** (`web/src/app/terms/page.tsx:172-175`) — Section 7 (Termination) bullet rewritten: "Deletion runs with a thirty-day grace period — sign back in any time during that window to cancel. After the grace period your data is permanently anonymized and cannot be restored." Preserves the "cannot be restored" finality after grace; removes the false "no-reversal-ever" claim that contradicted the cancel button users actually see.
+- **Privacy** (`/privacy/page.tsx:126`) — already aligned ("personal data is purged within 30 days"). Left untouched.
+- **Why CRITICAL** — TODO grades T264 CRITICAL on regulatory grounds: a Terms-of-Service that materially misrepresents the deletion contract is enforceable-against-us in jurisdictions with consumer-protection laws around T&C accuracy. T68 was the same issue, scored LOW originally. Fixed together.
+- **Files** — `web/src/app/help/page.tsx`, `web/src/app/terms/page.tsx`.
+
+---
+
 ## 2026-04-26 (T202 — expert-queue DOMPurify hardening) — _shipped, pushed to git/Vercel_
 
 ### T202 — Tighten DOMPurify config on expert markdown preview

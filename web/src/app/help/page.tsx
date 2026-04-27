@@ -158,8 +158,8 @@ export default async function HelpPage() {
               to delete your account under Settings &gt; Account.
             </>
           )}{' '}
-          Deletion is a scheduled anonymization with a seven-day grace period; direct messages are
-          cut off immediately. See our{' '}
+          Deletion is a scheduled anonymization with a thirty-day grace period — sign back in any
+          time during that window to cancel. Direct messages are cut off immediately. See our{' '}
           <a href="/privacy" style={linkStyle}>
             Privacy Policy
           </a>{' '}
