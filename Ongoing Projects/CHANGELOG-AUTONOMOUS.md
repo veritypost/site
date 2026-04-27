@@ -6,6 +6,51 @@ Format: newest at top.
 
 ---
 
+## 2026-04-27 — Wave 16: T4.8 redesign cluster TS errors + T336 focus trap — 2 items shipped
+
+**Items shipped:** 2 (T4.8 — 14 type errors → 0; T336 — focus trap hook + banner z-index documented).
+
+**T4.8 fix shape.** TODO described 14 errors as a single bucket. Pre-flight `npx tsc --noEmit` enumeration produced three distinct buckets:
+
+1. **`ScoreTier.label/slug` (6 errors across 4 files).** The `ScoreTier` shape from `@/lib/scoreTiers` exposes `display_name` + `name` (matching DB columns); the redesign code was reading `.label ?? .slug` as if the type aliased those names. Fixed by updating call sites to the actual field names — single source of truth in `scoreTiers.ts` stays authoritative; no alias fields added (would have just hidden the drift). Sites: `_components/AppShell.tsx:521`, `_components/TierProgress.tsx:42 + 86`, `profile/_sections/YouSection.tsx:63`, `profile/_sections/PublicProfileSection.tsx:179`.
+
+2. **`Json` cast at RPC boundary (3 errors).** `update_own_profile`'s typed signature requires `p_fields: Json`. Three call sites passed values whose TS types (`AvatarShape`, `Record<string, unknown>`, `{ [field]: unknown }`) don't match the `Json` index signature — even though the values are JSON-compatible at runtime. Added explicit `as Json` casts at the RPC boundary (matches the idiom used elsewhere in supabase callers). Sites: `profile/_components/AvatarEditor.tsx:166`, `profile/_sections/PublicProfileSection.tsx:90`, `profile/settings/_cards/PrivacyCard.tsx:130`. Also imported `Json` from `@/types/database` in each.
+
+3. **Wrong column name (1 error).** `expert_application_categories` table's column is `application_id`, not `expert_application_id`. The TODO didn't flag this one — surfaced by typecheck. Fixed `profile/_sections/ExpertProfileSection.tsx:76`.
+
+Final state: `npx tsc --noEmit` is clean. T357 cutover (TODO-OWNER) no longer blocked by typecheck. The DB-vs-redesign drift on tier label/slug was the most surprising part — the TODO's "(A) add `label` + `slug` to `ScoreTier` type" suggestion would have cemented the drift instead of fixing it.
+
+**T336 fix shape.** Two halves:
+
+- **Focus trap.** Created `web/src/app/redesign/_lib/useFocusTrap.ts` — a single hook that takes a `RefObject<HTMLElement>` and `{ active }`. When `active` is true: focuses the first focusable inside the ref, listens for Tab/Shift+Tab on the ref, recycles focus within. On deactivation: restores focus to whatever was active before. Uses the standard focusable-selector list (a, button, input, select, textarea, `[tabindex]:not([tabindex="-1"])`); filters out disabled + hidden via `offsetParent !== null`. Wired into `AppShell.tsx`: added a `railRef` and `useFocusTrap(railRef, { active: drawerOpen })`. Above 860px the rail is always-visible (sticky), so `drawerOpen` stays false there and the hook no-ops. Mobile-only behavior, no desktop regression risk.
+
+- **Banner z-index.** Pre-flight verification (per `feedback_verify_audit_findings_before_acting.md`): the TODO said "audit AccountStateBanner z-index — promote to z-40 if currently below the drawer's z-30." Reading `ProfileApp.tsx:536`, the banner is already wrapped in a `position: sticky; top: 0; zIndex: 40` container — above rail (z-30), overlay (z-25), and mobile app bar (z-20). No code change needed; added a documenting comment ("don't lower without auditing those") so future agents don't accidentally regress when touching the stacking context.
+
+**Pre-flight:** direct `Read` on `AppShell.tsx`, `AccountStateBanner.tsx`, `ProfileApp.tsx`. Verified the cited z-index claims against current source; one of two TODO sub-items already done. Verified `ScoreTier` type shape (`name + display_name`) before deciding fix direction.
+
+**Adversary:** skipped. Type-error fixes are mechanical with the typecheck as the verifier; focus trap is contained to one mobile drawer with no auth/billing surface; banner z-index was a no-op (already correct).
+
+**Post-impl:** `npx tsc --noEmit` re-run after all edits → clean. `npx eslint` on touched files → 3 pre-existing warnings (all in unmodified lines), 0 errors introduced.
+
+**Agents used:** 0.
+
+**Files touched:**
+- `web/src/app/redesign/_components/AppShell.tsx` (tier field rename + railRef + useFocusTrap call + import)
+- `web/src/app/redesign/_components/TierProgress.tsx` (tier field rename × 2)
+- `web/src/app/redesign/profile/_sections/YouSection.tsx` (tier field rename)
+- `web/src/app/redesign/profile/_sections/PublicProfileSection.tsx` (tier field rename + Json cast + import)
+- `web/src/app/redesign/profile/_sections/ExpertProfileSection.tsx` (`expert_application_id` → `application_id`)
+- `web/src/app/redesign/profile/_components/AvatarEditor.tsx` (Json cast + import)
+- `web/src/app/redesign/profile/settings/_cards/PrivacyCard.tsx` (Json cast + import)
+- `web/src/app/redesign/profile/_components/ProfileApp.tsx` (banner z-index doc comment)
+- `web/src/app/redesign/_lib/useFocusTrap.ts` (NEW — focus-trap hook)
+- `Ongoing Projects/TODO-AUTONOMOUS.md` — T4.8 and T336 marked SHIPPED.
+- `Ongoing Projects/CHANGELOG-AUTONOMOUS.md` — this entry.
+
+**Pattern note:** TODO described T4.8 as "14 errors" but pre-flight enumeration showed 3 distinct error families. Suggested fix "(A) add `label` + `slug` to `ScoreTier`" would have hidden DB-vs-UI drift; chose to update call sites to existing field names instead. T336's z-index half was already done — pre-flight verification (per the `verify_audit_findings_before_acting` feedback) avoided a no-op edit.
+
+---
+
 ## 2026-04-27 — Wave 15: T351 polish bundle — 5 of 7 sub-items shipped, 2 closed as overstated
 
 **Items shipped:** 1 (T351 — 5 of 7 sub-items inside, the other 2 closed as not-needed).

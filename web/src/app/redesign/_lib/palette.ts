@@ -48,18 +48,14 @@ export const C = {
   ringStrong: 'rgba(11,92,255,0.60)',
 } as const;
 
-// Tier expression. Earned ladders need to feel earned — distinct hues,
-// not just monochrome darkening. Mapped by tier slug; consumer falls
-// back to `inkMuted` for unknown tiers.
-export const TIER_C: Record<string, { ink: string; bg: string; ring: string }> = {
-  novice: { ink: '#52525b', bg: '#f4f4f5', ring: '#e4e4e7' },
-  reader: { ink: '#1e40af', bg: '#dbeafe', ring: '#bfdbfe' },
-  informed: { ink: '#15803d', bg: '#dcfce7', ring: '#bbf7d0' },
-  curious: { ink: '#a16207', bg: '#fef3c7', ring: '#fde68a' },
-  scholar: { ink: '#7c3aed', bg: '#ede9fe', ring: '#ddd6fe' },
-  sage: { ink: '#9d174d', bg: '#fce7f3', ring: '#fbcfe8' },
-  luminary: { ink: '#9a3412', bg: '#ffedd5', ring: '#fed7aa' },
-};
+// Tier expression has no color. Per owner directive (2026-04-27),
+// reading tiers do NOT get distinct hues — no rainbow, no muted ramp,
+// no gradient. Tiers render as plain text in the neutral ink palette.
+// The only user-controlled color in the redesign is the avatar (outer
+// ring / inner disc / letters); everything else stays neutral.
+//
+// TIER_C is intentionally undefined. Consumers that previously read it
+// were updated to render the tier name in `C.inkMuted` only.
 
 // Spacing — 4px base, 8px grid. Larger than admin (where S[1]=4, S[4]=16);
 // here the same keys exist but base default is wider for the consumer surface.

@@ -215,9 +215,16 @@ export function AccountStateBanner({ state, onAction }: Props) {
         fontFamily: FONT.sans,
       }}
     >
-      <div aria-hidden style={{ fontSize: 22, lineHeight: 1, marginTop: 2 }}>
-        {v.glyph}
-      </div>
+      <div
+        aria-hidden
+        style={{
+          width: 4,
+          alignSelf: 'stretch',
+          background: v.ink,
+          borderRadius: 2,
+          flexShrink: 0,
+        }}
+      />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{

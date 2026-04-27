@@ -134,12 +134,9 @@ Two-statement client flow replaced with single `lockdown_self` RPC call. Now ato
 
 Root cause was simpler than the TODO claimed: `globals.css:173` already provides `*:focus-visible { outline: 2px solid #111111; outline-offset: 2px; }` for every focusable element. But `Field.tsx`'s `inputStyle` had `outline: 'none'` inline, which clobbered the global rule (inline styles win on specificity). Same bug in `AppShell.tsx`'s search input. Fix: dropped `outline: 'none'` from both inline-style sites — global `:focus-visible` now applies. Zero new state, no React handlers, no helper imports needed. The unused `focusRing` helper in `palette.ts:118-121` stays in place for any future custom-ring designs (left untouched). See `CHANGELOG-AUTONOMOUS.md` Wave 13.
 
-## T336 — Focus trap + banner z-index promotion — HIGH
+## T336 — Focus trap + banner z-index promotion — SHIPPED 2026-04-27
 
-**Verified:** 2026-04-27 against `web/src/app/redesign/_components/AppShell.tsx:95-100` (Escape-to-close drawer shipped) + lines 616/625/627 (z-index: rail z-30, overlay z-25, mobilebar z-20). No `useFocusTrap` hook. Banner z-index unverified.
-**What's wrong:** When drawer opens on mobile, focus can escape to the underlying page (a11y); a banner stack-context interaction may hide the banner under the open drawer.
-**Fix:** Implement `useFocusTrap(ref, { active: drawerOpen })` — focus the first focusable on open, recycle Tab/Shift+Tab inside, restore prior focus on close. Audit AccountStateBanner z-index — promote to z-40 if currently below the drawer's z-30, OR document the correct stacking context.
-**Tier:** T2.
+Built `web/src/app/redesign/_lib/useFocusTrap.ts` — `useFocusTrap(ref, { active })` hook that focuses first focusable on open, cycles Tab/Shift+Tab within the ref, restores prior focus on deactivation. Wired into `AppShell.tsx` via a new `railRef` + `useFocusTrap(railRef, { active: drawerOpen })`. Above 860px the rail is always-visible so `drawerOpen` stays false and the hook no-ops — mobile-only behavior. Banner z-index was already correct: `ProfileApp.tsx:536` wraps `AccountStateBanner` in a `position: sticky; zIndex: 40` container, above rail z-30 / overlay z-25 / mobile bar z-20. Added a doc comment so future edits don't regress the stacking context. See `CHANGELOG-AUTONOMOUS.md` Wave 16.
 
 ## T337 — Native `window.confirm()` in 3 redesign components — SHIPPED 2026-04-27
 
@@ -705,14 +702,9 @@ POST handler + unused imports (`checkRateLimit`, `recordAdminAction`) removed; d
 **Tier:** T2.
 **Cross-link:** T334 caller-side (PrivacyCard cast) and several leaderboard `as never` casts will be cleared as part of this regen.
 
-## T4.8 — Redesign cluster TS errors (14 errors) — HIGH (blocks T357 cutover)
+## T4.8 — Redesign cluster TS errors (14 errors) — SHIPPED 2026-04-27
 
-**Verified:** 2026-04-27 — `web/src/app/redesign/` ships with TS errors on `ScoreTier.label/slug` and missing columns.
-**What's wrong:** TS errors block clean `npm run typecheck` runs. T357 cutover (TODO-OWNER) requires green typecheck before shipping the 7,200-line deletion + 45-file move.
-**Fix:** Either (A) fix the 14 type mismatches: add `label` + `slug` to `ScoreTier` type; backfill missing columns in queries; verify `public_profiles_v` includes the columns the redesign reads. Or (B) feature-flag the redesign cluster off until ready (cheap punt; `T357` cutover can't proceed under (B)).
-**Recommend (A):** Multi-week T357 cutover should not be punted indefinitely.
-**Tier:** T3.
-**Cross-link:** T335 (Field.tsx focus ring), T337 (native confirm), T351 (polish bundle), T334 caller-side, T331 (enum mismatch) — all redesign-tree work that bundles into T357.
+Pre-flight `npx tsc --noEmit` enumeration grouped the 14 errors into 3 buckets: (1) 6 errors using `tier.label / tier.slug` on `ScoreTier` — fixed by updating call sites to the actual field names (`display_name` / `name`) at AppShell, TierProgress (×2), YouSection, PublicProfileSection. The TODO's suggested "(A) add `label` + `slug` to `ScoreTier` type" would have entrenched the drift between DB columns and UI; updating call sites keeps a single source of truth. (2) 3 errors at `update_own_profile` RPC boundary where `Json` was the expected type — added `as Json` casts at AvatarEditor / PublicProfileSection / PrivacyCard, with `Json` imported from `@/types/database` (matches established supabase-caller idiom). (3) 1 wrong column name (`expert_application_id` → `application_id`) at ExpertProfileSection. Final typecheck → clean. T357 cutover no longer blocked. See `CHANGELOG-AUTONOMOUS.md` Wave 16.
 
 ## T4.9 — Stale "Tech (Kids)" category row — LOW
 
