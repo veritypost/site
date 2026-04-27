@@ -5,6 +5,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '../../lib/supabase/client';
+import { COPY } from '@/lib/copy';
 
 // T82 — values point at globals.css CSS vars so brand-color edits cascade.
 const C = {
@@ -121,10 +122,10 @@ export default function LogoutPage() {
 
         <h1 style={{ fontSize: '24px', fontWeight: '700', color: C.text, margin: '0 0 8px 0' }}>
           {status === 'signing_out'
-            ? 'Signing you out\u2026'
+            ? COPY.auth.signingOut
             : status === 'error'
-              ? 'Signed out locally'
-              : 'Signed out \u2014 redirecting\u2026'}
+              ? COPY.auth.signedOutLocal
+              : COPY.auth.signedOut}
         </h1>
         <p style={{ fontSize: '14px', color: C.dim, margin: '0 0 28px 0', lineHeight: '1.6' }}>
           {status === 'signing_out' && 'One moment while we end your session.'}

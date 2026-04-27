@@ -5,6 +5,12 @@ import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { safeErrorResponse } from '@/lib/apiErrors';
 
+// T170/T209 — authenticated search results are user-scoped (the query
+// strips out the caller's own id and respects role filters tied to the
+// caller). Apply private/no-store so a CDN can never cache + serve one
+// user's match set to another.
+const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
+
 // Bug 82: DM search — single server round-trip with user_roles join so
 // role-filtered searches return up to 20 real matches instead of filtering
 // 20 random username matches in JS (which can paginate every role row off).
@@ -18,16 +24,16 @@ export async function GET(request) {
       console.error('[messages.search.permission]', err?.message || err);
       return NextResponse.json(
         { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
-        { status: err.status }
+        { status: err.status, headers: NO_STORE }
       );
     }
-    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401, headers: NO_STORE });
   }
 
   const url = new URL(request.url);
   const q = String(url.searchParams.get('q') || '').trim();
   const roleFilter = url.searchParams.get('role') || 'all';
-  if (!q) return NextResponse.json({ users: [] });
+  if (!q) return NextResponse.json({ users: [] }, { headers: NO_STORE });
 
   const service = createServiceClient();
 
@@ -37,7 +43,7 @@ export async function GET(request) {
   // scan. Escaping would work too, but the search UX doesn't need
   // literal underscores to match (usernames are [a-z0-9] only).
   const safeQ = q.replace(/[,.%*()"\\_]/g, ' ').trim();
-  if (!safeQ) return NextResponse.json({ users: [] });
+  if (!safeQ) return NextResponse.json({ users: [] }, { headers: NO_STORE });
 
   let builder = service
     .from('users')
@@ -56,15 +62,19 @@ export async function GET(request) {
     return safeErrorResponse(NextResponse, error, {
       route: 'messages.search',
       fallbackStatus: 400,
+      headers: NO_STORE,
     });
 
-  return NextResponse.json({
-    users: (data || []).map((u) => ({
-      id: u.id,
-      username: u.username,
-      avatar_color: u.avatar_color,
-      verity_score: u.verity_score,
-      is_expert: u.is_expert,
-    })),
-  });
+  return NextResponse.json(
+    {
+      users: (data || []).map((u) => ({
+        id: u.id,
+        username: u.username,
+        avatar_color: u.avatar_color,
+        verity_score: u.verity_score,
+        is_expert: u.is_expert,
+      })),
+    },
+    { headers: NO_STORE }
+  );
 }

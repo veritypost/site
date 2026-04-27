@@ -760,14 +760,6 @@ The numbered items below retain their original section placement for readability
 **Problem:** No test selectors; e2e tests are brittle.
 **Fix:** Add `data-testid` to key interactive elements as new tests are written.
 
-#### T167 — Hard-coded user-facing strings throughout web — **LOW** (i18n readiness)
-**Example:** `web/src/components/CommentComposer.tsx:97` — "Mentions are available on paid plans...".
-**Fix:** Move to a constants module; foundation for future i18n.
-
-#### T173 — Comment body length not capped at app layer — **LOW** (defense-in-depth)
-**File:** `web/src/app/api/comments/route.js` — verification: no app-layer length check; the `post_comment` RPC may enforce length but its body wasn't inspected. **MCP-verify-first** before deciding whether app-layer cap is duplicative or genuinely missing.
-**Fix:** If RPC enforces, mirror at app layer with same threshold for fast-fail UX. If RPC doesn't enforce, app-layer cap is required.
-
 #### T182 — `EventsClient.shared` observer never removed — **MEDIUM** (anti-pattern)
 **File:** `VerityPost/VerityPost/EventsClient.swift:18-23`. Singleton OK today, but `[weak self]` + deinit hygiene lacking.
 **Fix:** Block-based observer with `[weak self]`; explicit deinit removal.
@@ -885,47 +877,15 @@ Items below already moved to Pre-Launch Assessment (Apple/Sentry/COPPA-CRITICAL)
 
 ### iOS Implementation Manager (T255-T263)
 
-#### T255 — `aps-environment` push entitlement missing — **HIGH**
-**File:** `VerityPost/VerityPost/VerityPost.entitlements` (absent key). Code calls `registerForRemoteNotifications()` but no entitlement; APNs registration silently fails.
-**Fix:** Add `<key>aps-environment</key><string>production</string>` (or `development` for TestFlight).
-
-#### T256 — Sign-in-with-Apple entitlement declared while auth direction is magic-link-only — **HIGH** (auth direction)
-**File:** `VerityPost/VerityPost/VerityPost.entitlements:5-8`. Per AUTH DIRECTION, magic-link only. SIWA button still in `SignupView.swift:95-119` + `LoginView.swift:36-82`.
-**Fix:** Remove SIWA entitlement, button, and AuthViewModel handler. Bundle with AUTH-MIGRATION.
-
-#### T257 — Kids app missing `NSAppTransportSecurity` declaration — **MEDIUM**
-**File:** `VerityPostKids/VerityPostKids/Info.plist`. Adult app has it (Info.plist:38-42); kids parity missing.
-**Fix:** Add `NSAppTransportSecurity` dict with `NSAllowsArbitraryLoads = false` for clarity.
-
-#### T258 — Bundle version + build hardcoded `1.0` / `1` — **MEDIUM**
-**File:** `VerityPost/VerityPost/Info.plist:17-18`, `VerityPostKids/VerityPostKids/Info.plist:19-20`. Build number must increment per submission.
-**Fix:** Dynamic build number via xcconfig + git commit count or build phase.
-
-#### T259 — Adult app declares `audio` background mode but no audio playback uses it — **LOW**
-**File:** `VerityPost/VerityPost/Info.plist:52-55`. Apple flags unused capability declarations.
-**Fix:** Remove if no audio background usage; or wire it before submission.
-
-#### T260 — Kids app missing `applinks:kids.veritypost.com` associated-domains entitlement — **MEDIUM**
-**File:** `VerityPostKids/VerityPostKids.entitlements` (missing). Adult has `applinks:veritypost.com`.
-**Fix:** Add entitlement + publish `.well-known/apple-app-site-association` on kids subdomain (when deep-link routing per K10 ships).
-
 #### T261 — Deployment target `iOS 17.0` excludes ~10-15% of users on iOS 16 — **LOW**
 **File:** project.pbxproj `IPHONEOS_DEPLOYMENT_TARGET = 17.0`. Audit code for iOS 17-only APIs; if none required, lower to 16.
 **Fix:** Test build at 16; lower if no API gates.
-
-#### T262 — UITests bundle ID variant verified, but document submission target — **LOW**
-**File:** `VerityPost.xcodeproj/project.pbxproj:452,474,558,580`. Confirm only `com.veritypost.app` submits, never `.uitests`.
-**Fix:** Document in release runbook.
 
 #### T263 — `PrivacyInfo.xcprivacy` privacy manifest unverified — **MEDIUM** (iOS 17+ requirement)
 **File:** Both apps. Apple requires `PrivacyInfo.xcprivacy` declaring API usage + tracking domains for any SDK touching sensitive APIs.
 **Fix:** Add `PrivacyInfo.xcprivacy` for both apps; declare APIs used (file timestamp, system boot time, disk space, etc.) and tracking domains (none, ideally).
 
 ### Attorney / Legal (T264-T273)
-
-#### T268 — DMCA designated agent registration with US Copyright Office unverified — **HIGH** (safe harbor)
-**File:** `dmca/page.tsx:119`. Lists `legal@veritypost.com` only; no Copyright Office registration number cited.
-**Fix:** Register agent at copyright.gov/dmca-agent (free, ~10 min); update DMCA page with registration number.
 
 #### T271 — Missing choice-of-law clause — **LOW** (contract enforceability)
 **File:** `terms/page.tsx`. No "Governing Law" section.
@@ -938,12 +898,6 @@ Items below already moved to Pre-Launch Assessment (Apple/Sentry/COPPA-CRITICAL)
 #### T285 — Web comment report uses free text; iOS uses structured — **MEDIUM** *(pairs with T32)*
 **File:** `web/src/app/api/comments/[id]/report/route.js:45-46`. Pairs with T32.
 **Fix:** Server-side enum validation; UI category picker on web.
-
-#### T287 — No system-wide kill-switch UI for comments / expert Q&A — **LOW**
-**File:** `web/src/lib/featureFlags.js`. `v2LiveGuard()` exists but no admin-facing toggle UI.
-**Fix:** `/admin/system-controls` with pause toggles + audit-logged enable/disable.
-
-### Page Walkthrough (T288-T297)
 
 #### T291 — Help page omits Ask-an-Expert from Verity tier feature list — **MEDIUM** (truth-in-pricing)
 **File:** `web/src/app/help/page.tsx:96-98`. Lists ads/bookmarks/quiz/TTS/DMs/follows; no expert access mentioned.

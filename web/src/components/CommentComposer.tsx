@@ -5,6 +5,7 @@ import { useState, useEffect, CSSProperties } from 'react';
 import { createClient } from '../lib/supabase/client';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import { MENTION_RE } from '@/lib/mentions';
+import { COPY } from '@/lib/copy';
 import type { Database } from '@/types/database';
 
 type Mention = { user_id: string; username: string };
@@ -94,7 +95,7 @@ export default function CommentComposer({
     // text (resolveMentions drops mentions silently otherwise).
     const hasMentions = !!trimmed.match(MENTION_RE);
     if (hasMentions && !canMention) {
-      setError('Mentions are available on paid plans — your @handle will post as plain text.');
+      setError(COPY.comments.mentionPaidComposerHint);
       // Do not block submit; let the user decide to edit or accept.
     } else {
       setError('');
@@ -152,7 +153,7 @@ export default function CommentComposer({
         // or removes the @-handle. The post-submit toast at submit() is
         // kept as a redundant safety net; the user dismisses it themselves.
         <div role="note" style={mentionHintStyle}>
-          @mentions are a paid feature &mdash; your text will post as plain text.
+          {COPY.comments.mentionPaid}
         </div>
       )}
       <textarea

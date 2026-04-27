@@ -31,6 +31,8 @@ const TYPE_TO_TEMPLATE = {
 const BATCH_SIZE = 50;
 
 async function run(request) {
+  // Cron auth — must verify CRON_SECRET header before any work; see
+  // web/src/lib/cronAuth.js for the timing-safe compare history.
   if (!verifyCronAuth(request).ok)
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   await logCronHeartbeat(CRON_NAME, 'start');

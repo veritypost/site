@@ -1,5 +1,8 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified shared_pages 2026-04-18
+// T268 — file the DMCA designated agent at https://copyright.gov/dmca-agent
+// (free, ~10min). Update the registration line below with the assigned
+// number once received.
 import type { CSSProperties } from 'react';
 import type { Metadata } from 'next';
 
@@ -117,6 +120,10 @@ export default function DMCAPage() {
         <div style={sectionStyle}>
           <h2 style={headingStyle}>Contact</h2>
           <p style={textStyle}>Send DMCA notices and counter-notices to legal@veritypost.com.</p>
+          <p style={textStyle}>
+            DMCA Designated Agent registration:{' '}
+            <strong>[pending — to be filed at copyright.gov/dmca-agent]</strong>.
+          </p>
         </div>
 
         {/* T278 — public CyberTipline path. Independent of the DMCA

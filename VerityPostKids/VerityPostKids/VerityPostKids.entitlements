@@ -7,6 +7,7 @@
 	<key>com.apple.developer.associated-domains</key>
 	<array>
 		<string>applinks:veritypost.com</string>
+		<string>applinks:kids.veritypost.com</string>
 	</array>
 </dict>
 </plist>

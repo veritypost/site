@@ -2,9 +2,20 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>com.apple.developer.applesignin</key>
-	<array>
-		<string>Default</string>
-	</array>
+	<!--
+	    aps-environment: APNs registration entitlement for PushRegistration.
+	    Set to "development" for local builds and TestFlight; flip to
+	    "production" before App Store submission (or split into a dedicated
+	    Release.entitlements file).
+	-->
+	<key>aps-environment</key>
+	<string>development</string>
+	<!--
+	    TODO (T256): Sign-in-with-Apple entitlement removed 2026-04-26 to
+	    align with the magic-link-only auth direction. The SIWA button still
+	    renders in SignupView/LoginView; without this entitlement the SDK
+	    will refuse to authenticate, which is the intended interim state
+	    until the Swift UI is stripped in a follow-up build pass.
+	-->
 </dict>
 </plist>

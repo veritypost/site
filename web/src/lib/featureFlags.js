@@ -70,8 +70,11 @@ export async function v2LiveGuard() {
   const { NextResponse } = await import('next/server');
   const live = await isV2Live(createServiceClient());
   if (live) return null;
+  // T170 — every authenticated route that calls this guard inherits the
+  // 503 verbatim. Mark it private/no-store so a CDN can never cache the
+  // maintenance response and serve it to a healthy request post-cutover.
   return NextResponse.json(
     { error: 'Service temporarily unavailable for maintenance.' },
-    { status: 503 }
+    { status: 503, headers: { 'Cache-Control': 'private, no-store, max-age=0' } }
   );
 }

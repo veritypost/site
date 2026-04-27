@@ -7,6 +7,53 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (Parallel sweep wave 7 — 11 items + iOS pre-submission prep) — _shipped, pushed to git/Vercel_
+
+### Cluster — iOS Info.plist + entitlements (T255-T262)
+
+- **T255** — `VerityPost/VerityPost/VerityPost.entitlements`: added `<key>aps-environment</key><string>development</string>` with comment instructing operator to flip to `production` (or split Release.entitlements) at App Store submission. APNs registration in `PushRegistration.swift` will now succeed in dev/TestFlight.
+- **T256** — same file: removed `com.apple.developer.applesignin` entitlement key + value. Aligned with locked magic-link auth direction. Swift UI in SignupView/LoginView intentionally not edited (would need iOS build to verify); the SDK refuses authentication without entitlement, acceptable incremental step.
+- **T257** — `VerityPostKids/VerityPostKids/Info.plist`: added `NSAppTransportSecurity` dict with `NSAllowsArbitraryLoads = false`, mirroring adult app declaration.
+- **T258** — both Info.plists: replaced hardcoded `1.0` / `1` with `$(MARKETING_VERSION)` / `$(CURRENT_PROJECT_VERSION)` xcconfig refs. Build settings already in pbxproj — refs resolve at build time.
+- **T259 STALE-CONFIRMED** — `TTSPlayer.swift:67-77` configures AVAudioSession with `.playback` / `.spokenAudio`. The `audio` UIBackgroundMode is justified — TTS continues when app backgrounds. No edit. Documented in runbook for App Review reference.
+- **T260** — `VerityPostKids/VerityPostKids.entitlements`: added `applinks:kids.veritypost.com`. Out-of-scope finding flagged: kids entitlements already had `applinks:veritypost.com` (suspect — would steal universal links from adult app). Adult entitlements DO NOT have `com.apple.developer.associated-domains` at all (audit's premise was wrong). Both flagged for owner review.
+- **T262** — created `Ongoing Projects/release-notes-ios.md` runbook documenting both submission targets (`com.veritypost.app`, `com.veritypost.kids`), test target IDs that must NOT ship, pre-submission checklist (entitlement env flip, build number increment, ATS, associated-domains caveats).
+
+Build-required verification: T255 APNs token round-trip needs real device; T258 plist substitution needs sanity build; T260 universal-link interception needs deep-link tap on device after AASA published.
+
+### Cluster — Web LOW + cron pattern-spread
+
+- **T173** — `web/src/app/api/comments/route.js`: comment-body length cap added. Pulls `comment_max_length` from `settings` (default 4000), 400 with `{error: 'comment_too_long', max_length}` over cap. Settings-driven so cap is a one-row update.
+- **T181 pattern-spread** — cron auth comments added to remaining 6 cron routes: pipeline-cleanup, recompute-family-achievements, send-emails, send-push, sweep-beta, sweep-kid-trials. Combined with W3's 6 = 12 of 13 cron routes now signposted (process-deletions remaining; not in spec).
+- **T268** — `web/src/app/dmca/page.tsx`: added DMCA registration line `[pending — to be filed at copyright.gov/dmca-agent]` + TODO header comment with the URL. One-line copy update once owner registers.
+- **T287** — already-done-W3 (TODO comment in `featureFlags.js`). Verified intact.
+- **Cache-Control pattern-spread** — `NO_STORE` headers added to 5 more authenticated routes: `comments/[id]`, `bookmarks/[id]`, `messages/search`, `notifications/preferences`, `account/login-cancel-deletion`. Plus `v2LiveGuard()` 503 in `featureFlags.js` — one-line change covers every guard caller.
+
+### Cluster — i18n constants seed (T167)
+
+- **NEW `web/src/lib/copy.ts`** — `COPY` object with namespaced groups (`comments`, `notifications`, `errors`, `auth`, `kids`, `paywall`), seeded with ~22 strings. Top-of-file comment documents the i18n migration path. Exports `CopyTree` type alias.
+- 3 call sites migrated as the demonstration: `CommentComposer.tsx` (mention paid hints — both post-submit toast and live inline hint now from COPY), `api/comments/[id]/route.js` (edit-window-expired response now returns both stable `error` code and `message` from COPP for client display), `logout/page.js` (3 status branches).
+- Pattern-seeding only; full migration is multi-day work. Win is the shape in place.
+
+### Files touched
+
+- VerityPost/VerityPost/Info.plist + VerityPost.entitlements
+- VerityPostKids/VerityPostKids/Info.plist + VerityPostKids.entitlements
+- Ongoing Projects/release-notes-ios.md (NEW)
+- web/src/app/api/comments/route.js + comments/[id]/route.js
+- web/src/app/api/cron/{pipeline-cleanup,recompute-family-achievements,send-emails,send-push,sweep-beta,sweep-kid-trials}/route.{js,ts}
+- web/src/app/api/bookmarks/[id]/route.js
+- web/src/app/api/messages/search/route.js
+- web/src/app/api/notifications/preferences/route.js
+- web/src/app/api/account/login-cancel-deletion/route.js
+- web/src/app/dmca/page.tsx
+- web/src/app/logout/page.js
+- web/src/components/CommentComposer.tsx
+- web/src/lib/copy.ts (NEW)
+- web/src/lib/featureFlags.js
+
+---
+
 ## 2026-04-27 (Parallel sweep wave 6 — 9 items + 1 NEEDS-SCHEMA across 6 clusters) — _shipped, pushed to git/Vercel_
 
 ### Cluster — Return-visit + read-state (T91 + T109)

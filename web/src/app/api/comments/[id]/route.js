@@ -5,6 +5,12 @@ import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { safeErrorResponse } from '@/lib/apiErrors';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { COPY } from '@/lib/copy';
+
+// T170/T209 — authenticated user data must never be cacheable by a CDN
+// or shared proxy. Apply private/no-store to every response on this
+// route (success + error paths).
+const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
 
 // PATCH /api/comments/[id] — owner edit.
 export async function PATCH(request, { params }) {
@@ -16,10 +22,10 @@ export async function PATCH(request, { params }) {
       console.error('[comments.[id].permission]', err?.message || err);
       return NextResponse.json(
         { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
-        { status: err.status }
+        { status: err.status, headers: NO_STORE }
       );
     }
-    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401, headers: NO_STORE });
   }
 
   const { id } = params;
@@ -34,12 +40,14 @@ export async function PATCH(request, { params }) {
   if (rate.limited) {
     return NextResponse.json(
       { error: 'Too many requests' },
-      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+      { status: 429, headers: { ...NO_STORE, 'Retry-After': String(rate.windowSec ?? 60) } }
     );
   }
 
   const { body } = await request.json().catch(() => ({}));
-  if (!body) return NextResponse.json({ error: 'body required' }, { status: 400 });
+  if (!body) {
+    return NextResponse.json({ error: 'body required' }, { status: 400, headers: NO_STORE });
+  }
 
   // T280 — cap the self-edit window to 10 minutes so authors can fix typos
   // but can't silently rewrite a comment after it has been replied to,
@@ -53,12 +61,19 @@ export async function PATCH(request, { params }) {
     .eq('id', id)
     .maybeSingle();
   if (lookupErr || !existing) {
-    return NextResponse.json({ error: 'not_found' }, { status: 404 });
+    return NextResponse.json({ error: 'not_found' }, { status: 404, headers: NO_STORE });
   }
   if (existing.user_id === user.id) {
     const createdAt = new Date(existing.created_at).getTime();
     if (Number.isFinite(createdAt) && Date.now() - createdAt > EDIT_WINDOW_MS) {
-      return NextResponse.json({ error: 'edit_window_expired' }, { status: 403 });
+      // `error` stays a stable machine code so existing clients keep working;
+      // `message` is the user-facing copy sourced from the i18n seed so any
+      // client that wants to surface the text inline reads it from a single
+      // place.
+      return NextResponse.json(
+        { error: 'edit_window_expired', message: COPY.comments.editWindowExpired },
+        { status: 403, headers: NO_STORE }
+      );
     }
   }
 
@@ -68,8 +83,12 @@ export async function PATCH(request, { params }) {
     p_body: body,
   });
   if (error)
-    return safeErrorResponse(NextResponse, error, { route: 'comments.id', fallbackStatus: 400 });
-  return NextResponse.json({ ok: true });
+    return safeErrorResponse(NextResponse, error, {
+      route: 'comments.id',
+      fallbackStatus: 400,
+      headers: NO_STORE,
+    });
+  return NextResponse.json({ ok: true }, { headers: NO_STORE });
 }
 
 // DELETE /api/comments/[id] — owner soft-delete.
@@ -82,10 +101,10 @@ export async function DELETE(_request, { params }) {
       console.error('[comments.[id].permission]', err?.message || err);
       return NextResponse.json(
         { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
-        { status: err.status }
+        { status: err.status, headers: NO_STORE }
       );
     }
-    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401, headers: NO_STORE });
   }
 
   const { id } = params;
@@ -95,6 +114,10 @@ export async function DELETE(_request, { params }) {
     p_comment_id: id,
   });
   if (error)
-    return safeErrorResponse(NextResponse, error, { route: 'comments.id', fallbackStatus: 400 });
-  return NextResponse.json({ ok: true });
+    return safeErrorResponse(NextResponse, error, {
+      route: 'comments.id',
+      fallbackStatus: 400,
+      headers: NO_STORE,
+    });
+  return NextResponse.json({ ok: true }, { headers: NO_STORE });
 }

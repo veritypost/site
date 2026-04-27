@@ -6,6 +6,14 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { scoreCommentPost } from '@/lib/scoring';
 import { v2LiveGuard } from '@/lib/featureFlags';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { getSettings, getNumber } from '@/lib/settings';
+
+// T173 — defense-in-depth body length cap. The post_comment RPC has its
+// own enforcement, but capping at the API layer fast-fails hostile or
+// runaway clients before we burn a quiz check + scoring round-trip. The
+// limit is sourced from the same `comment_max_length` setting that
+// /api/settings/public exposes to the client (default 4000 chars).
+const COMMENT_MAX_LENGTH_FALLBACK = 4000;
 
 // T170/T209 — authenticated user data must never be cacheable by a CDN
 // or shared proxy. Apply private/no-store to every response on this
@@ -81,6 +89,18 @@ export async function POST(request) {
   if (!article_id || !body) {
     return NextResponse.json(
       { error: 'article_id and body required' },
+      { status: 400, headers: NO_STORE }
+    );
+  }
+
+  // T173 — enforce comment body length at the app layer (defense-in-depth).
+  // Pull the limit from settings so changing the cap is a one-row update
+  // instead of a redeploy; fall back to 4000 if settings is unreachable.
+  const settings = await getSettings(service).catch(() => ({}));
+  const commentMaxLength = getNumber(settings, 'comment_max_length', COMMENT_MAX_LENGTH_FALLBACK);
+  if (typeof body !== 'string' || body.length > commentMaxLength) {
+    return NextResponse.json(
+      { error: 'comment_too_long', max_length: commentMaxLength },
       { status: 400, headers: NO_STORE }
     );
   }

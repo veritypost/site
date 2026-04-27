@@ -5,6 +5,11 @@ import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { safeErrorResponse } from '@/lib/apiErrors';
 
+// T170/T209 — authenticated user data must never be cacheable by a CDN
+// or shared proxy. Apply private/no-store to every response on this
+// route (success + error paths).
+const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
+
 // PATCH /api/bookmarks/[id] — update notes / move between collections.
 // Notes + collections are paid-only (D13) — we refuse on the server
 // for free users trying to sneak these fields in.
@@ -39,10 +44,10 @@ export async function PATCH(request, { params }) {
       console.error('[bookmarks.[id].permission]', err?.message || err);
       return NextResponse.json(
         { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
-        { status: err.status }
+        { status: err.status, headers: NO_STORE }
       );
     }
-    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401, headers: NO_STORE });
   }
 
   const service = createServiceClient();
@@ -55,7 +60,7 @@ export async function PATCH(request, { params }) {
     .eq('id', params.id)
     .maybeSingle();
   if (!bm || bm.user_id !== user.id) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    return NextResponse.json({ error: 'Not found' }, { status: 404, headers: NO_STORE });
   }
 
   if (notes !== undefined || collection_id !== undefined) {
@@ -63,7 +68,7 @@ export async function PATCH(request, { params }) {
     if (!isPaid) {
       return NextResponse.json(
         { error: 'Collections and notes are available on paid plans' },
-        { status: 403 }
+        { status: 403, headers: NO_STORE }
       );
     }
   }
@@ -71,12 +76,18 @@ export async function PATCH(request, { params }) {
   const update = {};
   if (notes !== undefined) update.notes = notes;
   if (collection_id !== undefined) update.collection_id = collection_id || null;
-  if (Object.keys(update).length === 0) return NextResponse.json({ ok: true });
+  if (Object.keys(update).length === 0) {
+    return NextResponse.json({ ok: true }, { headers: NO_STORE });
+  }
 
   const { error } = await service.from('bookmarks').update(update).eq('id', params.id);
   if (error)
-    return safeErrorResponse(NextResponse, error, { route: 'bookmarks.id', fallbackStatus: 400 });
-  return NextResponse.json({ ok: true });
+    return safeErrorResponse(NextResponse, error, {
+      route: 'bookmarks.id',
+      fallbackStatus: 400,
+      headers: NO_STORE,
+    });
+  return NextResponse.json({ ok: true }, { headers: NO_STORE });
 }
 
 // DELETE /api/bookmarks/[id]
@@ -89,10 +100,10 @@ export async function DELETE(_request, { params }) {
       console.error('[bookmarks.[id].permission]', err?.message || err);
       return NextResponse.json(
         { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
-        { status: err.status }
+        { status: err.status, headers: NO_STORE }
       );
     }
-    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401, headers: NO_STORE });
   }
 
   const service = createServiceClient();
@@ -102,6 +113,10 @@ export async function DELETE(_request, { params }) {
     .eq('id', params.id)
     .eq('user_id', user.id);
   if (error)
-    return safeErrorResponse(NextResponse, error, { route: 'bookmarks.id', fallbackStatus: 400 });
-  return NextResponse.json({ ok: true });
+    return safeErrorResponse(NextResponse, error, {
+      route: 'bookmarks.id',
+      fallbackStatus: 400,
+      headers: NO_STORE,
+    });
+  return NextResponse.json({ ok: true }, { headers: NO_STORE });
 }

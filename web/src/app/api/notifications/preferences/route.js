@@ -5,6 +5,11 @@ import { requirePermission, hasPermissionServer } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { safeErrorResponse } from '@/lib/apiErrors';
 
+// T170/T209 — alert_preferences rows are per-user PII (channel toggles,
+// quiet hours). Apply private/no-store on every response so a CDN can
+// never serve one user's prefs to another.
+const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
+
 // GET — list the caller's alert_preferences rows.
 // PATCH — upsert one row. Body: { alert_type, channel_push?, channel_email?,
 //                                 channel_in_app?, is_enabled?, quiet_hours_start?,
@@ -18,10 +23,10 @@ export async function GET() {
       console.error('[notifications.preferences.permission]', err?.message || err);
       return NextResponse.json(
         { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
-        { status: err.status }
+        { status: err.status, headers: NO_STORE }
       );
     }
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal error' }, { status: 500, headers: NO_STORE });
   }
 
   const service = createServiceClient();
@@ -33,8 +38,9 @@ export async function GET() {
     return safeErrorResponse(NextResponse, error, {
       route: 'notifications.preferences',
       fallbackStatus: 400,
+      headers: NO_STORE,
     });
-  return NextResponse.json({ preferences: data || [] });
+  return NextResponse.json({ preferences: data || [] }, { headers: NO_STORE });
 }
 
 export async function PATCH(request) {
@@ -51,14 +57,16 @@ export async function PATCH(request) {
       console.error('[notifications.preferences.permission]', err?.message || err);
       return NextResponse.json(
         { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
-        { status: err.status }
+        { status: err.status, headers: NO_STORE }
       );
     }
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal error' }, { status: 500, headers: NO_STORE });
   }
 
   const b = await request.json().catch(() => ({}));
-  if (!b.alert_type) return NextResponse.json({ error: 'alert_type required' }, { status: 400 });
+  if (!b.alert_type) {
+    return NextResponse.json({ error: 'alert_type required' }, { status: 400, headers: NO_STORE });
+  }
 
   const service = createServiceClient();
 
@@ -122,7 +130,7 @@ export async function PATCH(request) {
   if (Object.keys(update).length === 1 && ignoredFields.length > 0) {
     return NextResponse.json(
       { error: 'No permission to modify the requested fields', ignored_fields: ignoredFields },
-      { status: 403 }
+      { status: 403, headers: NO_STORE }
     );
   }
 
@@ -139,6 +147,7 @@ export async function PATCH(request) {
     return safeErrorResponse(NextResponse, error, {
       route: 'notifications.preferences',
       fallbackStatus: 400,
+      headers: NO_STORE,
     });
-  return NextResponse.json({ ok: true, ignored_fields: ignoredFields });
+  return NextResponse.json({ ok: true, ignored_fields: ignoredFields }, { headers: NO_STORE });
 }

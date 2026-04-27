@@ -3,6 +3,11 @@
 import { NextResponse } from 'next/server';
 import { createClient, createClientFromToken, createServiceClient } from '@/lib/supabase/server';
 
+// T170/T209 — login-time deletion-cancel signals deletion-state status,
+// which is per-account PII. Apply private/no-store to every response so
+// a CDN can never serve one user's `cancelled` flag to another.
+const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
+
 // Login-time auto-cancel for account deletions still inside the 30-day
 // grace window (D40 / 027_phase19_deletion.sql). Silent welcome-back:
 // the caller just logged in; if their deletion was pending, clear it.
@@ -41,7 +46,7 @@ export async function POST(request) {
     if (!bearer) {
       const origin = request.headers.get('origin');
       if (!isAllowedOrigin(origin)) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403, headers: NO_STORE });
       }
     }
 
@@ -50,7 +55,7 @@ export async function POST(request) {
       data: { user },
     } = await authClient.auth.getUser();
     if (!user) {
-      return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthenticated' }, { status: 401, headers: NO_STORE });
     }
 
     const service = createServiceClient();
@@ -61,11 +66,11 @@ export async function POST(request) {
       console.error('[account.login-cancel-deletion]', error.message);
       return NextResponse.json(
         { cancelled: false, error: 'Could not cancel deletion' },
-        { status: 500 }
+        { status: 500, headers: NO_STORE }
       );
     }
-    return NextResponse.json({ cancelled: !!data });
+    return NextResponse.json({ cancelled: !!data }, { headers: NO_STORE });
   } catch {
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal error' }, { status: 500, headers: NO_STORE });
   }
 }
