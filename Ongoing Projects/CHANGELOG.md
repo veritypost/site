@@ -7,7 +7,7 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
-## 2026-04-27 (autonomous-fix wave 3: 2 T3 items shipped, 1 deferred with reason) — _pending push to git_
+## 2026-04-27 (autonomous-fix wave 3: 2 T3 items shipped, 1 deferred with reason) — _shipped, pushed to git_ (commit 87bea57)
 
 Third execution wave. 2 of the 3 T3 medium items shipped end-to-end. T329 deferred because its precondition (T322 — wire 16 missing event types) hasn't shipped, so an admin events dashboard would have nothing meaningful to surface yet.
 
@@ -31,7 +31,7 @@ Third execution wave. 2 of the 3 T3 medium items shipped end-to-end. T329 deferr
 
 ---
 
-## 2026-04-27 (autonomous-fix wave 2: 7 T2 items shipped, 3 deferred with reasons) — _pending push to git_
+## 2026-04-27 (autonomous-fix wave 2: 7 T2 items shipped, 3 deferred with reasons) — _shipped, pushed to git_ (commit 6c88870)
 
 Second execution wave on the sixth-pass audit set. 7 T2 items shipped end-to-end. 3 T2 items deferred with explicit reasons (homoglyph library install, T5 retry-table, NavWrapper coupling). 3 T2 items in untracked redesign files held for the redesign-cutover commit.
 
@@ -70,7 +70,7 @@ Second execution wave on the sixth-pass audit set. 7 T2 items shipped end-to-end
 
 ---
 
-## 2026-04-27 (autonomous-fix wave: 7 trivials + 3 locked-ready shipped) — _pending push to git_
+## 2026-04-27 (autonomous-fix wave: 7 trivials + 3 locked-ready shipped) — _shipped, pushed to git_ (commit 0b31efc)
 
 First execution wave on the sixth-pass audit set. 10 items shipped end-to-end (code + verification + TODO/CHANGELOG bookkeeping in lockstep). All edits typecheck against the existing baseline (no new TS errors introduced; pre-existing `ScoreTier`/Json/AvatarEditor errors unchanged). No DB migrations applied; no Stripe API calls made; no tests added (none exist for the touched surfaces yet).
 
@@ -112,7 +112,7 @@ The original "11 trivials" set included T335 (Field.tsx focus styling — needs 
 
 ---
 
-## 2026-04-27 (TODO sixth-pass full re-audit — 3 dropped, 5 re-scoped, 6 queued for owner, 1 demoted) — _no code; verification + bookkeeping only_ — _pending push to git_
+## 2026-04-27 (TODO sixth-pass full re-audit — 3 dropped, 5 re-scoped, 6 queued for owner, 1 demoted) — _no code; verification + bookkeeping only_ — _shipped, pushed to git_ (in commit 0b31efc)
 
 Sixth verification pass on outstanding TODO items, run via 6 parallel Explore agents reading live code in clusters (auth routes + middleware, profile/settings/NavWrapper, story/comments/articles, admin/plans/billing/Stripe, redesign components, analytics/events + misc). Every open item from T14 through T360 (excluding owner-input-locked items already-skipped) read against current code with file:line evidence. Three items dropped as already-fixed / wrong claim, five re-scoped inline, six items moved to QUEUED FOR OWNER REVIEW, one demoted on severity, one verdict overridden where the agent misread scope.
 
