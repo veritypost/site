@@ -7,7 +7,7 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
-## 2026-04-27 (wave 10 — T354 closed via MCP audit, T-EMAIL-PRUNE shipped, T27 web partial) — _pending push to git_
+## 2026-04-27 (wave 10 — T354 closed via MCP audit, T-EMAIL-PRUNE shipped, T27 web partial) — _shipped, pushed to git_ (commit 6a1a5e8)
 
 ### Closed via MCP verification (1)
 
