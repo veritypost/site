@@ -7,6 +7,23 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-26 (T159 + T169 — error boundaries: admin segment added; closing claims as resolved) — _shipped, pushed to git/Vercel_
+
+### T169 — Admin segment error boundary added; T159 closed as resolved
+
+- **Discovery** — Audit graded T159 and T169 as resilience gaps but the underlying error-boundary infrastructure already exists. Verified file presence via `find web/src/app -name 'error.*'`:
+  - `web/src/app/error.js` — root boundary (exists)
+  - `web/src/app/global-error.js` — top-level fallback (exists)
+  - `web/src/app/story/[slug]/error.js` — wraps comment thread + the entire story page (exists; posts to `/api/errors` with `boundary: 'story'` tag, has reset button)
+  - `web/src/app/profile/error.js` — profile segment (exists)
+  - `web/src/app/admin/` — **MISSING**
+- **What** — Added `web/src/app/admin/error.js` mirroring the story + profile pattern: posts the failure to `/api/errors` with `boundary: 'admin'` tag (so admin crashes show up in the same triage stream as user-facing ones with a context tag), then renders a reset button with admin-appropriate copy ("Admin tool failed to load. The error has been recorded.").
+- **T159 (CommentThread error boundary) — closed as resolved.** The story-page error boundary already wraps every render path that includes `<CommentThread>`. A row-level error boundary inside the comment list would be additional polish but the audit's stated risk ("RLS or Supabase failure crashes whole section silently") is mitigated — failures bubble to the page-level boundary which catches + reports + offers reset. Not stale, just over-pessimistic about existing coverage.
+- **T169 — fully closed.** Per-segment boundaries for story, profile, admin all exist now. Anything below those segments inherits the closest boundary.
+- **Files** — `web/src/app/admin/error.js` (new).
+
+---
+
 ## 2026-04-26 (T265 + T266 + T270 + T292 — legal copy + admin jargon) — _shipped, pushed to git/Vercel_
 
 ### T265 — California privacy disclosure + footer link

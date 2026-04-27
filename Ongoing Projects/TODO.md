@@ -1005,10 +1005,6 @@ The numbered items below retain their original section placement for readability
 **File:** `web/src/app/beta-locked/page.tsx:27`. No runtime validation.
 **Fix:** Zod parse or shape guard.
 
-#### T159 — Comment thread has no error boundary — **HIGH** (resilience)
-**File:** `web/src/components/CommentThread.tsx`. RLS or Supabase failure crashes whole section silently.
-**Fix:** Wrap in `<ErrorBoundary>` or add granular `error.tsx`.
-
 #### T160 — Click handler on `<div>` in CommentThread overlay — **MEDIUM** (a11y)
 **File:** `web/src/components/CommentThread.tsx:699`. `<div onClick={closeDialog}>` lacks keyboard handler.
 **Fix:** Use `<button>` or add `role="button"` + `onKeyDown` for Escape/Enter.
@@ -1040,10 +1036,6 @@ The numbered items below retain their original section placement for readability
 #### T168 — Comment composer dedup creates intermediate Array — **LOW** (perf micro)
 **File:** `web/src/components/CommentComposer.tsx:78`. `Array.from(new Set([...].map(...)))`.
 **Fix:** Build Set; convert only when needed downstream.
-
-#### T169 — No global error.tsx route boundary — **MEDIUM** (resilience)
-**Problem:** Next.js App Router `error.tsx` files missing or sparse. Unhandled errors throw the full app to Next's default screen.
-**Fix:** Add `web/src/app/error.tsx` and per-segment boundaries for major routes (story, profile, admin).
 
 ### Senior Backend (T170-T181)
 
