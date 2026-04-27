@@ -7,7 +7,7 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
-## 2026-04-27 (T309 closed — all three RPCs already cross-clear correctly, verified via MCP) — _pending push to git_
+## 2026-04-27 (T309 closed — all three RPCs already cross-clear correctly, verified via MCP) — _shipped, pushed to git_ (commit bd7c474)
 
 Owner authorized the MCP query for T309. Read all three function bodies via `pg_proc`:
 
