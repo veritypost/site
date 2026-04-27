@@ -7,6 +7,19 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-26 (T30 + T31 — quiz UX polish) — _shipped, pushed to git/Vercel_
+
+### T30 — Interstitial ad no longer hijacks score reveal
+
+- **What** — `web/src/components/ArticleQuiz.tsx`: every third quiz pass triggers an interstitial ad (`if (n > 0 && n % 3 === 0)`). Previously fired synchronously inside the submit handler, so `setStage('result')` and `setShowInterstitial(true)` raced — the modal often won, hiding the score the user just earned. Wrapped in `setTimeout(..., 1500)` so the result lands first; the ad shows after a 1.5s beat. 1500ms matches the existing reveal-ceremony delay on the story page (post-pass discussion unlock), so the ad arrives at the same beat as the discussion reveal instead of competing with it.
+
+### T31 — Empty comment-thread state reinforces the quiz-gate trust principle
+
+- **What** — `web/src/components/CommentThread.tsx:865`: copy was "No comments yet — be the first." Replaced with "No comments yet. Everyone who posts here passed the article quiz — be the first to start the discussion." Reinforces the trust positioning (quiz-gated comments) without assuming the current viewer's quiz state, so the copy works for authed-passed, authed-not-passed, and anon visitors. iOS parity in `StoryDetailView.swift:1133-1140` not touched in this commit (avoids iOS-build verification gap; flagged as iOS-followup).
+- **Files** — `web/src/components/ArticleQuiz.tsx`, `web/src/components/CommentThread.tsx`.
+
+---
+
 ## 2026-04-26 (T159 + T169 — error boundaries: admin segment added; closing claims as resolved) — _shipped, pushed to git/Vercel_
 
 ### T169 — Admin segment error boundary added; T159 closed as resolved

@@ -176,7 +176,15 @@ export default function ArticleQuiz({
       }
       if (seeInterstitialAd) {
         const n = bumpQuizCount();
-        if (n > 0 && n % 3 === 0) setShowInterstitial(true);
+        // T30 — let the score-reveal land before the interstitial. The
+        // ad component takes over the screen; firing it synchronously
+        // with setStage('result') buries the score moment under a modal.
+        // 1500ms matches the existing reveal-ceremony timing on the
+        // story page so the ad lands at the same beat as the discussion
+        // unlock instead of competing with it.
+        if (n > 0 && n % 3 === 0) {
+          setTimeout(() => setShowInterstitial(true), 1500);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

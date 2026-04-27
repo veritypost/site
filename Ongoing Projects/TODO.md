@@ -514,15 +514,6 @@ The numbered items below retain their original section placement for readability
 
 ## MEDIUM — quality and parity
 
-### T30 — Quiz ad interstitial hijacks score reveal — **MEDIUM**
-**File:** `web/src/components/ArticleQuiz.tsx:163-165`
-**Fix:** Show quiz result, render score, then fire interstitial after 1.5-2s delay or on user dismissal.
-**Recommendation:** Latency-shift only, two-line change.
-
-### T31 — Empty comment state copy doesn't reinforce quiz-gate trust — **MEDIUM**
-**File:** `web/src/components/CommentThread.tsx:856-865`, `VerityPost/VerityPost/StoryDetailView.swift:1133-1140`
-**Fix:** "No comments yet. Everyone who posts here passed the quiz — including you. Start the conversation."
-
 ### T32 — Web comment-report uses free text, iOS uses structured categories — **MEDIUM**
 **File:** `CommentThread.tsx` (free text) vs `StoryDetailView.swift:316-335` (`ReportReason.allCases`).
 **Fix:** Replace web free-text field with category picker matching iOS `ReportReason` enum.

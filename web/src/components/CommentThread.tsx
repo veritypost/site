@@ -862,7 +862,8 @@ export default function CommentThread({
             padding: '30px 0',
           }}
         >
-          No comments yet &mdash; be the first.
+          No comments yet. Everyone who posts here passed the article quiz &mdash; be the first to
+          start the discussion.
         </div>
       ) : (
         <>
