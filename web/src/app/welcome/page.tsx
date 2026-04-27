@@ -30,7 +30,11 @@ function forwardNextQs(): string {
 //   - Otherwise → first-login onboarding 3-screen tour that redirects on
 //     `onboarding_completed_at` (a UX state flag, not a permission).
 
-const IS_COMING_SOON = process.env.NEXT_PUBLIC_SITE_MODE === 'coming_soon';
+// Beta gate supersedes coming-soon: when BETA_GATE=1 the launch model is
+// closed-beta-with-onboarding, so /welcome should render the first-login
+// carousel even if SITE_MODE=coming_soon is still set in env.
+const IS_COMING_SOON =
+  process.env.NEXT_PUBLIC_SITE_MODE === 'coming_soon' && process.env.NEXT_PUBLIC_BETA_GATE !== '1';
 
 function HoldingCard() {
   // Coming-soon mode: only text on the page is the domain itself. No brand
