@@ -4,7 +4,7 @@
 
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
-import { createServiceClient } from '@/lib/supabase/server';
+import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction } from '@/lib/adminMutation';
 import { getSiteUrl } from '@/lib/siteUrl';
@@ -65,7 +65,14 @@ export async function POST(request: Request) {
         ? new Date(body.expires_at).toISOString()
         : null;
 
-  const { data, error } = await service.rpc('mint_owner_referral_link', {
+  // mint_owner_referral_link reads auth.uid() inside the function to
+  // stamp owner_user_id (the admin who minted) and created_by. Service
+  // client has no JWT identity → auth.uid() returns null and the function
+  // raises 'no authenticated actor'. Call via the user-scoped client so
+  // the admin's JWT carries through; the function's own
+  // is_admin_or_above() check still gates access.
+  const userClient = await createClient();
+  const { data, error } = await userClient.rpc('mint_owner_referral_link', {
     p_description: description || undefined,
     p_max_uses: max_uses ?? undefined,
     p_expires_at: expires_at ?? undefined,
