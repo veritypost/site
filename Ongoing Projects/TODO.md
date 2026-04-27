@@ -31,28 +31,30 @@ Companion files in `Ongoing Projects/`: `CHANGELOG.md` (work history), `SYSTEM_N
 
 Do not pick up these IDs autonomously. The owner has explicitly reserved them. If the next item in your sweep is on this list, skip it and pick the next non-listed item.
 
-**TODO.md items requiring owner decision/action:**
-- **T2** — Cookie consent banner: **OWNER DECIDED 2026-04-27 → Funding Choices (option A)**. Implementation deferred until AdSense console access is available; ready to ship as soon as owner signals "go."
-- **T26** — VERIFIED 2026-04-27 — `post_comment` RPC does NOT insert into `notifications` for replies or mentions. Awaiting owner answers on scope (replies only vs replies + mentions) + 3 sub-questions before drafting migration. See T26 body in CRITICAL section.
-- **T173** — MCP `pg_proc` queries (require DB-read permission grant)
-- **T19** — Home feed prefs: wire vs. delete decision (owner direction)
-- **T20** — iOS expert application schema match (depends on editor process tolerance — owner)
-- **T34, T35, T54** — trust-positioning calls (downvotes, rank notifications, kids volume framing)
-- **T40** — Story timeline desktop aside ship/hide
-- **T55** — Prompt-preset versioning (depends on whether admins edit in production — owner)
-- **T56** — Lifetime billing dropdown drop/keep (pricing call)
-- **T57** — Stripe `stripe_price_id` automation: option (a) vs (b)
-- **T77** — Record MASTER-6 SHIPPED marker (owner-administrative)
-- **T85** — Profile Task 5 perm-key migration apply order (owner runs migration)
-- **T117** — Error-state retry inconsistency: re-scope/audit decision
-- **T268** — DMCA designated agent registration at copyright.gov
-- **T271** — Choice-of-law jurisdiction (Delaware vs California)
-- **T272** — Accessibility statement language sign-off
-- **T291** — Verity-tier-includes-expert pricing call
+**Skip-list status (post 2026-04-27 owner-decision pass).** All decisions documented are LOCKED — they're listed here because they need either implementation work the autonomous loop shouldn't pick up alone, or further owner input. Items already CLOSED are NOT listed; their closure record lives in `CHANGELOG.md` (search "Decision-log closures" for T77 / T85 / T268 / T272 / T291; T16 / T17 have full ship entries).
 
-**Bundle-level skip:**
-- **AUTH-MIGRATION** — direction is locked, but the build is one coordinated session under direct owner supervision. Do not execute its sub-items piecemeal autonomously.
-- **Everything in `Pre-Launch Assessment.md`** — Apple / Sentry / COPPA-CRITICAL items have their own owner touch points (S1 DSN check, A8 console walkthrough, K12 VPC method choice, etc.).
+LOCKED, awaiting "go" to ship code/migration:
+- **T2** — Funding Choices CMP; gated on AdSense console access.
+- **T19** — simplify home (categories nav + feed + Browse + occasional hero/breaking). See T19 body for impl spec.
+- **T26** — RPC migration adding `comment_reply` + `comment_mention` notifications via `create_notification`. Scope locked (in_app + push only).
+- **T40** — delete dead timeline aside (T11 covers the exit path).
+- **T54** — reorder kids dashboard KPIs (Quizzes Passed → Articles → Streak → Reading Time).
+- **T55** — drop `ai_prompt_preset_versions` orphan table (T242 snapshot covers audit/replay).
+- **T56** — drop lifetime billing option + standardize `'month'`/`'year'`.
+- **T57** — auto-mint Stripe price API on plan create (option B).
+- **T117** — migrate ~9 remaining web pages to `<ErrorState>` primitive.
+- **T173** — add comment-length cap to PATCH `/api/comments/[id]/route.js`.
+- **T271** — Maine governing-law section in TOS.
+- **T-EMAIL-PRUNE** — drop 4 engagement types from `send-emails` cron; keep `data_export_ready` + `kid_trial_expired` + `expert_reverification_due`.
+
+DEFERRED (owner returning to it later — no decision yet):
+- **T34** — downvotes ranking decision.
+- **T35** — rank-change notifications decision.
+
+**Bundle-level skip (separate session direction needed before execution):**
+
+- **AUTH-MIGRATION** — direction locked (magic-link only); the build is one coordinated session under direct owner supervision. Do not execute its sub-items piecemeal autonomously.
+- **Everything in `Pre-Launch Assessment.md`** — Apple / Sentry / COPPA-CRITICAL items + the IOS SESSION CLUSTER all have their own owner touch points and live in that file.
 
 ### Per-item workflow — RIGHT-SIZE THE AGENTS PER TIER
 

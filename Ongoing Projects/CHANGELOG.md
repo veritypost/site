@@ -7,6 +7,24 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (Decision-log closures — T77 / T85 / T268 / T272 / T291) — _no code; closure record only_
+
+Five TODO items closed during the 2026-04-27 owner-decision pass. No code change accompanies these — each represents either an owner-administrative action complete, or audit verification confirming the work was already shipped or already accurate. Recording here so TODO can drop the closed-status notes.
+
+- **T77 — MASTER-6 (password verification) SHIPPED marker recorded.** Commit `6e13089b03f0ed38790b208668f6075c191f098e` is the canonical SHA for the password-verification endpoint. Route at `web/src/app/api/auth/verify-password/route.js` MCP-verified to have `requireAuth`, 5/hour rate limit, ephemeral client, `record_failed_login_by_email`. Settings password card is the consumer. Owner records the SHA in pre-launch tracker.
+
+- **T85 — Profile Task 5 perm-key migration: already-resolved.** MCP query confirmed `profile.activity`, `profile.categories`, `profile.achievements` each bound to all 8 plan sets (admin / editor / expert / family / free / moderator / owner / pro). iOS `ProfileView.swift:191-200` uses canonical short-form keys (`profile.activity`, etc.). DB binding is live; no migration owed; iOS code already correct. Closed.
+
+- **T268 — DMCA designated agent registration: owner filed.** Owner filed at copyright.gov/dmca-agent (free, ~10 min). Registration ID will be substituted into `web/src/app/dmca/page.tsx` line 125 (where the W3 placeholder line `[pending — to be filed at copyright.gov/dmca-agent]` lives) when ready. Pure copy edit when owner pastes the ID.
+
+- **T272 — Accessibility statement: already-resolved.** MCP-verified `web/src/app/accessibility/page.tsx` already has the full formal statement: WCAG 2.1 AA commitment (line 49), known-limitations enumeration (lines 142-157), contact email `support@veritypost.com` (line 162), last-updated date (line 41). Audit's premise was stale.
+
+- **T291 — Help page Verity-tier expert pricing: HELP-PAGE-ACCURATE.** MCP-verified `plan_features.ask_expert` is `false` for verity_monthly/annual and `true` for verity_pro_monthly/annual. Help page at `web/src/app/help/page.tsx:114-117` correctly reflects this — Verity excludes Ask-an-Expert; Pro includes. No drift, no copy fix needed. (If owner ever wants Verity tier to include Ask-an-Expert, that's both a `plan_features` row update AND a help page refresh — separate pricing decision.)
+
+- **Files** — none modified for these closures. Status notes only.
+
+---
+
 ## 2026-04-27 (Phase 6 — final polish + testing, code shipped) — _code shipped; no new migration_
 
 ### Context
