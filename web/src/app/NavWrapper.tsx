@@ -51,10 +51,11 @@ interface AuthContextValue {
   authLoaded: boolean;
   /**
    * Normalized tier string for analytics / telemetry. One of:
-   * 'anon' | 'free_verified' | 'verity' | 'verity_pro' |
-   * 'verity_family' | 'verity_family_xl'. Derived from plan_id +
+   * 'anon' | 'unverified' | 'free_verified' | 'verity' |
+   * 'verity_pro' | 'verity_family'. Derived from plan_id +
    * email_verified. Never raw plan row — callers shouldn't need to
    * know the DB-side plan taxonomy to fire a track() call.
+   * (T302 added 'unverified'; T319 retired 'verity_family_xl'.)
    */
   userTier: string;
   /** Days since signup, or null for anon. */
@@ -84,7 +85,6 @@ function deriveTier(user: ProfileRow | null): string {
   // a plan_id literal ever contained an unrelated substring, and added
   // a refactor barrier whenever a tier changed name.
   const tier = user.plans?.tier || null;
-  if (tier === 'verity_family_xl') return 'verity_family_xl';
   if (tier === 'verity_family') return 'verity_family';
   if (tier === 'verity_pro') return 'verity_pro';
   if (tier === 'verity') return 'verity';

@@ -1,18 +1,31 @@
 // ============================================================
-// v2 plan catalog -- 5 marketed tiers, 9 DB plan rows.
+// v2 plan catalog -- 4 marketed tiers, 7 DB plan rows.
 // DB rows (see schema/reset_and_rebuild_v2.sql INSERT INTO plans):
 //   free
-//   verity_monthly           / verity_annual
+//   verity_monthly           / verity_annual         -- LEGACY GRANDFATHERED
 //   verity_pro_monthly       / verity_pro_annual
 //   verity_family_monthly    / verity_family_annual
-//   verity_family_xl_monthly / verity_family_xl_annual
+//
+// T319 — verity_family_xl_* SKUs were RETIRED per Phase 2 of AI + Plan
+// Change Implementation: the per-kid add-on model on `verity_family`
+// (1 included kid, +$4.99/mo per additional kid up to 4 total)
+// replaces the XL tier entirely. Code cleanup landed 2026-04-27;
+// matching DB row deletion ships via the T319 migration in
+// `Ongoing Projects/migrations/`.
+//
+// T318 — `verity_monthly` ($3.99) and `verity_pro_monthly` ($9.99)
+// intentionally grant identical perm sets. The cheaper SKU is
+// grandfathered legacy (per `cron/pro-grandfather-notify`); existing
+// `verity_monthly` subscribers keep $3.99 forever. New subscribers can
+// only buy `verity_pro_monthly` at $9.99. DO NOT "fix" the duplication
+// as a bug — the price gap is the legacy promise.
 //
 // TIER_ORDER is a static string list used for ordering and upgrade
 // comparison. It carries no price or display data -- those come from
 // the DB via getPlans().
 // ============================================================
 
-export const TIER_ORDER = ['free', 'verity', 'verity_pro', 'verity_family', 'verity_family_xl'];
+export const TIER_ORDER = ['free', 'verity', 'verity_pro', 'verity_family'];
 
 export function formatCents(cents, { currency = 'USD', compact = false } = {}) {
   if (cents == null) return '—';

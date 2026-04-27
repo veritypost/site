@@ -27,7 +27,7 @@
 >
 > ### How to handle each TODO category
 >
-> - **LOCKED items** (T19, T26, T54, T55, T57, T-EMAIL-PRUNE): owner has decided. Body section contains the impl spec. When owner says "ship T<N>" or "go on locked items," execute the spec. Don't re-ask the decision. If a sub-question surfaces during impl that the spec didn't anticipate, ask once with a recommendation, then proceed.
+> - **LOCKED items** (T19, T26, T55, T57, T-EMAIL-PRUNE): owner has decided. Body section contains the impl spec. When owner says "ship T<N>" or "go on locked items," execute the spec. Don't re-ask the decision. If a sub-question surfaces during impl that the spec didn't anticipate, ask once with a recommendation, then proceed.
 > - **LAUNCH BLOCKERS in `Pre-Launch Assessment.md`** (T2 — Funding Choices CMP; T271 — Maine governing-law TOS section): owner-touch only. Don't pick from the autonomous loop. Owner ships these in coordination with AdSense console access + legal sign-off windows.
 > - **DEFERRED items** (T14, T34, T35, T79, T84): owner has parked these. Don't pick them up. Don't re-recommend them. Don't tell the owner "next" includes them.
 > - **OPEN items in the body sections** (T27, T92, T165, T166, T233, T285): no owner decision needed; pick by priority and ship under the autonomous runbook. Each has audit evidence + recommended fix; verify the audit against current code before editing.
@@ -78,7 +78,6 @@ Do not pick up these IDs autonomously. The owner has explicitly reserved them. I
 LOCKED, awaiting "go" to ship code/migration:
 - **T19** — simplify home (categories nav + feed + Browse + occasional hero/breaking). See T19 body for impl spec.
 - **T26** — RPC migration adding `comment_reply` + `comment_mention` notifications via `create_notification`. Scope locked (in_app + push only).
-- **T54** — reorder kids dashboard KPIs (Quizzes Passed → Articles → Streak → Reading Time). _Owner-queue entry pending — current code matches neither the original audit nor the locked spec._
 - **T55** — drop `ai_prompt_preset_versions` orphan table (T242 snapshot covers audit/replay).
 - **T57** — auto-mint Stripe price API on plan create (option B).
 - **T117** — _Moved to QUEUED FOR OWNER REVIEW (sixth-pass)._ Verification found admin pages use `<EmptyState>` by design (not `<ErrorState>`); only 6 user-facing pages currently use `<ErrorState>` (bookmarks, leaderboard, messages, notifications, profile, search). The original ~19-page migration target was misframed — admin's `<EmptyState>` pattern is intentional. Owner question queued.
@@ -308,13 +307,6 @@ Owner clears entries when they return. **Do NOT remove entries autonomously.**
 
 _(Above queue items added during the AUTH/PERMS SYSTEM MAP fifth-pass audit, 2026-04-27.)_
 
-- **2026-04-27** — T54 KPI order on kids parent dashboard
-  - **What I was doing:** sixth-pass re-audit of locked items
-  - **What's blocking:** current code at `web/src/app/profile/kids/page.tsx:880-887` shows order Articles → Minutes → Quizzes Passed → Longest Streak. Locked owner decision was reorder to Quizzes Passed → Articles → Streak → Reading Time. Neither matches the original audit claim (which used the same line numbers as the locked decision).
-  - **Question for owner:** confirm the locked KPI order is still desired, OR has the order already been adjusted in a way that supersedes the locked spec?
-  - **Options I see:** (A) ship locked spec as written; (B) adjust locked spec; (C) abandon reorder. **Recommended pick: A** — reorder to Quizzes Passed → Articles → Streak → Reading Time per the locked decision, ~5 lines.
-  - **What I did instead:** captured here, kept T54 in skip list.
-
 - **2026-04-27** — T117 admin error-state primitive direction
   - **What I was doing:** sixth-pass re-audit; original "migrate ~19 web pages to `<ErrorState>`" claim against admin pages.
   - **What's blocking:** verification shows admin pages (analytics, breaking, ad-campaigns, ad-placements, email-templates, moderation, newsroom, pipeline, promo, recap, reports, sponsors, stories, subscriptions, support, webhooks) use `<EmptyState>` for both empty AND error rendering. User-facing pages (bookmarks, leaderboard, messages, notifications, profile, search) use `<ErrorState>`. The pattern split looks intentional, not a missed migration.
@@ -327,20 +319,6 @@ _(Above queue items added during the AUTH/PERMS SYSTEM MAP fifth-pass audit, 202
   - **What's blocking:** RPC bodies (`billing_freeze_profile` / `billing_resubscribe` / `billing_unfreeze`) aren't readable from local SQL files; need MCP to confirm whether they cross-clear each other.
   - **Question for owner:** ready to MCP-inspect the three RPC bodies so we can write the migration to fix cross-clearing (or confirm it's already correct)?
   - **Options I see:** (A) MCP-inspect now and ship migration if needed; (B) defer until billing-state-machine pass (T347 consolidation); (C) leave as-is and only address if it surfaces in support. **Recommended pick: A** — pair with T308 (manual-sync ignores `frozen_at`) for one billing-state-machine bundle.
-  - **What I did instead:** captured here.
-
-- **2026-04-27** — T318 SKU pricing differentiation (`verity_monthly` $3.99 vs `verity_pro_monthly` $9.99)
-  - **What I was doing:** sixth-pass re-verify of identical perm-set claim.
-  - **What's blocking:** code references confirm both SKUs are real and live (`web/src/app/help/page.tsx`, `cron/pro-grandfather-notify`, etc.); perm-set identity claim is from system-map MCP query. Can't differentiate from code alone.
-  - **Question for owner:** is the $6 price gap intentional with identical perms (legacy grandfathering), OR should the perm sets be split so each SKU grants something distinct?
-  - **Options I see:** (A) keep identical perms, document that `verity_monthly` is grandfathered legacy; (B) consolidate the SKUs (force-migrate `verity_monthly` users to `verity_pro_monthly` at $9.99 — likely violates grandfathering); (C) differentiate (e.g., `verity_pro_monthly` adds TTS, comment_post unlimited, advanced bookmarks). **Recommended: A** if grandfathering is the intent — but document explicitly so future agents don't "fix" the duplication as a bug.
-  - **What I did instead:** captured here, kept T318 body intact.
-
-- **2026-04-27** — T319 inactive `verity_family_*` SKU row deletion
-  - **What I was doing:** sixth-pass re-verify of "inactive SKUs still in DB" claim.
-  - **What's blocking:** code still references `verity_family_xl` in 6 places (NavWrapper tier check, ad-placements ALL_TIERS, leaderboard comment, family/config comment "retired permanently", recompute-family-achievements comment, `lib/plans.js` TIER_ORDER). DB row likely still present per system map. Removing rows requires MCP.
-  - **Question for owner:** hard-delete the inactive plan rows + remove the 6 code references, OR keep them as legacy fixtures to avoid breaking historic users?
-  - **Options I see:** (A) hard-delete + scrub code references in one bundle; (B) leave DB rows + add a `is_visible=false, is_active=false` guard everywhere; (C) hard-delete DB rows but leave code references intact (graceful no-op when no plan matches). **Recommended pick: A** — clean break, ~30 min including the 6 code edits.
   - **What I did instead:** captured here.
 
 - **2026-04-27** — T338 deletion-scheduled banner severity (`warnSoft` vs `dangerSoft`)
@@ -575,11 +553,6 @@ The numbered items below retain their original section placement for readability
 **Fix:** Weekly cron diffs each user's rank vs 7 days ago. In-app notification (not push) for moves of 3+ spots, top-10 entry/exit. Cap at 1/week.
 **Recommendation:** **Don't push** — rank changes are check-in-worthy, not ping-worthy. In-app surface only.
 
-### T54 — Kids parent dashboard leads with volume/streak metrics — **MEDIUM** (framing)
-**File:** `web/src/app/profile/kids/page.tsx:880-887` (KPI order: Articles → Minutes → Quizzes Passed → Longest Streak). _Sixth-pass line correction: 807-814 → 880-887; locked reorder spec (Quizzes Passed → Articles → Streak → Reading Time) NOT yet implemented._
-**Fix:** Reframe parent dashboard around comprehension quality + what the kid bookmarked. Verify weekly email copy via the `family_weekly_report` RPC body before deciding email-side action.
-**Recommendation:** **Lead with quiz scores + bookmarked articles**, not minutes-read. Aligns with the trust principle parents are escaping the volume frame for. Cheap reorder of the existing KPI cards.
-
 ### T55 — `ai_prompt_preset_versions` table designed but never written by routes — **MEDIUM** (admin foot-gun)
 **File:** Schema `currentschema:258-273` defines the versions table; `web/src/app/api/admin/prompt-presets/route.ts:131-137` and `[id]/route.ts:173-180` overwrite the active row directly. `recordAdminAction()` provides audit trail forensics, not rollback.
 **Fix:** Insert into `ai_prompt_preset_versions` on every prompt edit before mutating the active row. Add `/admin/prompt-presets/[id]/history` page that shows prior versions and a "Restore" action.
@@ -670,11 +643,6 @@ Items below already moved to Pre-Launch Assessment (Apple/Sentry/COPPA-CRITICAL)
 
 Source: `Ongoing Projects/2026-04-27_AUTH_PERMS_SYSTEM_MAP.md`. 4 parallel Explore agents re-verified each finding against live code 2026-04-27. Items already-fixed dropped (pen-test #26 — rate limit fires before JSON parse; pen-test #27 — login-precheck has constant-shape responses + per-email rate limit; pen-test #30 — email-change calls `auth.updateUser` first now; §21.2.9 — AvatarEditor has its own footer Save). Items not added to TODO: anomaly #14 (free-reads pill — owner-decided to drop in system-map Phase 0.4), #15 (lifecycle email — separate retention project), #21 (anon save-for-later — separate retention project).
 
-### T298 — DIRECTION CONFLICT: system map Phase 1 vs magic-link lock — **CRITICAL** (owner-decision required)
-**File:** `Ongoing Projects/2026-04-27_AUTH_PERMS_SYSTEM_MAP.md` §17 Phase 1 lines 922-987 describes a unified verify-email flow that begins "signup form (email + password)". This contradicts TODO.md line 39 + AUTH DIRECTION LOCKED (§AUTH-MIGRATION) which says "magic-link auth only · no password." Both docs dated 2026-04-27.
-**Why this matters:** Under magic-link, there is no `email_verified=false` state for new users — the link IS the verification. Phase 1's `<VerifyGate>` placements + pick-username server-side `email_verified` gate + `complete_email_verification` flow assume password+confirm-link semantics that don't apply post-magic-link cutover.
-**Recommendation:** Owner confirms which direction is canonical. If magic-link still locked → the system map's Phase 1 §17 should be marked superseded; the AUTH-MIGRATION bundle owns this surface. Anomaly resolutions (#1, #16, #20) re-evaluated under magic-link semantics. Several findings below (T320, T321, T313) become moot post-migration.
-
 ### Security — CRITICAL
 
 #### T299 — Homoglyph bypass on ban-evasion email check — **CRITICAL** (security)
@@ -717,14 +685,6 @@ Source: `Ongoing Projects/2026-04-27_AUTH_PERMS_SYSTEM_MAP.md`. 4 parallel Explo
 #### T317 — `access_codes.type` taxonomy is dual-purpose and mostly dead — **MEDIUM** (dead UI)
 **File:** `web/src/app/r/[slug]/route.ts:76-77` and `web/src/app/api/access-redeem/route.ts:62-63` filter `.eq('type', 'referral')` only. `web/src/app/admin/access/page.tsx:37` mints `'invite'|'press'|'beta'|'partner'` — none honored by redemption routes.
 **Fix:** Either delete the legacy types from the schema enum + admin UI, or wire them into redemption. Today they're a ship-the-hostage admin foot-gun.
-
-#### T318 — `verity_monthly` ($3.99) and `verity_pro_monthly` ($9.99) grant identical perm sets — **MEDIUM** (pricing/SKU)
-**Source:** Live MCP query in system map §3 — both attach to the same 545-perm role-set. Owner-decision territory: differentiate the perm sets OR consolidate the SKUs.
-**Fix:** Owner pricing decision; if differentiation chosen, draft migration to split perm-sets per SKU. T5 schema work.
-
-#### T319 — Inactive `verity_family_annual` + `verity_family_xl_*` SKUs still in DB — **MEDIUM** (cleanup)
-**Source:** System map §3 lists 4 inactive plans still in schema. Verify nothing references them at the UI/cron/webhook level, then delete row + perm-set bindings.
-**Fix:** Audit references; if zero, drop rows. T5 schema work — halt and queue.
 
 #### T320 — Owner-link Pro recipients are gutted (cohort=beta, email_verified=false) — **MEDIUM** (CX, superseded by AUTH-MIGRATION)
 **File:** `web/src/app/welcome/page.tsx:106-107` — `isBetaOwnerLinkSignup` bypass lets cohort-beta+Pro past the welcome carousel only; every other surface still hard-blocks the 21 `requires_verified=true` perms. Cannot comment, follow, vote, bookmark unlimited, see own activity, use TTS.

@@ -365,8 +365,9 @@ export default function LeaderboardPage() {
 
   const activeSubs = activeCat ? subcats.filter((s) => s.category_id === activeCat) : [];
   // Permission-driven: replaces the former `plan_status === 'active' &&
-  // plans.tier in (verity, verity_pro, verity_family, verity_family_xl)`
-  // derivation for category drill-down.
+  // plans.tier in (verity, verity_pro, verity_family)` derivation for
+  // category drill-down. (Pre-T319 also included verity_family_xl;
+  // retired per Phase 2 of AI + Plan Change Implementation.)
 
   return (
     // Ext-NN1 — main landmark for screen readers.

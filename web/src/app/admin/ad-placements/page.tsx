@@ -23,7 +23,9 @@ import type { Tables } from '@/types/database-helpers';
 type Placement = Tables<'ad_placements'>;
 type AdUnit = Tables<'ad_units'>;
 
-const ALL_TIERS = ['free', 'verity', 'verity_pro', 'verity_family', 'verity_family_xl'];
+// T319 — `verity_family_xl` retired per Phase 2 of AI + Plan Change
+// Implementation; the per-kid add-on model on `verity_family` replaced it.
+const ALL_TIERS = ['free', 'verity', 'verity_pro', 'verity_family'];
 const PLACEMENT_TYPES = ['banner', 'interstitial', 'in_feed', 'sidebar', 'video'];
 const PLATFORMS = ['all', 'web', 'ios', 'android'];
 const NETWORKS = ['direct', 'house', 'google_ads', 'amazon', 'other'];
@@ -92,7 +94,7 @@ function PlacementsInner() {
     setPlacementForm({
       name: '', display_name: '', placement_type: 'banner', platform: 'web',
       page: 'article', position: 'bottom',
-      hidden_for_tiers: ['verity_pro', 'verity_family', 'verity_family_xl'],
+      hidden_for_tiers: ['verity_pro', 'verity_family'],
       reduced_for_tiers: ['verity'],
       max_ads_per_page: 1, is_kids_safe: false,
     });

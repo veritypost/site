@@ -5,6 +5,7 @@ import { useState, useEffect, CSSProperties, ReactNode } from 'react';
 import { createClient } from '../../../lib/supabase/client';
 import { COPPA_CONSENT_TEXT, COPPA_CONSENT_VERSION } from '../../../lib/coppaConsent';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import AddKidUpsellModal, { type AddKidUpsellPayload } from '@/components/family/AddKidUpsellModal';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import { isPinWeak } from '@/lib/kidPinValidation';
 import type { Tables } from '@/types/database-helpers';
@@ -98,6 +99,15 @@ export default function ParentKidsPage() {
   const [pendingRemove, setPendingRemove] = useState<{ id: string; name: string } | null>(null);
   const [removeBusy, setRemoveBusy] = useState<boolean>(false);
   const [pauseBusy, setPauseBusy] = useState<string | null>(null);
+
+  // 402 upsell modal — opens when /api/kids POST returns kid_seat_required.
+  // The form payload is parked on `upsellPayload` so the bundled
+  // /api/family/add-kid-with-seat endpoint can re-run validation and
+  // create the kid in one atomic call alongside the Stripe seat bump.
+  const [upsellOpen, setUpsellOpen] = useState<boolean>(false);
+  const [upsellPayload, setUpsellPayload] = useState<AddKidUpsellPayload | null>(null);
+  const [upsellPriceCents, setUpsellPriceCents] = useState<number>(499);
+  const [upsellKidName, setUpsellKidName] = useState<string>('');
 
   async function load() {
     setLoading(true);
@@ -248,6 +258,34 @@ export default function ParentKidsPage() {
     const data = await res.json().catch(() => ({}));
     setSaving(false);
     if (!res.ok) {
+      // 402 from /api/kids POST means the parent doesn't have a paid
+      // seat for this kid yet. Park the form payload, open the upsell
+      // modal — the bundled endpoint there atomically charges the seat
+      // AND creates the kid. Trial flow is exempt; trials don't bill.
+      if (
+        res.status === 402 &&
+        !asTrial &&
+        data?.code === 'kid_seat_required' &&
+        form.date_of_birth
+      ) {
+        if (typeof data.extra_kid_price_cents === 'number') {
+          setUpsellPriceCents(data.extra_kid_price_cents);
+        }
+        setUpsellPayload({
+          display_name: payload.display_name,
+          avatar_color: payload.avatar_color || null,
+          pin: payload.pin,
+          date_of_birth: form.date_of_birth,
+          consent: {
+            parent_name: form.parent_name.trim(),
+            ack: true,
+            version: COPPA_CONSENT_VERSION,
+          },
+        });
+        setUpsellKidName(payload.display_name);
+        setUpsellOpen(true);
+        return;
+      }
       setError(data?.error || 'Create failed');
       return;
     }
@@ -449,17 +487,22 @@ export default function ParentKidsPage() {
           }}
         >
           {kids.map((k) => (
-            <KidCard
-              key={k.id}
-              kid={k}
-              pauseBusy={pauseBusy === k.id}
-              canRemove={canRemove}
-              onDashboard={() => {
-                window.location.href = `/profile/kids/${k.id}`;
-              }}
-              onPauseToggle={() => togglePause(k)}
-              onDelete={() => requestRemoveKid(k)}
-            />
+            // Wrapper per grid cell so the birthday banner sits directly
+            // above its kid's card (rather than spanning the row). Both
+            // banner and card are rendered inside the same cell.
+            <div key={k.id} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <BirthdayPromptBanner kid={k} />
+              <KidCard
+                kid={k}
+                pauseBusy={pauseBusy === k.id}
+                canRemove={canRemove}
+                onDashboard={() => {
+                  window.location.href = `/profile/kids/${k.id}`;
+                }}
+                onPauseToggle={() => togglePause(k)}
+                onDelete={() => requestRemoveKid(k)}
+              />
+            </div>
           ))}
         </div>
       )}
@@ -578,6 +621,34 @@ export default function ParentKidsPage() {
         busy={removeBusy}
         onConfirm={confirmRemoveKid}
         onClose={() => !removeBusy && setPendingRemove(null)}
+      />
+
+      <AddKidUpsellModal
+        open={upsellOpen}
+        kidName={upsellKidName}
+        extraKidPriceCents={upsellPriceCents}
+        payload={upsellPayload}
+        onClose={() => {
+          setUpsellOpen(false);
+        }}
+        onSuccess={() => {
+          // Bundled endpoint succeeded: kid + seat both in place.
+          // Close upsell, dismiss the inline form, refresh the list.
+          setUpsellOpen(false);
+          setUpsellPayload(null);
+          setShowForm(false);
+          setForm({
+            display_name: '',
+            avatar_color: COLOR_OPTIONS[0],
+            pin: '',
+            pinConfirm: '',
+            date_of_birth: '',
+            parent_name: '',
+            consent_ack: false,
+          });
+          setFlash('Kid profile added — your subscription was updated.');
+          load();
+        }}
       />
     </div>
   );
@@ -804,14 +875,17 @@ function KpiRow({ kpis }: { kpis: KpiPayload }) {
         marginBottom: 16,
       }}
     >
-      <KpiCard value={has ? kpis!.articles : '\u2014'} label="Articles this week" />
-      <KpiCard value={has ? kpis!.minutes : '\u2014'} label="Minutes this week" />
+      {/* T54 \u2014 KPI order locked to: Quizzes Passed \u2192 Articles \u2192 Longest Streak \u2192
+          Reading Time. Leads with comprehension quality + bookmarked-style
+          signal so parents see understanding metrics before raw volume. */}
       <KpiCard value={has ? kpis!.quizzes_passed : '\u2014'} label="Quizzes passed" />
+      <KpiCard value={has ? kpis!.articles : '\u2014'} label="Articles this week" />
       <KpiCard
         value={has && kpis!.longest_streak?.streak ? kpis!.longest_streak.streak : '\u2014'}
         label="Longest streak"
         sub={has && kpis!.longest_streak?.name ? kpis!.longest_streak.name : ''}
       />
+      <KpiCard value={has ? kpis!.minutes : '\u2014'} label="Reading time (min)" />
     </div>
   );
 }
@@ -991,6 +1065,85 @@ function StatusPill({ label, color }: { label: string; color: string }) {
     >
       {label}
     </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Birthday-prompt banner — surfaces when the daily cron has stamped
+// `birthday_prompt_at` on a kid whose age has crossed a band boundary the
+// parent hasn't acted on. CTA links into the per-kid dashboard, where the
+// existing BandPanel handles the actual advance/graduate flow. Banner is
+// silently hidden when:
+//   - prompt is unset (no pending crossing)
+//   - kid is not active (frozen / deleted)
+//   - kid already on `graduated` band (nothing more to do)
+// `birthday_prompt_at` is cleared server-side by the advance-band RPC
+// (Phase 6 migration), so refreshing the page after acting will dismiss.
+// ---------------------------------------------------------------------------
+function BirthdayPromptBanner({ kid }: { kid: KidRow }) {
+  if (!kid.birthday_prompt_at) return null;
+  if (!kid.is_active) return null;
+
+  const band = kid.reading_band || 'kids';
+  let message: string;
+  let cta: string;
+  if (band === 'kids') {
+    message = `${kid.display_name} is ready for the Tweens content track. Promote them to keep their reading age-appropriate.`;
+    cta = 'Move to Tweens';
+  } else if (band === 'tweens') {
+    message = `${kid.display_name} is approaching adulthood. Graduate them when they're ready.`;
+    cta = 'Start graduation';
+  } else {
+    // Already graduated — nothing for the parent to do here.
+    return null;
+  }
+
+  return (
+    <div
+      style={{
+        background: '#fffbeb',
+        border: `1px solid ${C.warn}`,
+        borderRadius: 10,
+        padding: '10px 12px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        flexWrap: 'wrap',
+      }}
+      role="status"
+    >
+      {/* Typographic indicator (no emoji per design system default). The
+          dot doubles as a status accent and matches the warn-tier color
+          family used elsewhere on this page (TrialHero, KidCard pills). */}
+      <span
+        aria-hidden="true"
+        style={{
+          width: 8,
+          height: 8,
+          borderRadius: '50%',
+          background: C.warn,
+          flex: '0 0 auto',
+        }}
+      />
+      <span style={{ flex: 1, minWidth: 180, fontSize: 12.5, color: '#78350f', lineHeight: 1.45 }}>
+        <strong style={{ fontWeight: 700 }}>Birthday milestone.</strong> {message}
+      </span>
+      <a
+        href={`/profile/kids/${kid.id}`}
+        style={{
+          padding: '6px 12px',
+          borderRadius: 7,
+          background: C.warn,
+          color: '#fff',
+          fontSize: 12,
+          fontWeight: 700,
+          textDecoration: 'none',
+          flex: '0 0 auto',
+        }}
+      >
+        {cta}
+      </a>
+    </div>
   );
 }
 

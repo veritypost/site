@@ -8,8 +8,8 @@ import { trackServer } from '@/lib/trackServer';
 
 // T324 — derive the user's tier server-side for analytics. Mirrors the client
 // `deriveTier` in NavWrapper.tsx so the bucket label is consistent across
-// surfaces. Returns one of: 'anon' / 'free_verified' / 'verity' /
-// 'verity_pro' / 'verity_family' / 'verity_family_xl'.
+// surfaces. Returns one of: 'anon' / 'unverified' / 'free_verified' /
+// 'verity' / 'verity_pro' / 'verity_family'.
 async function deriveServerTier(userId) {
   // Mirror NavWrapper.deriveTier — same buckets, same rules. T302 split
   // 'unverified' out of 'anon' so the funnel-join can distinguish
@@ -24,12 +24,7 @@ async function deriveServerTier(userId) {
       .maybeSingle();
     if (!data?.email_verified) return 'unverified';
     const tier = data.plans?.tier || null;
-    if (
-      tier === 'verity_family_xl' ||
-      tier === 'verity_family' ||
-      tier === 'verity_pro' ||
-      tier === 'verity'
-    ) {
+    if (tier === 'verity_family' || tier === 'verity_pro' || tier === 'verity') {
       return tier;
     }
     return 'free_verified';

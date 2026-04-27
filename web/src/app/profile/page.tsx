@@ -762,8 +762,7 @@ function OverviewTab({
     if (
       billingTier === 'verity' ||
       billingTier === 'verity_pro' ||
-      billingTier === 'verity_family' ||
-      billingTier === 'verity_family_xl'
+      billingTier === 'verity_family'
     ) {
       roleBadges.push({ label: 'Pro', variant: 'neutral' });
     }

@@ -7,6 +7,40 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (wave 6 — code-resolved owner-queue items: T54 + T298 + T318 + T319) — _pending push to git_
+
+After the owner asked which queue questions could be answered from current code, four were resolvable end-to-end.
+
+### Shipped
+
+- **T319 — `verity_family_xl` retirement cleanup.** Code-side scrub across 8 sites + a migration draft for the DB row deletion.
+  Code-side answer: `web/src/app/api/family/config/route.js:24` already documents the SKU as "retired permanently" — Phase 2 of AI + Plan Change Implementation locked the per-kid add-on model on `verity_family` (1 included kid + up to 4 total via $4.99/mo per-kid add-on). The XL pair was retired by that decision; only the cleanup pass remained. Files scrubbed:
+  - `web/src/lib/plans.js` — TIER_ORDER + DB-rows comment block (added grandfathering doc for T318 in the same comment)
+  - `web/src/app/NavWrapper.tsx` — `deriveTier` branch + AuthContext `userTier` type doc
+  - `web/src/app/admin/ad-placements/page.tsx` — `ALL_TIERS` constant + new-placement `hidden_for_tiers` default
+  - `web/src/app/api/admin/ad-placements/route.js` — POST default
+  - `web/src/app/leaderboard/page.tsx` — comment
+  - `web/src/app/api/cron/recompute-family-achievements/route.js` — comment
+  - `web/src/app/api/account/onboarding/route.js` — `deriveServerTier` branch
+  - `web/src/app/profile/page.tsx` — T316 Pro-pill billing tier check
+  Migration draft: `Ongoing Projects/migrations/2026-04-27_T319_drop_inactive_family_xl_plans.sql`. Includes a pre-flight DO-block that refuses to delete if any subscription still references a verity_family_xl plan, then drops the dependent permission_set bindings + the 2 plan rows.
+
+- **T318 — `verity_monthly` $3.99 grandfathering documented.** Code-side answer: `web/src/app/api/cron/pro-grandfather-notify/route.ts` is named "pro-grandfather-notify" and explicitly targets `verity_monthly` users — strong evidence the cheaper SKU is intentional legacy grandfathering, not a perm-set bug. Added a doc-comment in `web/src/lib/plans.js` clarifying the duplication is intentional + the price gap is the legacy promise. Future agents won't "fix" it as a bug.
+
+- **T54 — kids dashboard KPI reorder shipped.** `web/src/app/profile/kids/page.tsx:880-888`. Order changed from Articles → Minutes → Quizzes Passed → Longest Streak (the verified pre-fix state) to **Quizzes Passed → Articles → Longest Streak → Reading Time** per the locked spec. "Reading Time (min)" label normalized from "Minutes this week" to match the locked spec's terminology.
+
+- **T298 — magic-link vs system-map §17 conflict marked SUPERSEDED.** Code-side answer: repo grep for `signInWithOtp` returns zero active callers (only `TODO(T177)` deferral comments at email-change/route.js + billing/cancel/route.js). Signup/login still use email + password. So the system map's §17 Phase 1 describes CURRENT state, while TODO line 39 + AUTH DIRECTION lock describes FUTURE state. They're not in conflict in time — the "Phase 1" label collision is what makes them look conflicting. Added a SUPERSEDED note at the top of system map §17 Phase 1 noting the AUTH-MIGRATION bundle is the canonical next phase. Anomalies #1, #16, #18, #20 collapse under magic-link; #7 already shipped via T306+T307.
+
+### Bookkeeping
+
+- TODO closures: T54, T298, T318, T319 bodies deleted + corresponding owner-queue entries removed. Skip-list updated to drop T54 (locked → shipped).
+- TypeScript: 13 pre-existing errors unchanged; my edits compile clean.
+- New migration draft `T319_drop_inactive_family_xl_plans.sql` joins the 7 already in `Ongoing Projects/migrations/` from Wave 4. Total 8 migrations awaiting owner apply.
+
+- **Files** — `web/src/app/profile/kids/page.tsx`, `web/src/lib/plans.js`, `web/src/app/NavWrapper.tsx`, `web/src/app/admin/ad-placements/page.tsx`, `web/src/app/api/admin/ad-placements/route.js`, `web/src/app/leaderboard/page.tsx`, `web/src/app/api/cron/recompute-family-achievements/route.js`, `web/src/app/api/account/onboarding/route.js`, `web/src/app/profile/page.tsx`, `Ongoing Projects/2026-04-27_AUTH_PERMS_SYSTEM_MAP.md`, `Ongoing Projects/migrations/2026-04-27_T319_drop_inactive_family_xl_plans.sql`, `Ongoing Projects/TODO.md`, `Ongoing Projects/CHANGELOG.md`.
+
+---
+
 ## 2026-04-27 (autonomous-fix wave 5 — Wave B redesign batch, 4-of-8 shipped) — _shipped, pushed to git_ (commit c70fc8a; CODE itself in untracked redesign files, rolls up with T357 cutover)
 
 Fifth execution wave on the redesign batch. **4 of the 8 redesign-cutover items shipped to disk** — code lives in `web/src/app/redesign/*` which is currently untracked, so the changes commit when the larger T357 cutover lands. TODO + CHANGELOG bookkeeping commits now (those files ARE tracked).

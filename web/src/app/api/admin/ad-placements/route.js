@@ -76,7 +76,7 @@ export async function POST(request) {
       width: b.width || null,
       height: b.height || null,
       max_ads_per_page: b.max_ads_per_page || 1,
-      hidden_for_tiers: b.hidden_for_tiers || ['verity_pro', 'verity_family', 'verity_family_xl'],
+      hidden_for_tiers: b.hidden_for_tiers || ['verity_pro', 'verity_family'],
       reduced_for_tiers: b.reduced_for_tiers || ['verity'],
       is_kids_safe: b.is_kids_safe || false,
       is_active: true,
