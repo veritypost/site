@@ -7,6 +7,43 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (post-migration audit — diagnose what landed, write 4 corrected migration files) — _pending push to git_
+
+Owner reported "applied all 8 migrations but some failed." Ran an MCP audit. **4 of the 8 had issues; 4 landed cleanly.**
+
+### What landed cleanly
+
+- **T233 — articles soft-delete:** all 3 functions present (`admin_soft_delete_article`, `admin_restore_article`, `purge_soft_deleted_articles`) + RLS policy `articles_public_read_excludes_soft_deleted` exists. ✓
+- **T352 — audit_log retention:** both functions present (`anonymize_audit_log_pii`, `purge_audit_log`). ⚠️ Index `audit_log_created_at_idx` did NOT land — `CREATE INDEX CONCURRENTLY` can't run inside a transaction block; the apply path wrapped it. (See corrected file below.)
+- **T353 — webhook_log retention:** `purge_webhook_log` present. ✓
+- **T361 — billing_period standardize:** constraint `plans_billing_period_check` present; distinct values are now `['month', 'year', null]` (no more `'monthly'`/`'annual'`/`'lifetime'`). ✓
+- **T347 — DRAFT marker:** N/A (file had no SQL body, intended). ✓
+
+### What didn't land + 4 corrected files written
+
+- **T319 (family_xl plan rows) — DID NOT DELETE.** Both `verity_family_xl_monthly` and `verity_family_xl_annual` still in `public.plans`. Diagnosed via `pg_constraint`: the FK references blocking delete are `plan_permission_sets.plan_id` (6 rows) and `plan_features.plan_id` (54 rows). The original migration named the wrong junction tables (`permission_set_perms` + `permission_sets WHERE name LIKE 'plan:verity_family_xl%'`) which don't exist with that naming.
+  → **Corrected file:** `2026-04-27_T319_drop_inactive_family_xl_plans_CORRECTED.sql` — clears `plan_permission_sets` + `plan_features` first, then the plan rows. Pre-flight subscription-count guard preserved. Verified zero users / subscriptions / events / access_codes reference the XL plans.
+
+- **T354 (events partition rebuild) — RETRACTED.** Verified via MCP: events table is ALREADY partitioned, with DAILY granularity (`events_20260421` … `events_20260428` + `events_default`). The system map snapshot the original T354 was drafted from described a single un-partitioned table; that was stale. The original migration would have failed because events was already partitioned. The cron functions in the original used a monthly naming scheme (`events_p_<YYYY_MM>`) that doesn't match the actual daily names anyway.
+  → **Marker file:** `2026-04-27_T354_events_partition_RETRACTED.sql` — no SQL body; documents the retraction so future agents don't re-apply. Genuine retention follow-up still needed: confirm whether `pg_partman` / `pg_cron` already manages partition lifecycle, then add a 90-day drop-old rule aligned with the daily naming scheme.
+
+- **T362 (`update_metadata` RPC) — DID NOT LAND.** `pg_proc` shows the function absent. The original file is correct; most likely cause is that this step was skipped or silently rolled back in the bundle apply.
+  → **Re-apply file:** `2026-04-27_T362_update_metadata_rpc_REAPPLY.sql` — same body as the original, idempotent (`CREATE OR REPLACE`), no other table deps. Paste-and-run.
+
+- **T352 retention index — DID NOT LAND.** As above; `CREATE INDEX CONCURRENTLY` is illegal inside a transaction block.
+  → **Corrected file:** `2026-04-27_T352_audit_log_idx_CORRECTED.sql` — drops `CONCURRENTLY`. `audit_log` is small enough that the write-block is sub-second.
+
+### Action items for the owner
+
+1. Apply `2026-04-27_T319_drop_inactive_family_xl_plans_CORRECTED.sql` — finishes the family_xl cleanup.
+2. Apply `2026-04-27_T352_audit_log_idx_CORRECTED.sql` — adds the retention-sweep index.
+3. Apply `2026-04-27_T362_update_metadata_rpc_REAPPLY.sql` — adds the JSONB-merge RPC (unblocks the deferred half of T307).
+4. Skip the T354 retraction file (no-op). Decide whether to schedule a daily partition retention cron — needs `SELECT * FROM cron.job;` to check existing pg_cron jobs first.
+
+- **Files** — `Ongoing Projects/migrations/2026-04-27_T319_drop_inactive_family_xl_plans_CORRECTED.sql` (new), `Ongoing Projects/migrations/2026-04-27_T352_audit_log_idx_CORRECTED.sql` (new), `Ongoing Projects/migrations/2026-04-27_T362_update_metadata_rpc_REAPPLY.sql` (new), `Ongoing Projects/migrations/2026-04-27_T354_events_partition_RETRACTED.sql` (new marker), `Ongoing Projects/CHANGELOG.md` (this entry).
+
+---
+
 ## 2026-04-27 (owner-queue cleared — T117 closed, T338 closed, Confirm-email=OFF logged, T366 spawned) — _shipped, pushed to git_ (commit 13248fb)
 
 Owner cleared all four remaining queue items: T117 (option A), T338 (option A), `/admin/auth-recovery/` (option C), and confirmed Supabase "Confirm email" project setting is currently **OFF**.
