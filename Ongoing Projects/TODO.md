@@ -892,18 +892,6 @@ The numbered items below retain their original section placement for readability
 
 ### LOW — opportunistic
 
-#### T123 — Web signup heading references discussion before user knows it — **LOW**
-**File:** `web/src/app/signup/page.tsx:315` ("Join the discussion that's earned.").
-**Problem:** Cold visitor doesn't know what "discussion" means in product context. Jargon-as-headline.
-**Fix:** Replace with neutral plain-English heading or pair with the 4-step "Read → Quiz → Discuss" preview.
-**Recommendation:** Trivial copy edit.
-
-#### T124 — Web signup form has no autofocus on first field — **LOW**
-**File:** `web/src/app/signup/page.tsx:497-507` (no `autoFocus` on name input).
-**Problem:** Mobile user must tap to start typing. One extra tap = measurable drop in mobile signup.
-**Fix:** Add `autoFocus` to the name input.
-**Recommendation:** One-attribute change.
-
 #### T125 — Browse category title slug-null edge case still renders non-clickable — **LOW**
 **File:** `web/src/app/browse/page.tsx:437-577` (slug-null rows fall back to plain text).
 **Problem:** Rare but real — categories without slug render dead-looking titles inside otherwise-clickable rows.
@@ -936,18 +924,6 @@ The numbered items below retain their original section placement for readability
 **File:** `VerityPost/VerityPost/StoryDetailView.swift:~1800-1860`. `active: Bool` parameter passed but no visual differentiation.
 **Fix:** Apply `.disabled(already_voted)` or opacity/color when `active`.
 
-#### T132 — Inline hex colors in auth pages bypass design tokens — **LOW** (consistency)
-**File:** `web/src/app/signup/page.tsx:14-28` defines local `C` object with `#ffffff/#fafafa/#e5e5e5`. Other pages use `var(--text)`. Drift risk on brand changes.
-**Fix:** Replace with CSS-var fallbacks `background: var(--bg, #ffffff)`.
-
-#### T134 — Web password show/hide toggle below 44×44 touch target — **MEDIUM** (mobile a11y)
-**File:** `web/src/app/signup/page.tsx:~340-370`. Eye icon button likely <20px hit area.
-**Fix:** `minWidth: 44; minHeight: 44` on the button wrapper.
-
-#### T135 — Auth page placeholders are example values, not instructional hints — **LOW** (UX clarity)
-**File:** `web/src/app/signup/page.tsx:~280-320`. `you@example.com`, `Jane Reader` as placeholders. Best practice is visible labels + short hints.
-**Fix:** Add visible `<label>` tags or replace with `name@domain.com` / "First and Last Name."
-
 #### T136 — Web textarea elements lack visible resize affordance — **LOW** (discoverability)
 **File:** `web/src/components/CommentComposer.tsx`, `CommentRow.tsx:256-269`. No corner triangle or instruction.
 **Fix:** `resize: vertical; cursor: nwse-resize;` styling cue.
@@ -955,10 +931,6 @@ The numbered items below retain their original section placement for readability
 #### T137 — iOS email input lacks client-side format validation — **LOW** (UX)
 **File:** `VerityPost/VerityPost/SettingsView.swift:1391-1452`. Server-side only; user submits invalid → server rejection.
 **Fix:** Inline regex check in `onChange`, gray ✓ / red "Invalid email" hint.
-
-#### T138 — Signup heading "Join the discussion that's earned" is jargon for cold visitors — **LOW** (copy)
-**File:** `web/src/app/signup/page.tsx:315`. Cold user doesn't know what "earned" means in product context.
-**Fix:** Plain heading + 4-step "Read → Quiz → Discuss" preview.
 
 #### T139 — Audit error handling pattern across iOS Settings subpages — **MEDIUM** (UX consistency)
 **File:** `VerityPost/VerityPost/SettingsView.swift:1958-2040, 2090-2142, 2393-2436`. Multiple subpages use `try?` + `Log.d` swallow pattern. (Partially overlaps T44/T45 but broader.)

@@ -7,6 +7,22 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-26 (T124 + T134 shipped on /login; T123 + T132 + T135 + T138 deleted as stale) — _shipped, pushed to git/Vercel_
+
+### T124 + T134 — Login page autofocus + 44×44 password-toggle touch target
+
+- **What** — Audit items targeted `web/src/app/signup/page.tsx`, but that file is now a 20-line redirect to `/login` (closed-beta refactor moved the form). Re-targeted at `/login/page.tsx`:
+  - **T124**: added `autoFocus` to the identifier input at line 532. Mobile users skip a tap; desktop sees the cursor land in the right place.
+  - **T134**: password show/hide button widened to `minHeight: 44px` + `minWidth: 44px` with flex centering. Was `minHeight: 32px` + small padding (~24-30px effective hit area). Now meets Apple HIG + WCAG mobile-tap target minimum.
+- **Files** — `web/src/app/login/page.tsx` (two edits, lines 518-533 + 561-583).
+
+### T123 + T132 + T135 + T138 — Audit items dropped as stale
+
+- **What** — All four audit items cited `web/src/app/signup/page.tsx` lines 14-28 / 280-370 / 315 / 497-507. None of those addresses exist anymore — the file is a redirect stub. The closed-beta refactor naturally retired the offending content (jargon heading "Join the discussion that's earned", inline `const C = { ... }` palette, example-value placeholders, missing-label inputs).
+- **Why call them out** — Per memory rule "verify audit findings against current state before acting." These four were stale; cleanup ensures they don't get auto-prioritized in a future sweep. The login page that replaces signup uses CSS vars, has visible `<label>` elements, plain-language headings ("Welcome back.", "Set up your account.", "Have an access code?"), and the autofocus + tap-target fixes above.
+
+---
+
 ## 2026-04-26 (T201 + T224 — .env.example caught up to code-required vars) — _shipped, pushed to git/Vercel_
 
 ### T201 + T224 — Three missing vars added to web/.env.example

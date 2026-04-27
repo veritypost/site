@@ -529,6 +529,7 @@ function LoginPageInner() {
                 autoCapitalize="none"
                 spellCheck={false}
                 inputMode="email"
+                autoFocus
               />
             </div>
 
@@ -565,7 +566,7 @@ function LoginPageInner() {
                   onClick={() => setShowPassword(!showPassword)}
                   style={{
                     position: 'absolute',
-                    right: '10px',
+                    right: '4px',
                     top: '50%',
                     transform: 'translateY(-50%)',
                     background: 'none',
@@ -574,8 +575,11 @@ function LoginPageInner() {
                     fontSize: '12px',
                     color: C.dim,
                     fontFamily: 'inherit',
-                    padding: '6px 8px',
-                    minHeight: '32px',
+                    minHeight: '44px',
+                    minWidth: '44px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   }}
                 >
                   {showPassword ? 'Hide' : 'Show'}
