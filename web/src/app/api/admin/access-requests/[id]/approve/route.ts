@@ -5,7 +5,7 @@
 
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
-import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction } from '@/lib/adminMutation';
 import { renderTemplate, sendEmail } from '@/lib/email';
@@ -63,11 +63,10 @@ export async function POST(_request: Request, { params }: { params: { id: string
   const expiresAtIso = new Date(
     Date.now() + DEFAULT_EXPIRY_DAYS * 24 * 60 * 60 * 1000
   ).toISOString();
-  // Same auth.uid() reason as /api/admin/referrals/mint: call via the
-  // user-scoped client so the admin's JWT carries the actor identity
-  // into the SECURITY DEFINER function.
-  const userClient = await createClient();
-  const { data: minted, error: mintErr } = await userClient.rpc('mint_owner_referral_link', {
+  // Pass the admin's id explicitly via p_actor_user_id so the function
+  // doesn't need auth.uid().
+  const { data: minted, error: mintErr } = await service.rpc('mint_owner_referral_link', {
+    p_actor_user_id: actor.id,
     p_description: `Beta approval for ${req.email}`,
     p_max_uses: 1,
     p_expires_at: expiresAtIso,
