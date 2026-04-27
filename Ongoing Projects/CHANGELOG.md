@@ -7,6 +7,28 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (wave 12 — T26 migration drafted, T348 partial, T57 backend shipped) — _pending push to git_
+
+### Shipped (2 backend, 1 migration draft)
+
+- **T26 — `post_comment` notifications RPC migration drafted.** `Ongoing Projects/migrations/2026-04-27_T26_post_comment_notifications.sql`. Full `CREATE OR REPLACE FUNCTION` body that preserves all existing logic (quiz gate, mention strip for free tier, depth limits, reply-count bumps) AND adds two notification-insert blocks at the end:
+  - **Reply notifications** — when `p_parent_id IS NOT NULL`, insert `'comment_reply'` notification for the parent comment's author. Skips self-replies + skips when the parent author has blocked the poster (silent block).
+  - **Mention notifications** — for each mention entry in `p_mentions` jsonb (paid-tier only — free-tier mentions still stripped at the existing line ~30), insert one `'comment_mention'` per mentioned user. Skips self-mentions + skips when the mentioned user is also the parent author (already covered by reply branch) + skips blocked senders.
+  Per locked spec: in_app + push only, no email — every inserted notification carries `email_sent=true` so the `send-emails` cron skips it (T-EMAIL-PRUNE already retired engagement-class email types). Owner applies via Supabase SQL editor.
+
+- **T348 — per-supabase-client perm cache.** `web/src/lib/auth.js` `loadEffectivePerms` now stashes the resolver result on the client instance via `__permsCache: Map<userId, result>` (`Object.defineProperty` to make it non-enumerable so it doesn't pollute logs / serialization). Cache is keyed on `userId`. When a route handler threads the same client through `requirePermission` + `hasPermissionServer`, the second call returns from cache instead of round-tripping. Limited fix — most callers don't thread the client today; a future architecture pass with AsyncLocalStorage / `headers()` would catch the un-threaded callers too. T348 body re-scoped to "partial".
+
+- **T57 — Stripe price mint endpoint.** `web/src/app/api/admin/plans/[id]/mint-stripe-price/route.js`. POST handler: refuses if `stripe_price_id` already set (callers explicitly clear via existing PATCH if they want to re-mint), refuses if `price_cents <= 0`, refuses if `billing_period` isn't `'month'`/`'year'` (one-time plans not supported here). Calls Stripe `/v1/prices` with `Idempotency-Key: mint-stripe-price:<plan_id>:<price_cents>:<period>` so a retry within Stripe's ~24h replay window returns the same id. Sets `lookup_key = <plan_name>_<billing_period>` and stamps plan_id/plan_name/tier metadata on both the Price and the auto-created Product. Writes back to `plans.stripe_price_id` via service-role (PATCH `ALLOWED_FIELDS` intentionally excludes that field — this is the one path that sets it). Audit row written via `recordAdminAction('plan.mint_stripe_price', ...)`. Eliminates the silent-fail class at `/api/stripe/checkout/route.js:62-66`. **UI button on `/admin/plans` page still pending** — ~10 lines of JSX next to "Save pricing"; T57 body re-scoped to "partial."
+
+### Bookkeeping
+
+- TODO closures: T57 + T348 bodies re-scoped to "partial." T55 + T57 removed from LOCKED skip list (T55 has its drop-migration drafted; T57 has the backend shipped).
+- TypeScript: 13 pre-existing errors unchanged.
+
+- **Files** — `Ongoing Projects/migrations/2026-04-27_T26_post_comment_notifications.sql` (new), `web/src/lib/auth.js`, `web/src/app/api/admin/plans/[id]/mint-stripe-price/route.js` (new), `Ongoing Projects/TODO.md`, `Ongoing Projects/CHANGELOG.md`.
+
+---
+
 ## 2026-04-27 (wave 11 — T55 migration drafted; mid-edit reversal recorded) — _shipped, pushed to git_ (commit ea30523)
 
 Caught a wrong-direction error mid-edit and reversed before commit.

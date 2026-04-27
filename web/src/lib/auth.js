@@ -237,9 +237,44 @@ export async function getPlanFeatureLimit(featureKey, client) {
 // ============================================================
 
 async function loadEffectivePerms(supabase, userId) {
+  // T348 — per-supabase-client memoization. Stash the resolver result on
+  // the client instance so the same request that calls requirePermission
+  // multiple times (or requirePermission + hasPermissionServer in the
+  // same handler) only burns one compute_effective_perms RPC.
+  //
+  // This works WHEN the caller threads the same `client` argument through
+  // both calls. Most code paths today don't (each requirePermission call
+  // mints a fresh client via resolveAuthedClient(undefined)), so the
+  // benefit is limited until route handlers start passing their client
+  // through. Existing callers continue to behave identically; the cache
+  // is a no-op on cache miss. Worth shipping now because future route
+  // refactors that DO thread the client get the speedup automatically.
+  if (supabase.__permsCache instanceof Map) {
+    const cached = supabase.__permsCache.get(userId);
+    if (cached) return cached;
+  } else {
+    try {
+      Object.defineProperty(supabase, '__permsCache', {
+        value: new Map(),
+        writable: false,
+        enumerable: false,
+        configurable: false,
+      });
+    } catch {
+      // Some proxy clients reject defineProperty; fall through to
+      // un-memoized behaviour rather than crash.
+    }
+  }
+
   const { data, error } = await supabase.rpc('compute_effective_perms', { p_user_id: userId });
-  if (error) return { rows: null, error };
-  return { rows: Array.isArray(data) ? data : [], error: null };
+  const result = error
+    ? { rows: null, error }
+    : { rows: Array.isArray(data) ? data : [], error: null };
+
+  if (supabase.__permsCache instanceof Map && !error) {
+    supabase.__permsCache.set(userId, result);
+  }
+  return result;
 }
 
 export async function requirePermission(permissionKey, client) {
