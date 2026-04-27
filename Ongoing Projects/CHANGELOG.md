@@ -7,7 +7,7 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
-## 2026-04-27 (autonomous wave 8 — T317 + T310 + T355 shipped; T334 + T356 migrations drafted) — _pending push to git_
+## 2026-04-27 (autonomous wave 8 — T317 + T310 + T355 shipped; T334 + T356 migrations drafted) — _shipped, pushed to git_ (commit 4791431)
 
 ### Shipped (3)
 
