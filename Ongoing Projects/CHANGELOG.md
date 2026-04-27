@@ -7,7 +7,7 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
-## 2026-04-27 (T300 follow-up — T300b drafted to close 2 gaps) — _pending push to git_
+## 2026-04-27 (T300 follow-up — T300b drafted to close 2 gaps) — _shipped, pushed to git_ (commit 689dafa)
 
 ### MCP audit caught 2 gaps after owner applied T300
 
