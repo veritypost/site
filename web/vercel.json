@@ -51,6 +51,14 @@
     {
       "path": "/api/cron/birthday-band-check",
       "schedule": "15 6 * * *"
+    },
+    {
+      "path": "/api/cron/subscription-reconcile-stripe",
+      "schedule": "45 6 * * *"
+    },
+    {
+      "path": "/api/cron/pro-grandfather-notify",
+      "schedule": "0 7 * * *"
     }
   ]
 }

@@ -7,6 +7,103 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (Phase 6 — final polish + testing, code shipped) — _code shipped; no new migration_
+
+### Context
+
+Phase 6 of the AI + Plan Change Implementation roadmap. The final phase. Consolidates the customer-facing UI surfaces for the new plan structure + age-banded pipeline + DOB-correction system + graduation flow that Phases 0-5 built. Also closes out the operational gaps flagged in earlier phases (subscription drift reconciliation, Pro grandfather migration).
+
+### Cluster — graduation welcome screen
+
+`web/src/app/welcome/page.tsx` — added `GraduationClaim` early-return at the top of WelcomePage. When `?graduation_token=...` is present, renders dedicated email + password form, calls `/api/auth/graduate-kid/claim`, and on success surfaces a "Welcome [name], your account is ready" success state with login CTA. Without the token param, falls through to the standard onboarding carousel.
+
+### Cluster — reconciliation crons
+
+`web/src/app/api/cron/subscription-reconcile-stripe/route.ts` (NEW): daily cron at 06:45 UTC. For each Stripe-billed subscription in `active`/`trialing` status, retrieves the live Stripe subscription via the project's fetch-based Stripe client (REST API, no SDK dep). Computes expected `kid_seats_paid` from the `items.data[].price.metadata.seat_role` field (extra_kid quantity + 1 included). Updates DB if drift detected, logs to captureMessage. Capped at 200 subs/run.
+
+### Cluster — Pro grandfather migration cron
+
+`web/src/app/api/cron/pro-grandfather-notify/route.ts` (NEW): daily cron at 07:00 UTC. Two-stage flow:
+- **Notify stage:** Pro subs with `current_period_end` between 25-31 days out + no prior `metadata.pro_migration_notified_at` get the heads-up email queued (currently logs to captureMessage as the placeholder for the real email-send when infra is wired) + metadata stamp.
+- **Migrate stage:** Pro subs with `current_period_end` <= now() + 24h + already-notified get their Stripe subscription item swapped from Pro price → Verity price via REST PATCH (proration_behavior: 'none' — bills the new lower price at next renewal cleanly).
+- Runs in dry-run mode if `STRIPE_PRO_MONTHLY_PRICE_ID` / `STRIPE_PRO_ANNUAL_PRICE_ID` / `STRIPE_VERITY_MONTHLY_PRICE_ID` / `STRIPE_VERITY_ANNUAL_PRICE_ID` env vars unset (logs counts, no writes).
+- Apple Pro subs not handled here — Apple StoreKit doesn't allow programmatic plan-switch the same way; in-app banner asks them to manually switch (deferred to iOS work).
+
+### Cluster — family seat UI
+
+`web/src/app/profile/family/page.tsx` — added inline `FamilySeatsCard` component. Calls `GET /api/family/seats` on mount; when an active Family sub is detected, renders a card showing:
+- "M of N kid seats used (cap 4)"
+- Current monthly extra-kid charge ("+$X.XX/mo for extra seats")
+- Platform-specific copy: Apple users see "manage in App Store"; Google users see "manage in Google Play"; Stripe users see add-kid pricing or cap message.
+Hidden gracefully (returns null) for non-Family users + permission-denied responses.
+
+### Cluster — public pricing page
+
+`web/src/app/pricing/page.tsx` (NEW): server component. 3-card layout (Free / Verity / Family) with feature lists, price + period, CTA buttons. Below: scaling table showing monthly + annual pricing for 1-4 kids ($14.99 → $29.96/mo). Closing copy explains net-zero seat math at graduation. Static SEO metadata. No client JS.
+
+### Cluster — vercel.json
+
+Added two cron entries: `subscription-reconcile-stripe` at 06:45 UTC, `pro-grandfather-notify` at 07:00 UTC.
+
+### Verification
+
+- `npx tsc --noEmit` clean for Phase 6 surfaces (the `redesign/` directory's `ScoreTier` type drift remains from the unrelated work stream — not introduced by Phase 6).
+- ESLint + Prettier clean.
+
+### Files touched (3 + 3 new)
+
+- `web/vercel.json` (cron registration)
+- `web/src/app/welcome/page.tsx` (GraduationClaim early-return component)
+- `web/src/app/profile/family/page.tsx` (FamilySeatsCard inline component)
+- NEW: `web/src/app/api/cron/subscription-reconcile-stripe/route.ts`
+- NEW: `web/src/app/api/cron/pro-grandfather-notify/route.ts`
+- NEW: `web/src/app/pricing/page.tsx`
+
+### Owner action items
+
+1. **Set Stripe price IDs as env vars.** For the Pro grandfather cron to switch out of dry-run mode, set:
+   - `STRIPE_PRO_MONTHLY_PRICE_ID` (current Pro monthly price ID from Stripe Dashboard)
+   - `STRIPE_PRO_ANNUAL_PRICE_ID`
+   - `STRIPE_VERITY_MONTHLY_PRICE_ID` (the new Verity solo monthly price ID — owner created in Phase 2 setup)
+   - `STRIPE_VERITY_ANNUAL_PRICE_ID`
+2. **Wire the email-send infra.** The Pro grandfather notify stage currently logs to captureMessage instead of actually sending the email. When the email-template + outbound-send pipeline is online, replace the captureMessage block with the real send. Same applies to: DOB correction received/approved/rejected, band advance prompt, kid graduation account ready.
+3. **Smoke test the welcome graduation path:** copy a real `claim_url` from `/api/kids/[id]/advance-band` response (Phase 5 endpoint), open it in a fresh incognito session, complete the form. Verify new auth.users row exists + categories carried over to `users.metadata.feed.cats`.
+4. **Visit `/pricing` in prod** — copy + price + scaling table all reflect the locked Phase 2 numbers.
+
+### What this DOESN'T do (post-launch backlog)
+
+- **iOS graduation handoff** — kids app on launch detects `is_active=false AND reading_band='graduated'` → shows handoff screen + deep-links to VerityPost. Pure iOS work, separate ship.
+- **Email send infrastructure for transactional emails** — DOB correction notifications, band-advance prompts, graduation-account-ready emails all log captureMessage today. Need owner-side decision on email provider + template system.
+- **Apple Pro grandfather banner** — in-app one-time banner asking Apple-Pro users to manually switch. iOS work.
+- **Family seat-add UI** — `FamilySeatsCard` renders the seat state but doesn't include a "+ add kid seat" button that triggers the Stripe quantity bump. The existing /api/family/seats POST handler is in place; UI for the parent-driven seat increase ships next.
+- **`(Kids)` category cleanup verification** — Phase 3 migration drops the variant rows on apply. Confirm zero `(Kids)` rows remain after migration runs.
+
+### Migrations summary across the whole AI + Plan Change Implementation initiative (5 migrations staged)
+
+1. `2026-04-27_phase1_persist_article_consolidation.sql` — kid_articles consolidation
+2. `2026-04-27_phase2_plan_structure_rewrite.sql` — pricing + subscription columns + permissions
+3. `2026-04-27_phase3_age_banding.sql` — reading_band + age_band + RLS
+4. `2026-04-27_phase4_dob_correction_system.sql` — triggers + tables + admin RPC
+5. `2026-04-27_phase5_graduation_flow.sql` — graduation tokens + system RPC + claim RPC + birthday prompt
+
+All staged; owner applies via Supabase SQL editor. After applying: `npm run types:gen` to refresh `web/src/types/database.ts` and the `as any`/`as never` casts scattered across Phase 1-5 endpoints can be dropped on a follow-up sweep.
+
+### Initiative status: COMPLETE on dev side
+
+All 6 phases of `Ongoing Projects/AI + Plan Change Implementation/EXECUTE.md` are shipped. Generation pipeline (Pass A) is unblocked. Pro/Family XL retired. Per-kid Family seats wired end-to-end. Age-banded kid generation produces kids + tweens articles. DOB locked + correction request system live. Graduation flow + parent UI + welcome screen live. Reconciliation crons in place.
+
+Owner-side blockers to launch:
+- Apply 5 migrations
+- Run `npm run types:gen`
+- Apple SBP enrollment
+- 10 Apple SKUs in App Store Connect
+- 4 Stripe products + 6 prices
+- AdSense + AdMob applications
+- Email-send infrastructure
+- iOS graduation handoff (separate iOS commit)
+
+---
+
 ## 2026-04-27 (Phase 5 — graduation + parent flows, code shipped + migration staged) — _code shipped; migration staged for owner SQL editor apply_
 
 ### Context

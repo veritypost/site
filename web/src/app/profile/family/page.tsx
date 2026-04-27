@@ -176,6 +176,9 @@ export default function FamilyDashboard() {
         Private to your household (D24). Nobody outside the family sees any of this.
       </div>
 
+      {/* Phase 6 of AI + Plan Change Implementation: family seat summary card. */}
+      <FamilySeatsCard />
+
       {error && <div style={{ color: '#dc2626', fontSize: 12, marginBottom: 10 }}>{error}</div>}
 
       {loadError && (
@@ -353,6 +356,96 @@ export default function FamilyDashboard() {
             )}
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Phase 6 of AI + Plan Change Implementation — family seat summary
+// ---------------------------------------------------------------------------
+
+function FamilySeatsCard() {
+  const [state, setState] = useState<{
+    used: number;
+    paid: number;
+    included: number;
+    max_kids: number;
+    max_total_seats: number;
+    extra_kid_price_cents: number;
+    platform: 'stripe' | 'apple' | 'google' | null;
+    has_active_family_sub: boolean;
+  } | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/family/seats', { credentials: 'include' });
+        if (!res.ok) {
+          // Silently hide the card when the user lacks permission (free
+          // users), per the kids-redirect block above.
+          if (res.status === 401 || res.status === 403) return;
+          const j = await res.json().catch(() => ({}));
+          if (!cancelled) setErr(j.error || `HTTP ${res.status}`);
+          return;
+        }
+        const j = await res.json();
+        if (!cancelled) setState(j);
+      } catch (e) {
+        if (!cancelled) setErr(e instanceof Error ? e.message : 'load failed');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (err || !state || !state.has_active_family_sub) return null;
+
+  const extras = Math.max(0, state.paid - state.included);
+  const monthlyCents = extras * state.extra_kid_price_cents;
+  const monthlyAdded = (monthlyCents / 100).toFixed(2);
+
+  return (
+    <div
+      style={{
+        background: 'var(--card)',
+        border: '1px solid var(--border)',
+        borderRadius: 10,
+        padding: 14,
+        marginBottom: 16,
+        fontSize: 13,
+        color: 'var(--text)',
+      }}
+    >
+      <div style={{ fontWeight: 700, marginBottom: 4 }}>Family seats</div>
+      <div style={{ color: 'var(--dim)', marginBottom: 8 }}>
+        {state.used} of {state.paid} kid {state.paid === 1 ? 'seat' : 'seats'} used (cap{' '}
+        {state.max_kids}).
+        {extras > 0 ? ` Currently +$${monthlyAdded}/mo for extra seats.` : ''}
+      </div>
+      {state.platform === 'apple' && (
+        <div style={{ fontSize: 12, color: 'var(--dim)' }}>
+          Billed via Apple. Manage seats in your iOS app or App Store settings.
+        </div>
+      )}
+      {state.platform === 'google' && (
+        <div style={{ fontSize: 12, color: 'var(--dim)' }}>
+          Billed via Google Play. Manage seats in your Google Play account.
+        </div>
+      )}
+      {state.platform === 'stripe' && (
+        <div style={{ fontSize: 12, color: 'var(--dim)' }}>
+          Adding a kid{' '}
+          {state.used >= state.max_kids
+            ? ''
+            : `costs +$${(state.extra_kid_price_cents / 100).toFixed(2)}/mo. `}
+          {state.used >= state.max_kids
+            ? 'You are at the kid cap. Contact support for larger families.'
+            : ''}
+        </div>
       )}
     </div>
   );
