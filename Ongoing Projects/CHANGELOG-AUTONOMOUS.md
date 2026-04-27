@@ -6,6 +6,94 @@ Format: newest at top.
 
 ---
 
+## 2026-04-27 — Wave 21: 5-item closeout batch + 2 retirements via 3 parallel implementers + reviewer
+
+**Items shipped:** 5 substantive + 2 retired-as-convention.
+- Web cleanup (3): T322 partial (Stripe webhook + checkout events), T4.9 (stale category drop, migration drafted), T4.11 (sponsor FK CASCADE → RESTRICT, premise inverted by reviewer, migration drafted)
+- Notification hygiene (1 multi-surface): T27 + T3.5
+- iOS expert verification (1): T20
+- Retired as convention-only: T165 (inline style migration), T166 (data-testid backfill)
+
+**Wave 21 was the closeout wave** — owner directive: "just get them done once and for all" without further session typing. After this wave the truly-autonomous TODO pile is empty for this session; what remains needs owner involvement (Stripe LIVE flag-flips, schema-migration applies, iOS pair-fixes) or is in `TODO-PRE-LAUNCH.md` (web push, Sentry).
+
+**T322 partial (Stripe events):**
+- `subscribe_start` fires in `/api/stripe/checkout` POST after auth + rate-limit + plan resolve, immediately before `createCheckoutSession`. Captures funnel intent so an upstream Stripe failure still leaves a breadcrumb. Payload: `plan_name, plan_id, plan_tier, has_existing_customer`.
+- `subscribe_complete` fires in `handleCheckoutCompleted` AFTER the authoritative `billing_resubscribe` / `billing_change_plan` RPC succeeds. Webhook idempotency (UNIQUE event_id + status='processed' early-return) prevents double-fire on Stripe retries. Payload: `plan_id, plan_name, plan_tier, stripe_subscription_id, stripe_customer_id, was_resubscribe, user_tier`.
+- Both `void trackServer(...)` fire-and-forget. Reviewer verified `trackServer` swallows errors via try/catch — telemetry can't fail the response (telemetry "never makes a thing true" contract).
+
+**T4.9 (stale Tech (Kids) drop):**
+Pre-flight: zero references in code (web + iOS adult + iOS kids). Zero FK constraints declared on `categories.id`. 18 columns hold `category_id` semantically across the schema; MCP-verified each — all return zero references to the stale row. Migration at `Ongoing Projects/migrations/2026-04-27_drop_stale_tech_kids_category.sql` wraps a defensive `DO $$` block that re-counts references inside the transaction and `RAISE EXCEPTION` if non-zero, then `DELETE FROM categories WHERE id=… AND slug='kids-tech' AND name='Tech (Kids)'`. Triple-guarded WHERE so a re-run on already-cleared environment silently no-ops. Owner runs.
+
+**T4.11 (sponsor FK — premise inverted by reviewer):**
+**Implementer's first pass declared "no FKs, no-op." Reviewer caught this was wrong.** `pg_constraint` lookup found TWO FKs to `sponsors.id` and BOTH cascade:
+- `fk_articles_sponsor_id` on `articles.sponsor_id` → `sponsors.id`, `ON DELETE CASCADE`
+- `fk_campaigns_sponsor_id` on `campaigns.sponsor_id` → `sponsors.id`, `ON DELETE CASCADE`
+
+Real risk inverted: not "orphaned revenue rows" but "silent cascade-delete of articles + campaigns when admin clicks delete on a sponsor." Reviewer earned its keep on this one.
+
+Migration drafted at `Ongoing Projects/migrations/2026-04-27_sponsor_fk_restrict.sql` flipping both FKs to `ON DELETE RESTRICT`. Defensive `DO $$` verifies both `confdeltype='r'` before commit. RESTRICT is the safer default for a financially-relevant relationship (an operator who wants to clean up a sponsor must explicitly repoint or archive linked articles/campaigns first; can't accidentally nuke history). Owner runs.
+
+**T27 + T3.5 (notification hygiene — multi-surface coordination):**
+Audit finding: iOS `metadata.notifications.<key>` toggles wrote to paths NO backend code reads. Actual delivery gating is in `alert_preferences` table keyed by `alert_type`. So the 5 iOS toggles (`breaking, digest, expert_reply, comment_reply, weekly_recap`) were pure UI theater — saved data nowhere consumed. Same lie on the admin email-templates page: 6 of 9 templates were editable but never sent (no cron path).
+
+**iOS:** `NotificationsSettingsView` (SettingsView.swift:1951-2156) trimmed end-to-end. State surface dropped 12 → 5 fields. Body dropped the entire "What to send" card + save button + saveError/loadError banners. `load()` and `save()` deleted entirely; no DB I/O remains. Push prompt row + system-permission deep link kept (the only honest control left). Footer note updated to point users to web for per-alert prefs.
+
+**Web admin:** `admin/email-templates/page.tsx` split into Active (3 transactional templates: `data_export_ready`, `kid_trial_expired`, `expert_reverification_due`) + Inactive (6 parked) tabs. Each inactive row gets a dim "Inactive — no delivery wired" badge. Detail view shows a parked-template explainer card. Pause/Resume button hidden for inactive (it operates on `is_active` which only matters within the active set). Old `STATUS_FILTERS` filter retired (no parallel codepath). No timelines, no "coming soon" — present-tense factual copy.
+
+Coordination check: Active admin templates ↔ iOS toggles 1:1 = both surfaces converge on zero user-toggleable templates because the 3 active emails are transactional (security-only per memory rule), not preference-gated. Inactive admin templates have no corresponding iOS toggle. Honest.
+
+**T20 (iOS expert verification):**
+**Severe gap discovered.** iOS form was sending only 7 of 12 server-required fields AND using an invalid `application_type='public_figure'` (server's `submit_expert_application` RPC enforces `expert | educator | journalist` — every iOS expert apply submission was 400-ing silently). Implementation:
+- Replaced segmented control with valid 3-option (expert/educator/journalist).
+- Added DB-driven category multi-select chip (FlowLayout, iOS 17 native — no third-party dep).
+- Added 3 sample-response textareas (server requires exactly 3).
+- Added credentials textarea + website URL field.
+- Added inline error banner for 429 / 400 / network failures with copy-mapped responses.
+- Updated `ExpertApplyBody` Codable to all 12 server fields.
+- Removed previously-unsent `field` text input.
+Client-side validation matches RPC rules: name + bio + credentials non-empty, ≥1 category picked, all 3 samples non-empty. Submit button disabled with reason copy until valid. Network/server failures land in the banner instead of `Log.d` swallow.
+
+**Adjacent flag (out of scope):** the redesign web form `ExpertApplyForm.tsx` only enforces ≥1 sample but RPC requires =3 — same bug on web. Logged as follow-up but not fixed in this wave.
+
+**Memory-rule sweep (reviewer pass, all confirmed):**
+- No Sentry imports introduced (zero hits across all 4 touched files)
+- No keyboard shortcuts in admin UI
+- No timelines / "coming soon" / future-promise language
+- No TODO/HACK/FIXME markers
+- Email scope security-only respected — Active templates are all transactional/lifecycle; no replies/follows/digests
+- Genuine fixes, no parallel codepaths — dead toggles deleted, dead admin filters retired, broken `public_figure` and `field` retired entirely
+
+**Cross-implementer SettingsView.swift coordination (verified clean):**
+Two implementers edited SettingsView.swift in non-overlapping ranges:
+- T27/T3.5 trimmed `NotificationsSettingsView` (1951-2156)
+- T20 rebuilt `VerificationRequestView` (2159-2547) + new `FlowLayout` helper (2548+)
+No mutual edits. No accidental revert.
+
+**Mechanical verification:**
+- Web `npx tsc --noEmit`: clean
+- Web `npx eslint`: clean on all touched files
+- iOS `swiftc -parse SettingsView.swift`: clean
+
+**T165 + T166 retired:**
+Both removed from autonomous backlog and converted to standing conventions:
+- T165 (inline `style={{...}}` → Tailwind): 3,888 hits across ~170 files; bulk migration is multi-week with high regression risk; new code uses Tailwind utilities, existing inline styles stay until the surrounding feature is rewritten anyway.
+- T166 (`data-testid` backfill): bulk-adding without tests is dead chrome; convention going forward = test authors add testids to elements they need.
+Both flagged "do not migrate back" in TODO entries.
+
+**Agents used:** 4 (3 parallel implementers + 1 reviewer/verifier).
+
+**Files touched (this commit):**
+- iOS adult: `VerityPost/VerityPost/SettingsView.swift` (T27/T3.5 trim + T20 rebuild)
+- Web cron + admin: `web/src/app/admin/email-templates/page.tsx`, `web/src/app/api/stripe/checkout/route.js`, `web/src/app/api/stripe/webhook/route.js`
+- Migrations (NEW, not applied): `Ongoing Projects/migrations/2026-04-27_drop_stale_tech_kids_category.sql`, `Ongoing Projects/migrations/2026-04-27_sponsor_fk_restrict.sql`
+- Logs: TODO-AUTONOMOUS.md (5 SHIPPED markers + 2 RETIRED entries), CHANGELOG-AUTONOMOUS.md (this entry)
+
+**Closeout state:** truly-autonomous queue is empty for this session. Remaining unshipped items in TODO-AUTONOMOUS all have owner gates (Stripe LIVE flag, schema migration apply, iOS pair-fix dependency, decision call) or moved to TODO-PRE-LAUNCH (web push, Sentry).
+
+**Pattern note (Wave 21):** Reviewer earned its keep on T4.11 — implementer's first pass produced a wrong "no-op" verdict; reviewer's `pg_constraint` check exposed two CASCADE FKs and inverted the premise. This is the exact failure mode the reviewer pass exists to catch on elevated-care work. Wave-21's audit-trail / financial-relationship items genuinely needed the second set of eyes that Wave 19's hygiene batch didn't.
+
+---
+
 ## 2026-04-27 — Wave 20: 7-item elevated-care batch via 4 parallel implementers + reviewer
 
 **Items shipped:** 7. Each was deferred from Wave 19 because it didn't fit the "lower scrutiny / hygiene" mode — kid-safety, RBAC compliance, COPPA persistence, or significant single-file builds.

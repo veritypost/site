@@ -58,7 +58,9 @@ See `CHANGELOG-AUTONOMOUS.md` Wave 10. **Adversary saved a half-fix that was sec
 
 ## ANALYTICS — wired-but-incomplete
 
-## T322 — 13 KnownEventName types still unwired — HIGH
+## T322 — 13 KnownEventName types still unwired — PARTIALLY SHIPPED 2026-04-27 (Wave 21)
+
+Server-side batch shipped Wave 21: `subscribe_start` (in `/api/stripe/checkout` after auth + rate-limit + plan resolve, before `createCheckoutSession`) + `subscribe_complete` (in `handleCheckoutCompleted` AFTER `billing_resubscribe`/`billing_change_plan` RPC succeeds). Both fire-and-forget via `void trackServer(...)`. Webhook idempotency (UNIQUE event_id + status='processed' early-return) prevents double-fire on Stripe retries. Remaining: client-side mounts (`signup_start`, `article_read_start`/`complete`, `scroll_depth`, `score_earned`); 9 ad events parked until AdSense; `onboarding_complete` dedupe (web client mirror drop). Carry to next session.
 
 **Verified:** 2026-04-27 against `web/src/lib/events/types.ts:74-108` (28 events declared in `KnownEventName`) + grep for `trackServer(` and `trackEvent(` (8 events fire today: `signup_complete`, `verify_email_complete`, `onboarding_complete`, `comment_post`, `bookmark_add`, `page_view`, `quiz_started`, `quiz_completed`).
 **What's wrong:** 13+ events declared but never fired:
@@ -206,14 +208,18 @@ Closing the bulk T84 sweep. The 6 admin sites that needed fixing are shipped. Re
 
 Web browser push notifications (OS-level toasts when the tab is closed) lives in `Ongoing Projects/TODO-PRE-LAUNCH.md` as of owner directive 2026-04-27. Engineering shape is autonomous, but launch sequencing + owner-generated VAPID keypair + service-worker operational-risk decision + RLS migration land it as pre-launch work, not autonomous batch work. Do not re-add to TODO-AUTONOMOUS.
 
-## T165 — Inline `style={{...}}` migration — LOW
+## T165 — Inline `style={{...}}` migration — RETIRED 2026-04-27 as CONVENTION-ONLY (Wave 21)
+
+3,888 hits across ~170 files. Bulk migration is not a genuine fix at scope — it's a multi-week sweep with high regression risk for low compounding leverage. Convention going forward: new code uses Tailwind utility classes / CSS Modules; existing inline styles stay until the surrounding feature is rewritten anyway. Tailwind PostCSS is already wired. Removing from autonomous backlog; do not migrate back.
 
 **Verified:** 2026-04-27 — `grep -r "style={{" web/src --include="*.tsx" | wc -l` = 3,888 (down from prior count of 4,272 — drift confirms shrinkage). 170 unique files.
 **What's wrong:** Maintenance burden + bundle size cost. Tailwind PostCSS plugin already wired.
 **Fix:** Migrate critical components to CSS modules / Tailwind utility classes. Don't rewrite the whole codebase — pick top-10 most-edited files and convert those. Document the convention so new code uses Tailwind from start.
 **Tier:** T3 (incremental).
 
-## T166 — Zero `data-testid` attributes — LOW
+## T166 — Zero `data-testid` attributes — RETIRED 2026-04-27 as CONVENTION-ONLY (Wave 21)
+
+Bulk backfill is wrong scope. Convention going forward: when a new e2e test is written, the test author adds `data-testid` to the elements they need; bulk-adding without tests is dead chrome. Removing from autonomous backlog; do not migrate back.
 
 **Verified:** 2026-04-27 — `grep -r "data-testid" web/src` = 0.
 **What's wrong:** No test selectors. e2e tests are brittle.
@@ -309,7 +315,7 @@ Added `@Published var bypassOnboardingLocally: Bool = false` on `AuthViewModel`.
 
 ## iOS — settings parity
 
-## T27 iOS + T3.5 — Notification settings hygiene (web admin + iOS settings) — MEDIUM
+## T27 iOS + T3.5 — Notification settings hygiene — SHIPPED 2026-04-27 (Wave 21)
 
 **Verified:** 2026-04-27 against `VerityPost/VerityPost/SettingsView.swift:2015-2049` (iOS `NotificationsSettingsView` reads/writes `metadata.notifications` sub-keys: `breaking`, `digest`, `expert_reply`, `comment_reply`, `weekly_recap`) + `web/src/app/admin/email-templates/page.tsx` (admin UI lets admins edit copy for `breaking_news_alert`, `comment_reply`, `expert_answer_posted`, `kid_trial_day6`, `weekly_family_report`, `weekly_reading_report` — none of these are in the cron whitelist; they never send).
 **What's wrong / missing:**
@@ -325,7 +331,7 @@ Added `@Published var bypassOnboardingLocally: Bool = false` on `AuthViewModel`.
 
 ---
 
-## T20 — iOS verification application missing fields — HIGH
+## T20 — iOS verification application missing fields — SHIPPED 2026-04-27 (Wave 21)
 
 **Verified:** 2026-04-27 against `SettingsView.swift:2299-2326`. iOS sends 7 fields. Web sends 6 more: `expertise_areas`, `credentials`, `category_ids`, plus 3 `sample_responses`.
 **Fix:** Add iOS form sections matching web:
@@ -679,7 +685,7 @@ POST handler + unused imports (`checkRateLimit`, `recordAdminAction`) removed; d
 
 Pre-flight `npx tsc --noEmit` enumeration grouped the 14 errors into 3 buckets: (1) 6 errors using `tier.label / tier.slug` on `ScoreTier` — fixed by updating call sites to the actual field names (`display_name` / `name`) at AppShell, TierProgress (×2), YouSection, PublicProfileSection. The TODO's suggested "(A) add `label` + `slug` to `ScoreTier` type" would have entrenched the drift between DB columns and UI; updating call sites keeps a single source of truth. (2) 3 errors at `update_own_profile` RPC boundary where `Json` was the expected type — added `as Json` casts at AvatarEditor / PublicProfileSection / PrivacyCard, with `Json` imported from `@/types/database` (matches established supabase-caller idiom). (3) 1 wrong column name (`expert_application_id` → `application_id`) at ExpertProfileSection. Final typecheck → clean. T357 cutover no longer blocked. See `CHANGELOG-AUTONOMOUS.md` Wave 16.
 
-## T4.9 — Stale "Tech (Kids)" category row — LOW
+## T4.9 — Stale "Tech (Kids)" category row — SHIPPED 2026-04-27 (Wave 21, migration drafted)
 
 **Verified:** 2026-04-27 — REMEDIATION cited it. Phase 3 category dedup migration left one stale row that should have been collapsed into base "Tech".
 **Fix:** Verify via SQL whether the row exists + has FKs referencing it. If FKs exist, repoint to base "Tech" first; then DELETE the stale row.
@@ -743,7 +749,9 @@ Pre-flight `npx tsc --noEmit` enumeration grouped the 14 errors into 3 buckets: 
 
 ---
 
-## T4.11 — Sponsor DELETE may orphan revenue rows — LOW (verify FK first)
+## T4.11 — Sponsor DELETE → SHIPPED 2026-04-27 (Wave 21, premise inverted, migration drafted)
+
+**Reviewer-caught premise inversion.** TODO framed this as "may orphan revenue rows," but verification (`pg_constraint` + `web/src/types/database.ts:1748-1753, 2292-2297`) found TWO FKs to `sponsors.id` and BOTH cascade: `fk_articles_sponsor_id` (`articles.sponsor_id`) and `fk_campaigns_sponsor_id` (`campaigns.sponsor_id`), both `ON DELETE CASCADE`. Real risk is the inverse: deleting a sponsor silently cascade-deletes every article + campaign tied to it. Migration drafted at `Ongoing Projects/migrations/2026-04-27_sponsor_fk_restrict.sql` (defensive DO-block verifies both rules flipped before commit) — flips both FKs to `ON DELETE RESTRICT` so the DB rejects sponsor deletes when linked rows exist. Owner runs.
 
 **Verified:** 2026-04-27 — REMEDIATION flagged as `[UNVERIFIED]` pending FK behavior check.
 **Fix:** Query `pg_constraint` for FKs from any revenue/billing table to `sponsors`. If FK is `ON DELETE CASCADE`, decide: (A) soft-delete sponsors (`is_deleted=true` flag) instead of hard-delete; or (B) change FK to `ON DELETE RESTRICT` — no delete if dependent rows exist.

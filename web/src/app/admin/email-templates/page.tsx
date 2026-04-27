@@ -20,7 +20,17 @@ import type { Tables } from '@/types/database-helpers';
 
 type EmailTemplate = Tables<'email_templates'>;
 
-const STATUS_FILTERS: Array<'All' | 'Active' | 'Disabled'> = ['All', 'Active', 'Disabled'];
+// Source of truth: `web/src/app/api/cron/send-emails/route.js` TYPE_TO_TEMPLATE.
+// Only templates whose `key` is in this set are eligible to render + send.
+// Every other row in `email_templates` is parked UI: editable copy, no
+// delivery wired. Mirror this constant in the cron when types are added.
+const ACTIVE_TEMPLATE_KEYS = new Set<string>([
+  'data_export_ready',
+  'kid_trial_expired',
+  'expert_reverification_due',
+]);
+
+type TabKey = 'active' | 'inactive';
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(false);
@@ -44,7 +54,7 @@ function EmailTemplatesInner() {
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [catFilter, setCatFilter] = useState<'All' | 'Active' | 'Disabled'>('All');
+  const [tab, setTab] = useState<TabKey>('active');
   const [loadError, setLoadError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [editSubject, setEditSubject] = useState('');
@@ -77,17 +87,23 @@ function EmailTemplatesInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const filtered = templates.filter((t) => {
-    if (catFilter === 'Active' && !t.is_active) return false;
-    if (catFilter === 'Disabled' && t.is_active) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      if (!(t.name?.toLowerCase().includes(q) || t.key?.toLowerCase().includes(q) || t.subject?.toLowerCase().includes(q))) return false;
-    }
-    return true;
+  const isWiredForDelivery = (t: EmailTemplate) => !!t.key && ACTIVE_TEMPLATE_KEYS.has(t.key);
+
+  const activeTemplates = templates.filter(isWiredForDelivery);
+  const inactiveTemplates = templates.filter((t) => !isWiredForDelivery(t));
+
+  const visible = (tab === 'active' ? activeTemplates : inactiveTemplates).filter((t) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (
+      t.name?.toLowerCase().includes(q) ||
+      t.key?.toLowerCase().includes(q) ||
+      t.subject?.toLowerCase().includes(q)
+    );
   });
 
   const selected = selectedId ? templates.find((t) => t.id === selectedId) || null : null;
+  const selectedIsActive = selected ? isWiredForDelivery(selected) : false;
 
   const openTemplate = (id: string) => {
     setSelectedId(id);
@@ -151,11 +167,20 @@ function EmailTemplatesInner() {
   const detailBody = selected ? (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: S[2], marginBottom: S[4], flexWrap: 'wrap' }}>
-        <Badge variant={selected.is_active ? 'success' : 'neutral'} dot size="sm">
-          {selected.is_active ? 'Active' : 'Disabled'}
+        <Badge variant={selectedIsActive ? 'success' : 'neutral'} dot size="sm">
+          {selectedIsActive ? 'Active — sends to users' : 'Inactive — no delivery wired'}
         </Badge>
         <span style={{ fontSize: F.xs, color: C.dim, fontFamily: 'monospace' }}>{selected.key}</span>
       </div>
+
+      {!selectedIsActive && (
+        <div style={{
+          marginBottom: S[4], padding: S[3], background: C.card, border: `1px solid ${C.divider}`,
+          borderRadius: 8, fontSize: F.sm, color: C.dim, lineHeight: 1.5,
+        }}>
+          This template is parked. Editing the copy is safe, but no cron currently sends it. Kept here for UI parity so the rendered subject + body don&apos;t need to be reconstructed when delivery wires up.
+        </div>
+      )}
 
       <div style={{ marginBottom: S[4] }}>
         <label style={lblStyle}>Subject line</label>
@@ -197,16 +222,22 @@ function EmailTemplatesInner() {
         marginTop: S[4], padding: S[3], background: C.card, border: `1px solid ${C.divider}`,
         borderRadius: 8, fontSize: F.sm, color: C.dim, lineHeight: 1.5,
       }}>
-        Backend fetches this template, populates variables from user + story data, and sends via Resend. Changes apply immediately without a deploy.
+        {selectedIsActive
+          ? 'The send-emails cron fetches this template, populates variables from user + story data, and sends via Resend. Edits apply immediately without a deploy.'
+          : 'No cron path includes this key. Edits save to the row and persist, but the template never reaches a user until delivery is wired.'}
       </div>
     </div>
   ) : null;
 
   const detailFooter = selected ? (
     <div style={{ display: 'flex', gap: S[2], width: '100%', justifyContent: 'space-between' }}>
-      <Button variant="ghost" onClick={() => toggleStatus(selected.id)}>
-        {selected.is_active ? 'Disable' : 'Enable'}
-      </Button>
+      {selectedIsActive ? (
+        <Button variant="ghost" onClick={() => toggleStatus(selected.id)}>
+          {selected.is_active ? 'Pause sending' : 'Resume sending'}
+        </Button>
+      ) : (
+        <span />
+      )}
       <div style={{ display: 'flex', gap: S[2] }}>
         {editing ? (
           <>
@@ -224,26 +255,39 @@ function EmailTemplatesInner() {
     <Page>
       <PageHeader
         title="Email templates"
-        subtitle={`${templates.length} templates · delivered via Resend`}
+        subtitle={`${activeTemplates.length} active · ${inactiveTemplates.length} inactive · delivered via Resend`}
         actions={
           <div style={{ display: 'flex', gap: S[1] }}>
-            {STATUS_FILTERS.map((c) => (
+            {([
+              { key: 'active', label: `Active (${activeTemplates.length})` },
+              { key: 'inactive', label: `Inactive (${inactiveTemplates.length})` },
+            ] as Array<{ key: TabKey; label: string }>).map((t) => (
               <button
-                key={c}
-                onClick={() => setCatFilter(c)}
+                key={t.key}
+                onClick={() => setTab(t.key)}
                 style={{
                   padding: `${S[1]}px ${S[3]}px`, borderRadius: 6,
-                  border: `1px solid ${catFilter === c ? C.accent : C.divider}`,
-                  background: catFilter === c ? C.hover : 'transparent',
-                  color: catFilter === c ? C.white : C.soft,
-                  fontSize: F.sm, fontWeight: catFilter === c ? 600 : 500,
+                  border: `1px solid ${tab === t.key ? C.accent : C.divider}`,
+                  background: tab === t.key ? C.hover : 'transparent',
+                  color: tab === t.key ? C.white : C.soft,
+                  fontSize: F.sm, fontWeight: tab === t.key ? 600 : 500,
                   cursor: 'pointer', font: 'inherit',
                 }}
-              >{c}</button>
+              >{t.label}</button>
             ))}
           </div>
         }
       />
+
+      <div style={{
+        marginBottom: S[3], padding: S[2], borderRadius: 6,
+        background: C.card, border: `1px solid ${C.divider}`,
+        fontSize: F.xs, color: C.dim, lineHeight: 1.5,
+      }}>
+        {tab === 'active'
+          ? 'Active — sends to users. The send-emails cron picks these up on its schedule and dispatches via Resend.'
+          : 'Not currently sending — UI parity for when delivery wires up. Editing the copy persists to the row but no cron will deliver it.'}
+      </div>
 
       {loadError && (
         <div style={{
@@ -259,12 +303,16 @@ function EmailTemplatesInner() {
       </div>
 
       <PageSection>
-        {filtered.length === 0 ? (
-          <EmptyState title="No templates match" description="Adjust the filter or search." />
+        {visible.length === 0 ? (
+          <EmptyState
+            title={tab === 'active' ? 'No active templates match' : 'No inactive templates match'}
+            description={search ? 'Adjust the search.' : tab === 'active' ? 'No templates are currently wired for delivery.' : 'Every template is currently wired for delivery.'}
+          />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: S[1] }}>
-            {filtered.map((t) => {
+            {visible.map((t) => {
               const isSel = selectedId === t.id;
+              const wired = isWiredForDelivery(t);
               return (
                 <button
                   key={t.id}
@@ -281,11 +329,16 @@ function EmailTemplatesInner() {
                   onMouseLeave={(e) => { if (!isSel) (e.currentTarget as HTMLButtonElement).style.background = C.bg; }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: S[2], marginBottom: 2 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: S[2], marginBottom: 2, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: F.base, fontWeight: 600, color: C.white }}>{t.name}</span>
-                      <Badge size="xs" variant={t.is_active ? 'success' : 'neutral'}>
-                        {t.is_active ? 'active' : 'disabled'}
-                      </Badge>
+                      {wired ? (
+                        <>
+                          <Badge size="xs" variant="success">active</Badge>
+                          {!t.is_active && <Badge size="xs" variant="neutral">paused</Badge>}
+                        </>
+                      ) : (
+                        <Badge size="xs" variant="neutral">inactive — no delivery wired</Badge>
+                      )}
                     </div>
                     <div style={{ fontSize: F.xs, color: C.dim, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {t.key}

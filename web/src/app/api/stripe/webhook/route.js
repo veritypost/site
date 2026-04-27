@@ -5,6 +5,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { verifyWebhook, retrieveSubscription } from '@/lib/stripe';
 import { captureMessage } from '@/lib/observability';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { trackServer } from '@/lib/trackServer';
 
 // Auth: Stripe HMAC signature on raw body via verifyWebhook (see lib/stripe.js).
 // Raw body is read before JSON parse; signature is verified BEFORE any DB write.
@@ -484,6 +485,26 @@ async function handleCheckoutCompleted(service, session) {
       p_new_plan_id: plan.id,
     });
   }
+
+  // T322 — subscribe_complete pairs with subscribe_start fired by
+  // /api/stripe/checkout. Fire only AFTER the authoritative billing RPC
+  // succeeds (per trackServer contract — telemetry never makes a thing
+  // true, just records that it was true). The webhook itself is
+  // idempotent (webhook_log UNIQUE event_id), so this event also won't
+  // double-fire on Stripe retries — a replay returns early at the
+  // 'processed' check before reaching this handler. Fire-and-forget.
+  void trackServer('subscribe_complete', 'product', {
+    user_id: userRow.id,
+    user_tier: plan.tier,
+    payload: {
+      plan_id: plan.id,
+      plan_name: plan.name,
+      plan_tier: plan.tier,
+      stripe_subscription_id: subId,
+      stripe_customer_id: customerId,
+      was_resubscribe: !!userRow.frozen_at,
+    },
+  });
 }
 
 async function handleSubscriptionUpdated(service, sub) {

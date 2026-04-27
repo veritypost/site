@@ -1950,36 +1950,28 @@ struct SubscriptionSettingsView: View {
 
 struct NotificationsSettingsView: View {
     @EnvironmentObject var auth: AuthViewModel
-    private let client = SupabaseManager.shared.client
 
-    @State private var breakingAlerts = true
-    @State private var morningDigest = true
-    @State private var expertReplies = true
-    @State private var commentReplies = true
-    @State private var weeklyRecap = true
-    @State private var loaded = false
-    @State private var saving = false
-    @State private var loadError: String? = nil
-    @State private var saveError: String? = nil
     @StateObject private var push = PushPermission.shared
     @State private var showPushPrompt = false
 
     @StateObject private var perms = PermissionStore.shared
     @State private var canViewPrefs = false
     @State private var canTogglePush = false
-    @State private var canToggleInApp = false
+
+    // T27 + T3.5 (2026-04-27): per-type toggles ("breaking", "digest",
+    // "expert_reply", "comment_reply", "weekly_recap") were dead — they
+    // wrote to `users.metadata.notifications.*`, a key path no cron
+    // reads. The actual delivery gate is the `alert_preferences` table
+    // (per-user, per-alert_type), managed today only on web's
+    // /profile/settings page. iOS Alerts is reduced to the system-push
+    // permission viewer until per-type prefs are wired against
+    // /api/notifications/preferences.
 
     var body: some View {
         SettingsPageShell(title: "Alerts") {
             if !canViewPrefs {
                 SettingsNote(text: "Notifications preferences aren\u{2019}t available for your account.")
             } else {
-                if let err = loadError {
-                    SettingsErrorBanner(text: err, actionLabel: "Retry") {
-                        loadError = nil
-                        Task { await load() }
-                    }
-                }
                 if canTogglePush {
                     SettingsSectionHeader(title: "Push", tone: .normal)
                     SettingsCard {
@@ -2005,57 +1997,18 @@ struct NotificationsSettingsView: View {
                     }
                 }
 
-                if canToggleInApp {
-                    SettingsSectionHeader(title: "What to send", tone: .normal)
-                    SettingsCard {
-                        SettingsToggleRow(title: "Breaking news alerts",
-                                          subtitle: "Fast-moving stories",
-                                          isOn: $breakingAlerts)
-                        SettingsToggleRow(title: "Morning digest",
-                                          subtitle: "One email per day",
-                                          isOn: $morningDigest)
-                        SettingsToggleRow(title: "Expert replies",
-                                          subtitle: "When an expert answers your ask",
-                                          isOn: $expertReplies)
-                        SettingsToggleRow(title: "Replies to my comments",
-                                          subtitle: nil,
-                                          isOn: $commentReplies)
-                        SettingsToggleRow(title: "Weekly recap",
-                                          subtitle: "Your week in review",
-                                          isOn: $weeklyRecap,
-                                          showDivider: false)
-                    }
-
-                    if let err = saveError {
-                        SettingsErrorBanner(text: err, actionLabel: "Dismiss") {
-                            saveError = nil
-                        }
-                    }
-
-                    VStack {
-                        SettingsPrimaryButton(title: saving ? "Saving..." : "Save preferences",
-                                              isLoading: saving,
-                                              isDisabled: !loaded) {
-                            Task { await save() }
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
-                }
-
-                SettingsNote(text: "These preferences control email digests and in-app alerts. Actual push delivery also requires system permission.")
+                SettingsNote(text: "Per-alert preferences are managed from web account settings. iOS push delivery still requires the system permission above.")
             }
         }
-        .task { await load() }
+        .task { await push.refresh() }
         .task(id: perms.changeToken) {
             canViewPrefs = await PermissionService.shared.has("notifications.prefs.view")
             canTogglePush = await PermissionService.shared.has("notifications.prefs.toggle_push")
-            canToggleInApp = await PermissionService.shared.has("notifications.prefs.toggle_in_app")
         }
         .sheet(isPresented: $showPushPrompt) {
             PushPromptSheet(
                 title: "Turn on notifications",
-                detail: "We\u{2019}ll only notify you about things you\u{2019}ve subscribed to \u{2014} breaking news, expert replies, comment replies. You can change any of these below.",
+                detail: "We\u{2019}ll only notify you about things you\u{2019}ve subscribed to \u{2014} breaking news, expert replies, comment replies.",
                 onEnable: {
                     await push.requestIfNeeded()
                     if push.isOn, let uid = auth.currentUser?.id {
@@ -2068,67 +2021,6 @@ struct NotificationsSettingsView: View {
                     push.markPrePromptDeclined()
                 }
             )
-        }
-    }
-
-    private func load() async {
-        guard let userId = auth.currentUser?.id else { loaded = true; return }
-        // Round 6 iOS-DATA: `preferences` is a phantom column; real jsonb
-        // lives at `users.metadata` (writes go through update_own_profile).
-        // Error semantics: a nil/empty `metadata.notifications` is a valid
-        // first-load state (defaults render). A network/decode failure is
-        // surfaced via loadError + retry banner so the user knows their
-        // preferences may be stale rather than silently rendering defaults.
-        struct Row: Decodable { let metadata: JSONValue? }
-        do {
-            let row: Row = try await client.from("users")
-                .select("metadata")
-                .eq("id", value: userId)
-                .single().execute().value
-            if let prefs = row.metadata?["notifications"]?.objectValue {
-                breakingAlerts = prefs["breaking"]?.boolValue ?? true
-                morningDigest = prefs["digest"]?.boolValue ?? true
-                expertReplies = prefs["expert_reply"]?.boolValue ?? true
-                commentReplies = prefs["comment_reply"]?.boolValue ?? true
-                weeklyRecap = prefs["weekly_recap"]?.boolValue ?? true
-            }
-            loadError = nil
-        } catch {
-            loadError = "Couldn\u{2019}t load latest preferences. Defaults shown."
-            Log.d("Load notif prefs error:", error)
-        }
-        await push.refresh()
-        loaded = true
-    }
-
-    private func save() async {
-        guard let userId = auth.currentUser?.id else { return }
-        saving = true
-        defer { saving = false }
-        struct Row: Decodable { let metadata: JSONValue? }
-        let existing: Row? = try? await client.from("users")
-            .select("metadata").eq("id", value: userId).single().execute().value
-        var merged: [String: Any] = existing?.metadata?.dictionary ?? [:]
-        merged["notifications"] = [
-            "breaking": breakingAlerts,
-            "digest": morningDigest,
-            "expert_reply": expertReplies,
-            "comment_reply": commentReplies,
-            "weekly_recap": weeklyRecap,
-        ]
-        do {
-            let data = try JSONSerialization.data(withJSONObject: merged)
-            let metadataValue = try JSONDecoder().decode(JSONValue.self, from: data)
-            struct Args: Encodable { let p_fields: Patch }
-            struct Patch: Encodable { let metadata: JSONValue }
-            try await client.rpc(
-                "update_own_profile",
-                params: Args(p_fields: Patch(metadata: metadataValue))
-            ).execute()
-            saveError = nil
-        } catch {
-            saveError = "Couldn\u{2019}t save preferences. Try again."
-            Log.d("Save notif prefs error:", error)
         }
     }
 }
@@ -2268,18 +2160,60 @@ struct VerificationRequestView: View {
     @EnvironmentObject var auth: AuthViewModel
     private let client = SupabaseManager.shared.client
 
+    // T20 — iOS expert apply form brought to web parity. Server contract
+    // (submit_expert_application RPC) requires:
+    //   • application_type ∈ {expert, educator, journalist}
+    //   • exactly 3 sample_responses
+    //   • ≥1 category_id
+    // Also collects expertise_areas (category names), credentials (free
+    // text, wrapped in JSON array per RPC arg), bio, full_name. Mirrors
+    // web/src/app/redesign/profile/_sections/ExpertApplyForm.tsx labels +
+    // ordering and web/src/app/signup/expert/page.tsx 3-sample contract.
+
     @State private var type = "expert"
     @State private var fullName = ""
-    @State private var field = ""
     @State private var role = ""
     @State private var org = ""
     @State private var bio = ""
+    @State private var credentials = ""
     @State private var portfolioURL = ""
     @State private var linkedin = ""
+    @State private var websiteURL = ""
+
+    @State private var allCategories: [VPCategory] = []
+    @State private var pickedCategoryIDs: Set<String> = []
+    @State private var categoriesLoading = true
+    @State private var categoriesError: String? = nil
+
+    @State private var sample1 = ""
+    @State private var sample2 = ""
+    @State private var sample3 = ""
+
     @State private var existingStatus: String? = nil
     @State private var loaded = false
     @State private var submitting = false
     @State private var submittedMessage: String? = nil
+    @State private var submitError: String? = nil
+
+    private var trimmedFullName: String { fullName.trimmingCharacters(in: .whitespaces) }
+    private var trimmedBio: String { bio.trimmingCharacters(in: .whitespaces) }
+    private var trimmedCredentials: String { credentials.trimmingCharacters(in: .whitespaces) }
+    private var trimmedSamples: [String] {
+        [sample1, sample2, sample3].map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+    }
+
+    /// Mirrors server-side validation so users see errors before the
+    /// round-trip. Returns nil when the form is submittable.
+    private var validationError: String? {
+        if trimmedFullName.isEmpty { return "Add your full name." }
+        if trimmedBio.isEmpty { return "Add a short bio." }
+        if trimmedCredentials.isEmpty { return "Add your credentials." }
+        if pickedCategoryIDs.isEmpty { return "Pick at least one area of expertise." }
+        if trimmedSamples.contains(where: { $0.isEmpty }) {
+            return "All three sample responses are required."
+        }
+        return nil
+    }
 
     var body: some View {
         SettingsPageShell(title: "Verification") {
@@ -2295,12 +2229,12 @@ struct VerificationRequestView: View {
                 }
             }
 
-            SettingsSectionHeader(title: "Type", tone: .normal)
+            SettingsSectionHeader(title: "I\u{2019}m applying as", tone: .normal)
             SettingsCard {
                 Picker("", selection: $type) {
                     Text("Expert").tag("expert")
+                    Text("Educator").tag("educator")
                     Text("Journalist").tag("journalist")
-                    Text("Public figure").tag("public_figure")
                 }
                 .pickerStyle(.segmented)
                 .padding(16)
@@ -2314,18 +2248,17 @@ struct VerificationRequestView: View {
                                       placeholder: "Jane Doe",
                                       text: $fullName,
                                       autocap: .words)
-                    SettingsTextField(label: "Field / area",
-                                      placeholder: "AI policy",
-                                      text: $field)
-                    SettingsTextField(label: "Role / title",
-                                      placeholder: "Research Lead",
-                                      text: $role)
                     SettingsTextField(label: "Organization (optional)",
                                       placeholder: "—",
                                       text: $org)
+                    SettingsTextField(label: "Title (optional)",
+                                      placeholder: "Research Lead",
+                                      text: $role)
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Short bio").font(.caption).foregroundColor(VP.dim)
-                        TextField("Tell us about your work...", text: $bio, axis: .vertical)
+                        TextField("One paragraph readers will see next to your badge. ~280 characters.",
+                                  text: $bio,
+                                  axis: .vertical)
                             .font(.system(size: 15))
                             .foregroundColor(VP.text)
                             .lineLimit(3...8)
@@ -2339,16 +2272,86 @@ struct VerificationRequestView: View {
                 .padding(16)
             }
 
+            SettingsSectionHeader(title: "Areas of expertise", tone: .normal)
+            SettingsCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Pick every category your verification should cover.")
+                        .font(.caption)
+                        .foregroundColor(VP.dim)
+                    if categoriesLoading {
+                        HStack { ProgressView(); Spacer() }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } else if let err = categoriesError {
+                        Text(err)
+                            .font(.caption)
+                            .foregroundColor(VP.wrong)
+                    } else if allCategories.isEmpty {
+                        Text("No categories available.")
+                            .font(.caption)
+                            .foregroundColor(VP.dim)
+                    } else {
+                        FlowLayout(spacing: 6) {
+                            ForEach(allCategories) { cat in
+                                let active = pickedCategoryIDs.contains(cat.id)
+                                Button {
+                                    if active { pickedCategoryIDs.remove(cat.id) }
+                                    else { pickedCategoryIDs.insert(cat.id) }
+                                } label: {
+                                    Text(cat.displayName)
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundColor(active ? VP.bg : VP.dim)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(
+                                            Capsule().fill(active ? VP.accent : VP.bg)
+                                        )
+                                        .overlay(
+                                            Capsule().stroke(active ? VP.accent : VP.border, lineWidth: 1)
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+                .padding(16)
+            }
+
+            SettingsSectionHeader(title: "Credentials", tone: .normal)
+            SettingsCard {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Degrees, licenses, prior bylines, board roles, etc.")
+                        .font(.caption)
+                        .foregroundColor(VP.dim)
+                    TextField("Tell us what qualifies you...", text: $credentials, axis: .vertical)
+                        .font(.system(size: 15))
+                        .foregroundColor(VP.text)
+                        .lineLimit(3...8)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 11)
+                        .background(VP.bg)
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(VP.border, lineWidth: 1))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                .padding(16)
+            }
+
             SettingsSectionHeader(title: "Links", tone: .normal)
             SettingsCard {
                 VStack(spacing: 14) {
-                    SettingsTextField(label: "Portfolio URL",
+                    SettingsTextField(label: "Website / profile URL (optional)",
+                                      placeholder: "https://",
+                                      text: $websiteURL,
+                                      keyboard: .URL,
+                                      autocap: .never,
+                                      autocorrect: false)
+                    SettingsTextField(label: "Portfolio URL (optional)",
                                       placeholder: "https://",
                                       text: $portfolioURL,
                                       keyboard: .URL,
                                       autocap: .never,
                                       autocorrect: false)
-                    SettingsTextField(label: "LinkedIn",
+                    SettingsTextField(label: "LinkedIn (optional)",
                                       placeholder: "https://linkedin.com/in/...",
                                       text: $linkedin,
                                       keyboard: .URL,
@@ -2358,13 +2361,31 @@ struct VerificationRequestView: View {
                 .padding(16)
             }
 
+            SettingsSectionHeader(title: "Sample responses", tone: .normal)
+            SettingsCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Three short answers showing how you\u{2019}d respond to questions in your field. All three required.")
+                        .font(.caption)
+                        .foregroundColor(VP.dim)
+                    sampleEditor(index: 1, text: $sample1)
+                    sampleEditor(index: 2, text: $sample2)
+                    sampleEditor(index: 3, text: $sample3)
+                }
+                .padding(16)
+            }
+
+            if let err = submitError {
+                SettingsErrorBanner(text: err)
+            }
+
             VStack(spacing: 10) {
                 SettingsPrimaryButton(title: submitting ? "Submitting..." : "Submit application",
                                       isLoading: submitting,
-                                      isDisabled: fullName.trimmingCharacters(in: .whitespaces).isEmpty
-                                                  || field.isEmpty
-                                                  || bio.isEmpty) {
+                                      isDisabled: validationError != nil) {
                     Task { await submit() }
+                }
+                if let v = validationError, submitError == nil, submittedMessage == nil {
+                    Text(v).font(.caption).foregroundColor(VP.dim)
                 }
                 if let msg = submittedMessage {
                     Text(msg).font(.caption).foregroundColor(VP.right)
@@ -2373,7 +2394,26 @@ struct VerificationRequestView: View {
             .padding(.horizontal, 16)
             .padding(.top, 16)
         }
-        .task { await loadExisting() }
+        .task {
+            await loadExisting()
+            await loadCategories()
+        }
+    }
+
+    @ViewBuilder
+    private func sampleEditor(index: Int, text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Sample \(index)").font(.caption).foregroundColor(VP.dim)
+            TextField("Your response", text: text, axis: .vertical)
+                .font(.system(size: 15))
+                .foregroundColor(VP.text)
+                .lineLimit(3...8)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 11)
+                .background(VP.bg)
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(VP.border, lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
     }
 
     private func loadExisting() async {
@@ -2390,42 +2430,93 @@ struct VerificationRequestView: View {
         loaded = true
     }
 
+    private func loadCategories() async {
+        // Mirrors web ExpertApplyForm.tsx: top-level, active, non-kids categories.
+        do {
+            let cats: [VPCategory] = try await client.from("categories")
+                .select("id,name,slug,sort_order,parent_id,is_kids_safe")
+                .eq("is_active", value: true)
+                .is("parent_id", value: nil)
+                .not("slug", operator: .like, value: "kids-%")
+                .order("sort_order", ascending: true)
+                .execute().value
+            allCategories = cats
+            categoriesError = nil
+        } catch {
+            categoriesError = "Couldn\u{2019}t load categories. Pull to retry."
+            Log.d("ExpertApply categories load error:", error)
+        }
+        categoriesLoading = false
+    }
+
     private func submit() async {
         guard auth.currentUser?.id != nil else { return }
+        if let v = validationError {
+            submitError = v
+            return
+        }
+        submitError = nil
         submitting = true
         defer { submitting = false }
-        // Route through /api/expert/apply — gated on expert.application.apply,
-        // dispatches to submit_expert_application RPC.
+
+        // Mirrors server contract (submit_expert_application RPC). All
+        // fields the RPC accepts are sent — optional ones as null/empty
+        // arrays/objects so the server's COALESCE branches kick in.
         struct ExpertApplyBody: Encodable {
             let application_type: String
             let full_name: String
             let organization: String?
             let title: String?
             let bio: String
+            let expertise_areas: [String]
+            let website_url: String?
             let social_links: [String: String]
+            let credentials: [String]
             let portfolio_urls: [String]
+            let sample_responses: [String]
+            let category_ids: [String]
         }
 
+        // expertise_areas mirrors redesign web form: names of picked
+        // categories (text[] in DB). category_ids holds the same IDs and
+        // is what the RPC inserts into expert_application_categories.
+        let pickedNames: [String] = allCategories
+            .filter { pickedCategoryIDs.contains($0.id) }
+            .map { $0.name }
+        let pickedIDs: [String] = Array(pickedCategoryIDs)
+
         var portfolios: [String] = []
-        if !portfolioURL.trimmingCharacters(in: .whitespaces).isEmpty {
-            portfolios.append(portfolioURL.trimmingCharacters(in: .whitespaces))
-        }
+        let trimmedPortfolio = portfolioURL.trimmingCharacters(in: .whitespaces)
+        if !trimmedPortfolio.isEmpty { portfolios.append(trimmedPortfolio) }
+
         var socials: [String: String] = [:]
-        if !linkedin.trimmingCharacters(in: .whitespaces).isEmpty {
-            socials["linkedin"] = linkedin.trimmingCharacters(in: .whitespaces)
-        }
+        let trimmedLinkedIn = linkedin.trimmingCharacters(in: .whitespaces)
+        if !trimmedLinkedIn.isEmpty { socials["linkedin"] = trimmedLinkedIn }
+        if !trimmedPortfolio.isEmpty { socials["portfolio"] = trimmedPortfolio }
+
+        let trimmedWebsite = websiteURL.trimmingCharacters(in: .whitespaces)
+        let trimmedOrg = org.trimmingCharacters(in: .whitespaces)
+        let trimmedRole = role.trimmingCharacters(in: .whitespaces)
 
         let body = ExpertApplyBody(
             application_type: type,
-            full_name: fullName.trimmingCharacters(in: .whitespaces),
-            organization: org.isEmpty ? nil : org,
-            title: role.isEmpty ? nil : role,
-            bio: bio,
+            full_name: trimmedFullName,
+            organization: trimmedOrg.isEmpty ? nil : trimmedOrg,
+            title: trimmedRole.isEmpty ? nil : trimmedRole,
+            bio: trimmedBio,
+            expertise_areas: pickedNames,
+            website_url: trimmedWebsite.isEmpty ? nil : trimmedWebsite,
             social_links: socials,
-            portfolio_urls: portfolios
+            credentials: [trimmedCredentials],
+            portfolio_urls: portfolios,
+            sample_responses: trimmedSamples,
+            category_ids: pickedIDs
         )
 
-        guard let session = try? await client.auth.session else { return }
+        guard let session = try? await client.auth.session else {
+            submitError = "You\u{2019}re signed out. Sign in and try again."
+            return
+        }
         let url = SupabaseManager.shared.siteURL.appendingPathComponent("api/expert/apply")
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
@@ -2433,14 +2524,70 @@ struct VerificationRequestView: View {
         req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
         do {
             req.httpBody = try JSONEncoder().encode(body)
-            let (_, resp) = try await URLSession.shared.data(for: req)
-            if let http = resp as? HTTPURLResponse, http.statusCode == 200 {
+            let (data, resp) = try await URLSession.shared.data(for: req)
+            let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
+            if status == 200 {
                 submittedMessage = "Application received. We\u{2019}ll review within 5 business days."
+                submitError = nil
                 existingStatus = "pending"
+            } else if status == 429 {
+                submitError = "Too many applications. Try again later."
             } else {
-                Log.d("Verification submit non-200:", (resp as? HTTPURLResponse)?.statusCode as Any)
+                struct ErrBody: Decodable { let error: String? }
+                let parsed = try? JSONDecoder().decode(ErrBody.self, from: data)
+                submitError = parsed?.error ?? "Couldn\u{2019}t submit application. Try again."
+                Log.d("Verification submit non-200:", status)
             }
-        } catch { Log.d("Verification submit error:", error) }
+        } catch {
+            submitError = "Network error. Check your connection and try again."
+            Log.d("Verification submit error:", error)
+        }
+    }
+}
+
+// MARK: - FlowLayout (chip wrap)
+
+/// Lightweight wrap layout for chip rows. iOS 17+. Lays out subviews
+/// left-to-right, wrapping to a new line when the row width is exceeded.
+private struct FlowLayout: Layout {
+    var spacing: CGFloat = 6
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let maxWidth = proposal.width ?? .infinity
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        var totalWidth: CGFloat = 0
+        for sub in subviews {
+            let size = sub.sizeThatFits(.unspecified)
+            if x + size.width > maxWidth, x > 0 {
+                y += rowHeight + spacing
+                x = 0
+                rowHeight = 0
+            }
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+            totalWidth = max(totalWidth, x)
+        }
+        return CGSize(width: maxWidth.isFinite ? maxWidth : totalWidth,
+                      height: y + rowHeight)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x: CGFloat = bounds.minX
+        var y: CGFloat = bounds.minY
+        var rowHeight: CGFloat = 0
+        for sub in subviews {
+            let size = sub.sizeThatFits(.unspecified)
+            if x + size.width > bounds.maxX, x > bounds.minX {
+                y += rowHeight + spacing
+                x = bounds.minX
+                rowHeight = 0
+            }
+            sub.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
     }
 }
 

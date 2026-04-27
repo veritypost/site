@@ -5,6 +5,7 @@ import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { createCheckoutSession } from '@/lib/stripe';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { trackServer } from '@/lib/trackServer';
 
 // POST /api/stripe/checkout — body: { plan_name }
 //
@@ -94,6 +95,23 @@ export async function POST(request) {
 
   const origin = request.nextUrl.origin;
   try {
+    // T322 — subscribe_start fires once the caller is authenticated,
+    // rate-limit-cleared, and the requested plan resolves. The event
+    // captures intent BEFORE Stripe is contacted, so an upstream Stripe
+    // failure or cancellation still leaves a funnel breadcrumb that
+    // pairs with the eventual subscribe_complete from the webhook.
+    // Fire-and-forget — telemetry must not block the checkout response.
+    void trackServer('subscribe_start', 'product', {
+      user_id: user.id,
+      request,
+      payload: {
+        plan_name,
+        plan_id: plan.id,
+        plan_tier: plan.tier,
+        has_existing_customer: !!me?.stripe_customer_id,
+      },
+    });
+
     const session = await createCheckoutSession({
       userId: user.id,
       customerId: me?.stripe_customer_id || undefined,
