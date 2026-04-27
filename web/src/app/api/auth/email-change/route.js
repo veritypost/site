@@ -123,6 +123,22 @@ export async function POST(request) {
       '[auth.email-change] users.email_verified flip failed:',
       updErr.message || updErr
     );
+  } else {
+    // T306 — bump perms_version so the 21 `requires_verified=true` perms
+    // re-evaluate to `granted=false` on the user's next request. Without
+    // this, the client perms cache keeps granting verified-only features
+    // until next navigation. Best-effort: a perms-cache lag is the worst
+    // case if this rpc fails, not a security regression (server-side
+    // requirePermission re-checks every request).
+    const { error: bumpErr } = await service.rpc('bump_user_perms_version', {
+      p_user_id: user.id,
+    });
+    if (bumpErr) {
+      console.error(
+        '[auth.email-change] bump_user_perms_version failed:',
+        bumpErr.message || bumpErr
+      );
+    }
   }
 
   // Ext-M2 — audit the email-change initiation. Only the SUCCESS path

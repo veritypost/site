@@ -2062,21 +2062,10 @@ export default function StoryPage() {
             )}
           </div>
 
-          {/* Timeline (desktop aside) — launch-phase hide. */}
-          {false && isDesktop && canViewTimeline && (
-            <aside
-              style={{
-                width: 260,
-                flexShrink: 0,
-                position: 'sticky',
-                top: 60,
-                alignSelf: 'flex-start',
-              }}
-            >
-              <div style={SECTION_LABEL_STYLE_MB16}>Timeline</div>
-              <Timeline events={timeline} />
-            </aside>
-          )}
+          {/* T40 — desktop timeline aside removed at launch (kept the
+              Timeline component + canViewTimeline perm wiring for the
+              eventual re-introduction; this is a UX deletion, not a
+              capability deletion). */}
         </div>
 
         {/* Quiz + Discussion. The "Pass to comment" gate is the product

@@ -9,7 +9,6 @@ import Link from 'next/link';
 import { C, F, FONT, R, S } from '../_lib/palette';
 
 interface Props {
-  icon?: React.ReactNode;
   title: string;
   body: string;
   cta?: { label: string; href: string } | { label: string; onClick: () => void };
@@ -17,7 +16,7 @@ interface Props {
   variant?: 'subdued' | 'full';
 }
 
-export function EmptyState({ icon, title, body, cta, variant = 'subdued' }: Props) {
+export function EmptyState({ title, body, cta, variant = 'subdued' }: Props) {
   const padded = variant === 'full' ? S[8] : S[6];
   return (
     <div
@@ -30,17 +29,6 @@ export function EmptyState({ icon, title, body, cta, variant = 'subdued' }: Prop
         borderRadius: R.xl,
       }}
     >
-      <div
-        aria-hidden
-        style={{
-          fontSize: 36,
-          lineHeight: 1,
-          marginBottom: S[3],
-          color: C.inkFaint,
-        }}
-      >
-        {icon ?? '📭'}
-      </div>
       <h3
         style={{
           fontFamily: FONT.serif,

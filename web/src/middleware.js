@@ -152,21 +152,21 @@ function buildCspStrictReport(nonce) {
   ].join('; ');
 }
 
-// M-17 — CORS allow-list for `/api/*`.
+// M-17 / T311 — CORS allow-list for `/api/*`.
 //
-// Allow-list contents:
-//   - NEXT_PUBLIC_SITE_URL (prod origin, defaults to https://veritypost.com)
+// Allow-list contents (hardcoded — do NOT trust env vars for credentialed CORS):
+//   - https://veritypost.com + https://www.veritypost.com (prod)
 //   - http://localhost:3000 + http://localhost:3333 for local dev
+//
+// Prior version trusted process.env.NEXT_PUBLIC_SITE_URL — a hostile or
+// misconfigured env value would have added that origin to credentialed CORS
+// for `/api/*`. Removed the env-var trust; if a preview origin is needed,
+// add it explicitly here (or wire a NON-credentialed allow list separately).
 //
 // The iOS native client is unaffected because native fetch() has no
 // browser-enforced CORS engine; Authorization-header calls from the
 // app continue to work regardless of this allow-list.
-//
-// To add a preview origin later, extend ALLOWED_ORIGINS here or wire
-// an env var (e.g., CORS_EXTRA_ORIGINS) and split on commas.
-const PROD_ORIGIN = process.env.NEXT_PUBLIC_SITE_URL || 'https://veritypost.com';
 const ALLOWED_ORIGINS = new Set([
-  PROD_ORIGIN,
   'https://veritypost.com',
   'https://www.veritypost.com',
   'http://localhost:3000',
@@ -288,9 +288,17 @@ export async function middleware(request) {
   // launch model, so the /login + invite-code flow is the entry point.
   // Skip the coming-soon redirect when the beta gate is active so the
   // beta-gate logic below can redirect anonymous visitors to /login.
+  // :3333 dev-only redesign port bypasses coming-soon so the owner doesn't
+  // have to redo the preview-cookie dance on a separate origin. Production
+  // never serves on :3333. The host check is port-exact; a colon ensures we
+  // don't match a real domain that happens to end with "3333".
+  const _host = request.headers.get('host') || '';
+  const _isRedesignPort = _host.endsWith(':3333');
+
   if (
     process.env.NEXT_PUBLIC_SITE_MODE === 'coming_soon' &&
-    process.env.NEXT_PUBLIC_BETA_GATE !== '1'
+    process.env.NEXT_PUBLIC_BETA_GATE !== '1' &&
+    !_isRedesignPort
   ) {
     const allowed =
       pathname === '/welcome' ||
@@ -395,7 +403,18 @@ export async function middleware(request) {
     return redirect;
   }
 
-  if (!user && isProtected(pathname)) {
+  // :3333 anon preview — let unauthenticated visitors see the redesigned
+  // profile + settings + public profile in a demo state without forcing a
+  // login. The page detects the missing user and renders a synthetic preview
+  // row so the visual is fully populated. Production never matches because
+  // _isRedesignPort is host-scoped to localhost:3333.
+  const _isRedesignProfilePath =
+    pathname === '/profile' ||
+    pathname.startsWith('/profile/') ||
+    pathname === '/u' ||
+    pathname.startsWith('/u/');
+
+  if (!user && isProtected(pathname) && !(_isRedesignPort && _isRedesignProfilePath)) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = '/login';
     loginUrl.search = '';
@@ -424,8 +443,7 @@ export async function middleware(request) {
   // protected-prefix checks above already ran against the original
   // /profile path, so gating still works correctly. Production never
   // hits this — :3333 is dev-only.
-  const host = request.headers.get('host') || '';
-  if (host.endsWith(':3333')) {
+  if (_isRedesignPort) {
     const isProfileArea =
       pathname === '/profile' ||
       pathname.startsWith('/profile/') ||

@@ -7,6 +7,175 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
+## 2026-04-27 (autonomous-fix wave: 7 trivials + 3 locked-ready shipped) — _pending push to git_
+
+First execution wave on the sixth-pass audit set. 10 items shipped end-to-end (code + verification + TODO/CHANGELOG bookkeeping in lockstep). All edits typecheck against the existing baseline (no new TS errors introduced; pre-existing `ScoreTier`/Json/AvatarEditor errors unchanged). No DB migrations applied; no Stripe API calls made; no tests added (none exist for the touched surfaces yet).
+
+### Trivials shipped (T1, 0 agents — direct fix)
+
+- **T306 — `/api/auth/email-change` now bumps `perms_version`.** `web/src/app/api/auth/email-change/route.js`. After the `email_verified=false` flip succeeds, `service.rpc('bump_user_perms_version', { p_user_id: user.id })` fires best-effort. The 21 `requires_verified=true` perms now re-evaluate to `granted=false` on the next request instead of staying granted client-side until next nav.
+
+- **T311 — middleware CORS no longer trusts `NEXT_PUBLIC_SITE_URL`.** `web/src/middleware.js:155-186`. Dropped the `PROD_ORIGIN = process.env.NEXT_PUBLIC_SITE_URL || ...` line; allow-list is now purely the hardcoded prod hosts (`https://veritypost.com`, `https://www.veritypost.com`) + dev hosts. A hostile or misconfigured env var can no longer add itself to credentialed CORS for `/api/*`.
+
+- **T330 — `/u/[username]/page.tsx:190` now also checks `'hidden'`.** `web/src/app/u/[username]/page.tsx:188-198`. Lockdown-tier users (`profile_visibility='hidden'`) are now hidden from non-self viewers same as `'private'`. Sister files (`layout.js`, `/card/[username]/*`) already had this check; this was the lone leak waiting on a `PUBLIC_PROFILE_ENABLED` flip.
+
+- **T332 — Toast component cleans up timers on unmount.** `web/src/app/redesign/_components/Toast.tsx`. Active timer handles tracked in a `useRef<Set<ReturnType<typeof setTimeout>>>`; component-level `useEffect` cleanup clears them all. Eliminates the dev-mode "set state on unmounted component" warning + the closure leak through orphan `setTimeout` callbacks.
+
+- **T340 — Privacy section rail-search keywords updated.** `web/src/app/redesign/profile/_components/ProfileApp.tsx:388`. Added `'followers'`, `'unfollow'`, `'remove follower'` to the keywords array. Users typing those terms in the rail search now find the Privacy section.
+
+- **T344 — `EmptyState` `icon` prop removed (with caller cleanup).** `web/src/app/redesign/_components/EmptyState.tsx` dropped the `icon?: React.ReactNode` prop entry from `Props`. 5 callers swept to drop the now-rejected prop: `_sections/ActivitySection.tsx` (×2), `_sections/BlockedSection.tsx`, `_sections/BookmarksSection.tsx`, `_sections/MessagesSection.tsx`. Original "comment said for backward compat" was wrong — removing the prop produced 5 type errors that surfaced the actual usage.
+
+- **T350 — Deprecated auth-mockups page deleted.** `web/src/app/ideas/auth-mockups/page.tsx` removed; empty parent dir also removed. Repo-grep confirmed zero inbound `/ideas/auth-mockups` links before deletion.
+
+### Locked-ready shipped (LOCKED → ship on "go")
+
+- **T40 — Desktop story-page Timeline aside removed.** `web/src/app/story/[slug]/page.tsx:2065-2069`. The `{false && isDesktop && canViewTimeline && (<aside>...)}` block deleted; replaced with a comment noting the wiring is intact (`Timeline` component, `canViewTimeline` perm, `timeline` state) for an eventual re-introduction. Mobile Timeline access via the `activeTab === 'Timeline'` tab bar unchanged.
+
+- **T56 — `'lifetime'` dropped from admin BILLING_PERIODS array.** `web/src/app/admin/plans/page.tsx:56`. Array now `['', 'monthly', 'annual']`. Note: the locked spec also called for standardizing string values to `'month'` / `'year'` (matching the DB column reads in `web/src/app/profile/settings/page.tsx:4253` + `web/src/lib/plans.js:58,78`). That half is a T5 schema migration (existing plan rows carry `'monthly'`/`'annual'` from the admin form); tracked as new item **T361** for owner-applied migration.
+
+- **T173 — PATCH `/api/comments/[id]` now enforces body-length cap.** `web/src/app/api/comments/[id]/route.js`. Added `getSettings`/`getNumber` import + `COMMENT_MAX_LENGTH_FALLBACK=4000` + the same `comment_too_long` short-circuit POST uses. RPC `edit_comment` already enforces internally — this closes the route-level parity gap so PATCH and POST short-circuit identically.
+
+### Items deferred to T2 wave
+
+The original "11 trivials" set included T335 (Field.tsx focus styling — needs a CSS class wrapper or `<style>` injection), T336 (AppShell drawer Escape + focus trap + banner z-index promotion — touches keyboard a11y), T337 (replace 3 native `confirm()` calls with a Card-variant modal — requires a modal primitive that isn't built yet), T339 (`as never` Avatar casts — requires defining a proper `AvatarUser` type, possibly in `@/components/Avatar`). All four are real but not 1-3 lines; reclassified to T2 and queued for the next wave.
+
+### Verification
+
+- TypeScript: `npx tsc --noEmit -p tsconfig.json` — no new errors introduced. 13 pre-existing errors remain unchanged (ScoreTier `label`/`slug` mismatches in 4 files, AvatarEditor + PrivacyCard Json type mismatches, ExpertProfileSection field-name mismatch). None on touched paths.
+- TODO closures: bodies for T306, T311, T330, T332, T340, T344, T350, T40, T56 deleted from the file. Skip-list updated (T40, T56, T173 removed; T19/T26/T54/T55/T57/T-EMAIL-PRUNE remain locked).
+- New item T361 added to track the deferred billing-period string standardization (T5 migration).
+
+- **Files touched** — `web/src/app/api/auth/email-change/route.js`, `web/src/middleware.js`, `web/src/app/u/[username]/page.tsx`, `web/src/app/redesign/_components/Toast.tsx`, `web/src/app/redesign/_components/EmptyState.tsx`, `web/src/app/redesign/profile/_components/ProfileApp.tsx`, `web/src/app/redesign/profile/_sections/ActivitySection.tsx`, `web/src/app/redesign/profile/_sections/BlockedSection.tsx`, `web/src/app/redesign/profile/_sections/BookmarksSection.tsx`, `web/src/app/redesign/profile/_sections/MessagesSection.tsx`, `web/src/app/story/[slug]/page.tsx`, `web/src/app/admin/plans/page.tsx`, `web/src/app/api/comments/[id]/route.js`, `web/src/app/ideas/auth-mockups/page.tsx` (deleted), `Ongoing Projects/TODO.md`, `Ongoing Projects/CHANGELOG.md`.
+
+---
+
+## 2026-04-27 (TODO sixth-pass full re-audit — 3 dropped, 5 re-scoped, 6 queued for owner, 1 demoted) — _no code; verification + bookkeeping only_ — _pending push to git_
+
+Sixth verification pass on outstanding TODO items, run via 6 parallel Explore agents reading live code in clusters (auth routes + middleware, profile/settings/NavWrapper, story/comments/articles, admin/plans/billing/Stripe, redesign components, analytics/events + misc). Every open item from T14 through T360 (excluding owner-input-locked items already-skipped) read against current code with file:line evidence. Three items dropped as already-fixed / wrong claim, five re-scoped inline, six items moved to QUEUED FOR OWNER REVIEW, one demoted on severity, one verdict overridden where the agent misread scope.
+
+- **3 items DROPPED entirely** (verified stale or wrong-claim, body deleted from TODO):
+  - **T117** — original "migrate ~19 web pages to `<ErrorState>` primitive" claim. Sixth-pass enumerated current callers: only 6 user-facing pages use `<ErrorState>` (bookmarks, leaderboard, messages, notifications, profile, search). The 19 admin pages cited (analytics, breaking, ad-campaigns, ad-placements, email-templates, moderation, newsroom, pipeline, promo, recap, reports, sponsors, stories, subscriptions, support, webhooks) use `<EmptyState>` for both empty AND error rendering. The split looks intentional — not a missed migration. Removed from skip list, owner-question queued.
+  - **T314** — TTS button "renders disabled-but-visible for non-Pro" claim. Sixth-pass read at `web/src/app/story/[slug]/page.tsx:1805-1810` confirms button is conditionally rendered `{canListenTts && <TTSButton .../>}` — for non-Pro users it doesn't render at all. The "disabled-but-visible" premise was wrong. Item body deleted.
+  - **T326** — `/api/events/batch` "doesn't whitelist client-supplied `user_tier`" claim. Sixth-pass read confirmed line 164 sets `user_id: ctx.authedUserId` server-authoritatively before line 167's `user_tier: clampString(e.user_tier, 32)` length-clamp. Security invariant holds via user_id; the tier clamp is hardening, not a hole. Item body deleted.
+
+- **5 items RE-SCOPED inline** (kernel real, claim corrected):
+  - **T54** — `web/src/app/profile/kids/page.tsx` line range 807-814 → 880-887 (KPI order Articles → Minutes → Quizzes Passed → Longest Streak still in place; locked reorder spec NOT yet implemented). Owner-queue entry added — current code matches neither the original audit claim's lines nor the locked-decision lines, so confirming what's actually intended is queued.
+  - **T165** — count drift acknowledged: 4,272 → ~4,630 inline `style={{...}}` matches via fresh grep.
+  - **T173** — file-path note: POST is in `web/src/app/api/comments/route.js:96-106` (not `[id]/route.js` as original claim implied). PATCH parity gap kernel still real at `[id]/route.js:47-84`.
+  - **T310** — explicit route enumeration: `signup/route.js:200-210`, `login/route.js:119-128`, `callback/route.js:157-166`, `email-change/route.js:132-148` all wrap `audit_log` insert in try/catch. Sweep target is concrete now.
+  - **T322** — count correction: 5-of-19 → only 3 events actually fire (`signup_complete`, `onboarding_complete`, `page_view`). `quiz_started` / `quiz_completed` not actually wired despite earlier audit listing them.
+
+- **6 items moved to QUEUED FOR OWNER REVIEW** (require owner input before autonomous loop can pick them up):
+  - **T54** — current KPI order doesn't match either claim or locked spec; need owner re-confirm.
+  - **T117** — owner direction on `<EmptyState>`-for-admin / `<ErrorState>`-for-user split (intentional or migrate?).
+  - **T309** — RPC bodies (`billing_freeze_profile` / `billing_resubscribe` / `billing_unfreeze`) need MCP read; can't verify cross-clearing from code.
+  - **T318** — pricing decision: keep `verity_monthly` ($3.99) and `verity_pro_monthly` ($9.99) with identical perms (legacy grandfathering), OR differentiate.
+  - **T319** — DB-row deletion of inactive `verity_family_*` SKUs (6 code references confirmed).
+  - **T338** — UX call on deletion-scheduled banner severity (`warnSoft` vs `dangerSoft` — verifier and adversary disagreed).
+
+- **T330 verdict OVERRIDDEN** — one redesign-cluster agent called T330 STALE on the assumption that `web/src/app/u/[username]/page.tsx` had been "superseded by the redesign." That's wrong: `/u/[username]/*` is the live public-profile route; the redesign at `/redesign/profile/*` is the user's own-editor view, a different surface. T330 remains CRITICAL — `page.tsx:190` checks only `'private'` while sister files (`layout.js:25-27`, `/card/[username]/page.js:59-61`, `/card/[username]/layout.js:24-27`) all check `'hidden'`. Privacy-leak risk on `PUBLIC_PROFILE_ENABLED` flip. Body annotated to make scope explicit.
+
+- **T333 demoted HIGH → LOW.** "Dev-perms-all-true override gates only on `host === 'localhost:3333'`" — production hostnames never end in `:3333`, so the failure mode requires environment misconfiguration AND port collision. Cheap belt-and-suspenders fix (add `NODE_ENV !== 'production'` AND'd into the gate) is still worth doing opportunistically with the next redesign cutover work, but it's no longer a HIGH.
+
+- **T-EMAIL-PRUNE clarified.** Current `web/src/app/api/cron/send-emails/route.js:21-29` defines 7 types: `breaking_news`, `comment_reply`, `expert_answer_posted`, `kid_trial_day6`, `kid_trial_expired`, `data_export_ready`, `expert_reverification_due`. Locked decision keeps 3; the concrete 4 to drop are: `breaking_news`, `comment_reply`, `expert_answer_posted`, `kid_trial_day6`. Skip-list entry annotated; ready to ship on owner "go."
+
+- **CONFIRMED-REAL via sixth-pass with file:line evidence (~50 items):** T19, T26 (per prior MCP), T27, T40, T55, T56, T57, T92, T166, T173, T233, T299, T301, T302, T303, T304, T305 (with redesign multi-state alternative noted in `redesign/_lib/states.ts:68-157`), T306, T307, T308, T310, T311, T312, T315, T316, T317, T320, T321, T322, T323, T324, T325, T327, T328, T329, T330 (override), T331, T332, T334, T335, T336, T337, T339, T340, T341, T342, T343, T344, T350. Each verified by reading the cited file at the cited line and confirming the bug pattern.
+
+- **2 items OUT-OF-SCOPE for code-only verification:** T14 (iOS dynamic streak-recovery rendering — needs running app to check conditional branch); T359 (full Swift `profile_visibility` audit — needs deeper iOS code dive than this pass). Both retained in TODO with notes.
+
+- **Total open items in TODO now: ~173** (was ~176 — net minus 3 dropped: T117/T314/T326).
+
+- **Files** — `Ongoing Projects/TODO.md` (sixth-pass verification banner + T117/T314/T326 deletes + T54/T165/T173/T310/T322/T330/T333/T338/T-EMAIL-PRUNE body updates + 6 new owner-queue entries), `Ongoing Projects/CHANGELOG.md` (this entry).
+
+---
+
+## 2026-04-27 (AUTH/PERMS SYSTEM MAP audit — 47 new TODO items T298-T344; 4 dropped as already-fixed; magic-link conflict surfaced) — _no code; verification + bookkeeping only_
+
+Fifth verification pass, this one a 1-by-1 read of every finding in `Ongoing Projects/2026-04-27_AUTH_PERMS_SYSTEM_MAP.md` against live code via 4 parallel Explore agents (clusters: anomalies #1-11, anomalies #12-22, pen-test+analytics #23-38, redesign §21.1+§21.2). 61 findings reviewed.
+
+- **47 items added** to TODO under new "AUTH/PERMS SYSTEM MAP FINDINGS — verified 2026-04-27" section, indexed T298-T344. Each entry has the cited file:line and a fix recommendation. Spans CRITICAL security (T299 homoglyph bypass, T300 public-profile column leak, T301 kid pair-code 7-day TTL), HIGH auth/billing flow (T302-T311 NavWrapper / leaderboard / Stripe-cohort / banner / email-change / admin-sync / state-machine / audit / CORS), MEDIUM (T312-T321 perms cache / locked tabs / TTS / composer / Pro pride / access_codes / SKU pricing / inactive plans / owner-link gaps), analytics gaps (T322-T329 events firing / tier accuracy / cohort tracking / GA4 dual / dashboard reads), and redesign-cutover-prep (T330-T344 covering §21.1 ship-blockers + §21.2 important UX gaps).
+
+- **DIRECTION CONFLICT surfaced (T298, CRITICAL).** System map §17 Phase 1 plan (lines 922-987) describes a unified verify-email flow that begins "signup form (email + password)". This contradicts TODO line 39 + the AUTH DIRECTION LOCKED 2026-04-26 block ("magic-link auth only · no password"). Both docs dated 2026-04-27. Phase 1's `<VerifyGate>` placements + pick-username server-side `email_verified` gate + `complete_email_verification` flow assume password-confirm semantics that don't apply post-magic-link. Anomaly resolutions for #1, #16, #20 (T320, T313, T321) become moot post-AUTH-MIGRATION. Owner needs to confirm canonical direction before Phase 1 can be touched.
+
+- **4 items DROPPED as already-fixed** (verified by quoting current code):
+  - **Pen-test #26 (`/api/access-redeem` JSON parse before rate limit):** `web/src/app/api/access-redeem/route.ts` rate-limit check fires at line 39 BEFORE the `request.json()` parse at line 52. Order is correct.
+  - **Pen-test #27 (login-precheck timing side-channel):** `web/src/app/api/auth/login-precheck/route.js` already has constant-shape responses (lines 47, 56, 65) + per-IP (30/h) and per-email (3/h) rate limits + email normalization at line 28. Compensating controls in place.
+  - **Pen-test #30 (email-change race condition):** `web/src/app/api/auth/email-change/route.js:99-120` now calls `auth.updateUser` FIRST, then flips `email_verified=false`. The race window claimed in the system map (local flip beats updateUser) is no longer reproducible.
+  - **Redesign §21.2.9 (AvatarEditor save placement):** AvatarEditor is mounted in `PublicProfileSection.tsx:197`; the card has its own dedicated footer Save at lines 203-215. Reviewer's claim that the save is "on the bio card below" was based on an earlier layout.
+
+- **3 items NOT added to TODO (out of scope per system map):**
+  - **Anomaly #14 (free-reads pill lying to anon):** owner-decided in system map Phase 0.4 to drop pill + regwall + `LAUNCH_HIDE_ANON_INTERSTITIAL` flag entirely. No TODO entry — execution falls under that Phase 0 PR when Phase 0 ships.
+  - **Anomaly #15 (no lifecycle email cadence for unverified):** explicitly out of scope in the system map; separate retention project.
+  - **Anomaly #21 (anon visitors no save-for-later):** explicitly out of scope; separate retention project.
+
+- **2 items partially-verified, deferred to MCP confirm:**
+  - **Anomaly #10 (frozen_at + plan_grace_period_ends_at don't clear each other):** RPC bodies `billing_freeze_profile` / `billing_resubscribe` / `billing_unfreeze` aren't fully readable from local SQL files. Captured as T309 with a "defer-to-MCP" note for the planner agent when the item is picked up.
+  - **Anomaly #11 (verity_monthly vs verity_pro_monthly identical perms):** captured as T318. Cited from system map's MCP query result (545 perms each). Owner pricing decision before any technical work.
+
+- **Verification banner updated** with fifth-pass entry and new total (~160 open items).
+
+- **Files** — `Ongoing Projects/TODO.md` (new section ~T298-T344, verification banner update). System map doc itself NOT modified — it's a frozen-in-time reference doc per its own header.
+
+### Follow-up second-pass (same date) — architectural / sequencing concerns added
+
+After the user asked "is there anything in there we are missing or need to consider," re-skimmed the system map for items that don't fit the "bug with file:line" pattern but are real load-bearing concerns the line-by-line walk would skip. Added:
+
+- **T345 — Beta-cron + AUTH-MIGRATION sequencing pre-flight (CRITICAL).** `sweep_beta_expirations` (system map §11) hard-locks every `cohort='beta' AND email_verified=false` user the moment `settings.beta_active='false'`. AUTH-MIGRATION cutover trips this. Pre-flight required: bulk-trigger magic-links for those users, OR admin-confirm them, OR keep beta_active=true through the migration window. Owner picks before the migration session opens.
+- **T346 — Freeze-scope product question (MEDIUM).** Per system map §14: `frozen_at` blocks scoring + DM but NOT comments / voting / following / reading. Question for owner: intended (monetization signal only), or bug (should be content lockout)?
+- **T347 — Consolidate 8 user-state flags into one enum (MEDIUM, T5 schema).** Per system map §8: `is_banned`, `locked_until`, `is_muted`, `deletion_scheduled_for`, `frozen_at`, `plan_grace_period_ends_at`, `verify_locked_at`, `comped_until` are independent columns with no synchronization. Pair with T305 (banner stacking) + T309 (frozen+grace clearing).
+- **T348 — `requirePermission()` no per-request memoization (DEBT).** Per system map §12: every check round-trips to `compute_effective_perms`. Memoize via AsyncLocalStorage / request context.
+- **T349 — Single-screen signup form factor under magic-link (MEDIUM).** Per system map §17 Phase 2: drop password fields + defer username to post-verify. Bundle into AUTH-MIGRATION execution.
+- **T350 — Delete deprecated `web/src/app/ideas/auth-mockups/page.tsx` (LOW).** System map §20a's own recommendation — page doesn't align with the redesign palette.
+- **T351 — §21.3 redesign polish bundle (LOW, 7 sub-items).** Spacing literals → S-tokens, tier-badge consolidation, PasswordCard red-dot signal, Retry on followers load fail, microcopy pass, Hidden-confirm count, expert-queue admin empty state.
+
+**Two new entries to QUEUED FOR OWNER REVIEW:**
+- Supabase "Confirm email" project setting — ON or OFF in prod? Blocks AUTH-MIGRATION planning.
+- Manual admin email-confirm tool — ship `/admin/auth-recovery/` page now, or wait for first support ticket?
+
+These weren't bugs the agents could verify line-by-line — they're load-bearing concerns surfaced from the system map's narrative sections (§8, §11, §12, §14, §17 Phase 2, §20a, §21.3). Captured here so they don't fall off the radar between sessions.
+
+Total open items in TODO now: ~167 (was ~113 + 47 anomaly + 7 architectural). Verification banner reflects the new count.
+
+### Third-pass (same date) — DB-perf findings + system-map resolved markers
+
+After the user shared a self-critique pointing at additional gaps, two more changes:
+
+- **+5 DB-perf items added (T352-T356).** From a follow-on DB-perf review pass that surfaced 6 items (#39-44 in that review). 5 are new TODO entries: T352 audit_log retention, T353 webhook_log retention, T354 events table partition-drop cron, T355 subscription-reconcile-stripe N+1 sequential calls, T356 permission_set_perms REINDEX before launch. The 6th review item (`compute_effective_perms` request-scoped memoization) was already captured as T348; not duplicated. None launch-blocking; all real ops debt.
+
+- **System map doc updated inline** to mark already-fixed items as RESOLVED. The four items dropped during 5th-pass (§16 #26 access-redeem rate-limit order, §16 #27 login-precheck timing controls, §16 #30 email-change race ordering, §21.2.9 AvatarEditor save placement) now carry `[RESOLVED 2026-04-27 — TODO 5th-pass verification]` markers inline in `Ongoing Projects/2026-04-27_AUTH_PERMS_SYSTEM_MAP.md`. Future agents reading the system map see resolved status without having to cross-reference TODO.
+
+Total open items in TODO now: ~172. Verification banner reflects the new count.
+
+Files this round: `Ongoing Projects/TODO.md` (T352-T356 added in DB-perf section + verification banner update), `Ongoing Projects/2026-04-27_AUTH_PERMS_SYSTEM_MAP.md` (4 resolved markers inline at §16 #26, #27, #30 + §21.2.9), `Ongoing Projects/CHANGELOG.md` (this entry).
+
+---
+
+## 2026-04-27 (TODO fourth-pass audit — T201 / T285 closed; T40 / T54 / T117 / T165 / T173 / T233 re-scoped) — _no code; verification + bookkeeping only_
+
+Fourth verification pass on outstanding TODO items, run via 4 parallel Explore agents reading live code in clusters (settings/profile, admin/story, comments/notifications, misc/security). Two items confirmed already-fixed and dropped; six items re-scoped inline (line numbers, counts, or kernel correction); rest confirmed real and unchanged. No new bugs surfaced incidentally.
+
+- **T201 — REFERRAL_COOKIE_SECRET already in `.env.example`.** Verified at `web/.env.example:130`. Code at `web/src/app/r/[slug]/route.ts:100` and `web/src/lib/referralCookie.ts:24` reads it. Original gap-finder claim was stale. Item dropped from TODO verification banner.
+
+- **T285 — Web comment report already structured.** `web/src/app/api/comments/[id]/report/route.js:73-79` calls `assertReportReason(reason)` against the `web/src/lib/reportReasons.js` enum union. iOS `BlockService.swift:141-158` posts the same enum (`spam` / `harassment` / `offTopic` / `misinformation` / `other`). Web ↔ iOS parity confirmed. Item body deleted from TODO.
+
+- **T40 line correction.** Dead aside lives at `web/src/app/story/[slug]/page.tsx:2066`, not :1776. Body section updated.
+
+- **T54 line correction.** Kids dashboard KPI cards live at `web/src/app/profile/kids/page.tsx:807-814`, not :749-756. Order verified as Articles → Minutes → Quizzes Passed → Longest Streak — owner-locked target Quizzes Passed → Articles → Streak → Reading Time still applies.
+
+- **T117 re-scope.** ~19 pages need `<ErrorState>` migration, not ~9. Skip-list entry now lists explicit page set (admin: analytics, breaking, ad-campaigns, ad-placements, email-templates, moderation, newsroom, pipeline, promo, recap, reports, sponsors, stories, subscriptions, support, webhooks; user-facing: contact, expert-queue, forgot-password, login, profile, request-access, reset-password, verify-email, welcome).
+
+- **T165 re-scope.** Inline `style={{...}}` count is 4,272 across `web/src/`, not "90+". Tailwind PostCSS plugin is wired but adoption minimal; `globals.css` exists but mostly unused. Body section updated with sharper count.
+
+- **T173 re-scope.** Parity-only fix: `edit_comment` RPC enforces length internally so no data corruption risk. POST handler short-circuits with `comment_too_long` before RPC; PATCH passes `body` straight through. Skip-list entry updated to clarify scope.
+
+- **T233 corrections.** Hard-delete lives at `web/src/app/api/admin/articles/[id]/route.ts:762`, not :611. `recordAdminAction` writes BEFORE the `.delete()` (audit lands but article is irrecoverable) — original "audit log writes after delete (orphan if persist fails)" claim was wrong. Body section updated.
+
+- **All other open + locked + deferred items confirmed real and unchanged:** T14, T19, T26, T27, T34, T35, T55, T56, T57, T92, T166, T-EMAIL-PRUNE. All cross-checked against `web/src/app/profile/page.tsx`, `web/src/app/profile/settings/page.tsx`, `VerityPost/VerityPost/SettingsView.swift`, `VerityPost/VerityPost/ProfileView.swift`, `VerityPost/VerityPost/HomeView.swift`, `VerityPost/VerityPost/StoryDetailView.swift`, `VerityPost/VerityPost/Models.swift`, `VerityPost/VerityPost/BlockService.swift`, `web/src/app/api/admin/prompt-presets/route.ts`, `web/src/app/api/admin/plans/[id]/route.js`, `web/src/app/api/stripe/checkout/route.js`, `web/src/components/CommentThread.tsx`, `web/src/app/leaderboard/page.tsx`, `web/src/app/api/cron/send-emails/route.js`, `web/.env.example`. T26 migration still not drafted (awaiting owner answers per 2026-04-27 owner-decision pass).
+
+- **Files** — `Ongoing Projects/TODO.md` (verification banner + T40 / T54 / T117 / T165 / T173 / T233 bodies + T285 deletion + T201 reference deletion).
+
+---
+
 ## 2026-04-27 (Decision-log closures — T77 / T85 / T268 / T272 / T291) — _no code; closure record only_
 
 Five TODO items closed during the 2026-04-27 owner-decision pass. No code change accompanies these — each represents either an owner-administrative action complete, or audit verification confirming the work was already shipped or already accurate. Recording here so TODO can drop the closed-status notes.

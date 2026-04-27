@@ -5,7 +5,13 @@ import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { safeErrorResponse } from '@/lib/apiErrors';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { getSettings, getNumber } from '@/lib/settings';
 import { COPY } from '@/lib/copy';
+
+// T173 — defense-in-depth body length cap mirroring POST /api/comments. The
+// edit_comment RPC enforces internally; this fast-fails hostile or runaway
+// clients before we burn the lookup + RPC round-trip. Same fallback as POST.
+const COMMENT_MAX_LENGTH_FALLBACK = 4000;
 
 // T170/T209 — authenticated user data must never be cacheable by a CDN
 // or shared proxy. Apply private/no-store to every response on this
@@ -47,6 +53,17 @@ export async function PATCH(request, { params }) {
   const { body } = await request.json().catch(() => ({}));
   if (!body) {
     return NextResponse.json({ error: 'body required' }, { status: 400, headers: NO_STORE });
+  }
+
+  // T173 — body-length cap matching POST. RPC enforces internally; this is
+  // route-level parity so PATCH and POST short-circuit the same way.
+  const settings = await getSettings(service).catch(() => ({}));
+  const commentMaxLength = getNumber(settings, 'comment_max_length', COMMENT_MAX_LENGTH_FALLBACK);
+  if (typeof body !== 'string' || body.length > commentMaxLength) {
+    return NextResponse.json(
+      { error: 'comment_too_long', max_length: commentMaxLength },
+      { status: 400, headers: NO_STORE }
+    );
   }
 
   // T280 — cap the self-edit window to 10 minutes so authors can fix typos

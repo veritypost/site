@@ -185,9 +185,15 @@ export default function ProfilePage() {
         setLoading(false);
         return;
       }
-      // post-migration 142: profile_visibility is locked to ('public','private').
-      // Only 'private' is opt-in and hides the profile from non-self viewers.
-      if (targetRow.profile_visibility === 'private' && user.id !== targetRow.id) {
+      // T330 — profile_visibility is one of ('public','private','hidden'). 'private'
+      // is opt-in and hides the profile from non-self viewers; 'hidden' (added
+      // by the redesign lockdown tier) does the same. Both must be treated as
+      // non-readable for non-self viewers — otherwise lockdown leaks the moment
+      // PUBLIC_PROFILE_ENABLED flips.
+      if (
+        (targetRow.profile_visibility === 'private' || targetRow.profile_visibility === 'hidden') &&
+        user.id !== targetRow.id
+      ) {
         setNotFoundFlag(true);
         setLoading(false);
         return;

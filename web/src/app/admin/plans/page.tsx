@@ -49,7 +49,11 @@ const INITIAL_PLAN_FORM: PlanFormState = {
   description: '',
 };
 
-const BILLING_PERIODS = ['', 'monthly', 'annual', 'lifetime'] as const;
+// T56 — 'lifetime' option removed per owner direction (the SKU it would have
+// supported is not on the roadmap). Adding a CHECK constraint on
+// plans.billing_period to reject 'lifetime' inserts is queued as a follow-up
+// migration.
+const BILLING_PERIODS = ['', 'monthly', 'annual'] as const;
 
 function centsToDollars(c: number | null | undefined): number {
   return (Number(c) || 0) / 100;
