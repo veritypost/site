@@ -63,10 +63,15 @@ export async function POST(request) {
     // from the lookup below).
     const codeMatch = msg.match(/^\[([A-Z_]+)\]/);
     const code = codeMatch?.[1] || null;
+    // T17 — DM_BLOCKED joins the existing 403 set; folded with the
+    // existing reasons to a single uniform user-facing message so the
+    // response shape doesn't leak whether the gate fired on plan, mute,
+    // participation, or block. Granular code stays in server logs only.
     let status;
     if (code === 'DM_PAID_PLAN') status = 403;
     else if (code === 'DM_MUTED') status = 403;
     else if (code === 'NOT_PARTICIPANT') status = 403;
+    else if (code === 'DM_BLOCKED') status = 403;
     else if (code === 'DM_RATE_LIMIT') status = 429;
     else if (code === 'DM_EMPTY' || code === 'DM_TOO_LONG') status = 400;
     else status = 400;

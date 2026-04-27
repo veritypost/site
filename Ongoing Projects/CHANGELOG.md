@@ -7,17 +7,18 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
-## 2026-04-27 (T17 — bidirectional blocked_users enforcement on DM RPCs) — _migration applied; route patch deferred per TODO-only mode_
+## 2026-04-27 (T17 — bidirectional blocked_users enforcement on DM RPCs + uniform 403 collapse) — _migration applied; routes patched; shipped_
 
-### T17 — start_conversation + post_message reject blocked counterparties
+### T17 — start_conversation + post_message reject blocked counterparties; routes fold DM_BLOCKED into uniform 403
 
-- **Migration applied** (owner): `Ongoing Projects/migrations/2026-04-27_T17_dm_block_enforcement.sql`. MCP verified post-apply — both `start_conversation(uuid,uuid)` and `post_message(uuid,uuid,text)` definitions now contain `DM_BLOCKED`.
-- **What changed**:
+- **Migration applied** (owner): `Ongoing Projects/migrations/2026-04-27_T17_dm_block_enforcement.sql`. MCP verified — both `start_conversation(uuid,uuid)` and `post_message(uuid,uuid,text)` definitions now contain `DM_BLOCKED`.
   - `start_conversation` — bidirectional `blocked_users` check. Either direction blocks. Sits after the T16 recipient-opt-out check.
   - `post_message` — only fires on direct (`type='direct'`) conversations. Looks up the other participant, rejects if blocked in either direction. Group conversations skip — block-in-multi-party is a per-message UX hide, separate concern.
-- **New error code** `[DM_BLOCKED]`. Currently surfaces from the route as a default 400 ("Could not start conversation" / equivalent) until the route patch lands. Per owner direction (TODO-only mode), the route patch (fold `DM_BLOCKED` into the T283 / T16 uniform `cannot_dm` 403 collapse) is deferred — owner says "patch the route" when ready.
-- **Closes the audit hole**: a blocked user can no longer call `start_conversation` against the user who blocked them, nor keep messaging in an existing pre-block conversation. Data-layer enforcement; third-party clients with the anon key are now gated.
-- **Files** — `Ongoing Projects/migrations/2026-04-27_T17_dm_block_enforcement.sql` (applied).
+- **Route patches (genuine-fix completion)** — the T16 patch already collapsed `DM_RECIPIENT_OPTED_OUT` into the uniform `cannot_dm` 403 alongside `DM_PAID_PLAN`/`DM_MUTED`/`USER_NOT_FOUND`. Leaving `DM_BLOCKED` falling to a generic 400 would have been a parallel path. Both routes extended:
+  - `web/src/app/api/conversations/route.js` — `DM_BLOCKED` joins the existing T283 + T16 collapse → uniform `403 { error: 'cannot_dm' }`.
+  - `web/src/app/api/messages/route.js` — `DM_BLOCKED` added to the existing 403 set alongside `DM_PAID_PLAN`/`DM_MUTED`/`NOT_PARTICIPANT`. Same uniform user-facing message ("You cannot send messages in this conversation.") so the response shape doesn't leak whether the gate fired on plan, mute, participation, or block.
+- **Closes the audit hole**: a blocked user can no longer call `start_conversation` against the user who blocked them, nor keep messaging in an existing pre-block conversation. Data-layer enforcement; third-party clients with the anon key are now gated. Response shape uniform across all reject reasons.
+- **Files** — `Ongoing Projects/migrations/2026-04-27_T17_dm_block_enforcement.sql` (applied), `web/src/app/api/conversations/route.js`, `web/src/app/api/messages/route.js`.
 
 ---
 
