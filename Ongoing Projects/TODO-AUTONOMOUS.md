@@ -202,19 +202,9 @@ Note: under AUTH-MIGRATION (queued in TODO-OWNER), every signed-in user becomes 
 
 Closing the bulk T84 sweep. The 6 admin sites that needed fixing are shipped. Remaining items either don't need work or need server-side prep first.
 
-## T92 — No web push at all — HIGH (return-visit lever)
+## T92 — Web push — MOVED to TODO-PRE-LAUNCH (do not migrate back)
 
-**Verified:** 2026-04-27 — `web/public/` has no service-worker.js / sw.js. Code grep: zero VAPID, pushManager, /api/push/subscribe references. Settings page comment at `profile/settings/page.tsx` explicitly notes web has no service worker / VAPID / PushSubscription wiring.
-**What's wrong:** Web has zero ambient notification channel. iOS APNs ships breaking news + reply alerts; web users get nothing.
-**Fix:** Standard PWA push stack:
-1. Generate VAPID keypair → store private key in env, public key in `NEXT_PUBLIC_VAPID_PUBLIC_KEY`.
-2. Service worker `web/public/sw.js` — handle `push` events + `notificationclick`.
-3. `/api/push/subscribe` POST — store subscription in a `push_subscriptions` table.
-4. `/api/push/unsubscribe` POST — soft-delete on revoke.
-5. Wire delivery into the existing `notification_deliveries` cron (which already targets APNs) — fan out to web subscriptions in parallel.
-6. Opt-in pre-prompt at value moments (first comment posted, first save) — never cold-fire.
-**Tier:** T4 (cross-surface, security-sensitive — service worker scope, VAPID key handling, RLS on subscriptions table).
-**Bundling:** Standalone session — not foldable into copy/UI sweeps.
+Web browser push notifications (OS-level toasts when the tab is closed) lives in `Ongoing Projects/TODO-PRE-LAUNCH.md` as of owner directive 2026-04-27. Engineering shape is autonomous, but launch sequencing + owner-generated VAPID keypair + service-worker operational-risk decision + RLS migration land it as pre-launch work, not autonomous batch work. Do not re-add to TODO-AUTONOMOUS.
 
 ## T165 — Inline `style={{...}}` migration — LOW
 

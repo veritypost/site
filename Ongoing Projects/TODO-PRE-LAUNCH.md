@@ -249,6 +249,34 @@ After owner picks: stamp the chosen identifier in `parental_consents.consent_met
 
 ---
 
+## Web push (browser notifications) — pre-launch decision
+
+**Owner directive 2026-04-27:** moved from `TODO-AUTONOMOUS.md` to here — engineering shape is autonomous, but it's a real product feature (not a cleanup item) that needs launch sequencing, owner-side VAPID key handling, and a service-worker operational risk decision before shipping. Treat as pre-launch only; do not migrate back to autonomous.
+
+## T92 — No web push at all — HIGH (return-visit lever)
+
+**Verified:** 2026-04-27 — `web/public/` has no service-worker.js / sw.js. Code grep: zero VAPID, pushManager, /api/push/subscribe references. Settings page comment at `profile/settings/page.tsx` explicitly notes web has no service worker / VAPID / PushSubscription wiring.
+
+**What's missing:** Web has zero ambient notification channel. iOS APNs ships breaking news + reply alerts; web users (~80% of base) get nothing — no OS-level toast when a comment they wrote gets a reply, no breaking-news ping when their browser is closed. Major engagement lever absent on the primary surface.
+
+**What "shipping it" means:** Real OS-level desktop / mobile-browser notifications (Chrome / Edge / Firefox on Mac/Win/Linux/Android; Safari on macOS 13+; Safari on iOS 16.4+ via add-to-home-screen). Toast slides into the OS notification center even when the browser tab is closed. Click → opens the relevant Verity Post page.
+
+**Fix shape (8-12 hour focused build):**
+1. Generate VAPID keypair → store private key in env, public key in `NEXT_PUBLIC_VAPID_PUBLIC_KEY`. **Owner generates the keypair.**
+2. Service worker `web/public/sw.js` — handle `push` events + `notificationclick`. Operational-risk territory: a bad SW caches assets and can break the site for users; ship behind a kill-switch flag.
+3. `/api/push/subscribe` POST — store subscription in a new `push_subscriptions` table with RLS (auth.uid() owns rows). **Owner applies migration.**
+4. `/api/push/unsubscribe` POST — soft-delete on revoke.
+5. Wire delivery into the existing `notification_deliveries` cron (which already targets APNs) — fan out to web subscriptions in parallel via `web-push` library.
+6. Opt-in pre-prompt at value moments (first comment posted, first article saved) — never cold-fire on landing. Cold-fire kills acceptance rate forever; the pre-prompt is the most consequential UX decision in the whole feature.
+
+**Tier:** T4 (cross-surface, security-sensitive — service worker scope, VAPID key handling, RLS on subscriptions table, opt-in prompt timing).
+
+**Pre-launch gate:** none strictly — site can launch without it. But web users churning silent post-launch is the single biggest engagement-floor risk for a content product. **Recommend: ship before AdSense traffic ramps.** Owner decides whether to launch with or without; this entry stays here as the canonical home until shipped.
+
+**Bundling:** standalone session. Do not fold into any other batch run.
+
+---
+
 ## NOT_DONE Apple Kids — autonomous fixes inside iOS / kids server session
 
 ## K13 — Kid soft-delete doesn't hard-purge after grace — HIGH
@@ -304,6 +332,7 @@ T263 (`PrivacyInfo.xcprivacy` exists for both adult + kids apps).
 - **Before submitting kids app to Apple:** K12 VPC mechanism must ship; K8 metadata submission is the moment K12 must already be live; K15 push payload review must happen after T3.10 (kids push registration in TODO-AUTONOMOUS) lands.
 - **Before App Store Connect submit (adult):** T1.1 entitlement flipped, T1.2 SIWA buttons removed, T1.3 token-cleanup-on-logout shipped, A1 / A9 / A10 / A11 / A12 done. Demo reviewer test path (A7) provisioned. Apple Dev console walkthrough (A8) complete.
 - **Before AdSense submission:** T2 cookie banner must ship + `NEXT_PUBLIC_ADSENSE_PUBLISHER_ID` must be set.
+- **Before AdSense traffic ramps (post-approval):** ship T92 (web push). Silent web users churn faster than notified ones; web is ~80% of the user base, no ambient notification channel today. Not a strict launch-gate but the highest-leverage engagement lever sitting unbuilt.
 - **Before TOS goes to legal review:** T271 governing-law clause inserted.
 
 ---
