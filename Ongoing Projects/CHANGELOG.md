@@ -7,7 +7,7 @@ Every change made during audit execution sessions. Format per entry:
 
 ---
 
-## 2026-04-27 (wave 11 — T55 migration drafted; mid-edit reversal recorded) — _pending push to git_
+## 2026-04-27 (wave 11 — T55 migration drafted; mid-edit reversal recorded) — _shipped, pushed to git_ (commit ea30523)
 
 Caught a wrong-direction error mid-edit and reversed before commit.
 
