@@ -223,7 +223,14 @@ struct ParentalGateModal: View {
 
     private func startCountdown() {
         timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { t in
+        // Schedule on .common so the countdown keeps ticking while the
+        // user is actively interacting with the modal (scrolling, dragging
+        // the input). Timer.scheduledTimer's default schedule attaches to
+        // the current runloop in .default mode, which iOS suspends during
+        // tracking — kid stays "locked out" past the real expiry because
+        // the countdown stalled while they fidgeted. .common = .default
+        // ∪ tracking modes, so the timer fires regardless.
+        let t = Timer(timeInterval: 1, repeats: true) { t in
             Task { @MainActor in
                 if lockRemaining > 0 {
                     lockRemaining -= 1
@@ -237,6 +244,8 @@ struct ParentalGateModal: View {
                 }
             }
         }
+        RunLoop.current.add(t, forMode: .common)
+        timer = t
     }
 
     private func clearLockoutState() {
