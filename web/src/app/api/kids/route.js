@@ -138,10 +138,26 @@ export async function POST(request) {
       );
     }
   } catch (err) {
-    // Non-fatal: don't block create on a transient seat-check error,
-    // but log for observability. The webhook reconciliation cron will
-    // catch any over-quota write retroactively.
+    // A27 — fail closed. Pre-A27 swallowed the seat-check error and
+    // proceeded with the create — letting an over-cap kid land in the
+    // DB whenever the seat-check query (kid_profiles count or
+    // subscriptions read) misfired. The webhook reconciliation cron
+    // was supposed to catch this retroactively, but reconciliation
+    // creates user-visible billing surprises rather than preventing
+    // them. Refuse the create on any seat-check exception with 503 +
+    // Retry-After so the client retries cleanly. Plan-cap math is the
+    // single guardrail; we don't want to bypass it on transient errors.
     console.error('[kids.seat_check]', err?.message || err);
+    return NextResponse.json(
+      {
+        error: 'Could not verify seat availability — try again in a moment.',
+        code: 'seat_check_unavailable',
+      },
+      {
+        status: 503,
+        headers: { 'Retry-After': '5' },
+      }
+    );
   }
 
   const nowIso = now.toISOString();
