@@ -1,4 +1,5 @@
 import Foundation
+import os
 import Supabase
 
 /// Supabase configuration is sourced exclusively from the app bundle's Info.plist
@@ -9,8 +10,21 @@ import Supabase
 ///
 /// In DEBUG builds only, missing values fall back to the SUPABASE_URL /
 /// SUPABASE_KEY process environment variables for local dev convenience.
+///
+/// Missing / malformed config never traps the process — the splash gates on
+/// `configValid` and renders a build-error screen with a support email. This
+/// gives Apple a deterministic failure surface during review instead of a
+/// silent crash if a TestFlight build ships without xcconfig values wired.
 final class SupabaseManager {
     static let shared = SupabaseManager()
+
+    private static let log = Logger(subsystem: "com.veritypost.adult", category: "SupabaseManager")
+
+    /// True when both SUPABASE_URL and SUPABASE_KEY resolved cleanly. The
+    /// app's RootView (`ContentView`) reads this before any network call;
+    /// false routes to a "Build configuration error — contact
+    /// support@veritypost.com" screen instead of crashing.
+    let configValid: Bool
 
     private static func infoValue(_ key: String) -> String? {
         guard let raw = Bundle.main.object(forInfoDictionaryKey: key) as? String,
@@ -33,22 +47,19 @@ final class SupabaseManager {
         #endif
     }
 
-    private let supabaseURL: URL = {
-        guard let raw = SupabaseManager.resolve("SUPABASE_URL") else {
-            fatalError("[SupabaseManager] SUPABASE_URL not set. Configure INFOPLIST_KEY_SUPABASE_URL in xcconfig.")
-        }
-        guard let url = URL(string: raw) else {
-            fatalError("[SupabaseManager] SUPABASE_URL is malformed: \(raw)")
-        }
-        return url
+    /// Hardcoded placeholder URL used when SUPABASE_URL is unset or malformed.
+    /// Pointing at the production marketing host means any accidental network
+    /// call during a misconfigured build returns a 404 (cheap to spot in
+    /// logs) rather than landing on a real auth/data endpoint.
+    private static let placeholderURL: URL = {
+        var comps = URLComponents()
+        comps.scheme = "https"
+        comps.host = "veritypost.com"
+        return comps.url ?? URL(fileURLWithPath: "/")
     }()
 
-    private let supabaseKey: String = {
-        guard let key = SupabaseManager.resolve("SUPABASE_KEY") else {
-            fatalError("[SupabaseManager] SUPABASE_KEY not set. Configure INFOPLIST_KEY_SUPABASE_KEY in xcconfig.")
-        }
-        return key
-    }()
+    private let supabaseURL: URL
+    private let supabaseKey: String
 
     /// Shared URLSession used by the Supabase client + every sub-client
     /// (Auth, Postgrest, Storage, Functions). The OS default `timeoutIntervalForRequest`
@@ -98,5 +109,41 @@ final class SupabaseManager {
         return comps.url ?? URL(fileURLWithPath: "/")
     }()
 
-    private init() {}
+    private init() {
+        var ok = true
+
+        let resolvedURL: URL
+        if let raw = SupabaseManager.resolve("SUPABASE_URL") {
+            if let url = URL(string: raw) {
+                resolvedURL = url
+            } else {
+                SupabaseManager.log.fault(
+                    "SUPABASE_URL malformed; using placeholder. Configure INFOPLIST_KEY_SUPABASE_URL in xcconfig."
+                )
+                resolvedURL = SupabaseManager.placeholderURL
+                ok = false
+            }
+        } else {
+            SupabaseManager.log.fault(
+                "SUPABASE_URL not set; using placeholder. Configure INFOPLIST_KEY_SUPABASE_URL in xcconfig."
+            )
+            resolvedURL = SupabaseManager.placeholderURL
+            ok = false
+        }
+
+        let resolvedKey: String
+        if let key = SupabaseManager.resolve("SUPABASE_KEY") {
+            resolvedKey = key
+        } else {
+            SupabaseManager.log.fault(
+                "SUPABASE_KEY not set; using empty key. Configure INFOPLIST_KEY_SUPABASE_KEY in xcconfig."
+            )
+            resolvedKey = ""
+            ok = false
+        }
+
+        self.supabaseURL = resolvedURL
+        self.supabaseKey = resolvedKey
+        self.configValid = ok
+    }
 }

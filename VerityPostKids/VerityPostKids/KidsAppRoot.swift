@@ -91,6 +91,23 @@ struct KidsAppRoot: View {
             KidTabBar(selected: $selectedTab)
         }
         .ignoresSafeArea(.container, edges: .bottom)
+        // OwnersAudit Kids A40 — KidsAppState.loadError was set on every
+        // kid-row fetch failure (transient network, RLS misfire, kid_profiles
+        // schema drift) but never surfaced. The kid saw 0-day streak + the
+        // hardcoded category fallback list with no signal that the live
+        // profile failed to load. Add a subtle top-of-screen banner that
+        // names the failure without blocking the session — kid still gets
+        // categories + can read articles. Auto-dismisses on next successful
+        // load (handled by state.loadError = nil at the start of load()).
+        .overlay(alignment: .top) {
+            if let msg = state.loadError {
+                loadErrorBanner(msg)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: state.loadError)
         .fullScreenCover(item: $activeSheet, onDismiss: handleDismiss) { sheet in
             ZStack(alignment: .topLeading) {
                 sceneBody(sheet)
@@ -259,6 +276,42 @@ struct KidsAppRoot: View {
         .padding(.leading, 20)
         .padding(.top, 60)
         .accessibilityLabel("Close")
+    }
+
+    /// A40 — non-blocking banner surfacing a state-load failure. Kept
+    /// intentionally subtle; kid-friendly wording avoids networking
+    /// jargon. Tapping it triggers a re-load attempt.
+    private func loadErrorBanner(_ message: String) -> some View {
+        Button {
+            guard let kid = auth.kid else { return }
+            Task { await state.load(forKidId: kid.id, kidName: kid.name) }
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "wifi.exclamationmark")
+                    .font(.system(.subheadline, weight: .bold))
+                    .accessibilityHidden(true)
+                Text("Couldn't update your home screen. Tap to retry.")
+                    .font(.system(.caption, design: .rounded, weight: .semibold))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(K.text)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.thinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(K.coralDark.opacity(0.3), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.08), radius: 8, y: 2)
+        }
+        .buttonStyle(.plain)
+        // The full message goes to VoiceOver so the kid (or parent) hears
+        // the underlying cause when they focus the banner.
+        .accessibilityLabel("Couldn't update home screen. \(message). Tap to retry.")
     }
 }
 

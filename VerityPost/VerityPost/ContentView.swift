@@ -16,7 +16,35 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            if auth.isLoading {
+            if !SupabaseManager.shared.configValid {
+                // Build was shipped without SUPABASE_URL / SUPABASE_KEY in
+                // Info.plist (or with a malformed URL). Render a static
+                // failure screen so Apple Review and TestFlight users get
+                // a deterministic recovery path instead of a silent crash.
+                ZStack {
+                    VP.bg.ignoresSafeArea()
+                    VStack(spacing: 14) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.largeTitle)
+                            .foregroundColor(VP.danger)
+                            .accessibilityHidden(true)
+                        Text("Verity Post")
+                            .font(.system(.title, design: .default, weight: .bold))
+                            .tracking(-1)
+                            .foregroundColor(VP.text)
+                        Text("Build configuration error")
+                            .font(.system(.callout, design: .default, weight: .semibold))
+                            .foregroundColor(VP.text)
+                        Text("This build of the app is missing required configuration. Please contact support@veritypost.com so we can ship a fix.")
+                            .font(.footnote)
+                            .foregroundColor(VP.dim)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 40)
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Build configuration error. Please contact support at support at veritypost.com.")
+                }
+            } else if auth.isLoading {
                 // Splash — branded fade-in. VP tile scales + fades, wordmark
                 // follows at +200ms, ProgressView appears at +500ms so it
                 // never flashes ahead of the branding. Stage copy:
