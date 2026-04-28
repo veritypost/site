@@ -1125,39 +1125,92 @@ async function handleInvoiceUpcoming(service, invoice) {
   }
 }
 
-// B7 — customer.deleted orphans users.stripe_customer_id if it isn't cleared.
-// Our F-016 takeover defense then refuses a future upgrade because the dangling
-// customer id on the user row resolves to no live Stripe customer. Clear the
-// column so the next /api/stripe/checkout session can mint a fresh customer.
+// B7 / S4-A9 — customer.deleted unbinds three things together:
+//   1. Cancel any live `subscriptions` row tied to this Stripe customer
+//      (status IN ('active','trialing','past_due')), tagged
+//      cancel_reason='stripe_customer_deleted'. Without this, a user
+//      whose Stripe Customer is deleted (admin cleanup, Stripe-side
+//      fraud action) keeps `subscriptions.status='active'` indefinitely,
+//      iOS reads it as live, the reconcile cron keys on
+//      stripe_subscription_id (never on customer) and never catches the
+//      orphan, and the user holds premium access without payment.
+//   2. Freeze the user via billing_freeze_profile so users.plan_id
+//      flips to free and downstream paywalls/leaderboard/perm cache
+//      see the right tier.
+//   3. Clear users.stripe_customer_id so a future checkout mints a
+//      fresh customer (F-016 takeover defense).
 //
-// A deleted customer should not carry a live subscription on our side; if a
-// row with plan_status='active' exists anyway we log a warning so an operator
-// notices, but don't auto-freeze — the cleaner handler for a real cancellation
-// is customer.subscription.deleted, which we already handle.
+// Order matters under partial failure: cancel rows BEFORE the freeze RPC
+// so a 500-then-replay finds the rows already cancelled and the freeze
+// idempotent. Each step idempotent on Stripe re-delivery (webhook_log
+// UNIQUE event_id is the structural backstop, but the WHERE filters
+// here belt-and-brace it).
+//
+// Stripe also fires customer.subscription.deleted around the same time
+// for any live subs on the deleted customer. Order is not guaranteed:
+//   - subscription.deleted first → it freezes the user, our cancel
+//     UPDATE filter (status IN ('active','trialing','past_due'))
+//     finds 0 rows, no-op.
+//   - customer.deleted first → we cancel + freeze; subscription.deleted
+//     follow-up's billing_freeze_profile is a no-op (already frozen).
 async function handleCustomerDeleted(service, customer) {
   const customerId = customer?.id;
   if (!customerId) return;
 
   const { data: userRow } = await service
     .from('users')
-    .select('id, stripe_customer_id, plan_status, plan_id')
+    .select('id, stripe_customer_id, plan_status, plan_id, frozen_at')
     .eq('stripe_customer_id', customerId)
     .maybeSingle();
   if (!userRow) return;
 
-  if (userRow.plan_status === 'active') {
-    console.warn(
-      '[stripe.webhook] customer.deleted for user with active plan_status — ' +
-        `user_id=${userRow.id} customer_id=${customerId}`
-    );
+  // Step 1: cancel any live Stripe subscription rows for this user.
+  // Filter on `stripe_subscription_id IS NOT NULL` to scope to Stripe
+  // (Apple rows always have stripe_subscription_id null) without
+  // depending on the `platform` column being uniformly populated on
+  // legacy rows. `status IN (...)` is broader than just active/trialing
+  // because past_due rows are still billable until Stripe gives up.
+  // .select('id') returns the cancelled rows so we can record them in
+  // the audit metadata for forensic reconstruction.
+  const { data: cancelledRows } = await service
+    .from('subscriptions')
+    .update({
+      status: 'cancelled',
+      cancel_reason: 'stripe_customer_deleted',
+      cancelled_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('user_id', userRow.id)
+    .in('status', ['active', 'trialing', 'past_due'])
+    .not('stripe_subscription_id', 'is', null)
+    .select('id, stripe_subscription_id');
+  const cancelledIds = (cancelledRows || []).map((r) => r.id);
+
+  // Step 2: freeze the user — same RPC customer.subscription.deleted uses.
+  // Skip if already frozen (e.g., a parallel subscription.deleted handler
+  // already fired). The RPC itself is idempotent; the guard here just
+  // skips the round-trip.
+  if (!userRow.frozen_at && cancelledIds.length > 0) {
+    const { error: freezeErr } = await service.rpc('billing_freeze_profile', {
+      p_user_id: userRow.id,
+    });
+    if (freezeErr) {
+      // Surface as throw — webhook returns 500 + Stripe retries. The
+      // subscription rows are already cancelled (step 1 committed); the
+      // retry will skip step 1 (no active rows match) and re-attempt
+      // freeze + customer-id clear.
+      throw new Error(`billing_freeze_profile failed: ${freezeErr.message}`);
+    }
   }
 
+  // Step 3: clear users.stripe_customer_id so a future checkout mints a
+  // fresh Stripe Customer. The .eq('stripe_customer_id', customerId)
+  // guard prevents clobbering a user whose row was reassigned between
+  // the SELECT and UPDATE.
   await service
     .from('users')
     .update({ stripe_customer_id: null })
     .eq('id', userRow.id)
-    // Guard against clobbering a user whose row was reassigned between the
-    // select + update — only clear if the same customer id still matches.
     .eq('stripe_customer_id', customerId);
 
   await service.from('audit_log').insert({
@@ -1170,6 +1223,9 @@ async function handleCustomerDeleted(service, customer) {
       stripe_customer_id: customerId,
       plan_status_at_delete: userRow.plan_status || null,
       plan_id_at_delete: userRow.plan_id || null,
+      subscriptions_cancelled: cancelledIds,
+      cancel_reason: 'stripe_customer_deleted',
+      already_frozen: !!userRow.frozen_at,
     },
   });
 }
