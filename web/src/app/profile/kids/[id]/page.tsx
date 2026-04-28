@@ -337,7 +337,7 @@ export default function KidDashboardPage() {
           This dashboard is part of the Verity Family plan.
         </p>
         <a
-          href="/profile/settings#billing"
+          href="/profile/settings?section=plan"
           style={{
             display: 'inline-block',
             padding: '10px 18px',

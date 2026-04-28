@@ -367,7 +367,7 @@ export default function ParentKidsPage() {
           quizzes, and expert sessions.
         </p>
         <a
-          href="/profile/settings#billing"
+          href="/profile/settings?section=plan"
           style={{
             display: 'inline-block',
             padding: '10px 18px',
@@ -783,7 +783,7 @@ function TrialHero({ endsAt }: { endsAt: string | null }) {
         <div style={{ width: `${pct}%`, height: '100%', background: C.warn }} />
       </div>
       <a
-        href="/profile/settings#billing"
+        href="/profile/settings?section=plan"
         style={{
           display: 'inline-block',
           padding: '10px 18px',
@@ -826,7 +826,7 @@ function TrialExpiredHero({
       </p>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
         <a
-          href="/profile/settings#billing"
+          href="/profile/settings?section=plan"
           style={{
             display: 'inline-block',
             padding: '10px 18px',

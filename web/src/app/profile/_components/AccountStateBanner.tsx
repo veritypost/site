@@ -97,7 +97,7 @@ function visual(state: AccountState): Visual | null {
         body: state.frozenScore
           ? `Your score is held at ${state.frozenScore.toLocaleString()} while your subscription is inactive. Resubscribe to start earning again.`
           : 'Your score is paused while your subscription is inactive. Resubscribe to start earning again.',
-        cta: { label: 'Resubscribe', href: '/profile/settings#billing' },
+        cta: { label: 'Resubscribe', href: '/profile/settings?section=plan' },
       };
     case 'muted':
       return {
@@ -123,7 +123,7 @@ function visual(state: AccountState): Visual | null {
         body: state.reason
           ? `${state.reason}. You can re-apply after addressing the feedback.`
           : "Your expert application wasn't approved this round. You can re-apply once you have updated credentials.",
-        cta: { label: 'Re-apply', href: '/profile/settings#expert' },
+        cta: { label: 'Re-apply', href: '/profile/settings?section=expert-profile' },
       };
     case 'plan_grace':
       return {
@@ -135,7 +135,7 @@ function visual(state: AccountState): Visual | null {
         body: state.endsAt
           ? `Your last payment failed. Premium features stay active until ${formatDate(state.endsAt)} — please update your card before then.`
           : 'Your last payment failed. Update your card to keep premium features active.',
-        cta: { label: 'Update payment', href: '/profile/settings#billing' },
+        cta: { label: 'Update payment', href: '/profile/settings?section=plan' },
       };
     case 'expert_pending':
       return {
@@ -145,7 +145,7 @@ function visual(state: AccountState): Visual | null {
         glyph: '🕐',
         title: 'Expert application under review',
         body: "We typically review applications within 5 business days. We'll email you when there's a decision.",
-        cta: { label: 'Edit application', href: '/profile/settings#expert' },
+        cta: { label: 'Edit application', href: '/profile/settings?section=expert-profile' },
       };
     case 'comped':
       return {
