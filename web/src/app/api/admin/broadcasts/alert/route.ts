@@ -27,6 +27,7 @@ type AlertBody = {
   text?: string;
   story?: string;
   target?: 'all' | 'paid' | 'free';
+  reason?: string;
 };
 
 export async function POST(request: Request) {
@@ -42,10 +43,19 @@ export async function POST(request: Request) {
   const story = typeof body.story === 'string' ? body.story.trim() : '';
   const target: 'all' | 'paid' | 'free' =
     body.target === 'paid' || body.target === 'free' ? body.target : 'all';
+  // S6-A56: operator-attested reason captured by DestructiveActionConfirm.
+  const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
 
   if (!text) {
     return NextResponse.json({ error: 'text required' }, { status: 400 });
   }
+  if (!reason) {
+    return NextResponse.json(
+      { error: 'reason required for breaking alert audit trail' },
+      { status: 400 }
+    );
+  }
+
 
   const service = createServiceClient();
 
@@ -60,6 +70,31 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: 'Too many breaking alerts. Wait before sending another.' },
       { status: 429, headers: { 'Retry-After': '600' } }
+    );
+  }
+
+  // S6-A30: server-side enforcement of operator-managed alert limits.
+  // The /admin/breaking surface persists these to settings; this route
+  // reads them and rejects out-of-bounds requests so the UI can't lie
+  // about what's enforced. Char limit is the only one currently
+  // enforced at submit time — throttle and max-daily are operator
+  // guardrails surfaced in the UI; future work wires them through the
+  // rate-limit policy bag.
+  const { data: limitRows } = await service
+    .from('settings')
+    .select('key, value')
+    .in('key', ['breaking_alert_char_limit']);
+  let charLimit = 280;
+  (limitRows ?? []).forEach((r) => {
+    if (r.key === 'breaking_alert_char_limit' && r.value != null) {
+      const n = parseInt(String(r.value), 10);
+      if (Number.isFinite(n) && n > 0) charLimit = n;
+    }
+  });
+  if (text.length > charLimit) {
+    return NextResponse.json(
+      { error: 'char_limit_exceeded', limit: charLimit, length: text.length },
+      { status: 400 }
     );
   }
 
@@ -114,12 +149,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Could not create breaking alert' }, { status: 500 });
   }
 
-  await recordAdminAction({
-    action: 'breaking_news.send',
-    targetTable: 'articles',
-    targetId: (article as { id: string }).id,
-    newValue: { text: title, story: story || null, target },
-  });
+  try {
+    await recordAdminAction({
+      action: 'breaking_news.send',
+      targetTable: 'articles',
+      targetId: (article as { id: string }).id,
+      reason: reason || null,
+      newValue: { text: title, story: story || null, target },
+    });
+  } catch {
+    // S6-A5: audit-write failure is non-fatal — alert article exists,
+    // operator action already happened. Failure surfaces via the
+    // [AUDIT-FAILURE] log line.
+  }
 
   // Best-effort push fan-out. If the RPC fails, the article still exists
   // (published + is_breaking) — a retry is safe via the same route OR the

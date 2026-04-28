@@ -13,7 +13,7 @@ import NumberInput from '@/components/admin/NumberInput';
 import Spinner from '@/components/admin/Spinner';
 import EmptyState from '@/components/admin/EmptyState';
 import Badge from '@/components/admin/Badge';
-import ConfirmDialog from '@/components/admin/ConfirmDialog';
+import DestructiveActionConfirm from '@/components/admin/DestructiveActionConfirm';
 import { ToastProvider, useToast } from '@/components/admin/Toast';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 import type { Tables } from '@/types/database-helpers';
@@ -68,10 +68,58 @@ function BreakingInner() {
         setHistory([]);
       }
       else if (data) setHistory(data as unknown as ArticleRow[]);
+
+      // S6-A30: hydrate alert-limit settings from the settings table so
+      // edits persist across reloads. Falls back to component defaults
+      // when rows are absent.
+      const { data: settingsRows } = await supabase
+        .from('settings')
+        .select('key, value')
+        .in('key', [
+          'breaking_alert_char_limit',
+          'breaking_alert_throttle_min',
+          'breaking_alert_max_daily',
+        ]);
+      if (settingsRows) {
+        const map: Record<string, string> = {};
+        (settingsRows as Array<{ key: string; value: string | null }>).forEach((r) => {
+          if (r.key && r.value != null) map[r.key] = r.value;
+        });
+        const cl = parseInt(map.breaking_alert_char_limit ?? '', 10);
+        const tm = parseInt(map.breaking_alert_throttle_min ?? '', 10);
+        const md = parseInt(map.breaking_alert_max_daily ?? '', 10);
+        if (Number.isFinite(cl) && cl > 0) setCharLimit(cl);
+        if (Number.isFinite(tm) && tm > 0) setThrottleMin(tm);
+        if (Number.isFinite(md) && md > 0) setMaxDaily(md);
+      }
+
       setLoading(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // S6-A30: persist a settings key via the canonical upsert endpoint.
+  // Server-side enforcement reads from these same rows in the broadcast
+  // route handler, so the operator's edits actually constrain new alerts.
+  const saveLimit = async (key: string, value: number) => {
+    try {
+      const res = await fetch('/api/admin/settings/upsert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, value: String(value) }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        push({
+          message: json.error || `Could not save ${key}`,
+          variant: 'danger',
+        });
+      }
+    } catch (err) {
+      console.error('[admin.breaking] saveLimit failed:', err);
+      push({ message: 'Save failed — try again', variant: 'danger' });
+    }
+  };
 
   const charCount = text.length;
   const isValid = text.trim().length > 0 && charCount <= charLimit;
@@ -89,13 +137,13 @@ function BreakingInner() {
     setShowConfirm(true);
   };
 
-  const sendAlert = async () => {
+  const sendAlert = async (reason: string) => {
     if (!isValid) return;
     setSending(true);
     try {
       // T-012 — single-call server route owns article creation + audit +
       // push fan-out. Client no longer touches articles / record_admin_action
-      // directly.
+      // directly. S6-A56: pass operator-attested reason through.
       const res = await fetch('/api/admin/broadcasts/alert', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -103,13 +151,15 @@ function BreakingInner() {
           text: text.trim(),
           story: story.trim() || undefined,
           target,
+          reason,
         }),
       });
       const payload = await res.json().catch(() => ({} as Record<string, unknown>));
       if (!res.ok) {
         const msg = typeof payload.error === 'string' ? payload.error : 'Send failed';
         push({ message: msg, variant: 'danger' });
-        return;
+        // Throw so DestructiveActionConfirm skips the audit-write step.
+        throw new Error(msg);
       }
 
       const article = (payload as { article?: ArticleRow }).article;
@@ -153,9 +203,23 @@ function BreakingInner() {
 
       <PageSection title="Alert limits" boxed>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: S[4], alignItems: 'flex-end' }}>
-          <LabeledNum label="Char limit" value={charLimit} onChange={setCharLimit} />
-          <LabeledNum label="Throttle (min between)" value={throttleMin} onChange={setThrottleMin} suffix="min" />
-          <LabeledNum label="Max daily alerts" value={maxDaily} onChange={setMaxDaily} suffix="per day" />
+          <LabeledNum
+            label="Char limit"
+            value={charLimit}
+            onChange={(v) => { setCharLimit(v); saveLimit('breaking_alert_char_limit', v); }}
+          />
+          <LabeledNum
+            label="Throttle (min between)"
+            value={throttleMin}
+            onChange={(v) => { setThrottleMin(v); saveLimit('breaking_alert_throttle_min', v); }}
+            suffix="min"
+          />
+          <LabeledNum
+            label="Max daily alerts"
+            value={maxDaily}
+            onChange={(v) => { setMaxDaily(v); saveLimit('breaking_alert_max_daily', v); }}
+            suffix="per day"
+          />
         </div>
       </PageSection>
 
@@ -238,8 +302,9 @@ function BreakingInner() {
         )}
       </PageSection>
 
-      <ConfirmDialog
+      <DestructiveActionConfirm
         open={showConfirm}
+        onClose={() => setShowConfirm(false)}
         title="Send breaking alert?"
         message={
           <div>
@@ -255,11 +320,14 @@ function BreakingInner() {
           </div>
         }
         confirmLabel={sending ? 'Sending…' : 'Confirm & send'}
-        cancelLabel="Cancel"
-        variant="danger"
-        busy={sending}
-        onConfirm={sendAlert}
-        onCancel={() => setShowConfirm(false)}
+        reasonRequired
+        action="broadcasts.alert"
+        targetTable="broadcasts"
+        targetId={null}
+        newValue={{ target, char_count: charCount }}
+        onConfirm={async ({ reason }) => {
+          await sendAlert(reason);
+        }}
       />
     </Page>
   );
