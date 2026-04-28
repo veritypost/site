@@ -70,13 +70,13 @@ Every claim in this file was verified against the live database / current code o
 |---|---|---|---|---|
 | S1-T0.2 | P0 | Production-broken | `post_comment` `blocks` → `blocked_users` rename | 🟩 ready (`2026-04-27_S1_T0.2_post_comment_blocks_rename.sql`) |
 | S1-T0.3 | P0 | Production-broken | `claim_push_batch` + `ack_push_batch` + `claim_email_batch` + `ack_email_batch` RPC creation | 🟩 ready (`2026-04-27_S1_T0.3_drain_rpcs.sql`) |
-| S1-T0.5 | P0 | Production-broken | `current_kid_profile_id()` top-level read | 🟦 |
-| S1-T2.7 | P0 | Billing | `billing_change_plan` + `billing_resubscribe` idempotency | 🟦 |
-| S1-T2.2 | P0 | GDPR | `anonymize_user` redact comment + message bodies | 🟦 |
-| S1-T2.3 | P1 | Social RLS | Comment-block RLS enforcement | 🟦 |
-| S1-T3.8 | P2 | Mod chain | `resolve_report` notify reporter | 🟦 |
-| S1-T55 | P2 | Schema | Drop `ai_prompt_preset_versions` orphan table | 🟦 |
-| S1-T334 | P2 | Profile | `lockdown_self()` RPC | 🟦 |
+| S1-T0.5 | P0 | Production-broken | `current_kid_profile_id()` top-level read | 🟩 ready (`2026-04-27_S1_T0.5_current_kid_profile_id_top_level.sql`) |
+| S1-T2.7 | P0 | Billing | `billing_change_plan` + `billing_resubscribe` idempotency | 🟩 ready (`2026-04-27_S1_T2.7_billing_idempotency_advisory_lock.sql`) |
+| S1-T2.2 | P0 | GDPR | `anonymize_user` redact comment + message bodies | 🟩 ready (`2026-04-27_S1_T2.2_anonymize_user_redact_content.sql`) |
+| S1-T2.3 | P1 | Social RLS | Comment-block RLS enforcement | 🟩 ready (`2026-04-27_S1_T2.3_comments_select_block_filter.sql`) |
+| S1-T3.8 | P2 | Mod chain | `resolve_report` notify reporter | 🟩 ready (`2026-04-27_S1_T3.8_resolve_report_notify_reporter.sql`) |
+| S1-T55 | P2 | Schema | Drop `ai_prompt_preset_versions` orphan table | 🟩 no-op (table already absent from information_schema; verified 2026-04-27) |
+| S1-T334 | P2 | Profile | `lockdown_self()` RPC | 🟩 no-op (function exists and fully satisfies spec — visibility flip + follows wipe + audit + perms bump + jsonb return; verified 2026-04-27) |
 | S1-T347 | P1 | Schema | User-state enum consolidation | 🟦 (Q4.1 lock) |
 | S1-T14 | P2 | Streaks | `use_streak_freeze` RPC | 🟦 |
 | S1-T25 | P1 | Notifications | Topic/category alerts schema + fan-out trigger | 🟧 (owner-pending) |
