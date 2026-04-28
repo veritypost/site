@@ -133,6 +133,7 @@ final class KidsAppState: ObservableObject {
             let palette: [Color] = [K.purple, K.teal, K.coral, K.sky, K.mint, K.gold]
             self.categories = rows.enumerated().map { i, r in
                 KidCategory(
+                    categoryId: r.id,
                     name: cleanCategoryName(r.name),
                     slug: r.slug,
                     color: palette[i % palette.count],
@@ -140,7 +141,7 @@ final class KidsAppState: ObservableObject {
                 )
             }
 
-            await loadProgressCounts(for: rows.map(\.id))
+            await loadProgressCounts()
         } catch {
             // Fallback slugs mirror the seeded `categories` rows so the
             // category-tap filter in ArticleListView (K3) still works if the
@@ -156,8 +157,20 @@ final class KidsAppState: ObservableObject {
         }
     }
 
-    private func loadProgressCounts(for categoryIds: [String]) async {
-        guard !categoryIds.isEmpty, !kidId.isEmpty else { return }
+    /// A85 — count completed reads per category, keyed by the server-
+    /// side `categories.id` carried on each KidCategory. Pre-A85 used a
+    /// positional zip between `categoryIds[i]` and `self.categories[i]`,
+    /// which silently mis-attributed counts whenever the in-memory array
+    /// was rebuilt under a different ordering (sort change, fallback
+    /// init, partial successful load). Now the join goes:
+    ///
+    ///   reading_log.article_id → articles.category_id → KidCategory.categoryId
+    ///
+    /// purely by id. Categories without a categoryId (the offline
+    /// fallback's hardcoded slugs) skip the count merge and stay at
+    /// progress: 0 until a real categories fetch succeeds.
+    private func loadProgressCounts() async {
+        guard !kidId.isEmpty else { return }
         struct ReadRow: Decodable { let article_id: String }
         struct ArtRow: Decodable { let id: String; let category_id: String? }
         do {
@@ -183,13 +196,14 @@ final class KidsAppState: ObservableObject {
                 if let cid = a.category_id { countByCat[cid, default: 0] += 1 }
             }
 
-            self.categories = self.categories.enumerated().map { i, cat in
-                let catId = categoryIds[safe: i] ?? ""
+            self.categories = self.categories.map { cat in
+                guard let catId = cat.categoryId else { return cat }
                 let count = countByCat[catId] ?? 0
                 // K3 added `slug` to KidCategory — preserve it through
                 // the rebuild so ArticleListView's category-filter pill
                 // still matches against the same slug the loader set.
                 return KidCategory(
+                    categoryId: cat.categoryId,
                     name: cat.name,
                     slug: cat.slug,
                     color: cat.color,
@@ -246,10 +260,32 @@ final class KidsAppState: ObservableObject {
 
 struct KidCategory: Identifiable, Equatable {
     let id = UUID()
+    /// Server-side categories.id (UUID string). Kept distinct from `id`
+    /// (which is the SwiftUI identity) so a rebuilt KidCategory can
+    /// match server-side reading_log → articles.category_id without
+    /// depending on positional alignment between the loader's row order
+    /// and the in-memory array. Optional so the fallback init path
+    /// (offline / DB fetch failure) can still publish slug-only
+    /// categories without inventing a fake category id.
+    let categoryId: String?
     let name: String
     let slug: String?
     let color: Color
     var progress: Int
+
+    init(
+        categoryId: String? = nil,
+        name: String,
+        slug: String?,
+        color: Color,
+        progress: Int
+    ) {
+        self.categoryId = categoryId
+        self.name = name
+        self.slug = slug
+        self.color = color
+        self.progress = progress
+    }
 }
 
 struct QuizOutcome {
@@ -257,12 +293,6 @@ struct QuizOutcome {
     let newStreak: Int
     let milestone: StreakScene.Milestone?
     let badge: BadgeUnlockScene?
-}
-
-private extension Array {
-    subscript(safe index: Int) -> Element? {
-        indices.contains(index) ? self[index] : nil
-    }
 }
 
 /// Strip admin-context "(Kids)" suffix from category names since the kids
