@@ -252,10 +252,18 @@ struct KidQuizEngineView: View {
     @State private var didTriggerDrain: Bool = false
     // C14 — server-computed verdict from get_kid_quiz_verdict RPC.
     // Replaces local `correctCount >= ceil(total * 0.6)`. `nil` while
-    // the verdict is being fetched or if the fetch failed; local
-    // computation is used as a safety fallback only.
+    // the verdict is being fetched. The pre-A41 path used a local 60%
+    // ceil fallback when the RPC failed; that produced a passed/failed
+    // signal the kid trusts, off a number the server would have
+    // disagreed with — and the server-side admin threshold is 67%, so
+    // the iOS shortcut also drifted from the canonical pass bar.
     @State private var serverVerdict: KidQuizServerVerdict? = nil
     @State private var verdictPending: Bool = false
+    // A41 — split flag for "RPC didn't return". A nil serverVerdict
+    // alone is ambiguous (in flight vs failed); this flag flips only
+    // after a verdict fetch terminates with an error so the result
+    // body can route to a dedicated retry UI rather than guessing.
+    @State private var verdictFetchFailed: Bool = false
     // Apple Kids Category review — the quiz must refuse to load if the
     // article isn't kids-safe, even though navigation through the rest of
     // the kids app should never produce a non-safe article. Defense in
@@ -710,7 +718,10 @@ struct KidQuizEngineView: View {
 
     private func fetchServerVerdict() async {
         guard let kidId = auth.kid?.id else { return }
-        await MainActor.run { verdictPending = true }
+        await MainActor.run {
+            verdictPending = true
+            verdictFetchFailed = false
+        }
         do {
             struct VerdictPayload: Decodable {
                 let is_passed: Bool
@@ -737,63 +748,69 @@ struct KidQuizEngineView: View {
                     thresholdPct: verdict.threshold_pct
                 )
                 self.verdictPending = false
+                self.verdictFetchFailed = false
             }
         } catch {
             print("[KidQuizEngineView] get_kid_quiz_verdict failed:", error)
-            // Fall through to local computation if the RPC fails —
-            // don't block the kid on a transient network issue, but
-            // bump writeFailures so scenes soften celebration copy.
+            // A41 — fail closed. Pre-A41 fell through to local
+            // `correctCount >= ceil(total * 0.6)`, which guessed a
+            // verdict against the wrong threshold (server uses 67%)
+            // and gave the kid a misleading passed/failed signal.
+            // Now: surface a retry path; do NOT fabricate a verdict.
             await MainActor.run {
-                self.writeFailures += 1
                 self.verdictPending = false
+                self.verdictFetchFailed = true
             }
         }
+    }
+
+    /// A41 — retry the verdict fetch when the previous call failed.
+    /// Used by the verdict-failure result body. Writes are already
+    /// landed at this point (we only attempt verdict after the drain
+    /// gate succeeded), so this is purely a re-RPC.
+    private func retryVerdictFetch() {
+        Task { await fetchServerVerdict() }
     }
 
     // MARK: Result
 
-    private var currentResult: KidQuizResult {
-        // C14 — prefer server verdict when we have it. Falls back to
-        // local computation only if the RPC hasn't returned (e.g.
-        // offline) so the kid never sees an indefinite spinner.
-        let total = questions.count
-        let passed: Bool
-        let shownCorrect: Int
-        if let v = serverVerdict {
-            passed = v.isPassed
-            shownCorrect = v.correct
-        } else {
-            // Fallback matches the pre-C14 local computation (60%
-            // threshold, ceiling). Only used if the server verdict
-            // failed to load.
-            passed = correctCount >= max(1, Int(ceil(Double(total) * 0.6)))
-            shownCorrect = correctCount
-        }
+    /// A41 + A93 — the result struct passed to onDone is server-only.
+    /// Returns nil whenever serverVerdict isn't resolved; callers
+    /// (resultView, writeFailureBody) gate on this nil to keep the
+    /// "Done" button hidden until the server says passed/failed. No
+    /// local-threshold guess is ever fabricated.
+    private var currentResult: KidQuizResult? {
+        guard let v = serverVerdict else { return nil }
         // Reader-side reading_log double-fail counts as one extra write failure.
         let totalFailures = writeFailures + (readingLogFailed ? 1 : 0)
         return KidQuizResult(
-            passed: passed,
-            correctCount: shownCorrect,
-            total: total,
+            passed: v.isPassed,
+            correctCount: v.correct,
+            total: v.total,
             writeFailures: totalFailures
         )
     }
 
+    @ViewBuilder
     private var resultView: some View {
-        let r = currentResult
-        // OwnersAudit Kids Task 12 — threshold needs to be visible alongside
-        // the score so a kid who fails knows how close they came.
-        let threshold = max(1, Int(ceil(Double(r.total) * 0.6)))
-        return VStack(spacing: 20) {
+        VStack(spacing: 20) {
             Spacer()
-            // T251 — three rendering states for the result body:
+            // Render-state ladder for the result body. Order matters
+            // because each branch is mutually exclusive and tested top-
+            // to-bottom; later flags only matter once earlier ones cleared.
             //  1. awaitingDrain: writes haven't all landed yet (or the 3s
             //     race is still running). Show a "saving" spinner.
             //  2. drainHadFailures: writes timed out or failed terminally.
             //     Show the "Couldn't save" + retry UI. Do NOT lie to the
             //     kid that their progress was recorded.
-            //  3. otherwise: server verdict is being fetched (verdictPending)
-            //     or has resolved — show the existing success/fail body.
+            //  3. verdictPending: writes succeeded; verdict RPC is in flight.
+            //     Hold the reveal — quick, normal anticipation.
+            //  4. verdictFetchFailed (A41): writes succeeded but the server
+            //     verdict RPC failed. Refuse to fabricate a passed/failed
+            //     signal — surface a retry path. Pre-A41 fell through to a
+            //     local 60% threshold guess that diverged from the server's
+            //     67% bar (A93) and gave the kid a misleading verdict.
+            //  5. resolved: server verdict in hand — render success/fail.
             if awaitingDrain {
                 ProgressView()
                 Text("Saving your quiz…")
@@ -802,55 +819,27 @@ struct KidQuizEngineView: View {
             } else if drainHadFailures {
                 writeFailureBody
             } else if verdictPending {
-                // OwnersAudit Kids Task 2 — while the server verdict is still in
-                // flight, hold the result reveal. The local fallback can disagree
-                // with the server (write failure → server count differs); the
-                // brief wait is normal anticipation, not punishing.
                 ProgressView()
                 Text("Checking your score…")
                     .font(.scaledSystem(size: 14, weight: .semibold, design: .rounded))
                     .foregroundStyle(K.dim)
+            } else if verdictFetchFailed {
+                verdictFailureBody
+            } else if let r = currentResult {
+                successBody(r)
             } else {
-                ZStack {
-                    Circle()
-                        .fill(r.passed ? K.teal.opacity(0.15) : K.coral.opacity(0.15))
-                        .frame(width: 120, height: 120)
-                    Image(systemName: r.passed ? "checkmark.seal.fill" : "arrow.counterclockwise.circle.fill")
-                        .font(.scaledSystem(size: 60, weight: .bold))
-                        .foregroundStyle(r.passed ? K.teal : K.coral)
-                }
-
-                Text(r.passed ? "Great job!" : "Give it another go?")
-                    .font(.scaledSystem(size: 28, weight: .black, design: .rounded))
-                    .foregroundStyle(K.text)
-
-                // OwnersAudit Kids Task 12 — show threshold so a kid sees how
-                // many they needed, not just how many they got.
-                Text(r.passed
-                     ? "You got \(r.correctCount) of \(r.total) right."
-                     : "You got \(r.correctCount) of \(r.total). You need \(threshold) to pass.")
-                    .font(.scaledSystem(size: 15, weight: .semibold, design: .rounded))
-                    .foregroundStyle(K.dim)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 16)
-
-                // OwnersAudit Kids Task 10 — connect outcome to something
-                // concrete so the quiz reads as participation context, not
-                // a school test.
-                Text(r.passed
-                     ? "Your streak just got longer."
-                     : "Read it again and try when you're ready.")
-                    .font(.scaledSystem(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundStyle(K.dim)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 16)
+                // Defensive — should be unreachable. Keeps the kid
+                // looking at a spinner rather than a fully-empty card
+                // if a state transition leaves all flags low.
+                ProgressView()
             }
 
             Spacer()
 
-            // Done button only appears once the verdict has resolved AND
-            // writes succeeded. The retry UI owns its own buttons.
-            if !awaitingDrain && !drainHadFailures && !verdictPending {
+            // Done button only when the server verdict has resolved.
+            // The retry UIs own their own buttons.
+            if let r = currentResult,
+               !awaitingDrain, !drainHadFailures, !verdictPending, !verdictFetchFailed {
                 Button { onDone(r) } label: {
                     Text("Done")
                         .font(.scaledSystem(size: 16, weight: .bold, design: .rounded))
@@ -865,6 +854,103 @@ struct KidQuizEngineView: View {
         }
         .padding(.horizontal, 24)
         .padding(.bottom, 40)
+    }
+
+    /// Pass/fail success body. Threshold copy comes from the server-
+    /// supplied threshold_pct so iOS never has its own threshold opinion.
+    @ViewBuilder
+    private func successBody(_ r: KidQuizResult) -> some View {
+        // A93 — threshold is server-driven via serverVerdict.thresholdPct.
+        // The kid sees the same passed/failed bar the admin and pipeline
+        // use, with no iOS-side number.
+        let thresholdPct = serverVerdict?.thresholdPct ?? 0
+        let threshold = max(1, Int(ceil(Double(r.total) * Double(thresholdPct) / 100.0)))
+
+        ZStack {
+            Circle()
+                .fill(r.passed ? K.teal.opacity(0.15) : K.coral.opacity(0.15))
+                .frame(width: 120, height: 120)
+            Image(systemName: r.passed ? "checkmark.seal.fill" : "arrow.counterclockwise.circle.fill")
+                .font(.scaledSystem(size: 60, weight: .bold))
+                .foregroundStyle(r.passed ? K.teal : K.coral)
+        }
+
+        Text(r.passed ? "Great job!" : "Give it another go?")
+            .font(.scaledSystem(size: 28, weight: .black, design: .rounded))
+            .foregroundStyle(K.text)
+
+        // OwnersAudit Kids Task 12 — show threshold so a kid sees how
+        // many they needed, not just how many they got.
+        Text(r.passed
+             ? "You got \(r.correctCount) of \(r.total) right."
+             : "You got \(r.correctCount) of \(r.total). You need \(threshold) to pass.")
+            .font(.scaledSystem(size: 15, weight: .semibold, design: .rounded))
+            .foregroundStyle(K.dim)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 16)
+
+        // OwnersAudit Kids Task 10 — connect outcome to something
+        // concrete so the quiz reads as participation context, not
+        // a school test.
+        Text(r.passed
+             ? "Your streak just got longer."
+             : "Read it again and try when you're ready.")
+            .font(.scaledSystem(size: 13, weight: .semibold, design: .rounded))
+            .foregroundStyle(K.dim)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 16)
+    }
+
+    /// A41 — verdict-failure body. Writes succeeded; only the verdict
+    /// RPC is unavailable. Offers a retry that re-runs the RPC and a
+    /// way out that doesn't celebrate. Distinct from writeFailureBody:
+    /// no kid data is at risk, only the displayed verdict.
+    @ViewBuilder
+    private var verdictFailureBody: some View {
+        ZStack {
+            Circle()
+                .fill(K.coral.opacity(0.15))
+                .frame(width: 120, height: 120)
+            Image(systemName: "questionmark.circle.fill")
+                .font(.scaledSystem(size: 56, weight: .bold))
+                .foregroundStyle(K.coral)
+        }
+
+        Text("Couldn't check your score")
+            .font(.scaledSystem(size: 24, weight: .black, design: .rounded))
+            .foregroundStyle(K.text)
+            .multilineTextAlignment(.center)
+
+        Text("Your answers are saved. Try again to see if you passed.")
+            .font(.scaledSystem(size: 14, weight: .semibold, design: .rounded))
+            .foregroundStyle(K.dim)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 24)
+
+        VStack(spacing: 10) {
+            Button { retryVerdictFetch() } label: {
+                Text("Try again")
+                    .font(.scaledSystem(size: 16, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, minHeight: 54)
+                    .background(K.teal)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .shadow(color: K.teal.opacity(0.3), radius: 12, y: 4)
+            }
+            .buttonStyle(.plain)
+
+            // Bail without celebrating. Send a nil result so KidsAppRoot
+            // skips the streak/badge scene chain — without a verdict we
+            // can't claim the quiz passed, even if it actually did.
+            Button { onDone(nil) } label: {
+                Text("Close")
+                    .font(.scaledSystem(size: 14, weight: .semibold, design: .rounded))
+                    .foregroundStyle(K.dim)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 24)
     }
 
     /// T251 — failure body for the result screen. Renders when in-flight
