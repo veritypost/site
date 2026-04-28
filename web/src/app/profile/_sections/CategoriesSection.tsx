@@ -11,6 +11,17 @@
 // No color per category. Categories are differentiated by name + position
 // + which pill is "active", not hue. Same memory rule as the no-tier-hue
 // directive (2026-04-27).
+//
+// T360 — autonomous-component contract for the iOS port (S9-T358):
+//   * `CategoriesSection` is a PURE presentational component. Props in,
+//     JSX out. Zero supabase / fetch calls. Selection state (active pill)
+//     stays local — that's UI state, not data. The iOS port mirrors this
+//     shape 1:1 in SwiftUI: `data` flows in from the load layer; `@State`
+//     owns the active pill selection.
+//   * `CategoriesSectionConnected` is the data-loading wrapper used by
+//     the live profile shell. Lives in this file because the load shape
+//     is tightly coupled to the row types — separating files would
+//     fork the type drift.
 
 'use client';
 
@@ -23,132 +34,61 @@ import { EmptyState } from '../_components/EmptyState';
 import { SkeletonBlock, SkeletonLine } from '../_components/Skeleton';
 import { C, F, FONT, R, S, SH } from '../_lib/palette';
 
-type CategoryRow = Pick<Tables<'categories'>, 'id' | 'name' | 'slug' | 'parent_id' | 'sort_order'>;
-type ScoreRow = Pick<
+export type CategoryRow = Pick<
+  Tables<'categories'>,
+  'id' | 'name' | 'slug' | 'parent_id' | 'sort_order'
+>;
+export type CategoryScoreRow = Pick<
   Tables<'category_scores'>,
   'category_id' | 'score' | 'articles_read' | 'quizzes_correct'
 >;
 
-interface Props {
-  authUserId: string | null;
-  preview: boolean;
+export interface CategoriesSectionProps {
+  // The full set of adult-side categories (parents + subs), pre-filtered
+  // by the loader. Empty array = catalog hasn't populated yet.
+  categories: CategoryRow[];
+  // The viewer's per-category aggregates. Empty array = catalog populated
+  // but this user hasn't scored against any category yet.
+  scores: CategoryScoreRow[];
+  // Loader state. Distinct from "catalog empty" / "no scores" so the
+  // skeleton + the two empty states can be rendered separately.
+  loading: boolean;
 }
 
-// Preview-mode fixture. Mirrors the shape rendered by the live data path
-// so the loaded view in :3333 / no-auth looks coherent.
-const PREVIEW_CATEGORIES: CategoryRow[] = [
-  { id: 'p-pol', name: 'Politics', slug: 'politics', parent_id: null, sort_order: 1 },
-  {
-    id: 's-pol-elec',
-    name: 'Election policy',
-    slug: 'election',
-    parent_id: 'p-pol',
-    sort_order: 1,
-  },
-  { id: 's-pol-for', name: 'Foreign policy', slug: 'foreign', parent_id: 'p-pol', sort_order: 2 },
-  { id: 's-pol-loc', name: 'Local politics', slug: 'local', parent_id: 'p-pol', sort_order: 3 },
-  { id: 'p-hea', name: 'Public health', slug: 'health', parent_id: null, sort_order: 2 },
-  {
-    id: 's-hea-pan',
-    name: 'Pandemic response',
-    slug: 'pandemic',
-    parent_id: 'p-hea',
-    sort_order: 1,
-  },
-  { id: 's-hea-vax', name: 'Vaccines', slug: 'vaccines', parent_id: 'p-hea', sort_order: 2 },
-  { id: 'p-tec', name: 'Technology', slug: 'tech', parent_id: null, sort_order: 3 },
-  { id: 's-tec-ai', name: 'AI & ML', slug: 'ai', parent_id: 'p-tec', sort_order: 1 },
-  { id: 'p-eco', name: 'Economics', slug: 'eco', parent_id: null, sort_order: 4 },
-  { id: 'p-cli', name: 'Climate', slug: 'climate', parent_id: null, sort_order: 5 },
-];
+// Pure presentational. The iOS port (S9-T358) mirrors this prop shape
+// + slot layout 1:1. No data fetching here — the connected wrapper
+// below handles that.
+export function CategoriesSection({ categories, scores, loading }: CategoriesSectionProps) {
+  const parents = useMemo(() => categories.filter((c) => !c.parent_id), [categories]);
 
-const PREVIEW_SCORES: ScoreRow[] = [
-  { category_id: 'p-pol', score: 412, articles_read: 58, quizzes_correct: 24 },
-  { category_id: 's-pol-elec', score: 142, articles_read: 18, quizzes_correct: 6 },
-  { category_id: 's-pol-for', score: 98, articles_read: 12, quizzes_correct: 4 },
-  { category_id: 's-pol-loc', score: 87, articles_read: 14, quizzes_correct: 5 },
-  { category_id: 'p-hea', score: 386, articles_read: 51, quizzes_correct: 22 },
-  { category_id: 's-hea-pan', score: 158, articles_read: 22, quizzes_correct: 9 },
-  { category_id: 's-hea-vax', score: 122, articles_read: 16, quizzes_correct: 7 },
-  { category_id: 'p-tec', score: 304, articles_read: 44, quizzes_correct: 18 },
-  { category_id: 's-tec-ai', score: 144, articles_read: 19, quizzes_correct: 8 },
-  { category_id: 'p-eco', score: 261, articles_read: 36, quizzes_correct: 14 },
-  { category_id: 'p-cli', score: 197, articles_read: 28, quizzes_correct: 11 },
-];
+  // Default to the parent with the highest user score so the loaded
+  // view lands on the user's strongest area instead of an arbitrary
+  // alphabetical first parent.
+  const defaultParentId = useMemo(() => {
+    if (parents.length === 0) return null;
+    const scoreMap = new Map(scores.map((s) => [s.category_id, s.score]));
+    const ranked = parents
+      .slice()
+      .sort((a, b) => (scoreMap.get(b.id) ?? 0) - (scoreMap.get(a.id) ?? 0));
+    return ranked[0].id;
+  }, [parents, scores]);
 
-export function CategoriesSection({ authUserId, preview }: Props) {
-  const supabase = useMemo(() => createClient(), []);
-
-  const [loading, setLoading] = useState(true);
-  const [categories, setCategories] = useState<CategoryRow[]>([]);
-  const [scores, setScores] = useState<ScoreRow[]>([]);
   const [activeParentId, setActiveParentId] = useState<string | null>(null);
   const [activeSubId, setActiveSubId] = useState<string | null>(null);
 
+  // Sync the default once the loader hands us data. Re-runs only when the
+  // computed default itself changes — a re-render with the same parent
+  // list and scores doesn't reset the user's manual pill selection.
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      // Preview-mode short-circuit: render the fixture so the section has
-      // shape on :3333 even with no auth session. Skips network entirely.
-      if (preview || !authUserId) {
-        if (cancelled) return;
-        setCategories(PREVIEW_CATEGORIES);
-        setScores(preview ? PREVIEW_SCORES : []);
-        setActiveParentId(PREVIEW_CATEGORIES[0]?.id ?? null);
-        setLoading(false);
-        return;
-      }
+    if (defaultParentId && !activeParentId) setActiveParentId(defaultParentId);
+  }, [defaultParentId, activeParentId]);
 
-      // Load adult-side categories (kids-safe categories are owned by the
-      // kids surface; same filter the /leaderboard page applies). Scores
-      // are scoped to this user's adult rows — kid_profile_id IS NULL
-      // ensures we don't pull family-shared kid scores into the adult view.
-      const [catsRes, scoresRes] = await Promise.all([
-        supabase
-          .from('categories')
-          .select('id, name, slug, parent_id, sort_order')
-          .eq('is_active', true)
-          .is('deleted_at', null)
-          .eq('is_kids_safe', false)
-          .order('sort_order'),
-        supabase
-          .from('category_scores')
-          .select('category_id, score, articles_read, quizzes_correct')
-          .eq('user_id', authUserId)
-          .is('kid_profile_id', null),
-      ]);
-
-      if (cancelled) return;
-      const cats = (catsRes.data ?? []) as CategoryRow[];
-      const sc = (scoresRes.data ?? []) as ScoreRow[];
-      setCategories(cats);
-      setScores(sc);
-
-      // Default to the parent with the highest user score so the loaded
-      // view lands on the user's strongest area instead of an arbitrary
-      // alphabetical first parent.
-      const parents = cats.filter((c) => !c.parent_id);
-      if (parents.length > 0) {
-        const scoreMap = new Map(sc.map((s) => [s.category_id, s.score]));
-        const ranked = parents
-          .slice()
-          .sort((a, b) => (scoreMap.get(b.id) ?? 0) - (scoreMap.get(a.id) ?? 0));
-        setActiveParentId(ranked[0].id);
-      }
-      setLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [authUserId, preview, supabase]);
-
-  const parents = useMemo(() => categories.filter((c) => !c.parent_id), [categories]);
   const subsForActive = useMemo(
     () => (activeParentId ? categories.filter((c) => c.parent_id === activeParentId) : []),
     [categories, activeParentId]
   );
   const scoreById = useMemo(() => {
-    const m = new Map<string, ScoreRow>();
+    const m = new Map<string, CategoryScoreRow>();
     for (const s of scores) m.set(s.category_id, s);
     return m;
   }, [scores]);
@@ -180,7 +120,7 @@ export function CategoriesSection({ authUserId, preview }: Props) {
     return (
       <EmptyState
         title="No categories yet"
-        body="Categories aren't loaded for this surface. Check back once the catalog is populated."
+        body="Categories aren't loaded for this surface."
         variant="full"
       />
     );
@@ -402,6 +342,63 @@ export function CategoriesSection({ authUserId, preview }: Props) {
       </ul>
     </div>
   );
+}
+
+// Connected wrapper — the data-loading layer used by the live profile
+// shell. Loads categories + the viewer's category_scores, then renders
+// the pure CategoriesSection above. This is the only consumer of
+// supabase / network in this file, by design.
+export interface CategoriesSectionConnectedProps {
+  authUserId: string | null;
+}
+
+export function CategoriesSectionConnected({ authUserId }: CategoriesSectionConnectedProps) {
+  const supabase = useMemo(() => createClient(), []);
+  const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState<CategoryRow[]>([]);
+  const [scores, setScores] = useState<CategoryScoreRow[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!authUserId) {
+        if (cancelled) return;
+        setCategories([]);
+        setScores([]);
+        setLoading(false);
+        return;
+      }
+
+      // Load adult-side categories (kids-safe categories are owned by the
+      // kids surface; same filter the /leaderboard page applies). Scores
+      // are scoped to this user's adult rows — kid_profile_id IS NULL
+      // ensures we don't pull family-shared kid scores into the adult view.
+      const [catsRes, scoresRes] = await Promise.all([
+        supabase
+          .from('categories')
+          .select('id, name, slug, parent_id, sort_order')
+          .eq('is_active', true)
+          .is('deleted_at', null)
+          .eq('is_kids_safe', false)
+          .order('sort_order'),
+        supabase
+          .from('category_scores')
+          .select('category_id, score, articles_read, quizzes_correct')
+          .eq('user_id', authUserId)
+          .is('kid_profile_id', null),
+      ]);
+
+      if (cancelled) return;
+      setCategories((catsRes.data ?? []) as CategoryRow[]);
+      setScores((scoresRes.data ?? []) as CategoryScoreRow[]);
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authUserId, supabase]);
+
+  return <CategoriesSection categories={categories} scores={scores} loading={loading} />;
 }
 
 function pillStyle(active: boolean, size: 'md' | 'sm' = 'md'): React.CSSProperties {

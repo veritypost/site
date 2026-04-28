@@ -19,14 +19,14 @@ import { deriveAccountStates, isHardBlock } from '../_lib/states';
 import { ActivitySection } from '../_sections/ActivitySection';
 import { BlockedSection } from '../_sections/BlockedSection';
 import { BookmarksSection } from '../_sections/BookmarksSection';
-import { CategoriesSection } from '../_sections/CategoriesSection';
+import { CategoriesSectionConnected } from '../_sections/CategoriesSection';
 import { DataSection } from '../_sections/DataSection';
 import { ExpertProfileSection } from '../_sections/ExpertProfileSection';
 import { ExpertQueueSection } from '../_sections/ExpertQueueSection';
 import { IdentitySection } from '../_sections/IdentitySection';
 import { LinkOutSection } from '../_sections/LinkOutSection';
 import { MessagesSection } from '../_sections/MessagesSection';
-import { MilestonesSection } from '../_sections/MilestonesSection';
+import { MilestonesSectionConnected } from '../_sections/MilestonesSection';
 import { NotificationsSection } from '../_sections/NotificationsSection';
 import { PlanSection } from '../_sections/PlanSection';
 import { PrivacySection } from '../_sections/PrivacySection';
@@ -267,7 +267,7 @@ export function ProfileApp({ defaultSection }: Props) {
       locked: !perms.categories,
       reason: 'Your strongest topics and where to grow.',
       keywords: ['topics', 'subjects', 'interests', 'feed'],
-      render: () => <CategoriesSection authUserId={authUserId} preview={false} />,
+      render: () => <CategoriesSectionConnected authUserId={authUserId} />,
     },
     {
       id: 'milestones',
@@ -277,7 +277,7 @@ export function ProfileApp({ defaultSection }: Props) {
       locked: !perms.milestones,
       reason: 'The badges you’ve earned and what’s next on the ladder.',
       keywords: ['achievements', 'badges', 'awards', 'streak'],
-      render: () => <MilestonesSection authUserId={authUserId} preview={false} user={user} />,
+      render: () => <MilestonesSectionConnected authUserId={authUserId} user={user} />,
     },
 
     // ── Family + expert (conditional) ────────────────────────────────────

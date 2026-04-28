@@ -11,9 +11,17 @@
 // No color per achievement. Every "earned" card looks the same regardless
 // of rarity / category / points_reward; differentiation is by name + icon
 // + earned date. (Memory rule: tiers and ranks don't get hue. Same applies
-// to per-achievement coloring — owner has reinforced this for the redesign
-// surface.) The earned vs still-ahead distinction is structural — two
-// sections — not chromatic.
+// to per-achievement coloring.) The earned vs still-ahead distinction is
+// structural — two sections — not chromatic.
+//
+// T360 — autonomous-component contract for the iOS port (S9-T358):
+//   * `MilestonesSection` is a PURE presentational component. Props in,
+//     JSX out. Zero supabase / fetch calls. The iOS port mirrors this
+//     prop shape 1:1.
+//   * `MilestonesSectionConnected` is the data-loading wrapper used by
+//     the live profile shell. Lives in this file because the load shape
+//     is tightly coupled to the row types — separating files would
+//     fork the type drift.
 
 'use client';
 
@@ -28,149 +36,44 @@ import { EmptyState } from '../_components/EmptyState';
 import { SkeletonBlock, SkeletonLine } from '../_components/Skeleton';
 import { C, F, FONT, R, S } from '../_lib/palette';
 
-type AchievementRow = Pick<
+export type AchievementRow = Pick<
   Tables<'achievements'>,
   'id' | 'key' | 'name' | 'description' | 'icon_name' | 'criteria' | 'sort_order' | 'category'
 >;
 type EarnedRow = Pick<Tables<'user_achievements'>, 'achievement_id' | 'earned_at'>;
 type UserRow = Tables<'users'>;
 
-interface UserCounters {
+// Snapshot of the viewer's counters used to derive the "still-ahead" gap.
+// Keys mirror the achievement criteria JSON keys (migration 050).
+export interface MilestoneUserCounters {
   reading_count?: number;
   quiz_pass_count?: number;
   comment_count?: number;
   streak_days?: number;
 }
 
-interface Props {
-  authUserId: string | null;
-  preview: boolean;
-  user: UserRow;
+export interface MilestonesSectionProps {
+  // The full active+non-secret achievement catalog.
+  achievements: AchievementRow[];
+  // Map of achievement_id → earned_at iso string. Achievements not in
+  // the map are still ahead.
+  earned: Map<string, string>;
+  // Viewer's progress counters used to compute the "n to go" hint.
+  counters: MilestoneUserCounters;
+  // Loader state. Distinct from "catalog empty" so skeleton + empty
+  // states render separately.
+  loading: boolean;
 }
 
-// Preview-mode fixture. Mirrors the shape of the live load so the section
-// has body on :3333 with no auth.
-const PREVIEW_EARNED: Array<{ row: AchievementRow; earned_at: string }> = [
-  fixture('First read', 'Read your first article on Verity Post.', 412),
-  fixture('7-day streak', 'Read on seven days in a row.', 401),
-  fixture('30-day streak', 'Read on thirty days in a row.', 372),
-  fixture('100 articles', 'Cross 100 articles read.', 220),
-  fixture('Quiz master · 50', 'Pass 50 quizzes.', 188),
-  fixture('Verified expert', 'Approved as a verified expert.', 91),
-];
-const PREVIEW_LOCKED: AchievementRow[] = [
-  lockFixture('100-day streak', 'Read on a hundred days in a row.', { streak_days: 100 }),
-  lockFixture('500 articles', 'Cross 500 articles read.', { reading_count: 500 }),
-  lockFixture('Quiz master · 100', 'Pass 100 quizzes.', { quiz_pass_count: 100 }),
-  lockFixture(
-    'First-answer expert',
-    'Answer one question in your verified area.',
-    {} as Record<string, never>
-  ),
-];
-
-function fixture(
-  name: string,
-  description: string,
-  daysAgo: number
-): { row: AchievementRow; earned_at: string } {
-  return {
-    row: {
-      id: `preview-earned-${name}`,
-      key: name.toLowerCase().replace(/\s+/g, '_'),
-      name,
-      description,
-      icon_name: null,
-      criteria: {} as Json,
-      sort_order: 0,
-      category: 'reading',
-    },
-    earned_at: new Date(Date.now() - daysAgo * 86_400_000).toISOString(),
-  };
-}
-
-function lockFixture(
-  name: string,
-  description: string,
-  criteria: Record<string, number> | Record<string, never>
-): AchievementRow {
-  return {
-    id: `preview-locked-${name}`,
-    key: name.toLowerCase().replace(/\s+/g, '_'),
-    name,
-    description,
-    icon_name: null,
-    criteria: criteria as unknown as Json,
-    sort_order: 0,
-    category: 'reading',
-  };
-}
-
-export function MilestonesSection({ authUserId, preview, user }: Props) {
-  const supabase = useMemo(() => createClient(), []);
-
-  const [loading, setLoading] = useState(true);
-  const [achievements, setAchievements] = useState<AchievementRow[]>([]);
-  const [earned, setEarned] = useState<Map<string, string>>(new Map());
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      if (preview || !authUserId) {
-        if (cancelled) return;
-        setAchievements(preview ? [...PREVIEW_EARNED.map((e) => e.row), ...PREVIEW_LOCKED] : []);
-        const map = new Map<string, string>();
-        if (preview) {
-          for (const e of PREVIEW_EARNED) map.set(e.row.id, e.earned_at);
-        }
-        setEarned(map);
-        setLoading(false);
-        return;
-      }
-
-      const [catRes, mineRes] = await Promise.all([
-        supabase
-          .from('achievements')
-          .select('id, key, name, description, icon_name, criteria, sort_order, category')
-          .eq('is_active', true)
-          .eq('is_secret', false)
-          .order('sort_order'),
-        supabase
-          .from('user_achievements')
-          .select('achievement_id, earned_at')
-          .eq('user_id', authUserId)
-          .is('kid_profile_id', null),
-      ]);
-
-      if (cancelled) return;
-      const cats = (catRes.data ?? []) as AchievementRow[];
-      const mine = (mineRes.data ?? []) as EarnedRow[];
-      setAchievements(cats);
-      const map = new Map<string, string>();
-      for (const r of mine) map.set(r.achievement_id, r.earned_at);
-      setEarned(map);
-      setLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [authUserId, preview, supabase]);
-
-  const userCounters: UserCounters = useMemo(() => {
-    const u = user as UserRow & {
-      articles_read_count?: number | null;
-      quizzes_completed_count?: number | null;
-      comment_count?: number | null;
-      streak_current?: number | null;
-    };
-    return {
-      reading_count: u.articles_read_count ?? 0,
-      quiz_pass_count: u.quizzes_completed_count ?? 0,
-      comment_count: u.comment_count ?? 0,
-      streak_days: u.streak_current ?? 0,
-    };
-  }, [user]);
-
+// Pure presentational. The iOS port (S9-T358) mirrors this prop shape
+// + slot layout 1:1. No data fetching here — the connected wrapper
+// below handles that.
+export function MilestonesSection({
+  achievements,
+  earned,
+  counters,
+  loading,
+}: MilestonesSectionProps) {
   const { earnedList, lockedList } = useMemo(() => {
     const e: Array<{ row: AchievementRow; earned_at: string }> = [];
     const l: AchievementRow[] = [];
@@ -186,9 +89,9 @@ export function MilestonesSection({ authUserId, preview, user }: Props) {
     // Order still-ahead by smallest gap first, so the next milestone the
     // user is closest to clearing rises to the top. Achievements with no
     // numeric criteria fall to the end.
-    l.sort((a, b) => gapWeight(a, userCounters) - gapWeight(b, userCounters));
+    l.sort((a, b) => gapWeight(a, counters) - gapWeight(b, counters));
     return { earnedList: e, lockedList: l };
-  }, [achievements, earned, userCounters]);
+  }, [achievements, earned, counters]);
 
   if (loading) {
     return (
@@ -205,7 +108,7 @@ export function MilestonesSection({ authUserId, preview, user }: Props) {
     return (
       <EmptyState
         title="No milestones yet"
-        body="The milestone catalog hasn't loaded for this surface. Check back once it's populated."
+        body="The milestone catalog hasn't loaded for this surface."
         variant="full"
       />
     );
@@ -255,7 +158,10 @@ export function MilestonesSection({ authUserId, preview, user }: Props) {
         }
       >
         {lockedList.length === 0 ? (
-          <EmptyState title="All caught up" body="More milestones coming." />
+          <EmptyState
+            title="All caught up"
+            body="You've earned every milestone in the current catalog."
+          />
         ) : (
           <div
             style={{
@@ -265,12 +171,93 @@ export function MilestonesSection({ authUserId, preview, user }: Props) {
             }}
           >
             {lockedList.map((a) => (
-              <LockedCard key={a.id} row={a} counters={userCounters} />
+              <LockedCard key={a.id} row={a} counters={counters} />
             ))}
           </div>
         )}
       </Card>
     </div>
+  );
+}
+
+// Connected wrapper — the data-loading layer used by the live profile
+// shell. Loads the active achievement catalog + this user's earnings,
+// derives the counter snapshot off the user row, then renders the pure
+// MilestonesSection above. This is the only consumer of supabase /
+// network in this file, by design.
+export interface MilestonesSectionConnectedProps {
+  authUserId: string | null;
+  user: UserRow;
+}
+
+export function MilestonesSectionConnected({
+  authUserId,
+  user,
+}: MilestonesSectionConnectedProps) {
+  const supabase = useMemo(() => createClient(), []);
+  const [loading, setLoading] = useState(true);
+  const [achievements, setAchievements] = useState<AchievementRow[]>([]);
+  const [earned, setEarned] = useState<Map<string, string>>(new Map());
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!authUserId) {
+        if (cancelled) return;
+        setAchievements([]);
+        setEarned(new Map());
+        setLoading(false);
+        return;
+      }
+
+      const [catRes, mineRes] = await Promise.all([
+        supabase
+          .from('achievements')
+          .select('id, key, name, description, icon_name, criteria, sort_order, category')
+          .eq('is_active', true)
+          .eq('is_secret', false)
+          .order('sort_order'),
+        supabase
+          .from('user_achievements')
+          .select('achievement_id, earned_at')
+          .eq('user_id', authUserId)
+          .is('kid_profile_id', null),
+      ]);
+
+      if (cancelled) return;
+      setAchievements((catRes.data ?? []) as AchievementRow[]);
+      const map = new Map<string, string>();
+      for (const r of (mineRes.data ?? []) as EarnedRow[]) map.set(r.achievement_id, r.earned_at);
+      setEarned(map);
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authUserId, supabase]);
+
+  const counters: MilestoneUserCounters = useMemo(() => {
+    const u = user as UserRow & {
+      articles_read_count?: number | null;
+      quizzes_completed_count?: number | null;
+      comment_count?: number | null;
+      streak_current?: number | null;
+    };
+    return {
+      reading_count: u.articles_read_count ?? 0,
+      quiz_pass_count: u.quizzes_completed_count ?? 0,
+      comment_count: u.comment_count ?? 0,
+      streak_days: u.streak_current ?? 0,
+    };
+  }, [user]);
+
+  return (
+    <MilestonesSection
+      achievements={achievements}
+      earned={earned}
+      counters={counters}
+      loading={loading}
+    />
   );
 }
 
@@ -321,7 +308,7 @@ function EarnedCard({ row, earnedAt }: { row: AchievementRow; earnedAt: string }
   );
 }
 
-function LockedCard({ row, counters }: { row: AchievementRow; counters: UserCounters }) {
+function LockedCard({ row, counters }: { row: AchievementRow; counters: MilestoneUserCounters }) {
   const hint = computeGapHint(row.criteria, counters) ?? row.description ?? '';
   return (
     <div
@@ -388,7 +375,7 @@ function Glyph({ name, muted }: { name: string | null; muted: boolean }) {
 // recognized numeric key.
 function readCriterion(
   criteria: Json | null
-): { key: keyof UserCounters; threshold: number } | null {
+): { key: keyof MilestoneUserCounters; threshold: number } | null {
   if (!criteria || typeof criteria !== 'object' || Array.isArray(criteria)) return null;
   const obj = criteria as Record<string, unknown>;
   for (const k of ['reading_count', 'quiz_pass_count', 'comment_count', 'streak_days'] as const) {
@@ -400,7 +387,7 @@ function readCriterion(
   return null;
 }
 
-function computeGapHint(criteria: Json | null, counters: UserCounters): string | null {
+function computeGapHint(criteria: Json | null, counters: MilestoneUserCounters): string | null {
   const c = readCriterion(criteria);
   if (!c) return null;
   const have = counters[c.key] ?? 0;
@@ -422,7 +409,7 @@ function computeGapHint(criteria: Json | null, counters: UserCounters): string |
 
 // Used for ordering still-ahead by closest-to-earn first. Achievements
 // with no numeric criteria sort last (Number.MAX_SAFE_INTEGER).
-function gapWeight(a: AchievementRow, counters: UserCounters): number {
+function gapWeight(a: AchievementRow, counters: MilestoneUserCounters): number {
   const c = readCriterion(a.criteria);
   if (!c) return Number.MAX_SAFE_INTEGER;
   const have = counters[c.key] ?? 0;
