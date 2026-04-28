@@ -552,13 +552,20 @@ struct HomeView: View {
         guard ss.isEnabled("registration_wall") else { return }
         guard !auth.isLoggedIn else { return }
 
-        let seenKey = "vp_articles_viewed_ids"
+        // A16 — namespace the counter by user-id so an account switch /
+        // sign-out doesn't inherit the prior viewer's free-article tally.
+        // Anon viewers share the `_anon` slot; signing in flips the gate
+        // off via the early return above, and signing out and signing in
+        // as a different free user gets a fresh tally instead of being
+        // walled out instantly.
+        let scope = auth.currentUser?.id ?? "_anon"
+        let seenKey = "vp_articles_viewed_ids_\(scope)"
         var seen = Set(UserDefaults.standard.stringArray(forKey: seenKey) ?? [])
         if seen.contains(articleId) { return }
         seen.insert(articleId)
         UserDefaults.standard.set(Array(seen), forKey: seenKey)
 
-        let countKey = "vp_articles_viewed"
+        let countKey = "vp_articles_viewed_\(scope)"
         let viewed = seen.count
         UserDefaults.standard.set(viewed, forKey: countKey)
 
