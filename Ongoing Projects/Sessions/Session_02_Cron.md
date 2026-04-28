@@ -101,7 +101,7 @@ If any item below is observed to already be fixed (Wave 19/20/21 may have touche
 **Title:** Fix `verifyCronAuth(request).ok` check in cron auth gates.
 **Source:** TODO A1 (verified 2026-04-27).
 **Severity:** P0 — live security hole. Public, attacker-callable cron endpoints running as service-role with billing/DOB/subscription/kid-profile mutation power.
-**Status:** 🟦 OPEN.
+**Status:** 🟩 SHIPPED 2026-04-28 — commit landed in main (verifyCronAuth(request).ok fix in 3 routes + pro-grandfather-notify cron + vercel.json entry deleted per Q1; logCronHeartbeat 2-arg → 3-arg signature corrected to `start`/`end` phases). Final auth grep returns zero hits.
 
 ### Files (current state in production today)
 
@@ -180,7 +180,7 @@ curl -i -H "Authorization: Bearer $CRON_SECRET" https://veritypost.com/api/cron/
 **Title:** Stagger 2 collision pairs in `vercel.json`.
 **Source:** TODO A17 / PotentialCleanup §C2 (verified 2026-04-27).
 **Severity:** P1 — no symptoms today; will surface at launch when Supabase pool exhaustion under concurrent crons starts queueing connections.
-**Status:** 🟦 OPEN.
+**Status:** 🟩 SHIPPED 2026-04-28 — commit `4dff8f0`. Three pairs eliminated (the 2 documented + a third Mon-only `30 4` collision between `flag-expert-reverifications` and `process-data-exports`): anonymize-audit-log-pii at 25 3, purge-webhook-log at 5 4, flag-expert-reverifications at 40 4 Mon. Note: `*/5` send-push/send-emails (S2-A34/A35) introduces unavoidable minute-share with mult-5 daily crons, which is by design — drain handlers only touch notifications.push_claimed_at + email_claimed_at, disjoint from daily-cron tables. Future audits should exclude `*/5` from minute-collision checks.
 
 ### Current state in `web/vercel.json`
 
@@ -247,7 +247,7 @@ node -e "
 **Title:** Register `cleanup-data-exports` and `rate-limit-cleanup` in `vercel.json`.
 **Source:** TODO A18 / PotentialCleanup §C3 (verified 2026-04-27).
 **Severity:** P2 — no immediate failure; storage and `rate_limit_events` table grow unbounded over time. Becomes P1 after 30-60 days of production traffic.
-**Status:** 🟦 OPEN.
+**Status:** 🟩 SHIPPED 2026-04-28 — commit `4dff8f0`. Both handlers were already correctly wrapped with verifyCronAuth(request).ok + withCronLog; A18 was schedule registration only. Picked non-mult-5 minutes (`17 5` and `47 5`) so the */5 send-push/send-emails ticks don't overlap with these on every */5 hit.
 
 ### Current state
 
@@ -324,7 +324,7 @@ SELECT event_type, processing_status, processing_duration_ms, processing_error
 **Title:** Redesign push + email cron handlers as drain-until-empty per call, scheduled every 5 minutes.
 **Source:** TODO A34 + A35 / PotentialCleanup §C1 / OWNER-ANSWERS Q4.2 (verified 2026-04-27).
 **Severity:** P0 for `send-push` (breaking-news has 24h SLA today against the comment that promises "every minute"); P1 for `send-emails`.
-**Status:** 🟦 OPEN — owner decision LOCKED to Path B (drain-until-empty per Q4.2). Path A (Vercel Pro upgrade for sub-minute cron) was rejected — pre-launch traffic doesn't justify the Pro tier cost.
+**Status:** 🟩 SHIPPED 2026-04-28. Schedules in `4dff8f0` (vercel.json `*/5 * * * *` for both); send-push drain loop in `fea0397`; send-emails drain loop + `claim_email_batch` swap in `5d5eb12`. Q4.2 path B (drain-until-empty) — NOT Vercel Pro upgrade. S1-T0.3 (commit `aa555af`) shipped the 4 RPCs (`claim_push_batch` / `ack_push_batch` / `claim_email_batch` / `ack_email_batch`) as the unblock. Drain loop respects 25s wall-clock budget under Vercel maxDuration=60; emits `drained: bool` in response payload so monitoring can distinguish healthy steady-state from fan-out outpacing send capacity.
 
 ### Current state
 
@@ -509,7 +509,7 @@ This is the highest-stakes item in this session. Use full 6-agent ship pattern:
 **Title:** Append a random suffix to `event_id` in `cronLog.js`.
 **Source:** TODO A71 (verified 2026-04-27 against `web/src/lib/cronLog.js:48`).
 **Severity:** P1 — under the new `*/5` cadence (S2-A34/A35) two cron ticks can fire within the same `startedAt` ISO second under retry. Current `event_id = cron:${name}:${startedAt}` is deterministic; same-second retries collide on the implicit unique constraint.
-**Status:** 🟦 OPEN.
+**Status:** 🟩 SHIPPED 2026-04-28 — commit `0883e9e`. 4-byte random hex suffix (`randomBytes(4).toString('hex')`) appended; ~32 bits of entropy makes same-second + same-suffix collision negligible. No downstream parsers split on event_id colons (verified via grep).
 
 ### Current state in `web/src/lib/cronLog.js:48`
 
@@ -600,7 +600,7 @@ If any consumer split-parses, account for the new third segment (suffix) — lik
 **Title:** Confirm `archive_cluster` RPC cast in `pipeline-cleanup` is not in S2 scope; flag for S1.
 **Source:** PotentialCleanup §D6 (INHERITED, verify against current code).
 **Severity:** P2 — fragile pattern; types-regen lives in S6 deliverables (or S1 depending on owner allocation). This session VERIFIES the cron handler is in our path and either fixes the type cast inline or hands off.
-**Status:** 🟨 DEPENDS — pre-impl investigator decides.
+**Status:** 🟨 DEPENDS ON S6 (`S6-database-types` regen) — verified 2026-04-28. `web/src/app/api/cron/pipeline-cleanup/route.ts:256-260` still casts `service.rpc as unknown as RpcFn` for the `archive_cluster` call. Genuine fix is types regeneration — out of S2 scope (touches `web/src/types/database.ts`). Closure is the `S2-§D6-CAST` item below; both close together once S6 ships the regenerated types.
 
 ### Current state
 
@@ -652,7 +652,7 @@ grep -A 5 "archive_cluster" web/src/types/database.ts
 **Title:** Remove the `as unknown` cast in `pipeline-cleanup/route.ts:256-265` once `web/src/types/database.ts` includes `archive_cluster`.
 **Source:** Moved here from `Session_06_Admin.md` S6-Cleanup-§D6 because the cron-route file is S2-owned per `00_INDEX.md`. Original audit: PotentialCleanup §D6.
 **Severity:** P2 — fragile pattern that silently regresses to no-op the day someone reorders the RPC's argument list or drops a column; the cast hides the type error and the cron silently fails or no-ops on the next run.
-**Status:** 🟨 DEPENDS ON S6 (`S6-database-types`, which itself depends on S1's schema migrations landing).
+**Status:** 🟨 DEPENDS ON S6 (`S6-database-types`, which itself depends on S1's schema migrations landing). Verified 2026-04-28 — the cast still exists at `web/src/app/api/cron/pipeline-cleanup/route.ts:256-260`. Will close in the same window as the verify item above once S6 regen lands.
 
 ### File:line current state
 
@@ -693,7 +693,7 @@ tsc --noEmit
 **Title:** Implement the cron handler that flags parents for re-consent when COPPA consent text version changes.
 **Source:** PotentialCleanup §I11 (verified 2026-04-27).
 **Severity:** P1 — when consent text changes (e.g., new data category added, new sub-processor), existing kids stay bound to old version with no re-consent path. GDPR-K + COPPA evidentiary gap.
-**Status:** 🟨 DEPENDS ON S1 — schema for the consent-version table lives in S1 (Session 1, DB Migrations).
+**Status:** 🟨 DEPENDS — S1 actually shipped a different design than what this manual assumes (verified 2026-04-28 against commit `8aa22b4`). S1-I11 added a TRIGGER (`_mark_reconsent_required`) on `consent_versions` that stamps `kid_profiles.reconsent_required_at` directly when a new version becomes current — there is no `find_outdated_consent_parents` RPC and no `queue_reconsent_notification` RPC. The cron-handler design in this manual relies on those RPCs and won't fit the trigger pattern. A different cron design is needed: scan `kid_profiles WHERE reconsent_required_at IS NOT NULL AND reconsented_at IS NULL` and queue notifications. That design + the notification helper are not yet specified by owner — needs an owner pass before implementation. Marking 🟨 DEPENDS pending owner spec for the new design (or S1 shipping the originally-named RPCs in a follow-up).
 
 ### Current state
 
@@ -811,7 +811,7 @@ When this ships:
 **Title:** When S1 ships orphan-table drops (e.g., A114 / T55), audit cron purge handlers for dead references.
 **Source:** TODO sequencing notes + Sessions/00_INDEX.md cross-cutting items (verified 2026-04-27).
 **Severity:** P2 — purge crons referencing dropped tables fail at runtime; failure rolls into the wrapper's Sentry capture.
-**Status:** 🟨 DEPENDS ON S1.
+**Status:** 🟩 RESOLVED 2026-04-28 — S1 has already dropped 5 orphan tables in `3e776c3` (`iap_transactions`, `media_assets`, `deep_links`, `kid_category_permissions`, `streaks`). Verification grep against `web/src/app/api/cron/` for those + `ai_prompt_preset_versions` returned zero hits — no cron handler references any dropped table. No-op coordination.
 
 ### Current state
 
