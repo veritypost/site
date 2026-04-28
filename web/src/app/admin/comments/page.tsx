@@ -10,7 +10,7 @@ import NumberInput from '@/components/admin/NumberInput';
 import Badge from '@/components/admin/Badge';
 import Spinner from '@/components/admin/Spinner';
 import { confirm, ConfirmDialogHost } from '@/components/admin/ConfirmDialog';
-import { ToastProvider, useToast } from '@/components/admin/Toast';
+import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C, F, S } from '@/lib/adminPalette';
 import { EDITOR_ROLES } from '@/lib/roles';
 
@@ -313,8 +313,6 @@ function CommentsAdminInner() {
 
 export default function CommentsAdmin() {
   return (
-    <ToastProvider>
-      <CommentsAdminInner />
-    </ToastProvider>
+    <CommentsAdminInner />
   );
 }

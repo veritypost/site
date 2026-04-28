@@ -15,7 +15,7 @@ import DatePicker from '@/components/admin/DatePicker';
 import EmptyState from '@/components/admin/EmptyState';
 import Drawer from '@/components/admin/Drawer';
 import Spinner from '@/components/admin/Spinner';
-import { ToastProvider, useToast } from '@/components/admin/Toast';
+import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 import type { Tables } from '@/types/database-helpers';
 
@@ -437,8 +437,6 @@ const lblStyle: React.CSSProperties = {
 
 export default function RecapAdmin() {
   return (
-    <ToastProvider>
-      <RecapInner />
-    </ToastProvider>
+    <RecapInner />
   );
 }

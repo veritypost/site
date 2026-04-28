@@ -12,7 +12,7 @@ import TextInput from '@/components/admin/TextInput';
 import Button from '@/components/admin/Button';
 import Badge from '@/components/admin/Badge';
 import Spinner from '@/components/admin/Spinner';
-import { ToastProvider, useToast } from '@/components/admin/Toast';
+import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 
 type ReaderItem = {
@@ -382,8 +382,6 @@ function ConfigGroup({
 
 export default function ReaderAdmin() {
   return (
-    <ToastProvider>
-      <ReaderInner />
-    </ToastProvider>
+    <ReaderInner />
   );
 }

@@ -50,7 +50,7 @@ import Textarea from '@/components/admin/Textarea';
 import NumberInput from '@/components/admin/NumberInput';
 import Switch from '@/components/admin/Switch';
 import Select from '@/components/admin/Select';
-import { ToastProvider, useToast } from '@/components/admin/Toast';
+import { useToast } from '@/components/admin/Toast';
 
 type CategoryRow = Tables<'categories'>;
 
@@ -108,9 +108,7 @@ function rowToForm(row: CategoryRow): FormState {
 
 export default function CategoriesAdminPage() {
   return (
-    <ToastProvider>
-      <CategoriesAdminInner />
-    </ToastProvider>
+    <CategoriesAdminInner />
   );
 }
 

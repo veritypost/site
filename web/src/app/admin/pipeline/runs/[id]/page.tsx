@@ -50,7 +50,7 @@ import Button from '@/components/admin/Button';
 import Badge from '@/components/admin/Badge';
 import EmptyState from '@/components/admin/EmptyState';
 import Spinner from '@/components/admin/Spinner';
-import { ToastProvider, useToast } from '@/components/admin/Toast';
+import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C, F, S } from '@/lib/adminPalette';
 import type { Tables } from '@/types/database-helpers';
 import type { Json } from '@/types/database';
@@ -183,9 +183,7 @@ function safeStringify(value: Json | null | undefined): string {
 
 export default function RunDetailPage() {
   return (
-    <ToastProvider>
-      <RunDetailInner />
-    </ToastProvider>
+    <RunDetailInner />
   );
 }
 

@@ -14,7 +14,7 @@ import EmptyState from '@/components/admin/EmptyState';
 import Drawer from '@/components/admin/Drawer';
 import Modal from '@/components/admin/Modal';
 import Spinner from '@/components/admin/Spinner';
-import { ToastProvider, useToast } from '@/components/admin/Toast';
+import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 import type { Tables } from '@/types/database-helpers';
 
@@ -390,8 +390,6 @@ const lblStyle: React.CSSProperties = {
 
 export default function EmailTemplatesAdmin() {
   return (
-    <ToastProvider>
-      <EmailTemplatesInner />
-    </ToastProvider>
+    <EmailTemplatesInner />
   );
 }

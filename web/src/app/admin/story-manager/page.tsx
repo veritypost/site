@@ -17,7 +17,7 @@ import Badge from '@/components/admin/Badge';
 import Drawer from '@/components/admin/Drawer';
 import Spinner from '@/components/admin/Spinner';
 import { confirm, ConfirmDialogHost } from '@/components/admin/ConfirmDialog';
-import { ToastProvider, useToast } from '@/components/admin/Toast';
+import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 
 // Editorial day = America/New_York. Same constant the home page uses
@@ -1222,8 +1222,6 @@ const labelStyle: React.CSSProperties = {
 
 export default function StoryEditorAdmin() {
   return (
-    <ToastProvider>
-      <StoryEditorInner />
-    </ToastProvider>
+    <StoryEditorInner />
   );
 }

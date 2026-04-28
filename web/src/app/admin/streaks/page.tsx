@@ -11,7 +11,7 @@ import NumberInput from '@/components/admin/NumberInput';
 import Button from '@/components/admin/Button';
 import EmptyState from '@/components/admin/EmptyState';
 import Spinner from '@/components/admin/Spinner';
-import { ToastProvider, useToast } from '@/components/admin/Toast';
+import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 import type { Tables } from '@/types/database-helpers';
 
@@ -353,8 +353,6 @@ function LabeledNum({ label, value, onBlur, onChange, unit }: {
 
 export default function StreaksAdmin() {
   return (
-    <ToastProvider>
-      <StreaksInner />
-    </ToastProvider>
+    <StreaksInner />
   );
 }

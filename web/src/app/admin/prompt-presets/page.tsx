@@ -48,7 +48,7 @@ import NumberInput from '@/components/admin/NumberInput';
 import Select from '@/components/admin/Select';
 import ConfirmDialog from '@/components/admin/ConfirmDialog';
 import Spinner from '@/components/admin/Spinner';
-import { ToastProvider, useToast } from '@/components/admin/Toast';
+import { useToast } from '@/components/admin/Toast';
 
 type Audience = 'adult' | 'kid' | 'both';
 type Tab = 'all' | Audience;
@@ -110,9 +110,7 @@ const EMPTY_EDITOR: EditorState = {
 
 export default function PromptPresetsAdminPage() {
   return (
-    <ToastProvider>
-      <PromptPresetsAdminInner />
-    </ToastProvider>
+    <PromptPresetsAdminInner />
   );
 }
 

@@ -18,7 +18,7 @@ import Modal from '@/components/admin/Modal';
 import Badge from '@/components/admin/Badge';
 import EmptyState from '@/components/admin/EmptyState';
 import Spinner from '@/components/admin/Spinner';
-import { ToastProvider, useToast } from '@/components/admin/Toast';
+import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C, F, S } from '@/lib/adminPalette';
 
 // Editor-managed scheduling of kid expert sessions.
@@ -334,8 +334,6 @@ const labelStyle: React.CSSProperties = {
 
 export default function AdminExpertSessions() {
   return (
-    <ToastProvider>
-      <ExpertSessionsInner />
-    </ToastProvider>
+    <ExpertSessionsInner />
   );
 }

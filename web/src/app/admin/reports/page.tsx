@@ -14,7 +14,7 @@ import Textarea from '@/components/admin/Textarea';
 import Badge from '@/components/admin/Badge';
 import EmptyState from '@/components/admin/EmptyState';
 import Spinner from '@/components/admin/Spinner';
-import { ToastProvider, useToast } from '@/components/admin/Toast';
+import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C, F, S } from '@/lib/adminPalette';
 
 // Moderator report queue. Supervisor flags jump to the top when that
@@ -477,8 +477,6 @@ const labelStyle: React.CSSProperties = {
 
 export default function ReportsAdmin() {
   return (
-    <ToastProvider>
-      <ReportsAdminInner />
-    </ToastProvider>
+    <ReportsAdminInner />
   );
 }

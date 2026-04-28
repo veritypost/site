@@ -20,7 +20,7 @@ import Spinner from '@/components/admin/Spinner';
 import Field from '@/components/admin/Field';
 import TextInput from '@/components/admin/TextInput';
 import DestructiveActionConfirm from '@/components/admin/DestructiveActionConfirm';
-import { ToastProvider, useToast } from '@/components/admin/Toast';
+import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 import type { Tables } from '@/types/database-helpers';
 
@@ -355,8 +355,6 @@ function DetailRow({ label, children, small }: { label: string; children: React.
 
 export default function AccessRequestsAdmin() {
   return (
-    <ToastProvider>
-      <RequestsInner />
-    </ToastProvider>
+    <RequestsInner />
   );
 }

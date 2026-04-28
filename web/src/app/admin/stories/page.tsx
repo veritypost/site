@@ -16,7 +16,7 @@ import Select from '@/components/admin/Select';
 import Badge from '@/components/admin/Badge';
 import EmptyState from '@/components/admin/EmptyState';
 import Spinner from '@/components/admin/Spinner';
-import { ToastProvider, useToast } from '@/components/admin/Toast';
+import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C, F, S } from '@/lib/adminPalette';
 
 type ArticleRow = Tables<'articles'> & {
@@ -371,8 +371,6 @@ function StoriesAdminInner() {
 
 export default function StoriesAdmin() {
   return (
-    <ToastProvider>
-      <StoriesAdminInner />
-    </ToastProvider>
+    <StoriesAdminInner />
   );
 }

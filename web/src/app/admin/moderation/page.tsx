@@ -15,7 +15,7 @@ import Badge from '@/components/admin/Badge';
 import Modal from '@/components/admin/Modal';
 import EmptyState from '@/components/admin/EmptyState';
 import Spinner from '@/components/admin/Spinner';
-import { ToastProvider, useToast } from '@/components/admin/Toast';
+import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C, F, S } from '@/lib/adminPalette';
 import type { Tables } from '@/types/database-helpers';
 
@@ -627,8 +627,6 @@ const labelStyle: React.CSSProperties = {
 
 export default function ModerationConsole() {
   return (
-    <ToastProvider>
-      <ModerationConsoleInner />
-    </ToastProvider>
+    <ModerationConsoleInner />
   );
 }

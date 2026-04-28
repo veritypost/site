@@ -21,7 +21,7 @@ import StatCard from '@/components/admin/StatCard';
 import Drawer from '@/components/admin/Drawer';
 import Spinner from '@/components/admin/Spinner';
 import Field from '@/components/admin/Field';
-import { ToastProvider, useToast } from '@/components/admin/Toast';
+import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 import { getSiteUrl } from '@/lib/siteUrl';
 import type { Tables } from '@/types/database-helpers';
@@ -322,8 +322,6 @@ function ReferralsInner() {
 
 export default function ReferralsAdmin() {
   return (
-    <ToastProvider>
-      <ReferralsInner />
-    </ToastProvider>
+    <ReferralsInner />
   );
 }

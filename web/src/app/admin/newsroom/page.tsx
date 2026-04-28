@@ -64,7 +64,7 @@ import PipelineRunPicker, {
   estimateClusterCostUsd,
   formatEstimatedCost,
 } from '@/components/admin/PipelineRunPicker';
-import { ToastProvider, useToast } from '@/components/admin/Toast';
+import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C, F, S } from '@/lib/adminPalette';
 
 type Audience = 'adult' | 'kid';
@@ -206,9 +206,7 @@ function formatCostUsd(value: number | string | null | undefined): string {
 
 export default function NewsroomAdminPage() {
   return (
-    <ToastProvider>
-      <NewsroomWorkspace />
-    </ToastProvider>
+    <NewsroomWorkspace />
   );
 }
 

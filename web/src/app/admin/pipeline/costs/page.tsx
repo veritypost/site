@@ -21,7 +21,7 @@ import PageSection from '@/components/admin/PageSection';
 import StatCard from '@/components/admin/StatCard';
 import Spinner from '@/components/admin/Spinner';
 import EmptyState from '@/components/admin/EmptyState';
-import { ToastProvider, useToast } from '@/components/admin/Toast';
+import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C, F, S } from '@/lib/adminPalette';
 
 // ---------------------------------------------------------------------------
@@ -117,9 +117,7 @@ function thirtyDayKeys(): string[] {
 
 export default function PipelineCostsPage() {
   return (
-    <ToastProvider>
-      <PipelineCostsPageInner />
-    </ToastProvider>
+    <PipelineCostsPageInner />
   );
 }
 

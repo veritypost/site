@@ -20,7 +20,7 @@ import StatCard from '@/components/admin/StatCard';
 import EmptyState from '@/components/admin/EmptyState';
 import Spinner from '@/components/admin/Spinner';
 import { confirm, ConfirmDialogHost } from '@/components/admin/ConfirmDialog';
-import { ToastProvider, useToast } from '@/components/admin/Toast';
+import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C, F, S } from '@/lib/adminPalette';
 
 // Blueprint v2 uses `feeds` (not the legacy `rss_feeds`). Columns renamed:
@@ -578,8 +578,6 @@ function KV({ label, value }: { label: string; value: React.ReactNode }) {
 
 export default function FeedsAdmin() {
   return (
-    <ToastProvider>
-      <FeedsAdminInner />
-    </ToastProvider>
+    <FeedsAdminInner />
   );
 }

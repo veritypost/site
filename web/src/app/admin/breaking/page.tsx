@@ -14,7 +14,7 @@ import Spinner from '@/components/admin/Spinner';
 import EmptyState from '@/components/admin/EmptyState';
 import Badge from '@/components/admin/Badge';
 import DestructiveActionConfirm from '@/components/admin/DestructiveActionConfirm';
-import { ToastProvider, useToast } from '@/components/admin/Toast';
+import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 import type { Tables } from '@/types/database-helpers';
 
@@ -357,8 +357,6 @@ function LabeledNum({ label, value, onChange, suffix }: { label: string; value: 
 
 export default function BreakingAdmin() {
   return (
-    <ToastProvider>
-      <BreakingInner />
-    </ToastProvider>
+    <BreakingInner />
   );
 }

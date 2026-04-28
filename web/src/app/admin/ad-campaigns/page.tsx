@@ -17,7 +17,7 @@ import EmptyState from '@/components/admin/EmptyState';
 import Badge from '@/components/admin/Badge';
 import Drawer from '@/components/admin/Drawer';
 import Spinner from '@/components/admin/Spinner';
-import { ToastProvider, useToast } from '@/components/admin/Toast';
+import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 import type { Tables } from '@/types/database-helpers';
 
@@ -330,8 +330,6 @@ function Lbl({ label, children }: { label: string; children: React.ReactNode }) 
 
 export default function CampaignsAdmin() {
   return (
-    <ToastProvider>
-      <CampaignsInner />
-    </ToastProvider>
+    <CampaignsInner />
   );
 }
