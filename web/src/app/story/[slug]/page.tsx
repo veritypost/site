@@ -13,6 +13,7 @@ import TTSButton from '../../../components/TTSButton';
 import Ad from '../../../components/Ad';
 import Interstitial from '../../../components/Interstitial';
 import { JsonLd, newsArticle } from '../../../components/JsonLd';
+import LockModal from '../../../components/LockModal';
 import { bumpArticleViewCount } from '../../../lib/session';
 import { useFocusTrap } from '../../../lib/useFocusTrap';
 import { useTrack } from '@/lib/useTrack';
@@ -409,6 +410,10 @@ export default function StoryPage() {
   // T-016: free-plan bookmark cap is DB-driven via plan_features.bookmarks.
   // Fallback to 10 preserves prior behaviour when the row is unreachable.
   const [bookmarkCap, setBookmarkCap] = useState<number>(10);
+  // S7-A105 — touch users can't see the desktop tooltip on the disabled
+  // Save button. State flips true when a user taps the at-cap button;
+  // LockModal then opens with an upgrade prompt routed at /pricing.
+  const [showBookmarkUpgradeModal, setShowBookmarkUpgradeModal] = useState<boolean>(false);
   const [shareMsg, setShareMsg] = useState<string>('');
 
   const [showReportModal, setShowReportModal] = useState<boolean>(false);
@@ -1883,9 +1888,13 @@ export default function StoryPage() {
                         articleId={story.id}
                       />
                     )}
-                    {/* T-016: free-plan bookmark cap is DB-driven. Previously
-                     * hardcoded `>= 10` and "10 of 10"; bookmarkCap now
-                     * comes from plan_features.bookmarks for the user's plan. */}
+                    {/* T-016 + S7-A105: free-plan bookmark cap is DB-driven.
+                     * Previously hardcoded `>= 10` and "10 of 10"; bookmarkCap
+                     * now comes from plan_features.bookmarks for the user's
+                     * plan. At cap, a tap (touch) or click (desktop with
+                     * tooltip) opens LockModal with an upgrade route — the
+                     * disabled-with-tooltip pattern was invisible to touch
+                     * users and lost the conversion path. */}
                     {(() => {
                       const atCap =
                         !bookmarked &&
@@ -1894,8 +1903,10 @@ export default function StoryPage() {
                         bookmarkTotal >= bookmarkCap;
                       return (
                         <button
-                          onClick={toggleBookmark}
-                          disabled={atCap}
+                          onClick={
+                            atCap ? () => setShowBookmarkUpgradeModal(true) : toggleBookmark
+                          }
+                          aria-disabled={atCap}
                           title={atCap ? 'Upgrade for unlimited bookmarks' : undefined}
                           style={{
                             padding: '10px 14px',
@@ -1905,7 +1916,7 @@ export default function StoryPage() {
                             background: 'transparent',
                             color: bookmarked ? 'var(--accent)' : atCap ? '#ccc' : 'var(--dim)',
                             fontSize: 13,
-                            cursor: atCap ? 'not-allowed' : 'pointer',
+                            cursor: 'pointer',
                             fontFamily: 'var(--font-sans)',
                             opacity: atCap ? 0.6 : 1,
                           }}
@@ -2398,6 +2409,23 @@ export default function StoryPage() {
           </div>
         </div>
       )}
+
+      {/* S7-A105 — bookmark cap upgrade modal. Opened on tap of the
+          disabled Save button when the user has hit their plan cap.
+          Synthetic capability mirrors the plan-locked path elsewhere
+          (lock_reason left undefined → resolvePrompt falls through to
+          the "Upgrade to unlock" prompt routed at /pricing). */}
+      <LockModal
+        open={showBookmarkUpgradeModal}
+        onClose={() => setShowBookmarkUpgradeModal(false)}
+        capability={
+          showBookmarkUpgradeModal
+            ? {
+                lock_message: `You've reached the ${bookmarkCap}-bookmark cap on the free plan. Upgrade to save more.`,
+              }
+            : null
+        }
+      />
     </div>
   );
 }

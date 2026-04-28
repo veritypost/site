@@ -89,11 +89,9 @@ export default function AccessibilityPage() {
               High Contrast Mode
             </h3>
             <p style={{ fontSize: '13px', color: '#666666', margin: '0' }}>
-              A high contrast preference will be available under Account Settings &rarr; Display
-              preferences (Coming soon — the reader will honor this setting once it&apos;s wired
-              up). In the meantime, OS-level high-contrast modes (Windows High Contrast, macOS
-              Increase Contrast, iOS Increase Contrast) are respected through the platform&apos;s
-              system styling.
+              OS-level high-contrast modes (Windows High Contrast, macOS Increase Contrast, iOS
+              Increase Contrast) are respected through the platform&apos;s system styling. An
+              in-app high-contrast preference is not currently available.
             </p>
           </div>
 
@@ -150,8 +148,8 @@ export default function AccessibilityPage() {
               Older PDF documents linked from articles may not be fully screen-reader compatible.
             </li>
             <li>
-              We are actively working to address these limitations and improve accessibility across
-              all content.
+              These limitations exist on third-party material we do not author; in-house surfaces
+              are kept to the WCAG 2.1 AA bar described above.
             </li>
           </ul>
         </div>

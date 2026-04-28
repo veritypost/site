@@ -1,10 +1,14 @@
-// Shared "Under construction" placeholder for surfaces that are being
-// cleaned up before launch. Used by /profile/[id] and /u/[username]
-// while the public profile UX is being polished. Owner reverts each
-// callsite (one-line flip back to the real component) when ready.
+// S7-A47 — placeholder for launch-hidden surfaces. The component name
+// "UnderConstruction" is preserved so existing call sites (`/u/[username]`,
+// `/profile/[id]`) need no migration; per memory `feedback_launch_hides`,
+// launch-hides keep their state alive. The previous "Under construction"
+// + "Check back soon" + "polishing X" copy was banned-timeline language
+// (rule 3.1) and has been rewritten to clean unavailable-state copy.
 //
-// Voice: plain, brand-consistent, no emojis. CTA points back to the
-// home feed so visitors who arrived via an old link aren't dead-ended.
+// Future cleanup (cross-session, S7 + S8): once the public profile +
+// `/u/[username]` shell is rebuilt, replace these call sites with
+// `EmptyState` from components/EmptyState.tsx and delete this file. The
+// rebuilt surfaces are not blocked on the rename.
 
 import Link from 'next/link';
 
@@ -42,18 +46,6 @@ export default function UnderConstruction({ surface = 'this page' }: { surface?:
           padding: '40px 32px',
         }}
       >
-        <div
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: 1.5,
-            textTransform: 'uppercase',
-            color: C.dim,
-            marginBottom: 12,
-          }}
-        >
-          Under construction
-        </div>
         <h1
           style={{
             fontSize: 22,
@@ -63,7 +55,7 @@ export default function UnderConstruction({ surface = 'this page' }: { surface?:
             color: C.text,
           }}
         >
-          We&rsquo;re polishing {surface}
+          {surface} is not currently available
         </h1>
         <p
           style={{
@@ -73,8 +65,7 @@ export default function UnderConstruction({ surface = 'this page' }: { surface?:
             color: C.dim,
           }}
         >
-          This part of Verity Post is being rebuilt before launch. Check back soon &mdash; in the
-          meantime, the rest of the site is live.
+          Browse the home feed for the latest stories.
         </p>
         <Link
           href="/"
@@ -89,7 +80,7 @@ export default function UnderConstruction({ surface = 'this page' }: { surface?:
             textDecoration: 'none',
           }}
         >
-          Back to the home feed
+          Browse stories
         </Link>
       </div>
     </div>

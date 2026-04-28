@@ -44,11 +44,13 @@ const C = {
 // companion revert guide in Sessions/04-21-2026.
 const LAUNCH_HIDE_RECAP = true;
 
-// T147 — when the launch hide is on, render a small landing card so
-// visitors who land on /recap (deep-link, search, navigation) understand
-// the feature exists and is on the way. Returning null leaves users on
-// a blank page wondering whether the route is broken.
-function RecapComingSoonCard() {
+// S7-A47 — empty unavailable-state for the launch-hidden recap surface.
+// Per rule 3.1 (no user-facing timeline copy) the previous "Coming soon"
+// + "We're finishing the editorial polish" + "goes live alongside paid
+// plans" lines were stripped. Honest present-state copy + a CTA back to
+// the home feed; component + queries + types stay alive (memory
+// `feedback_launch_hides`) so unhide is the LAUNCH_HIDE_RECAP=false flip.
+function RecapUnavailableCard() {
   return (
     <div
       style={{
@@ -63,23 +65,9 @@ function RecapComingSoonCard() {
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       }}
     >
-      <div
-        style={{
-          fontSize: 12,
-          fontWeight: 700,
-          letterSpacing: '0.18em',
-          textTransform: 'uppercase',
-          color: '#666',
-          marginBottom: 12,
-        }}
-      >
-        Coming soon
-      </div>
-      <h1 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 12px' }}>Your weekly recap</h1>
+      <h1 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 12px' }}>Weekly recap</h1>
       <p style={{ fontSize: 14, lineHeight: 1.6, color: '#444', margin: '0 0 18px' }}>
-        Each Sunday Verity Post will compile the articles you read, the quizzes you passed, and the
-        threads you joined into a single Sunday-morning summary. We&apos;re finishing the editorial
-        polish; the recap goes live alongside paid plans.
+        The weekly recap is not currently available. Browse the home feed for the latest stories.
       </p>
       <a
         href="/"
@@ -94,14 +82,14 @@ function RecapComingSoonCard() {
           textDecoration: 'none',
         }}
       >
-        Back to home
+        Browse stories
       </a>
     </div>
   );
 }
 
 export default function RecapListPage() {
-  if (LAUNCH_HIDE_RECAP) return <RecapComingSoonCard />;
+  if (LAUNCH_HIDE_RECAP) return <RecapUnavailableCard />;
 
   // eslint-disable-next-line react-hooks/rules-of-hooks -- launch-hide pattern; remove when feature unhides (FIX_SESSION_1 launch-hides)
   const [loading, setLoading] = useState<boolean>(true);

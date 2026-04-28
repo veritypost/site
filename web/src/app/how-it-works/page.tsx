@@ -1,6 +1,7 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified shared_pages 2026-04-18
 import Link from 'next/link';
+import { BRAND_NAME } from '@/lib/brand';
 
 interface Step {
   number: string;
@@ -15,7 +16,7 @@ export default function HowItWorksPage() {
       number: '1',
       title: 'Read',
       description:
-        'Browse curated news articles from hundreds of verified sources. Every article includes a Verity Score, source transparency data, and AI-generated summaries so you can quickly understand the key facts.',
+        'Browse curated news articles from hundreds of verified sources. Every article includes a Verity Score and source transparency data, with AI assistance helping verified contributors surface context and source provenance — never replacing the human author.',
       color: '#111111',
     },
     {
@@ -36,7 +37,7 @@ export default function HowItWorksPage() {
       number: '4',
       title: 'Earn',
       description:
-        'Build your Verity Score by reading thoroughly, acing quizzes, and contributing quality discussions. Higher scores earn community recognition and let you apply for expert and journalist roles.',
+        'Build your Verity Score by reading thoroughly, acing quizzes, and contributing quality discussions. Your score grows with every article you finish and every quiz you pass.',
       color: '#f472b6',
     },
   ];
@@ -58,7 +59,8 @@ export default function HowItWorksPage() {
               marginRight: 'auto',
             }}
           >
-            Verity Post helps you become a more informed reader through a simple four-step process.
+            {BRAND_NAME} helps you become a more informed reader through a simple four-step
+            process.
           </p>
         </div>
 

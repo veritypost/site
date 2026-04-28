@@ -31,21 +31,17 @@ interface CategoryStyle {
   accent: string;
 }
 
-// Visual-only metadata keyed by category slug — no data lives here
-const CAT_STYLE: Record<string, CategoryStyle> = {
-  politics: { icon: '', color: '#ede9fe', accent: '#7c3aed' },
-  technology: { icon: '', color: '#dbeafe', accent: '#1d4ed8' },
-  science: { icon: '', color: '#e0f2fe', accent: '#0369a1' },
-  health: { icon: '', color: '#dcfce7', accent: '#16a34a' },
-  world: { icon: '', color: '#fce7f3', accent: '#be185d' },
-  business: { icon: '', color: '#fef9c3', accent: '#a16207' },
-  entertainment: { icon: '', color: '#fee2e2', accent: '#b91c1c' },
-  sports: { icon: '', color: '#ffedd5', accent: '#c2410c' },
-  environment: { icon: '', color: '#d1fae5', accent: '#059669' },
-  education: { icon: '', color: '#e0e7ff', accent: '#4338ca' },
-};
-
-const DEFAULT_STYLE: CategoryStyle = { icon: '', color: '#f3f4f6', accent: '#6b7280' };
+// S7-A106 — uniform expanded card design. The previous per-category
+// CAT_STYLE map populated only ~6 of N categories; everything else fell
+// to DEFAULT_STYLE and the expansion flatlined inconsistently. Per
+// rule 3.2 (no color-per-tier) and the genuine-fix principle, we drop
+// per-category hue entirely. The CategoryStyle interface stays so the
+// existing call sites keep their shape; UNIFORM_STYLE is the only
+// supplier. Re-introduce per-category color only after every active
+// category gets a brand decision (high friction, owner call).
+const UNIFORM_STYLE: CategoryStyle = { icon: '', color: '#f3f4f6', accent: '#6b7280' };
+const DEFAULT_STYLE: CategoryStyle = UNIFORM_STYLE;
+const CAT_STYLE: Record<string, CategoryStyle> = {};
 
 // Featured card accent colors cycle for stories that have no category style match
 const FEATURED_COLORS = ['#111111', '#6ee7b7', '#fca5a5', '#fcd34d', '#cccccc'] as const;
@@ -308,13 +304,15 @@ export default function BrowsePage() {
             {/* Trending Now */}
             <div style={{ marginBottom: 28 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-                {/* T239 — section title swaps to "Featured by editors" when
-                    any of the displayed cards is_featured=true; otherwise
-                    falls back to "Latest" (recency-only). When admins
-                    surface the is_featured pin UI later, the label flips
-                    automatically with no extra wiring. */}
+                {/* S7-A107 — stable "Latest stories" label. Previously
+                    flipped to "Featured by editors" when a featured pin
+                    appeared in the top 3, but the public surface has no
+                    editor-of-record byline yet so "editors" framing
+                    implies a team that doesn't exist. Re-introduce a
+                    "Featured" header only after AR1 surfaces real editor
+                    attribution alongside the pin. */}
                 <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, letterSpacing: '-0.02em' }}>
-                  {hasEditorPick ? 'Featured by editors' : 'Latest'}
+                  Latest stories
                 </h2>
               </div>
               {featured.length === 0 ? (
