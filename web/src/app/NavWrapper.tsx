@@ -499,6 +499,28 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
                   {link.label}
                 </a>
               ))}
+              {/* S7-I6 — re-open the cookie banner so visitors can change
+                  their consent at any time. Required by ePrivacy. The
+                  CookieBanner subscribes to the custom event. */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('vp-open-cookie-banner'));
+                  }
+                }}
+                style={{
+                  fontSize: 11,
+                  color: 'var(--muted)',
+                  background: 'transparent',
+                  border: 'none',
+                  padding: 0,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                Cookie preferences
+              </button>
             </div>
             <div style={{ textAlign: 'center', fontSize: 10, color: 'var(--muted)' }}>
               © {new Date().getFullYear()} {BRAND_LEGAL_ENTITY}. All rights reserved.

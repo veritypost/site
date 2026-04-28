@@ -1,7 +1,6 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified shared_components 2026-04-18
 import './globals.css';
-import Script from 'next/script';
 import { Suspense } from 'react';
 import { Inter, Source_Serif_4 } from 'next/font/google';
 import NavWrapper from './NavWrapper';
@@ -11,6 +10,8 @@ import { PermissionsProvider } from '../components/PermissionsProvider';
 import GAListener from '../components/GAListener';
 import { getSiteUrl } from '../lib/siteUrl';
 import { JsonLd, organizationAndWebSite } from '../components/JsonLd';
+import CookieBanner from '../components/CookieBanner';
+import ConsentedScripts from '../components/ConsentedScripts';
 import { BRAND_NAME, BRAND_DOMAIN } from '../lib/brand';
 
 // GA4 measurement ID. Set via NEXT_PUBLIC_GA_MEASUREMENT_ID in Vercel env;
@@ -129,45 +130,16 @@ export default function RootLayout({ children }) {
         <a href="#main-content" className="vp-skip-link">
           Skip to main content
         </a>
-        {/* GA4 (gtag.js). Loaded afterInteractive so it doesn't block
-            first paint. The GAListener component below subscribes to
-            App Router navigation changes and fires page_view events,
-            since gtag's auto-pageview only covers the initial hard load.
-            TODO (master plan Phase B step 4): wrap both in a
-            consent-gated loader once the CMP is installed. Until then
-            the tag loads unconditionally, which is fine for US traffic
-            but not EU. */}
-        <Script
-          id="ga4-loader"
-          strategy="afterInteractive"
-          src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
-        />
-        <Script id="ga4-init" strategy="afterInteractive">
-          {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            window.gtag = gtag;
-            gtag('js', new Date());
-            gtag('config', '${GA_ID}', { send_page_view: false });
-          `}
-        </Script>
+        {/* S7-I6 — consent-gated third-party scripts. GA4 + AdSense load
+            only when the user has opted into analytics / advertising via
+            the CookieBanner CMP. ePrivacy Art. 5(3) requires opt-in for
+            non-essential cookies before they fire; this is the
+            enforcement point. The GAListener still ships unconditionally
+            because it's a no-op until window.gtag is defined. */}
+        <ConsentedScripts gaMeasurementId={GA_ID} adsensePublisherId={ADSENSE_PUB_ID} />
         <Suspense fallback={null}>
           <GAListener />
         </Suspense>
-
-        {/* Google AdSense library. Loaded only when NEXT_PUBLIC_ADSENSE_
-            PUBLISHER_ID is set — keeps the script off the page entirely
-            until the publisher ID is in hand. `afterInteractive` so first
-            paint is unblocked. AdSense per-slot <ins> blocks are rendered
-            by <AdSenseSlot /> (see components/AdSenseSlot.tsx). */}
-        {ADSENSE_PUB_ID && (
-          <Script
-            id="adsense-loader"
-            strategy="afterInteractive"
-            src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_PUB_ID}`}
-            crossOrigin="anonymous"
-          />
-        )}
 
         <ObservabilityInit />
         <PermissionsProvider>
@@ -178,6 +150,11 @@ export default function RootLayout({ children }) {
             <main id="main-content">
               <NavWrapper>{children}</NavWrapper>
             </main>
+            {/* S7-I6 — homegrown CMP. Renders bottom-sheet on first
+                visit; persists consent in localStorage. Reachable from
+                the footer "Cookie preferences" link (dispatches a
+                vp-open-cookie-banner event the component subscribes to). */}
+            <CookieBanner />
           </ToastProvider>
         </PermissionsProvider>
       </body>
