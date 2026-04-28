@@ -2,6 +2,7 @@
 // @feature-verified profile_settings 2026-04-18
 import { NextResponse } from 'next/server';
 import { createClient, createClientFromToken, createServiceClient } from '@/lib/supabase/server';
+import { isAllowedOrigin } from '@/lib/cors';
 
 // T170/T209 — login-time deletion-cancel signals deletion-state status,
 // which is per-account PII. Apply private/no-store to every response so
@@ -24,19 +25,10 @@ const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
 // scheduled; the row-lock overhead is negligible. No 4xx leaks info about
 // whether a deletion was or wasn't pending.
 //
-// CSRF: cookie branch (no bearer) mutates account state — mirror the
-// /api/account/delete origin allowlist. Bearer branch skips the origin
-// check because mobile clients don't send a trustworthy Origin.
-function isAllowedOrigin(origin) {
-  if (!origin) return false;
-  const allowed = [
-    process.env.NEXT_PUBLIC_SITE_URL,
-    'http://localhost:3333',
-    'https://veritypost.com',
-    'https://www.veritypost.com',
-  ].filter(Boolean);
-  return allowed.includes(origin);
-}
+// CSRF: cookie branch (no bearer) mutates account state — uses the
+// shared lib/cors.js allow-list (S3-A128 single source of truth).
+// Bearer branch skips the origin check because mobile clients don't
+// send a trustworthy Origin.
 
 export async function POST(request) {
   try {

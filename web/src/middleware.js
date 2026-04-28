@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { isAllowedOrigin, CORS_ALLOW_METHODS, CORS_ALLOW_HEADERS } from '@/lib/cors';
 
 // Logged-in-only route trees. Anonymous visitors get 302'd to
 // /login?next=<path> so they can sign in and be bounced back. Middleware
@@ -152,34 +153,14 @@ function buildCspStrictReport(nonce) {
   ].join('; ');
 }
 
-// M-17 / T311 — CORS allow-list for `/api/*`.
-//
-// Allow-list contents (hardcoded — do NOT trust env vars for credentialed CORS):
-//   - https://veritypost.com + https://www.veritypost.com (prod)
-//   - http://localhost:3000 + http://localhost:3333 for local dev
-//
-// Prior version trusted process.env.NEXT_PUBLIC_SITE_URL — a hostile or
-// misconfigured env value would have added that origin to credentialed CORS
-// for `/api/*`. Removed the env-var trust; if a preview origin is needed,
-// add it explicitly here (or wire a NON-credentialed allow list separately).
-//
-// The iOS native client is unaffected because native fetch() has no
-// browser-enforced CORS engine; Authorization-header calls from the
-// app continue to work regardless of this allow-list.
-const ALLOWED_ORIGINS = new Set([
-  'https://veritypost.com',
-  'https://www.veritypost.com',
-  'http://localhost:3000',
-  'http://localhost:3333',
-]);
-const CORS_ALLOW_METHODS = 'GET, POST, PATCH, DELETE, OPTIONS';
-const CORS_ALLOW_HEADERS =
-  'authorization, content-type, x-health-token, x-request-id, x-vercel-cron';
-
+// M-17 / T311 — CORS allow-list for `/api/*`. Source of truth is
+// `lib/cors.js` (S3-A128). Env vars are NOT trusted for credentialed
+// CORS — preview origins must be added explicitly to that file. Native
+// iOS clients are unaffected (no browser-enforced CORS).
 function applyCors(request, response) {
   const origin = request.headers.get('origin');
   if (!origin) return; // same-origin / server-to-server: no CORS needed
-  if (!ALLOWED_ORIGINS.has(origin)) return; // unlisted: browser will block
+  if (!isAllowedOrigin(origin)) return; // unlisted: browser will block
   response.headers.set('Access-Control-Allow-Origin', origin);
   response.headers.set('Access-Control-Allow-Credentials', 'true');
   response.headers.append('Vary', 'Origin');

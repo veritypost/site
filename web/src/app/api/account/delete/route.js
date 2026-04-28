@@ -5,6 +5,7 @@ import { createClient, createClientFromToken, createServiceClient } from '@/lib/
 import { hasPermissionServer } from '@/lib/auth';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { isAllowedOrigin } from '@/lib/cors';
 
 // T170/T209 — account deletion is the most replay-sensitive operation
 // on the platform. Every response (POST + DELETE, success + error)
@@ -25,32 +26,9 @@ const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
 // cookie policy mitigates most real cases, but a missing explicit
 // origin check meant a crafted cross-origin form POST against a
 // misconfigured deployment could pass. Enforce an origin allowlist
-// on the cookie branch. Bearer branch skips the origin check because
-// mobile clients do not send a trustworthy Origin.
-function isAllowedOrigin(origin) {
-  if (!origin) return false;
-  const allowed = [
-    process.env.NEXT_PUBLIC_SITE_URL,
-    'http://localhost:3333',
-    'https://veritypost.com',
-    'https://www.veritypost.com',
-  ]
-    .filter(Boolean)
-    .map((s) => {
-      try {
-        return new URL(s).origin;
-      } catch {
-        return null;
-      }
-    })
-    .filter(Boolean);
-  try {
-    const probe = new URL(origin).origin;
-    return allowed.includes(probe);
-  } catch {
-    return false;
-  }
-}
+// on the cookie branch via lib/cors.js (S3-A128 single source of
+// truth). Bearer branch skips the origin check because mobile
+// clients do not send a trustworthy Origin.
 
 async function resolveAuth(request) {
   const auth = request.headers.get('authorization') || '';
