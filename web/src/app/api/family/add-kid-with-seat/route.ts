@@ -42,6 +42,7 @@ import {
   listCustomerSubscriptions,
   updateSubscriptionItemQuantity,
   addSubscriptionItem,
+  removeSubscriptionItem,
 } from '@/lib/stripe';
 import { recordAdminAction } from '@/lib/adminMutation';
 import type { Json } from '@/types/database';
@@ -352,8 +353,23 @@ export async function POST(request: Request) {
   const extraKidPriceId = process.env.STRIPE_VERITY_FAMILY_EXTRA_KID_PRICE_ID || '';
   const dryRunStripe = !process.env.STRIPE_SECRET_KEY || !extraKidPriceId;
 
+  // S4-T0.4 — feature flag for the rollback-v2 branch. Default OFF until
+  // the owner-paired test passes on a real test family account. When OFF,
+  // the legacy rollback path (restore-quantity-only) runs even on the
+  // add path, leaving an orphan $0 line item — same behavior as before.
+  // When ON, add-path failures DELETE the just-attached line item;
+  // patch-path failures restore prior quantity. Read once at the top
+  // of the handler so a mid-flight flag flip can't split the branch.
+  const rollbackV2 = process.env.NEXT_PUBLIC_ADD_KID_ROLLBACK_V2 === 'true';
+
   let priorStripeQuantity: number | null = null;
   let priorStripeItemId: string | null = null;
+  // S4-T0.4 — track which Stripe op fired so the rollback knows what
+  // to undo. 'add' means we attached a new line item (need DELETE);
+  // 'patch' means we incremented an existing item quantity (need
+  // quantity restore).
+  let stripeOp: 'add' | 'patch' | null = null;
+  let addedStripeItemId: string | null = null;
 
   if (needsSeatBump && !dryRunStripe) {
     if (!userRes.data?.stripe_customer_id || !sub.stripe_subscription_id) {
@@ -406,12 +422,22 @@ export async function POST(request: Request) {
               idempotencyKey: stripeIdem,
             }
           );
+          // Track 'patch' only when we actually wrote a quantity change —
+          // a no-op (live qty already at target) means nothing to roll back.
+          stripeOp = 'patch';
         }
       } else if (targetExtras > 0) {
         // No seat item yet — first extra kid; attach the add-on price.
-        await addSubscriptionItem(sub.stripe_subscription_id, extraKidPriceId, targetExtras, {
-          idempotencyKey: stripeIdem,
-        });
+        // Capture the new item id so the add-path rollback knows what
+        // to DELETE.
+        const created = (await addSubscriptionItem(
+          sub.stripe_subscription_id,
+          extraKidPriceId,
+          targetExtras,
+          { idempotencyKey: stripeIdem }
+        )) as { id?: string } | null;
+        addedStripeItemId = created?.id || null;
+        stripeOp = 'add';
       }
     } catch (err) {
       const e = err as { status?: number; message?: string };
@@ -463,18 +489,60 @@ export async function POST(request: Request) {
     // Roll back the Stripe seat bump so we don't leave the parent paying
     // for a seat we never delivered. Best-effort — log and surface the
     // original failure.
-    if (needsSeatBump && !dryRunStripe && priorStripeItemId && priorStripeQuantity != null) {
+    //
+    // S4-T0.4 — branch on the recorded stripeOp:
+    //   - 'add' → DELETE the line item we just attached. Restoring
+    //     quantity to 0 leaves the item alive at $0 and breaks future
+    //     patch ops (they'd see an existing seat item with quantity=0
+    //     instead of "no seat item yet"). DELETE is the only correct
+    //     undo for an add.
+    //   - 'patch' → restore prior quantity. Existing path; preserved
+    //     verbatim for the patch branch only.
+    //
+    // Behind the rollbackV2 feature flag (env-default OFF until the
+    // owner-paired test on a real test family account passes). When
+    // OFF, the legacy restore-quantity branch runs for both add and
+    // patch — same buggy behavior as before, kept intentionally so
+    // the flag-flip is the deploy-time switch.
+    if (needsSeatBump && !dryRunStripe) {
+      const rollbackIdem = `add_kid_seat:rollback:${user.id}:${idemKey}`;
       try {
-        await updateSubscriptionItemQuantity(
-          sub.stripe_subscription_id!,
-          priorStripeItemId,
-          priorStripeQuantity,
-          { idempotencyKey: `add_kid_seat:rollback:${user.id}:${idemKey}` }
-        );
+        if (rollbackV2 && stripeOp === 'add' && addedStripeItemId) {
+          await removeSubscriptionItem(addedStripeItemId, { idempotencyKey: rollbackIdem });
+        } else if (
+          rollbackV2 &&
+          stripeOp === 'patch' &&
+          priorStripeItemId &&
+          priorStripeQuantity != null
+        ) {
+          await updateSubscriptionItemQuantity(
+            sub.stripe_subscription_id!,
+            priorStripeItemId,
+            priorStripeQuantity,
+            { idempotencyKey: rollbackIdem }
+          );
+        } else if (
+          !rollbackV2 &&
+          priorStripeItemId &&
+          priorStripeQuantity != null
+        ) {
+          // Legacy buggy path — pre-flag-flip behavior. Only restores
+          // quantity for the patch branch; add-path rollback silently
+          // skips and leaves the orphan line item (the bug we're
+          // fixing). Kept until the owner-paired test confirms the v2
+          // branch is safe.
+          await updateSubscriptionItemQuantity(
+            sub.stripe_subscription_id!,
+            priorStripeItemId,
+            priorStripeQuantity,
+            { idempotencyKey: rollbackIdem }
+          );
+        }
       } catch (rollbackErr) {
         console.error(
           '[family.add_kid_with_seat] rollback failed',
-          (rollbackErr as { message?: string })?.message
+          (rollbackErr as { message?: string })?.message,
+          { stripeOp, rollbackV2, addedStripeItemId, priorStripeItemId, priorStripeQuantity }
         );
       }
     }

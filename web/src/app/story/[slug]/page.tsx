@@ -451,11 +451,13 @@ export default function StoryPage() {
   const [isDesktop, setIsDesktop] = useState<boolean>(true);
   const [bookmarkError, setBookmarkError] = useState<string>('');
 
-  // T234 — AI-disclosure pill. `is_ai_generated` is set by the synthesis
-  // pipeline; `show_ai_label` is the admin master switch (admin/system
-  // page → Transparency). Default to true when the setting is missing so
-  // a fresh DB defaults to disclosed (EU AI Act / CA AB 2655 alignment).
-  const [showAiLabel, setShowAiLabel] = useState<boolean>(true);
+  // S7-A13 — AI-disclosure pill un-gated. EU AI Act Article 50 + CA AB
+  // 2655 disclosure obligations are not globally toggleable. The previous
+  // `showAiLabel` admin master switch let an operator turn off every
+  // disclosure pill site-wide; the existence of the kill-switch is itself
+  // the regulatory issue, even if never flipped. Disclosure is now a
+  // fact-of-record on `is_ai_generated`; admin styling experiments would
+  // ship as a separate setting that controls placement, never visibility.
 
   // T11 — post-article exit path. Up to three most-recent same-category
   // articles, excluding the current one. Editorial selection (no
@@ -604,11 +606,9 @@ export default function StoryPage() {
         });
         if (cancelled) return;
 
-        // T234 — read the AI-disclosure master switch alongside the
-        // existing settings consumers (free_article_limit, registration_wall,
-        // tts_default). Default true when the row is missing so disclosure
-        // is the safe default; admin can flip to hide.
-        setShowAiLabel(isEnabled(allSettings, 'show_ai_label', true));
+        // S7-A13 — `show_ai_label` master switch was deleted; AI
+        // disclosure renders unconditionally on `is_ai_generated`. The
+        // settings row, if still present in the DB, is no longer read.
 
         const {
           data: { user: authUser },
@@ -1413,6 +1413,28 @@ export default function StoryPage() {
   // the story has loaded; the SEO crawler reads the rendered HTML, so a
   // null branch during load is fine (no crawler will hit a loading state).
   const siteOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+  // S7-I5 — `<meta name="ai-generated" content="true">` for AI-flagged
+  // articles. Injected client-side because the article surface is a
+  // client component (auth-gated content); the JSON-LD above is the
+  // primary regulatory signal (server-rendered, indexable). The meta
+  // tag is the secondary signal scrapers / aggregators consume.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (!story?.is_ai_generated) return;
+    const META_ID = 'vp-ai-disclosure-meta';
+    let el = document.head.querySelector<HTMLMetaElement>(`meta#${META_ID}`);
+    if (!el) {
+      el = document.createElement('meta');
+      el.id = META_ID;
+      el.name = 'ai-generated';
+      document.head.appendChild(el);
+    }
+    el.content = 'true';
+    return () => {
+      el?.remove();
+    };
+  }, [story?.is_ai_generated]);
+
   const storyJsonLd = story
     ? newsArticle({
         headline: story.title || '',
@@ -1421,6 +1443,12 @@ export default function StoryPage() {
         dateModified: story.updated_at || story.published_at,
         description: story.excerpt || null,
         siteUrl: siteOrigin,
+        // S7-I5 — machine-readable AI disclosure. Pre-emptive compliance
+        // with EU AI Act Article 50 (effective Aug 2026) + CA AB 2655
+        // (already in force). Companion to the visible disclosure pill.
+        isAiGenerated: !!story.is_ai_generated,
+        aiModel: (story as { ai_model?: string | null }).ai_model ?? null,
+        aiProvider: (story as { ai_provider?: string | null }).ai_provider ?? null,
       })
     : null;
 
@@ -1728,11 +1756,10 @@ export default function StoryPage() {
                   </p>
                 )}
 
-                {/* T234 — AI-disclosure pill. Renders only when the
-                    article was synthesized by the pipeline AND the admin
-                    master switch is on. Companion to the privacy-policy
-                    EU AI Act / CA AB 2655 disclosure (T267). */}
-                {story.is_ai_generated && showAiLabel && (
+                {/* S7-A13 — AI-disclosure pill. Un-gated; predicate is the
+                    fact `is_ai_generated`. Regulatory disclosure under EU
+                    AI Act / CA AB 2655 cannot be globally toggleable. */}
+                {story.is_ai_generated && (
                   <div style={{ marginBottom: 16 }}>
                     <span
                       title="This article was synthesized from multiple wire-source publications using AI assistance."
@@ -1754,12 +1781,20 @@ export default function StoryPage() {
                   </div>
                 )}
 
-                {/* T243 — author byline. Renders only when the article has a
-                    resolved author (author_id non-null + the joined row came
-                    back). Expert flag adds a subtle inline badge. Pipeline-
-                    authored / legacy articles with no author_id render
-                    nothing here, preserving the original layout. */}
-                {story.author && (
+                {/* S7-A43 — byline. Two render paths:
+                    1. AI-generated articles: suppress the human byline +
+                       expert badge entirely. An expert badge on an AI
+                       piece is fraudulent attribution under EU AI Act /
+                       CA AB 2655. Render "Compiled by Verity Post" for
+                       AI-only pieces; render "Verified by <verifier>" if
+                       the synthesis was reviewed by a human verifier
+                       (requires `verified_by` to land via AR1 — until
+                       then "Compiled by Verity Post" is the safe label).
+                    2. Human-authored articles: existing byline + expert
+                       badge logic unchanged.
+                    T243 — only render when the article has a resolved
+                    author. */}
+                {story.is_ai_generated ? (
                   <div
                     style={{
                       fontSize: 13,
@@ -1772,33 +1807,54 @@ export default function StoryPage() {
                     }}
                   >
                     <span>
-                      By{' '}
+                      Compiled by{' '}
                       <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
-                        {story.author.display_name || story.author.username || 'Verity Post'}
+                        Verity Post
                       </span>
                     </span>
-                    {story.author.is_expert && (
-                      <span
-                        title={story.author.expert_title || 'Verified expert'}
-                        style={{
-                          display: 'inline-block',
-                          fontSize: 11,
-                          fontWeight: 600,
-                          color: 'var(--accent)',
-                          background: 'var(--card)',
-                          border: '1px solid var(--border)',
-                          padding: '2px 8px',
-                          borderRadius: 999,
-                          letterSpacing: '0.02em',
-                          fontFamily: 'var(--font-sans)',
-                        }}
-                      >
-                        {story.author.expert_title
-                          ? `Expert · ${story.author.expert_title}`
-                          : 'Expert'}
-                      </span>
-                    )}
                   </div>
+                ) : (
+                  story.author && (
+                    <div
+                      style={{
+                        fontSize: 13,
+                        color: 'var(--dim)',
+                        marginBottom: 8,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <span>
+                        By{' '}
+                        <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                          {story.author.display_name || story.author.username || 'Verity Post'}
+                        </span>
+                      </span>
+                      {story.author.is_expert && (
+                        <span
+                          title={story.author.expert_title || 'Verified expert'}
+                          style={{
+                            display: 'inline-block',
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: 'var(--accent)',
+                            background: 'var(--card)',
+                            border: '1px solid var(--border)',
+                            padding: '2px 8px',
+                            borderRadius: 999,
+                            letterSpacing: '0.02em',
+                            fontFamily: 'var(--font-sans)',
+                          }}
+                        >
+                          {story.author.expert_title
+                            ? `Expert · ${story.author.expert_title}`
+                            : 'Expert'}
+                        </span>
+                      )}
+                    </div>
+                  )
                 )}
 
                 <div

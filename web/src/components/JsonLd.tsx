@@ -77,9 +77,25 @@ interface NewsArticleInput {
   imageUrl?: string | null;
   description?: string | null;
   siteUrl: string;
+  // S7-I5 — machine-readable AI disclosure. EU AI Act Article 50 (Aug
+  // 2026) + CA AB 2655 already-in-force. When `isAiGenerated` is true,
+  // the schema gains a `creativeWorkStatus: 'AI-Generated'` field and
+  // a SoftwareApplication creator with the model + provider name.
+  isAiGenerated?: boolean;
+  aiModel?: string | null;
+  aiProvider?: string | null;
 }
 
 export function newsArticle(input: NewsArticleInput) {
+  const aiCreator =
+    input.isAiGenerated && (input.aiModel || input.aiProvider)
+      ? {
+          '@type': 'SoftwareApplication',
+          name: [input.aiProvider, input.aiModel].filter(Boolean).join(' '),
+          applicationCategory: 'GenerativeAIModel',
+        }
+      : undefined;
+
   return {
     '@context': 'https://schema.org',
     '@type': 'NewsArticle',
@@ -92,6 +108,11 @@ export function newsArticle(input: NewsArticleInput) {
     dateModified: input.dateModified || input.datePublished || undefined,
     description: input.description || undefined,
     image: input.imageUrl ? [input.imageUrl] : undefined,
+    // S7-I5 — `creativeWorkStatus: 'AI-Generated'` is the schema.org
+    // signal Google's "About this result" surface consumes. Absent on
+    // human-authored articles; presence is the disclosure.
+    creativeWorkStatus: input.isAiGenerated ? 'AI-Generated' : undefined,
+    creator: aiCreator,
     author: input.authorName
       ? {
           '@type': 'Person',

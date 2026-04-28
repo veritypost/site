@@ -182,6 +182,27 @@ export async function addSubscriptionItem(
   });
 }
 
+// S4-T0.4 — remove a subscription item entirely. Used as the rollback
+// for add-path failures in /api/family/add-kid-with-seat: when the
+// route just attached a new line item via addSubscriptionItem and the
+// kid_profiles insert then fails, restoring quantity to 0 leaves the
+// item alive (Stripe still bills $0 line items on some plans, and
+// future patch ops have to special-case it). The right rollback is
+// to DELETE the item.
+//
+// proration_behavior=create_prorations rebates any partial-period
+// charges back to the customer's balance. Pass an idempotencyKey so
+// retries (network stall during the rollback itself) don't double-act.
+export async function removeSubscriptionItem(itemId, { idempotencyKey } = {}) {
+  return stripeFetch(`/subscription_items/${itemId}`, {
+    method: 'DELETE',
+    body: {
+      proration_behavior: 'create_prorations',
+    },
+    idempotencyKey,
+  });
+}
+
 // Verify webhook signature per Stripe spec. Returns the parsed event
 // or throws. Accepts the raw request body as a string.
 export function verifyWebhook(rawBody, signatureHeader) {

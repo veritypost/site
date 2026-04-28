@@ -691,7 +691,7 @@ function KidsAppBanner() {
         <div style={{ fontSize: 12, color: C.dim, lineHeight: 1.5 }}>
           {live
             ? 'Then open the app and enter a pair code from this page to link the account.'
-            : 'Coming soon to the App Store. Pair codes from this page will link the account once the app launches.'}
+            : 'The Verity Kids iOS app is not yet available. Pair codes from this page link the account once the app is installed.'}
         </div>
       </div>
       {live ? (
@@ -732,7 +732,7 @@ function KidsAppBanner() {
             fontWeight: 600,
           }}
         >
-          Coming soon to the App Store
+          App not yet available
         </span>
       )}
     </div>
