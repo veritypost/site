@@ -283,7 +283,7 @@ export default function ArticlesTable() {
               >
                 <td style={{ padding: `${S[2]}px ${S[3]}px` }}>
                   <Link
-                    href={`/story/${row.slug}`}
+                    href={`/${row.slug}`}
                     style={{
                       color: C.white,
                       textDecoration: 'none',
