@@ -33,6 +33,24 @@ export async function GET() {
 
   const service = createServiceClient();
 
+  // Banned users must not be able to mint or share referral codes —
+  // they're a back-channel growth vector for accounts that were
+  // explicitly removed from the platform. Return empty slugs so the
+  // client renders the "no links" state gracefully without leaking
+  // ban state.
+  try {
+    const { data: row } = await service
+      .from('users')
+      .select('is_banned')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (row?.is_banned === true) {
+      return NextResponse.json({ slugs: [] });
+    }
+  } catch (e) {
+    console.error('[referrals.me] ban check threw:', e);
+  }
+
   const rate = await checkRateLimit(service, {
     key: `referrals_me:${user.id}`,
     policyKey: 'referrals_me',
