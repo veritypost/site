@@ -26,10 +26,9 @@ BEGIN
    WHERE proname = 'resolve_report'
      AND pronamespace = 'public'::regnamespace;
   IF body_text IS NULL THEN
-    RAISE EXCEPTION 'S1-T3.8 abort: resolve_report not found';
-  END IF;
-  IF body_text LIKE '%report_resolved%' THEN
-    RAISE NOTICE 'S1-T3.8 no-op: resolve_report already notifies reporter';
+    RAISE NOTICE 'S1-T3.8 pre-flight: resolve_report absent (pre-dropped or first install) — DROP+CREATE below will install fresh';
+  ELSIF body_text LIKE '%report_resolved%' THEN
+    RAISE NOTICE 'S1-T3.8 no-op: resolve_report already notifies reporter — DROP+CREATE below reinstalls idempotently';
   END IF;
 END $$;
 
