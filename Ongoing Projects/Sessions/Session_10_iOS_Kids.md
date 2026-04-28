@@ -17,14 +17,17 @@
 ## Items
 
 ### S10-Q3b-pair — Kid JWT issuer flip
-🟨 **Source:** OWNER-ANSWERS_READ_ONLY_HISTORICAL.md Q3b — RED verdict from audit. Co-ships with S1 (RPC kid-rejects + RLS hardening) + S3 (middleware kid-blind fix + `kindAllowed` param).
-**Files:**
-- `web/src/app/api/kids/pair/route.js:149` — change `iss: 'verity-post-kids-pair'` to `iss: \`${SUPABASE_URL}/auth/v1\``. Add `is_kid_delegated: true` claim explicitly at top level. Move `kid_profile_id` to top level (currently top level — verify; coordinate with S1's `current_kid_profile_id()` rewrite to read top level).
-- `web/src/app/api/kids/refresh/route.js:114` — same iss + claim shape.
-**Wait for:** S1 RPC kid-rejects migration + S1 `users` RLS RESTRICTIVE policies + S3 middleware kid-blind fix + S3 `kindAllowed` param. **Do not flip the issuer until all three peer sessions land.**
+🟩 **shipped via cross-session leak in `4ddef375`.** Both prerequisites verified shipped: S1 (`87040fb` RLS RESTRICTIVE + `93161fe` is_kid_delegated() RPC prologue), S3 (`fb42099` middleware kid-blind + kindAllowed gate). My commit's pre-staged content was bundled into the S6-A61 commit by the concurrent staging mechanism. Changes verified in-tree:
+- `iss: \`${SUPABASE_URL}/auth/v1\`` (was 'verity-post-kids-pair') in both pair + refresh routes; SUPABASE_URL env-guard 503s if missing.
+- Top-level claims `is_kid_delegated`/`kid_profile_id`/`parent_user_id` (backward-compat for pre-flip iOS in flight + lib/auth.js getUser).
+- `app_metadata.{is_kid_delegated,kid_profile_id,parent_user_id}` (post-flip Supabase-issuer shape; read by `public.current_kid_profile_id()` which the as-shipped S1 function reads from app_metadata, not top-level as the audit doc said).
+- Refresh-verify path reads from BOTH top-level and app_metadata so a token minted under either shape rotates cleanly.
+- `/api/kids/quiz/[id]` (S10-A6) bearer verifier reads same dual-shape claims.
+
+Audit-finding correction: audit doc said "S1's `current_kid_profile_id()` rewrite to read top level"; the as-shipped function reads `app_metadata`. Wrote claims under app_metadata (mirrored top-level for in-flight backward-compat) to match the SQL function as it actually exists.
 
 ### S10-A2 — Kid pair JWT issuer mismatch (resolved by Q3b above)
-🟩 Same as S10-Q3b-pair.
+🟩 Same as S10-Q3b-pair (`4ddef375` cross-session leak).
 
 ### S10-A3-iOS — `parental_consents` upsert silently fails
 🟨 DB constraint lives in S1-A3. iOS slice: verify the upsert hits the new constraint correctly post-S1 ship. **Pure verification, no code work.**
@@ -51,7 +54,7 @@
 🟩 No work.
 
 ### S10-A70 — Kid pair JWT signed with same `SUPABASE_JWT_SECRET`
-🟨 Bundle with S10-Q3b-pair. Long-term fix is separate signing key (per memory, this is AR2 — multi-week, parked).
+🟨 **deferred to AR2.** Long-term fix is a separate signing key — multi-week work. Q3b-pair narrowed the attack surface (issuer + dual-shape claims) but adult GoTrue tokens minted with the same secret are still structurally signable as kid tokens; defended by claim-shape verification (is_kid_delegated must be true) + lib/auth.js's kindAllowed gate, but the cryptographic separation is the AR2 surface.
 
 ### S10-A84 — KidQuizEngineView writeAttempt single retry no backoff
 🟩 **`c6d8b68`.** dispatchWrite now runs primary + 2 retries with 0.5s / 1.5s backoff. Total retry budget = 2s + 3 RPC calls; fits inside the 3s drain-gate window. T251 persistence layer still owns the cross-launch recovery for terminal failures.
@@ -96,7 +99,7 @@
 🟩 **`f4836f3`.** Swept `grep -in "verity post\|verityPost" VerityPostKids/VerityPostKids/*.swift`. Remaining occurrences are all canonical: "Verity Post Kids" (PairCodeView title, Info.plist), "veritypost.com" (URL constants in SupabaseKidsClient, ProfileView, PairCodeView mailto), and code identifiers `VerityPostKidsApp`/`VerityPostKids` (folder/struct names — not user-facing). No bare "Verity" remains in user-facing copy.
 
 ### S10-T0.5-iOS — Kid token claim shape coherence
-🟨 Kid mint at `kids/pair/route.js:153` puts `kid_profile_id` at top level. S1 migration rewrites `current_kid_profile_id()` to read top-level. **No iOS change.** Verification only after S1 ships.
+🟩 **closed by `4ddef375` Q3b-pair flip.** Kid token now publishes `kid_profile_id` at top level AND under `app_metadata`. The as-shipped `public.current_kid_profile_id()` reads from `app_metadata` (verified via pg_get_functiondef); the dual-write keeps the pre-flip top-level shape valid for iOS clients still in flight on existing tokens. No iOS change required.
 
 ### S10-T3.2 — Bundle Phase 5.6 graduation deep link with iOS parent UI
 🟧 **OWNER-PENDING** — TODO2 T3.2. Owner picks (A) ship Phase 5.5 standalone (~7.5h) or (B) bundle 5.5+5.6 deep-link (~10-11h, requires Universal Links setup which is owner Apple Dev console).
