@@ -4,9 +4,9 @@
  * Client wrapper around the article body. Decides between read-only and
  * edit-mode rendering based on the canEdit flag the server passed in.
  *
- * The editor (toolbar + InlineEditor) is loaded via next/dynamic with
- * ssr:false so non-editors never receive its bundle. This keeps the
- * marked + sanitize-html-equivalent client code out of the read path.
+ * The editor (full story-manager surface — see ArticleEditor) is loaded
+ * via next/dynamic with ssr:false so non-editors never receive its
+ * bundle. The read-only path stays a tiny tree of static markup.
  */
 
 import dynamic from 'next/dynamic';
@@ -22,6 +22,7 @@ export type ArticleSurfaceArticle = {
   body: string;
   status: string;
   age_band: string | null;
+  is_kids_safe: boolean | null;
   published_at: string | null;
   updated_at: string | null;
 };

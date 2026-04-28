@@ -135,6 +135,7 @@ export default async function ArticleSlugPage({ params }: { params: { slug: stri
           body: article.body ?? '',
           status: article.status,
           age_band: article.age_band,
+          is_kids_safe: article.is_kids_safe,
           published_at: article.published_at,
           updated_at: article.updated_at,
         }}

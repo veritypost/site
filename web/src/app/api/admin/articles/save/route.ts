@@ -21,6 +21,11 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction, requireAdminOutranks } from '@/lib/adminMutation';
 
+// Mirrors web/src/app/api/admin/articles/[id]/route.ts and
+// new-draft/route.ts. Same shape kept across all three so any slug that
+// the PATCH endpoint accepts is also accepted by save, and vice versa.
+const SLUG_SAFE = /^[a-z0-9][a-z0-9-]{0,118}[a-z0-9]$|^[a-z0-9]$/;
+
 type ArticleFields = Record<string, unknown>;
 type TimelineEntryPayload = {
   id?: string;
@@ -95,7 +100,33 @@ export async function POST(request: Request) {
       (prior as { hero_pick_for_date?: string | null }).hero_pick_for_date ?? null;
   }
 
-  const articleRow: ArticleFields = { ...body.article };
+  // Slug normalization + validation + collision check. The legacy story-
+  // manager / kids-story-manager surfaces let the user type any string
+  // into the URL field; the save path used to bubble a generic 500 on
+  // unique-constraint violation. Validate up front and 409 on collision
+  // so the editor can show a clean "URL already taken" message.
+  const rawSlug = String(body.article.slug ?? '').trim().toLowerCase();
+  if (!SLUG_SAFE.test(rawSlug)) {
+    return NextResponse.json(
+      { error: 'URL must be lowercase letters, numbers, or hyphens (start and end with a letter or number)' },
+      { status: 422 }
+    );
+  }
+  const { data: collision, error: collisionErr } = await service
+    .from('articles')
+    .select('id')
+    .eq('slug', rawSlug)
+    .is('deleted_at', null)
+    .maybeSingle();
+  if (collisionErr) {
+    console.error('[admin.articles.save] slug collision lookup failed:', collisionErr.message);
+    return NextResponse.json({ error: 'Could not check URL availability' }, { status: 500 });
+  }
+  if (collision && (!isUpdate || collision.id !== articleId)) {
+    return NextResponse.json({ error: 'url_taken' }, { status: 409 });
+  }
+
+  const articleRow: ArticleFields = { ...body.article, slug: rawSlug };
 
   // Audit trail for the hero-pick column (schema/144). Only stamp when
   // the value actually changes — story-manager passes `hero_pick_for_date`
