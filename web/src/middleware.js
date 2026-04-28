@@ -245,8 +245,8 @@ export async function middleware(request) {
   // F7 Decision 1 — legacy admin shells deleted. Exact-match 301 redirects
   // so external deep links (emails, Slack, bookmarks) keep working without
   // catching the F7 sub-routes /admin/pipeline/{runs,costs,settings} that
-  // share the prefix. Both legacy pages carried @admin-verified markers;
-  // Decision 1 + the F7-pipeline-restructure plan are the deferred approval.
+  // share the prefix. Both legacy pages share the admin role-gate; the
+  // F7-pipeline-restructure plan covers the deferred approval.
   if (pathname === '/admin/pipeline' || pathname === '/admin/ingest') {
     const dest = request.nextUrl.clone();
     dest.pathname = '/admin/newsroom';
