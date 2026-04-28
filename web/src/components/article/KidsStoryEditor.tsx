@@ -476,16 +476,20 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
     setIsDirty(true);
   };
 
-  const saveAll = async () => {
+  // Optional override lets publishStory force status='published' on the
+  // very same save dispatch instead of relying on a setState that won't
+  // have flushed by the time saveAll reads `story.status` from closure.
+  const saveAll = async (override?: Partial<StoryForm>) => {
     setSaving(true);
     try {
-      let categoryId = story.category_id;
-      if (!categoryId && story.category) {
-        const { data: catData } = await supabase.from('categories').select('id').eq('name', story.category).single();
+      const effective: StoryForm = { ...story, ...(override || {}) };
+      let categoryId = effective.category_id;
+      if (!categoryId && effective.category) {
+        const { data: catData } = await supabase.from('categories').select('id').eq('name', effective.category).single();
         if (catData) categoryId = catData.id;
       }
 
-      const slug = story.slug || (story.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now());
+      const slug = effective.slug || (effective.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now());
 
       const currentEntry = entries.find((e) => e.is_current && e.type === 'story') || entries.filter((e) => e.type === 'story').pop();
 
@@ -495,14 +499,14 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
         body: JSON.stringify({
           article_id: storyId || null,
           article: {
-            title: story.title,
+            title: effective.title,
             slug,
-            excerpt: story.summary || '',
-            status: story.status,
+            excerpt: effective.summary || '',
+            status: effective.status,
             category_id: categoryId,
-            is_breaking: story.is_breaking || false,
+            is_breaking: effective.is_breaking || false,
             is_kids_safe: true,
-            kids_summary: story.summary || '',
+            kids_summary: effective.summary || '',
             // S6-Cleanup-§D3: this manager saves the kids-band variant.
             // Tweens band is parked pre-AR1 — historical rows readable, no
             // new writes from the pipeline.
@@ -518,7 +522,7 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
             type: entry.type,
             content: entry.type === 'story' ? (entry.content || null) : null,
           })),
-          sources: (story.sources || []).map((s, i) => ({
+          sources: (effective.sources || []).map((s, i) => ({
             publisher: s.outlet || '',
             url: s.url || '',
             title: s.headline || '',
@@ -555,8 +559,10 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
         setQuizzes((prev) => prev.map((q) => (q.entry_id && remap[q.entry_id] ? { ...q, entry_id: remap[q.entry_id] } : q)));
       }
 
-      // Reflect persisted slug locally.
-      setStory((prev) => ({ ...prev, slug }));
+      // Reflect persisted slug + status locally. status is included
+      // because publishStory passes it via override — without this, UI
+      // would still show the pre-publish status until reload.
+      setStory((prev) => ({ ...prev, slug, status: effective.status }));
       setIsDirty(false);
 
       if (wasNew || (slugChanged && embedded)) {
@@ -583,8 +589,10 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
   };
 
   const publishStory = async () => {
-    updateStory('status', 'published');
-    await saveAll();
+    // Pass status='published' via the saveAll override — relying on
+    // updateStory + setState here would race the immediate saveAll() and
+    // the request would go out with the stale 'draft' status.
+    await saveAll({ status: 'published' });
   };
 
   const deleteStory = () => {
