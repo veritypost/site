@@ -207,6 +207,13 @@ struct BadgeUnlockScene: View {
     // MARK: Choreography
 
     private func runChoreography(at center: CGPoint) {
+        // Reset shimmer rotation before each run. Without this, a re-
+        // presentation of the scene under the same view identity (e.g.
+        // queueing back-to-back badge unlocks) starts the shimmer sweep
+        // from wherever the last animation left off — typically the
+        // 360° resting pose — and the new sweep barely visibly moves.
+        shimmerRotation = 0
+
         if reduceMotion {
             // Static badge reveal: overlay, badge, text, buttons all in
             // final position. No shimmer, no pulse rings, no confetti.
