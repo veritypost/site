@@ -131,11 +131,23 @@ export async function GET(
         { status: 401, headers: NO_STORE }
       );
     }
-    if (
-      !decoded ||
-      decoded.is_kid_delegated !== true ||
-      typeof decoded.kid_profile_id !== 'string'
-    ) {
+    // Q3b — read claims from both top-level (pre-Q3b shape, still in
+    // flight on existing devices) and app_metadata (post-Q3b Supabase-
+    // issuer shape).
+    const claims = (decoded || {}) as Record<string, unknown>;
+    const meta =
+      claims.app_metadata && typeof claims.app_metadata === 'object'
+        ? (claims.app_metadata as Record<string, unknown>)
+        : {};
+    const isKidDelegated =
+      claims.is_kid_delegated === true || meta.is_kid_delegated === true;
+    const kidProfileIdClaim =
+      typeof claims.kid_profile_id === 'string' && claims.kid_profile_id
+        ? (claims.kid_profile_id as string)
+        : typeof meta.kid_profile_id === 'string'
+          ? (meta.kid_profile_id as string)
+          : null;
+    if (!isKidDelegated || !kidProfileIdClaim) {
       return NextResponse.json(
         { error: 'Invalid token' },
         { status: 401, headers: NO_STORE }

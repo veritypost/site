@@ -61,18 +61,31 @@ export async function POST(request) {
 
     // Shape guard — refuse any token that isn't a kid-delegated pair JWT, even
     // if signed correctly. Stops an adult GoTrue access_token (same secret)
-    // from being rotated into a kid JWT by this endpoint.
-    if (
-      !decoded ||
-      decoded.is_kid_delegated !== true ||
-      typeof decoded.kid_profile_id !== 'string' ||
-      typeof decoded.parent_user_id !== 'string'
-    ) {
+    // from being rotated into a kid JWT by this endpoint. Q3b: read claims
+    // from BOTH top-level (pre-Q3b shape, still in flight on existing
+    // devices) AND app_metadata (post-Q3b Supabase-issuer shape).
+    const claims = decoded || {};
+    const meta =
+      claims.app_metadata && typeof claims.app_metadata === 'object'
+        ? claims.app_metadata
+        : {};
+    const isKidDelegated =
+      claims.is_kid_delegated === true || meta.is_kid_delegated === true;
+    const kidProfileId =
+      typeof claims.kid_profile_id === 'string' && claims.kid_profile_id
+        ? claims.kid_profile_id
+        : typeof meta.kid_profile_id === 'string'
+          ? meta.kid_profile_id
+          : null;
+    const parentUserId =
+      typeof claims.parent_user_id === 'string' && claims.parent_user_id
+        ? claims.parent_user_id
+        : typeof meta.parent_user_id === 'string'
+          ? meta.parent_user_id
+          : null;
+    if (!isKidDelegated || !kidProfileId || !parentUserId) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
-
-    const kidProfileId = decoded.kid_profile_id;
-    const parentUserId = decoded.parent_user_id;
 
     // Profile state check. kid_profiles has no frozen_at/deleted_at columns;
     // `is_active=false` is the soft-delete slot, `paused_at IS NOT NULL` is the
@@ -102,17 +115,35 @@ export async function POST(request) {
     const now = Math.floor(Date.now() / 1000);
     const exp = now + TOKEN_TTL_SECONDS;
 
+    // Q3b — issuer flip. See web/src/app/api/kids/pair/route.js for the
+    // full rationale. Same Supabase-issuer URL so auth.jwt() resolves
+    // through the standard path; same dual-shape claim placement (top-
+    // level + app_metadata) so both pre-Q3b and post-Q3b consumers
+    // (lib/auth.js getUser, public.is_kid_delegated, and
+    // public.current_kid_profile_id) read the same identity.
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (!supabaseUrl) {
+      console.error('[kids.refresh] missing SUPABASE_URL for issuer');
+      return NextResponse.json({ error: 'Server misconfigured' }, { status: 503 });
+    }
+    const issuer = `${supabaseUrl.replace(/\/+$/, '')}/auth/v1`;
+
     const newToken = jwt.sign(
       {
         aud: 'authenticated',
         exp,
         iat: now,
-        iss: 'verity-post-kids-pair',
+        iss: issuer,
         sub: kidProfileId,
         role: 'authenticated',
         is_kid_delegated: true,
         kid_profile_id: kidProfileId,
         parent_user_id: parentUserId,
+        app_metadata: {
+          is_kid_delegated: true,
+          kid_profile_id: kidProfileId,
+          parent_user_id: parentUserId,
+        },
       },
       jwtSecret,
       { algorithm: 'HS256' }

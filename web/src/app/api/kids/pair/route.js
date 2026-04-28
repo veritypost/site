@@ -5,12 +5,20 @@
 //   Input: { code, device? }
 //   Output: { access_token, kid_profile_id, kid_name, expires_at }
 //
-// JWT payload signed with SUPABASE_JWT_SECRET:
+// JWT payload signed with SUPABASE_JWT_SECRET (Q3b token shape):
+//   - iss: `${SUPABASE_URL}/auth/v1`  — matches the Supabase issuer so
+//          the supabase-swift client treats this as a first-class
+//          session and auth.jwt() resolves it through the standard path
 //   - sub: kid_profile_id  (so auth.uid() returns the kid_profile_id)
 //   - role: 'authenticated'
-//   - is_kid_delegated: true  (custom claim; RLS branches on this)
-//   - kid_profile_id: uuid     (duplicate of sub for clarity)
-//   - parent_user_id: uuid     (used by RLS to bind writes to the parent's users.id)
+//   - is_kid_delegated: true  (top-level; public.is_kid_delegated() RLS
+//          helper reads this top-level)
+//   - app_metadata: { is_kid_delegated, kid_profile_id, parent_user_id }
+//          (public.current_kid_profile_id() reads kid_profile_id from
+//          app_metadata; standard Supabase shape)
+//   - kid_profile_id, parent_user_id at top level too — backward-compat
+//          for in-flight kid tokens minted under the pre-Q3b shape +
+//          for `lib/auth.js` getUser() which reads either location.
 //
 // Kid iOS stores this token + uses it as the bearer on all Supabase calls.
 // RLS policies on kid-readable tables accept either adult session (parent path)
@@ -141,17 +149,40 @@ export async function POST(request) {
     const now = Math.floor(Date.now() / 1000);
     const exp = now + TOKEN_TTL_SECONDS;
 
+    // Q3b — issuer flip. Pre-Q3b iss was 'verity-post-kids-pair', a
+    // custom string the standard Supabase issuer-check would reject as
+    // unknown. The new iss matches the project's auth issuer URL so
+    // auth.jwt() resolves under the same code path as adult sessions
+    // and the Supabase-shape claims (app_metadata.kid_profile_id) are
+    // visible to public.current_kid_profile_id() (S1).
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (!supabaseUrl) {
+      console.error('[kids.pair] missing SUPABASE_URL for issuer');
+      return NextResponse.json({ error: 'Server misconfigured' }, { status: 503 });
+    }
+    const issuer = `${supabaseUrl.replace(/\/+$/, '')}/auth/v1`;
+
     const token = jwt.sign(
       {
         aud: 'authenticated',
         exp,
         iat: now,
-        iss: 'verity-post-kids-pair',
+        iss: issuer,
         sub: kid_profile_id,
         role: 'authenticated',
+        // Top-level: read by public.is_kid_delegated() and by the
+        // backward-compat branch in lib/auth.js getUser().
         is_kid_delegated: true,
         kid_profile_id,
         parent_user_id,
+        // app_metadata: read by public.current_kid_profile_id() and by
+        // S3's preferred branch in lib/auth.js getUser(). Mirrors the
+        // top-level fields so both shapes resolve to the same identity.
+        app_metadata: {
+          is_kid_delegated: true,
+          kid_profile_id,
+          parent_user_id,
+        },
       },
       jwtSecret,
       { algorithm: 'HS256' }

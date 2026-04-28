@@ -121,6 +121,44 @@ function ReaderInner() {
         if (Object.keys(cfg).length) setConfig((prev) => ({ ...prev, ...cfg }));
         if (Object.keys(n).length) setNums((prev) => ({ ...prev, ...n }));
       }
+
+      // S6-A61: hydrate onboarding step copy + enabled flags from
+      // `settings.onboarding_steps`. Stored as a JSON-encoded string
+      // because the settings table value column is text. Welcome
+      // carousel reads the same key (S7 owns that wire-up).
+      const { data: onboardingRow } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'onboarding_steps')
+        .maybeSingle();
+      if (onboardingRow?.value) {
+        try {
+          const parsed = JSON.parse(String(onboardingRow.value)) as
+            | { steps?: Array<{ id?: string; name?: string; copy?: string; enabled?: boolean; order?: number }> }
+            | null;
+          if (parsed?.steps && Array.isArray(parsed.steps)) {
+            // Merge by id with the defaults so newly-added defaults
+            // surface even if a stale persisted blob exists.
+            const byId = new Map(parsed.steps.map((s) => [s.id, s]));
+            setOnboardingSteps((prev) =>
+              prev.map((d) => {
+                const stored = byId.get(d.id);
+                if (!stored) return d;
+                return {
+                  ...d,
+                  name: stored.name ?? d.name,
+                  copy: stored.copy ?? d.copy,
+                  enabled: typeof stored.enabled === 'boolean' ? stored.enabled : d.enabled,
+                  order: typeof stored.order === 'number' ? stored.order : d.order,
+                };
+              })
+            );
+          }
+        } catch (err) {
+          console.error('[admin.reader] onboarding_steps parse failed:', err);
+        }
+      }
+
       setLoading(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -177,12 +215,46 @@ function ReaderInner() {
     fetch('/api/admin/settings/invalidate', { method: 'POST' }).catch(err => { console.error('[admin/reader] settings invalidate', err); });
   };
 
-  const toggleStep = (id: string) => setOnboardingSteps((prev) => prev.map((s) => s.id === id ? { ...s, enabled: !s.enabled } : s));
+  // S6-A61: persist onboarding-steps edits to settings.onboarding_steps.
+  // Welcome carousel reads the same key (S7-owned wire-up follows).
+  const persistOnboarding = async (next: typeof onboardingSteps): Promise<boolean> => {
+    const value = JSON.stringify({ steps: next });
+    const res = await fetch('/api/admin/settings/upsert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'onboarding_steps', value }),
+    });
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      push({
+        message: `Save failed: ${json.error || 'unknown error'}`,
+        variant: 'danger',
+      });
+      return false;
+    }
+    fetch('/api/admin/settings/invalidate', { method: 'POST' }).catch(() => {});
+    return true;
+  };
+
+  const toggleStep = async (id: string) => {
+    const prev = onboardingSteps;
+    const next = prev.map((s) => (s.id === id ? { ...s, enabled: !s.enabled } : s));
+    setOnboardingSteps(next);
+    const ok = await persistOnboarding(next);
+    if (!ok) setOnboardingSteps(prev);
+  };
   const startEditStep = (step: { id: string; copy: string }) => { setEditingStep(step.id); setEditCopy(step.copy); };
-  const saveStepCopy = (id: string) => {
-    setOnboardingSteps((prev) => prev.map((s) => s.id === id ? { ...s, copy: editCopy } : s));
+  const saveStepCopy = async (id: string) => {
+    const prev = onboardingSteps;
+    const next = prev.map((s) => (s.id === id ? { ...s, copy: editCopy } : s));
+    setOnboardingSteps(next);
     setEditingStep(null);
-    push({ message: 'Step updated', variant: 'success' });
+    const ok = await persistOnboarding(next);
+    if (ok) {
+      push({ message: 'Step updated', variant: 'success' });
+    } else {
+      setOnboardingSteps(prev);
+    }
   };
 
   if (loading) {
