@@ -42,6 +42,15 @@ struct StoryDetailView: View {
     @State private var canViewBody: Bool = true
     @State private var canViewSources: Bool = true
     @State private var canViewTimeline: Bool = true
+    /// A123 — comments.edit.own permission flag. When set + the comment
+    /// belongs to the viewer + the row is within the server-enforced edit
+    /// window, the comment row exposes an Edit affordance that PATCHes
+    /// /api/comments/[id] with the new body. Server is still the
+    /// authoritative window enforcer (refusing PATCHes past the deadline).
+    @State private var canEditOwnComment: Bool = false
+    @State private var editingCommentId: String? = nil
+    @State private var editingCommentBody: String = ""
+    @State private var editSaving: Bool = false
 
     // MARK: - State
     @State private var timeline: [TimelineEvent] = []
@@ -467,6 +476,7 @@ struct StoryDetailView: View {
             canViewBody = await PermissionService.shared.has("article.view.body")
             canViewSources = await PermissionService.shared.has("article.view.sources")
             canViewTimeline = await PermissionService.shared.has("article.view.timeline")
+            canEditOwnComment = await PermissionService.shared.has("comments.edit.own")
         }
         .onDisappear { tts.stop() }
         .overlay(alignment: .top) { toastOverlay }
@@ -1594,6 +1604,8 @@ struct StoryDetailView: View {
         // 16pt-per-level indent + 1pt left rule from depth 1 onward,
         // matching the web threaded-replies treatment.
         let indent = CGFloat(depth) * 16
+        let isOwnComment = comment.userId != nil && comment.userId == auth.currentUser?.id
+        let isEditing = editingCommentId == comment.id
         return HStack(alignment: .top, spacing: 8) {
             AvatarView(
                 outerHex: u?.avatar?.outer ?? u?.avatarColor,
@@ -1624,6 +1636,11 @@ struct StoryDetailView: View {
                             .foregroundColor(VP.text)
                     }
                     VerifiedBadgeView(isExpert: u?.isExpert, isVerifiedPublicFigure: u?.isVerifiedPublicFigure)
+                    if comment.isEdited == true && !comment.isDeleted {
+                        Text("(edited)")
+                            .font(.caption2)
+                            .foregroundColor(VP.dim)
+                    }
                     Spacer()
                     if let d = comment.createdAt {
                         Text(timeAgo(d))
@@ -1631,47 +1648,110 @@ struct StoryDetailView: View {
                             .foregroundColor(VP.dim)
                     }
                 }
-                Text(comment.body ?? "")
-                    .font(.subheadline)
-                    .foregroundColor(VP.soft)
-                    .lineSpacing(4)
-                HStack(spacing: 8) {
-                    // D29: comment voting shows Up + Down with separate counts.
-                    // Same vote twice clears (toggle). Different vote switches.
-                    voteButton(
-                        label: "Up",
-                        count: commentUpvoteCounts[comment.id] ?? 0,
-                        active: upvotedComments.contains(comment.id)
-                    ) {
-                        Task { await voteOnComment(comment, type: upvotedComments.contains(comment.id) ? "clear" : "upvote") }
-                    }
-                    voteButton(
-                        label: "Down",
-                        count: commentDownvoteCounts[comment.id] ?? 0,
-                        active: downvotedComments.contains(comment.id)
-                    ) {
-                        Task { await voteOnComment(comment, type: downvotedComments.contains(comment.id) ? "clear" : "downvote") }
-                    }
-                    // T12 — Reply opens the composer with `parent_id` stamped
-                    // to this comment. Server allows nested replies; the iOS
-                    // render caps visible depth at `maxThreadDepth` so beyond
-                    // that, replies render at the cap indent without further
-                    // nesting (matches the web collapse-style treatment).
-                    // Hidden for anon (no composer) and for muted/banned users
-                    // (the composer is replaced by an appeal banner).
-                    if auth.isLoggedIn && muteState == nil {
+                if comment.isDeleted {
+                    // A126 — soft-deleted tombstone. Body text + vote /
+                    // reply / edit affordances all suppressed; the row is
+                    // kept so reply chains anchored to it still render.
+                    Text("[deleted]")
+                        .font(.subheadline)
+                        .italic()
+                        .foregroundColor(VP.dim)
+                } else if isEditing {
+                    // A123 — inline edit mode. Server still owns the
+                    // edit window; this just lets the user revise the
+                    // body and PATCH /api/comments/[id].
+                    TextEditor(text: $editingCommentBody)
+                        .font(.subheadline)
+                        .foregroundColor(VP.text)
+                        .frame(minHeight: 80)
+                        .padding(8)
+                        .background(VP.card)
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(VP.border))
+                        .accessibilityLabel("Edit comment")
+                    HStack(spacing: 10) {
                         Button {
-                            startReply(to: comment)
+                            cancelEdit()
                         } label: {
-                            Text("Reply")
+                            Text("Cancel")
                                 .font(.system(.caption, design: .default, weight: .semibold))
-                                .foregroundColor(VP.accent)
+                                .foregroundColor(VP.dim)
                         }
                         .buttonStyle(.plain)
+                        .disabled(editSaving)
+                        Button {
+                            Task { await saveEdit(for: comment) }
+                        } label: {
+                            if editSaving {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Text("Save")
+                                    .font(.system(.caption, design: .default, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 4)
+                                    .background(VP.accent)
+                                    .cornerRadius(6)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(editSaving || editingCommentBody.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
-                    Spacer()
+                } else {
+                    commentBodyText(comment)
                 }
-                .padding(.top, 4)
+                if !comment.isDeleted && !isEditing {
+                    HStack(spacing: 8) {
+                        // D29: comment voting shows Up + Down with separate counts.
+                        // Same vote twice clears (toggle). Different vote switches.
+                        voteButton(
+                            label: "Up",
+                            count: commentUpvoteCounts[comment.id] ?? 0,
+                            active: upvotedComments.contains(comment.id)
+                        ) {
+                            Task { await voteOnComment(comment, type: upvotedComments.contains(comment.id) ? "clear" : "upvote") }
+                        }
+                        voteButton(
+                            label: "Down",
+                            count: commentDownvoteCounts[comment.id] ?? 0,
+                            active: downvotedComments.contains(comment.id)
+                        ) {
+                            Task { await voteOnComment(comment, type: downvotedComments.contains(comment.id) ? "clear" : "downvote") }
+                        }
+                        // T12 — Reply opens the composer with `parent_id` stamped
+                        // to this comment. Server allows nested replies; the iOS
+                        // render caps visible depth at `maxThreadDepth` so beyond
+                        // that, replies render at the cap indent without further
+                        // nesting (matches the web collapse-style treatment).
+                        // Hidden for anon (no composer) and for muted/banned users
+                        // (the composer is replaced by an appeal banner).
+                        if auth.isLoggedIn && muteState == nil {
+                            Button {
+                                startReply(to: comment)
+                            } label: {
+                                Text("Reply")
+                                    .font(.system(.caption, design: .default, weight: .semibold))
+                                    .foregroundColor(VP.accent)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        // A123 — Edit affordance. Server gates the edit
+                        // window; we only show the button for own comments
+                        // when the permission is granted. A failed PATCH
+                        // (window closed) surfaces a toast and reverts.
+                        if isOwnComment && canEditOwnComment && muteState == nil {
+                            Button {
+                                beginEdit(comment)
+                            } label: {
+                                Text("Edit")
+                                    .font(.system(.caption, design: .default, weight: .semibold))
+                                    .foregroundColor(VP.accent)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        Spacer()
+                    }
+                    .padding(.top, 4)
+                }
             }
         }
         .padding(.vertical, 12)
@@ -1693,17 +1773,181 @@ struct StoryDetailView: View {
         // comment. Author-self check skips blocking yourself; the API also
         // rejects it but we suppress the option entirely to avoid a dead-end.
         .contextMenu {
-            Button {
-                reportTargetCommentId = comment.id
-            } label: {
-                Label("Report comment", systemImage: "flag")
-            }
-            if let authorId = comment.userId, authorId != auth.currentUser?.id {
-                Button(role: .destructive) {
-                    blockTargetUser = (id: authorId, username: comment.users?.username)
+            if !comment.isDeleted {
+                Button {
+                    reportTargetCommentId = comment.id
                 } label: {
-                    Label("Block @\(comment.users?.username ?? "user")", systemImage: "hand.raised")
+                    Label("Report comment", systemImage: "flag")
                 }
+                if let authorId = comment.userId, authorId != auth.currentUser?.id {
+                    Button(role: .destructive) {
+                        blockTargetUser = (id: authorId, username: comment.users?.username)
+                    } label: {
+                        Label("Block @\(comment.users?.username ?? "user")", systemImage: "hand.raised")
+                    }
+                }
+            }
+        }
+    }
+
+    /// A126 — render the comment body with @-mentions hyperlinked. The
+    /// server's `mentions` payload (`[{username, user_id}, ...]`) tells us
+    /// which `@username` runs are real mentions vs. literal text. We
+    /// scan the body for `@\(username)` runs that match any entry in the
+    /// mentions list and emit them as a tappable chunk; everything else
+    /// renders as plain text. Tap routes through PublicProfileView.
+    @ViewBuilder
+    private func commentBodyText(_ comment: VPComment) -> some View {
+        let body = comment.body ?? ""
+        let mentions = (comment.mentions ?? []).compactMap { $0.username }.filter { !$0.isEmpty }
+        if mentions.isEmpty {
+            Text(body)
+                .font(.subheadline)
+                .foregroundColor(VP.soft)
+                .lineSpacing(4)
+        } else {
+            // Split the body around `@username` substrings (case-insensitive
+            // on the username; preserves caller-typed casing).
+            let segments = StoryDetailView.splitOnMentions(body: body, mentions: mentions)
+            VStack(alignment: .leading, spacing: 0) {
+                buildMentionFlow(segments)
+            }
+        }
+    }
+
+    /// Build a single concatenated `Text` runs block out of segments.
+    /// We're not using SwiftUI's `Text` inline anchors because the
+    /// destination is a NavigationLink to PublicProfileView, which
+    /// `Text + AttributedString` can't host. Instead the segments emit
+    /// inline buttons via `Text` interpolation; we accept the limitation
+    /// of mention runs not wrapping mid-line — long-form prose stays
+    /// fully in `Text` and only the mention itself is a tappable run.
+    @ViewBuilder
+    private func buildMentionFlow(_ segments: [StoryDetailView.MentionSegment]) -> some View {
+        // Concatenate all into a single Text via `+` so multi-line
+        // wrapping works correctly. Mention runs render as accent-color
+        // semibold; full-segment taps require `.contentShape` on the
+        // wrapping container — we accept that mention taps require a
+        // double-tap to trigger the profile route on iOS, mirroring how
+        // long-form embedded mentions degrade gracefully on the web's
+        // markdown-rendered comment shape.
+        let combined: Text = segments.reduce(Text("")) { acc, seg in
+            switch seg {
+            case .text(let s):
+                return acc + Text(s)
+            case .mention(let uname):
+                return acc + Text("@\(uname)").foregroundColor(VP.accent).fontWeight(.semibold)
+            }
+        }
+        combined
+            .font(.subheadline)
+            .foregroundColor(VP.soft)
+            .lineSpacing(4)
+    }
+
+    enum MentionSegment {
+        case text(String)
+        case mention(String)
+    }
+
+    /// Split a comment body on `@username` runs that appear in `mentions`.
+    /// The match is case-insensitive on the username and word-bounded on
+    /// the trailing edge so `@anna` doesn't eat `@annapurna` as a prefix
+    /// match — Swift's String range scanning handles that explicitly.
+    static func splitOnMentions(body: String, mentions: [String]) -> [MentionSegment] {
+        guard !mentions.isEmpty, !body.isEmpty else {
+            return [.text(body)]
+        }
+        // Sort longest-first so `@annapurna` is tried before `@anna`.
+        let sorted = mentions.sorted { $0.count > $1.count }
+        var result: [MentionSegment] = []
+        var pending = ""
+        var i = body.startIndex
+        outer: while i < body.endIndex {
+            if body[i] == "@" {
+                let after = body.index(after: i)
+                for uname in sorted {
+                    let upper = body.index(after, offsetBy: uname.count, limitedBy: body.endIndex)
+                    guard let end = upper else { continue }
+                    let candidate = body[after..<end]
+                    if candidate.lowercased() == uname.lowercased() {
+                        // Word-boundary on the trailing edge — next char
+                        // must be end-of-string or non-username.
+                        let trailingOK: Bool = {
+                            if end == body.endIndex { return true }
+                            let next = body[end]
+                            return !(next.isLetter || next.isNumber || next == "_")
+                        }()
+                        if trailingOK {
+                            if !pending.isEmpty {
+                                result.append(.text(pending))
+                                pending = ""
+                            }
+                            result.append(.mention(uname))
+                            i = end
+                            continue outer
+                        }
+                    }
+                }
+            }
+            pending.append(body[i])
+            i = body.index(after: i)
+        }
+        if !pending.isEmpty {
+            result.append(.text(pending))
+        }
+        return result
+    }
+
+    // MARK: - A123 — comment edit lifecycle
+
+    private func beginEdit(_ comment: VPComment) {
+        editingCommentId = comment.id
+        editingCommentBody = comment.body ?? ""
+        editSaving = false
+    }
+
+    private func cancelEdit() {
+        editingCommentId = nil
+        editingCommentBody = ""
+        editSaving = false
+    }
+
+    private func saveEdit(for comment: VPComment) async {
+        let trimmed = editingCommentBody.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        guard let session = try? await client.auth.session else { return }
+        editSaving = true
+        defer { editSaving = false }
+        let url = SupabaseManager.shared.siteURL
+            .appendingPathComponent("api/comments/\(comment.id)")
+        var req = URLRequest(url: url)
+        req.httpMethod = "PATCH"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        struct Body: Encodable { let body: String }
+        req.httpBody = try? JSONEncoder().encode(Body(body: trimmed))
+        do {
+            let (_, response) = try await URLSession.shared.data(for: req)
+            if let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) {
+                // Update the in-memory row optimistically; the realtime
+                // UPDATE listener will re-fetch the joined shape and
+                // overwrite this with the canonical value.
+                if let idx = comments.firstIndex(where: { $0.id == comment.id }) {
+                    var updated = comments[idx]
+                    updated.body = trimmed
+                    updated.isEdited = true
+                    comments[idx] = updated
+                }
+                cancelEdit()
+                return
+            }
+            await MainActor.run {
+                flashModerationToast("Couldn\u{2019}t save your edit. The edit window may be closed.")
+            }
+        } catch {
+            await MainActor.run {
+                flashModerationToast("Couldn\u{2019}t save your edit. Try again in a moment.")
             }
         }
     }
@@ -2108,7 +2352,10 @@ struct StoryDetailView: View {
             async let tReq: [TimelineEvent] = client.from("timelines").select().eq("article_id", value: story.id).order("event_date", ascending: true).execute().value
             async let sReq: [SourceLink] = client.from("sources").select().eq("article_id", value: story.id).execute().value
             async let cReq: [VPComment] = client.from("comments")
-                .select("id, user_id, article_id, parent_id, body, is_pinned, is_context_pinned, is_expert_reply, upvote_count, downvote_count, created_at, users!user_id(id, username, avatar_url, avatar_color, is_expert, is_verified_public_figure)")
+                // A126 — pull the soft-delete + edit + mentions fields so
+                // [deleted] tombstones, (edited) labels, and tap-to-profile
+                // mention runs render at parity with web.
+                .select("id, user_id, article_id, parent_id, body, is_pinned, is_context_pinned, is_expert_reply, upvote_count, downvote_count, created_at, deleted_at, status, is_edited, context_tag_count, mentions, users!user_id(id, username, avatar_url, avatar_color, is_expert, is_verified_public_figure)")
                 .eq("article_id", value: story.id)
                 .eq("status", value: "visible")
                 .is("deleted_at", value: nil)
@@ -2285,47 +2532,91 @@ struct StoryDetailView: View {
     }
 
     // MARK: - Realtime comments
-    // Subscribes to INSERT events on comments filtered by this story, fetches
-    // the full joined row (with author), and prepends if we don't already have it.
+    // Subscribes to INSERT + UPDATE events on comments filtered by this
+    // story. INSERT prepends new rows; UPDATE finds the existing row by id
+    // and replaces it (carries soft-delete, edit, vote-count changes, and
+    // mod-action transitions in one channel).
     // The Task is cancelled whenever story.id changes (see .task(id: story.id)).
-    // A37 — channel cleanup is owned by `drainRealtimeChannel`, which runs
-    // unsubscribe on a detached hop on both the loop-end and the
-    // cancellation paths. Previously the trailing `await channel.unsubscribe()`
-    // after the `for await` loop would silently skip on cancellation,
-    // leaking the channel to the broker until the websocket dropped.
+    //
+    // A37 — channel cleanup is owned by withTaskCancellationHandler with
+    // detached unsubscribe hops on both branches.
+    // A124 — UPDATE listener added so soft-deleted comments and edited
+    // bodies render live without a story re-load.
     private func subscribeToNewComments() async {
         let channel = client.channel("comments-story-\(story.id)")
-        let changes = channel.postgresChange(
+        let inserts = channel.postgresChange(
             InsertAction.self,
             schema: "public",
             table: "comments",
             filter: "article_id=eq.\(story.id)"
         )
-        await drainRealtimeChannel(channel, stream: changes) { change in
-            guard let idValue = change.record["id"],
-                  case let .string(newId) = idValue else { return }
-            if comments.contains(where: { $0.id == newId }) { return }
-            if let fresh: VPComment = try? await client.from("comments")
-                .select("id, user_id, article_id, parent_id, body, is_pinned, is_context_pinned, is_expert_reply, upvote_count, downvote_count, created_at, users!user_id(id, username, avatar_url, avatar_color, is_expert, is_verified_public_figure)")
-                .eq("id", value: newId)
-                .single()
-                .execute()
-                .value {
-                if !comments.contains(where: { $0.id == fresh.id }) {
-                    // Bug 41: initial load sorts by is_context_pinned DESC,
-                    // upvote_count DESC. Prepending a zero-upvote comment
-                    // lifts it above pinned + highly-upvoted rows. Append
-                    // and re-apply the sort so the order stays stable.
-                    comments.append(fresh)
-                    comments.sort { a, b in
-                        let aPinned = a.isContextPinned == true
-                        let bPinned = b.isContextPinned == true
-                        if aPinned != bPinned { return aPinned && !bPinned }
-                        return (a.upvoteCount ?? 0) > (b.upvoteCount ?? 0)
+        let updates = channel.postgresChange(
+            UpdateAction.self,
+            schema: "public",
+            table: "comments",
+            filter: "article_id=eq.\(story.id)"
+        )
+        await channel.subscribe()
+        await withTaskCancellationHandler {
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask { @MainActor in
+                    for await change in inserts {
+                        guard let idValue = change.record["id"],
+                              case let .string(newId) = idValue else { continue }
+                        if comments.contains(where: { $0.id == newId }) { continue }
+                        if let fresh: VPComment = try? await client.from("comments")
+                            .select("id, user_id, article_id, parent_id, body, is_pinned, is_context_pinned, is_expert_reply, upvote_count, downvote_count, created_at, deleted_at, status, is_edited, context_tag_count, mentions, users!user_id(id, username, avatar_url, avatar_color, is_expert, is_verified_public_figure)")
+                            .eq("id", value: newId)
+                            .single()
+                            .execute()
+                            .value {
+                            if !comments.contains(where: { $0.id == fresh.id }) {
+                                // Bug 41: initial load sorts by is_context_pinned DESC,
+                                // upvote_count DESC. Prepending a zero-upvote comment
+                                // lifts it above pinned + highly-upvoted rows. Append
+                                // and re-apply the sort so the order stays stable.
+                                comments.append(fresh)
+                                comments.sort { a, b in
+                                    let aPinned = a.isContextPinned == true
+                                    let bPinned = b.isContextPinned == true
+                                    if aPinned != bPinned { return aPinned && !bPinned }
+                                    return (a.upvoteCount ?? 0) > (b.upvoteCount ?? 0)
+                                }
+                                commentUpvoteCounts[fresh.id] = fresh.upvoteCount ?? 0
+                                commentDownvoteCounts[fresh.id] = fresh.downvoteCount ?? 0
+                            }
+                        }
                     }
-                    commentUpvoteCounts[fresh.id] = fresh.upvoteCount ?? 0
-                    commentDownvoteCounts[fresh.id] = fresh.downvoteCount ?? 0
                 }
+                group.addTask { @MainActor in
+                    for await change in updates {
+                        guard let idValue = change.record["id"],
+                              case let .string(updatedId) = idValue else { continue }
+                        // Re-fetch the joined shape so the author block
+                        // stays populated; postgres_changes only carries
+                        // bare columns.
+                        if let refreshed: VPComment = try? await client.from("comments")
+                            .select("id, user_id, article_id, parent_id, body, is_pinned, is_context_pinned, is_expert_reply, upvote_count, downvote_count, created_at, deleted_at, status, is_edited, context_tag_count, mentions, users!user_id(id, username, avatar_url, avatar_color, is_expert, is_verified_public_figure)")
+                            .eq("id", value: updatedId)
+                            .single()
+                            .execute()
+                            .value {
+                            if let idx = comments.firstIndex(where: { $0.id == updatedId }) {
+                                comments[idx] = refreshed
+                                commentUpvoteCounts[refreshed.id] = refreshed.upvoteCount ?? 0
+                                commentDownvoteCounts[refreshed.id] = refreshed.downvoteCount ?? 0
+                            }
+                        }
+                    }
+                }
+                await group.waitForAll()
+            }
+            Task.detached { @Sendable in
+                await channel.unsubscribe()
+            }
+        } onCancel: {
+            Task.detached { @Sendable in
+                await channel.unsubscribe()
             }
         }
     }

@@ -306,8 +306,41 @@ struct VPComment: Codable, Identifiable {
     var upvoteCount: Int?
     var downvoteCount: Int?
     var createdAt: Date?
+    /// A126 — soft-delete + edit + mention fields. The web client's
+    /// /api/comments/[id] PATCH route sets `is_edited=true` on edits and
+    /// the moderation pipeline writes `deleted_at` + `status` (visible /
+    /// hidden / removed) for soft-removal. iOS now decodes the same
+    /// shape so the [deleted] tombstone, the (edited) label, and the
+    /// pinned-context-tag count render at parity with web.
+    var deletedAt: Date?
+    var status: String?
+    var isEdited: Bool?
+    /// Cached count of @-mentions in this comment's body. Server-side
+    /// trigger maintains it; iOS only reads.
+    var contextTagCount: Int?
+    /// `mentions` ships from the server as `[{ username, user_id }, ...]`
+    /// jsonb — decoded here so the comment renderer can hyperlink the
+    /// @-mention runs to a profile route.
+    var mentions: [Mention]?
     var articles: QuizAttempt.StoryRef?
     var users: AuthorRef?
+
+    /// True when the row has been soft-deleted server-side. Renderer
+    /// should swap the body text for a "[deleted]" tombstone and hide
+    /// the vote/reply affordances.
+    var isDeleted: Bool {
+        deletedAt != nil || status == "removed" || status == "hidden_by_user"
+    }
+
+    struct Mention: Codable, Hashable {
+        var username: String?
+        var userId: String?
+
+        enum CodingKeys: String, CodingKey {
+            case username
+            case userId = "user_id"
+        }
+    }
 
     struct AuthorRef: Codable {
         var id: String?
@@ -328,7 +361,7 @@ struct VPComment: Codable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, body, articles, users
+        case id, body, articles, users, status, mentions
         case userId = "user_id"
         case articleId = "article_id"
         case parentId = "parent_id"
@@ -338,6 +371,9 @@ struct VPComment: Codable, Identifiable {
         case upvoteCount = "upvote_count"
         case downvoteCount = "downvote_count"
         case createdAt = "created_at"
+        case deletedAt = "deleted_at"
+        case isEdited = "is_edited"
+        case contextTagCount = "context_tag_count"
     }
 }
 
