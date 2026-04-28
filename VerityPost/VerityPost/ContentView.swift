@@ -137,6 +137,13 @@ struct ContentView: View {
             } else if auth.needsEmailVerification {
                 VerifyEmailView()
                     .environmentObject(auth)
+            } else if auth.needsPickUsername {
+                // S9-Q2-iOS — magic-link signup creates the auth.users row
+                // without a public.users.username; PickUsernameView posts
+                // /api/auth/save-username and reloads the user before
+                // ContentView re-renders into MainTabView.
+                PickUsernameView()
+                    .environmentObject(auth)
             } else if auth.currentUser?.needsOnboarding == true && !auth.bypassOnboardingLocally {
                 // WelcomeView handles the onboarding stamp + user reload
                 // itself. When the reload flips `needsOnboarding` false

@@ -41,12 +41,27 @@ enum SessionExpiredReason: Equatable {
     case accountChange
 }
 
+/// S9-Q2-iOS — feature flag for the OAuth (Apple + Google) buttons on
+/// /login and /signup. Default false: magic-link is the canonical iOS
+/// auth flow per OWNER-ANSWERS Q2. Code preserved end-to-end so a one-
+/// line flip re-enables OAuth without a rebuild.
+let VPOAuthEnabled: Bool = false
+
 @MainActor
 final class AuthViewModel: ObservableObject {
     @Published var isLoggedIn = false
     @Published var isLoading = true
     @Published var currentUser: VPUser?
     @Published var authError: String?
+
+    /// S9-Q2-iOS — set after a successful /api/auth/send-magic-link call so
+    /// the LoginView / SignupView can swap to a "Check your inbox" card.
+    /// Cleared on a new send attempt or when the user dismisses the sheet.
+    @Published var magicLinkSentTo: String?
+    /// Resend-cooldown remaining seconds. Counts down from 30s after each
+    /// successful send. UI disables the resend button while > 0.
+    @Published var magicLinkCooldownSec: Int = 0
+    private var magicLinkCooldownTask: Task<Void, Never>?
 
     /// True when signup completed but the email has not yet been verified.
     /// ContentView uses this to show VerifyEmailView instead of the tab bar.
@@ -655,6 +670,16 @@ final class AuthViewModel: ObservableObject {
         }
     }
 
+    /// S9-Q2-iOS — true when we have a session but the cached user row's
+    /// `username` is nil/empty. ContentView gates on this to push
+    /// PickUsernameView before MainTabView so a fresh magic-link signup
+    /// always lands on the picker first.
+    var needsPickUsername: Bool {
+        guard isLoggedIn, let user = currentUser else { return false }
+        let uname = user.username?.trimmingCharacters(in: .whitespaces) ?? ""
+        return uname.isEmpty
+    }
+
     /// Resend the email verification link. Called from VerifyEmailView when
     /// the user didn't receive the first email.
     func resendVerificationEmail() async -> Bool {
@@ -1060,6 +1085,80 @@ final class AuthViewModel: ObservableObject {
             }
         } catch {
             authError = "Sign in with Google failed. Try again."
+        }
+    }
+
+    // MARK: - Magic link (S9-Q2-iOS)
+
+    /// POST /api/auth/send-magic-link with the user's email. The route
+    /// always returns 200 with a generic body except on a malformed
+    /// 400 (input validation). On success we kick off a 30s resend
+    /// cooldown so the UI can disable the resend button without
+    /// trusting the server response (the response is intentionally
+    /// uniform across rate-limit caps, ban-evasion, and beta-gate).
+    /// See `web/src/app/api/auth/send-magic-link/route.js` for the
+    /// canonical iOS contract published in S3-Q2-f.
+    func sendMagicLink(email: String) async -> Bool {
+        authError = nil
+        let trimmed = email.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, trimmed.contains("@") else {
+            authError = "Please enter a valid email."
+            return false
+        }
+        let url = SupabaseManager.shared.siteURL.appendingPathComponent("api/auth/send-magic-link")
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        struct Body: Encodable { let email: String }
+        req.httpBody = try? JSONEncoder().encode(Body(email: trimmed))
+        do {
+            let (_, response) = try await URLSession.shared.data(for: req)
+            guard let http = response as? HTTPURLResponse else {
+                authError = "Network error. Try again."
+                return false
+            }
+            if http.statusCode == 400 {
+                authError = "Please enter a valid email."
+                return false
+            }
+            if !(200...299).contains(http.statusCode) {
+                authError = "Couldn\u{2019}t send the link. Try again."
+                return false
+            }
+            magicLinkSentTo = trimmed
+            startMagicLinkCooldown()
+            return true
+        } catch {
+            authError = "Network error. Try again."
+            return false
+        }
+    }
+
+    /// Reset the magic-link UI state (e.g., when the LoginView/SignupView
+    /// sheet dismisses or the user taps "Use a different email").
+    func clearMagicLinkState() {
+        magicLinkCooldownTask?.cancel()
+        magicLinkCooldownTask = nil
+        magicLinkSentTo = nil
+        magicLinkCooldownSec = 0
+        authError = nil
+    }
+
+    private func startMagicLinkCooldown() {
+        magicLinkCooldownTask?.cancel()
+        magicLinkCooldownSec = 30
+        magicLinkCooldownTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                if Task.isCancelled { break }
+                await MainActor.run {
+                    guard let self else { return }
+                    if self.magicLinkCooldownSec > 0 {
+                        self.magicLinkCooldownSec -= 1
+                    }
+                }
+                if let s = await self?.magicLinkCooldownSec, s <= 0 { break }
+            }
         }
     }
 
