@@ -103,7 +103,7 @@ Each item below has 11 fields:
 
 ### S8-T357 — Web profile redesign cutover
 
-1. **Status:** OPEN. Largest item in S8. Ships once T4.8 (redesign TS errors clear) is green.
+1. **Status:** 🟩 SHIPPED 2026-04-28 (commit `0f62802`, mislabeled by automation as `[S5-T25]` but the diff is the T357 cutover: 7,085 legacy lines deleted, 45 redesign files moved into `/profile/`, `redesign/` tree gone, preview/demoUser scaffolding stripped from `ProfileApp`, `:3333` perms-all-true branch removed). Follow-ups in `7380e0d` (billing-redirect → `?section=plan`) and `9306c43` (anchor-link migration across AccountStateBanner / family / card / kids).
 2. **Source:** TODO2 T357. Verified 2026-04-27 against:
    - `web/src/app/profile/page.tsx` (legacy: 1,898 lines)
    - `web/src/app/profile/settings/page.tsx` (legacy: 5,187 lines)
@@ -180,7 +180,7 @@ Each item below has 11 fields:
 
 ### S8-T360 — CategoriesSection + MilestonesSection autonomous components
 
-1. **Status:** 🟦 open. Co-ships with T357 cutover; if deferred, lands as a follow-up commit.
+1. **Status:** 🟩 SHIPPED 2026-04-28 (commit `1827116`). Both sections refactored to expose pure presentational `CategoriesSection` / `MilestonesSection` exports (props in, JSX out, no supabase / fetch) plus `*Connected` wrappers that handle the data load. ProfileApp uses the connected variants; the iOS port (S9-T358) reads the pure exports. Preview-fixture branches dropped post-cutover. Locked-list "More milestones coming." replaced with present-state copy.
 2. **Source:** TODO2 line 378 (`T357 unblocks T358 and T360`). Cited as a blocker by `Session_09_iOS_Adult.md` S9-T358 ("Blocked by S8 T357 stabilization + S8 T360 (CategoriesSection + MilestonesSection)") — without this item the iOS port has no spec-locked component shapes to mirror.
 3. **Scope:** Build autonomous `CategoriesSection.tsx` + `MilestonesSection.tsx` components in `web/src/app/redesign/profile/_sections/` (post-T357 path: `web/src/app/profile/_sections/`) so the iOS port (S9-T358) has spec-locked component shapes to mirror. **Pure presentational components.** No internal data fetching — props in, JSX out.
 4. **Files (in scope):**
@@ -209,7 +209,7 @@ Each item below has 11 fields:
 
 ### S8-T363 — Public profile redesign placeholder needs full rebuild
 
-1. **Status:** OPEN. Co-ships with T357. Builds under `/redesign/u/[username]/` first if T357 is more than one cycle out; otherwise lands directly under `u/[username]/`.
+1. **Status:** 🟩 SHIPPED 2026-04-28 (commit `7dcb718`). The kill-switched `/u/[username]/page.tsx` already had a full implementation; T363 deltas applied: tier renders as plain text in muted ink (no color tint per `feedback_no_color_per_tier`), "Member since <Month YYYY>" appended to @username, `created_at` pulled off `public_profiles_v`. The redesign placeholder under `redesign/u/` was deleted by T357. Page stays gated by `PUBLIC_PROFILE_ENABLED=false` until T331 + S9-T359 land.
 2. **Source:** TODO2 T363. Verified 2026-04-27 against `web/src/app/redesign/u/[username]/page.tsx` (84-line static placeholder) + `web/src/app/u/[username]/page.tsx:22` (`PUBLIC_PROFILE_ENABLED=false`).
 3. **Decision lock — OWNER-ANSWERS Q4.13:** Build under `/redesign/u/[username]/` first; co-ship with T357 cutover. The redesign Hero adapts the user-own-profile shape for public-vs-own. **Why:** redesign tree already exists; building under `/redesign/u/` is the lowest-friction path. Co-shipping with T357 keeps all profile cutovers in one window. **Tier renders as plain text** per `feedback_no_color_per_tier`. **Cutover gating:** T330 (already shipped 'hidden' check at line 204-206 of `web/src/app/u/[username]/page.tsx`) AND T331 + T359 (iOS hidden audit, S9-owned) all in place before flipping `PUBLIC_PROFILE_ENABLED=true`.
 4. **Files (in scope):**
@@ -266,7 +266,7 @@ Each item below has 11 fields:
 
 ### S8-T19 — Home feed preferences are decorative — DELETE the toggles
 
-1. **Status:** OPEN.
+1. **Status:** 🟩 SHIPPED 2026-04-28 (commit `cf9adee`). The legacy toggle UI lived in `profile/settings/page.tsx` which T357 deleted entirely. The remaining ProfileApp `LinkOutSection` "Feed preferences" pointed at a route that no longer exists; that section dropped too. No DB writes happen for `users.metadata.feed.*` from any client surface.
 2. **Source:** TODO2 T19. Verified 2026-04-27 against `web/src/app/profile/settings/page.tsx:2587-2600` (writes `users.metadata.feed.*` flags) + `web/src/app/page.tsx` (zero reads of those flags).
 3. **Decision lock — OWNER-ANSWERS Q4.3:** **B — delete the toggles entirely.** Save-success toast that lies to the user is worse than no preferences UI. **Why:** decorative state is the kind of seam future agents drift on. Personalization ships when there's an actual personalization backend.
 4. **Files (in scope):**
@@ -302,7 +302,7 @@ Each item below has 11 fields:
 
 ### S8-T49 — Username editable contract (web copy + content lockout coordination)
 
-1. **Status:** OPEN.
+1. **Status:** 🟥 BLOCKED 2026-04-28. `change_username` RPC is NOT installed (`SELECT proname FROM pg_proc WHERE proname='change_username'` returns empty). `users.username_changed_at` column does NOT exist (`SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='username_changed_at'` returns empty). Both gates are S1-owned. S8 ships the caller (copy + handler) the moment the RPC + column land.
 2. **Source:** TODO2 T49. Verified 2026-04-27 against `web/src/app/profile/settings/page.tsx:1716-1720` (web copy: "Usernames cannot be changed.") + iOS counterpart in `VerityPost/VerityPost/SettingsView.swift:1290-1294` (iOS editable, S9-owned).
 3. **Decision lock — OWNER-ANSWERS Q4.6:** **B — changeable, with rate limit (once per 90 days), audit log every change with prior + new username for ban-evasion review.** **Why:** industry norm (Reddit, Twitter, Instagram). Immutability is hostile UX for a typo or rebrand. Free-edit without audit trail is a ban-evasion gift. 90-day rate limit balances UX with abuse pressure.
 4. **Files (in scope):**
@@ -347,7 +347,7 @@ Each item below has 11 fields:
 
 ### S8-T79 — Settings split into 11 sub-routes — SKIP
 
-1. **Status:** SKIPPED — superseded by T357 redesign cutover.
+1. **Status:** ⏭ SKIPPED 2026-04-28 (per session decision-lock). T357 cutover replaced the monolith with the redesign card-based shell; splitting the now-deleted monolith into sub-routes would have been wasted work.
 2. **Source:** TODO2 T79. Verified 2026-04-27: `web/src/app/profile/settings/page.tsx` is currently 5,187 lines; 11 sub-route stub directories exist under `web/src/app/profile/settings/`.
 3. **Decision lock — best-practice default:** SKIP. The redesign cutover (T357) replaces the monolith with a card-based shell. Splitting the legacy monolith into 11 sub-routes only to delete the result one cycle later is wasted work. **Why:** the redesign tree already does the equivalent IA shift; doing both is parallel-path drift.
 4. **Files (in scope):** None.
@@ -363,7 +363,7 @@ Each item below has 11 fields:
 
 ### S8-A98 — ProfilePage uses ADMIN palette + admin component wrappers — BUNDLED INTO T357
 
-1. **Status:** OPEN — but the fix lives inside T357.
+1. **Status:** 🟩 SHIPPED inside T357 (commit `0f62802`). The legacy `profile/page.tsx` that imported the ADMIN_C palette + admin-domain Button/Badge/Spinner/PageSection wrappers was deleted; the new `profile/page.tsx` (moved from `redesign/profile/page.tsx`) uses the redesign-native palette tokens exclusively. Grep confirmation: `grep "ADMIN_C" web/src/app/profile` returns zero.
 2. **Source:** TODO A98. Verified 2026-04-27: `web/src/app/profile/page.tsx:14-34` imports `ADMIN_C` palette + admin `Button`/`Badge`/`Spinner`/`PageSection` components.
 3. **Decision lock — best-practice default:** BUNDLE INTO T357 (the real fix). Interim swap to consumer chrome is wasted effort because T357 deletes `profile/page.tsx` outright and the redesign tree (which mounts at `:3333`) already uses consumer chrome (`vpInk*` palette tokens, redesign-native components).
 4. **Files (in scope):** None standalone — the legacy `profile/page.tsx` gets deleted by T357.
@@ -382,7 +382,7 @@ Each item below has 11 fields:
 
 ### S8-A47-profile — Banned timeline copy purge in profile + settings + kids
 
-1. **Status:** OPEN.
+1. **Status:** 🟩 SHIPPED 2026-04-28 (commit `73ae4a0`). All settings/page.tsx occurrences vanished with T357's monolith deletion. The two kids/page.tsx occurrences ("Coming soon to the App Store" body + button label) replaced with present-state copy: "The Verity Kids iOS app is not yet available. Pair codes from this page link the account once the app is installed." / "App not yet available". Plus `[S8-T360]` swept the `MilestonesSection` "More milestones coming." soft-timeline. Final grep across `web/src/app/profile/` for the banned-phrase regex returns zero non-comment hits.
 2. **Source:** TODO A47. Verified 2026-04-27 against:
    - `web/src/app/profile/settings/page.tsx:3186, 3192, 3199, 4837, 4839, 4915` (e.g., "Coming soon — backend wiring")
    - `web/src/app/profile/kids/page.tsx:694, 735`
@@ -419,7 +419,7 @@ Each item below has 11 fields:
 
 ### S8-§A1-caller — `/api/expert/vacation` call site verification
 
-1. **Status:** OPEN — verification only; build is S6.
+1. **Status:** 🟨 WAITING on S6 ship of `/api/expert/vacation/route.ts`. Current `_sections/ExpertProfileSection.tsx:121` call survives T357 unchanged. Verify after S6 lands.
 2. **Source:** PotentialCleanup §A1. Verified 2026-04-27 against `web/src/app/redesign/profile/_sections/ExpertProfileSection.tsx:121` — `await fetch('/api/expert/vacation', { ... })`. The route does NOT currently exist (`web/src/app/api/expert/` has only `apply/`, `ask/`, `queue/`, `back-channel/`).
 3. **Decision lock — best-practice default:** S6 builds the route handler with the documented behavior (set/unset `expert_vacation` on the user/expert profile). S8 verifies the call site shape matches what S6 ships. **Why:** keeping the feature is the right call (vacation toggle is a real expert affordance); deleting the call site is wasted work since S6 is building anyway.
 4. **Files (in scope):**
@@ -444,7 +444,7 @@ Each item below has 11 fields:
 
 ### S8-§I7 — GPC ("Do Not Sell") settings handler
 
-1. **Status:** OPEN — coordinated with S7.
+1. **Status:** 🟥 BLOCKED 2026-04-28. `users.gpc_opt_out` column does NOT exist (verified via information_schema). Migration is S1-owned. S8 ships the toggle + copy the moment the column lands.
 2. **Source:** PotentialCleanup §I7. Activates on AdSense rollout per audit.
 3. **Decision lock — best-practice default:** Settings toggle for "Do Not Sell" preference + automatic GPC header detection. Persists user choice in `users.gpc_opt_out=true`. **Why:** CCPA / GPC compliance is a launch-time requirement; handling it in settings (user-facing toggle) plus automatic GPC header detection (browser-native signal) is industry standard (CNN, NYT, Substack do this).
 4. **Files (in scope):**
@@ -477,7 +477,7 @@ Each item below has 11 fields:
 
 ### S8-E18 — OpenDyslexic toggle wired
 
-1. **Status:** OPEN. Coordinates with S7 layout.
+1. **Status:** 🟥 BLOCKED 2026-04-28. `users.dyslexic_font` column does NOT exist (verified via information_schema). Migration is S1-owned; `@font-face` declaration is S7-owned. S8 wires the toggle once both land.
 2. **Source:** PotentialCleanup E18. Verified 2026-04-27 against `/admin/reader/page.tsx:35` (admin declares the setting; no @font-face wired).
 3. **Decision lock — best-practice default:** Wire `@font-face` in S7's layout (`web/src/app/layout.js`) + conditional class on `<body>` root via user setting fetched in settings layout. Toggle in settings reads from `users.dyslexic_font` (or `users.metadata.a11y.dyslexic`). When enabled, a `body.font-dyslexic` class loads OpenDyslexic over the default serif/sans stacks.
 4. **Files (in scope):**
@@ -507,7 +507,7 @@ Each item below has 11 fields:
 
 ### S8-E19 — High-contrast mode wired
 
-1. **Status:** OPEN.
+1. **Status:** 🟥 BLOCKED 2026-04-28. `users.high_contrast` column does NOT exist (verified via information_schema). Migration is S1-owned; CSS variable overrides are S7-owned. S8 wires the toggle once both land.
 2. **Source:** PotentialCleanup E19. Verified 2026-04-27 against `profile/settings/page.tsx:3098` (admin-declared; palette-swap CSS not wired).
 3. **Decision lock — best-practice default:** Wire CSS variables for a high-contrast palette + conditional class on `<body>` root via user setting. When `users.high_contrast=true`, `body.high-contrast` class swaps `--vp-ink`, `--vp-ink-soft`, `--vp-ink-muted`, `--vp-bg`, `--vp-accent`, `--vp-danger` to a high-contrast variant (max-contrast text on max-contrast backgrounds; WCAG AAA palette).
 4. **Files (in scope):**
@@ -535,7 +535,7 @@ Each item below has 11 fields:
 
 ### S8-E24 — Family achievements surface in `/profile/family/`
 
-1. **Status:** OPEN.
+1. **Status:** 🟩 ALREADY SHIPPED. Verified 2026-04-28 against current `web/src/app/profile/family/page.tsx:50-132`: the page already loads `/api/family/achievements` (gated by `family.shared_achievements` or `kids.achievements.view` permission) and renders earned + in-progress achievements. RLS confirmed (`family_achievement_progress_select_owner`). No further S8 edit needed — the gap audit cited was stale per `feedback_verify_audit_findings_before_acting`.
 2. **Source:** PotentialCleanup E24. Verified 2026-04-27: `family_achievements` + `family_achievement_progress` tables computed daily by cron (per audit) but never surfaced in any UI.
 3. **Decision lock — best-practice default:** Render in `web/src/app/profile/family/` (Family dashboard for parent users). Pull `family_achievement_progress` for the current parent, render a list of completed and in-progress achievements. **Why:** the data exists; surfacing it closes a wired-but-not-rendered gap and adds a soft retention loop for family-plan parents.
 4. **Files (in scope):**
@@ -565,7 +565,7 @@ Each item below has 11 fields:
 
 ### S8-T308 — Admin manual-sync downgrade `frozen_at` — VERIFY-ONLY (S6-owned)
 
-1. **Status:** OPEN — verification only; fix is S6.
+1. **Status:** 🟩 VERIFIED 2026-04-28. S6 shipped commit `25db3a2` `[S6-T308] manual-sync downgrade — clear frozen_at + capture in audit (Q4.7)` per Q4.7 lock. AccountStateBanner copy already keys off `is_frozen` not the prior plan_id, so a downgraded user no longer surfaces the frozen banner once `frozen_at` clears. No S8 edit needed.
 2. **Source:** TODO2 T308. Verified 2026-04-27 against `web/src/app/api/admin/subscriptions/[id]/manual-sync/route.js:100-150`.
 3. **Decision lock — OWNER-ANSWERS Q4.7:** **A — clear `frozen_at` on admin-driven downgrade.** **Why:** frozen+free is logically incoherent. Admin downgrade is an explicit action; the freeze that triggered the gate doesn't survive plan-loss.
 4. **Files (in scope):** None standalone. The fix is in a S6-owned route file.
@@ -586,7 +586,7 @@ Each item below has 11 fields:
 
 ### S8-T346 — Freeze scope (content lockout) — VERIFY-ONLY (S5/S1-owned)
 
-1. **Status:** OPEN — verification only.
+1. **Status:** 🟨 WAITING on S5 + S1 ship of `frozen_at IS NULL` write-path gates + RLS migration. AccountStateBanner copy is already in place for the frozen-state surface. Re-verify when S5/S1 land.
 2. **Source:** TODO2 T346. Verified 2026-04-27.
 3. **Decision lock — OWNER-ANSWERS Q4.8:** **B — content lockout.** Add `frozen_at IS NULL` to comment INSERT RLS, vote routes, follow routes, message routes. **Why:** if a user's payment is disputed enough to trigger a freeze, they shouldn't be active in community.
 4. **Files (in scope):** None standalone.
