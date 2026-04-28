@@ -19,18 +19,12 @@ import Drawer from '@/components/admin/Drawer';
 import Spinner from '@/components/admin/Spinner';
 import Field from '@/components/admin/Field';
 import TextInput from '@/components/admin/TextInput';
-import DestructiveActionConfirm from '@/components/admin/DestructiveActionConfirm';
 import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 import type { Tables } from '@/types/database-helpers';
 
-// Extending Tables<'access_requests'> with the email-confirm columns
-// added in 2026-04-26_access_request_email_confirm.sql until types
-// regenerate post-apply.
 type Req = Tables<'access_requests'> & {
-  email_confirmed_at: string | null;
-  email_confirm_token: string | null;
-  email_confirm_expires_at: string | null;
+  access_codes: { code: string; expires_at: string | null; current_uses: number | null } | null;
 };
 
 function RequestsInner() {
@@ -46,9 +40,8 @@ function RequestsInner() {
   const [busy, setBusy] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [showReject, setShowReject] = useState(false);
-  // S6-A55: approve mints credentials. Wrap in DestructiveActionConfirm
-  // with required reason capture.
-  const [showApproveConfirm, setShowApproveConfirm] = useState(false);
+  // Approve is a single click. Audit log stamps actor + timestamp on
+  // the server side; no UI confirmation needed.
 
   useEffect(() => {
     (async () => {
@@ -69,40 +62,36 @@ function RequestsInner() {
   async function loadAll() {
     const { data } = await supabase
       .from('access_requests')
-      .select('*')
+      .select('*, access_codes:access_code_id(code, expires_at, current_uses)')
       .order('created_at', { ascending: false });
     setRows((data || []) as Req[]);
   }
 
-  // Pending tab hides email-unconfirmed rows so admin only spends time on
-  // requests where the requester has clicked the email-confirm link.
-  // 'all' shows everything including unconfirmed for visibility.
+  // Phase 1 intake removed the email-confirm step — all pending rows are
+  // ready for review.
   const filtered = rows.filter((r) => {
     if (tab === 'all') return true;
-    if (tab === 'pending') return r.status === 'pending' && !!r.email_confirmed_at;
     return r.status === tab;
   });
   const counts = {
-    pending: rows.filter((r) => r.status === 'pending' && !!r.email_confirmed_at).length,
+    pending: rows.filter((r) => r.status === 'pending').length,
     approved: rows.filter((r) => r.status === 'approved').length,
     rejected: rows.filter((r) => r.status === 'rejected').length,
     total: rows.length,
   };
 
-  const approve = async (r: Req, reason: string) => {
+  const approve = async (r: Req) => {
     setBusy(true);
     try {
       const res = await fetch(`/api/admin/access-requests/${r.id}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason }),
+        body: JSON.stringify({}),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         push({ message: json.error || 'Approve failed', variant: 'danger' });
-        // Throw so DestructiveActionConfirm skips the audit-write step on
-        // a failed mutation (no phantom audit row).
-        throw new Error(json.error || 'Approve failed');
+        return;
       }
       push({
         message: json.email_sent
@@ -110,7 +99,6 @@ function RequestsInner() {
           : `Approved. Email send failed — copy link manually: ${json.invite_url}`,
         variant: json.email_sent ? 'success' : 'warn',
       });
-      setShowApproveConfirm(false);
       setActive(null);
       await loadAll();
     } finally {
@@ -165,10 +153,20 @@ function RequestsInner() {
       render: (r: Req) => r.created_at ? new Date(r.created_at).toLocaleString() : '—',
     },
     {
-      key: 'email_confirmed_at', header: 'Email confirmed',
-      render: (r: Req) => r.email_confirmed_at
-        ? <Badge variant="success" size="xs">Yes</Badge>
-        : <Badge variant="warn" size="xs">Awaiting</Badge>,
+      key: 'source', header: 'Source',
+      render: (r: Req) => {
+        const meta = (r.metadata as { utm?: { source?: string | null }; referer?: string | null } | null) || null;
+        const utm = meta?.utm?.source;
+        if (utm) return <code style={{ fontSize: F.xs }}>{utm}</code>;
+        if (meta?.referer) {
+          try {
+            return <code style={{ fontSize: F.xs }}>{new URL(meta.referer).hostname}</code>;
+          } catch {
+            return <span style={{ color: C.dim }}>—</span>;
+          }
+        }
+        return <span style={{ color: C.dim }}>direct</span>;
+      },
     },
     {
       key: 'status', header: 'Status',
@@ -193,7 +191,7 @@ function RequestsInner() {
     <Page>
       <PageHeader
         title="Access requests"
-        subtitle="Email-confirmed requests show under Pending. Approve mints a one-time 7-day invite link and emails it."
+        subtitle="Beta waitlist — review, approve to mint a one-time 7-day invite link, or reject."
       />
 
       <div style={{
@@ -257,9 +255,7 @@ function RequestsInner() {
               <Button
                 variant="primary"
                 loading={busy}
-                disabled={!active.email_confirmed_at}
-                title={!active.email_confirmed_at ? 'Awaiting email confirmation from requester' : undefined}
-                onClick={() => active && setShowApproveConfirm(true)}
+                onClick={() => active && approve(active)}
               >
                 Approve & email link
               </Button>
@@ -277,17 +273,60 @@ function RequestsInner() {
               </Badge>
             </DetailRow>
             <DetailRow label="Email"><code>{active.email}</code></DetailRow>
-            <DetailRow label="Email confirmed">
-              {active.email_confirmed_at
-                ? <Badge variant="success" size="xs">{new Date(active.email_confirmed_at).toLocaleString()}</Badge>
-                : <Badge variant="warn" size="xs">Not yet — link not clicked</Badge>}
-            </DetailRow>
             <DetailRow label="Submitted">{active.created_at ? new Date(active.created_at).toLocaleString() : '—'}</DetailRow>
+            {(() => {
+              const meta = (active.metadata as {
+                utm?: Record<string, string | null>;
+                referer?: string | null;
+                cohort_snapshot?: string | null;
+                referral_code_id?: string | null;
+              } | null) || null;
+              if (!meta) return null;
+              const utmEntries = meta.utm
+                ? Object.entries(meta.utm).filter(([, v]) => !!v)
+                : [];
+              return (
+                <>
+                  {meta.cohort_snapshot && (
+                    <DetailRow label="Cohort at intake">
+                      <code style={{ fontSize: F.xs }}>{meta.cohort_snapshot}</code>
+                    </DetailRow>
+                  )}
+                  {meta.referral_code_id && (
+                    <DetailRow label="Referral code">
+                      <code style={{ fontSize: F.xs }}>{meta.referral_code_id}</code>
+                    </DetailRow>
+                  )}
+                  {meta.referer && (
+                    <DetailRow label="Referrer" small>
+                      <code style={{ fontSize: F.xs, wordBreak: 'break-all' }}>{meta.referer}</code>
+                    </DetailRow>
+                  )}
+                  {utmEntries.length > 0 && (
+                    <DetailRow label="UTM" small>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {utmEntries.map(([k, v]) => (
+                          <code key={k} style={{ fontSize: F.xs }}>
+                            {k}={v as string}
+                          </code>
+                        ))}
+                      </div>
+                    </DetailRow>
+                  )}
+                </>
+              );
+            })()}
+            {active.status === 'approved' && active.access_codes && (
+              <DetailRow label="Invite link">
+                <ApprovedInviteLink
+                  code={active.access_codes.code}
+                  expiresAt={active.access_codes.expires_at}
+                  redeemed={(active.access_codes.current_uses || 0) > 0}
+                />
+              </DetailRow>
+            )}
             {active.ip_address && <DetailRow label="IP"><code style={{ fontSize: F.xs }}>{active.ip_address}</code></DetailRow>}
             {active.user_agent && <DetailRow label="User-Agent" small><code style={{ fontSize: F.xs, wordBreak: 'break-all' }}>{active.user_agent}</code></DetailRow>}
-            {active.access_code_id && (
-              <DetailRow label="Linked code"><code style={{ fontSize: F.xs }}>{active.access_code_id}</code></DetailRow>
-            )}
           </div>
         )}
       </Drawer>
@@ -318,28 +357,6 @@ function RequestsInner() {
         </Field>
       </Drawer>
 
-      <DestructiveActionConfirm
-        open={showApproveConfirm && !!active}
-        onClose={() => setShowApproveConfirm(false)}
-        title="Approve access request?"
-        message={
-          <span>
-            This mints a one-time 7-day signup link for{' '}
-            <strong>{active?.email}</strong> and emails it. Provide a reason
-            for the audit trail.
-          </span>
-        }
-        confirmLabel="Approve & email link"
-        reasonRequired
-        action="access_requests.approve"
-        targetTable="access_requests"
-        targetId={active?.id ?? null}
-        oldValue={active ? { status: active.status } : null}
-        newValue={{ status: 'approved' }}
-        onConfirm={async ({ reason }) => {
-          if (active) await approve(active, reason);
-        }}
-      />
     </Page>
   );
 }
@@ -349,6 +366,61 @@ function DetailRow({ label, children, small }: { label: string; children: React.
     <div>
       <div style={{ fontSize: F.xs, fontWeight: 600, color: C.dim, marginBottom: S[1], textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
       <div style={{ fontSize: small ? F.xs : F.sm, color: C.white }}>{children}</div>
+    </div>
+  );
+}
+
+// Inline invite-URL display for approved rows. Always available — useful
+// when the auto-email failed (no RESEND_API_KEY, deliverability issue,
+// etc.) so the operator can copy + paste it manually.
+function ApprovedInviteLink({
+  code,
+  expiresAt,
+  redeemed,
+}: {
+  code: string;
+  expiresAt: string | null;
+  redeemed: boolean;
+}) {
+  const [copied, setCopied] = useState(false);
+  const url = typeof window !== 'undefined' ? `${window.location.origin}/r/${code}` : `/r/${code}`;
+  const expired = !!expiresAt && new Date(expiresAt) < new Date();
+  const onCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Browser blocked clipboard — fall back to manual select
+    }
+  };
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: S[1] }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: S[2] }}>
+        <code
+          style={{
+            fontSize: F.xs,
+            wordBreak: 'break-all',
+            flex: 1,
+            color: redeemed || expired ? C.dim : C.white,
+            textDecoration: redeemed || expired ? 'line-through' : 'none',
+          }}
+        >
+          {url}
+        </code>
+        <Button size="sm" variant="ghost" onClick={onCopy} disabled={redeemed || expired}>
+          {copied ? 'Copied' : 'Copy'}
+        </Button>
+      </div>
+      <div style={{ fontSize: F.xs, color: C.dim }}>
+        {redeemed
+          ? 'Already redeemed'
+          : expired
+            ? 'Expired'
+            : expiresAt
+              ? `Expires ${new Date(expiresAt).toLocaleString()}`
+              : 'No expiry'}
+      </div>
     </div>
   );
 }

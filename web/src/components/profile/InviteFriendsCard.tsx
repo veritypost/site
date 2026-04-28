@@ -1,10 +1,16 @@
 'use client';
 
-// Profile card showing the user's 2 referral slugs + per-slot redemption
-// counts. Counts only — no PII of redeemers, per the design review's
-// privacy mitigation.
+// Profile section content: the user's two referral slugs + redemption
+// counts per slot. Mounted by ProfileApp's `id: 'refer'` SectionDef —
+// AppShell renders the h1 title + subtitle from the SectionDef itself,
+// so this card intentionally does NOT render its own heading.
+//
+// Privacy: redemption counts only — never the redeemer's identity.
+// Per the design review's harassment-vector mitigation (no PII of
+// people who clicked your link).
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { C, F, FONT, R, S, focusRing } from '@/app/profile/_lib/palette';
 
 type SlugRow = {
   id: string;
@@ -17,150 +23,267 @@ type SlugRow = {
   created_at: string;
 };
 
-const C = {
-  bg: '#0a0a0a',
-  border: '#1f1f1f',
-  text: '#f5f5f5',
-  dim: '#a1a1aa',
-  muted: '#71717a',
-  accent: '#3b82f6',
-  success: '#10b981',
-} as const;
+type LoadState =
+  | { status: 'loading' }
+  | { status: 'ok'; slugs: SlugRow[] }
+  | { status: 'rate_limited'; retryAfterSec: number }
+  | { status: 'error' };
 
-export default function InviteFriendsCard({ highlight = false }: { highlight?: boolean }) {
-  const [slugs, setSlugs] = useState<SlugRow[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function InviteFriendsCard() {
+  const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [copiedSlot, setCopiedSlot] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [copyFailedSlot, setCopyFailedSlot] = useState<number | null>(null);
+  const liveRegionRef = useRef<HTMLDivElement | null>(null);
+  const copyTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const res = await fetch('/api/referrals/me');
-        if (!res.ok) {
-          if (!cancelled) setError('Could not load referral links.');
+        if (cancelled) return;
+        if (res.status === 429) {
+          const retry = Number(res.headers.get('retry-after')) || 60;
+          setState({ status: 'rate_limited', retryAfterSec: retry });
           return;
         }
-        const json = await res.json();
-        if (!cancelled) setSlugs((json.slugs || []) as SlugRow[]);
+        if (!res.ok) {
+          setState({ status: 'error' });
+          return;
+        }
+        const json = (await res.json()) as { slugs?: SlugRow[] };
+        setState({ status: 'ok', slugs: json.slugs || [] });
       } catch {
-        if (!cancelled) setError('Could not load referral links.');
-      } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setState({ status: 'error' });
       }
     })();
     return () => {
       cancelled = true;
+      if (copyTimerRef.current !== null) {
+        window.clearTimeout(copyTimerRef.current);
+        copyTimerRef.current = null;
+      }
     };
   }, []);
+
+  // Single shared timer so rapid Copy clicks on slot 1 → slot 2 don't have
+  // slot 1's expiry fire mid-announcement and clear slot 2's state.
+  const startCopyResetTimer = () => {
+    if (copyTimerRef.current !== null) {
+      window.clearTimeout(copyTimerRef.current);
+    }
+    copyTimerRef.current = window.setTimeout(() => {
+      setCopiedSlot(null);
+      setCopyFailedSlot(null);
+      if (liveRegionRef.current) liveRegionRef.current.textContent = '';
+      copyTimerRef.current = null;
+    }, 1800);
+  };
 
   const copy = async (slot: number, url: string) => {
     try {
       await navigator.clipboard.writeText(url);
       setCopiedSlot(slot);
-      setTimeout(() => setCopiedSlot((c) => (c === slot ? null : c)), 1800);
+      setCopyFailedSlot(null);
+      if (liveRegionRef.current) {
+        liveRegionRef.current.textContent = 'Invite link copied to clipboard.';
+      }
+      startCopyResetTimer();
     } catch {
-      setError('Copy failed. Long-press the link to copy.');
+      // Clipboard access denied / insecure context. Surface a transient
+      // inline failure on this row only — never wipe loaded slugs.
+      setCopiedSlot(null);
+      setCopyFailedSlot(slot);
+      if (liveRegionRef.current) {
+        liveRegionRef.current.textContent = 'Could not copy link. Long-press to copy manually.';
+      }
+      startCopyResetTimer();
     }
   };
 
-  return (
-    <section
-      style={{
-        borderRadius: 12,
-        border: `1px solid ${highlight ? C.accent : C.border}`,
-        background: C.bg,
-        padding: 20,
-        marginBottom: 20,
-      }}
-    >
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 4 }}>
-          Invite friends
-        </div>
-        <div style={{ fontSize: 13, color: C.dim, lineHeight: 1.4 }}>
-          You have two unique invite links. Share them with friends — anyone who signs up through
-          your link is tracked, and we&apos;ll let you know about rewards as the program expands.
-        </div>
+  const cardStyle: React.CSSProperties = {
+    position: 'relative', // contains the visually-hidden live region
+    background: C.surfaceRaised,
+    border: `1px solid ${C.border}`,
+    borderRadius: R.lg,
+    padding: S[5],
+    fontFamily: FONT.sans,
+  };
+
+  if (state.status === 'loading') {
+    return (
+      <div style={cardStyle}>
+        <p style={{ color: C.inkMuted, fontSize: F.sm, margin: 0 }}>Loading your invite links…</p>
       </div>
+    );
+  }
 
-      {loading && <div style={{ fontSize: 13, color: C.muted }}>Loading…</div>}
+  if (state.status === 'rate_limited') {
+    return (
+      <div style={cardStyle} role="alert">
+        <p style={{ color: C.inkMuted, fontSize: F.sm, margin: 0 }}>
+          Too many requests right now. Try again in {state.retryAfterSec} seconds.
+        </p>
+      </div>
+    );
+  }
 
-      {error && !loading && (
-        <div style={{ fontSize: 13, color: '#dc2626', marginBottom: 8 }}>{error}</div>
-      )}
+  if (state.status === 'error') {
+    return (
+      <div style={cardStyle} role="alert">
+        <p style={{ color: C.danger, fontSize: F.sm, margin: 0 }}>
+          We couldn&rsquo;t load your invite links. Refresh the page to try again.
+        </p>
+      </div>
+    );
+  }
 
-      {!loading && !error && slugs.length === 0 && (
-        <div style={{ fontSize: 13, color: C.muted }}>
-          Your invite links will appear here once your account is fully set up.
-        </div>
-      )}
+  if (state.slugs.length === 0) {
+    return (
+      <div style={cardStyle}>
+        <p style={{ color: C.inkMuted, fontSize: F.sm, margin: 0 }}>
+          We couldn&rsquo;t generate your invite links. Refresh the page to try again.
+        </p>
+      </div>
+    );
+  }
 
-      {!loading &&
-        slugs.map((s) => (
-          <div
-            key={s.id}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              padding: '12px 0',
-              borderTop: `1px solid ${C.border}`,
-            }}
-          >
+  return (
+    <div style={cardStyle}>
+      {/* Visually-hidden announcer for the Copied toast. */}
+      <div
+        ref={liveRegionRef}
+        aria-live="polite"
+        aria-atomic="true"
+        style={{
+          position: 'absolute',
+          width: 1,
+          height: 1,
+          padding: 0,
+          margin: -1,
+          overflow: 'hidden',
+          clip: 'rect(0,0,0,0)',
+          border: 0,
+        }}
+      />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: S[3] }}>
+        {state.slugs.map((s, idx) => {
+          // Future-proof: respect max_uses if it ever rises above 1, instead
+          // of treating any redemption as fully-used.
+          const exhausted =
+            s.max_uses != null
+              ? s.redemption_count >= s.max_uses
+              : s.redemption_count > 0;
+          const used = !s.active || exhausted;
+          const friendsLabel =
+            s.redemption_count === 1 ? '1 friend joined' : `${s.redemption_count} friends joined`;
+          const buttonLabel =
+            copiedSlot === s.slot
+              ? 'Copied'
+              : copyFailedSlot === s.slot
+                ? 'Copy failed'
+                : used
+                  ? 'Used'
+                  : 'Copy';
+          const buttonBg =
+            copiedSlot === s.slot
+              ? C.success
+              : copyFailedSlot === s.slot
+                ? C.dangerSoft
+                : C.surfaceRaised;
+          const buttonBorder =
+            copiedSlot === s.slot
+              ? C.success
+              : copyFailedSlot === s.slot
+                ? C.danger
+                : C.borderStrong;
+          const buttonText =
+            copiedSlot === s.slot
+              ? C.accentInk
+              : copyFailedSlot === s.slot
+                ? C.danger
+                : used
+                  ? C.inkMuted
+                  : C.ink;
+          return (
             <div
+              key={s.id}
               style={{
-                fontSize: 11,
-                fontWeight: 700,
-                color: C.muted,
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase',
-                minWidth: 56,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: S[3],
+                padding: `${S[3]}px 0`,
+                borderTop: idx === 0 ? 'none' : `1px solid ${C.divider}`,
               }}
             >
-              Link {s.slot}
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div
+                  style={{
+                    fontSize: F.xs,
+                    color: C.inkFaint,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                    fontWeight: 600,
+                    marginBottom: S[1],
+                  }}
+                >
+                  Slot {s.slot}
+                </div>
+                <div
+                  style={{
+                    fontFamily: FONT.mono,
+                    fontSize: F.sm,
+                    color: used ? C.inkMuted : C.ink,
+                    textDecoration: used ? 'line-through' : 'none',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                  title={s.url}
+                >
+                  {s.url}
+                </div>
+                <div style={{ fontSize: F.xs, color: C.inkMuted, marginTop: S[1] }}>
+                  {friendsLabel}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => copy(s.slot, s.url)}
+                disabled={used}
                 style={{
-                  fontFamily: 'ui-monospace, SFMono-Regular, monospace',
-                  fontSize: 13,
-                  color: C.text,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                  padding: `${S[2]}px ${S[3]}px`,
+                  borderRadius: R.md,
+                  border: `1px solid ${buttonBorder}`,
+                  background: buttonBg,
+                  color: buttonText,
+                  fontFamily: FONT.sans,
+                  fontSize: F.sm,
+                  fontWeight: 600,
+                  cursor: used ? 'not-allowed' : 'pointer',
+                  minWidth: 96,
+                  transition: 'background 120ms, border-color 120ms, color 120ms',
+                }}
+                onFocus={(e) => {
+                  // Only paint the focus ring for keyboard focus — mouse
+                  // clicks shouldn't leave a sticky ring after release.
+                  if (!used && e.currentTarget.matches(':focus-visible')) {
+                    Object.assign(e.currentTarget.style, focusRing);
+                  }
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.outline = '';
+                  e.currentTarget.style.boxShadow = '';
                 }}
               >
-                {s.url}
-              </div>
-              <div style={{ fontSize: 12, color: C.dim, marginTop: 2 }}>
-                {s.redemption_count} {s.redemption_count === 1 ? 'signup' : 'signups'}
-                {s.max_uses != null && ` · max ${s.max_uses}`}
-                {!s.active && ' · disabled'}
-              </div>
+                {buttonLabel}
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => copy(s.slot, s.url)}
-              disabled={!s.active}
-              style={{
-                padding: '8px 14px',
-                borderRadius: 8,
-                border: `1px solid ${C.border}`,
-                background: copiedSlot === s.slot ? C.success : 'transparent',
-                color: copiedSlot === s.slot ? '#000' : C.text,
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: s.active ? 'pointer' : 'not-allowed',
-                fontFamily: 'inherit',
-                transition: 'background 120ms',
-              }}
-            >
-              {copiedSlot === s.slot ? 'Copied' : 'Copy'}
-            </button>
-          </div>
-        ))}
-    </section>
+          );
+        })}
+      </div>
+    </div>
   );
 }

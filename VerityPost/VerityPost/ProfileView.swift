@@ -382,34 +382,21 @@ struct ProfileView: View {
         .accessibilityLabel("Verity Score frozen. Resubscribe to resume tracking.")
     }
 
-    // MARK: - Hero card (compact horizontal: avatar + ring left, name/score/progress right)
+    // MARK: - Hero card (avatar + display name + verity score)
+    //
+    // Per owner direction: no tier chip, no overall progress bar, no
+    // delta-to-next caption. Tier identity stays neutral (rule
+    // `feedback_no_color_per_tier`). Per-category progress bars live on
+    // the Categories tab — those are engagement meters, unrelated to
+    // tier visuals.
     @ViewBuilder
     private func heroCard(_ user: VPUser) -> some View {
         let score = user.verityScore ?? 0
-        let current = tierFor(score: score)
-        let next = nextTier(after: current)
-        let minScore = current?.minScore ?? 0
-        let range = (next?.minScore ?? 0) - minScore
-        let progress: Double = {
-            guard next != nil, range > 0 else { return 1.0 }
-            return min(1.0, max(0.0, Double(score - minScore) / Double(range)))
-        }()
-        // Until score_tiers loads, render a neutral skeleton ring so the
-        // first paint doesn't flash "Newcomer" grey before the real tier
-        // resolves. Once loaded, switch to the real tier label — but the
-        // ring/badge color stays neutral. Owner rule: tiers don't get
-        // distinct hues (no rainbow / muted ramp / gradient); tier is a
-        // label, not a visual identity (`feedback_no_color_per_tier`).
-        let tiersReady = scoreTiersLoaded && !scoreTiers.isEmpty
-        let tierColor = VP.muted
-        let tierLabel = tiersReady ? (current?.displayName ?? "Newcomer") : ""
         let displayTitle = (user.displayName?.trimmingCharacters(in: .whitespaces).isEmpty == false
                             ? user.displayName
                             : user.username) ?? "Reader"
-        let deltaToNext = max(0, (next?.minScore ?? score) - score)
 
         HStack(alignment: .center, spacing: 14) {
-            // Plain circle avatar (tap to edit color + name)
             Button {
                 showAvatarEdit = true
             } label: {
@@ -418,39 +405,28 @@ struct ProfileView: View {
             .buttonStyle(.plain)
             .accessibilityLabel("Edit avatar color and display name")
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
                     Text(displayTitle)
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundColor(VP.text)
+                        .font(.system(size: 22, weight: .semibold, design: .serif))
+                        .foregroundColor(VP.ink)
                         .lineLimit(1)
                     VerifiedBadgeView(user: user, size: 11)
-                    // expert_title chip — surfaces alongside the existing
-                    // VerifiedBadgeView "Expert" pill when the user has a
-                    // declared title (e.g., "Cardiologist"). Mirrors the
-                    // web `roleBadges` row at `web/src/app/profile/page.tsx`.
                     if user.isExpert == true,
                        let title = user.expertTitle?.trimmingCharacters(in: .whitespaces),
                        !title.isEmpty {
                         Text(title)
                             .font(.system(size: 10, weight: .semibold))
-                            .foregroundColor(VP.text)
+                            .foregroundColor(VP.inkSoft)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(VP.card)
-                            .overlay(RoundedRectangle(cornerRadius: 4).stroke(VP.border))
-                            .cornerRadius(4)
+                            .background(VP.surfaceSunken)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                    .stroke(VP.borderSoft)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                             .lineLimit(1)
-                    }
-                    if tiersReady {
-                        Text(tierLabel)
-                            .font(.system(size: 10, weight: .semibold))
-                            .tracking(0.3)
-                            .foregroundColor(tierColor)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(tierColor.opacity(0.1))
-                            .cornerRadius(4)
                     }
                 }
 
@@ -458,40 +434,23 @@ struct ProfileView: View {
                     Text(score.formatted())
                         .font(.system(size: 22, weight: .heavy))
                         .tracking(-0.5)
-                        .foregroundColor(VP.text)
+                        .foregroundColor(VP.ink)
                         .contentTransition(.numericText())
                     Text("Verity score")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(VP.dim)
-                    Spacer()
-                    if next != nil {
-                        Text("\(deltaToNext.formatted()) to \(next!.displayName)")
-                            .font(.system(size: 11))
-                            .foregroundColor(VP.dim)
-                            .lineLimit(1)
-                    }
-                }
-
-                if next != nil {
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(VP.border)
-                                .frame(height: 4)
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(tierColor)
-                                .frame(width: geo.size.width * CGFloat(progress), height: 4)
-                        }
-                    }
-                    .frame(height: 4)
+                        .foregroundColor(VP.inkMuted)
                 }
             }
         }
         .padding(14)
         .frame(maxWidth: .infinity)
-        .background(VP.card)
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(VP.border))
-        .cornerRadius(12)
+        .background(VP.surfaceRaised)
+        .overlay(
+            RoundedRectangle(cornerRadius: VP.Radius.lg, style: .continuous)
+                .stroke(VP.borderSoft)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: VP.Radius.lg, style: .continuous))
+        .vpShadowAmbient()
         .padding(.horizontal, 16)
         .padding(.top, 12)
         .padding(.bottom, 8)

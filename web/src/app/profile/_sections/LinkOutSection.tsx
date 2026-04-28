@@ -1,8 +1,8 @@
 // Generic "this section is a launchpad to another page" treatment. Used
 // for surfaces where the canonical UX lives elsewhere (Bookmarks, Messages,
-// Expert queue, Family kids, Categories, Milestones, Refer a friend,
-// Help, Sign out). The rail entry feels like every other section, but the
-// panel is a focused hand-off card.
+// Expert queue, Family kids, Categories, Milestones, Help, Sign out).
+// The rail entry feels like every other section, but the panel is a
+// focused hand-off card.
 
 'use client';
 

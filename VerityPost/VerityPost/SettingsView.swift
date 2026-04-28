@@ -74,17 +74,22 @@ private struct IconTile: View {
     }
 }
 
-/// Card container — 1px VP.border, 12pt corner radius, VP.bg interior.
-/// Rows inside are responsible for their own internal dividers.
+/// Card container — redesign tokens. 1px softer border, 14pt radius,
+/// raised-white interior, ambient two-stack shadow. Rows inside are
+/// responsible for their own internal dividers.
 private struct SettingsCard<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
         VStack(spacing: 0) { content }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(VP.bg)
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(VP.border, lineWidth: 1))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .background(VP.surfaceRaised)
+            .overlay(
+                RoundedRectangle(cornerRadius: VP.Radius.lg, style: .continuous)
+                    .stroke(VP.borderSoft, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: VP.Radius.lg, style: .continuous))
+            .vpShadowAmbient()
             .padding(.horizontal, 16)
     }
 }
@@ -113,17 +118,17 @@ private struct SettingsRowLink<Destination: View>: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.system(size: 15, weight: .regular))
-                        .foregroundColor(VP.text)
+                        .foregroundColor(VP.ink)
                     if let subtitle {
                         Text(subtitle)
                             .font(.caption)
-                            .foregroundColor(VP.dim)
+                            .foregroundColor(VP.inkMuted)
                     }
                 }
                 Spacer(minLength: 8)
                 Image(systemName: "chevron.right")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(VP.muted)
+                    .foregroundColor(VP.inkFaint)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
@@ -131,7 +136,7 @@ private struct SettingsRowLink<Destination: View>: View {
             .contentShape(Rectangle())
             .overlay(alignment: .bottom) {
                 if showDivider {
-                    Rectangle().fill(VP.border.opacity(0.6)).frame(height: 1).padding(.leading, 16)
+                    Rectangle().fill(VP.divider).frame(height: 1).padding(.leading, 16)
                 }
             }
         }
@@ -794,36 +799,58 @@ struct SettingsView: View {
                       || !visibleAbout.isEmpty
                       || !visibleDanger.isEmpty
 
+        // Invite-friends row only renders when the account is verified
+        // and not frozen — gating mirrors web's beta gate (verified email
+        // is the canonical "fully landed" signal). Honors search filter
+        // by checking the same keywords the per-section filter uses.
+        let inviteKeywords = ["invite", "friend", "refer", "share", "link"]
+        let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let canInvite =
+            (auth.currentUser?.emailVerified ?? false) &&
+            (auth.currentUser?.frozenAt == nil) &&
+            (q.isEmpty || inviteKeywords.contains { $0.contains(q) })
+
         VStack(spacing: 18) {
             if !visibleAccount.isEmpty {
-                HubSection(title: "Account", icon: "person.crop.circle.fill", iconTint: VP.text) {
+                HubSection(title: "Account", icon: "person.crop.circle.fill", iconTint: VP.brand) {
                     renderRows(visibleAccount)
                 }
             }
             if !visiblePrefs.isEmpty {
-                HubSection(title: "Preferences", icon: "slider.horizontal.3", iconTint: VP.text) {
+                HubSection(title: "Preferences", icon: "slider.horizontal.3", iconTint: VP.brand) {
                     renderRows(visiblePrefs)
                 }
             } else if !canViewAlerts && !canViewFeedPrefs && searchQuery.isEmpty {
                 SettingsNote(text: "Preferences aren\u{2019}t available for your account.")
             }
             if !visiblePrivacy.isEmpty {
-                HubSection(title: "Privacy", icon: "lock.fill", iconTint: VP.text) {
+                HubSection(title: "Privacy", icon: "lock.fill", iconTint: VP.brand) {
                     renderRows(visiblePrivacy)
                 }
             }
+            if canInvite {
+                HubSection(title: "Invite friends", icon: "person.2.fill", iconTint: VP.brand) {
+                    SettingsRowLink(
+                        "Your invite links",
+                        subtitle: "Two one-time links to share with friends.",
+                        showDivider: false
+                    ) {
+                        InviteFriendsView()
+                    }
+                }
+            }
             if !visibleBilling.isEmpty {
-                HubSection(title: "Billing", icon: "creditcard.fill", iconTint: VP.text) {
+                HubSection(title: "Billing", icon: "creditcard.fill", iconTint: VP.brand) {
                     renderRows(visibleBilling)
                 }
             }
             if !visibleExpert.isEmpty {
-                HubSection(title: "Expert", icon: "checkmark.seal.fill", iconTint: VP.text) {
+                HubSection(title: "Expert", icon: "checkmark.seal.fill", iconTint: VP.brand) {
                     renderRows(visibleExpert)
                 }
             }
             if !visibleAbout.isEmpty {
-                HubSection(title: "About", icon: "info.circle.fill", iconTint: VP.text) {
+                HubSection(title: "About", icon: "info.circle.fill", iconTint: VP.brand) {
                     renderRows(visibleAbout)
                 }
             }
@@ -2545,51 +2572,9 @@ struct VerificationRequestView: View {
     }
 }
 
-// MARK: - FlowLayout (chip wrap)
-
-/// Lightweight wrap layout for chip rows. iOS 17+. Lays out subviews
-/// left-to-right, wrapping to a new line when the row width is exceeded.
-private struct FlowLayout: Layout {
-    var spacing: CGFloat = 6
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let maxWidth = proposal.width ?? .infinity
-        var x: CGFloat = 0
-        var y: CGFloat = 0
-        var rowHeight: CGFloat = 0
-        var totalWidth: CGFloat = 0
-        for sub in subviews {
-            let size = sub.sizeThatFits(.unspecified)
-            if x + size.width > maxWidth, x > 0 {
-                y += rowHeight + spacing
-                x = 0
-                rowHeight = 0
-            }
-            x += size.width + spacing
-            rowHeight = max(rowHeight, size.height)
-            totalWidth = max(totalWidth, x)
-        }
-        return CGSize(width: maxWidth.isFinite ? maxWidth : totalWidth,
-                      height: y + rowHeight)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var x: CGFloat = bounds.minX
-        var y: CGFloat = bounds.minY
-        var rowHeight: CGFloat = 0
-        for sub in subviews {
-            let size = sub.sizeThatFits(.unspecified)
-            if x + size.width > bounds.maxX, x > bounds.minX {
-                y += rowHeight + spacing
-                x = bounds.minX
-                rowHeight = 0
-            }
-            sub.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
-            x += size.width + spacing
-            rowHeight = max(rowHeight, size.height)
-        }
-    }
-}
+// FlowLayout was duplicated here and in AlertsView.swift. Removed the
+// duplicate; the AlertsView declaration is module-visible and serves
+// both call sites. Caller at line ~2320 passes spacing explicitly.
 
 // MARK: - Expert settings (role=expert)
 

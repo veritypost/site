@@ -67,7 +67,7 @@ import { getRateLimitPolicy } from '@/lib/rateLimits';
 import { isAsciiEmail } from '@/lib/emailNormalize';
 import { getSiteUrl } from '@/lib/siteUrl';
 import { truncateIpV4 } from '@/lib/apiErrors';
-import { checkSignupGate } from '@/lib/betaGate';
+import { checkSignupGate, isApprovedEmail } from '@/lib/betaGate';
 import { REF_COOKIE_NAME } from '@/lib/referralCookie';
 import { cookies } from 'next/headers';
 
@@ -210,20 +210,34 @@ export async function POST(request) {
     console.error('[auth.send-magic-link] existing-user check threw:', err?.message || err);
   }
   if (!existingUserId) {
+    // Approval is the canonical "this email is allowed" signal.
+    // Admin-approved emails bypass the cookie gate so a recipient whose
+    // invite-link email never landed (Resend down, dropped, deleted) can
+    // still sign up by typing their email directly. Without this bypass,
+    // an approved user with no cookie is silently dropped — exactly the
+    // failure mode the audit log surfaced.
+    let approvedBypass = false;
     try {
-      const gate = await checkSignupGate(service, refCookie);
-      if (!gate.allowed) {
-        await writeAuditRow(service, {
-          email,
-          reason: `closed_beta_${gate.reason || 'denied'}`,
-          ipTruncated,
-        });
+      approvedBypass = await isApprovedEmail(service, email);
+    } catch (err) {
+      console.error('[auth.send-magic-link] approval check threw:', err?.message || err);
+    }
+    if (!approvedBypass) {
+      try {
+        const gate = await checkSignupGate(service, refCookie);
+        if (!gate.allowed) {
+          await writeAuditRow(service, {
+            email,
+            reason: `closed_beta_${gate.reason || 'denied'}`,
+            ipTruncated,
+          });
+          return genericOk();
+        }
+      } catch (err) {
+        console.error('[auth.send-magic-link] beta gate threw:', err?.message || err);
+        await writeAuditRow(service, { email, reason: 'beta_gate_error', ipTruncated });
         return genericOk();
       }
-    } catch (err) {
-      console.error('[auth.send-magic-link] beta gate threw:', err?.message || err);
-      await writeAuditRow(service, { email, reason: 'beta_gate_error', ipTruncated });
-      return genericOk();
     }
   }
 

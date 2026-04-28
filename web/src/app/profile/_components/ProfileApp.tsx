@@ -24,6 +24,7 @@ import { DataSection } from '../_sections/DataSection';
 import { ExpertProfileSection } from '../_sections/ExpertProfileSection';
 import { ExpertQueueSection } from '../_sections/ExpertQueueSection';
 import { IdentitySection } from '../_sections/IdentitySection';
+import InviteFriendsCard from '@/components/profile/InviteFriendsCard';
 import { LinkOutSection } from '../_sections/LinkOutSection';
 import { MessagesSection } from '../_sections/MessagesSection';
 import { MilestonesSectionConnected } from '../_sections/MilestonesSection';
@@ -402,34 +403,10 @@ export function ProfileApp({ defaultSection }: Props) {
       id: 'refer',
       glyph: '⌘',
       group: 'Account',
-      title: 'Refer a friend',
-      reason: 'Share Verity Post and unlock perks when friends join.',
-      keywords: ['invite', 'refer', 'friend', 'share', 'rewards'],
-      render: () => (
-        <LinkOutSection
-          glyph="⌘"
-          title="Invite friends"
-          body={
-            u.username
-              ? `Share veritypost.com/r/${u.username} — anyone who signs up through your link is tied to your invite.`
-              : 'Set a username first so we can mint your referral link.'
-          }
-          actions={
-            u.username
-              ? [
-                  {
-                    label: 'Copy invite link',
-                    onClick: () => {
-                      navigator.clipboard
-                        .writeText(`${window.location.origin}/r/${u.username}`)
-                        .catch(() => {});
-                    },
-                  },
-                ]
-              : [{ label: 'Set username', href: '/profile?section=identity' }]
-          }
-        />
-      ),
+      title: 'Invite friends',
+      reason: 'Two invite links to share. Each one lets one friend join Verity Post.',
+      keywords: ['invite', 'refer', 'friend', 'share', 'link', 'signup', 'rewards'],
+      render: () => <InviteFriendsCard />,
     },
     {
       id: 'help',

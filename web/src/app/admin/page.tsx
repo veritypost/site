@@ -42,6 +42,7 @@ const PAGES: HubGroup[] = [
   { group: 'Users & Identity', desc: 'Who is on the platform, how they get in, and how trust is built', items: [
     { href: '/admin/users', title: 'User Management', desc: 'Users, devices, manual actions, ban/unban, roles, plans — per-user Permissions console on each row' },
     { href: '/admin/access', title: 'Access Codes', desc: 'Signup gating codes, auto-requests, usage tracking' },
+    { href: '/admin/access-requests', title: 'Access Requests', desc: 'Beta access intake — review pending requests and approve to email a one-time invite link' },
     { href: '/admin/verification', title: 'Expert Verification', desc: 'Review expert applications, probation status, approve/reject, annual re-verification flags' },
     { href: '/admin/data-requests', title: 'Data Requests', desc: 'Review GDPR/CCPA export and deletion requests, identity verify or reject' },
     { href: '/admin/permissions', title: 'Permissions & Access Control', desc: 'Set-centric RBAC — CRUD permissions, sets, role and plan grants; per-user view lives on each user row' },
@@ -92,6 +93,7 @@ export default function AdminHubPage() {
   const router = useRouter();
 
   const [featuredStories, setFeaturedStories] = useState<FeaturedStory[]>([]);
+  const [pendingRequestCount, setPendingRequestCount] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
   const [authorized, setAuthorized] = useState<boolean>(false);
   const [, setRestrictedRole] = useState<string | null>(null);
@@ -137,6 +139,15 @@ export default function AdminHubPage() {
         .limit(5);
 
       if (stories) setFeaturedStories(stories as unknown as FeaturedStory[]);
+
+      // Pending access-request count — Phase 1 intake removed the
+      // email-confirm gate, so all pending rows count.
+      const { count: pending } = await supabase
+        .from('access_requests')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'pending');
+      setPendingRequestCount(pending || 0);
+
       setLoading(false);
     }
 
@@ -161,6 +172,38 @@ export default function AdminHubPage() {
         title="Admin Hub"
         subtitle={`${total} pages across ${PAGES.length} sections`}
       />
+
+      {pendingRequestCount > 0 && (
+        <Link
+          href="/admin/access-requests"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: S[3],
+            padding: `${S[3]}px ${S[4]}px`,
+            marginBottom: S[6],
+            border: `1px solid ${C.warn}`,
+            borderRadius: 8,
+            background: 'rgba(245, 158, 11, 0.08)',
+            color: C.white,
+            textDecoration: 'none',
+            fontFamily: 'inherit',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: S[2] }}>
+            <Badge variant="warn" size="xs">
+              {pendingRequestCount}
+            </Badge>
+            <span style={{ fontSize: F.base, fontWeight: 500 }}>
+              {pendingRequestCount === 1
+                ? 'access request awaiting review'
+                : 'access requests awaiting review'}
+            </span>
+          </div>
+          <span style={{ fontSize: F.sm, color: C.dim }}>Review &rarr;</span>
+        </Link>
+      )}
 
       {/* Quick links — compact navigation for the most-used destinations */}
       <PageSection

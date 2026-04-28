@@ -24,7 +24,7 @@
 
 'use client';
 
-import { CSSProperties, FormEvent, Suspense, useEffect, useState } from 'react';
+import { CSSProperties, FormEvent, Suspense, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { usePageViewTrack } from '@/lib/useTrack';
 import MagicLinkForm from './_MagicLinkForm';
@@ -45,14 +45,14 @@ const C = {
   danger: 'var(--danger)',
 } as const;
 
-type Mode = 'signin' | 'invite';
+type Mode = 'signin' | 'invite' | 'request';
 
 const inviteReasonText: Record<string, string> = {
   invalid_format: "That doesn't look like a valid code.",
-  code_not_found: "We couldn't find that invite.",
-  code_disabled: 'That invite has been disabled.',
-  code_expired: 'That invite has expired.',
-  code_exhausted: 'That invite has already been used.',
+  code_not_found: "We couldn't find that code.",
+  code_disabled: 'That code has been disabled.',
+  code_expired: 'That code has expired.',
+  code_exhausted: 'That code has already been used.',
   rate_limited: 'Too many attempts. Try again in a minute.',
   server_misconfig: 'Server is missing config. Contact the team.',
   internal_error: 'Something went wrong. Please try again.',
@@ -69,7 +69,9 @@ export default function LoginPage() {
 function LoginPageInner() {
   const searchParams = useSearchParams();
   const recovered = searchParams?.get('recovered') === '1';
-  const initialMode: Mode = searchParams?.get('mode') === 'invite' ? 'invite' : 'signin';
+  const modeParam = searchParams?.get('mode');
+  const initialMode: Mode =
+    modeParam === 'invite' || modeParam === 'request' ? modeParam : 'signin';
   usePageViewTrack('login');
 
   const [mode, setMode] = useState<Mode>(initialMode);
@@ -78,6 +80,23 @@ function LoginPageInner() {
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteRedeemed, setInviteRedeemed] = useState<boolean>(false);
   const [focused, setFocused] = useState<boolean>(false);
+
+  // Request-access state — email-only intake.
+  const [requestEmail, setRequestEmail] = useState<string>('');
+  const [requestSentEmail, setRequestSentEmail] = useState<string>('');
+  const [requestBusy, setRequestBusy] = useState<boolean>(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const [requestSent, setRequestSent] = useState<boolean>(false);
+  const [requestFocused, setRequestFocused] = useState<boolean>(false);
+
+  // autoFocus only fires on initial mount; refs + effect re-focus the
+  // current tab's input on every mode change.
+  const inviteInputRef = useRef<HTMLInputElement | null>(null);
+  const requestInputRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    if (mode === 'invite') inviteInputRef.current?.focus();
+    if (mode === 'request' && !requestSent) requestInputRef.current?.focus();
+  }, [mode, requestSent]);
 
   // Inbound ?toast notices from other flows. Limited under magic-link
   // (no password-reset toasts left); ?recovered=1 has its own banner
@@ -117,6 +136,37 @@ function LoginPageInner() {
       setInviteError('Network issue. Please try again.');
     } finally {
       setInviteBusy(false);
+    }
+  };
+
+  const submitRequest = async (e: FormEvent) => {
+    e.preventDefault();
+    setRequestError(null);
+    const email = requestEmail.trim();
+    if (!email) return;
+    setRequestBusy(true);
+    try {
+      const res = await fetch('/api/access-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        status?: string;
+      };
+      if (!res.ok || !json.ok) {
+        setRequestError(json.error || 'Could not submit your request. Please try again.');
+        return;
+      }
+      setRequestSentEmail(email);
+      setRequestEmail('');
+      setRequestSent(true);
+    } catch {
+      setRequestError('Network issue. Please try again.');
+    } finally {
+      setRequestBusy(false);
     }
   };
 
@@ -189,13 +239,13 @@ function LoginPageInner() {
           </div>
         </a>
 
-        {/* Two-tab toggle: Sign in (magic-link) vs Use access code. */}
+        {/* Three-tab toggle: Sign in (magic-link), Have a code, Request access. */}
         <div
           role="tablist"
           aria-label="Login mode"
           style={{
             display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
+            gridTemplateColumns: '1fr 1fr 1fr',
             gap: 0,
             padding: 4,
             background: '#f3f4f6',
@@ -203,8 +253,10 @@ function LoginPageInner() {
             marginBottom: 22,
           }}
         >
-          {(['signin', 'invite'] as const).map((m) => {
+          {(['signin', 'invite', 'request'] as const).map((m) => {
             const active = m === mode;
+            const label =
+              m === 'signin' ? 'Sign in' : m === 'invite' ? 'Have a code' : 'Request access';
             return (
               <button
                 key={m}
@@ -214,22 +266,30 @@ function LoginPageInner() {
                 onClick={() => {
                   setMode(m);
                   setInviteError(null);
+                  setRequestError(null);
+                  // Reset request success card if user navigates away from
+                  // the request tab — otherwise they come back to a stale
+                  // success state with no email field visible.
+                  if (m !== 'request') {
+                    setRequestSent(false);
+                    setRequestSentEmail('');
+                  }
                 }}
                 style={{
-                  padding: '10px 12px',
+                  padding: '10px 8px',
                   borderRadius: 8,
                   border: 'none',
                   background: active ? '#ffffff' : 'transparent',
                   color: active ? C.text : C.dim,
                   fontWeight: 600,
-                  fontSize: 14,
+                  fontSize: 13,
                   cursor: 'pointer',
                   fontFamily: 'inherit',
                   boxShadow: active ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
                   transition: 'background 120ms, color 120ms',
                 }}
               >
-                {m === 'signin' ? 'Sign in' : 'Use access code'}
+                {label}
               </button>
             );
           })}
@@ -283,10 +343,10 @@ function LoginPageInner() {
         {mode === 'invite' && (
           <>
             <h1 style={{ fontSize: '26px', fontWeight: 700, color: C.text, margin: '0 0 8px 0' }}>
-              Have an access code?
+              Sign in with your code
             </h1>
             <p style={{ fontSize: 14, color: C.dim, margin: '0 0 22px 0', lineHeight: 1.55 }}>
-              Paste the code or the full /r/&lt;slug&gt; URL below.
+              Enter the code we sent you to continue.
             </p>
 
             {inviteError && (
@@ -319,10 +379,11 @@ function LoginPageInner() {
                   Access code
                 </label>
                 <input
+                  ref={inviteInputRef}
                   id="invite-code"
                   name="code"
                   type="text"
-                  placeholder="abc123 or https://veritypost.com/r/abc123"
+                  placeholder="e.g. abc123de"
                   value={inviteCode}
                   onChange={(e) => setInviteCode(e.target.value)}
                   onFocus={() => setFocused(true)}
@@ -330,7 +391,6 @@ function LoginPageInner() {
                   autoComplete="off"
                   autoCapitalize="none"
                   spellCheck={false}
-                  autoFocus
                   required
                   style={inviteFieldStyle}
                 />
@@ -353,9 +413,141 @@ function LoginPageInner() {
                   minHeight: '44px',
                 }}
               >
-                {inviteBusy ? 'Redeeming…' : 'Redeem access code'}
+                {inviteBusy ? 'Redeeming…' : 'Continue'}
               </button>
             </form>
+
+            <p style={{ fontSize: 13, color: C.dim, margin: '18px 0 0 0', textAlign: 'center' }}>
+              No invite yet?{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('request');
+                  setInviteError(null);
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  color: C.accent,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  fontSize: 13,
+                }}
+              >
+                Request access &rarr;
+              </button>
+            </p>
+          </>
+        )}
+
+        {mode === 'request' && (
+          <>
+            <h1 style={{ fontSize: '26px', fontWeight: 700, color: C.text, margin: '0 0 8px 0' }}>
+              Request your invite
+            </h1>
+            <p style={{ fontSize: 14, color: C.dim, margin: '0 0 22px 0', lineHeight: 1.55 }}>
+              Verity Post is invite-only during our beta. Enter your email and we&rsquo;ll send a sign-in link once your account is approved.
+            </p>
+
+            {requestSent ? (
+              <div
+                role="status"
+                style={{
+                  padding: '14px 16px',
+                  borderRadius: 10,
+                  background: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  color: '#166534',
+                  fontSize: 14,
+                  lineHeight: 1.55,
+                }}
+              >
+                Request received. We&rsquo;ll email{' '}
+                {requestSentEmail ? (
+                  <strong style={{ wordBreak: 'break-all' }}>{requestSentEmail}</strong>
+                ) : (
+                  'your inbox'
+                )}{' '}
+                with a sign-in link once your account is approved.
+              </div>
+            ) : (
+              <>
+                {requestError && (
+                  <div
+                    role="alert"
+                    style={{
+                      backgroundColor: '#fef2f2',
+                      border: '1px solid #fecaca',
+                      borderRadius: '10px',
+                      padding: '12px 14px',
+                      marginBottom: '16px',
+                    }}
+                  >
+                    <p style={{ margin: 0, fontSize: '13px', color: C.danger }}>{requestError}</p>
+                  </div>
+                )}
+
+                <form onSubmit={submitRequest}>
+                  <div style={{ marginBottom: 16 }}>
+                    <label
+                      htmlFor="request-email"
+                      style={{
+                        display: 'block',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        color: C.text,
+                        marginBottom: '7px',
+                      }}
+                    >
+                      Email
+                    </label>
+                    <input
+                      ref={requestInputRef}
+                      id="request-email"
+                      name="email"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={requestEmail}
+                      onChange={(e) => setRequestEmail(e.target.value)}
+                      onFocus={() => setRequestFocused(true)}
+                      onBlur={() => setRequestFocused(false)}
+                      autoComplete="email"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      required
+                      style={{
+                        ...inviteFieldStyle,
+                        border: `1.5px solid ${requestFocused ? C.accent : C.border}`,
+                      }}
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={requestBusy || !requestEmail.trim()}
+                    style={{
+                      width: '100%',
+                      padding: '13px',
+                      fontSize: '15px',
+                      fontWeight: 600,
+                      color: '#fff',
+                      backgroundColor:
+                        requestBusy || !requestEmail.trim() ? C.dim : C.accent,
+                      border: 'none',
+                      borderRadius: '10px',
+                      cursor:
+                        requestBusy || !requestEmail.trim() ? 'not-allowed' : 'pointer',
+                      fontFamily: 'inherit',
+                      minHeight: '44px',
+                    }}
+                  >
+                    {requestBusy ? 'Submitting…' : 'Request invite'}
+                  </button>
+                </form>
+              </>
+            )}
           </>
         )}
       </div>

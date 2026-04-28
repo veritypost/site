@@ -12,7 +12,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { verifyRef } from './referralCookie';
 
 export type GateResult =
-  | { allowed: true; viaOwnerLink: boolean; codeId: string | null }
+  | { allowed: true; viaOwnerLink: boolean; codeId: string | null; viaApproval?: boolean }
   | {
       allowed: false;
       reason:
@@ -24,6 +24,33 @@ export type GateResult =
         | 'code_expired'
         | 'code_exhausted';
     };
+
+/**
+ * Approval-based bypass for the cookie gate. An admin-approved
+ * `access_requests` row is the canonical source of truth for "this
+ * email is allowed in." It must work even when the recipient never
+ * clicked the invite link (auto-email failed, link lost in inbox,
+ * cookies cleared, different device, etc.). Once approved, that email
+ * is in — period.
+ */
+export async function isApprovedEmail(
+  service: SupabaseClient,
+  email: string | null | undefined
+): Promise<boolean> {
+  if (!email) return false;
+  const lc = email.toLowerCase();
+  try {
+    const { data } = await service
+      .from('access_requests')
+      .select('id')
+      .eq('email', lc)
+      .eq('status', 'approved')
+      .maybeSingle();
+    return !!data;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Read settings.beta_active. Returns false if the row is missing or

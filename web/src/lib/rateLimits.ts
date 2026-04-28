@@ -66,6 +66,13 @@ export const RATE_LIMITS = {
   // a minute is rare. Key on SHA-256(token), never the raw token.
   AUTH_GRADUATE_CLAIM_TOKEN: { windowSec: 60, max: 5 },
 
+  // Beta access-request intake. Per IP cap is loose enough for a normal
+  // visitor retrying on a flaky connection but tight enough that one IP
+  // can't burst-flood the queue. Per email cap is 1/day so a single
+  // inbox can't be used as a battering ram against the admin queue.
+  ACCESS_REQUEST_SUBMIT_PER_IP: { windowSec: 3600, max: 5 },
+  ACCESS_REQUEST_SUBMIT_PER_EMAIL: { windowSec: 86400, max: 1 },
+
   // === Comments / votes (S5 imports — declared here for shared config) ===
 
   COMMENT_POST_PER_USER: { windowSec: 60, max: 10 },

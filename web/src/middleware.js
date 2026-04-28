@@ -291,6 +291,7 @@ export async function middleware(request) {
       pathname.startsWith('/admin') ||
       pathname.startsWith('/ideas') ||
       pathname.startsWith('/_next/') ||
+      pathname.startsWith('/.well-known/') ||
       pathname === '/favicon.ico' ||
       pathname === '/robots.txt' ||
       pathname === '/sitemap.xml';
@@ -360,6 +361,7 @@ export async function middleware(request) {
     pathname.startsWith('/r/') ||
     pathname.startsWith('/api/') ||
     pathname.startsWith('/_next/') ||
+    pathname.startsWith('/.well-known/') ||
     pathname === '/favicon.ico' ||
     pathname === '/robots.txt' ||
     pathname === '/sitemap.xml';

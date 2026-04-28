@@ -46,7 +46,21 @@ const nextConfig = {
   },
   poweredByHeader: false,
   async headers() {
-    return [{ source: '/:path*', headers: securityHeaders }];
+    return [
+      { source: '/:path*', headers: securityHeaders },
+      // Apple-app-site-association (AASA) must be served as
+      // application/json so iOS Universal Links validation accepts it.
+      // Next.js auto-detects MIME from file extension; AASA has no
+      // extension, so we set the header explicitly. Static — Apple
+      // re-fetches occasionally; long cache is fine.
+      {
+        source: '/.well-known/apple-app-site-association',
+        headers: [
+          { key: 'Content-Type', value: 'application/json' },
+          { key: 'Cache-Control', value: 'public, max-age=3600' },
+        ],
+      },
+    ];
   },
 };
 

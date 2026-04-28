@@ -1,9 +1,11 @@
 import SwiftUI
 
 enum VP {
-    // Palette — mirrors site/src/app/globals.css exactly.
-    // Accent is BLACK, not indigo. The site uses --accent: #111111 for all
-    // primary actions and active states; the indigo shade was wrong.
+    // === Legacy tokens ===
+    // Mirror site/src/app/globals.css. Used by ~24 Swift files that have
+    // not been migrated to the redesign palette. New views should reach
+    // for the redesign tokens below (VP.brand, VP.ink, VP.surfaceRaised,
+    // etc.) and only fall back to these where a v1.1 sweep hasn't landed.
     static let bg = Color.white
     static let card = Color(hex: "f7f7f7")
     static let border = Color(hex: "e5e5e5")
@@ -68,6 +70,116 @@ enum VP {
     static func nextTier(for count: Int) -> Int {
         tiers.first(where: { count < $0 }) ?? tiers.last ?? 100
     }
+
+    // === Redesign tokens (mirrors web/src/app/profile/_lib/palette.ts) ===
+    // Role-based naming. Used by ProfileView hero, SettingsView hub +
+    // chrome + drill-ins, and InviteFriendsView. Other surfaces stay on
+    // the legacy tokens above until a wider sweep migrates them.
+
+    // Brand (replaces black `accent` for redesigned surfaces only)
+    static let brand     = Color(hex: "0b5cff")
+    static let brandSoft = Color(hex: "e6efff")
+    static let brandInk  = Color(hex: "ffffff")
+    /// Focus-ring tint — 30% brand. Use via .vpShadowRing() on focused controls.
+    static let ring      = Color(red: 11.0 / 255, green: 92.0 / 255, blue: 255.0 / 255, opacity: 0.30)
+
+    // Ink ramp (5 levels of neutral text emphasis)
+    static let ink       = Color(hex: "0a0a0a")
+    static let inkSoft   = Color(hex: "27272a")
+    static let inkMuted  = Color(hex: "52525b")
+    static let inkDim    = Color(hex: "71717a")
+    static let inkFaint  = Color(hex: "a1a1aa")
+
+    // Surface ramp (depth via lightness, not shadow)
+    static let surface       = Color(hex: "fafafa")
+    static let surfaceRaised = Color(hex: "ffffff")
+    static let surfaceSunken = Color(hex: "f4f4f5")
+
+    // Lines (3 grades — soft for cards, strong for outlined controls, divider for inter-row)
+    static let borderSoft   = Color(hex: "e4e4e7")
+    static let borderStrong = Color(hex: "d4d4d8")
+    static let divider      = Color(hex: "f1f1f3")
+
+    // Soft semantic backgrounds (use with full-tone text from existing semantics)
+    static let successSoft = Color(hex: "dcfce7")
+    static let warnSoft    = Color(hex: "fef3c7")
+    static let dangerSoft  = Color(hex: "fee2e2")
+    static let infoSoft    = Color(hex: "e6efff")
+
+    // Verified / expert badges
+    static let verified    = Color(hex: "0b5cff")
+    static let expertColor = Color(hex: "7c3aed")
+
+    /// Spacing scale (px). 4-base, 8-grid. Verbose paths (VP.Spacing.s4)
+    /// over single-letter top-levels to avoid collision with Swift generic
+    /// parameter conventions (e.g. `func foo<S: View>`).
+    enum Spacing {
+        static let s0: CGFloat = 0
+        static let s1: CGFloat = 4
+        static let s2: CGFloat = 8
+        static let s3: CGFloat = 12
+        static let s4: CGFloat = 16
+        static let s5: CGFloat = 20
+        static let s6: CGFloat = 24
+        static let s7: CGFloat = 32
+        static let s8: CGFloat = 40
+        static let s9: CGFloat = 56
+        static let s10: CGFloat = 72
+    }
+
+    /// Type scale. Hero uses serif via Font.system(_, design: .serif).
+    enum Size {
+        static let xs: CGFloat = 11
+        static let sm: CGFloat = 13
+        static let base: CGFloat = 15
+        static let md: CGFloat = 16
+        static let lg: CGFloat = 18
+        static let xl: CGFloat = 22
+        static let xxl: CGFloat = 28
+        static let display: CGFloat = 36
+    }
+
+    /// Corner radii.
+    enum Radius {
+        static let sm: CGFloat = 6
+        static let md: CGFloat = 10
+        static let lg: CGFloat = 14
+        static let xl: CGFloat = 20
+        static let pill: CGFloat = 999
+    }
+}
+
+// MARK: - Redesign shadow modifiers
+//
+// Two-stack ambient shadow approximates the web `box-shadow:
+// 0 1px 2px rgba(15,15,15,0.04), 0 1px 3px rgba(15,15,15,0.06)`.
+// IMPORTANT: place .vpShadowAmbient AFTER .clipShape — a shadow before
+// the clip gets clipped to invisibility.
+
+extension View {
+    /// Ambient card shadow. Subtle two-pass for depth on white surfaces.
+    func vpShadowAmbient() -> some View {
+        self
+            .shadow(color: Color.black.opacity(0.04), radius: 1, x: 0, y: 1)
+            .shadow(color: Color.black.opacity(0.06), radius: 3, x: 0, y: 1)
+    }
+
+    /// Elevated shadow for floating controls (sheets, popovers).
+    func vpShadowElevated() -> some View {
+        self
+            .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+            .shadow(color: Color.black.opacity(0.06), radius: 12, x: 0, y: 4)
+    }
+
+    /// Focus ring overlay. Use as a strokeBorder on the *outside* of the
+    /// element. SwiftUI shadow doesn't render a clean ring shape, so we
+    /// stroke instead.
+    func vpShadowRing() -> some View {
+        self.overlay(
+            RoundedRectangle(cornerRadius: VP.Radius.md, style: .continuous)
+                .stroke(VP.ring, lineWidth: 3)
+        )
+    }
 }
 
 // MARK: - Color hex init
@@ -88,6 +200,13 @@ extension Color {
         // 6-hex-digit RRGGBB only. Reject 3-digit / 8-digit / empty so the
         // muted fallback wins instead of an under-/over-shifted bit pattern.
         guard scanned, trimmed.count == 6, scanner.isAtEnd else {
+            // Log only — never crash. User data (users.avatar_color,
+            // kid colors, server-stored hex) flows through this parser
+            // and historically has accepted 3-digit shorthands, nulls,
+            // and other shapes. A crash on debug would abort-trap the
+            // simulator on any profile with a non-canonical avatar hex.
+            // Token typos are caught by visual audit + the muted-fallback
+            // rendering in dev (clearly broken color = clearly typo).
             Log.d("[Color(hex:)] malformed input — falling back to VP.muted:", raw)
             self = Color(red: 0x99 / 255, green: 0x99 / 255, blue: 0x99 / 255)
             return

@@ -1,0 +1,32 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": [
+          "FQCAS829U7.com.veritypost.app",
+          "FQCAS829U7.com.veritypost.kids"
+        ],
+        "components": [
+          {
+            "/": "/api/auth/callback*",
+            "comment": "Magic-link sign-in callback"
+          },
+          {
+            "/": "/r/*",
+            "comment": "Referral / invite links"
+          },
+          {
+            "/": "/story/*",
+            "comment": "Article deep-links"
+          }
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": [
+      "FQCAS829U7.com.veritypost.app",
+      "FQCAS829U7.com.veritypost.kids"
+    ]
+  }
+}

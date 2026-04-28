@@ -1,70 +1,179 @@
-// Public access-request intake. Email-only. After submission we email
-// the requester a confirm link; only after they click does the row's
-// email_confirmed_at flip and the admin queue surfaces it for review.
+// Public access-request intake — beta waitlist.
 //
-// Reactivates the route that was 410'd by Ext-AA1 (2026-04-25).
+// Phase 1 design (matches "best teams" intake flow):
+//   - Email-only payload. No confirm-email step; the access codes & invite
+//     link admin sends on approval are the actual proof-of-control of the
+//     inbox. Spam/bogus entries get filtered in the admin queue.
+//   - Anti-enumeration response shape:
+//       * Generic 200 across every account-state branch (already a user,
+//         already approved, already pending, bot-rejected, per-email
+//         rate-limit hit, success). Attacker can't probe email state.
+//       * Per-IP rate-limit returns 429 with Retry-After. The hammering
+//         party IS the attacker — leaking that they're capped is
+//         intentional and the proper retry signal for legitimate users.
+//       * Malformed payload returns 400.
+//   - Captures attribution at intake (UTM, referrer, vp_ref cookie,
+//     signup_cohort snapshot) into `metadata` jsonb — frozen at submit
+//     time so later cohort flips don't rewrite history.
+//   - Two rate-limit scopes (policy keys in lib/rateLimits.ts):
+//       ACCESS_REQUEST_SUBMIT_PER_IP    (5/hour)
+//       ACCESS_REQUEST_SUBMIT_PER_EMAIL (1/day)
+//   - Short-circuits before insert: already an active user, already
+//     approved (re-fire invite re-mint is admin's call), already pending
+//     (idempotent — refresh updated_at, no dup row).
 
 import { NextResponse } from 'next/server';
-import crypto from 'node:crypto';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
-import { renderTemplate, sendEmail } from '@/lib/email';
-import { REQUEST_CONFIRM_TEMPLATE } from '@/lib/accessRequestEmail';
-import { getSiteUrl } from '@/lib/siteUrl';
+import { getRateLimitPolicy } from '@/lib/rateLimits';
 import { isAsciiEmail } from '@/lib/emailNormalize';
+import { REF_COOKIE_NAME, verifyRef } from '@/lib/referralCookie';
+import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-const TOKEN_TTL_HOURS = 24;
 
-function newToken() {
-  // 32 url-safe bytes — 256 bits. Resists guessing.
-  return crypto
-    .randomBytes(32)
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
+const GENERIC_OK = {
+  ok: true,
+  message: "Request received. We'll email a sign-in link once your account is approved.",
+};
+
+function genericOk() {
+  return NextResponse.json(GENERIC_OK, {
+    status: 200,
+    headers: { 'Cache-Control': 'private, no-store, max-age=0' },
+  });
+}
+
+// Pull attribution from headers + body. Frozen at intake. Stored on
+// metadata jsonb so the schema doesn't churn every time we add a field.
+function buildAttribution(request, body, refCookie, cohortSnapshot, ipTruncated) {
+  // Headers are runtime-bounded, but defensively cap. Hostile UAs can be
+  // multi-KB; we don't want metadata jsonb growing unbounded.
+  const referer = (request.headers.get('referer') || '').slice(0, 1024) || null;
+  const ua = (request.headers.get('user-agent') || '').slice(0, 1024) || null;
+  // Pull UTM from the body when present (the form may forward window.location
+  // params at submit), falling back to parsing the referer header.
+  const utm = {
+    source: pickUtm(body, referer, 'utm_source'),
+    medium: pickUtm(body, referer, 'utm_medium'),
+    campaign: pickUtm(body, referer, 'utm_campaign'),
+    term: pickUtm(body, referer, 'utm_term'),
+    content: pickUtm(body, referer, 'utm_content'),
+  };
+  let referralCodeId = null;
+  if (refCookie) {
+    const decoded = verifyRef(refCookie);
+    if (decoded?.c) referralCodeId = decoded.c;
+  }
+  return {
+    captured_at: new Date().toISOString(),
+    cohort_snapshot: cohortSnapshot || null,
+    referral_code_id: referralCodeId,
+    referer,
+    user_agent: ua,
+    ip_24: ipTruncated,
+    utm,
+  };
+}
+
+function pickUtm(body, referer, key) {
+  if (body && typeof body[key] === 'string' && body[key].length <= 200) return body[key];
+  if (!referer) return null;
+  try {
+    const u = new URL(referer);
+    const v = u.searchParams.get(key);
+    return v ? v.slice(0, 200) : null;
+  } catch {
+    return null;
+  }
+}
+
+// Truncate IPv4 to /24. IPv6 falls through unchanged because /24 doesn't
+// map; full v6 is fine for rate-limit keys.
+function truncateIp(ip) {
+  if (!ip) return null;
+  const parts = ip.split('.');
+  if (parts.length === 4) return `${parts[0]}.${parts[1]}.${parts[2]}.0`;
+  return ip;
 }
 
 export async function POST(request) {
   try {
     const service = createServiceClient();
 
-    const ip = await getClientIp();
-    const rate = await checkRateLimit(service, {
-      key: `access_request:ip:${ip || 'unknown'}`,
-      policyKey: 'access_request_ip',
-      max: 5,
-      windowSec: 3600,
-    });
-    if (rate.limited) {
-      return NextResponse.json(
-        { error: 'Too many requests. Please try again later.' },
-        { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 3600) } }
-      );
+    // Parse body once. Malformed → 400.
+    let body = null;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid request.' }, { status: 400 });
     }
 
-    const body = await request.json().catch(() => ({}));
-    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
-
-    if (!email || !EMAIL_RE.test(email)) {
+    const rawEmail = typeof body?.email === 'string' ? body.email.trim() : '';
+    if (!rawEmail || rawEmail.length > 254 || !EMAIL_RE.test(rawEmail) || !isAsciiEmail(rawEmail)) {
       return NextResponse.json({ error: 'A valid email is required.' }, { status: 400 });
     }
-    // T299 — block homoglyph bypass at public intake. Same canonicalization
-    // gate every other email-write surface uses.
-    if (!isAsciiEmail(email)) {
+    const email = rawEmail.toLowerCase();
+
+    const rawIp = await getClientIp();
+    const ipTruncated = truncateIp(rawIp);
+
+    // Per-IP rate limit. Returns 429 (intentional — see header comment).
+    const ipPolicy = getRateLimitPolicy('ACCESS_REQUEST_SUBMIT_PER_IP');
+    const ipRate = await checkRateLimit(service, {
+      key: `access_request:ip:${rawIp || 'unknown'}`,
+      policyKey: 'access_request_submit_per_ip',
+      ...ipPolicy,
+    });
+    if (ipRate.limited) {
       return NextResponse.json(
-        { error: 'We can only accept emails using standard letters and numbers.' },
-        { status: 400 }
+        { error: 'Too many requests. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(ipRate.windowSec ?? ipPolicy.windowSec) } }
       );
     }
 
-    const userAgent = request.headers.get('user-agent') || null;
+    // Per-email rate limit. Cap-hit returns generic ok — anti-enumeration.
+    const emailPolicy = getRateLimitPolicy('ACCESS_REQUEST_SUBMIT_PER_EMAIL');
+    const emailRate = await checkRateLimit(service, {
+      key: `access_request:email:${email}`,
+      policyKey: 'access_request_submit_per_email',
+      ...emailPolicy,
+    });
+    if (emailRate.limited) {
+      return genericOk();
+    }
 
-    // Already approved? Tell them to check their inbox for the invite.
+    // Cohort snapshot — frozen at intake so a later admin flip of
+    // signup_cohort doesn't rewrite the row's attribution.
+    const { data: setting } = await service
+      .from('settings')
+      .select('value')
+      .eq('key', 'signup_cohort')
+      .maybeSingle();
+    const cohortSnapshot = (setting?.value && String(setting.value)) || null;
+
+    const cookieJar = await cookies();
+    const refCookie = cookieJar.get(REF_COOKIE_NAME)?.value || null;
+    const attribution = buildAttribution(request, body, refCookie, cohortSnapshot, ipTruncated);
+
+    // Short-circuit: already an active user. Don't insert; return generic ok.
+    // Anti-enumeration: same response shape as a real submission.
+    // `email` is already lowercased; users.email is lowercased at insert
+    // time across the auth pipeline, so eq is the correct primitive.
+    const { data: existingUser } = await service
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle();
+    if (existingUser) {
+      return genericOk();
+    }
+
+    // Short-circuit: already approved. Same generic ok — admin can re-fire
+    // the invite manually from the queue if the user lost the email.
     const { data: approved } = await service
       .from('access_requests')
       .select('id')
@@ -72,96 +181,69 @@ export async function POST(request) {
       .eq('status', 'approved')
       .maybeSingle();
     if (approved) {
-      return NextResponse.json({
-        ok: true,
-        status: 'already_approved',
-        message: 'You were already approved. Check your inbox for the invite link.',
-      });
+      return genericOk();
     }
 
-    const token = newToken();
-    const expires = new Date(Date.now() + TOKEN_TTL_HOURS * 60 * 60 * 1000).toISOString();
-    const siteUrl = getSiteUrl();
-    const confirmUrl = `${siteUrl}/api/access-request/confirm?token=${encodeURIComponent(token)}`;
-    const expiresHuman = new Date(expires).toLocaleString(undefined, {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-
-    // Idempotency: if there's an existing pending row for this email,
-    // refresh the token (don't create dups). The user might have lost
-    // the prior email or it expired.
-    const { data: existing } = await service
+    // Idempotent insert / refresh. If a pending row exists we just bump
+    // updated_at + refresh attribution — no dup. New rows write through
+    // with email_confirmed_at = now() so the legacy admin filter (and the
+    // dashboard count) treat them as ready for review immediately.
+    const { data: existingPending } = await service
       .from('access_requests')
-      .select('id, status, email_confirmed_at')
+      .select('id')
       .eq('email', email)
-      .in('status', ['pending'])
+      .eq('status', 'pending')
       .maybeSingle();
 
-    let upsertErr = null;
-    if (existing) {
+    // DB write failures collapse to genericOk + console.error — never
+    // surface a 500 to the public surface (anti-enumeration: hostile
+    // probing must not get a different status code on a triggered error).
+    if (existingPending) {
       const { error } = await service
         .from('access_requests')
         .update({
-          email_confirm_token: token,
-          email_confirm_expires_at: expires,
+          metadata: attribution,
+          email_confirmed_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
-        .eq('id', existing.id);
-      upsertErr = error;
+        .eq('id', existingPending.id);
+      if (error) {
+        console.error('[access-request] refresh error:', error.message);
+        return genericOk();
+      }
     } else {
       const { error } = await service.from('access_requests').insert({
         email,
         type: 'beta',
         status: 'pending',
-        email_confirm_token: token,
-        email_confirm_expires_at: expires,
-        ip_address: ip || null,
-        user_agent: userAgent,
+        ip_address: rawIp || null,
+        user_agent: (request.headers.get('user-agent') || '').slice(0, 1024) || null,
+        email_confirmed_at: new Date().toISOString(),
+        metadata: attribution,
       });
-      upsertErr = error;
+      if (error) {
+        console.error('[access-request] insert error:', error.message);
+        return genericOk();
+      }
     }
 
-    if (upsertErr) {
-      console.error('[access-request]', upsertErr.message);
-      return NextResponse.json({ error: 'Could not submit request' }, { status: 500 });
-    }
-
-    // Send the confirm email. Failure here is recoverable — user can
-    // re-submit to get a new token.
+    // Best-effort audit row — visibility for ops without coupling to the
+    // primary write. Failure here doesn't fail the response.
     try {
-      const tpl = renderTemplate(REQUEST_CONFIRM_TEMPLATE, {
-        confirm_url: confirmUrl,
-        expires_at: expiresHuman,
+      await service.from('audit_log').insert({
+        actor_id: null,
+        action: 'access_request:submit',
+        target_type: 'email',
+        target_id: null,
+        metadata: { email_lc: email, ip_24: ipTruncated, cohort: cohortSnapshot },
       });
-      await sendEmail({
-        to: email,
-        subject: tpl.subject,
-        html: tpl.html,
-        text: tpl.text,
-        fromName: tpl.fromName,
-        fromEmail: tpl.fromEmail,
-        replyTo: undefined,
-        unsubscribeUrl: undefined,
-      });
-    } catch (e) {
-      console.error('[access-request] sendEmail failed:', e);
-      return NextResponse.json(
-        { error: 'Could not send confirmation email. Please try again.' },
-        { status: 500 }
-      );
-    }
+    } catch {}
 
-    return NextResponse.json({
-      ok: true,
-      status: existing ? 'pending_existing' : 'submitted',
-      message: 'Check your email for a confirmation link.',
-    });
+    return genericOk();
   } catch (err) {
+    // Anti-enumeration: even a top-level throw collapses to generic ok.
+    // Real failure visibility is via console.error (and Sentry once wired).
     console.error('[access-request]', err);
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+    return genericOk();
   }
 }

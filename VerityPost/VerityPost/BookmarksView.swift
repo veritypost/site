@@ -192,15 +192,18 @@ struct BookmarksView: View {
         pendingDelete = target
         pendingDeleteOriginalIndex = idx
         items.remove(at: idx)
-        pendingDeleteTask = Task { [weak self] in
+        pendingDeleteTask = Task {
+            // SwiftUI View is a struct — `[weak self]` is invalid. The
+            // closure captures the View by value; @State is reference-
+            // backed under the hood, so writes still hit the live store.
             try? await Task.sleep(nanoseconds: 5 * 1_000_000_000)
-            guard let self, !Task.isCancelled else { return }
-            await self.commitRemove(target)
+            guard !Task.isCancelled else { return }
+            await commitRemove(target)
             await MainActor.run {
-                if self.pendingDelete?.id == target.id {
-                    self.pendingDelete = nil
-                    self.pendingDeleteOriginalIndex = nil
-                    self.pendingDeleteTask = nil
+                if pendingDelete?.id == target.id {
+                    pendingDelete = nil
+                    pendingDeleteOriginalIndex = nil
+                    pendingDeleteTask = nil
                 }
             }
         }

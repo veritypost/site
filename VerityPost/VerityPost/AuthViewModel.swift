@@ -208,7 +208,11 @@ final class AuthViewModel: ObservableObject {
     func checkSession() async {
         sessionCheckTask?.cancel()
         let task = Task { [weak self] in
-            await self?.runSessionCheck()
+            // Unwrap to Void return so the Task type matches
+            // `Task<Void, Never>` (optional-chaining on self? would
+            // produce `Task<Void?, Never>` and fail the assignment).
+            guard let self else { return }
+            await self.runSessionCheck()
         }
         sessionCheckTask = task
         await task.value
@@ -709,6 +713,32 @@ final class AuthViewModel: ObservableObject {
     /// (calls `/user` on unexpired tokens, refreshSession on expired),
     /// so a revoked/dead/cross-project token fails inside setSession.
     func handleDeepLink(_ url: URL) async {
+        // PKCE flow (Universal Links from web magic-link emails): the URL
+        // arrives as `https://veritypost.com/api/auth/callback?code=XXX`.
+        // The web Supabase client uses PKCE, so the token exchange happens
+        // here in the app via the SDK's exchangeCodeForSession.
+        if let comps = URLComponents(url: url, resolvingAgainstBaseURL: false),
+           let code = comps.queryItems?.first(where: { $0.name == "code" })?.value,
+           !code.isEmpty {
+            do {
+                let session = try await client.auth.exchangeCodeForSession(authCode: code)
+                deepLinkError = nil
+                deepLinkErrorDismissTask?.cancel()
+                await loadUser(id: session.user.id.uuidString)
+                isLoggedIn = true
+                needsEmailVerification = false
+                pendingVerificationEmail = nil
+                return
+            } catch {
+                Log.d("Deep link PKCE exchange failed: \(error)")
+                setDeepLinkError("This link isn\u{2019}t valid or has expired. Request a new one.")
+                return
+            }
+        }
+
+        // Implicit flow (legacy / direct fragment-style tokens): the URL
+        // arrives with `#access_token=...&refresh_token=...&type=...` in
+        // the fragment. Used by Supabase's older recovery / OAuth flows.
         guard let fragment = url.fragment ?? url.query else {
             setDeepLinkError("This link isn\u{2019}t valid. Try the most recent email we sent.")
             return
