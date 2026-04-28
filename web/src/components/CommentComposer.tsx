@@ -84,22 +84,90 @@ export default function CommentComposer({
       .map((u) => ({ user_id: u.id, username: u.username }));
   }
 
+  // S5-§H2 — pre-submit mention lock.
+  //
+  // Pre-§H2 the composer let the post fly even when the @-tokens couldn't
+  // fan out (free-tier author OR mentioned user has blocked the author).
+  // The post_comment RPC silently dropped mention fan-out, the user saw
+  // their @-link tappable in their own comment, and the mentioned user
+  // never got a notification. That breaks user expectation and silently
+  // discriminates against free tier.
+  //
+  // The fix is to ask the server "can I mention these?" before submit and
+  // block on a no-go reason. The post_comment RPC re-validates plan +
+  // blocks server-side as defense-in-depth (S1 ships that change).
+  async function checkCanMention(
+    usernames: string[]
+  ): Promise<
+    | { ok: true; unresolved?: string[] }
+    | { ok: false; reason: 'free_tier_mention_disabled' | 'mentioned_user_blocks_you' | 'unknown'; usernames?: string[] }
+  > {
+    if (usernames.length === 0) return { ok: true };
+    try {
+      const res = await fetch('/api/comments/can-mention', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usernames }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        allowed?: boolean;
+        reason?: string;
+        usernames?: string[];
+        unresolved?: string[];
+      };
+      if (!res.ok) return { ok: false, reason: 'unknown' };
+      if (data.allowed === false) {
+        const reason =
+          data.reason === 'free_tier_mention_disabled' ||
+          data.reason === 'mentioned_user_blocks_you'
+            ? data.reason
+            : 'unknown';
+        return { ok: false, reason, usernames: data.usernames };
+      }
+      return { ok: true, unresolved: data.unresolved };
+    } catch {
+      // Network failure — let the submit proceed; the server-side defense
+      // catches an unauthorized mention if the network blip cleared by
+      // the time the POST lands. Surfacing a hard block on a transient
+      // network error would punish a legitimate user.
+      return { ok: true };
+    }
+  }
+
   async function submit() {
     const trimmed = body.trim();
     if (!trimmed || busy) return;
-    // L-08: MENTION_RE is `/g`-flagged, so `.test()` carries `lastIndex`
-    // state across calls. Use `.match()` (or reset lastIndex) so the
-    // boolean check is order-independent. If the user typed @names
-    // without the comments.mention.insert permission, surface a
-    // non-silent toast so they know their handle will post as plain
-    // text (resolveMentions drops mentions silently otherwise).
-    const hasMentions = !!trimmed.match(MENTION_RE);
-    if (hasMentions && !canMention) {
-      setError(COPY.comments.mentionPaidComposerHint);
-      // Do not block submit; let the user decide to edit or accept.
-    } else {
-      setError('');
+    setError('');
+
+    // Extract @-tokens once. MENTION_RE is `/g`-flagged so we deliberately
+    // re-iterate rather than call .test() (which carries lastIndex).
+    const mentionNames = Array.from(
+      new Set([...trimmed.matchAll(MENTION_RE)].map((m) => m[1]))
+    );
+
+    // Pre-submit lock — only fires when the draft has @-tokens. No
+    // tokens → straight to the post path with zero extra latency.
+    if (mentionNames.length > 0) {
+      const verdict = await checkCanMention(mentionNames);
+      if (!verdict.ok) {
+        if (verdict.reason === 'free_tier_mention_disabled') {
+          setError(
+            'Mentions are a Pro feature. Upgrade or remove the @username to post.'
+          );
+        } else if (verdict.reason === 'mentioned_user_blocks_you') {
+          const blocked = (verdict.usernames || []).join(', @');
+          setError(
+            blocked
+              ? `You can't mention @${blocked} — they've blocked you.`
+              : "You can't mention that user — they've blocked you."
+          );
+        } else {
+          setError(COPY.comments.postFailed);
+        }
+        return;
+      }
     }
+
     setBusy(true);
     try {
       const mentions = await resolveMentions(trimmed);

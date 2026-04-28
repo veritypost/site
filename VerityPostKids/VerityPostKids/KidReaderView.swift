@@ -40,6 +40,16 @@ struct KidReaderView: View {
                     header
                     if loading {
                         ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
+                    } else if body_.isEmpty {
+                        // OwnersAudit Kids A7 — empty kids_summary means the
+                        // editor hasn't authored a kid-band rewrite. Pre-A7
+                        // fell through to the adult `body` column, which
+                        // contains adult-tier vocabulary, source chains, and
+                        // quotes never sanitized for kids. Hard refusal —
+                        // surface a friendly empty state and back the kid out
+                        // to the article list. Quiz button hidden so there's
+                        // no path forward into a quiz on an unwritten story.
+                        notReadyState
                     } else {
                         // Split on blank-line paragraph breaks so kids get
                         // visible block spacing instead of one wall of text.
@@ -202,6 +212,33 @@ struct KidReaderView: View {
         .padding(.top, 60)
     }
 
+    /// A7 — shown when an article has no kids_summary. Friendly placeholder
+    /// + back-to-list button. No quiz button since there's no kid-band copy
+    /// to quiz on.
+    private var notReadyState: some View {
+        VStack(alignment: .center, spacing: 14) {
+            Image(systemName: "newspaper")
+                .font(.system(.largeTitle, weight: .bold))
+                .foregroundStyle(K.dim)
+                .accessibilityHidden(true)
+            Text("Story not ready yet — try another.")
+                .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                .foregroundStyle(K.dim)
+                .multilineTextAlignment(.center)
+            Button { dismiss() } label: {
+                Text("Back")
+                    .font(.system(.subheadline, design: .rounded, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: 180, minHeight: 44)
+                    .background(K.teal)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .buttonStyle(.plain)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
+    }
+
     // MARK: Load + read-log
 
     private func loadArticle() async {
@@ -209,7 +246,6 @@ struct KidReaderView: View {
         defer { loading = false }
 
         struct Row: Decodable {
-            let body: String?
             let kids_summary: String?
         }
 
@@ -218,15 +254,20 @@ struct KidReaderView: View {
             // kid-JWT RLS policy on articles drifts, kids could fetch an
             // adult article by known UUID. Explicit is_kids_safe=true
             // filter catches both cases.
+            //
+            // A7 — only `kids_summary` is selected. The adult `body` column
+            // is intentionally not fetched so a future code path can't
+            // accidentally re-introduce the fall-through. Empty result
+            // routes to the notReadyState empty branch in `body`.
             let row: Row = try await client
                 .from("articles")
-                .select("body, kids_summary")
+                .select("kids_summary")
                 .eq("id", value: article.id)
                 .eq("is_kids_safe", value: true)
                 .single()
                 .execute()
                 .value
-            self.body_ = row.kids_summary ?? row.body ?? ""
+            self.body_ = row.kids_summary ?? ""
             self.startTime = Date()
         } catch {
             self.loadError = "Couldn't load article"
