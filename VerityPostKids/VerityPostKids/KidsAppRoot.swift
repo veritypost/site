@@ -42,7 +42,17 @@ struct KidsAppRoot: View {
 
     var body: some View {
         Group {
-            if auth.kid != nil {
+            // A39 — gate the auth-state branch on KidsAuth.isBusy so the
+            // launch path doesn't flash PairCodeView for the 200-500ms
+            // it takes restore() to read Keychain + verify the stored
+            // JWT. Pre-A39 a paired kid saw the pair-code prompt
+            // briefly on every cold launch. Now: a neutral loading gate
+            // until restore() resolves; only then does the view branch
+            // into tabbedApp (paired) or PairCodeView (unpaired).
+            if auth.isBusy && auth.kid == nil {
+                launchGate
+                    .environmentObject(auth)
+            } else if auth.kid != nil {
                 tabbedApp
                     .environmentObject(auth)
                     .environmentObject(state)
@@ -276,6 +286,27 @@ struct KidsAppRoot: View {
         .padding(.leading, 20)
         .padding(.top, 60)
         .accessibilityLabel("Close")
+    }
+
+    /// A39 — neutral launch gate shown while KidsAuth.restore() is in
+    /// flight. Avoids flashing PairCodeView for paired kids on cold
+    /// launch. No interactive elements — purely a placeholder until
+    /// the auth state resolves into either tabbedApp (paired) or
+    /// PairCodeView (unpaired).
+    private var launchGate: some View {
+        ZStack {
+            K.bg.ignoresSafeArea()
+            VStack(spacing: 14) {
+                ProgressView()
+                    .controlSize(.large)
+                    .tint(K.teal)
+                Text("Loading…")
+                    .font(.scaledSystem(size: 14, weight: .semibold, design: .rounded))
+                    .foregroundStyle(K.dim)
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Loading")
     }
 
     /// A40 — non-blocking banner surfacing a state-load failure. Kept
