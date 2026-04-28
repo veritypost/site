@@ -1,6 +1,11 @@
 // Interactive mockups of the four design moves in proposedideas/.
-// Hidden from nav + crawlers (robots already disallows /preview; this
-// lives under /ideas which is undiscoverable unless you know the URL).
+// Access control:
+//   - Middleware (web/src/middleware.js) admin-gates /ideas/* — S3-owned;
+//     pickup blocker for full A21 ship. Until S3 lands the matcher,
+//     anyone with the URL still reaches these pages.
+//   - Defense-in-depth: ideas/layout.tsx exports robots: { index: false,
+//     follow: false } so crawlers don't index even if the gate ever
+//     leaks.
 // Not wired to real data — each mockup uses inline sample content so
 // they render identically regardless of DB state.
 

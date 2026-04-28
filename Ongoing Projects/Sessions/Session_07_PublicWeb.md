@@ -286,13 +286,15 @@ A13, A43, I5 carry regulatory exposure. AI disclosure is a **fact of record**, n
 
 ---
 
-### S7-A21 — `/ideas` is publicly reachable
+### S7-A21 — `/ideas` is publicly reachable 🟩 / 🟧
 
 - **ID:** S7-A21
 - **Title:** `/ideas` is publicly reachable — no auth gate
 - **Source:** TODO A21 (HIGH — infra / launch readiness).
 - **Severity:** HIGH. Internal mocks publicly visible.
-- **Status:** OPEN. Best-practice locked. Cross-session coordination required.
+- **Status:** S7 SLICE SHIPPED 2026-04-27; S3 admin-gate still 🟧.
+  - **🟩 Shipped (S7 slice):** created `web/src/app/ideas/layout.tsx` exporting `metadata: { robots: { index: false, follow: false } }` — cascades to every nested ideas route (page, earned, quiet, receipt, sources, feed, feed/ranked). Defense-in-depth so crawlers don't index even if the gate leaks. Updated the misleading header comment in `ideas/page.tsx:1-5` to accurately describe the access-control model (middleware primary + robots noindex secondary).
+  - **🟧 Owner of the gate (S3):** `web/src/middleware.js:204-208` currently passthroughs `/ideas/*`. S3 must add the `/ideas/*` admin-only matcher to the existing middleware so anonymous + non-admin authed traffic gets a 404 instead of the rendered mocks. Once shipped, run `curl -I https://staging/ideas` as anon → expect 404. Until S3 lands the matcher, anyone with the URL still reaches these pages — robots noindex is the only barrier.
 - **File:line:** `web/src/app/ideas/page.tsx:1-6` (header comment falsely claims "hidden from nav + crawlers"); `web/src/app/ideas/feed/ranked/page.tsx`; entire `/ideas/*` tree.
 - **Current state:** Route has no middleware gate, no admin check. Anyone who guesses or leaks the URL sees internal design mockups.
 - **Fix (best-practice locked):** Middleware-gate the entire `/ideas/*` tree on admin role. **S3 owns the middleware edit** (`web/src/middleware.js`). S7 verifies the page is unreachable to anonymous users post-S3-ship.
