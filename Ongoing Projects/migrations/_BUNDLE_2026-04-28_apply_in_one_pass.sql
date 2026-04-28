@@ -3539,9 +3539,29 @@ COMMIT;
 --   kids.streak.view_own            — zero callers
 --   kids.streaks.view_own           — zero callers
 --
--- Owner applies via SQL editor.
+-- The `guard_system_permissions` trigger refuses DELETE on permissions
+-- by default; it honors `app.allow_system_perm_edits=true` GUC as an
+-- escape hatch. Set LOCAL inside this txn. 15 dependent
+-- permission_set_perms FK rows are removed first.
 
-DELETE FROM permissions
+BEGIN;
+SET LOCAL app.allow_system_perm_edits = 'true';
+
+DELETE FROM public.permission_set_perms
+WHERE permission_id IN (
+  SELECT id FROM public.permissions
+  WHERE key IN (
+    'kids.bookmark.add',
+    'kids.bookmarks.add',
+    'kids.streak.use_freeze',
+    'kids.leaderboard.global_opt_in',
+    'kids.leaderboard.global.opt_in',
+    'kids.streak.view_own',
+    'kids.streaks.view_own'
+  )
+);
+
+DELETE FROM public.permissions
 WHERE key IN (
   'kids.bookmark.add',
   'kids.bookmarks.add',
@@ -3551,6 +3571,29 @@ WHERE key IN (
   'kids.streak.view_own',
   'kids.streaks.view_own'
 );
+
+DO $$
+DECLARE
+  remaining int;
+BEGIN
+  SELECT COUNT(*) INTO remaining
+  FROM public.permissions
+  WHERE key IN (
+    'kids.bookmark.add',
+    'kids.bookmarks.add',
+    'kids.streak.use_freeze',
+    'kids.leaderboard.global_opt_in',
+    'kids.leaderboard.global.opt_in',
+    'kids.streak.view_own',
+    'kids.streaks.view_own'
+  );
+  IF remaining > 0 THEN
+    RAISE EXCEPTION 'T4.1 abort: % dead permission rows still present', remaining;
+  END IF;
+  RAISE NOTICE 'T4.1 applied: 7 dead permission keys removed';
+END $$;
+
+COMMIT;
 
 
 
