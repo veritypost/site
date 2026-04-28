@@ -933,25 +933,19 @@ Combined budget: ~14.4k probes/day at per-IP cap.
 
 ---
 
-### S3-A48 — `/forgot-password` "1 hour" TTL claim 🟨 MOOT-UNDER-Q2
+### S3-A48 — `/forgot-password` "1 hour" TTL claim 🟩 MOOT-CONFIRMED (Q2-g 6c04ffa)
 
 **Source:** TODO_READ_ONLY_HISTORICAL.md A48.
 
-**Status:** **MOOT** under Q2-g (forgot-password page is soft-deleted to redirect). If Q2-g ships first (it should — see § 0.8 order), this item drops.
-
-**If Q2-g is somehow blocked:** verify the actual Supabase Auth dashboard token TTL setting AND `/api/auth/send-reset` enforcement window. Either (a) match copy at `web/src/app/forgot-password/page.tsx:294-295` to the actual TTL, or (b) remove the specific number ("Check your email for the reset link.").
-
-**Action.** None when Q2-g ships first. Mark ✅ MOOT after Q2-g lands.
+**Status:** ✅ MOOT — confirmed 2026-04-28. `/forgot-password/page.tsx` is now an 18-line soft-delete redirect to `/login?recovered=1`. The "1 hour" copy no longer exists.
 
 ---
 
-### S3-A111 — Resend cooldown vs link expiry copy collision 🟨 MOOT-UNDER-Q2
+### S3-A111 — Resend cooldown vs link expiry copy collision 🟩 MOOT-CONFIRMED (Q2-g 6c04ffa)
 
 **Source:** TODO_READ_ONLY_HISTORICAL.md A111.
 
-**Status:** **MOOT** under Q2-g. Same reason as A48 — page is soft-deleted.
-
-**Action.** None when Q2-g ships first. Mark ✅ MOOT after Q2-g lands.
+**Status:** ✅ MOOT — confirmed 2026-04-28. `/forgot-password` is a redirect; no resend cooldown copy exists.
 
 ---
 
@@ -979,13 +973,11 @@ Combined budget: ~14.4k probes/day at per-IP cap.
 
 ---
 
-### S3-A108 — `/login` error attempt counter 🟨 MOOT-UNDER-Q2
+### S3-A108 — `/login` error attempt counter 🟩 MOOT-CONFIRMED (Q2-b a3159ac)
 
 **Source:** TODO_READ_ONLY_HISTORICAL.md A108.
 
-**Status:** **MOOT** under Q2 (magic-link has no password attempts to count). The lockout state machine that A108 was about disappears under Q2-b's rebuild.
-
-**Action.** None when Q2-b ships first. Mark ✅ MOOT after Q2-b lands.
+**Status:** ✅ MOOT — confirmed 2026-04-28. `/login/page.tsx` lines 14-18 explicitly note the lockout/attempt-counter machinery is removed under magic-link. No password attempts to count.
 
 ---
 
@@ -1028,7 +1020,7 @@ return <ExpertSignupStep2 />;
 
 ---
 
-### S3-Q1b-AUTH — Drop `requires_verified` from auth flow 🟨 DEPENDS-ON-S1
+### S3-Q1b-AUTH — Drop `requires_verified` from auth flow 🟨 DEPENDS-ON-S1 (column still present 2026-04-28; 956 false / 45 true rows; S1 migration not yet shipped)
 
 **Source:** OWNER-ANSWERS Q1b — locked. Banner-only verification, no perm gate.
 
@@ -1051,6 +1043,8 @@ return <ExpertSignupStep2 />;
 
 **Without S1's migration**, code-side drop is incomplete — the `compute_effective_perms` RPC still reads the column. If S1 hasn't migrated, this item waits.
 
+**S3-side state 2026-04-28.** Verified via grep — there are zero `requireVerifiedEmail` callers anywhere in `web/src/**`. The helper function in `lib/auth.js:147-158` is dead code awaiting cross-session cleanup; it stays exported until S1 ships the column drop. The single `requires_verified` mention in S3-owned files is a comment in `web/src/app/api/auth/email-change/route.js:146` documenting why `bump_user_perms_version` is invoked — the bump call itself is independently useful (clears stale perm cache when user state flips). Comment becomes stale after S1's column-drop and gets retired in the same follow-up commit that deletes `requireVerifiedEmail`.
+
 **Q1b downstream effects (resolves automatically per OWNER-ANSWERS):**
 - T320 (owner-link Pro recipients gutted) — dissolves. With no `requires_verified` gate, owner-link users can comment / follow / vote / use billing the moment they land in welcome.
 - T321 (similar gate on billing surface) — dissolves.
@@ -1068,7 +1062,7 @@ return <ExpertSignupStep2 />;
 
 ---
 
-## 5. Q3b — Middleware kid-blind fix + `kindAllowed` param 🟨 BLOCKED on S1 (no [S1-Q3b] tags on main as of 2026-04-27)
+## 5. Q3b — Middleware kid-blind fix + `kindAllowed` param 🟩 fb42099 (co-ships with S1 [S1-Q3b] 96c2f66/93161fe/d922fca/a482285/87040fb)
 
 **Source:** OWNER-ANSWERS Q3b — RED audit verdict. Co-ships with S1 (RPC kid-rejects + RLS hardening) + S10 (kids/pair issuer flip).
 
@@ -1363,14 +1357,14 @@ Mark each box only after the verification command output is captured in the impl
 - [ ] After S1 migration drops `requires_verified` column: `grep -rn "requires_verified" web/src/lib web/src/app/api/auth web/src/app/api/account` returns zero hits in S3-owned files.
 - [ ] After S1 migration: `grep -rn "requireVerifiedEmail" web/src/app/api/auth web/src/app/api/account` returns zero hits in S3-owned files (callers removed; helper itself stays exported until all sessions clean up).
 
-### Q3b kid-blind fix (pending S1 + S10)
+### Q3b kid-blind fix 🟩 fb42099
 
-- [ ] `lib/auth.js` exports `requireAuth(client, { kindAllowed })` and `requirePermission(key, client, { kindAllowed })` with default `'user'`.
-- [ ] `getUser()` surfaces `user.kind`, `user.kid_profile_id`, `user.parent_user_id`.
-- [ ] `middleware.js` rejects kid JWTs (401) on every path except the kid-allowlist.
-- [ ] `/api/account/delete` and `/api/account/login-cancel-deletion` reject kid JWTs (401) before any handler logic.
-- [ ] Integration test forges a kid JWT against 10 EXPECTED-USER routes; all 10 return 401.
-- [ ] Co-shipped with S1's RPC kid-rejects + S10's kids/pair issuer flip — confirmed all three are merged in the same release window.
+- [x] `lib/auth.js` exports `requireAuth(client, { kindAllowed })` and `requirePermission(key, client, { kindAllowed })` with default `'user'`.
+- [x] `getUser()` surfaces `user.kind`, `user.kid_profile_id`, `user.parent_user_id`.
+- [x] `middleware.js` rejects kid JWTs (401) on every path except the kid-allowlist (`/kids/*`, `/api/kids/*`).
+- [x] `/api/account/delete` and `/api/account/login-cancel-deletion` reject kid JWTs (401) before any handler logic.
+- [x] S1's RPC kid-rejects + RLS RESTRICTIVE policies merged (`96c2f66`, `93161fe`, `d922fca`, `a482285`, `87040fb`).
+- [ ] S10's kids/pair issuer flip — pending; S3 slice ships independent of S10. Once S10 lands, the integration test (forge a Supabase-issued kid JWT, hit 10 EXPECTED-USER routes, all 401) becomes runnable. Until then the test is moot — kid bearers fail upstream at `verifyBearerToken`'s `iss` check.
 
 ### Commit hygiene
 
