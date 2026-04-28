@@ -41,6 +41,12 @@
 
 'use client';
 
+// Session B (Newsroom v2): when NEXT_PUBLIC_NEWSROOM_V2='1', the default
+// export below short-circuits to the v2 page. Flag off, the legacy
+// implementation in this file runs unchanged. The legacy code stays
+// live so old workflows keep working while the new UI bakes.
+import NewsroomV2Page from './page.v2';
+
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -204,11 +210,15 @@ function formatCostUsd(value: number | string | null | undefined): string {
   return `$${n.toFixed(2)}`;
 }
 
-export default function NewsroomAdminPage() {
+function LegacyNewsroomAdminPage() {
   return (
     <NewsroomWorkspace />
   );
 }
+
+const NEWSROOM_V2 = process.env.NEXT_PUBLIC_NEWSROOM_V2 === '1';
+const ResolvedNewsroomPage = NEWSROOM_V2 ? NewsroomV2Page : LegacyNewsroomAdminPage;
+export default ResolvedNewsroomPage;
 
 function NewsroomWorkspace() {
   const router = useRouter();

@@ -19,19 +19,36 @@ type FeaturedStory = Article & { categories: Pick<Category, 'name' | 'slug'> | n
 type HubPage = { href: string; title: string; desc: string };
 type HubGroup = { group: string; desc: string; items: HubPage[] };
 
+const NEWSROOM_V2 = process.env.NEXT_PUBLIC_NEWSROOM_V2 === '1';
+
+const CONTENT_PIPELINE_LEGACY: HubPage[] = [
+  { href: '/admin/newsroom', title: 'Newsroom', desc: 'Operator workspace — adult/kid tab, filters, prompt picker, cluster grid, generate' },
+  { href: '/admin/pipeline/runs', title: 'Pipeline runs', desc: 'Observability — every generate/ingest run with filters, cost, duration' },
+  { href: '/admin/pipeline/costs', title: 'Pipeline costs', desc: 'Today-vs-cap, per-model breakdown, 30-day chart, outliers' },
+  { href: '/admin/pipeline/settings', title: 'Pipeline settings', desc: 'Kill switches, cost caps, cluster/story-match/plagiarism thresholds' },
+  { href: '/admin/pipeline/cleanup', title: 'Cleanup', desc: 'Daily cron sweep history — orphan runs/items/locks and 14-day cluster expiry; manual trigger' },
+  { href: '/admin/categories', title: 'Categories', desc: 'Taxonomy editor — top-level + subcategories, kids-safe gate, slug, status' },
+  { href: '/admin/prompt-presets', title: 'Prompt presets', desc: 'Reusable generation instructions — adult, kid, or both' },
+  { href: '/admin/feeds', title: 'Feeds', desc: 'RSS sources — outlets, audience routing, health, last poll' },
+  { href: '/admin/stories', title: 'Articles', desc: 'Browse all articles; click into a row to review, edit, and publish through the integrated newsroom editor' },
+  { href: '/admin/kids-story-manager', title: 'Kids Story Manager', desc: 'Edit articles for ages 7-9 (kids reading band)' },
+];
+
+// Decision 13: 10 cards collapse to 3 once the new Newsroom is live.
+// Pipeline runs / costs / cleanup live as Newsroom panels; settings,
+// prompt-presets, categories live inside Pipeline Config.
+const CONTENT_PIPELINE_V2: HubPage[] = [
+  { href: '/admin/newsroom', title: 'Newsroom', desc: 'Discovery + Articles + runs/costs/cleanup panels — the operator workspace' },
+  { href: '/admin/feeds', title: 'Feeds', desc: 'RSS sources — outlets, audience routing, health, last poll' },
+  { href: '/admin/pipeline-config', title: 'Pipeline Config', desc: 'Kill switches, thresholds, prompt presets, categories — all in one place' },
+];
+
+const CONTENT_PIPELINE_DESC = NEWSROOM_V2
+  ? 'Three consolidated panels — Newsroom, Feeds, Pipeline Config'
+  : 'How articles get made — from RSS ingestion through AI generation to publish';
+
 const PAGES: HubGroup[] = [
-  { group: 'Content Pipeline', desc: 'How articles get made — from RSS ingestion through AI generation to publish', items: [
-    { href: '/admin/newsroom', title: 'Newsroom', desc: 'Operator workspace — adult/kid tab, filters, prompt picker, cluster grid, generate' },
-    { href: '/admin/pipeline/runs', title: 'Pipeline runs', desc: 'Observability — every generate/ingest run with filters, cost, duration' },
-    { href: '/admin/pipeline/costs', title: 'Pipeline costs', desc: 'Today-vs-cap, per-model breakdown, 30-day chart, outliers' },
-    { href: '/admin/pipeline/settings', title: 'Pipeline settings', desc: 'Kill switches, cost caps, cluster/story-match/plagiarism thresholds' },
-    { href: '/admin/pipeline/cleanup', title: 'Cleanup', desc: 'Daily cron sweep history — orphan runs/items/locks and 14-day cluster expiry; manual trigger' },
-    { href: '/admin/categories', title: 'Categories', desc: 'Taxonomy editor — top-level + subcategories, kids-safe gate, slug, status' },
-    { href: '/admin/prompt-presets', title: 'Prompt presets', desc: 'Reusable generation instructions — adult, kid, or both' },
-    { href: '/admin/feeds', title: 'Feeds', desc: 'RSS sources — outlets, audience routing, health, last poll' },
-    { href: '/admin/stories', title: 'Articles', desc: 'Browse all articles; click into a row to review, edit, and publish through the integrated newsroom editor' },
-    { href: '/admin/kids-story-manager', title: 'Kids Story Manager', desc: 'Edit articles for ages 7-9 (kids reading band)' },
-  ]},
+  { group: 'Content Pipeline', desc: CONTENT_PIPELINE_DESC, items: NEWSROOM_V2 ? CONTENT_PIPELINE_V2 : CONTENT_PIPELINE_LEGACY },
   { group: 'Community & Moderation', desc: 'User-generated content, discussion rules, and content moderation', items: [
     { href: '/admin/comments', title: 'Discussion Settings', desc: 'Quiz gate, AI tagging, role badges, threading depth, health scoring' },
     { href: '/admin/reports', title: 'Reports & Moderation', desc: 'Flagged content queue, supervisor fast-lane' },
@@ -80,13 +97,20 @@ const PAGES: HubGroup[] = [
 ];
 
 // Quick links — commonly accessed destinations.
-const QUICK_LINKS: { href: string; label: string }[] = [
-  { href: '/admin/stories',       label: 'Articles' },
-  { href: '/admin/story-manager', label: 'New article' },
-  { href: '/admin/users',         label: 'Users' },
-  { href: '/admin/reports',       label: 'Reports' },
-  { href: '/admin/support',       label: 'Support' },
-];
+const QUICK_LINKS: { href: string; label: string }[] = NEWSROOM_V2
+  ? [
+      { href: '/admin/newsroom?tab=articles', label: 'Newsroom > Articles tab' },
+      { href: '/admin/users',                 label: 'Users' },
+      { href: '/admin/reports',               label: 'Reports' },
+      { href: '/admin/support',               label: 'Support' },
+    ]
+  : [
+      { href: '/admin/stories',       label: 'Articles' },
+      { href: '/admin/story-manager', label: 'New article' },
+      { href: '/admin/users',         label: 'Users' },
+      { href: '/admin/reports',       label: 'Reports' },
+      { href: '/admin/support',       label: 'Support' },
+    ];
 
 export default function AdminHubPage() {
   const total = PAGES.reduce((a, g) => a + g.items.length, 0);
