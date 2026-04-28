@@ -93,14 +93,44 @@ function StreaksInner() {
         .limit(10);
       setTopStreaks((streakRows || []) as User[]);
 
-      const { data: settingsRows } = await supabase.from('settings').select('key, value').like('key', 'streak_%');
+      // S6-A60: hydrate from BOTH bare keys and the legacy
+      // streak_config_* / streak_num_* prefixed rows. Newly-saved values
+      // write bare keys; legacy rows still load so prior operator
+      // configuration survives the migration. Audit per locked decision
+      // pending — runtime readers don't exist for most of these toggles
+      // yet, but writing bare keys means a future reader hits the same
+      // shape without another rename pass.
+      // Pulling the entire settings table here is the simpler path than
+      // building an explicit key-list; the page uses streak/wrapped/
+      // gamification keys + dynamically-generated milestone_*/reading_pct_*
+      // keys, and grabbing them all keeps the migration coherent.
+      const { data: settingsRows } = await supabase
+        .from('settings')
+        .select('key, value');
       if (settingsRows) {
         const cfg: Record<string, boolean> = {};
         const n: Record<string, number> = {};
         (settingsRows as Array<{ key: string; value: string | null }>).forEach((row) => {
-          const k = row.key.replace('streak_config_', '').replace('streak_num_', '');
-          if (row.key.startsWith('streak_config_')) cfg[k] = row.value === 'true';
-          if (row.key.startsWith('streak_num_')) n[k] = parseFloat(row.value || '') || 0;
+          if (row.value == null) return;
+          const bareCfg = row.key.startsWith('streak_config_') ? row.key.slice('streak_config_'.length) : null;
+          const bareNum = row.key.startsWith('streak_num_') ? row.key.slice('streak_num_'.length) : null;
+          if (bareCfg) {
+            // Legacy prefixed value populates if no bare key wins below.
+            cfg[bareCfg] = row.value === 'true';
+          } else if (bareNum) {
+            n[bareNum] = parseFloat(row.value) || 0;
+          }
+        });
+        // Bare keys win over legacy prefixed.
+        (settingsRows as Array<{ key: string; value: string | null }>).forEach((row) => {
+          if (row.value == null) return;
+          if (row.key.startsWith('streak_config_') || row.key.startsWith('streak_num_')) return;
+          if (row.value === 'true' || row.value === 'false') {
+            cfg[row.key] = row.value === 'true';
+          } else {
+            const f = parseFloat(row.value);
+            if (Number.isFinite(f)) n[row.key] = f;
+          }
         });
         if (Object.keys(cfg).length) setConfig((prev) => ({ ...prev, ...cfg }));
         if (Object.keys(n).length) setNums((prev) => ({ ...prev, ...n }));
@@ -123,11 +153,15 @@ function StreaksInner() {
     fetch('/api/admin/settings/invalidate', { method: 'POST' }).catch(() => {});
     return null;
   };
+  // S6-A60: write bare keys (no streak_config_ / streak_num_ prefix) so
+  // runtime readers can hit the same shape this UI persists. Operators
+  // editing here previously wrote prefixed keys nothing read; toggling
+  // did nothing.
   const toggle = (k: string) => {
     const next = !config[k];
     setConfig((prev) => ({ ...prev, [k]: next }));
     (async () => {
-      const err = await saveSetting('streak_config_' + k, String(next));
+      const err = await saveSetting(k, String(next));
       if (err) {
         setConfig((prev) => ({ ...prev, [k]: !next }));
         push({ message: `Save failed: ${err}`, variant: 'danger' });
@@ -137,7 +171,7 @@ function StreaksInner() {
   const updateNum = async (k: string, v: string | number) => {
     const val = typeof v === 'number' ? v : parseFloat(v as string) || 0;
     setNums((prev) => ({ ...prev, [k]: val }));
-    const err = await saveSetting('streak_num_' + k, String(val));
+    const err = await saveSetting(k, String(val));
     if (err) { push({ message: `Save failed: ${err}`, variant: 'danger' }); }
   };
 
