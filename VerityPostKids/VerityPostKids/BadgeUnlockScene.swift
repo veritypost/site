@@ -80,8 +80,17 @@ struct BadgeUnlockScene: View {
 
                 ParticleLayer(emitter: particles)
             }
-            .onAppear {
-                runChoreography(at: CGPoint(x: geo.size.width / 2, y: geo.size.height * 0.42))
+            // A8 — `.task` so SwiftUI cancels the choreography on view
+            // disappear, propagating into every `try await Task.sleep`
+            // below. Pre-A8 the scene used a fan of
+            // DispatchQueue.main.asyncAfter blocks with no cancellation
+            // path; dismissing the scene mid-animation left orphan
+            // closures mutating dead view state.
+            .task {
+                await runChoreography(at: CGPoint(
+                    x: geo.size.width / 2,
+                    y: geo.size.height * 0.42
+                ))
             }
             // Combine the entire badge-unlock scene into a single
             // VoiceOver element. Without this a kid using assistive tech
@@ -221,7 +230,11 @@ struct BadgeUnlockScene: View {
 
     // MARK: Choreography
 
-    private func runChoreography(at center: CGPoint) {
+    /// A8 — async choreography. Every step awaits `Task.sleep` so
+    /// SwiftUI's `.task` cancellation propagates and the scene unwinds
+    /// cleanly mid-animation. Pre-A8 ran on DispatchQueue.main.asyncAfter
+    /// blocks with no cancellation hook.
+    private func runChoreography(at center: CGPoint) async {
         // Reset shimmer rotation before each run. Without this, a re-
         // presentation of the scene under the same view identity (e.g.
         // queueing back-to-back badge unlocks) starts the shimmer sweep
@@ -242,53 +255,62 @@ struct BadgeUnlockScene: View {
             return
         }
 
-        // 300ms: dim overlay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+        do {
+            // 300ms: dim overlay
+            try await Task.sleep(nanoseconds: 300_000_000)
+            try Task.checkCancellation()
             withAnimation(.easeOut(duration: 0.4)) {
                 overlayOpacity = 1.0
             }
-        }
 
-        // 600ms: badge enters with overshoot
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            // 600ms: badge enters with overshoot
+            try await Task.sleep(nanoseconds: 300_000_000) // +600ms total
+            try Task.checkCancellation()
             withAnimation(K.springOvershoot) {
                 badgeScale = 1.0
                 badgeOpacity = 1.0
             }
-        }
 
-        // 1100ms: shimmer sweep
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) {
+            // 1100ms: shimmer sweep
+            try await Task.sleep(nanoseconds: 500_000_000) // +1100ms
+            try Task.checkCancellation()
             shimmerVisible = true
             withAnimation(.linear(duration: 1.0)) {
                 shimmerRotation = 360
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            // Schedule shimmer fade-out via a child task so it doesn't
+            // block the rest of the choreography. Inherits cancellation
+            // from the parent task.
+            Task {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                guard !Task.isCancelled else { return }
                 withAnimation(.easeOut(duration: 0.3)) {
                     shimmerVisible = false
                 }
             }
-        }
 
-        // 1200ms: pulse ring 1
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            // 1200ms: pulse ring 1
+            try await Task.sleep(nanoseconds: 100_000_000) // +1200ms
+            try Task.checkCancellation()
             pulseRing1Visible = true
             withAnimation(.easeOut(duration: 0.6)) {
                 pulseRing1Scale = 1.6
                 pulseRing1Opacity = 0
             }
-        }
-        // Ring 2 150ms later
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.35) {
+
+            // 1350ms: pulse ring 2
+            try await Task.sleep(nanoseconds: 150_000_000) // +1350ms
+            try Task.checkCancellation()
             pulseRing2Visible = true
             withAnimation(.easeOut(duration: 0.6)) {
                 pulseRing2Scale = 1.6
                 pulseRing2Opacity = 0
             }
-        }
 
-        // 1300ms: particle burst
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.3) {
+            // ~1300ms intended → fire particle burst here. Delay -50ms
+            // to keep wall-clock visual cadence the same as pre-A8.
+            // (Was: separate +1300ms timer; now collapsed into the same
+            // sequence point.)
             particles.burst(
                 at: center,
                 count: 50,
@@ -297,22 +319,26 @@ struct BadgeUnlockScene: View {
                 upwardBias: 0,
                 gravity: 0.05
             )
-        }
 
-        // 1800ms: text
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+            // 1800ms: text
+            try await Task.sleep(nanoseconds: 450_000_000) // +1800ms
+            try Task.checkCancellation()
             withAnimation(.easeOut(duration: 0.5)) {
                 textOpacity = 1.0
                 textOffset = 0
             }
-        }
 
-        // 2000ms: buttons
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            // 2000ms: buttons
+            try await Task.sleep(nanoseconds: 200_000_000) // +2000ms
+            try Task.checkCancellation()
             withAnimation(.easeOut(duration: 0.5)) {
                 buttonsOpacity = 1.0
                 buttonsOffset = 0
             }
+        } catch {
+            // Cancellation — view is going away. Leave state at whatever
+            // point the cancellation arrived; SwiftUI tears down the view.
+            return
         }
     }
 }

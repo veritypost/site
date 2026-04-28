@@ -110,8 +110,12 @@ struct StreakScene: View {
                 // Particles on top
                 ParticleLayer(emitter: particles)
             }
-            .onAppear {
-                runChoreography(at: CGPoint(x: cx, y: cy))
+            // A8 — `.task` so SwiftUI cancels the choreography on view
+            // disappear, propagating into every `try await Task.sleep`
+            // below. Pre-A8 used DispatchQueue.main.asyncAfter blocks
+            // with no cancellation path.
+            .task {
+                await runChoreography(at: CGPoint(x: cx, y: cy))
             }
             .onDisappear {
                 sparkleTimer?.invalidate()
@@ -216,7 +220,11 @@ struct StreakScene: View {
 
     // MARK: Choreography
 
-    private func runChoreography(at center: CGPoint) {
+    /// A8 — async choreography. Every step awaits `Task.sleep` so
+    /// SwiftUI's `.task` cancellation propagates and the scene unwinds
+    /// cleanly mid-animation. Pre-A8 ran on DispatchQueue.main.asyncAfter
+    /// blocks with no cancellation hook.
+    private func runChoreography(at center: CGPoint) async {
         if reduceMotion {
             // Static end-state — no flame animation, no rings, no particle
             // burst, no continuous sparkles. Number jumps to current.
@@ -229,41 +237,56 @@ struct StreakScene: View {
             return
         }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+        do {
+            // 300ms: flame enters with overshoot
+            try await Task.sleep(nanoseconds: 300_000_000)
+            try Task.checkCancellation()
             withAnimation(K.springOvershoot) {
                 flameScale = 1.0
                 flameOpacity = 1.0
             }
-        }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
+            // 550ms: number rolls up
+            try await Task.sleep(nanoseconds: 250_000_000) // +550ms
+            try Task.checkCancellation()
             numberTrigger = true
-        }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            // 600ms: glow fades in
+            try await Task.sleep(nanoseconds: 50_000_000) // +600ms
+            try Task.checkCancellation()
             withAnimation(.easeOut(duration: 0.8)) {
                 glowOpacity = 1.0
             }
-        }
 
-        for i in 0..<3 {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.7 + Double(i) * 0.15) {
-                spawnRing()
-            }
-        }
+            // 700/850/1000ms: 3 expanding rings, 150ms apart
+            try await Task.sleep(nanoseconds: 100_000_000) // +700ms
+            try Task.checkCancellation()
+            spawnRing()
+            try await Task.sleep(nanoseconds: 150_000_000) // +850ms
+            try Task.checkCancellation()
+            spawnRing()
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.85) {
+            // 850ms: 70-particle burst (fires alongside second ring)
             particles.burst(at: center, count: 70, minSpeed: 3, maxSpeed: 10, upwardBias: 2)
-        }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+            try await Task.sleep(nanoseconds: 150_000_000) // +1000ms
+            try Task.checkCancellation()
+            spawnRing()
+
+            // 1800ms: milestone card slides up
+            try await Task.sleep(nanoseconds: 800_000_000) // +1800ms
+            try Task.checkCancellation()
             withAnimation(K.springOvershoot) {
                 milestoneOffset = 0
                 milestoneOpacity = 1.0
             }
-        }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            // 2000ms: continuous sparkle timer kicks off (still uses
+            // Timer because the prototype is a 200ms repeating emitter
+            // for 6s; converting to Task.sleep loop is equivalent but
+            // the Timer pattern reads clearer for a sparkle metronome).
+            try await Task.sleep(nanoseconds: 200_000_000) // +2000ms
+            try Task.checkCancellation()
             sparkleTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { timer in
                 Task { @MainActor in
                     guard sparkleCount < 30 else {
@@ -277,6 +300,11 @@ struct StreakScene: View {
                     ))
                 }
             }
+        } catch {
+            // Cancellation — view is going away. Leave state at whatever
+            // point the cancellation arrived; .onDisappear cleans the
+            // sparkleTimer.
+            return
         }
     }
 
@@ -291,8 +319,15 @@ struct StreakScene: View {
             }
         }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.85) {
-            rings.removeAll { $0.id == ring.id }
+        // A8 — ring cleanup also moves to Task.sleep. Each spawned
+        // ring's removal task is ad-hoc (not bound to .task because
+        // multiple rings spawn concurrently); it carries no view
+        // state past `rings.removeAll`, so a missed cancellation just
+        // leaves a stale ring in the array — harmless once the view
+        // unmounts.
+        Task { @MainActor [id = ring.id] in
+            try? await Task.sleep(nanoseconds: 850_000_000)
+            rings.removeAll { $0.id == id }
         }
     }
 }

@@ -97,8 +97,15 @@ struct QuizPassScene: View {
 
                 ParticleLayer(emitter: particles)
             }
-            .onAppear {
-                runChoreography(at: CGPoint(x: geo.size.width / 2, y: geo.size.height * 0.65))
+            // A8 — `.task` so SwiftUI cancels the choreography on view
+            // disappear, propagating into every `try await Task.sleep`
+            // below. Pre-A8 used DispatchQueue.main.asyncAfter blocks
+            // with no cancellation path.
+            .task {
+                await runChoreography(at: CGPoint(
+                    x: geo.size.width / 2,
+                    y: geo.size.height * 0.65
+                ))
             }
         }
     }
@@ -260,7 +267,11 @@ struct QuizPassScene: View {
 
     // MARK: Choreography
 
-    private func runChoreography(at center: CGPoint) {
+    /// A8 — async choreography. Every step awaits `Task.sleep` so
+    /// SwiftUI's `.task` cancellation propagates and the scene unwinds
+    /// cleanly mid-animation. Pre-A8 ran on DispatchQueue.main.asyncAfter
+    /// blocks with no cancellation hook.
+    private func runChoreography(at center: CGPoint) async {
         if reduceMotion {
             // Static end-state — correct chip already highlighted, result
             // sheet up, score and ring at final values, no confetti.
@@ -277,37 +288,41 @@ struct QuizPassScene: View {
             return
         }
 
-        // 500ms: highlight correct chip + show checkmark
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        do {
+            // 500ms: highlight correct chip + show checkmark (chained via +100ms)
+            try await Task.sleep(nanoseconds: 500_000_000)
+            try Task.checkCancellation()
             if let idx = answers.firstIndex(where: { $0.correct }) {
                 withAnimation(K.springOvershoot) {
                     chipHighlightIndex = idx
                 }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    withAnimation(K.springOvershoot) {
-                        chipCheckVisible = true
-                    }
+                try await Task.sleep(nanoseconds: 100_000_000) // +600ms
+                try Task.checkCancellation()
+                withAnimation(K.springOvershoot) {
+                    chipCheckVisible = true
                 }
             }
-        }
 
-        // 900ms: radial sweep on correct chip
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
+            // 900ms: radial sweep on correct chip
+            // We're already at +600ms from the chained checkmark; sleep
+            // the remaining 300ms.
+            try await Task.sleep(nanoseconds: 300_000_000) // +900ms
+            try Task.checkCancellation()
             withAnimation(.easeOut(duration: 0.5)) {
                 chipSweepScale = 2.5
                 chipSweepOpacity = 0
             }
-        }
 
-        // 1300ms: fade question
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.3) {
+            // 1300ms: fade question
+            try await Task.sleep(nanoseconds: 400_000_000) // +1300ms
+            try Task.checkCancellation()
             withAnimation(.easeOut(duration: 0.4)) {
                 questionOpacity = 0.1
             }
-        }
 
-        // 1500ms: result slides up + score + ring animate
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            // 1500ms: result slides up + score + ring animate
+            try await Task.sleep(nanoseconds: 200_000_000) // +1500ms
+            try Task.checkCancellation()
             withAnimation(K.springOvershoot) {
                 resultOffset = 0
             }
@@ -315,10 +330,10 @@ struct QuizPassScene: View {
             withAnimation(.easeOut(duration: 1.5)) {
                 ringProgress = Double(newScore) / 100.0
             }
-        }
 
-        // 2100ms: confetti burst
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.1) {
+            // 2100ms: confetti burst
+            try await Task.sleep(nanoseconds: 600_000_000) // +2100ms
+            try Task.checkCancellation()
             particles.burst(
                 at: center,
                 count: 80,
@@ -327,6 +342,10 @@ struct QuizPassScene: View {
                 upwardBias: 3,
                 gravity: 0.12
             )
+        } catch {
+            // Cancellation — view is going away. Leave state at whatever
+            // point the cancellation arrived.
+            return
         }
     }
 }

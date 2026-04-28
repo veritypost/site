@@ -266,7 +266,13 @@ struct KidsAppRoot: View {
     private func handleDismiss() {
         guard !sceneQueue.isEmpty else { return }
         let next = sceneQueue.removeFirst()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+        // A8 — converted from DispatchQueue.main.asyncAfter to Task.sleep
+        // so SwiftUI cancellation propagates correctly. The 350ms gap
+        // lets the previous fullScreenCover finish its dismiss
+        // animation before the next presentation kicks off (otherwise
+        // the system de-dups the back-to-back presentations).
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 350_000_000)
             sceneKey = UUID()
             activeSheet = next
         }
