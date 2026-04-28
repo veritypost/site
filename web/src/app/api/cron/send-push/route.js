@@ -16,9 +16,20 @@ const CRON_NAME = 'send-push';
 // channel='in_app' via create_notification), honours per-user
 // alert_preferences.channel_push, and dispatches via APNs.
 //
-// Schedule: every minute (vercel.json). BATCH_SIZE × concurrency are tuned
-// so breaking-news fan-outs to tens of thousands of users drain in a few
-// minutes rather than hours.
+// Schedule: */5 * * * * (drain-until-empty per call; respects 25s
+// wall-clock budget under the Vercel function 60s ceiling).
+// See Sessions/Session_02_Cron.md S2-A34 for design rationale and
+// OWNER-ANSWERS Q4.2 for the locked decision.
+//
+// Drain semantics:
+//   - claim_push_batch (FOR UPDATE SKIP LOCKED) lets overlapping ticks
+//     claim disjoint rows; if a tick is still draining when the next
+//     */5 fires, the new tick picks up where the prior left off.
+//   - WALL_CLOCK_BUDGET_MS leaves headroom for the cron-log heartbeat
+//     to write the final webhook_log row before Vercel kills the
+//     function.
+//   - MAX_ITERATIONS is a hard safety bound against pathological
+//     queues; in practice the wall-clock budget triggers first.
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -41,26 +52,80 @@ const BATCH_SIZE = 200;
 // headroom via live observation.
 const CONCURRENCY = 20;
 
+// A34 drain budget. Vercel function ceiling is 60s (maxDuration); we
+// leave 5s of margin so the cron-log wrapper has time to write the
+// terminal webhook_log row before the platform kills the invocation.
+const WALL_CLOCK_BUDGET_MS = 25_000;
+// Hard safety bound. With BATCH_SIZE=200 this caps a single call at
+// 200k rows regardless of wall clock — but in practice the budget hits
+// first under any realistic queue depth.
+const MAX_ITERATIONS = 1000;
+
 async function run(request) {
   // Cron auth — must verify CRON_SECRET header before any work; see
   // web/src/lib/cronAuth.js for the timing-safe compare history.
   if (!verifyCronAuth(request).ok)
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   await logCronHeartbeat(CRON_NAME, 'start');
-  try {
-    return await runInner();
-  } catch (err) {
-    await logCronHeartbeat(CRON_NAME, 'error', { error: err?.message || String(err) });
-    throw err;
-  }
-}
 
-async function runInner() {
   if (!process.env.APNS_AUTH_KEY) {
     await logCronHeartbeat(CRON_NAME, 'error', { error: 'APNS_AUTH_KEY not configured' });
     return NextResponse.json({ error: 'APNS_AUTH_KEY not configured', sent: 0 }, { status: 503 });
   }
 
+  // Drain loop — keep claiming + dispatching until the queue is empty
+  // (drained=true), the wall-clock budget is exhausted, or we hit the
+  // hard iteration ceiling. Per OWNER-ANSWERS Q4.2 (drain-until-empty,
+  // not Vercel Pro upgrade).
+  const t0 = Date.now();
+  const totals = { iterations: 0, batch: 0, sent: 0, skipped: 0, failed: 0, invalidated: 0 };
+  let drained = false;
+
+  try {
+    while (totals.iterations < MAX_ITERATIONS) {
+      if (Date.now() - t0 > WALL_CLOCK_BUDGET_MS) break;
+
+      const result = await drainOneBatch();
+      totals.iterations += 1;
+      totals.batch += result.batch;
+      totals.sent += result.sent;
+      totals.skipped += result.skipped;
+      totals.failed += result.failed;
+      totals.invalidated += result.invalidated;
+
+      if (result.fatal) {
+        await logCronHeartbeat(CRON_NAME, 'error', {
+          error: result.fatal,
+          stage: result.stage,
+          iterations: totals.iterations,
+          ...totals,
+        });
+        return NextResponse.json({ error: result.fatal, ...totals }, { status: 500 });
+      }
+      if (result.batch === 0) {
+        drained = true;
+        break;
+      }
+    }
+  } catch (err) {
+    await logCronHeartbeat(CRON_NAME, 'error', { error: err?.message || String(err), ...totals });
+    throw err;
+  }
+
+  await logCronHeartbeat(CRON_NAME, 'end', {
+    ...totals,
+    drained,
+    duration_ms: Date.now() - t0,
+  });
+  return NextResponse.json({ ...totals, drained, duration_ms: Date.now() - t0 });
+}
+
+// drainOneBatch — claim one BATCH_SIZE-sized window, dispatch via APNs,
+// ack each row's terminal status. Returns counts + drained-batch flag.
+// `fatal` indicates a structural failure that should abort the whole
+// drain loop (e.g., RPC missing, claim error). A 0-batch result means
+// the queue is empty for this tick.
+async function drainOneBatch() {
   const service = createServiceClient();
 
   // L19: atomic claim via claim_push_batch RPC (FOR UPDATE SKIP LOCKED so
@@ -74,12 +139,18 @@ async function runInner() {
   });
   if (loadErr) {
     console.error('[cron.send-push] claim failed:', loadErr);
-    await logCronHeartbeat(CRON_NAME, 'error', { error: loadErr.message, stage: 'claim' });
-    return NextResponse.json({ error: 'Claim failed' }, { status: 500 });
+    return {
+      batch: 0,
+      sent: 0,
+      skipped: 0,
+      failed: 0,
+      invalidated: 0,
+      fatal: `claim_push_batch failed: ${loadErr.message}`,
+      stage: 'claim',
+    };
   }
   if (!queued?.length) {
-    await logCronHeartbeat(CRON_NAME, 'end', { sent: 0, batch: 0 });
-    return NextResponse.json({ sent: 0 });
+    return { batch: 0, sent: 0, skipped: 0, failed: 0, invalidated: 0 };
   }
 
   const userIds = [...new Set(queued.map((n) => n.user_id))];
@@ -260,14 +331,7 @@ async function runInner() {
   }
 
   if (!needsDispatch.length) {
-    await logCronHeartbeat(CRON_NAME, 'end', {
-      sent,
-      skipped,
-      failed,
-      invalidated,
-      batch: queued.length,
-    });
-    return NextResponse.json({ sent, skipped, failed, invalidated, batch: queued.length });
+    return { batch: queued.length, sent, skipped, failed, invalidated };
   }
 
   // Flatten to (notification, token) pairs and partition by the token's
@@ -343,14 +407,7 @@ async function runInner() {
     else failed += 1;
   }
 
-  await logCronHeartbeat(CRON_NAME, 'end', {
-    sent,
-    skipped,
-    failed,
-    invalidated,
-    batch: queued.length,
-  });
-  return NextResponse.json({ sent, skipped, failed, invalidated, batch: queued.length });
+  return { batch: queued.length, sent, skipped, failed, invalidated };
 }
 
 export const GET = withCronLog('send-push', run);
