@@ -6,6 +6,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
 import { recordAdminAction } from '@/lib/adminMutation';
+import { KEY_SLUG_RE, KEY_SLUG_ERROR } from '@/lib/adminValidation';
 
 // POST /api/admin/permission-sets  — create a permission set
 //
@@ -43,6 +44,10 @@ export async function POST(request) {
   const { key, display_name } = body || {};
   if (!key || !display_name) {
     return NextResponse.json({ error: 'key and display_name are required' }, { status: 400 });
+  }
+  // S6-A64: defence-in-depth slug validation (client also validates).
+  if (!KEY_SLUG_RE.test(String(key).trim())) {
+    return NextResponse.json({ error: KEY_SLUG_ERROR }, { status: 400 });
   }
 
   const row = {

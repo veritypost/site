@@ -395,11 +395,36 @@ function PromoInner() {
             </Select>
           </Lbl>
           <Lbl label={form.discount_type === 'percent' ? 'Discount value (%)' : 'Discount value ($)'}>
-            <TextInput
-              type="text"
-              inputMode="decimal"
+            {/* S6-A65: NumberInput with min/max + on-blur validation. Percent is
+                 capped 0–100; amount is non-negative (upper bound is enforced
+                 server-side against the plan's price). */}
+            <NumberInput
+              min={0}
+              max={form.discount_type === 'percent' ? 100 : undefined}
+              step={form.discount_type === 'percent' ? 1 : 0.01}
               value={form.discount_value_display}
-              onChange={(e) => setForm({ ...form, discount_value_display: e.target.value })}
+              onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                setForm({ ...form, discount_value_display: e.target.value })
+              }
+              onBlur={() => {
+                const raw = String(form.discount_value_display).trim();
+                if (raw === '') return;
+                if (form.discount_type === 'percent') {
+                  const n = parseFloat(raw);
+                  if (!Number.isFinite(n) || n < 0 || n > 100) {
+                    setError('Discount must be 0–100%.');
+                  } else {
+                    setError('');
+                  }
+                } else {
+                  const n = parseFloat(raw);
+                  if (!Number.isFinite(n) || n < 0) {
+                    setError('Discount must be a non-negative dollar amount.');
+                  } else {
+                    setError('');
+                  }
+                }
+              }}
               placeholder={form.discount_type === 'percent' ? '25' : '5.00'}
             />
           </Lbl>

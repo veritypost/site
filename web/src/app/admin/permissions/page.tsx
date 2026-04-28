@@ -15,6 +15,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { hasPermission, refreshAllPermissions } from '@/lib/permissions';
+import { KEY_SLUG_RE, KEY_SLUG_ERROR } from '@/lib/adminValidation';
 import DestructiveActionConfirm from '@/components/admin/DestructiveActionConfirm';
 
 import Page, { PageHeader } from '@/components/admin/Page';
@@ -220,6 +221,12 @@ export default function AdminPermissionsPage() {
       toast.push({ message: 'key, display_name, and category are required', variant: 'danger' });
       return;
     }
+    // S6-A64: enforce shared slug pattern pre-submit so a bad permission
+    // key never ships and breaks every gate referencing it.
+    if (!KEY_SLUG_RE.test(key)) {
+      toast.push({ message: KEY_SLUG_ERROR, variant: 'danger' });
+      return;
+    }
     setCreatingPerm(true);
     const row = {
       key,
@@ -312,6 +319,11 @@ export default function AdminPermissionsPage() {
     const display = newSetDisplayName.trim();
     if (!key || !display) {
       toast.push({ message: 'key and display_name are required', variant: 'danger' });
+      return;
+    }
+    // S6-A64: same slug pattern as permission keys.
+    if (!KEY_SLUG_RE.test(key)) {
+      toast.push({ message: KEY_SLUG_ERROR, variant: 'danger' });
       return;
     }
     setCreatingSet(true);

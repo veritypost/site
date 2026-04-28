@@ -41,16 +41,6 @@ import type { Tables } from '@/types/database-helpers';
 type UserRow = Tables<'users'> & {
   plans?: { name: string | null } | null;
   user_roles?: Array<{ roles: { name: string } | null }> | null;
-  devices?: Array<{
-    id: string;
-    device?: string;
-    os?: string;
-    browser?: string;
-    lastSeen?: string;
-    last_seen?: string;
-    current?: boolean;
-    suspicious?: boolean;
-  }> | null;
 };
 
 // Tier data is DB-backed via `score_tiers` — see `@/lib/scoreTiers`.
@@ -302,21 +292,11 @@ export default function UsersAdmin() {
     });
   };
 
-  const unlinkDevice = async (userId: string, deviceId: string) => {
-    const res = await fetch(`/api/admin/users/${userId}/sessions/${deviceId}`, { method: 'DELETE' });
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      toast.push({ message: j.error || 'Unlink failed', variant: 'danger' });
-      return;
-    }
-    setUsers((prev) => prev.map((u) =>
-      u.id === userId
-        ? { ...u, devices: (u.devices || []).filter((d) => d.id !== deviceId) }
-        : u,
-    ));
-    toast.push({ message: 'Device unlinked', variant: 'success' });
-  };
-
+  // S6-A62: linked-devices section deleted 2026-04-28. UI was wrapped in
+  // `{false && ...}` because the device fetch was never wired; section
+  // always rendered "No devices linked." Delete-not-hide per the
+  // genuine-fixes rule. Reintroduce when the device-lookup endpoint
+  // exists; this page can re-add the prop + section then.
   const handleMarkRead = async (u: UserRow) => {
     if (!readSlug.trim()) return;
     const res = await fetch(`/api/admin/users/${u.id}/mark-read`, {
@@ -614,7 +594,6 @@ export default function UsersAdmin() {
           onExport={() => handleExportData(selected)}
           onChangeRole={() => openDialog('role', selected.id)}
           onChangePlan={() => openDialog('plan', selected.id)}
-          onUnlinkDevice={(id) => unlinkDevice(selected.id, id)}
           onMarkRead={() => handleMarkRead(selected)}
           onMarkQuiz={() => handleMarkQuiz(selected)}
           onAwardAchievement={() => handleAwardAchievement(selected)}
@@ -691,7 +670,6 @@ function UserDetail(props: {
   onExport: () => void;
   onChangeRole: () => void;
   onChangePlan: () => void;
-  onUnlinkDevice: (deviceId: string) => void;
   onMarkRead: () => void;
   onMarkQuiz: () => void;
   onAwardAchievement: () => void;
@@ -704,7 +682,7 @@ function UserDetail(props: {
 }) {
   const {
     user, onToggleBan, onDelete, onExport, onChangeRole, onChangePlan,
-    onUnlinkDevice, onMarkRead, onMarkQuiz, onAwardAchievement,
+    onMarkRead, onMarkQuiz, onAwardAchievement,
     readSlug, setReadSlug, quizSlug, setQuizSlug, quizScore, setQuizScore,
     achievement, setAchievement, achievementsList, scoreTiers,
   } = props;
@@ -768,48 +746,6 @@ function UserDetail(props: {
           <StatCard key={s.label} label={s.label} value={s.value} />
         ))}
       </div>
-
-      {/* Linked devices — hidden; the device fetch is not wired yet so this
-          section always showed "No devices linked." Will be re-enabled in a
-          later batch once the server-side device lookup exists. */}
-      {false && (
-        <>
-          <SectionLabel>Linked devices</SectionLabel>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: S[2], marginBottom: S[6] }}>
-            {(user.devices || []).length === 0 && (
-              <div style={{ fontSize: F.sm, color: ADMIN_C.muted }}>No devices linked.</div>
-            )}
-            {(user.devices || []).map((d) => (
-              <div
-                key={d.id}
-                style={{
-                  background: ADMIN_C.card,
-                  border: `1px solid ${d.suspicious ? ADMIN_C.danger : ADMIN_C.divider}`,
-                  borderRadius: 8,
-                  padding: `${S[2]}px ${S[3]}px`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: S[3],
-                }}
-              >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: S[1], flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: F.sm, fontWeight: 600 }}>{d.device}</span>
-                    {d.suspicious && <Badge variant="danger" size="xs">suspicious</Badge>}
-                    {d.current && <Badge variant="success" size="xs">current</Badge>}
-                  </div>
-                  <div style={{ fontSize: F.xs, color: ADMIN_C.dim, marginTop: 2 }}>
-                    {d.os} · {d.browser} · Last seen {d.lastSeen || d.last_seen}
-                  </div>
-                </div>
-                <Button size="sm" variant="secondary" onClick={() => onUnlinkDevice(d.id)}>
-                  Unlink
-                </Button>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
 
       <SectionLabel>Manual actions</SectionLabel>
       <div style={{ display: 'flex', flexDirection: 'column', gap: S[3], marginBottom: S[6] }}>

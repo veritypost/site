@@ -6,6 +6,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
 import { recordAdminAction } from '@/lib/adminMutation';
+import { KEY_SLUG_RE, KEY_SLUG_ERROR } from '@/lib/adminValidation';
 
 // POST /api/admin/permissions   — create a permission row
 //
@@ -48,6 +49,11 @@ export async function POST(request) {
       { error: 'key, display_name, and category are required' },
       { status: 400 }
     );
+  }
+  // S6-A64: server-side defence-in-depth on slug pattern. Client validates
+  // pre-submit; this guard catches direct API hits / drift.
+  if (!KEY_SLUG_RE.test(String(key).trim())) {
+    return NextResponse.json({ error: KEY_SLUG_ERROR }, { status: 400 });
   }
 
   const row = {

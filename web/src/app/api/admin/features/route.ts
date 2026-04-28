@@ -5,8 +5,7 @@ import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction } from '@/lib/adminMutation';
-
-const KEY_SLUG_RE = /^[a-z0-9_.-]+$/;
+import { KEY_SLUG_RE, KEY_SLUG_ERROR } from '@/lib/adminValidation';
 
 type CreateBody = {
   key?: string;
@@ -53,7 +52,7 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as CreateBody;
   const key = typeof body.key === 'string' ? body.key.trim() : '';
   if (!key || !KEY_SLUG_RE.test(key)) {
-    return NextResponse.json({ error: 'key must match /^[a-z0-9_.-]+$/' }, { status: 400 });
+    return NextResponse.json({ error: KEY_SLUG_ERROR }, { status: 400 });
   }
   const displayName = typeof body.display_name === 'string' ? body.display_name.trim() : '';
   if (!displayName) return NextResponse.json({ error: 'display_name required' }, { status: 400 });

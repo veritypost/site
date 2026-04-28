@@ -8,6 +8,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { ADMIN_ROLES } from '@/lib/roles';
 import { createClient } from '@/lib/supabase/client';
+import { KEY_SLUG_RE, KEY_SLUG_ERROR } from '@/lib/adminValidation';
 import DestructiveActionConfirm from '@/components/admin/DestructiveActionConfirm';
 
 import Page, { PageHeader } from '@/components/admin/Page';
@@ -31,7 +32,8 @@ import type { Tables } from '@/types/database-helpers';
 
 type FeatureFlag = Tables<'feature_flags'>;
 
-const KEY_SLUG_RE = /^[a-z0-9_.-]+$/;
+// S6-A64: KEY_SLUG_RE moved to @/lib/adminValidation as the single
+// canonical pattern shared with /admin/permissions and the API routes.
 
 const ADVANCED_TEXT_FIELDS = [
   'target_platforms',
@@ -235,7 +237,7 @@ export default function FeatureFlagsAdmin() {
     const key = form.key.trim();
     if (!key) { toast.push({ message: 'key is required', variant: 'danger' }); return; }
     if (!KEY_SLUG_RE.test(key)) {
-      toast.push({ message: 'key must match /^[a-z0-9_.-]+$/', variant: 'danger' });
+      toast.push({ message: KEY_SLUG_ERROR, variant: 'danger' });
       return;
     }
     if (!form.display_name.trim()) {
