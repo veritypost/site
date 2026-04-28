@@ -2288,6 +2288,11 @@ struct StoryDetailView: View {
     // Subscribes to INSERT events on comments filtered by this story, fetches
     // the full joined row (with author), and prepends if we don't already have it.
     // The Task is cancelled whenever story.id changes (see .task(id: story.id)).
+    // A37 — channel cleanup is owned by `drainRealtimeChannel`, which runs
+    // unsubscribe on a detached hop on both the loop-end and the
+    // cancellation paths. Previously the trailing `await channel.unsubscribe()`
+    // after the `for await` loop would silently skip on cancellation,
+    // leaking the channel to the broker until the websocket dropped.
     private func subscribeToNewComments() async {
         let channel = client.channel("comments-story-\(story.id)")
         let changes = channel.postgresChange(
@@ -2296,37 +2301,33 @@ struct StoryDetailView: View {
             table: "comments",
             filter: "article_id=eq.\(story.id)"
         )
-        await channel.subscribe()
-        for await change in changes {
+        await drainRealtimeChannel(channel, stream: changes) { change in
             guard let idValue = change.record["id"],
-                  case let .string(newId) = idValue else { continue }
-            if comments.contains(where: { $0.id == newId }) { continue }
+                  case let .string(newId) = idValue else { return }
+            if comments.contains(where: { $0.id == newId }) { return }
             if let fresh: VPComment = try? await client.from("comments")
                 .select("id, user_id, article_id, parent_id, body, is_pinned, is_context_pinned, is_expert_reply, upvote_count, downvote_count, created_at, users!user_id(id, username, avatar_url, avatar_color, is_expert, is_verified_public_figure)")
                 .eq("id", value: newId)
                 .single()
                 .execute()
                 .value {
-                await MainActor.run {
-                    if !comments.contains(where: { $0.id == fresh.id }) {
-                        // Bug 41: initial load sorts by is_context_pinned DESC,
-                        // upvote_count DESC. Prepending a zero-upvote comment
-                        // lifts it above pinned + highly-upvoted rows. Append
-                        // and re-apply the sort so the order stays stable.
-                        comments.append(fresh)
-                        comments.sort { a, b in
-                            let aPinned = a.isContextPinned == true
-                            let bPinned = b.isContextPinned == true
-                            if aPinned != bPinned { return aPinned && !bPinned }
-                            return (a.upvoteCount ?? 0) > (b.upvoteCount ?? 0)
-                        }
-                        commentUpvoteCounts[fresh.id] = fresh.upvoteCount ?? 0
-                        commentDownvoteCounts[fresh.id] = fresh.downvoteCount ?? 0
+                if !comments.contains(where: { $0.id == fresh.id }) {
+                    // Bug 41: initial load sorts by is_context_pinned DESC,
+                    // upvote_count DESC. Prepending a zero-upvote comment
+                    // lifts it above pinned + highly-upvoted rows. Append
+                    // and re-apply the sort so the order stays stable.
+                    comments.append(fresh)
+                    comments.sort { a, b in
+                        let aPinned = a.isContextPinned == true
+                        let bPinned = b.isContextPinned == true
+                        if aPinned != bPinned { return aPinned && !bPinned }
+                        return (a.upvoteCount ?? 0) > (b.upvoteCount ?? 0)
                     }
+                    commentUpvoteCounts[fresh.id] = fresh.upvoteCount ?? 0
+                    commentDownvoteCounts[fresh.id] = fresh.downvoteCount ?? 0
                 }
             }
         }
-        await channel.unsubscribe()
     }
 
     // MARK: - Bookmark

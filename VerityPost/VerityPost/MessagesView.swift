@@ -668,6 +668,10 @@ struct MessagesView: View {
     // rows the user can see. A second channel listens for INSERT on
     // conversation_participants filtered to this user, to pick up "someone
     // added me to a new conversation" — on fire we just reload the list.
+    // A37 — cleanup runs on both loop-end and cancellation paths via
+    // `drainRealtimeChannel`. The trailing `await channel.unsubscribe()`
+    // after a `for await` was a leak on view-recreate; now the helper
+    // owns it.
     private func subscribeToConversationUpdates() async {
         guard let userId = auth.currentUser?.id else { return }
         let channelName = "convos-\(userId)-\(Int(Date().timeIntervalSince1970))"
@@ -677,9 +681,8 @@ struct MessagesView: View {
             schema: "public",
             table: "conversations"
         )
-        await channel.subscribe()
-        for await change in updates {
-            guard case let .string(convoId) = change.record["id"] else { continue }
+        await drainRealtimeChannel(channel, stream: updates) { change in
+            guard case let .string(convoId) = change.record["id"] else { return }
             let preview: String? = {
                 if case let .string(v) = change.record["last_message_preview"] { return v }
                 return nil
@@ -689,22 +692,20 @@ struct MessagesView: View {
                 if let d = MessagesView.msgISO.date(from: v) { return d }
                 return MessagesView.msgISOFallback.date(from: v)
             }()
-            await MainActor.run {
-                guard let i = conversations.firstIndex(where: { $0.id == convoId }) else { return }
-                var patched = conversations[i]
-                patched.lastMessagePreview = preview
-                patched.lastMessageAt = lastAt
-                conversations[i] = patched
-                conversations.sort { ($0.lastMessageAt ?? .distantPast) > ($1.lastMessageAt ?? .distantPast) }
-            }
+            guard let i = conversations.firstIndex(where: { $0.id == convoId }) else { return }
+            var patched = conversations[i]
+            patched.lastMessagePreview = preview
+            patched.lastMessageAt = lastAt
+            conversations[i] = patched
+            conversations.sort { ($0.lastMessageAt ?? .distantPast) > ($1.lastMessageAt ?? .distantPast) }
         }
-        await channel.unsubscribe()
     }
 
     // Listens to messages INSERT across every conversation the user can see
     // (RLS scopes). Drives the unread pill on the list view when a message
     // arrives for a conversation that isn't currently open. Skips own sends
     // and the open conversation.
+    // A37 — see subscribeToConversationUpdates for the cleanup contract.
     private func subscribeToCrossConvoMessages() async {
         guard let userId = auth.currentUser?.id else { return }
         let channelName = "messages-any-\(userId)-\(Int(Date().timeIntervalSince1970))"
@@ -714,20 +715,17 @@ struct MessagesView: View {
             schema: "public",
             table: "messages"
         )
-        await channel.subscribe()
-        for await change in inserts {
-            guard case let .string(convoId) = change.record["conversation_id"] else { continue }
-            if convoId == selectedConvo?.id { continue }
-            if case let .string(senderId) = change.record["sender_id"], senderId == userId { continue }
-            await MainActor.run {
-                if let i = conversations.firstIndex(where: { $0.id == convoId }) {
-                    conversations[i].unread += 1
-                }
+        await drainRealtimeChannel(channel, stream: inserts) { change in
+            guard case let .string(convoId) = change.record["conversation_id"] else { return }
+            if convoId == selectedConvo?.id { return }
+            if case let .string(senderId) = change.record["sender_id"], senderId == userId { return }
+            if let i = conversations.firstIndex(where: { $0.id == convoId }) {
+                conversations[i].unread += 1
             }
         }
-        await channel.unsubscribe()
     }
 
+    // A37 — see subscribeToConversationUpdates for the cleanup contract.
     private func subscribeToNewParticipants() async {
         guard let userId = auth.currentUser?.id else { return }
         let channelName = "convo-parts-\(userId)-\(Int(Date().timeIntervalSince1970))"
@@ -738,12 +736,10 @@ struct MessagesView: View {
             table: "conversation_participants",
             filter: "user_id=eq.\(userId)"
         )
-        await channel.subscribe()
-        for await _ in inserts {
+        await drainRealtimeChannel(channel, stream: inserts) { _ in
             // Someone added me to a new conversation. Reload the list.
             await loadConversations()
         }
-        await channel.unsubscribe()
     }
 
     private func timeAgo(_ date: Date) -> String {
@@ -919,6 +915,7 @@ struct DMThreadView: View {
     // site/src/app/messages/page.js Pass-2 Task-10 — dedup by id so the
     // sender's own insert echo doesn't double-render. The auto-scroll is
     // already wired by `.onChange(of: messages.count)` above.
+    // A37 — see subscribeToConversationUpdates for the cleanup contract.
     private func subscribeToNewMessages() async {
         let channelName = "messages-\(conversation.id)-\(Int(Date().timeIntervalSince1970))"
         let channel = client.channel(channelName)
@@ -928,10 +925,9 @@ struct DMThreadView: View {
             table: "messages",
             filter: "conversation_id=eq.\(conversation.id)"
         )
-        await channel.subscribe()
-        for await change in inserts {
-            guard case let .string(newId) = change.record["id"] else { continue }
-            if messages.contains(where: { $0.id == newId }) { continue }
+        await drainRealtimeChannel(channel, stream: inserts) { change in
+            guard case let .string(newId) = change.record["id"] else { return }
+            if messages.contains(where: { $0.id == newId }) { return }
             let senderId: String? = {
                 if case let .string(v) = change.record["sender_id"] { return v }
                 return nil
@@ -946,13 +942,10 @@ struct DMThreadView: View {
                 return MessagesView.msgISOFallback.date(from: v)
             }()
             let msg = Msg(id: newId, senderId: senderId, body: body, createdAt: createdAt)
-            await MainActor.run {
-                if !messages.contains(where: { $0.id == msg.id }) {
-                    messages.append(msg)
-                }
+            if !messages.contains(where: { $0.id == msg.id }) {
+                messages.append(msg)
             }
         }
-        await channel.unsubscribe()
     }
 
     private func loadMessages() async {
@@ -1037,6 +1030,7 @@ struct DMThreadView: View {
     // readMessageIds so the "Read" caption flips live on the sender's side.
     // Own receipts (from the upsert above) are filtered out — the sender
     // doesn't need "Read" on their own read-acks of incoming messages.
+    // A37 — see subscribeToConversationUpdates for the cleanup contract.
     private func subscribeToReadReceipts() async {
         let channelName = "receipts-\(conversation.id)-\(Int(Date().timeIntervalSince1970))"
         let channel = client.channel(channelName)
@@ -1045,17 +1039,13 @@ struct DMThreadView: View {
             schema: "public",
             table: "message_receipts"
         )
-        await channel.subscribe()
-        for await change in inserts {
-            guard case let .string(messageId) = change.record["message_id"] else { continue }
-            if case let .string(userId) = change.record["user_id"], userId == auth.currentUser?.id { continue }
-            await MainActor.run {
-                if !readMessageIds.contains(messageId) {
-                    readMessageIds.insert(messageId)
-                }
+        await drainRealtimeChannel(channel, stream: inserts) { change in
+            guard case let .string(messageId) = change.record["message_id"] else { return }
+            if case let .string(userId) = change.record["user_id"], userId == auth.currentUser?.id { return }
+            if !readMessageIds.contains(messageId) {
+                readMessageIds.insert(messageId)
             }
         }
-        await channel.unsubscribe()
     }
 
     // Round 6 iOS-GATES — DM send routes through POST /api/messages so the
