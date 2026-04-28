@@ -74,6 +74,16 @@ export function safeErrorResponse(NextResponse, err, options = {}) {
 // Truncate an IP to a /24 for logs — enough for abuse correlation,
 // not enough to pinpoint the individual. GDPR-friendlier than storing
 // the full v4 (F-139).
+//
+// [S3-A72] Fail-closed on malformed input. The prior fallback for
+// non-v4 / non-mapped-v6 shapes preserved most of the original IP if
+// it happened to contain a colon ("garbage:value:0"), bypassing the
+// /24 truncation entirely on a hostile X-Forwarded-For. Privacy
+// default: lose forensic detail, never log a full identifier. Real
+// IPv6 addresses arrive at this helper in normalized form via
+// IPv4-mapped notation (`::ffff:1.2.3.4`); raw IPv6 paths return null
+// today — if a future product needs proper /48 IPv6 truncation, that's
+// a separate addition.
 export function truncateIpV4(ip) {
   if (typeof ip !== 'string' || ip.length === 0) return null;
   // Handle IPv4-mapped IPv6 (::ffff:1.2.3.4) by taking the trailing v4.
@@ -81,10 +91,7 @@ export function truncateIpV4(ip) {
   const candidate = mapped ? mapped[1] : ip;
   const parts = candidate.split('.');
   if (parts.length !== 4 || parts.some((p) => !/^\d{1,3}$/.test(p))) {
-    // Non-v4 (likely IPv6): preserve only the first /48 equivalent.
-    // Conservative fallback — just drop the last ':' segment.
-    const colonIdx = ip.lastIndexOf(':');
-    return colonIdx > 0 ? `${ip.slice(0, colonIdx)}:0` : null;
+    return null;
   }
   return `${parts[0]}.${parts[1]}.${parts[2]}.0`;
 }

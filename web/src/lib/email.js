@@ -1,5 +1,7 @@
 // Resend wrapper + template renderer. Fetch-only; no npm dep.
 
+import { getSiteUrlOrNull } from './siteUrl';
+
 const RESEND_API = 'https://api.resend.com/emails';
 
 // HTML-escape user-controllable substitutions so a notification title/body
@@ -75,8 +77,15 @@ export async function sendEmail({
   };
   if (replyTo) body.reply_to = replyTo;
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://veritypost.com';
-  const fallbackUnsub = `${siteUrl}/profile/settings#emails`;
+  // [S3-A127] Use the central siteUrl helper. The prior fallback
+  // hardcoded 'https://veritypost.com', which caused preview-deploy
+  // emails (no NEXT_PUBLIC_SITE_URL) to ship unsubscribe URLs
+  // pointing at production. getSiteUrlOrNull returns null in
+  // prod-like environments when the env var is missing — Gmail
+  // compliance prefers an absent List-Unsubscribe header over a
+  // wrong one, so degrade to no header in that case.
+  const siteUrl = getSiteUrlOrNull();
+  const fallbackUnsub = siteUrl ? `${siteUrl}/profile/settings#emails` : null;
   const unsubHeaders = buildUnsubscribeHeaders(unsubscribeUrl || fallbackUnsub);
   if (unsubHeaders) body.headers = unsubHeaders;
 
