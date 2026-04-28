@@ -189,6 +189,61 @@ struct StoryDetailView: View {
         return f
     }()
 
+    /// A78 — preprocess article body for AVSpeechUtterance so the listener
+    /// hears prose, not markdown punctuation. Operations (in order):
+    ///   `[label](url)` → `label`           (links — drop href)
+    ///   `**text**` / `__text__` → `text`    (bold)
+    ///   `*text*` / `_text_` → `text`        (italic)
+    ///   `` `code` `` → `code`               (inline code fences)
+    ///   leading `#` markers on heading lines → stripped
+    /// Best-effort regex preprocessor. Anything we miss reads literally,
+    /// which is no worse than the previous baseline.
+    static func stripMarkdownForTTS(_ input: String) -> String {
+        var out = input
+        // Inline code first — its delimiters don't conflict with the
+        // other rules and can contain asterisks we don't want stripped.
+        out = out.replacingOccurrences(
+            of: "`([^`]+)`",
+            with: "$1",
+            options: .regularExpression
+        )
+        // [label](url) — links.
+        out = out.replacingOccurrences(
+            of: #"\[([^\]]+)\]\([^)]+\)"#,
+            with: "$1",
+            options: .regularExpression
+        )
+        // **bold** and __bold__.
+        out = out.replacingOccurrences(
+            of: #"\*\*([^*]+)\*\*"#,
+            with: "$1",
+            options: .regularExpression
+        )
+        out = out.replacingOccurrences(
+            of: #"__([^_]+)__"#,
+            with: "$1",
+            options: .regularExpression
+        )
+        // *italic* and _italic_.
+        out = out.replacingOccurrences(
+            of: #"(?<!\*)\*([^*\n]+)\*(?!\*)"#,
+            with: "$1",
+            options: .regularExpression
+        )
+        out = out.replacingOccurrences(
+            of: #"(?<!_)_([^_\n]+)_(?!_)"#,
+            with: "$1",
+            options: .regularExpression
+        )
+        // Heading prefixes ("# ", "## ", up to "###### ").
+        out = out.replacingOccurrences(
+            of: #"(?m)^#{1,6}\s+"#,
+            with: "",
+            options: .regularExpression
+        )
+        return out
+    }
+
     // MARK: - Body
     var body: some View {
         VStack(spacing: 0) {
@@ -735,7 +790,12 @@ struct StoryDetailView: View {
             }
         } else {
             Button {
-                let spoken = "\(story.title ?? ""). \(story.content ?? "")"
+                // A78 — strip markdown before handing to AVSpeechUtterance.
+                // The raw body would otherwise be read with literal
+                // asterisks and bracketed link syntax. Web doesn't TTS,
+                // so this is iOS-only.
+                let raw = "\(story.title ?? ""). \(story.content ?? "")"
+                let spoken = StoryDetailView.stripMarkdownForTTS(raw)
                 tts.start(spoken)
             } label: {
                 Text("Listen")
@@ -2080,15 +2140,53 @@ struct StoryDetailView: View {
         // D29: Articles have no reactions — reaction loading removed.
 
         // Bookmark + passed quiz
+        // A82 — these reads back the bookmark + quiz-pass state that drive
+        // persisted UI (the bookmark flag, the post-quiz composer unlock).
+        // A silent failure means the user sees an unbookmarked / unpassed
+        // story even though the server has the row — they bookmark again,
+        // hit the cap, retry the quiz pointlessly. Surface the error to
+        // `loadError` so the retry path catches it. Comment-vote reads
+        // below stay best-effort because their UI degrades gracefully
+        // (counts read as 0 until the second open).
         if let session = try? await client.auth.session {
             let userId = session.user.id.uuidString
             struct BM: Decodable { let id: String }
-            if let bm: BM = try? await client.from("bookmarks").select("id").eq("user_id", value: userId).eq("article_id", value: story.id).single().execute().value {
-                isBookmarked = true; bookmarkId = bm.id
+            do {
+                let bm: BM = try await client.from("bookmarks")
+                    .select("id")
+                    .eq("user_id", value: userId)
+                    .eq("article_id", value: story.id)
+                    .single()
+                    .execute()
+                    .value
+                isBookmarked = true
+                bookmarkId = bm.id
+            } catch {
+                // PostgREST surfaces "no rows" via `single()` as a thrown
+                // error — that's the not-found case we swallow. Anything
+                // else is a real failure that gates persisted UI.
+                let msg = error.localizedDescription.lowercased()
+                let isNotFound = msg.contains("no rows") || msg.contains("pgrst116")
+                if !isNotFound {
+                    Log.d("[StoryDetail] bookmark check failed:", error)
+                    loadError = "We couldn\u{2019}t check this story\u{2019}s bookmark. Pull to retry."
+                }
             }
 
             struct PassRow: Decodable { let attempt_number: Int?; let is_correct: Bool? }
-            let rows: [PassRow] = (try? await client.from("quiz_attempts").select("attempt_number, is_correct").eq("user_id", value: userId).eq("article_id", value: story.id).execute().value) ?? []
+            let rows: [PassRow]
+            do {
+                rows = try await client.from("quiz_attempts")
+                    .select("attempt_number, is_correct")
+                    .eq("user_id", value: userId)
+                    .eq("article_id", value: story.id)
+                    .execute()
+                    .value
+            } catch {
+                Log.d("[StoryDetail] quiz attempts read failed:", error)
+                loadError = "We couldn\u{2019}t load your quiz history for this story. Pull to retry."
+                rows = []
+            }
             var byAttempt: [Int: (correct: Int, total: Int)] = [:]
             for row in rows {
                 let k = row.attempt_number ?? 0
@@ -2236,6 +2334,12 @@ struct StoryDetailView: View {
     // trigger runs server-side and RLS can stay ownership-only per
     // migration 045. Direct supabase-client inserts hit the old RLS wall
     // and bypass server-side validation.
+    //
+    // A118 — server-side cap is the source of truth. The trigger raises
+    // `P0001 bookmark_cap_exceeded`, which the API route surfaces as a
+    // 403 with `{"error":"bookmark_cap_exceeded"}`. We read the body,
+    // route a cap-exceeded response into the upgrade alert, and treat
+    // every other non-2xx as a transient failure.
     private func toggleBookmark() async {
         guard let session = try? await client.auth.session else { return }
         let site = SupabaseManager.shared.siteURL
@@ -2252,45 +2356,48 @@ struct StoryDetailView: View {
             guard let url = URL(string: "/api/bookmarks", relativeTo: site) else { return }
             struct Body: Encodable { let article_id: String }
             struct Resp: Decodable { let id: String }
+            struct ErrResp: Decodable { let error: String? }
             var req = URLRequest(url: url)
             req.httpMethod = "POST"
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
             req.httpBody = try? JSONEncoder().encode(Body(article_id: story.id))
-            if let (data, response) = try? await URLSession.shared.data(for: req),
-               let http = response as? HTTPURLResponse, http.statusCode == 200,
-               let decoded = try? JSONDecoder().decode(Resp.self, from: data) {
-                isBookmarked = true; bookmarkId = decoded.id
+            guard let (data, response) = try? await URLSession.shared.data(for: req),
+                  let http = response as? HTTPURLResponse else {
+                return
             }
+            if http.statusCode == 200,
+               let decoded = try? JSONDecoder().decode(Resp.self, from: data) {
+                isBookmarked = true
+                bookmarkId = decoded.id
+                return
+            }
+            // Cap-exceeded — surface upgrade affordance instead of failing
+            // silently. The route returns 403 with `error: "bookmark_cap_exceeded"`
+            // when the trigger raises P0001. Anything else is a transient
+            // failure we just log.
+            if let err = try? JSONDecoder().decode(ErrResp.self, from: data),
+               err.error == "bookmark_cap_exceeded" {
+                await MainActor.run { showUpgradeAlert = true }
+                return
+            }
+            Log.d("[StoryDetail] bookmark POST non-2xx:", http.statusCode)
         }
     }
 
     /// D13: users without `bookmarks.unlimited` may bookmark up
     /// to 10 articles; users with it are uncapped. Removing an existing
     /// bookmark never hits the cap.
+    ///
+    /// A118 — the iOS client used to pre-count bookmarks before posting,
+    /// which raced against the server's `bookmarks_cap` trigger: between
+    /// the SELECT and the POST another tab/web session could land row #11.
+    /// We now trust the server-side trigger and parse its P0001
+    /// "bookmark_cap_exceeded" reply (surfaced by /api/bookmarks as a 403)
+    /// into the upgrade affordance, mirroring what the web client does.
+    /// The pre-check is gone end-to-end.
     private func attemptBookmark() async {
         guard (try? await client.auth.session) != nil else { return }
-        if isBookmarked {
-            await toggleBookmark()
-            return
-        }
-        if !hasUnlimitedBookmarks {
-            do {
-                guard let session = try? await client.auth.session else { return }
-                let userId = session.user.id.uuidString
-                struct Row: Decodable { let id: String }
-                let existing: [Row] = try await client.from("bookmarks")
-                    .select("id")
-                    .eq("user_id", value: userId)
-                    .execute().value
-                if existing.count >= 10 {
-                    await MainActor.run { showUpgradeAlert = true }
-                    return
-                }
-            } catch {
-                Log.d("bookmark cap check failed: \(error)")
-            }
-        }
         await toggleBookmark()
     }
 
