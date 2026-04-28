@@ -38,7 +38,10 @@ const C = {
   danger: 'var(--danger)',
 } as const;
 
-type Availability = null | 'available' | 'taken' | 'reserved';
+// [S3-Q2-e] Availability collapses to a 2-state model. Reserved
+// usernames now read as `available: false` from the server (Q2b
+// oracle closure), so the UI only needs available / taken.
+type Availability = null | 'available' | 'taken';
 
 function buildSuggestions(
   email: string | null | undefined,
@@ -112,22 +115,28 @@ export default function PickUsernamePage() {
     };
   }, []);
 
+  // [S3-Q2-e] Route the availability check through the session-scoped
+  // /api/auth/check-username endpoint. Direct PostgREST queries
+  // against `users` + `reserved_usernames` from the anon client were
+  // the original enumeration vector closed by Q2b. The endpoint
+  // returns { available: boolean } with no taken-vs-reserved
+  // distinction; the UI maps `false` to 'taken' for copy purposes.
   const checkName = async (name: string): Promise<Availability> => {
-    const supabase = createClient();
-    const [{ data: takenRow }, { data: reservedRow }] = await Promise.all([
-      supabase
-        .from('users')
-        .select('username')
-        .eq('username', name)
-        .maybeSingle<{ username: string }>(),
-      supabase
-        .from('reserved_usernames')
-        .select('username')
-        .eq('username', name)
-        .maybeSingle<{ username: string }>(),
-    ]);
-    if (reservedRow) return 'reserved';
-    return takenRow ? 'taken' : 'available';
+    const res = await fetch(`/api/auth/check-username?u=${encodeURIComponent(name)}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (res.status === 401) {
+      // Anonymous caller (session expired mid-flow). Treat as
+      // unknown — let the submit-time UNIQUE constraint enforce
+      // the real check.
+      return null;
+    }
+    if (!res.ok) {
+      return null;
+    }
+    const body = (await res.json().catch(() => ({}))) as { available?: boolean };
+    return body.available === true ? 'available' : 'taken';
   };
 
   const handleChange = (val: string) => {
@@ -138,8 +147,8 @@ export default function PickUsernamePage() {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (cleaned.length >= 3) {
       setChecking(true);
-      // Spec calls for 300ms. Keep network chatter down — one query per
-      // pause in typing, not one per keystroke.
+      // [S3-Q2-e] 250ms debounce per the iOS contract (spec §2.Q2-e
+      // step 4). Keeps network chatter low while feeling instant.
       debounceRef.current = setTimeout(async () => {
         try {
           const result = await checkName(cleaned);
@@ -150,7 +159,7 @@ export default function PickUsernamePage() {
         } finally {
           setChecking(false);
         }
-      }, 300);
+      }, 250);
     } else {
       setChecking(false);
     }
@@ -226,7 +235,7 @@ export default function PickUsernamePage() {
   const borderColor =
     availability === 'available'
       ? C.success
-      : availability === 'taken' || availability === 'reserved'
+      : availability === 'taken'
         ? C.danger
         : focused
           ? C.accent
@@ -263,8 +272,7 @@ export default function PickUsernamePage() {
     userSelect: 'none',
   };
 
-  const showTryThese =
-    (availability === 'taken' || availability === 'reserved') && suggestions.length > 0;
+  const showTryThese = availability === 'taken' && suggestions.length > 0;
 
   return (
     <div style={shell}>
@@ -389,12 +397,7 @@ export default function PickUsernamePage() {
             )}
             {!checking && availability === 'taken' && (
               <p style={{ margin: 0, fontSize: '13px', color: C.danger }}>
-                @{username} is already taken{showTryThese ? ' — try one of these:' : '.'}
-              </p>
-            )}
-            {!checking && availability === 'reserved' && (
-              <p style={{ margin: 0, fontSize: '13px', color: C.danger }}>
-                @{username} is reserved{showTryThese ? ' — try one of these:' : '.'}
+                @{username} isn&apos;t available{showTryThese ? ' — try one of these:' : '.'}
               </p>
             )}
             {username.length > 0 && username.length < 3 && (
