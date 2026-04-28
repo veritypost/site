@@ -966,6 +966,28 @@ export default function StoryPage() {
     };
   }, [story]);
 
+  // S7-I5 — `<meta name="ai-generated" content="true">` for AI-flagged
+  // articles. Injected client-side because the article surface is a
+  // client component (auth-gated content); the JSON-LD below is the
+  // primary regulatory signal (server-rendered, indexable). The meta
+  // tag is the secondary signal scrapers / aggregators consume.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (!story?.is_ai_generated) return;
+    const META_ID = 'vp-ai-disclosure-meta';
+    let el = document.head.querySelector<HTMLMetaElement>(`meta#${META_ID}`);
+    if (!el) {
+      el = document.createElement('meta');
+      el.id = META_ID;
+      el.name = 'ai-generated';
+      document.head.appendChild(el);
+    }
+    el.content = 'true';
+    return () => {
+      el?.remove();
+    };
+  }, [story?.is_ai_generated]);
+
   // Word-count-based read time. 200 wpm matches the iOS estimatedReadMinutes
   // helper so both surfaces agree on the displayed minute count for the same
   // article body. Clamps to 1 so empty/sparse stubs still show a value.
@@ -1418,27 +1440,6 @@ export default function StoryPage() {
   // the story has loaded; the SEO crawler reads the rendered HTML, so a
   // null branch during load is fine (no crawler will hit a loading state).
   const siteOrigin = typeof window !== 'undefined' ? window.location.origin : '';
-  // S7-I5 — `<meta name="ai-generated" content="true">` for AI-flagged
-  // articles. Injected client-side because the article surface is a
-  // client component (auth-gated content); the JSON-LD above is the
-  // primary regulatory signal (server-rendered, indexable). The meta
-  // tag is the secondary signal scrapers / aggregators consume.
-  useEffect(() => {
-    if (typeof document === 'undefined') return;
-    if (!story?.is_ai_generated) return;
-    const META_ID = 'vp-ai-disclosure-meta';
-    let el = document.head.querySelector<HTMLMetaElement>(`meta#${META_ID}`);
-    if (!el) {
-      el = document.createElement('meta');
-      el.id = META_ID;
-      el.name = 'ai-generated';
-      document.head.appendChild(el);
-    }
-    el.content = 'true';
-    return () => {
-      el?.remove();
-    };
-  }, [story?.is_ai_generated]);
 
   const storyJsonLd = story
     ? newsArticle({
