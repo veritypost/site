@@ -2,10 +2,11 @@
 // @feature-verified shared_pages 2026-04-18
 import type { CSSProperties } from 'react';
 import type { Metadata } from 'next';
+import { BRAND_NAME, BRAND_KIDS_NAME } from '@/lib/brand';
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy — Verity Post',
-  description: 'How Verity Post collects, uses, and protects your information.',
+  title: `Privacy Policy — ${BRAND_NAME}`,
+  description: `How ${BRAND_NAME} collects, uses, and protects your information.`,
 };
 
 export default function PrivacyPage() {
@@ -165,7 +166,7 @@ export default function PrivacyPage() {
               verifiable parental consent.
             </li>
             <li>
-              Verity Kids collects minimal data and does not enable social features or public
+              {BRAND_KIDS_NAME} collects minimal data and does not enable social features or public
               profile creation.
             </li>
             <li>

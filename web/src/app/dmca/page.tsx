@@ -120,41 +120,6 @@ export default function DMCAPage() {
         <div style={sectionStyle}>
           <h2 style={headingStyle}>Contact</h2>
           <p style={textStyle}>Send DMCA notices and counter-notices to legal@veritypost.com.</p>
-          <p style={textStyle}>
-            DMCA Designated Agent registration:{' '}
-            <strong>[pending — to be filed at copyright.gov/dmca-agent]</strong>.
-          </p>
-        </div>
-
-        {/* T278 — public CyberTipline path. Independent of the DMCA
-            takedown flow above; CSAM is a separate legal regime
-            (18 U.S.C. § 2258A) and reporters need a direct route to
-            NCMEC even if Verity Post's own report flow is unreachable. */}
-        <div
-          style={{
-            ...sectionStyle,
-            background: '#fff7f7',
-            border: '1px solid #f1c0c0',
-            borderRadius: 12,
-            padding: 20,
-            marginTop: 32,
-          }}
-        >
-          <h2 style={headingStyle}>Suspected child sexual abuse material</h2>
-          <p style={textStyle}>
-            In addition to reporting it through Verity Post, you can also report directly to
-            NCMEC&apos;s CyberTipline at{' '}
-            <a
-              href="https://report.cybertipline.org"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: '#111', textDecoration: 'underline' }}
-            >
-              report.cybertipline.org
-            </a>{' '}
-            or call 1-800-843-5678. We are required by U.S. law (18 U.S.C. § 2258A) to report
-            apparent CSAM to NCMEC.
-          </p>
         </div>
       </div>
     </div>
