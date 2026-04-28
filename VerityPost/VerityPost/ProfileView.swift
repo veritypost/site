@@ -395,9 +395,12 @@ struct ProfileView: View {
         }()
         // Until score_tiers loads, render a neutral skeleton ring so the
         // first paint doesn't flash "Newcomer" grey before the real tier
-        // resolves. Once loaded, switch to the real tier color/label.
+        // resolves. Once loaded, switch to the real tier label — but the
+        // ring/badge color stays neutral. Owner rule: tiers don't get
+        // distinct hues (no rainbow / muted ramp / gradient); tier is a
+        // label, not a visual identity (`feedback_no_color_per_tier`).
         let tiersReady = scoreTiersLoaded && !scoreTiers.isEmpty
-        let tierColor = tiersReady ? Color(hex: current?.colorHex ?? "999999") : VP.border
+        let tierColor = VP.muted
         let tierLabel = tiersReady ? (current?.displayName ?? "Newcomer") : ""
         let displayTitle = (user.displayName?.trimmingCharacters(in: .whitespaces).isEmpty == false
                             ? user.displayName
@@ -1444,7 +1447,8 @@ struct ProfileView: View {
             let score = user.verityScore ?? 0
             let current = tierFor(score: score)
             let next = nextTier(after: current)
-            let tierColor = Color(hex: current?.colorHex ?? "999999")
+            // Owner rule: no color-per-tier — neutral palette token only.
+            let tierColor = VP.muted
             let tierLabel = current?.displayName ?? "Newcomer"
             let minScore = current?.minScore ?? 0
             let range = (next?.minScore ?? 0) - minScore
@@ -1656,8 +1660,13 @@ struct ProfileView: View {
         return sorted.first(where: { $0.minScore > currentMin })
     }
 
+    /// Owner rule: tiers don't get distinct hues. Every tier badge / ring
+    /// renders in `VP.muted`. Helper kept so callers don't need to reach
+    /// for the palette token directly (and so a future polish pass that
+    /// wants to opacity-vary the muted token can land in one place).
     private func tierColorFor(score: Int) -> Color {
-        Color(hex: tierFor(score: score)?.colorHex ?? "999999")
+        _ = tierFor(score: score)
+        return VP.muted
     }
 
     private func loadScoreTiers() async {
