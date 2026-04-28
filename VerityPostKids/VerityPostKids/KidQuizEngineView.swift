@@ -574,24 +574,40 @@ struct KidQuizEngineView: View {
         let id = write.id
         let dispatchedEpoch = dispatchEpoch
         let task: Task<Bool, Never> = Task { [client] in
-            // T-018 — primary attempt + single 1s-backoff retry. Same
-            // shape as the pre-T251 path; T251 layers persistence on top
-            // rather than replacing the in-session retry.
+            // A84 — primary attempt + 2 retries with 0.5s / 1.5s
+            // exponential-ish backoff. Pre-A84 was a single 1s retry,
+            // which collapses on a momentary connectivity blip but
+            // gives up quickly. The 0.5s first retry recovers from a
+            // sub-second hiccup without the kid noticing; the 1.5s
+            // second retry is the hardware/network-stable retry. Both
+            // sleeps stay inside the 3s drain-gate budget so the
+            // result-screen spinner can still run the race.
+            //
+            // Order: try → sleep 0.5s → try → sleep 1.5s → try → fail.
             do {
                 try await client.from("quiz_attempts").insert(write.toInsert()).execute()
                 return true
             } catch {
                 #if DEBUG
-                print("[KidQuizEngineView] quiz_attempts insert failed:", error.localizedDescription)
+                print("[KidQuizEngineView] quiz_attempts insert failed (try 1):", error.localizedDescription)
                 #endif
             }
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            try? await Task.sleep(nanoseconds: 500_000_000)
             do {
                 try await client.from("quiz_attempts").insert(write.toInsert()).execute()
                 return true
             } catch {
                 #if DEBUG
-                print("[KidQuizEngineView] quiz_attempts insert failed on retry:", error.localizedDescription)
+                print("[KidQuizEngineView] quiz_attempts insert failed (try 2):", error.localizedDescription)
+                #endif
+            }
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            do {
+                try await client.from("quiz_attempts").insert(write.toInsert()).execute()
+                return true
+            } catch {
+                #if DEBUG
+                print("[KidQuizEngineView] quiz_attempts insert failed (try 3):", error.localizedDescription)
                 #endif
                 return false
             }
