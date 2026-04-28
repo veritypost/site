@@ -89,12 +89,75 @@ struct BookmarksView: View {
         .navigationTitle("Bookmarks")
         .navigationBarTitleDisplayMode(.inline)
         .task(id: auth.currentUser?.id) { await load() }
+        .task(id: auth.currentUser?.id) { await subscribeToBookmarkChanges() }
         .task(id: perms.changeToken) {
             hasUnlimitedBookmarks = await PermissionService.shared.has("bookmarks.unlimited")
             hasCollections = await PermissionService.shared.has("bookmarks.collection.create")
         }
         .navigationDestination(item: $navigatedStory) { story in
             StoryDetailView(story: story).environmentObject(auth)
+        }
+    }
+
+    // MARK: - Realtime
+    // A77 — listen for INSERT and DELETE on `bookmarks` filtered by the
+    // current user's id. INSERT (e.g., a parallel web tab saved one)
+    // triggers a re-load to pick up the joined article + categories
+    // shape. DELETE (web-side undo, admin purge) drops the row from the
+    // local list immediately so the count + cap-state stay in sync.
+    //
+    // Both Action types are registered on one channel, then we drain
+    // each stream concurrently. The channel is subscribed once
+    // (drainRealtimeChannel for the inserts handles it); the deletes
+    // loop drains in parallel and the second drainRealtimeChannel call
+    // for cleanup is gated to only fire unsubscribe once via the
+    // outer cancellation handler.
+    private func subscribeToBookmarkChanges() async {
+        guard let userId = auth.currentUser?.id else { return }
+        let channelName = "bookmarks-\(userId)-\(Int(Date().timeIntervalSince1970))"
+        let channel = client.channel(channelName)
+        let inserts = channel.postgresChange(
+            InsertAction.self,
+            schema: "public",
+            table: "bookmarks",
+            filter: "user_id=eq.\(userId)"
+        )
+        let deletes = channel.postgresChange(
+            DeleteAction.self,
+            schema: "public",
+            table: "bookmarks",
+            filter: "user_id=eq.\(userId)"
+        )
+        await channel.subscribe()
+        await withTaskCancellationHandler {
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask { @MainActor in
+                    for await change in inserts {
+                        guard case let .string(newId) = change.record["id"] else { continue }
+                        if items.contains(where: { $0.id == newId }) { continue }
+                        // Fetch the joined shape — postgres_changes only
+                        // carries bare columns, not the categories(name)
+                        // join the list relies on.
+                        await load()
+                    }
+                }
+                group.addTask { @MainActor in
+                    for await change in deletes {
+                        // DeleteAction record carries the OLD row's id
+                        // under .oldRecord.
+                        guard case let .string(deletedId) = change.oldRecord["id"] else { continue }
+                        items.removeAll { $0.id == deletedId }
+                    }
+                }
+                await group.waitForAll()
+            }
+            Task.detached { @Sendable in
+                await channel.unsubscribe()
+            }
+        } onCancel: {
+            Task.detached { @Sendable in
+                await channel.unsubscribe()
+            }
         }
     }
 
