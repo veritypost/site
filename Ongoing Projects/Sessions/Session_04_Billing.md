@@ -155,7 +155,7 @@ Each item below has all 11 fields: ID · Title · Source · Severity · Status �
 - **Title:** Apple webhook reclaim only checks 'received'; Stripe reclaims 'received' + 'processing'
 - **Source:** TODO_READ_ONLY_HISTORICAL.md A68
 - **Severity:** MEDIUM — defensive symmetry. Today's Apple code paths suggest a row shouldn't land in `'processing'`, but it's not impossible; if it ever does, the row deadlocks forever.
-- **Status:** 🟦 open
+- **Status:** 🟩 SHIPPED 2026-04-28 (commit pending below)
 - **File:line:** `web/src/app/api/ios/appstore/notifications/route.js:107-135` (Apple reclaim only matches `'received'`); `web/src/app/api/stripe/webhook/route.js:156-173` (Stripe reclaims both via `.in('processing_status', ['processing', 'received'])`)
 - **Current state:** Apple webhook reclaim filter: `processing_status='received'`. Stripe's correct pattern: `processing_status IN ('received', 'processing')`. Mismatch.
 - **Fix:** Mirror the Stripe logic. Change the Apple reclaim query to `.in('processing_status', ['processing', 'received'])`. Same age-threshold cutoff stays. Same row state machine — reclaim resets the row to `'received'` for re-processing.
