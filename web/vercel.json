@@ -26,15 +26,15 @@
     },
     {
       "path": "/api/cron/send-emails",
-      "schedule": "45 4 * * *"
+      "schedule": "*/5 * * * *"
     },
     {
       "path": "/api/cron/send-push",
-      "schedule": "0 5 * * *"
+      "schedule": "*/5 * * * *"
     },
     {
       "path": "/api/cron/flag-expert-reverifications",
-      "schedule": "30 4 * * 1"
+      "schedule": "40 4 * * 1"
     },
     {
       "path": "/api/cron/pipeline-cleanup",
@@ -58,7 +58,7 @@
     },
     {
       "path": "/api/cron/anonymize-audit-log-pii",
-      "schedule": "30 3 * * *"
+      "schedule": "25 3 * * *"
     },
     {
       "path": "/api/cron/purge-audit-log",
@@ -66,7 +66,15 @@
     },
     {
       "path": "/api/cron/purge-webhook-log",
-      "schedule": "0 4 * * *"
+      "schedule": "5 4 * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-data-exports",
+      "schedule": "17 5 * * *"
+    },
+    {
+      "path": "/api/cron/rate-limit-cleanup",
+      "schedule": "47 5 * * *"
     }
   ]
 }
