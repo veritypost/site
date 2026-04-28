@@ -87,7 +87,7 @@
 // them from the Request object would close the last DA-119 gap on the
 // admin audit trail.
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceClient } from '@/lib/supabase/server';
 
 type RecordAdminActionArgs = {
   action: string;
@@ -102,6 +102,11 @@ type RecordAdminActionArgs = {
 // Skips the RPC when target === actor (`require_outranks` treats self
 // as never strictly outranking, which is correct for penalty flows but
 // wrong for self-directed admin operations like editing your own row).
+//
+// S6-A26 (deferred): this self-edit short-circuit is a privilege-escalation
+// shape risk. Awaiting S1 verification of `caller_can_assign_role` RPC body
+// to confirm strict-greater hierarchy enforcement on self-edits before
+// removing the bypass. Do not relax this guard until S1 ships the verify.
 export async function requireAdminOutranks(
   targetUserId: string | null | undefined,
   actorId: string
@@ -130,14 +135,95 @@ export async function requireAdminOutranks(
   return null;
 }
 
-// Best-effort audit write via the SECURITY DEFINER RPC. The RPC
-// auth.uid()-checks the caller, so this MUST run on the cookie-scoped
-// authed client (not the service client). Errors are logged, never
-// thrown — the mutation has already landed and the caller should not
-// see an audit-write failure as a 500.
+// S6-A5: structured audit-failure surface. Stops the swallow-and-forget
+// pattern. When the RPC fails we log a tagged line with full context, then
+// attempt a service-role direct insert into admin_audit_log so the row
+// still lands. If even the fallback fails, the error propagates to the
+// caller — the caller decides whether to surface it or not. Default:
+// callers should NOT roll back the mutation over an audit failure;
+// rolling back makes the system more brittle than missing one audit row.
+type AuditFailureContext = {
+  actorId: string | null;
+  args: RecordAdminActionArgs;
+  error: { message?: string; code?: string } | unknown;
+};
+
+function logAuditFailure(ctx: AuditFailureContext): void {
+  const e = ctx.error as { message?: string; code?: string } | undefined;
+  // Single structured line; downstream log shippers grep on the tag.
+  console.error('[AUDIT-FAILURE]', JSON.stringify({
+    actorId: ctx.actorId,
+    targetUserId: ctx.args.targetId ?? null,
+    targetTable: ctx.args.targetTable ?? null,
+    action: ctx.args.action,
+    reason: ctx.args.reason ?? null,
+    errorMessage: e?.message ?? String(ctx.error ?? 'unknown'),
+    errorCode: e?.code ?? null,
+  }));
+  // Sentry hook is gated on env; structured log is the surface when off.
+  if (process.env.SENTRY_DSN) {
+    try {
+      // Lazy import keeps Sentry out of the hot path when not configured.
+      // The tag and context are reused so triage doesn't need cross-grep.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const Sentry = require('@sentry/nextjs') as {
+        captureMessage?: (msg: string, ctx?: unknown) => void;
+      };
+      Sentry.captureMessage?.('admin_audit_failure', {
+        level: 'error',
+        tags: { surface: 'admin_audit', action: ctx.args.action },
+        extra: { actorId: ctx.actorId, args: ctx.args, error: ctx.error },
+      });
+    } catch {
+      // Sentry import / capture failure is itself non-fatal.
+    }
+  }
+}
+
+// Service-role fallback insert into admin_audit_log. Bypasses RLS and the
+// RPC's auth.uid() requirement. Best-effort — if even this fails, throws
+// so the caller can decide.
+async function fallbackInsertAuditLog(
+  args: RecordAdminActionArgs,
+  actorId: string
+): Promise<void> {
+  const service = createServiceClient();
+  const { error } = await service.from('admin_audit_log').insert({
+    actor_user_id: actorId,
+    action: args.action,
+    target_table: args.targetTable ?? null,
+    target_id: args.targetId ?? null,
+    reason: args.reason ?? null,
+    old_value: (args.oldValue ?? null) as never,
+    new_value: (args.newValue ?? null) as never,
+  });
+  if (error) {
+    throw new Error(`fallback admin_audit_log insert failed: ${error.message}`);
+  }
+}
+
+// Audit write via the SECURITY DEFINER RPC, with structured failure
+// surface and service-role fallback (S6-A5). The RPC auth.uid()-checks
+// the caller, so the primary path runs on the cookie-scoped authed
+// client. On RPC failure we log + fallback-insert under service role so
+// the audit row lands. On terminal failure (both paths broken) the
+// error throws — callers should propagate but NOT roll back the
+// originating mutation.
 export async function recordAdminAction(args: RecordAdminActionArgs): Promise<void> {
+  const authed = createClient();
+  // Best-effort actor capture — used for fallback insert + log context.
+  // If the session is gone (rare for admin paths), we still emit the log
+  // line and skip the fallback; caller-visible behavior is unchanged.
+  let actorId: string | null = null;
   try {
-    const authed = createClient();
+    const { data } = await authed.auth.getUser();
+    actorId = data?.user?.id ?? null;
+  } catch {
+    // ignore — actorId stays null
+  }
+
+  let rpcError: { message?: string; code?: string } | unknown = null;
+  try {
     const { error } = await authed.rpc('record_admin_action', {
       p_action: args.action,
       p_target_table: args.targetTable ?? undefined,
@@ -146,12 +232,52 @@ export async function recordAdminAction(args: RecordAdminActionArgs): Promise<vo
       p_old_value: (args.oldValue ?? null) as never,
       p_new_value: (args.newValue ?? null) as never,
     });
-    if (error) {
-      console.error('[adminMutation] record_admin_action failed:', error.message);
-    }
+    if (!error) return;
+    rpcError = error;
   } catch (err) {
-    console.error('[adminMutation] record_admin_action threw:', err);
+    rpcError = err;
   }
+
+  logAuditFailure({ actorId, args, error: rpcError });
+
+  if (!actorId) {
+    // Without an actor ID we cannot satisfy the NOT NULL constraint on
+    // admin_audit_log.actor_user_id. Surface the failure.
+    throw new Error('audit_failed');
+  }
+
+  try {
+    await fallbackInsertAuditLog(args, actorId);
+  } catch (fallbackErr) {
+    logAuditFailure({ actorId, args, error: fallbackErr });
+    throw new Error('audit_failed');
+  }
+}
+
+// S6-A57: mutate-first-audit-on-success helper. Fixes the pre-mutation-
+// audit anti-pattern (phantom audit rows for changes that never landed).
+// The mutation is the user-facing fact; the audit row describes what
+// happened. If the audit write fails, the mutation has already succeeded
+// — we log + fallback-insert via recordAdminAction's path, never rollback.
+//
+// Usage:
+//   const result = await withDestructiveAction(
+//     () => service.from('users').update(...).eq('id', target).select().single(),
+//     async (r) => recordAdminAction({ action: 'users.ban', targetId: r.id, ... })
+//   );
+export async function withDestructiveAction<T>(
+  actionFn: () => Promise<T>,
+  auditFn: (result: T) => Promise<void>
+): Promise<T> {
+  const result = await actionFn();
+  try {
+    await auditFn(result);
+  } catch (auditErr) {
+    // recordAdminAction already logged + attempted fallback. Swallow here
+    // so the originating mutation's caller sees the success it earned.
+    console.error('[withDestructiveAction] audit step terminal failure:', auditErr);
+  }
+  return result;
 }
 
 // Standard envelope for the try/catch around requirePermission. Maps the
