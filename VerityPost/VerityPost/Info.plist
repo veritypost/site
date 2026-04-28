@@ -14,14 +14,8 @@
 	<string>$(PRODUCT_NAME)</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
-	<!--
-	    T258 (2026-04-26): switched from hardcoded "1.0" / "1" to xcconfig
-	    refs so build numbers can increment per App Store submission via
-	    the existing MARKETING_VERSION / CURRENT_PROJECT_VERSION build
-	    settings in VerityPost.xcodeproj (or an xcconfig file).
-	-->
 	<key>CFBundleShortVersionString</key>
-	<string>$(MARKETING_VERSION)</string>
+	<string>1.0</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -34,7 +28,7 @@
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<string>1</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSApplicationQueriesSchemes</key>
