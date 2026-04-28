@@ -310,7 +310,7 @@ function NotificationsInner() {
           <PageSection title="Recent">
             <DataTable
               columns={[
-                { key: 'user', header: 'User', render: (n: Notification) => n.users?.username || n.user_id },
+                { key: 'user', header: 'User', render: (n: Notification) => n.users?.username ? `@${n.users.username}` : '(deleted)' },
                 { key: 'body', header: 'Message', truncate: true, render: (n: Notification) => n.body || n.title || '—' },
                 {
                   key: 'type', header: 'Type',
