@@ -221,7 +221,8 @@ struct HomeView: View {
 
     private var topBar: some View {
         HStack(spacing: 0) {
-            Text("verity post")
+            // A52 — canonical brand casing is "Verity Post" (Title Case).
+            Text("Verity Post")
                 .font(.system(size: 15, weight: .heavy))
                 .tracking(-0.15)
                 .foregroundColor(VP.text)
