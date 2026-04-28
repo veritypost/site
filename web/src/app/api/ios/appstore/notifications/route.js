@@ -102,6 +102,55 @@ export async function POST(request) {
   }
 
   const service = createServiceClient();
+
+  // S4-A4 — Apple posts both Sandbox and Production notifications to the
+  // same configured S2S URL. The JWS-verified payload's `data.environment`
+  // distinguishes them. Without this gate, a developer with a Sandbox
+  // tester account can forge state mutations against production users by
+  // signing a Sandbox payload (Apple's signature verifies because Apple
+  // signs Sandbox traffic too). Reject any payload whose environment
+  // doesn't match the deployment env. Fail-closed: if neither
+  // VERCEL_ENV nor NODE_ENV indicates production OR preview/dev, reject
+  // everything until env is configured properly.
+  //
+  // Audit-log row writes BEFORE the early return so failed-payload
+  // investigation is possible. The check runs AFTER signature verify
+  // (don't pollute the audit log with unsigned junk) and BEFORE the
+  // webhook_log claim (no row gets minted for rejected envelopes).
+  const claimedEnv = notification?.data?.environment;
+  const vercelEnv = process.env.VERCEL_ENV;
+  const nodeEnv = process.env.NODE_ENV;
+  let expectedEnv;
+  if (vercelEnv === 'production' || (!vercelEnv && nodeEnv === 'production')) {
+    expectedEnv = 'Production';
+  } else if (vercelEnv === 'preview' || vercelEnv === 'development' || nodeEnv === 'development') {
+    expectedEnv = 'Sandbox';
+  } else {
+    // Both VERCEL_ENV and NODE_ENV unset/unknown — fail closed.
+    expectedEnv = null;
+  }
+  if (!claimedEnv || claimedEnv !== expectedEnv) {
+    await service.from('audit_log').insert({
+      actor_id: null,
+      action: 'ios_webhook_env_mismatch',
+      target_type: 'webhook',
+      target_id: null,
+      metadata: {
+        source: 'apple_notif',
+        notification_uuid: notificationUUID,
+        notification_type: notificationType + (subtype ? `:${subtype}` : ''),
+        claimed_environment: claimedEnv || null,
+        expected_environment: expectedEnv,
+        vercel_env: vercelEnv || null,
+        node_env: nodeEnv || null,
+      },
+    });
+    return NextResponse.json(
+      { error: 'environment mismatch', claimed_environment: claimedEnv || null },
+      { status: 400 }
+    );
+  }
+
   const eventId = `apple_notif:${notificationUUID}`;
 
   const { data: prior } = await service

@@ -83,7 +83,7 @@ Each item below has all 11 fields: ID · Title · Source · Severity · Status �
 - **Title:** Apple webhook accepts Sandbox notifications in production
 - **Source:** TODO_READ_ONLY_HISTORICAL.md A4 + PotentialCleanup §B4
 - **Severity:** **CRITICAL — production billing corruptible from any developer with a Sandbox tester account.**
-- **Status:** 🟦 open
+- **Status:** 🟩 SHIPPED 2026-04-28 (commit pending below)
 - **File:line:** `web/src/app/api/ios/appstore/notifications/route.js` (no `notification.environment` check anywhere; the file's own comment at lines 17-18 acknowledges Sandbox + Production hit the same configured URL but the code never reads `data.environment`)
 - **Current state:** The route accepts every signed Apple S2S payload regardless of which environment Apple is sending from. A Sandbox receipt redeemed in dev applies state to production users — unfreeze, extend, downgrade, refund processing, expired-but-renewed flips. Any developer with a Sandbox tester account can corrupt prod billing rows.
 - **Fix:** In production deployments (`process.env.VERCEL_ENV === 'production'` — preferred; `NODE_ENV === 'production'` as fallback), reject every payload where `notification.environment !== 'Production'`. In dev / preview deployments, reject every payload where `notification.environment !== 'Sandbox'`. On reject: return 400, write an `audit_log` row tagged `action='ios_webhook_env_mismatch'` with the offending environment + apple-notification-uuid, do not mutate any user/subscription state. The body parsing already happens upstream; the env check goes immediately after parse + signature verify, before any DB mutation.
