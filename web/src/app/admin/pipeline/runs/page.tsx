@@ -16,10 +16,10 @@
  * pipeline_runs already gates to admins; this page re-checks
  * ADMIN_ROLES on mount to match the rest of the admin surface.
  *
- * Coexists with the existing @admin-verified /admin/pipeline shell
- * (this file does NOT touch that one). The old page still serves the
- * pipeline config UI; this new deeper route is the runs observability
- * view referenced from the newsroom page.
+ * Coexists with the existing /admin/pipeline shell (this file does NOT
+ * touch that one). The old page still serves the pipeline config UI;
+ * this new deeper route is the runs observability view referenced from
+ * the newsroom page.
  *
  * Auth: client-side ADMIN_ROLES gate matching newsroom/settings.
  */

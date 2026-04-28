@@ -19,9 +19,8 @@ import { getSettings } from '@/lib/settings';
 // Hardcoded fallbacks — match the values FamilyViews.swift used pre-
 // extraction. Both surfaces use these if their respective lookups fail.
 //
-// Phase 2 of AI + Plan Change Implementation locked these values:
 //   - verity_family includes 1 kid; up to 4 kids total via per-kid add-on
-//   - verity_family_xl is retired permanently (per-kid model replaces it)
+//   - verity_family_xl was retired 2026-04-27 (per-kid model replaces it)
 //   - extra_kid_price_cents is the per-additional-kid monthly add-on
 const DEFAULTS = {
   max_kids: { verity_family: 4 },

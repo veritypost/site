@@ -513,10 +513,10 @@ async function handleSubscriptionUpdated(service, sub) {
   const { userRow, planRow } = await lookupUserAndPlan(service, customerId, priceId);
   if (!userRow) throw new Error(`no user for customer=${customerId}`);
 
-  // Phase 2 of AI + Plan Change Implementation: Family subs use a base
-  // item + an "extra kid seat" item with quantity-based billing. Compute
-  // kid_seats_paid = 1 (the included kid in base) + quantity of any item
-  // whose price metadata flags it as the extra-kid line. Cap at 4.
+  // Family subs use a base item + an "extra kid seat" item with
+  // quantity-based billing. Compute kid_seats_paid = 1 (the included
+  // kid in base) + quantity of any item whose price metadata flags it
+  // as the extra-kid line. Cap at 4.
   let kidSeatsPaid = null;
   try {
     const items = sub.items?.data ?? [];

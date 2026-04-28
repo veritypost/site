@@ -23,8 +23,8 @@ import type { Tables } from '@/types/database-helpers';
 type Placement = Tables<'ad_placements'>;
 type AdUnit = Tables<'ad_units'>;
 
-// T319 — `verity_family_xl` retired per Phase 2 of AI + Plan Change
-// Implementation; the per-kid add-on model on `verity_family` replaced it.
+// T319 — `verity_family_xl` was retired 2026-04-27; the per-kid add-on
+// model on `verity_family` replaced it.
 const ALL_TIERS = ['free', 'verity', 'verity_pro', 'verity_family'];
 const PLACEMENT_TYPES = ['banner', 'interstitial', 'in_feed', 'sidebar', 'video'];
 const PLATFORMS = ['all', 'web', 'ios', 'android'];

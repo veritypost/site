@@ -336,7 +336,7 @@ Every owner-pending decision in S6 scope is locked below with the senior-dev / U
 - **Source:** TODO_READ_ONLY_HISTORICAL.md A32. **Locked (best-practice):** Delete (no chat widget shipped to wire to).
 - **Severity:** P1
 - **Status:** 🟦 open
-- **File:line current state:** `web/src/app/admin/support/page.tsx:64-181` — `ChatWidgetConfig` lives entirely in `useState`. Toggle fires "Chat widget enabled" toast; nothing persists. Estimated-user-count widget at `:120-130` shows invented numbers (`gracePeriod ? 120 : 0`, `paidPlans ? 3400 : 0`).
+- **File:line current state:** `web/src/app/admin/support/page.tsx:64-181` — `ChatWidgetConfig` lives entirely in `useState`. Toggle fires "Chat widget enabled" toast; nothing persists. Estimated-user-count widget at `:85-93` (drift-corrected 2026-04-27 — was cited as `:120-130`) shows invented numbers (`gracePeriod ? 120 : 0`, `paidPlans ? 3400 : 0`).
 - **Why it matters:** Operator-trust collapse. If this surface lies, every other admin surface is suspect. Invented user counts are believable at a glance — worst kind of fake state.
 - **The fix:**
   1. Delete the entire `ChatWidgetConfig` component (lines 64-181 region).

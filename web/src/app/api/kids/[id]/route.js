@@ -37,11 +37,10 @@ export async function PATCH(request, { params }) {
   }
 
   const b = await request.json().catch(() => ({}));
-  // Phase 2 of AI + Plan Change Implementation: date_of_birth is locked
-  // post-creation. Corrections route through the request form (Phase 4
-  // builds /api/kids/[id]/dob-correction). DOB stays editable only via
-  // the admin RPC `admin_apply_dob_correction` which sets a session var
-  // to bypass the immutability trigger.
+  // date_of_birth is locked post-creation. Corrections route through
+  // the request form at /api/kids/[id]/dob-correction. DOB stays
+  // editable only via the admin RPC `admin_apply_dob_correction` which
+  // sets a session var to bypass the immutability trigger.
   const allowed = ['display_name', 'avatar_color', 'max_daily_minutes', 'reading_level'];
   const update = {};
   for (const k of allowed) if (b[k] !== undefined) update[k] = b[k];

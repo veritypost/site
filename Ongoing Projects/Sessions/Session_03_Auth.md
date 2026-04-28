@@ -1256,7 +1256,7 @@ A test that exercises this set runs as part of the post-impl review. The test co
 - **Title:** Rephrase the `@admin-verified` comment at `middleware.js:267` (memory-rule violation)
 - **Source:** Moved here from `Session_06_Admin.md` S6-Cleanup-§D5 because the file is S3-owned. Original audit: Cleanup §D5. Memory: `feedback_admin_marker_dropped` — retired 2026-04-23, 77 markers + CLAUDE.md lock-rule retired; **DO NOT REINTRODUCE.**
 - **Severity:** P3 (cosmetic; comment-only).
-- **Status:** 🟦 open.
+- **Status:** 🟩 8df73d2.
 - **File:line current state (verified 2026-04-27):**
   - `web/src/middleware.js:267` — comment: "share the prefix. Both legacy pages carried @admin-verified markers;"
 - **Why it matters:** Memory rule retired the `@admin-verified` marker entirely. The comment is a stale reference to a concept that no longer exists in the codebase's vocabulary; future readers will assume the marker is still meaningful and either restore the lock-rule or get confused.

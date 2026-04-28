@@ -10,11 +10,10 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 const CRON_NAME = 'recompute-family-achievements';
 
 // Auth: CRON_SECRET via verifyCronAuth. Fail-closed 403.
-// Phase 17.1: sweeps every active verity_family owner, recomputes
-// criteria-based family achievements, stamps earned_at on newly
-// satisfied ones. Daily cadence — the lag is acceptable. (Pre-T319
-// also swept verity_family_xl; retired per Phase 2 of AI + Plan
-// Change Implementation.)
+// Sweeps every active verity_family owner, recomputes criteria-based
+// family achievements, stamps earned_at on newly satisfied ones. Daily
+// cadence — the lag is acceptable. (Pre-T319 also swept
+// verity_family_xl, retired 2026-04-27.)
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 // Pin to 60s — daily sweep over active family owners; RPC-bounded work.

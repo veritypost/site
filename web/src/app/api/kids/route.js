@@ -92,10 +92,10 @@ export async function POST(request) {
 
   const service = createServiceClient();
 
-  // Phase 2 of AI + Plan Change Implementation: enforce kid seat budget.
-  // Family plan provides `included_kids` baseline + paid extras (tracked
-  // on subscriptions.kid_seats_paid). Reject create if at the cap with a
-  // 402 so the client can surface the per-kid upsell ($4.99/mo).
+  // Enforce kid seat budget. Family plan provides `included_kids`
+  // baseline + paid extras (tracked on subscriptions.kid_seats_paid).
+  // Reject create if at the cap with a 402 so the client can surface
+  // the per-kid upsell ($4.99/mo).
   try {
     const [{ count: activeKidCount }, subRes] = await Promise.all([
       service

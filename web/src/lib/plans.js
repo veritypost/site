@@ -6,11 +6,10 @@
 //   verity_pro_monthly       / verity_pro_annual
 //   verity_family_monthly    / verity_family_annual
 //
-// T319 — verity_family_xl_* SKUs were RETIRED per Phase 2 of AI + Plan
-// Change Implementation: the per-kid add-on model on `verity_family`
-// (1 included kid, +$4.99/mo per additional kid up to 4 total)
-// replaces the XL tier entirely. Code cleanup landed 2026-04-27;
-// matching DB row deletion ships via the T319 migration in
+// T319 — verity_family_xl_* SKUs were retired 2026-04-27. The per-kid
+// add-on model on `verity_family` (1 included kid, +$4.99/mo per
+// additional kid up to 4 total) replaces the XL tier entirely. Matching
+// DB row deletion ships via the T319 migration in
 // `Ongoing Projects/migrations/`.
 //
 // T318 — `verity_monthly` ($3.99) and `verity_pro_monthly` ($9.99)
