@@ -9,7 +9,7 @@ import UIKit
 /// card; anyone else gets `EmptyView`.
 struct HomeRecapCard: View {
     @EnvironmentObject var auth: AuthViewModel
-    @StateObject private var perms = PermissionStore.shared
+    @ObservedObject private var perms = PermissionStore.shared
     @State private var recapTitle: String?
     @State private var recapId: String?
     @State private var canViewRecaps: Bool?

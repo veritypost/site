@@ -8,7 +8,7 @@ import Supabase
 /// Free: 10-cap, flat list. Verity+: unlimited + collections + notes.
 struct BookmarksView: View {
     @EnvironmentObject var auth: AuthViewModel
-    @StateObject private var perms = PermissionStore.shared
+    @ObservedObject private var perms = PermissionStore.shared
     private let client = SupabaseManager.shared.client
 
     @State private var items: [BookmarkItem] = []

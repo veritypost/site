@@ -33,11 +33,11 @@ struct AlertsView: View {
 
     @State private var showLogin = false
     @State private var showSignup = false
-    @StateObject private var push = PushPermission.shared
+    @ObservedObject private var push = PushPermission.shared
     @State private var showPushPrompt = false
 
     // Permission flags, hydrated on change-token bumps.
-    @StateObject private var perms = PermissionStore.shared
+    @ObservedObject private var perms = PermissionStore.shared
     @State private var canViewInbox = false
     @State private var canMarkAllRead = false
     @State private var canSubCategory = false

@@ -26,7 +26,7 @@ import Supabase
 /// generic strings; the iOS layer surfaces them via inline banner / toast.
 struct FamilyDashboardView: View {
     @EnvironmentObject var auth: AuthViewModel
-    @StateObject private var perms = PermissionStore.shared
+    @ObservedObject private var perms = PermissionStore.shared
 
     @State private var kids: [KidProfile] = []
     @State private var loading = true

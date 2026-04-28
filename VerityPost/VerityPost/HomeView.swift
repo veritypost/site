@@ -21,7 +21,7 @@ import Supabase
 
 struct HomeView: View {
     @EnvironmentObject var auth: AuthViewModel
-    @StateObject private var perms = PermissionStore.shared
+    @ObservedObject private var perms = PermissionStore.shared
     private let client = SupabaseManager.shared.client
 
     @State private var stories: [Story] = []

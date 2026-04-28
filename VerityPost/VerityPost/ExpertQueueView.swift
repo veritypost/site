@@ -13,7 +13,7 @@ import Supabase
 /// authorization and back-channel notifications stay in one place.
 struct ExpertQueueView: View {
     @EnvironmentObject var auth: AuthViewModel
-    @StateObject private var perms = PermissionStore.shared
+    @ObservedObject private var perms = PermissionStore.shared
     private let client = SupabaseManager.shared.client
     private static let iso8601Fmt = ISO8601DateFormatter()
 

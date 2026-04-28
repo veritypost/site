@@ -39,7 +39,7 @@ import Supabase
 
 struct ProfileView: View {
     @EnvironmentObject var auth: AuthViewModel
-    @StateObject private var perms = PermissionStore.shared
+    @ObservedObject private var perms = PermissionStore.shared
     private let client = SupabaseManager.shared.client
 
     // Permission-gated flags. Populated in a `.task(id: perms.changeToken)`.

@@ -626,9 +626,9 @@ private struct HubSection<Content: View>: View {
 
 struct SettingsView: View {
     @EnvironmentObject var auth: AuthViewModel
-    @StateObject private var perms = PermissionStore.shared
-    @StateObject private var push = PushPermission.shared
-    @StateObject private var blocks = BlockService.shared
+    @ObservedObject private var perms = PermissionStore.shared
+    @ObservedObject private var push = PushPermission.shared
+    @ObservedObject private var blocks = BlockService.shared
     @Environment(\.dismiss) private var dismiss
 
     @State private var showFeedback = false
@@ -1863,8 +1863,8 @@ struct MFASettingsView: View {
 
 struct SubscriptionSettingsView: View {
     @EnvironmentObject var auth: AuthViewModel
-    @StateObject private var perms = PermissionStore.shared
-    @StateObject private var store = StoreManager.shared
+    @ObservedObject private var perms = PermissionStore.shared
+    @ObservedObject private var store = StoreManager.shared
     @State private var showSubscription = false
     @State private var hasActiveSubscription: Bool = false
     @State private var restoreMessage: String? = nil
@@ -1951,10 +1951,10 @@ struct SubscriptionSettingsView: View {
 struct NotificationsSettingsView: View {
     @EnvironmentObject var auth: AuthViewModel
 
-    @StateObject private var push = PushPermission.shared
+    @ObservedObject private var push = PushPermission.shared
     @State private var showPushPrompt = false
 
-    @StateObject private var perms = PermissionStore.shared
+    @ObservedObject private var perms = PermissionStore.shared
     @State private var canViewPrefs = false
     @State private var canTogglePush = false
 
@@ -2606,7 +2606,7 @@ struct DataPrivacyView: View {
     // Task 62 — DM read receipts opt-out (migration 044).
     @State private var dmReceiptsEnabled = true
     @State private var dmReceiptsLoading = true
-    @StateObject private var perms = PermissionStore.shared
+    @ObservedObject private var perms = PermissionStore.shared
     @State private var canExport = false
 
     var body: some View {
@@ -2904,7 +2904,7 @@ indirect enum JSONValue: Codable {
 /// and mutated through DELETE /api/users/[id]/block.
 struct BlockedAccountsView: View {
     @EnvironmentObject var auth: AuthViewModel
-    @StateObject private var blocks = BlockService.shared
+    @ObservedObject private var blocks = BlockService.shared
 
     struct BlockedRow: Decodable, Identifiable {
         let id: String

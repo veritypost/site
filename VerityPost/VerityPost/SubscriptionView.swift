@@ -9,7 +9,7 @@ import StoreKit
 
 struct SubscriptionView: View {
     @EnvironmentObject var auth: AuthViewModel
-    @StateObject private var store = StoreManager.shared
+    @ObservedObject private var store = StoreManager.shared
     @State private var isAnnual = true
     @State private var promoCode = ""
     @State private var promoLoading = false

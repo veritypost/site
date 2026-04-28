@@ -28,7 +28,7 @@ private struct ArticleContentHeightKey: PreferenceKey {
 struct StoryDetailView: View {
     let story: Story
     @EnvironmentObject var auth: AuthViewModel
-    @StateObject private var perms = PermissionStore.shared
+    @ObservedObject private var perms = PermissionStore.shared
     private let client = SupabaseManager.shared.client
 
     // Permission-gated flags. All sourced from `PermissionService`.
@@ -124,7 +124,7 @@ struct StoryDetailView: View {
     @State private var streakCount = 0
 
     // Apple Guideline 1.2 — Report Content + Block User on comments.
-    @StateObject private var blocks = BlockService.shared
+    @ObservedObject private var blocks = BlockService.shared
     @State private var reportTargetCommentId: String? = nil
     @State private var blockTargetUser: (id: String, username: String?)? = nil
     @State private var moderationToast: String? = nil
@@ -136,7 +136,7 @@ struct StoryDetailView: View {
     @StateObject private var tts = TTSPlayer()
 
     // Push prompt — shown once after first quiz pass if status is .notDetermined.
-    @StateObject private var push = PushPermission.shared
+    @ObservedObject private var push = PushPermission.shared
     @State private var showPushPrompt = false
 
     // D1: pass threshold is 3 out of 5. Used only for UX copy; server is the

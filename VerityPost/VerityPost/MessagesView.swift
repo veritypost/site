@@ -6,7 +6,7 @@ import Supabase
 
 struct MessagesView: View {
     @EnvironmentObject var auth: AuthViewModel
-    @StateObject private var perms = PermissionStore.shared
+    @ObservedObject private var perms = PermissionStore.shared
     private let client = SupabaseManager.shared.client
 
     // MARK: - Formatters (static to avoid per-message allocation)
@@ -31,7 +31,7 @@ struct MessagesView: View {
     @State private var selectedConvo: DMConversation? = nil
 
     // Apple Guideline 1.2 — DM thread Report / Block state.
-    @StateObject private var blocks = BlockService.shared
+    @ObservedObject private var blocks = BlockService.shared
     @State private var threadReportConvo: DMConversation? = nil
     @State private var threadBlockTarget: (id: String, username: String?)? = nil
     @State private var threadToast: String? = nil

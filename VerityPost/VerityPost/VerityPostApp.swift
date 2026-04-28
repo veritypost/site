@@ -42,7 +42,7 @@ struct VerityPostApp: App {
     // works alongside the SwiftUI app lifecycle.
     @UIApplicationDelegateAdaptor(VPAppDelegate.self) private var appDelegate
     @StateObject private var auth = AuthViewModel()
-    @StateObject private var articleRouter = ArticleRouter.shared
+    @ObservedObject private var articleRouter = ArticleRouter.shared
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {

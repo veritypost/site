@@ -10,7 +10,7 @@ import Supabase
 struct PublicProfileView: View {
     let username: String
     @EnvironmentObject var auth: AuthViewModel
-    @StateObject private var perms = PermissionStore.shared
+    @ObservedObject private var perms = PermissionStore.shared
     private let client = SupabaseManager.shared.client
 
     @State private var profile: VPUser?
@@ -25,7 +25,7 @@ struct PublicProfileView: View {
     @State private var canShareCard: Bool = false
 
     // Apple Guideline 1.2 — Report / Block on user profiles.
-    @StateObject private var blocks = BlockService.shared
+    @ObservedObject private var blocks = BlockService.shared
     @State private var showReportDialog = false
     @State private var showBlockDialog = false
     @State private var profileToast: String? = nil
