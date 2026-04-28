@@ -73,11 +73,25 @@ enum VP {
 // MARK: - Color hex init
 
 extension Color {
-    init(hex: String) {
-        let hex = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
-        let scanner = Scanner(string: hex)
+    /// Parse `"#RRGGBB"` / `"RRGGBB"` into a `Color`. On a malformed input,
+    /// emit a debug log and fall back to `VP.muted` (#999999) instead of
+    /// silently producing pure black — black is also a valid palette tone
+    /// (`VP.text`, `VP.accent`), so a parser failure used to be
+    /// indistinguishable from an intentional dark color and any wrong
+    /// color_hex coming back from the server (`null`, empty, four hex
+    /// digits, "transparent") rendered as deliberate black.
+    init(hex raw: String) {
+        let trimmed = raw.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+        let scanner = Scanner(string: trimmed)
         var rgb: UInt64 = 0
-        scanner.scanHexInt64(&rgb)
+        let scanned = scanner.scanHexInt64(&rgb)
+        // 6-hex-digit RRGGBB only. Reject 3-digit / 8-digit / empty so the
+        // muted fallback wins instead of an under-/over-shifted bit pattern.
+        guard scanned, trimmed.count == 6, scanner.isAtEnd else {
+            Log.d("[Color(hex:)] malformed input — falling back to VP.muted:", raw)
+            self = Color(red: 0x99 / 255, green: 0x99 / 255, blue: 0x99 / 255)
+            return
+        }
         let r = Double((rgb >> 16) & 0xFF) / 255
         let g = Double((rgb >> 8) & 0xFF) / 255
         let b = Double(rgb & 0xFF) / 255
