@@ -34,18 +34,17 @@ type AccessRequest = Tables<'access_requests'>;
 type Plan = Tables<'plans'>;
 type Role = Tables<'roles'>;
 
-// T317 — `referral` is the only `type` the redemption routes (/r/[slug] +
-// /api/access-redeem) actually honor; the other values were inert. Reduced
-// to a single canonical option so admins don't mint codes that silently
-// skip the redemption pipeline. Schema enum can be tightened in a
-// follow-up migration once any historical rows with the legacy types are
-// confirmed unused.
-const TYPE_OPTIONS = ['referral'] as const;
+// S6-A113: TYPE_OPTIONS dropdown removed. The single-option dropdown
+// confused operators ("are there other types?") and lied about what the
+// system can do. Server-side route defaults to 'referral' when omitted;
+// historical T317 reduction stays — `referral` is the only value the
+// redemption routes honor. Schema enum can be tightened in a follow-up
+// migration once any historical rows with legacy types are confirmed
+// unused.
 
 interface CodeForm {
   code: string;
   description: string;
-  type: string;
   grants_plan_id: string;
   grants_role_id: string;
   max_uses: string;
@@ -56,7 +55,6 @@ interface CodeForm {
 const EMPTY_FORM: CodeForm = {
   code: '',
   description: '',
-  type: 'referral',
   grants_plan_id: '',
   grants_role_id: '',
   max_uses: '10',
@@ -222,7 +220,6 @@ export default function AccessAdmin() {
 
   const createCode = async () => {
     const code = (form.code.trim() || generateCode()).toUpperCase();
-    if (!form.type) { toast.push({ message: 'Type is required', variant: 'danger' }); return; }
     const maxUses = form.max_uses === '' ? null : parseInt(form.max_uses, 10);
     if (maxUses !== null && (Number.isNaN(maxUses) || maxUses < 0)) {
       toast.push({ message: 'max_uses must be a non-negative integer or blank', variant: 'danger' });
@@ -232,7 +229,10 @@ export default function AccessAdmin() {
     const row = {
       code,
       description: form.description.trim() || null,
-      type: form.type,
+      // S6-A113: type defaulted to 'referral' server-side (the only value
+      // the redemption pipeline honors). Form no longer surfaces a Type
+      // dropdown — see comment near EMPTY_FORM.
+      type: 'referral',
       grants_plan_id: form.grants_plan_id || null,
       grants_role_id: form.grants_role_id || null,
       max_uses: maxUses,
@@ -523,13 +523,6 @@ export default function AccessAdmin() {
               onChange={(e) => setForm({ ...form, code: e.target.value })}
               placeholder="e.g. VP123ABC"
               style={{ textTransform: 'uppercase', fontFamily: 'ui-monospace, monospace', fontWeight: 600 }}
-            />
-          </Field>
-          <Field label="Type" required>
-            <Select
-              value={form.type}
-              onChange={(e) => setForm({ ...form, type: e.target.value })}
-              options={TYPE_OPTIONS.map((t) => ({ value: t, label: t }))}
             />
           </Field>
         </div>
