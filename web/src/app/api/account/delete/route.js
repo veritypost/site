@@ -30,6 +30,24 @@ const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
 // truth). Bearer branch skips the origin check because mobile
 // clients do not send a trustworthy Origin.
 
+// S3-Q3b — kid identity is signaled by the JWT's `is_kid_delegated`
+// claim (or, structurally, a top-level kid_profile_id without the
+// boolean — also rejected). Account deletion is parent-scoped: a
+// kid bearer must never schedule or cancel deletion of any account.
+// Mirrors the middleware reject + lib/auth.js requireAuth gate so
+// routes that bypass requireAuth (this one + login-cancel-deletion)
+// stay hermetic.
+function isKidUser(user) {
+  if (!user || typeof user !== 'object') return false;
+  const meta = user.app_metadata || {};
+  return (
+    user.is_kid_delegated === true ||
+    meta.is_kid_delegated === true ||
+    !!user.kid_profile_id ||
+    !!meta.kid_profile_id
+  );
+}
+
 async function resolveAuth(request) {
   const auth = request.headers.get('authorization') || '';
   const bearer = auth.toLowerCase().startsWith('bearer ') ? auth.slice(7).trim() : null;
@@ -39,6 +57,7 @@ async function resolveAuth(request) {
     const {
       data: { user },
     } = await authClient.auth.getUser();
+    if (isKidUser(user)) return { user: null, authClient: null };
     return { user, authClient };
   }
 
@@ -50,6 +69,7 @@ async function resolveAuth(request) {
   const {
     data: { user },
   } = await authClient.auth.getUser();
+  if (isKidUser(user)) return { user: null, authClient: null };
   return { user, authClient };
 }
 

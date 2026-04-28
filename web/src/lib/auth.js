@@ -100,12 +100,61 @@ async function resolveAuthedClient(client) {
   return mod.createClient();
 }
 
+// S3-Q3b — kid-vs-user identity is signaled by the JWT's
+// `is_kid_delegated=true` claim. Today's kid JWTs are signed by the
+// custom issuer `verity-post-kids-pair` and carry the claim at the
+// top level; once S10 flips the issuer to Supabase, custom claims
+// propagate via `app_metadata` on the GoTrue user object as well as
+// on the raw JWT payload. Read both so behaviour is correct in both
+// regimes — the function only flips identity when at least one
+// surface explicitly carries `is_kid_delegated === true`. A bare
+// `kid_profile_id` without the boolean is treated as a malformed
+// token and conservatively rejected as kid to keep adult routes
+// hermetic.
+function readKidClaims(authUser) {
+  if (!authUser || typeof authUser !== 'object') {
+    return { isKid: false, kidProfileId: null, parentUserId: null };
+  }
+  const meta = authUser.app_metadata || {};
+  const isKidDelegated =
+    authUser.is_kid_delegated === true || meta.is_kid_delegated === true;
+  const kidProfileId =
+    authUser.kid_profile_id || meta.kid_profile_id || null;
+  const parentUserId =
+    authUser.parent_user_id || meta.parent_user_id || null;
+  // A token that names a kid_profile_id without is_kid_delegated is
+  // structurally invalid — refuse to promote it to "user" identity.
+  const isKid = isKidDelegated || !!kidProfileId;
+  return { isKid, kidProfileId, parentUserId };
+}
+
 export async function getUser(client) {
   const supabase = await resolveAuthedClient(client);
   const {
     data: { user: authUser },
   } = await supabase.auth.getUser();
   if (!authUser) return null;
+
+  const { isKid, kidProfileId, parentUserId } = readKidClaims(authUser);
+
+  // S3-Q3b — kid identity must NEVER resolve through the adult
+  // `public.users` row. Even if RLS or a future schema change let a
+  // kid_profile_id query return a users row, the kind flag forces a
+  // null-resolution here so requireAuth (default kindAllowed='user')
+  // throws a clean 401. The middleware also rejects kid JWTs on
+  // user routes, but this is the belt-and-suspenders backstop for
+  // route handlers that bypass the middleware (API edge runtime,
+  // server actions invoked outside the middleware path).
+  if (isKid) {
+    return {
+      id: null,
+      email: authUser.email || null,
+      roles: [],
+      kind: 'kid',
+      kid_profile_id: kidProfileId,
+      parent_user_id: parentUserId,
+    };
+  }
 
   const { data: profile } = await supabase
     .from('users')
@@ -131,15 +180,43 @@ export async function getUser(client) {
 
   const roles = (roleRows || []).map((r) => r.roles?.name).filter(Boolean);
 
-  return { ...profile, email: authUser.email, roles };
+  return {
+    ...profile,
+    email: authUser.email,
+    roles,
+    kind: 'user',
+    kid_profile_id: null,
+    parent_user_id: null,
+  };
 }
 
-export async function requireAuth(client) {
+// S3-Q3b — `kindAllowed` defaults to 'user' so every legacy caller
+// implicitly rejects kid tokens (matches their pre-Q3b behaviour
+// where kid JWTs failed the iss check or returned null on the users
+// join). A small set of /api/kids/* routes pass `'kid'` explicitly;
+// nothing today is `'either'`.
+export async function requireAuth(client, options = {}) {
+  const { kindAllowed = 'user' } = options;
   const user = await getUser(client);
   if (!user) {
     const err = new Error('UNAUTHENTICATED');
     err.status = 401;
     throw err;
+  }
+  if (kindAllowed !== 'either') {
+    const isKid = user.kind === 'kid';
+    if (kindAllowed === 'user' && isKid) {
+      const err = new Error('UNAUTHENTICATED');
+      err.status = 401;
+      err.detail = 'kid token rejected on user-only route';
+      throw err;
+    }
+    if (kindAllowed === 'kid' && !isKid) {
+      const err = new Error('UNAUTHENTICATED');
+      err.status = 401;
+      err.detail = 'user token rejected on kid-only route';
+      throw err;
+    }
   }
   return user;
 }
@@ -277,9 +354,10 @@ async function loadEffectivePerms(supabase, userId) {
   return result;
 }
 
-export async function requirePermission(permissionKey, client) {
+export async function requirePermission(permissionKey, client, options = {}) {
+  const { kindAllowed = 'user' } = options;
   const supabase = await resolveAuthedClient(client);
-  const user = await requireAuth(supabase);
+  const user = await requireAuth(supabase, { kindAllowed });
 
   const { rows, error } = await loadEffectivePerms(supabase, user.id);
   if (error || rows == null) {
@@ -308,11 +386,16 @@ export async function requirePermission(permissionKey, client) {
 
 // Non-throwing variant for conditional logic inside handlers.
 // Returns false on any failure (auth, RPC error, missing row).
+// S3-Q3b — kid tokens never resolve to user perms; return false
+// without burning an RPC. Kid-route handlers don't use this helper
+// (they assert kid ownership directly via lib/kids); user routes
+// that do use it must always see kids as "no perm".
 export async function hasPermissionServer(permissionKey, client) {
   try {
     const supabase = await resolveAuthedClient(client);
     const user = await getUser(supabase);
     if (!user) return false;
+    if (user.kind === 'kid') return false;
     const { rows, error } = await loadEffectivePerms(supabase, user.id);
     if (error || rows == null) return false;
     const row = rows.find((r) => r && r.permission_key === permissionKey);

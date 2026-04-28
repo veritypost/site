@@ -29,6 +29,21 @@ const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
 // shared lib/cors.js allow-list (S3-A128 single source of truth).
 // Bearer branch skips the origin check because mobile clients don't
 // send a trustworthy Origin.
+//
+// S3-Q3b — kid identity is signaled by the JWT's `is_kid_delegated`
+// claim. Account deletion + cancel-deletion are parent-scoped; a
+// kid bearer is rejected as if it were unauthenticated.
+
+function isKidUser(user) {
+  if (!user || typeof user !== 'object') return false;
+  const meta = user.app_metadata || {};
+  return (
+    user.is_kid_delegated === true ||
+    meta.is_kid_delegated === true ||
+    !!user.kid_profile_id ||
+    !!meta.kid_profile_id
+  );
+}
 
 export async function POST(request) {
   try {
@@ -46,7 +61,7 @@ export async function POST(request) {
     const {
       data: { user },
     } = await authClient.auth.getUser();
-    if (!user) {
+    if (!user || isKidUser(user)) {
       return NextResponse.json({ error: 'Unauthenticated' }, { status: 401, headers: NO_STORE });
     }
 

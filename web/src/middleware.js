@@ -5,7 +5,7 @@ import { isAllowedOrigin, CORS_ALLOW_METHODS, CORS_ALLOW_HEADERS } from '@/lib/c
 // Logged-in-only route trees. Anonymous visitors get 302'd to
 // /login?next=<path> so they can sign in and be bounced back. Middleware
 // handles presence only — permission-specific authorization stays in
-// server components via requirePermission() / requireVerifiedEmail().
+// server components via requirePermission().
 // R13-T3 — `/notifications` intentionally NOT in this list; the page
 // renders its own anon CTA in-place (see notifications/page.tsx) instead
 // of redirecting to /login, which was jarring when the tab is one of the
@@ -364,6 +364,16 @@ export async function middleware(request) {
     pathname === '/robots.txt' ||
     pathname === '/sitemap.xml';
 
+  // S3-Q3b — kid-allowed paths bypass the kid-reject. /kids/* is
+  // already redirected below; /api/kids/* is the iOS API surface
+  // S10 owns; Next assets and public files never carry session
+  // intent. Any other path with a kid claim on the session is a
+  // misrouting and gets a hard 401.
+  const isKidAllowedPath =
+    pathname === '/kids' ||
+    pathname.startsWith('/kids/') ||
+    pathname.startsWith('/api/kids/');
+
   // Skip GoTrue call on public routes. Only the protected-route redirect,
   // the closed-beta gate, and the /kids/* fork below branch on `user`,
   // so every other request can avoid a Supabase auth round-trip entirely.
@@ -373,6 +383,39 @@ export async function middleware(request) {
     pathname.startsWith('/kids/') ||
     (betaGateEnabled && !betaGateAllowed);
   const user = needsUser ? (await supabase.auth.getUser()).data.user : null;
+
+  // S3-Q3b — explicit kid reject. Runs BEFORE beta-gate, before
+  // protected-route redirect, before the /kids redirect — anything
+  // else risks 302'ing a kid JWT through a /login bounce that loops
+  // back to the same kid session. 401 with no body short-circuits
+  // cleanly. The check reads claims off both the top-level user
+  // object and app_metadata (Supabase puts custom claims in
+  // app_metadata when the issuer flips); a structurally invalid
+  // token (kid_profile_id without the boolean) is also treated as
+  // kid to keep adult routes hermetic. Only fires on paths that
+  // already trigger the user fetch (needsUser=true) — public pages
+  // never see the kid claim because they don't need to know who
+  // the caller is. The route handlers reached from public paths
+  // re-check kid identity via requireAuth's kindAllowed='user'
+  // default, so the in-process backstop catches anything middleware
+  // skipped.
+  if (user && !isKidAllowedPath) {
+    const meta = user.app_metadata || {};
+    const isKid =
+      user.is_kid_delegated === true ||
+      meta.is_kid_delegated === true ||
+      !!user.kid_profile_id ||
+      !!meta.kid_profile_id;
+    if (isKid) {
+      const reject = new NextResponse(JSON.stringify({ error: 'UNAUTHENTICATED' }), {
+        status: 401,
+        headers: { 'content-type': 'application/json' },
+      });
+      reject.headers.set('x-request-id', requestId);
+      setCspHeader(reject, csp, cspStrictReport);
+      return reject;
+    }
+  }
 
   if (betaGateEnabled && !betaGateAllowed && !user) {
     const loginUrl = request.nextUrl.clone();
