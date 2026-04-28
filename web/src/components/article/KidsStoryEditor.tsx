@@ -114,6 +114,16 @@ type DestructiveState = {
 
 type ArticleRow = Tables<'articles'> & { categories: { name: string | null; is_kids_safe?: boolean } | null };
 
+// US-format display for entry dates. Parse YYYY-MM-DD parts directly so
+// no timezone shift happens. Falls back to the raw string if it doesn't
+// match the canonical shape.
+const formatMmDdYyyy = (s: string | null | undefined): string => {
+  if (!s) return '';
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return s;
+  return `${m[2]}/${m[3]}/${m[1]}`;
+};
+
 export type KidsStoryEditorProps = {
   articleId: string | null;
   onArticleChange?: (id: string | null, slug?: string | null) => void;
@@ -597,7 +607,7 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
         {e?.is_current && (
           <div style={{ display: 'flex', alignItems: 'center', gap: S[2], marginBottom: S[3] }}>
             <Badge variant="warn">Now</Badge>
-            <span style={{ fontSize: F.sm, color: C.dim }}>{e.event_date}</span>
+            <span style={{ fontSize: F.sm, color: C.dim }}>{formatMmDdYyyy(e.event_date)}</span>
           </div>
         )}
         <h1 style={{ fontSize: 26, fontWeight: 700, lineHeight: 1.2, letterSpacing: '-0.02em', margin: 0, marginBottom: S[3] }}>
@@ -662,7 +672,7 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
                   Now
                 </span>
               )}
-              <div style={{ fontSize: F.sm, fontWeight: e.is_current ? 700 : 500, color: e.is_current ? C.now : C.dim, marginBottom: 2 }}>{e.event_date}</div>
+              <div style={{ fontSize: F.sm, fontWeight: e.is_current ? 700 : 500, color: e.is_current ? C.now : C.dim, marginBottom: 2 }}>{formatMmDdYyyy(e.event_date)}</div>
               <div style={{ fontSize: F.base, fontWeight: 600, color: e.is_current ? C.white : C.soft }}>
                 {e.title || 'Untitled'}
               </div>
@@ -890,6 +900,11 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
                 >
                   <Badge variant={hasContent ? 'info' : 'neutral'} size="xs">{hasContent ? 'Story' : 'Event'}</Badge>
                   {entry.is_current && <Badge variant="warn" size="xs">Now</Badge>}
+                  {entry.event_date && (
+                    <span style={{ fontSize: F.xs, color: C.muted, fontFamily: 'ui-monospace, monospace', whiteSpace: 'nowrap' }}>
+                      {formatMmDdYyyy(entry.event_date)}
+                    </span>
+                  )}
                   <span style={{ fontSize: F.base, fontWeight: 600, color: C.white, flex: '1 1 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
                     {entry.title || 'Untitled'}
                   </span>
