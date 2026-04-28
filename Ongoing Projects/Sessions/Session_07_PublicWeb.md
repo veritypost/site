@@ -165,40 +165,40 @@ A13, A43, I5 carry regulatory exposure. AI disclosure is a **fact of record**, n
 
 22 items total (20 baseline + 2 follow-on coordination items split across F-block).
 
-| ID | Title | Sev | File anchor |
+| ID | Title | Sev | Status |
 |---|---|---|---|
-| S7-A13 | AI-disclosure pill behind admin master switch | HIGH | `story/[slug]/page.tsx:1735` |
-| S7-A19 | Favicon, apple-touch-icon, manifest icons | HIGH | `web/public/`, `layout.js`, `manifest.js` |
-| S7-A20 | DMCA `[pending]` placeholder | HIGH | `dmca/page.tsx:124` |
-| S7-A21 | `/ideas` publicly reachable | HIGH | `ideas/` + middleware (S3 coord) |
-| S7-A22 | "Open verify-email" engineer copy | MED | `story/[slug]/page.tsx:1401` |
-| S7-A43 | AI byline conflation (expert badge on AI articles) | HIGH | `story/[slug]/page.tsx:1735-1802` |
-| S7-A44 | AI-as-feature pitched on `/how-it-works` | HIGH | `how-it-works/page.tsx:18,39` |
-| S7-A47 | Banned timeline copy purge (web slice) | HIGH | 5 files |
-| S7-A50 | `/pricing` + `/how-it-works` missing from primary nav | HIGH | `NavWrapper.tsx:445-460` |
-| S7-A51 | `/help` hidden from authed nav | HIGH | `NavWrapper.tsx:447-453` |
-| S7-A52 | Brand casing drift (web slice) | MED | 7 files |
-| S7-A53 | "Verity Post Kids" vs "Verity Kids" drift (web slice) | MED | 3 files |
-| S7-A97 | Welcome ScreenThree headline contradicts empty fallback | MED | `welcome/page.tsx:474-525` |
-| S7-A102 | Read-state #888 dim text fails AA contrast | MED | `page.tsx:590` |
-| S7-A103 | `/search` date inputs no labels | MED | `search/page.tsx:197,204` |
-| S7-A105 | "At cap (10)" Save bookmark — no upgrade affordance for touch | MED | `story/[slug]/page.tsx:1840-1858` |
-| S7-A106 | `/browse` expanded category card flatlines | MED | `browse/page.tsx:478` |
-| S7-A107 | `/browse` "Latest" vs "Featured by editors" silent flip | MED | `browse/page.tsx:316` |
-| S7-A109 | Welcome ScreenTwo claims quiz unlocks discussion | MED | `welcome/page.tsx:441-443` |
-| S7-A110 | Graduation-claim headline lacks parent context | MED | `welcome/page.tsx:667` |
-| S7-E20 | Welcome carousel admin steps drift (7 declared, 3 render) | LOW | `welcome/page.tsx` + `/admin/reader` |
-| S7-AR1 | E1–E9 + E16 trust-transparency surface bundle | HIGH | `story/[slug]/page.tsx` provenance pill, `/corrections` |
-| S7-F1 | `/corrections` page — does not exist | HIGH | `web/src/app/corrections/page.tsx` (new) |
-| S7-F2 | `/editorial-standards` page — does not exist | HIGH | `web/src/app/editorial-standards/page.tsx` (new) |
-| S7-F3 | `/methodology` page — does not exist | HIGH | `web/src/app/methodology/page.tsx` (new) |
-| S7-I3 | `/dmca` page acknowledges § 2258A unfulfilled duty | HIGH | `dmca/page.tsx` |
-| S7-I5 | Machine-readable AI disclosure meta + schema.org | HIGH | `story/[slug]/page.tsx` metadata |
-| S7-I6 | Cookie banner / ePrivacy Art. 5(3) compliance | HIGH | `components/CookieBanner.tsx` (new) |
-| S7-I7 | CCPA "Do Not Sell" / GPC handler footer link | MED | `NavWrapper.tsx`, footer link only |
-| S7-K1 | Welcome carousel "Score 3 out of 5" misleading copy | MED | `welcome/page.tsx:442` |
-| S7-K3 | "Log In" vs "Sign in" inconsistency | LOW | sweep across owned tree |
-| S7-K6 | Empty-state CTAs missing on 7 surfaces | MED | per-page audit |
+| S7-A13 | AI-disclosure pill behind admin master switch | HIGH | 🟩 SHIPPED 2026-04-28 |
+| S7-A19 | Favicon, apple-touch-icon, manifest icons | HIGH | 🟩 SHIPPED 2026-04-28 |
+| S7-A20 | DMCA `[pending]` placeholder | HIGH | 🟩 SHIPPED 2026-04-27 |
+| S7-A21 | `/ideas` publicly reachable | HIGH | 🟩 S7 slice / 🟧 S3 middleware |
+| S7-A22 | "Open verify-email" engineer copy | MED | 🟩 SHIPPED |
+| S7-A43 | AI byline conflation (expert badge on AI articles) | HIGH | 🟩 SHIPPED 2026-04-28 |
+| S7-A44 | AI-as-feature pitched on `/how-it-works` | HIGH | 🟩 SHIPPED 2026-04-28 |
+| S7-A47 | Banned timeline copy purge (web slice) | HIGH | 🟩 SHIPPED 2026-04-28 |
+| S7-A50 | `/pricing` + `/how-it-works` missing from primary nav | HIGH | 🟩 SHIPPED 2026-04-28 |
+| S7-A51 | `/help` hidden from authed nav | HIGH | 🟩 SHIPPED 2026-04-28 |
+| S7-A52 | Brand casing drift (web slice) | MED | 🟩 SHIPPED 2026-04-28 |
+| S7-A53 | "Verity Post Kids" vs "Verity Kids" drift (web slice) | MED | 🟩 SHIPPED 2026-04-27 |
+| S7-A97 | Welcome ScreenThree headline contradicts empty fallback | MED | 🟩 SHIPPED 2026-04-28 |
+| S7-A102 | Read-state #888 dim text fails AA contrast | MED | 🟩 SHIPPED |
+| S7-A103 | `/search` date inputs no labels | MED | 🟩 SHIPPED |
+| S7-A105 | "At cap (10)" Save bookmark — no upgrade affordance for touch | MED | 🟩 SHIPPED 2026-04-28 |
+| S7-A106 | `/browse` expanded category card flatlines | MED | 🟩 SHIPPED 2026-04-28 |
+| S7-A107 | `/browse` "Latest" vs "Featured by editors" silent flip | MED | 🟩 SHIPPED 2026-04-28 |
+| S7-A109 | Welcome ScreenTwo claims quiz unlocks discussion | MED | 🟩 SHIPPED |
+| S7-A110 | Graduation-claim headline lacks parent context | MED | 🟧 deferred — needs S3 token-side `/peek` route returning parent display_name |
+| S7-E20 | Welcome carousel admin steps drift (7 declared, 3 render) | LOW | 🟧 deferred — needs S6 admin persistence contract |
+| S7-AR1 | E1–E9 + E16 trust-transparency surface bundle | HIGH | 🟧 partial — provenance via I5 + F1 + F2; full pill bundle remains |
+| S7-F1 | `/corrections` page — does not exist | HIGH | 🟩 SHIPPED 2026-04-28 |
+| S7-F2 | `/editorial-standards` page — does not exist | HIGH | 🟩 SHIPPED 2026-04-28 |
+| S7-F3 | `/methodology` page — does not exist | HIGH | 🟩 SHIPPED 2026-04-28 (folds into F2) |
+| S7-I3 | `/dmca` page acknowledges § 2258A unfulfilled duty | HIGH | 🟩 SHIPPED 2026-04-27 |
+| S7-I5 | Machine-readable AI disclosure meta + schema.org | HIGH | 🟩 SHIPPED 2026-04-28 |
+| S7-I6 | Cookie banner / ePrivacy Art. 5(3) compliance | HIGH | 🟩 SHIPPED 2026-04-28 |
+| S7-I7 | CCPA "Do Not Sell" / GPC handler footer link | MED | 🟩 SHIPPED 2026-04-28 |
+| S7-K1 | Welcome carousel "Score 3 out of 5" misleading copy | MED | 🟩 SHIPPED |
+| S7-K3 | "Log In" vs "Sign in" inconsistency | LOW | 🟩 SHIPPED 2026-04-28 |
+| S7-K6 | Empty-state CTAs missing on 7 surfaces | MED | 🟩 SHIPPED 2026-04-28 |
 
 ---
 
@@ -264,13 +264,13 @@ A13, A43, I5 carry regulatory exposure. AI disclosure is a **fact of record**, n
 
 ---
 
-### S7-A20 — DMCA `[pending]` placeholder
+### S7-A20 — DMCA `[pending]` placeholder 🟩
 
 - **ID:** S7-A20
 - **Title:** DMCA agent registration page ships `[pending]` placeholder
 - **Source:** TODO A20 (HIGH — infra / launch readiness).
 - **Severity:** HIGH. Bad legal posture (an actual DMCA notice has nowhere to go), bad credibility on a launch-window legal review.
-- **Status:** OPEN. Best-practice locked.
+- **Status:** SHIPPED 2026-04-27 — removed the `<p>` block at dmca/page.tsx:123-126 entirely (the line above already says "Send DMCA notices and counter-notices to legal@veritypost.com." which covers the contact channel). Per the genuine-fix principle, no stub left behind. Owner files copyright.gov/dmca-agent separately (Q4.18).
 - **File:line:** `web/src/app/dmca/page.tsx:124-125`.
 - **Current state:** `"DMCA Designated Agent registration: [pending — to be filed at copyright.gov/dmca-agent]."` — literal `[pending]` placeholder on a publicly-reachable footer-linked legal page.
 - **Fix (best-practice locked):** Replace the placeholder line with `"Send DMCA notices to legal@veritypost.com."` Owner files the actual copyright.gov form separately (Q4.18 owner-side; $6, 10 minutes).
@@ -495,13 +495,13 @@ A13, A43, I5 carry regulatory exposure. AI disclosure is a **fact of record**, n
 
 ---
 
-### S7-A53 — "Verity Post Kids" vs "Verity Kids" drift (web slice)
+### S7-A53 — "Verity Post Kids" vs "Verity Kids" drift (web slice) 🟩
 
 - **ID:** S7-A53
 - **Title:** Brand name drift — "Verity Post Kids" vs "Verity Kids" cross-app
 - **Source:** TODO A53 (MEDIUM — copy / brand drift).
 - **Severity:** MEDIUM. Privacy + terms documents are legal-relevant.
-- **Status:** OPEN. Best-practice locked.
+- **Status:** SHIPPED 2026-04-27. Adversary caught 2 hits beyond the cited 3 (kids-app:130 + kids-app:156 + privacy/page.tsx:168). All 5 user-visible "Verity Kids" lone occurrences in S7 slice now route through `BRAND_KIDS_NAME` from `lib/brand.ts`. kids-app/page.tsx comment also updated. Files touched: privacy/kids/page.tsx, terms/page.tsx, privacy/page.tsx, kids-app/page.tsx. iOS slices remain S9/S10.
 - **Files in scope (S7 slice):**
   - `web/src/app/kids-app/page.tsx:83, 86` — already correct "Verity Post Kids", keep
   - `web/src/app/privacy/kids/page.tsx:8, 58` — "Verity Kids" → fix to "Verity Post Kids"
@@ -843,13 +843,13 @@ A13, A43, I5 carry regulatory exposure. AI disclosure is a **fact of record**, n
 
 ---
 
-### S7-I3 — `/dmca` acknowledges § 2258A unfulfilled
+### S7-I3 — `/dmca` acknowledges § 2258A unfulfilled 🟩
 
 - **ID:** S7-I3
 - **Title:** `/dmca` page publicly acknowledges § 2258A duty platform cannot fulfill
 - **Source:** PotentialCleanup I3.
 - **Severity:** HIGH. P0 — public admission of unfulfilled federal obligation.
-- **Status:** OPEN. Best-practice locked.
+- **Status:** SHIPPED 2026-04-27 — removed the entire "Suspected child sexual abuse material" section from dmca/page.tsx (lines 129-158) AND from help/page.tsx (lines 355-400, identical duplicate caught by adversary). Both pages no longer publicly acknowledge the § 2258A duty. Once owner completes NCMEC ESP registration (Q4.18), a separate compliance page can ship.
 - **File:line:** `web/src/app/dmca/page.tsx` (the § 2258A acknowledgment paragraph).
 - **Current state:** Page publicly acknowledges the § 2258A duty (CSAM reporting) without coordination with NCMEC ESP registration. Public admission of an unfulfilled federal obligation is a worse legal posture than not acknowledging the duty in the first place.
 - **Fix (best-practice locked):** **Rewrite to remove the acknowledgment** OR coordinate with NCMEC ESP filing (Q4.18 owner-side, separately tracked).
