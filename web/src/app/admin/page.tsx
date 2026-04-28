@@ -31,7 +31,6 @@ const PAGES: HubGroup[] = [
     { href: '/admin/feeds', title: 'Feeds', desc: 'RSS sources — outlets, audience routing, health, last poll' },
     { href: '/admin/stories', title: 'Articles', desc: 'Browse all articles; click into a row to review, edit, and publish through the integrated newsroom editor' },
     { href: '/admin/kids-story-manager', title: 'Kids Story Manager', desc: 'Edit articles for ages 7-9 (kids reading band)' },
-    { href: '/admin/tweens-story-manager', title: 'Tweens Story Manager', desc: 'Edit articles for ages 10-12 (tweens reading band)' },
   ]},
   { group: 'Community & Moderation', desc: 'User-generated content, discussion rules, and content moderation', items: [
     { href: '/admin/comments', title: 'Discussion Settings', desc: 'Quiz gate, AI tagging, role badges, threading depth, health scoring' },

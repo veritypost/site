@@ -156,11 +156,10 @@ function KidsStoryManagerInner() {
       setCategories(parents);
       setSubcategories(subsByParentName);
 
-      // Phase 3 of AI + Plan Change Implementation: Kids Story Manager
-      // is now scoped to age_band='kids' specifically. Tweens land in
-      // /admin/tweens-story-manager. NULL age_band rows surface here as
-      // legacy single-tier kid content (back-compat with pre-Phase-3
-      // articles that pre-date the band split).
+      // Kids Story Manager is scoped to age_band='kids' specifically.
+      // Historical age_band='tweens' rows stay in the schema but the
+      // pipeline no longer produces them pre-AR1 (S6-Cleanup-§D3).
+      // NULL age_band rows surface here as legacy single-tier kid content.
       const { data: stories } = await supabase
         .from('articles')
         .select('*, categories!fk_articles_category_id!inner(name, is_kids_safe)')
@@ -385,9 +384,9 @@ function KidsStoryManagerInner() {
             is_breaking: story.is_breaking || false,
             is_kids_safe: true,
             kids_summary: story.summary || '',
-            // Phase 3 of AI + Plan Change Implementation: this manager
-            // saves the kids-band variant. Tweens-band edits go through
-            // /admin/tweens-story-manager.
+            // S6-Cleanup-§D3: this manager saves the kids-band variant.
+            // Tweens band is parked pre-AR1 — historical rows readable, no
+            // new writes from the pipeline.
             age_band: 'kids',
           },
           timeline_entries: entries.map((entry) => ({
