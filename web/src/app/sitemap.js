@@ -28,11 +28,14 @@ export async function generateSitemaps() {
   let articleCount = 0;
   try {
     const supabase = createClient();
+    // Decision 22 — kids/tweens articles excluded from the sitemap for
+    // COPPA risk reduction. Filter on age_band (canonical column) instead
+    // of the prior slug.like.kids-% prefix hack.
     const { count } = await supabase
       .from('articles')
       .select('id', { count: 'exact', head: true })
       .eq('status', 'published')
-      .not('slug', 'like', 'kids-%');
+      .eq('age_band', 'adult');
     articleCount = count || 0;
   } catch (err) {
     console.error('[sitemap.generateSitemaps] count failed:', err?.message || err);
@@ -104,15 +107,18 @@ export default async function sitemap({ id }) {
   let storyRoutes = [];
   try {
     const supabase = createClient();
+    // Decision 22 — adults only. Kids + tweens stay out of Google. Path
+    // is the canonical /<slug> per Session C; /story/<slug> redirects
+    // to it but isn't worth listing.
     const { data: stories } = await supabase
       .from('articles')
       .select('slug, published_at, updated_at, created_at')
       .eq('status', 'published')
-      .not('slug', 'like', 'kids-%')
+      .eq('age_band', 'adult')
       .order('published_at', { ascending: false })
       .range(offset, offset + CHUNK_SIZE - 1);
     storyRoutes = (stories || []).map((s) => ({
-      url: `${base}/story/${s.slug}`,
+      url: `${base}/${s.slug}`,
       lastModified: s.updated_at || s.published_at || s.created_at || new Date(),
       changeFrequency: 'daily',
       priority: 0.8,

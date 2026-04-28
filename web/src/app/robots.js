@@ -15,6 +15,7 @@ export default function robots() {
           '/api/',
           '/bookmarks',
           '/forgot-password',
+          '/kids-article/*',
           '/logout',
           '/messages',
           '/notifications',

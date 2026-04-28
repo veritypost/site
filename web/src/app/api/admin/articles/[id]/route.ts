@@ -73,6 +73,11 @@ type ArticleRow = {
   updated_at: string;
 };
 
+// Session C — manual-edit slug rule (Decision 20). Lowercase
+// alphanumerics + hyphens, with start/end alphanumeric. Single-char
+// slug also allowed.
+const SLUG_SAFE = /^[a-z0-9][a-z0-9-]{0,118}[a-z0-9]$|^[a-z0-9]$/;
+
 const ARTICLE_SELECT = `id, title, slug, subtitle, body, body_html, excerpt, status,
   moderation_status, moderation_notes, retraction_reason, published_at, unpublished_at,
   author_id, cluster_id, category_id, is_kids_safe, updated_at`;
@@ -246,6 +251,9 @@ const PatchSchema = z
     moderation_notes: z.string().nullish(),
     status: z.enum(['draft', 'published', 'archived', 'scheduled']).optional(),
     retraction_reason: z.string().max(2000).nullish(),
+    // Session C — manual URL edits (Decision 3). Editable anytime,
+    // including post-publish; collisions return 409 below.
+    slug: z.string().trim().min(1).max(120).optional(),
     sources: z.array(SourceSchema).optional(),
     timeline: z.array(TimelineSchema).optional(),
     quizzes: z.array(QuizSchema).optional(),
@@ -268,6 +276,7 @@ function requiredPerms(body: PatchBody, currentStatus: string): string[] {
     body.excerpt !== undefined ||
     body.body !== undefined ||
     body.moderation_notes !== undefined ||
+    body.slug !== undefined ||
     body.sources !== undefined ||
     body.timeline !== undefined ||
     body.quizzes !== undefined;
@@ -367,8 +376,42 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     }
   }
 
+  // Session C — manual slug edit (Decision 3 + Decision 20). Lowercase
+  // the input, validate against SLUG_SAFE, then check collision against
+  // any other article. Same-id matches don't count (no-op edits don't
+  // 409). Editing a published article's slug 404s the old URL — accepted
+  // tradeoff per Decision 3 + greenfield.
+  let nextSlug: string | null = null;
+  if (body.slug !== undefined) {
+    const candidate = body.slug.trim().toLowerCase();
+    if (!SLUG_SAFE.test(candidate)) {
+      return NextResponse.json(
+        { error: 'slug must be lowercase alphanumerics or hyphens (start/end alphanumeric)' },
+        { status: 422 }
+      );
+    }
+    if (candidate !== prior.slug) {
+      const { data: collision, error: lookupErr } = await service
+        .from('articles')
+        .select('id')
+        .eq('slug', candidate)
+        .neq('id', id)
+        .is('deleted_at', null)
+        .maybeSingle();
+      if (lookupErr) {
+        console.error('[admin.articles.patch] slug collision lookup failed:', lookupErr.message);
+        return NextResponse.json({ error: 'Could not check URL availability' }, { status: 500 });
+      }
+      if (collision) {
+        return NextResponse.json({ error: 'slug_taken' }, { status: 409 });
+      }
+      nextSlug = candidate;
+    }
+  }
+
   // Build article update payload.
   const update: Record<string, unknown> = {};
+  if (nextSlug !== null) update.slug = nextSlug;
   if (body.title !== undefined) update.title = body.title;
   if (body.subtitle !== undefined) update.subtitle = body.subtitle;
   if (body.excerpt !== undefined) update.excerpt = body.excerpt;

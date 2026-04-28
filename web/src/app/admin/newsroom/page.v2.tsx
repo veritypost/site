@@ -458,8 +458,7 @@ function NewArticleModal({ onClose }: { onClose: () => void }) {
       }
       toast.push({ message: mode === 'manual' ? 'Draft created.' : 'Article generated.', variant: 'success' });
       if (json.slug) {
-        // Session C will replace /story/<slug> with /<slug>; do NOT preempt.
-        router.push(`/story/${json.slug}`);
+        router.push(`/${json.slug}`);
       } else {
         onClose();
       }

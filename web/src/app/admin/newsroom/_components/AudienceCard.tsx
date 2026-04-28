@@ -382,7 +382,7 @@ export default function AudienceCard(props: AudienceCardProps) {
           <>
             {articleSlug ? (
               <Link
-                href={`/story/${articleSlug}`}
+                href={`/${articleSlug}`}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
