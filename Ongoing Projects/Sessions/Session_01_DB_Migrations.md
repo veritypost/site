@@ -68,35 +68,35 @@ Every claim in this file was verified against the live database / current code o
 
 | ID | Severity | Category | Title | Status |
 |---|---|---|---|---|
-| S1-T0.2 | P0 | Production-broken | `post_comment` `blocks` → `blocked_users` rename | 🟦 |
-| S1-T0.3 | P0 | Production-broken | `claim_push_batch` + `ack_push_batch` + `claim_email_batch` + `ack_email_batch` RPC creation | 🟦 |
-| S1-T0.5 | P0 | Production-broken | `current_kid_profile_id()` top-level read | 🟦 |
-| S1-T2.7 | P0 | Billing | `billing_change_plan` + `billing_resubscribe` idempotency | 🟦 |
-| S1-T2.2 | P0 | GDPR | `anonymize_user` redact comment + message bodies | 🟦 |
-| S1-T2.3 | P1 | Social RLS | Comment-block RLS enforcement | 🟦 |
-| S1-T3.8 | P2 | Mod chain | `resolve_report` notify reporter | 🟦 |
-| S1-T55 | P2 | Schema | Drop `ai_prompt_preset_versions` orphan table | 🟦 |
-| S1-T334 | P2 | Profile | `lockdown_self()` RPC | 🟦 |
-| S1-T347 | P1 | Schema | User-state enum consolidation | 🟦 (Q4.1 lock) |
-| S1-T14 | P2 | Streaks | `use_streak_freeze` RPC | 🟦 |
-| S1-T25 | P1 | Notifications | Topic/category alerts schema + fan-out trigger | 🟧 (owner-pending) |
-| S1-A3 | P0 | COPPA | `parental_consents` UNIQUE constraint | 🟦 |
-| S1-A95 | P2 | Schema | Drop dead `articles` columns | 🟦 |
-| S1-A114 | P2 | Schema | Drop 5 of 6 orphan tables | 🟦 |
-| S1-A115 | P2 | Schema | `permission_scope_overrides` UNIQUE | 🟦 |
-| S1-A116 | P1 | Schema | `score_events.action` FK to `score_rules.action` | 🟦 |
-| S1-A101 | P1 | RBAC | Silent-mute CHECK constraint | 🟦 (Q4.16 lock) |
+| S1-T0.2 | P0 | Production-broken | `post_comment` `blocks` → `blocked_users` rename | 🟩 ready (`2026-04-27_S1_T0.2_post_comment_blocks_rename.sql`) |
+| S1-T0.3 | P0 | Production-broken | `claim_push_batch` + `ack_push_batch` + `claim_email_batch` + `ack_email_batch` RPC creation | 🟩 ready (`2026-04-27_S1_T0.3_drain_rpcs.sql`) |
+| S1-T0.5 | P0 | Production-broken | `current_kid_profile_id()` top-level read | 🟩 ready (`2026-04-27_S1_T0.5_current_kid_profile_id_top_level.sql`) |
+| S1-T2.7 | P0 | Billing | `billing_change_plan` + `billing_resubscribe` idempotency | 🟩 ready (`2026-04-27_S1_T2.7_billing_idempotency_advisory_lock.sql`) |
+| S1-T2.2 | P0 | GDPR | `anonymize_user` redact comment + message bodies | 🟩 ready (`2026-04-27_S1_T2.2_anonymize_user_redact_content.sql`) |
+| S1-T2.3 | P1 | Social RLS | Comment-block RLS enforcement | 🟩 ready (`2026-04-27_S1_T2.3_comments_select_block_filter.sql`) |
+| S1-T3.8 | P2 | Mod chain | `resolve_report` notify reporter | 🟩 ready (`2026-04-27_S1_T3.8_resolve_report_notify_reporter.sql`) |
+| S1-T55 | P2 | Schema | Drop `ai_prompt_preset_versions` orphan table | 🟩 no-op (table already absent from information_schema; verified 2026-04-27) |
+| S1-T334 | P2 | Profile | `lockdown_self()` RPC | 🟩 no-op (function exists and fully satisfies spec — visibility flip + follows wipe + audit + perms bump + jsonb return; verified 2026-04-27) |
+| S1-T347 | P1 | Schema | User-state enum consolidation | 🟩 ready (`2026-04-27_S1_T347_user_state_enum.sql`) |
+| S1-T14 | P2 | Streaks | `use_streak_freeze` RPC | 🟩 ready (`2026-04-27_S1_T14_use_streak_freeze_rpc.sql`) |
+| S1-T25 | P1 | Notifications | Topic/category alerts schema + fan-out trigger | 🟩 schema ready (`2026-04-27_S1_T25_subscription_topics.sql`); fan-out trigger 🟧 owner-pending |
+| S1-A3 | P0 | COPPA | `parental_consents` UNIQUE constraint | 🟩 ready (`2026-04-27_S1_A3_parental_consents_columns.sql`; UNIQUE already present; consent_version+parent_name added) |
+| S1-A95 | P2 | Schema | Drop dead `articles` columns | 🟩 ready (`2026-04-27_S1_A95_drop_dead_articles_columns.sql`) |
+| S1-A114 | P2 | Schema | Drop 5 of 6 orphan tables | 🟩 ready (`2026-04-27_S1_A114_drop_orphan_tables.sql`) |
+| S1-A115 | P2 | Schema | `permission_scope_overrides` UNIQUE | 🟩 ready (`2026-04-27_S1_A115_permission_scope_overrides_unique.sql`) |
+| S1-A116 | P1 | Schema | `score_events.action` FK to `score_rules.action` | 🟩 ready (`2026-04-27_S1_A116_score_events_action_fk.sql`) |
+| S1-A101 | P1 | RBAC | Silent-mute CHECK constraint | 🟩 ready (`2026-04-27_S1_A101_mute_check.sql`) |
 | S1-A12 | P2 | Brand | Drop `score_tiers.color_hex` column | 🟨 (depends S6 + S9) |
-| S1-A67 | P1 | COPPA | `parental_consents.parent_user_id` FK alignment | 🟦 |
+| S1-A67 | P1 | COPPA | `parental_consents.parent_user_id` FK alignment | 🟩 ready (`2026-04-27_S1_A67_parental_consents_fk_alignment.sql`; re-points graduation_tokens+kid_dob_* FKs from auth.users→public.users) |
 | S1-Q3b | P0 | Kid-JWT | Kid JWT issuer flip — DB hardening (RED verdict) | 🟨 (peer-coord S3 + S10) |
-| S1-Q4.7 | P1 | Billing | Admin manual-sync `frozen_at` clear | 🟦 (Q4.7 lock) |
-| S1-Q4.8 | P0 | RBAC | Freeze content-lockout RLS | 🟦 (Q4.8 lock) |
-| S1-Q4.9 | P2 | Public-profile | `public_profiles_v` `is_pro` exposure | 🟦 (Q4.9 lock) |
-| S1-Q4.20 | P0 | COPPA | Family-plan-required for kid pairing — RPC enforcement | 🟦 (Q4.20 lock) |
-| S1-I11 | P1 | COPPA | Consent-version re-consent schema | 🟦 |
-| S1-J-verify | P2 | Schema | Orphan-table verification (J1–J5) | 🟦 |
-| S1-D6 | P3 | Schema | Confirm `archive_cluster` RPC types regen prep | 🟦 |
-| S1-A2-PC | P1 | Schema | `update_metadata` RPC verification + types prep | 🟦 |
+| S1-Q4.7 | P1 | Billing | Admin manual-sync `frozen_at` clear | 🟩 ready (`2026-04-27_S1_Q4.7_clear_frozen_on_free.sql`) |
+| S1-Q4.8 | P0 | RBAC | Freeze content-lockout RLS | 🟩 ready (`2026-04-27_S1_Q4.8_freeze_content_lockout_rls.sql`) |
+| S1-Q4.9 | P2 | Public-profile | `public_profiles_v` `is_pro` exposure | 🟩 ready (`2026-04-27_S1_Q4.9_public_profiles_v_is_pro.sql`) |
+| S1-Q4.20 | P0 | COPPA | Family-plan-required for kid pairing — RPC enforcement | 🟩 ready (`2026-04-27_S1_Q4.20_kid_pair_family_plan_trigger.sql`) |
+| S1-I11 | P1 | COPPA | Consent-version re-consent schema | 🟩 ready (`2026-04-27_S1_I11_consent_versions_schema.sql`; apply after A3) |
+| S1-J-verify | P2 | Schema | Orphan-table verification (J1–J5) | 🟩 ready (`2026-04-27_S1_J-verify_orphan_table_check.sql`; read-only — run after A114) |
+| S1-D6 | P3 | Schema | Confirm `archive_cluster` RPC types regen prep | 🟩 ready (`2026-04-27_S1_D6_archive_cluster_check.sql`; read-only; archive_cluster confirmed existing) |
+| S1-A2-PC | P1 | Schema | `update_metadata` RPC verification + types prep | 🟩 ready (`2026-04-27_S1_A2-PC_update_metadata_check.sql`; read-only; update_metadata confirmed existing) |
 
 Severity legend per `PotentialCleanup` source rules: **P0** = production-broken; **P1** = silent drift / billing-leakage; **P2** = dead code / schema integrity; **P3** = doc/type drift; **P4** = aspirational (not in S1 scope).
 
