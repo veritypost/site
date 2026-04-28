@@ -158,6 +158,55 @@ const formatMmDdYyyy = (s: string | null | undefined): string => {
   return `${m[2]}/${m[3]}/${m[1]}`;
 };
 
+// Defined at module level — NOT inside the component body. Inline
+// component declarations get a fresh function reference on every parent
+// render, which makes React treat the subtree as a different component
+// type and remount it. The remount blew focus out of every input on
+// every keystroke (URL, headline, source fields, timeline forms — all
+// of them).
+type SectionProps = {
+  title?: string;
+  description?: string;
+  aside?: React.ReactNode;
+  divider?: boolean;
+  embedded: boolean;
+  children: React.ReactNode;
+};
+function Section({ title, description, aside, divider, embedded, children }: SectionProps) {
+  if (!embedded) {
+    return (
+      <PageSection title={title} description={description} aside={aside} divider={divider}>
+        {children}
+      </PageSection>
+    );
+  }
+  return (
+    <section
+      style={{
+        padding: `${S[4]}px ${S[4]}px`,
+        borderTop: divider === false ? 'none' : `1px solid ${C.divider}`,
+      }}
+    >
+      {(title || aside) && (
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: S[3], marginBottom: S[3], flexWrap: 'wrap' }}>
+          <div>
+            {title && (
+              <div style={{ fontSize: F.base, fontWeight: 700, color: C.white }}>{title}</div>
+            )}
+            {description && (
+              <div style={{ fontSize: F.sm, color: C.dim, marginTop: 2 }}>{description}</div>
+            )}
+          </div>
+          {aside && (
+            <div style={{ display: 'flex', gap: S[1], flexWrap: 'wrap' }}>{aside}</div>
+          )}
+        </div>
+      )}
+      {children}
+    </section>
+  );
+}
+
 export type StoryEditorProps = {
   articleId: string | null;
   onArticleChange?: (id: string | null, slug?: string | null) => void;
@@ -856,51 +905,6 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
     );
   }
 
-  // ---- Edit mode body. Section helpers respect the embedded flag so
-  // the article-page surface gets its content directly without the
-  // admin Page chrome.
-  const Section = (props: {
-    title?: string;
-    description?: string;
-    aside?: React.ReactNode;
-    divider?: boolean;
-    children: React.ReactNode;
-  }) => {
-    if (!embedded) {
-      return (
-        <PageSection title={props.title} description={props.description} aside={props.aside} divider={props.divider}>
-          {props.children}
-        </PageSection>
-      );
-    }
-    // Embedded fallback: a lightweight section that mirrors PageSection's
-    // header/body shape without the admin shell padding.
-    return (
-      <section
-        style={{
-          padding: `${S[4]}px ${S[4]}px`,
-          borderTop: props.divider === false ? 'none' : `1px solid ${C.divider}`,
-        }}
-      >
-        {(props.title || props.aside) && (
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: S[3], marginBottom: S[3], flexWrap: 'wrap' }}>
-            <div>
-              {props.title && (
-                <div style={{ fontSize: F.base, fontWeight: 700, color: C.white }}>{props.title}</div>
-              )}
-              {props.description && (
-                <div style={{ fontSize: F.sm, color: C.dim, marginTop: 2 }}>{props.description}</div>
-              )}
-            </div>
-            {props.aside && (
-              <div style={{ display: 'flex', gap: S[1], flexWrap: 'wrap' }}>{props.aside}</div>
-            )}
-          </div>
-        )}
-        {props.children}
-      </section>
-    );
-  };
 
   const headerActions = (
     <>
@@ -917,7 +921,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
 
   const editorBody = (
     <>
-      <Section divider={false}>
+      <Section embedded={embedded} divider={false}>
         <div style={{ display: 'flex', gap: S[1], flexWrap: 'wrap' }}>
           <Button
             variant="secondary"
@@ -967,7 +971,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
         </div>
       </Section>
 
-      <Section title="Metadata">
+      <Section embedded={embedded} title="Metadata">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: S[3] }}>
           <div>
             <label style={labelStyle}>Category</label>
@@ -1032,6 +1036,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
       </Section>
 
       <Section
+        embedded={embedded}
         title={`Timeline entries (${entries.length})`}
         description={`${storiesCount} articles · ${eventsCount} events`}
         aside={

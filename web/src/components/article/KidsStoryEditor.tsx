@@ -114,6 +114,54 @@ type DestructiveState = {
 
 type ArticleRow = Tables<'articles'> & { categories: { name: string | null; is_kids_safe?: boolean } | null };
 
+// Defined at module level — NOT inside the component body. Inline
+// component declarations get a fresh function reference on every parent
+// render, which makes React treat the subtree as a different component
+// type and remount it. The remount blew focus out of every input on
+// every keystroke.
+type SectionProps = {
+  title?: string;
+  description?: string;
+  aside?: React.ReactNode;
+  divider?: boolean;
+  embedded: boolean;
+  children: React.ReactNode;
+};
+function Section({ title, description, aside, divider, embedded, children }: SectionProps) {
+  if (!embedded) {
+    return (
+      <PageSection title={title} description={description} aside={aside} divider={divider}>
+        {children}
+      </PageSection>
+    );
+  }
+  return (
+    <section
+      style={{
+        padding: `${S[4]}px ${S[4]}px`,
+        borderTop: divider === false ? 'none' : `1px solid ${C.divider}`,
+      }}
+    >
+      {(title || aside) && (
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: S[3], marginBottom: S[3], flexWrap: 'wrap' }}>
+          <div>
+            {title && (
+              <div style={{ fontSize: F.base, fontWeight: 700, color: C.white }}>{title}</div>
+            )}
+            {description && (
+              <div style={{ fontSize: F.sm, color: C.dim, marginTop: 2 }}>{description}</div>
+            )}
+          </div>
+          {aside && (
+            <div style={{ display: 'flex', gap: S[1], flexWrap: 'wrap' }}>{aside}</div>
+          )}
+        </div>
+      )}
+      {children}
+    </section>
+  );
+}
+
 // US-format display for entry dates. Parse YYYY-MM-DD parts directly so
 // no timezone shift happens. Falls back to the raw string if it doesn't
 // match the canonical shape.
@@ -703,49 +751,6 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
     );
   }
 
-  // ---- Edit mode body. Section helpers respect the embedded flag so
-  // the article-page surface gets its content directly without the
-  // admin Page chrome.
-  const Section = (props: {
-    title?: string;
-    description?: string;
-    aside?: React.ReactNode;
-    divider?: boolean;
-    children: React.ReactNode;
-  }) => {
-    if (!embedded) {
-      return (
-        <PageSection title={props.title} description={props.description} aside={props.aside} divider={props.divider}>
-          {props.children}
-        </PageSection>
-      );
-    }
-    return (
-      <section
-        style={{
-          padding: `${S[4]}px ${S[4]}px`,
-          borderTop: props.divider === false ? 'none' : `1px solid ${C.divider}`,
-        }}
-      >
-        {(props.title || props.aside) && (
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: S[3], marginBottom: S[3], flexWrap: 'wrap' }}>
-            <div>
-              {props.title && (
-                <div style={{ fontSize: F.base, fontWeight: 700, color: C.white }}>{props.title}</div>
-              )}
-              {props.description && (
-                <div style={{ fontSize: F.sm, color: C.dim, marginTop: 2 }}>{props.description}</div>
-              )}
-            </div>
-            {props.aside && (
-              <div style={{ display: 'flex', gap: S[1], flexWrap: 'wrap' }}>{props.aside}</div>
-            )}
-          </div>
-        )}
-        {props.children}
-      </section>
-    );
-  };
 
   const headerActions = (
     <>
@@ -763,7 +768,7 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
 
   const editorBody = (
     <>
-      <Section divider={false}>
+      <Section embedded={embedded} divider={false}>
         <div style={{ display: 'flex', gap: S[1], flexWrap: 'wrap' }}>
           <Button
             variant="secondary"
@@ -815,7 +820,7 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
         </div>
       </Section>
 
-      <Section title="Metadata">
+      <Section embedded={embedded} title="Metadata">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: S[3] }}>
           <div>
             <label style={labelStyle}>Category</label>
@@ -867,6 +872,7 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
       </Section>
 
       <Section
+        embedded={embedded}
         title={`Timeline entries (${entries.length})`}
         description={`${storiesCount} articles · ${eventsCount} events`}
         aside={
