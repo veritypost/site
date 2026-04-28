@@ -27,9 +27,11 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // Actions:
 //   downgrade — mark the subscription cancelled, sync users.plan_id to
 //               the free plan, clear grace markers, drop plan_status to
-//               'cancelled'. Matches the final state of
-//               billing_freeze_profile except that we leave verity_score
-//               / frozen_at alone (this is a graceful drop, not a freeze).
+//               'cancelled'. S6-T308 / Q4.7 LOCKED 2026-04-28: also
+//               clears frozen_at — frozen+free is logically incoherent,
+//               so admin-driven downgrade is a clean exit. The prior
+//               frozen_at value is captured in the audit row's metadata
+//               for forensic visibility.
 //   resume    — mark the subscription active, re-sync users.plan_id to
 //               the subscription's plan_id, set plan_status='active',
 //               clear grace markers.
@@ -97,6 +99,23 @@ export async function POST(request, { params }) {
   const rankErr = await requireAdminOutranks(sub.user_id, actor.id);
   if (rankErr) return rankErr;
 
+  // S6-T308: capture the user's frozen_at BEFORE the downgrade write so
+  // the audit row records the prior state. Used by both branches; resume
+  // doesn't clear frozen_at, but tracking the read keeps the audit shape
+  // uniform.
+  let priorFrozenAt = null;
+  if (action === 'downgrade') {
+    const { data: priorUser, error: priorErr } = await service
+      .from('users')
+      .select('frozen_at')
+      .eq('id', sub.user_id)
+      .maybeSingle();
+    if (priorErr) {
+      return safeErrorResponse(NextResponse, priorErr, { route: 'admin.manual-sync:prior-user' });
+    }
+    priorFrozenAt = priorUser?.frozen_at ?? null;
+  }
+
   if (action === 'downgrade') {
     // B19: resolve the free plan by `tier='free'` (the canonical column)
     // rather than by name. The `name` column is a human-readable key that
@@ -136,12 +155,15 @@ export async function POST(request, { params }) {
 
     // 3) Sync users.plan_id → free so the permission resolver re-binds
     //    the user to the free set on next compute_effective_perms.
+    //    S6-T308 / Q4.7: admin manual-sync downgrade clears frozen_at —
+    //    frozen+free is incoherent. Prior value lands in the audit row.
     const { error: userUpdErr } = await service
       .from('users')
       .update({
         plan_id: freePlan.id,
         plan_status: 'cancelled',
         plan_grace_period_ends_at: null,
+        frozen_at: null,
       })
       .eq('id', sub.user_id);
     if (userUpdErr)
@@ -186,7 +208,9 @@ export async function POST(request, { params }) {
   });
   if (bumpErr) console.error('[subs.manual-sync] perms_version bump failed:', bumpErr.message);
 
-  // 5) Audit trail.
+  // 5) Audit trail. S6-T308: downgrade captures the prior frozen_at so a
+  // future investigator can reconstruct whether the user was previously
+  // frozen at the moment of admin downgrade.
   await recordAdminAction({
     action: `billing:manual_${action}_db_only`,
     targetTable: 'subscription',
@@ -195,6 +219,9 @@ export async function POST(request, { params }) {
     newValue: {
       note: 'Local DB only. Sync in Stripe Dashboard separately.',
       user_id: sub.user_id,
+      ...(action === 'downgrade' && priorFrozenAt !== null
+        ? { cleared_frozen_at: priorFrozenAt }
+        : {}),
     },
   });
 
