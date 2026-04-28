@@ -33,6 +33,10 @@ BEGIN
   END IF;
 END $$;
 
+-- Drop first: live function has parameter defaults that CREATE OR REPLACE
+-- cannot remove (Postgres 42P13). Same signature, recreated below.
+DROP FUNCTION IF EXISTS public.resolve_report(uuid, uuid, text, text);
+
 CREATE OR REPLACE FUNCTION public.resolve_report(
   p_mod_id     uuid,
   p_report_id  uuid,
