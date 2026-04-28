@@ -95,11 +95,52 @@ function FeedsAdminInner() {
       } else {
         setFeeds(data || []);
       }
+
+      // S6-A59: hydrate stale + broken thresholds from `settings` so this
+      // page and /admin/system read the same source of truth. Prior code
+      // kept local-state-only values that diverged silently.
+      const { data: settingsRows } = await supabase
+        .from('settings')
+        .select('key, value')
+        .in('key', ['stale_feed_hours', 'broken_feed_failures']);
+      if (settingsRows) {
+        (settingsRows as Array<{ key: string; value: string | null }>).forEach((r) => {
+          if (r.value == null) return;
+          const n = parseInt(String(r.value), 10);
+          if (!Number.isFinite(n) || n <= 0) return;
+          if (r.key === 'stale_feed_hours') setStaleHours(n);
+          if (r.key === 'broken_feed_failures') setBrokenFailCount(n);
+        });
+      }
+
       setLoading(false);
     };
     init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // S6-A59: persist threshold edits via the canonical settings upsert
+  // so /admin/system + /admin/feeds + the runtime cron read the same
+  // value.
+  const saveThreshold = async (key: string, value: number) => {
+    try {
+      const res = await fetch('/api/admin/settings/upsert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, value: String(value) }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        toast.push({
+          message: j.error || `Could not save ${key}`,
+          variant: 'danger',
+        });
+      }
+    } catch (err) {
+      console.error('[admin.feeds] saveThreshold failed:', err);
+      toast.push({ message: 'Save failed — try again', variant: 'danger' });
+    }
+  };
 
   const deriveStatus = (f: FeedRow): FeedStatus => {
     const errors = f.error_count ?? 0;
@@ -360,11 +401,29 @@ function FeedsAdminInner() {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: S[4], alignItems: 'flex-end' }}>
           <div style={{ flex: '1 1 140px', minWidth: 120 }}>
             <label style={labelStyle}>Stale after (hours)</label>
-            <NumberInput size="sm" value={staleHours} min={1} onChange={(e) => setStaleHours(parseInt(e.target.value, 10) || 0)} />
+            <NumberInput
+              size="sm"
+              value={staleHours}
+              min={1}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10) || 0;
+                setStaleHours(n);
+                if (n > 0) saveThreshold('stale_feed_hours', n);
+              }}
+            />
           </div>
           <div style={{ flex: '1 1 140px', minWidth: 120 }}>
             <label style={labelStyle}>Broken after (errors)</label>
-            <NumberInput size="sm" value={brokenFailCount} min={1} onChange={(e) => setBrokenFailCount(parseInt(e.target.value, 10) || 0)} />
+            <NumberInput
+              size="sm"
+              value={brokenFailCount}
+              min={1}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10) || 0;
+                setBrokenFailCount(n);
+                if (n > 0) saveThreshold('broken_feed_failures', n);
+              }}
+            />
           </div>
           <div style={{ flex: '1 1 140px', minWidth: 120 }}>
             <label style={labelStyle}>Pull interval (min)</label>
