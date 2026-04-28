@@ -18,6 +18,70 @@ const COMMENT_MAX_LENGTH_FALLBACK = 4000;
 // route (success + error paths).
 const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
 
+// =====================================================================
+// S5-iOS-parity (A123 / A124 / A125 / A126) — comment edit + delete
+// API contract published for S9 to cite by file:line.
+//
+// Contract: edit (A123)
+// ---------------------
+//   PATCH /api/comments/[id]
+//   Body:    { body: string }                  // 1..comment_max_length chars after trim
+//   Auth:    bearer required.
+//   Perms:   comments.edit.own (owner) — mods/admins use the moderation
+//            surface, gated on a different permission key.
+//   Window:  EDIT_WINDOW_MS = 10 minutes from comments.created_at for the
+//            owner branch (T280). Mods bypass via the moderation surface.
+//   Server:  edit_comment RPC sets body, body_html (re-render), is_edited,
+//            edited_at, mentions (re-extracted from new body); mentions
+//            unresolved against users.username get dropped.
+//   Resp:    200 { ok: true } | 400 { error: 'body required' | 'comment_too_long' (+ max_length) }
+//                              | 403 { error: 'edit_window_expired' (+ message), or 'Forbidden' }
+//                              | 404 { error: 'not_found' }
+//                              | 429 { error: 'Too many requests', Retry-After header }
+//   Realtime: server emits an UPDATE on comments via Postgres realtime;
+//             web's CommentThread.tsx UPDATE handler merges. iOS must
+//             subscribe to the same UPDATE channel to receive parity.
+//
+// Contract: soft-delete (A126)
+// -----------------------------
+//   DELETE /api/comments/[id]
+//   Auth:    bearer required.
+//   Perms:   comments.delete.own (owner) — mods use moderation surface.
+//   Server:  soft_delete_comment RPC sets deleted_at = now(),
+//            body = '[deleted]', body_html = NULL, mentions = '[]'::jsonb
+//            (T2.2 anonymize pattern).
+//   Resp:    200 { ok: true } | 400 { error: '...' } | 401/403 | 404
+//   Render:  clients render `[deleted]` tombstone when deleted_at IS NOT
+//            NULL. iOS VPComment model decodes deleted_at, status,
+//            is_edited, mentions, context_tag_count, is_context_pinned
+//            per A126 to reach parity with the web row.
+//
+// Contract: mention array (A126 / §H2)
+// -------------------------------------
+//   comments.mentions is jsonb array of { user_id: uuid, username: string }.
+//   Server populates on insert (POST /api/comments) and on edit (PATCH
+//   above) by extracting `@<username>` tokens via MENTION_RE, looking
+//   them up in users.username, writing the resolved pair. Unresolved
+//   mentions get dropped from the array. Free-tier authors are gated at
+//   pre-submit by /api/comments/can-mention (S5-§H2); the post_comment
+//   RPC re-validates plan to defend against hand-crafted POSTs that
+//   bypass the composer.
+//
+//   iOS contract: decode the array; render each `@username` as a
+//   tappable element that opens /card/<username>. Plain `@username`
+//   text without a corresponding array entry renders as plain text.
+//
+// Contract: threading depth (A125)
+// ---------------------------------
+//   Server allows arbitrary depth via comments.parent_id chain. Web caps
+//   visual nesting via /api/settings/public.comment_max_depth (default
+//   2). Owner-locked Q4.15 = B (iOS-native "Continue this thread →"
+//   affordance at depth 3 that opens the rest in a fullscreen sheet).
+//   iOS keeps maxThreadDepth = 3 in StoryDetailView.swift; at depth 3
+//   it renders a "Continue this thread →" button that re-roots a sheet
+//   at that comment and renders depth 0..3 of the subtree, recursive.
+// =====================================================================
+
 // PATCH /api/comments/[id] — owner edit.
 export async function PATCH(request, { params }) {
   let user;

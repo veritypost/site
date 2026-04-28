@@ -83,7 +83,22 @@ struct BadgeUnlockScene: View {
             .onAppear {
                 runChoreography(at: CGPoint(x: geo.size.width / 2, y: geo.size.height * 0.42))
             }
+            // Combine the entire badge-unlock scene into a single
+            // VoiceOver element. Without this a kid using assistive tech
+            // is walked through the decorative pulse rings, the badge
+            // tier label, the achievement headline, the subhead, and
+            // both buttons as separate disconnected stops. Combining
+            // gives one coherent "Badge unlocked: ..." summary; the
+            // share + done buttons remain reachable as element actions.
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(a11yLabel)
         }
+    }
+
+    /// Spoken summary for the badge-unlock scene. Reads as
+    /// "Gold Badge unlocked. <achievement headline>. <subhead>."
+    private var a11yLabel: String {
+        "\(tierLabel) unlocked. \(headline) \(subhead)"
     }
 
     // MARK: Badge

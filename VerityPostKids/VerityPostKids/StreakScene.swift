@@ -117,8 +117,30 @@ struct StreakScene: View {
                 sparkleTimer?.invalidate()
                 sparkleTimer = nil
             }
+            // Combine the entire celebration scene into a single
+            // VoiceOver element so a kid using assistive tech hears one
+            // coherent summary instead of being walked through the
+            // animated number, the milestone headline, the subhead, and
+            // the share/done buttons as four disconnected stops. The
+            // share + done buttons remain individually focusable through
+            // their .accessibilityAction descendants since SwiftUI keeps
+            // direct buttons as actions on the combined element.
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(a11yLabel)
         }
         .background(K.bg.ignoresSafeArea())
+    }
+
+    /// Spoken summary for the entire StreakScene. Mirrors what a
+    /// sighted kid sees: the new streak count, the streak unit, and
+    /// the milestone headline + subhead when present.
+    private var a11yLabel: String {
+        var parts: [String] = ["\(current) day streak"]
+        if let m = milestone {
+            parts.append(m.headline)
+            parts.append(m.subhead)
+        }
+        return parts.joined(separator: ". ")
     }
 
     // MARK: Milestone card
