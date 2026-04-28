@@ -583,11 +583,12 @@ function SupportingCard({
   isNew: boolean;
   isRead: boolean;
 }) {
-  // T109 — read titles dim to #888 (vs #111 default). Excerpt tone is
-  // intentionally left alone — it's already C.soft (#444), and dimming
-  // it further would hurt scannability for sighted users with the
-  // article reopened.
-  const titleColor = isRead ? '#888888' : C.text;
+  // T109 — read titles dim to #666 (vs #111 default). #666 measures
+  // 5.74:1 against white, passing WCAG AA for normal text. Excerpt tone
+  // is intentionally left alone — it's already C.soft (#444), and dimming
+  // it further would hurt scannability for sighted users with the article
+  // reopened.
+  const titleColor = isRead ? '#666666' : C.text;
   return (
     <article style={{ padding: '24px 0' }}>
       <Link

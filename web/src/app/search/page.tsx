@@ -199,12 +199,14 @@ export default function SearchPage() {
                 value={from}
                 onChange={(e) => setFrom(e.target.value)}
                 style={filterStyle}
+                aria-label="From date"
               />
               <input
                 type="date"
                 value={to}
                 onChange={(e) => setTo(e.target.value)}
                 style={filterStyle}
+                aria-label="To date"
               />
             </>
           )}

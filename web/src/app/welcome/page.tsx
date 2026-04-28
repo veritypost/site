@@ -439,8 +439,7 @@ function ScreenTwo() {
       </div>
 
       <p style={{ fontSize: 14, lineHeight: 1.6, color: C.text, margin: 0 }}>
-        Every article has a 5-question comprehension quiz. Score <strong>3 out of 5</strong> and the
-        discussion unlocks.
+        Most articles have a comprehension quiz. Pass it and the discussion unlocks.
       </p>
       <p
         style={{

@@ -1398,7 +1398,7 @@ export default function StoryPage() {
           </a>
         ) : discussionLockState === 'unverified' ? (
           <a href="/verify-email" style={lockCtaStyle}>
-            Open verify-email
+            Verify your email
           </a>
         ) : null}
       </div>
