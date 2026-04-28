@@ -286,7 +286,7 @@ The existing UPDATE handler (`CommentThread.tsx:276-313`) merges `payload.new` (
 - **Title:** Strip "coming soon" / "check back" / "we're working on it" / "actively working" / "launches soon" / "we'll get back" / "before launch" / "in a future pass" copy from the notifications surface.
 - **Source:** TODO A47 (cross-cutting). S5's slice is `web/src/app/notifications/page.tsx`. CommentComposer.tsx is also in scope; audit and rewrite if any present-tense violations exist.
 - **Severity:** P1 — direct violation of owner-locked rule (memory `feedback_no_user_facing_timelines`). App Store reviewer can flag promised-but-not-shipped features.
-- **Status:** OPEN.
+- **Status:** 🟩 VERIFIED CLEAN — `grep -rnE` of the lint regex against `web/src/app/notifications/`, `web/src/app/messages/`, `web/src/app/bookmarks/`, `web/src/components/Comment*` returned zero matches (2026-04-28). No code change needed for S5 surfaces; doc-only.
 - **File:line:** `web/src/app/notifications/page.tsx` (full file audit) + `web/src/components/CommentComposer.tsx` (full file audit).
 - **Current state (verified 2026-04-27):** main timeline-copy violations live in S7 (recap, UnderConstruction, accessibility) and S8 (profile/settings) and S9 (AlertsView.swift). S5's notifications surface and comment composer must be checked; any "Coming soon — backend wiring" or similar pattern gets rewritten.
 - **Fix:** rewrite each violation to **describe present state** OR render a clean unavailable state. **No softer-timeline replacement** ("Check back later", "We're working on it") — those are also banned. Strip entirely; describe what's true now. Examples:
@@ -303,7 +303,7 @@ The existing UPDATE handler (`CommentThread.tsx:276-313`) merges `payload.new` (
 - **Title:** Mark-one-as-read fetch is cancelled by browser nav before reaching the server.
 - **Source:** TODO A104.
 - **Severity:** P2 — notification badge persists incorrectly. User dismisses → navigates → returns → badge still unread. Engagement / trust regression.
-- **Status:** OPEN.
+- **Status:** 🟩 SHIPPED — commit b97d38c.
 - **File:line:** `web/src/app/notifications/page.tsx:402-405`.
 - **Current state (verified 2026-04-27):**
   ```tsx
@@ -351,7 +351,7 @@ The existing UPDATE handler (`CommentThread.tsx:276-313`) merges `payload.new` (
 - **Title:** Old notifications mix with recent ones in a single "Earlier" group.
 - **Source:** TODO A96.
 - **Severity:** P2 — UX legibility. A 6-month-old reply ranks identically with a 10-day-old one.
-- **Status:** OPEN.
+- **Status:** 🟩 SHIPPED — commit b97d38c (bundled with A104).
 - **File:line:** `web/src/app/notifications/page.tsx:46-48` (current `groupNotifications` reducer).
 - **Current state (verified 2026-04-27):**
   ```ts
@@ -384,7 +384,7 @@ The existing UPDATE handler (`CommentThread.tsx:276-313`) merges `payload.new` (
 - **Title:** New API surface for per-category subscription management. Backs the iOS `manageSubscriptionsEnabled` flag (currently `false`).
 - **Source:** TODO2 T25. S1 owns schema + publish-time trigger; S5 owns subscription CRUD routes; S9 owns iOS UI.
 - **Severity:** P1 — feature is half-built (`alert_preferences` table exists for per-alert-type channel/frequency only; no category-level subscription mechanism; `breaking_news` is a global blast).
-- **Status:** DEPENDS ON S1.
+- **Status:** 🟩 SHIPPED — commit 0f62802. GET/POST/DELETE all live; safe-fallback 503 with reason `subscriptions_unavailable` when S1 table missing — route is live the moment S1 lands the migration.
 - **S1 schema spec (recorded for reference):**
   ```sql
   -- migrations/<date>_T25_subscription_topics.sql (S1 owns)
@@ -448,7 +448,7 @@ The existing UPDATE handler (`CommentThread.tsx:276-313`) merges `payload.new` (
 - **Title:** Publish the API contract for comment edit, soft-delete, mention array, threading depth so S9 can implement iOS parity without ambiguity.
 - **Source:** TODO A123, A124, A125, A126.
 - **Severity:** P1 (cross-platform divergence on a basic feature).
-- **Status:** S5 owns the contract (web side is authoritative; the API is already shipped); S9 ships iOS code. No code change in S5.
+- **Status:** 🟩 SHIPPED — contract block added at `web/src/app/api/comments/[id]/route.js` lines 22-89 (file landed under commit be4e03d due to concurrent-staging race; verified in tree). S9 cites by file:line.
 
 #### Contract: Comment edit (A123)
 
@@ -505,7 +505,7 @@ The existing UPDATE handler (`CommentThread.tsx:276-313`) merges `payload.new` (
 - **Title:** When a free-tier user submits a comment containing `@otheruser`, the server resolves the mention into `mentions` array and deducts mention-fan-out push credits. Free-tier mentions are silently dropped from the array (mention notification doesn't fire). The user sees the comment post; the mentioned user gets nothing.
 - **Source:** PotentialCleanup §H2 (D21).
 - **Severity:** P2 — silent paid-tier-discrimination + breaks user expectations (visible `@username` link in own comment that produces no notification).
-- **Status:** OPEN.
+- **Status:** 🟩 SHIPPED — pre-submit lock + new can-mention route landed under commit 7079b60 (concurrent-staging race; verified in tree). Server defense-in-depth in `post_comment` RPC ships in S1.
 - **Current state:** the post-comment RPC extracts `@username` tokens; for free-tier authors, the mention array is populated for rendering (so the link tappable behavior works) but the notification fan-out is skipped. Free user sees their `@reply` syntax succeed visually but the mentioned user never knows.
 - **Fix (per memory `feedback_genuine_fixes_not_patches`): pre-submit lock, not silent post-submit drop.**
   - **CommentComposer.tsx (S5 owns):** before submit, call `/api/comments/can-mention` (new lightweight route) with the extracted `@username` list. The route returns `{ allowed: boolean, reason?: 'free_tier_mention_disabled' | 'mentioned_user_blocks_you' | 'ok' }`.
@@ -524,7 +524,7 @@ The existing UPDATE handler (`CommentThread.tsx:276-313`) merges `payload.new` (
 - **Title:** Apple/FCM marks a device push token as invalid (uninstall, opt-out, app reinstall under different APNs); push-send cron deactivates the token; user sees nothing in-app and assumes pushes are still working.
 - **Source:** PotentialCleanup §H4.
 - **Severity:** P2 — feature appears working, isn't.
-- **Status:** OPEN. iOS UI (settings line + re-register tap) lives in S9; S5 publishes the API exposing token status.
+- **Status:** 🟩 SHIPPED — commit 48004a9. iOS UI (settings line + re-register tap) lives in S9; S5 publishes the API exposing token status.
 - **S5 action — new route** `web/src/app/api/push/status/route.ts`:
   - **GET** auth required. Returns per-platform shape `{ web, ios, android }`, each `{ registered: bool, last_seen_at: timestamp|null, last_invalidated_at: timestamp|null, status: 'active'|'invalidated'|'absent' }`.
   - Reads from `push_devices` (verify table name vs send-push cron's consumer view), aggregates per platform.
@@ -564,7 +564,7 @@ The existing UPDATE handler (`CommentThread.tsx:276-313`) merges `payload.new` (
 - **Title:** Audit each notification-emitting route for idempotency + rate limits + error response hygiene + RLS coherence.
 - **Source:** general hygiene; bundled here so the S5 sweep covers it.
 - **Severity:** P2 — operator-mistake blast radius.
-- **Status:** OPEN.
+- **Status:** 🟩 SHIPPED — commit 906f78b (the one meaningful audit finding: `bookmarks/[id]` PATCH+DELETE missing rate limits). All other routes pass checklist on inspection — adding doc-noise headers to clean routes would violate genuine-fixes rule.
 - **Files in scope:**
   - `web/src/app/api/comments/route.js` and `web/src/app/api/comments/[id]/route.ts` (POST, PATCH, DELETE).
   - `web/src/app/api/comments/[id]/vote/route.js`.
@@ -656,23 +656,89 @@ Apply S1 dependencies in this order to unblock the most S5 work in parallel:
 
 ## 5. Completion checklist (top-to-bottom of §1)
 
-- [ ] **S5-T34** Wilson score — DB migration applied, client `wilson_score` order shipped, realtime sort verified.
-- [ ] **S5-T35** Rank notifications — DROPPED, tombstoned (no work).
-- [ ] **S5-T365** Pro pill — view extended, fetch updated, render shipped, no `plan_id` leak.
-- [ ] **S5-T2.3** Block RLS — verified post-S1 on web + iOS-contract + realtime + raw PostgREST + mod bypass.
-- [ ] **S5-A47-social** Timeline copy — notifications page + CommentComposer swept; lint regex documented.
-- [ ] **S5-A104** Mark-read race — sendBeacon + keepalive + optimistic flip shipped.
-- [ ] **S5-A96** Earlier bucket — 4-bucket grouping (Today / This week / Earlier this month / Older) shipped.
-- [ ] **S5-T25** Topic alerts — subscriptions route shipped, GET/POST/DELETE idempotent, fan-out trigger verified, S9 hand-off documented.
-- [ ] **S5-iOS-parity** A123/A124/A125/A126 contract — comment block above each route handler documents PATCH / DELETE / mention-array / threading shape; S9 cites it.
-- [ ] **S5-§H1** Missed-pushes summary — render branch shipped on notifications page, S1+S2 dependency tracked.
-- [ ] **S5-§H2** Mention pre-submit lock — composer pre-submit error + new `/api/comments/can-mention` route + server defense-in-depth.
-- [ ] **S5-§H4** Push status — `/api/push/status` shipped, S9 hand-off documented.
-- [ ] **S5-Q4.8** Freeze scope — 5 routes audited for service-role bypass; RLS-only enforcement validated post-S1.
-- [ ] **S5-Notification-table-cleanup** — 11 routes audited; idempotency + rate limits + error hygiene + RLS coherence documented per route.
-- [ ] **Out-of-scope** A105 / A100 / A23 / A66 hand-offs filed in target session files.
-- [ ] **Final verification** §4 checklist green.
-- [ ] **00_INDEX.md** updated with shipped status per item.
+- 🟥 **S5-T34** Wilson score — BLOCKED. S1's session index does NOT
+  contain a T34 wilson-score migration; the column doesn't exist in the
+  live DB (verified via MCP information_schema query 2026-04-28). The
+  S5 client diff (single-line ORDER BY swap) cannot ship without the
+  generated column or it 500s every comment thread load. Re-queue once
+  S1 picks up the migration (file `web/src/components/CommentThread.tsx`
+  line 137 awaits the change).
+- 🟩 **S5-T35** Rank notifications — DROPPED per Q4.5 lock; tombstoned
+  inline at §1. No commit (no work).
+- 🟨 **S5-T365** Pro pill — DEFERRED. S1 has the migration drafted
+  (`2026-04-27_S1_Q4.9_public_profiles_v_is_pro.sql`) but it's not
+  applied to the live DB (verified via MCP — `is_pro` not in
+  `public_profiles_v`). Shipping the client widening + render now would
+  read-fail on production. Re-queue once S1 applies; client diff is
+  isolated to `CommentThread.tsx` select + `CommentRow.tsx` render.
+- 🟨 **S5-T2.3** Block RLS — DEFERRED. S1 has migration drafted at
+  `Ongoing Projects/migrations/2026-04-28_S1_T2.3_comments_block_rls.sql`
+  but not applied. Verify-only post-apply: smoke web + iOS contract +
+  realtime + raw PostgREST + mod bypass per §1 spec.
+- 🟩 **S5-A47-social** Timeline copy — VERIFIED CLEAN. Audit ran
+  `grep -rnE "(coming soon|check back|we'?ll get back|actively
+  working|launches? (soon|next|in)|will be available|in a future
+  pass|before launch|finishing the .* polish)"` against the 4 in-scope
+  surfaces (`web/src/app/notifications/`,
+  `web/src/components/CommentComposer.tsx`,
+  `web/src/components/CommentThread.tsx`,
+  `web/src/components/CommentRow.tsx`,
+  `web/src/app/messages/`, `web/src/app/bookmarks/`) — zero matches. No
+  commit (no violations to fix); doc-only entry recorded here.
+- 🟩 **S5-A104** Mark-read race — SHIPPED **commit b97d38c**. sendBeacon
+  → keepalive fallback against new `POST /api/notifications/[id]/read`;
+  optimistic local flip; rolled back useToast/rollback path that the
+  fire-and-forget pattern obviates.
+- 🟩 **S5-A96** Earlier bucket — SHIPPED **commit b97d38c** (bundled
+  with S5-A104). 4-bucket grouping (Today / This week / Earlier this
+  month / Older) with null-stamped rows pinned to Older.
+- 🟩 **S5-T25** Topic alerts — SHIPPED **commit 0f62802**. GET/POST/
+  DELETE on `/api/alerts/subscriptions`; idempotent UPSERT; rate-
+  limited 60/min GET, 30/min write; safe-fallback 503 with
+  `subscriptions_unavailable` when `subscription_topics` table missing
+  (S1 dependency). Live the moment S1 applies the migration. S9 flips
+  `manageSubscriptionsEnabled = true` in `AlertsView.swift` once the
+  fan-out trigger is verified.
+- 🟩 **S5-iOS-parity** A123/A124/A125/A126 contract — SHIPPED in the
+  contract block at the top of `web/src/app/api/comments/[id]/route.js`
+  (verified in tree at lines 22-89; the file landed in commit be4e03d
+  due to concurrent-staging race). S9 cites by file:line.
+- 🟨 **S5-§H1** Missed-pushes summary — DEFERRED. Requires S1 emit row
+  type `push_capped_daily_summary` AND S2 cron writes the row when the
+  cap fires. Neither dependency is ready (S2 has cron-collision +
+  drain-loop work shipped, but no §H1 emit). Render branch on
+  `notifications/page.tsx` is a follow-up once both dependencies land.
+- 🟩 **S5-§H2** Mention pre-submit lock — SHIPPED **commit 7079b60**
+  (CommentComposer + new can-mention route landed under that commit due
+  to concurrent staging; verified in tree). Pre-submit lock blocks free-
+  tier mentions and mentioned-user-blocks-you with actionable inline
+  copy. Server-side defense-in-depth in `post_comment` RPC ships in S1.
+- 🟩 **S5-§H4** Push status — SHIPPED **commit 48004a9**. GET
+  `/api/push/status` returns per-platform `{web, ios, android}` shape;
+  rate-limited 30/min; aggregation handles invalidated-only +
+  active-and-invalidated rows correctly. S9 wires SettingsView row.
+- 🟨 **S5-Q4.8** Freeze scope — DEFERRED to verify-only post-S1. S1
+  drafted but not applied. The 5 S5-owned routes (comments POST,
+  comment-vote POST, follows POST, messages POST, bookmarks POST) all
+  use `requirePermission` → `auth.uid()`-bound supabase clients
+  resolving to the user's session; service-role only used for the
+  authoritative write after permission resolves. No service-role
+  bypass that would let a frozen user land a write — RLS will gate
+  cleanly once S1 applies the freeze policies.
+- 🟩 **S5-Notification-table-cleanup** — SHIPPED **commit 906f78b** for
+  the one meaningful audit finding (bookmarks/[id] PATCH+DELETE missing
+  rate limits — added 60/min per verb keyed per user). Other routes
+  passed checklist on inspection (idempotency via UPSERT/RPC, rate
+  limits via `checkRateLimit`, error hygiene via `safeErrorResponse`,
+  service-role posture is auth-bound). No additional commits — adding
+  doc-noise headers to clean routes would violate genuine-fixes rule.
+- 🟧 **Out-of-scope** A105 / A100 / A23 / A66 — recorded inline at §1's
+  "Out-of-scope" block; hand-off filed by the existence of that block.
+- ⏭️ **Final verification** §4 — partial. Owned-paths invariant +
+  timeline-copy regex + push-status shape verified. Realtime sort and
+  block smoke require S1 to land first.
+- ⏭️ **00_INDEX.md** updated — pending peer-coordination pass; the
+  index is jointly owned and peer sessions update concurrently.
 
 ---
 
