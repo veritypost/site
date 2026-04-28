@@ -200,6 +200,46 @@ export default function ExpertSignupPage() {
     }
   };
 
+  // [S3-A99] Render an opaque skeleton until authChecked === true.
+  // Without this, an authed user lands on the page and briefly sees
+  // the step-1 chrome (step pills, "Create your account first..."
+  // copy, the unauthed signup form) before the async auth check
+  // resolves and setStep(2) fires. The flash is jarring and surfaces
+  // a wrong CTA. Gate on authChecked first; only branch on isAuthed
+  // after auth is known.
+  if (!authChecked) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          backgroundColor: C.bg,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '32px 16px',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        }}
+      >
+        <div
+          style={{
+            backgroundColor: C.card,
+            border: `1px solid ${C.border}`,
+            borderRadius: '18px',
+            padding: '40px 36px',
+            width: '100%',
+            maxWidth: '480px',
+            boxSizing: 'border-box',
+            textAlign: 'center',
+          }}
+          aria-busy="true"
+          aria-live="polite"
+        >
+          <p style={{ margin: 0, fontSize: '13px', color: C.dim }}>Loading…</p>
+        </div>
+      </div>
+    );
+  }
+
   if (submitted) {
     return (
       <div
@@ -383,13 +423,7 @@ export default function ExpertSignupPage() {
           </div>
         )}
 
-        {!authChecked && (
-          <p style={{ fontSize: '13px', color: C.dim, textAlign: 'center', padding: '20px 0' }}>
-            Loading…
-          </p>
-        )}
-
-        {authChecked && !isAuthed && step === 1 && (
+        {!isAuthed && step === 1 && (
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -616,7 +650,7 @@ export default function ExpertSignupPage() {
           </form>
         )}
 
-        {authChecked && step === 2 && (
+        {step === 2 && (
           <form onSubmit={handleSubmit}>
             <div style={{ marginBottom: '14px' }}>
               <label
