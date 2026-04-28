@@ -5,7 +5,7 @@ import type { Metadata } from 'next';
 export const metadata: Metadata = {
   title: 'Kids Privacy Notice — Verity Post',
   description:
-    'What Verity Post collects from children using Verity Kids, why we collect it, and how parents can review or delete it.',
+    'What Verity Post collects from children using Verity Post Kids, why we collect it, and how parents can review or delete it.',
 };
 
 export default function KidsPrivacyPage() {
@@ -55,7 +55,7 @@ export default function KidsPrivacyPage() {
 
         <div style={sectionStyle}>
           <p style={paragraphStyle}>
-            This Kids Privacy Notice explains what data we collect from children using Verity Kids,
+            This Kids Privacy Notice explains what data we collect from children using Verity Post Kids,
             why we collect it, and how parents can review or delete it. This applies in addition to
             our main{' '}
             <a href="/privacy" style={linkStyle}>

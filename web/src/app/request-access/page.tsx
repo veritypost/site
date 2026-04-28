@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { BRAND_NAME } from '../../lib/brand';
 
 export default function RequestAccessPage() {
   const [email, setEmail] = useState('');
@@ -66,7 +67,7 @@ export default function RequestAccessPage() {
             marginBottom: 16,
           }}
         >
-          verity post — request access
+          {BRAND_NAME} — request access
         </div>
 
         <h1 style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.2, marginBottom: 12 }}>

@@ -114,8 +114,8 @@ export default function TermsPage() {
           <h2 style={headingStyle}>4. Children & Minors</h2>
           <ul style={listStyle}>
             <li>
-              Users aged 13 to 17 may use Verity Post with parental consent. A dedicated Verity Kids
-              app provides age-appropriate content.
+              Users aged 13 to 17 may use Verity Post with parental consent. A dedicated Verity Post
+              Kids app provides age-appropriate content.
             </li>
             <li>
               Parents and guardians may manage child accounts, including content filters and usage

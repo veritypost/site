@@ -2,25 +2,34 @@
 // "Add to Home Screen" that installs with correct branding.
 // Next 14 serves this file at /manifest.webmanifest.
 //
-// Coming-soon mode: name/short_name reduced to the domain and the
-// product description is removed so nothing product-descriptive leaks
-// into Google / social crawlers via the manifest. Restore at launch:
-// name: 'Verity Post', short_name: 'Verity Post', description:
-// 'News with a quiz-gated comment section. Score 3/5 on the article
-// quiz to join the discussion.'
+// Icons reference the Next.js file-based icon route (`app/icon.tsx`
+// generates `/icon` → 32×32 PNG). Real PNGs ship from owner; this
+// manifest swaps to those files in one edit when they land.
+
+import { BRAND_NAME, BRAND_DOMAIN } from '../lib/brand';
 
 export default function manifest() {
   return {
-    name: 'veritypost.com',
-    short_name: 'veritypost.com',
+    name: BRAND_NAME,
+    short_name: BRAND_NAME,
+    description: 'News with a comprehension quiz.',
     start_url: '/',
     display: 'standalone',
     orientation: 'portrait',
     background_color: '#ffffff',
     theme_color: '#ffffff',
-    // Icons omitted until owner drops PNGs into web/public/. Listing
-    // missing files here made every Android / iOS install attempt 404
-    // on icon download and fall back to the default browser glyph.
-    icons: [],
+    id: `https://${BRAND_DOMAIN}/`,
+    icons: [
+      {
+        src: '/icon',
+        sizes: '32x32',
+        type: 'image/png',
+      },
+      {
+        src: '/apple-icon',
+        sizes: '180x180',
+        type: 'image/png',
+      },
+    ],
   };
 }

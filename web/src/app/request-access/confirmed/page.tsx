@@ -5,10 +5,11 @@
 //   ?status=error   → something fell over, retry
 
 import Link from 'next/link';
+import { BRAND_NAME } from '../../../lib/brand';
 
 export const metadata = {
-  title: 'Email confirmed — verity post',
-  description: 'Email confirmation result for your verity post beta access request.',
+  title: `Email confirmed — ${BRAND_NAME}`,
+  description: `Email confirmation result for your ${BRAND_NAME} beta access request.`,
 };
 
 const COPY: Record<
@@ -70,7 +71,7 @@ export default async function RequestAccessConfirmedPage({
             marginBottom: 16,
           }}
         >
-          verity post
+          {BRAND_NAME}
         </div>
         <h1 style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.2, marginBottom: 12 }}>
           {c.title}

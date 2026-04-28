@@ -11,6 +11,7 @@ import { PermissionsProvider } from '../components/PermissionsProvider';
 import GAListener from '../components/GAListener';
 import { getSiteUrl } from '../lib/siteUrl';
 import { JsonLd, organizationAndWebSite } from '../components/JsonLd';
+import { BRAND_NAME, BRAND_DOMAIN } from '../lib/brand';
 
 // GA4 measurement ID. Set via NEXT_PUBLIC_GA_MEASUREMENT_ID in Vercel env;
 // fallback literal is the Verity Post production property so the tag ships
@@ -46,36 +47,32 @@ export const metadata = {
   // (which throws in prod when NEXT_PUBLIC_SITE_URL is unset) prevents
   // a preview branch from silently emitting prod URLs in OG tags.
   metadataBase: new URL(getSiteUrl()),
-  // Coming-soon mode: Google result reduced to URL only.
-  // - title=domain so the title line reads the same as the URL line.
-  // - empty description + max-snippet:0 + max-image-preview:none so Google
-  //   has nothing to show under the link and no preview image.
-  // - OG + Twitter stripped so social unfurls reveal nothing either.
-  // Restore at launch: title "Verity Post — Read. Prove it. Discuss.",
-  // quiz-gated description, normal OG/Twitter cards.
-  title: 'veritypost.com',
-  description: '',
+  // Brand strings imported from `lib/brand.ts` — single source of truth.
+  // Mixed casing in the wild ("verity post" / "veritypost.com") drifted
+  // across the codebase and shipped to every social unfurl + Google
+  // result. Owner-locked Title Case "Verity Post" is canonical now.
+  title: {
+    default: BRAND_NAME,
+    template: `%s · ${BRAND_NAME}`,
+  },
+  description: 'News with a comprehension quiz. Read, prove you read it, then join the discussion.',
   robots: {
     index: true,
     follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      'max-snippet': 0,
-      'max-image-preview': 'none',
-      'max-video-preview': 0,
-      noarchive: true,
-      notranslate: true,
-    },
   },
   openGraph: {
-    title: 'veritypost.com',
-    siteName: 'veritypost.com',
+    title: BRAND_NAME,
+    siteName: BRAND_NAME,
     type: 'website',
+    url: getSiteUrl(),
+    // Note: og:image + twitter:image are injected automatically by
+    // Next.js from `app/opengraph-image.tsx` — do not list them here
+    // or both layers will fight for the slot.
   },
   twitter: {
-    card: 'summary',
-    title: 'veritypost.com',
+    card: 'summary_large_image',
+    title: BRAND_NAME,
+    site: `@${BRAND_DOMAIN.replace('.com', '')}`,
   },
   // DA-183 — apple mobile PWA hints. Without these, iOS Add-to-Home-Screen
   // installs with a blurred screenshot icon. `themeColor` moved to the
@@ -83,13 +80,11 @@ export const metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'Verity Post',
+    title: BRAND_NAME,
   },
-  // DA-184 — icons deliberately omitted until the owner drops PNGs into
-  // web/public/. The folder doesn't exist yet, so referencing files
-  // here just emitted 404s on every page load. Re-add icon + apple
-  // entries once /favicon.ico, /icon-192.png, and /apple-touch-icon.png
-  // are present.
+  // Icons are injected automatically by Next.js from app-level
+  // `icon.tsx` + `apple-icon.tsx` files (App Router file-based metadata).
+  // Real PNGs ship via owner — those files become a one-line edit then.
   other: {
     'mobile-web-app-capable': 'yes',
     'google-adsense-account': 'ca-pub-3486969662269929',

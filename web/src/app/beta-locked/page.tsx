@@ -4,10 +4,11 @@
 // new-account creation surface.
 
 import Link from 'next/link';
+import { BRAND_NAME } from '../../lib/brand';
 
 export const metadata = {
-  title: 'verity post — Closed Beta',
-  description: 'verity post is in closed beta. Access is by invite only.',
+  title: `${BRAND_NAME} — Closed Beta`,
+  description: `${BRAND_NAME} is in closed beta. Access is by invite only.`,
 };
 
 const reasonCopy: Record<string, string> = {
@@ -54,7 +55,7 @@ export default async function BetaLockedPage({
             marginBottom: 16,
           }}
         >
-          verity post
+          {BRAND_NAME}
         </div>
 
         <h1 style={{ fontSize: 32, fontWeight: 800, lineHeight: 1.15, marginBottom: 16 }}>
@@ -62,7 +63,7 @@ export default async function BetaLockedPage({
         </h1>
 
         <p style={{ fontSize: 17, lineHeight: 1.5, color: '#374151', marginBottom: 12 }}>
-          verity post is invite-only right now. New accounts need a personal invite link from
+          {BRAND_NAME} is invite-only right now. New accounts need a personal invite link from
           someone in the beta.
         </p>
 

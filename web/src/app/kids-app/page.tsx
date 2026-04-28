@@ -1,5 +1,5 @@
 // /kids-app — marketing landing for anon traffic redirected from /kids/*.
-// Inline email capture for the Verity Kids iOS launch notification list.
+// Inline email capture for the Verity Post Kids iOS notification list.
 // No modal; the form sits in the page flow. Parent-directed copy (COPPA-safe).
 // POSTs to /api/kids-waitlist with honeypot + min-time anti-bot guards.
 'use client';
@@ -107,11 +107,10 @@ export default function KidsAppLanding() {
           </li>
         </ul>
 
-        <div style={{ fontSize: '14px', color: '#666666', margin: '0 0 20px' }}>
-          Coming to the App Store soon.
-        </div>
-
-        {/* Inline email capture — no modal */}
+        {/* Inline email capture — no modal. Per rule 3.1 (no
+            user-facing timeline copy), the previous "Coming to the
+            App Store soon" line was stripped. The waitlist itself is
+            the present-state surface; we email when the app is live. */}
         {status === 'success' ? (
           <div
             role="status"
@@ -127,7 +126,7 @@ export default function KidsAppLanding() {
               fontWeight: 500,
             }}
           >
-            Thanks. We&apos;ll email you when Verity Kids launches.
+            Thanks. We&apos;ll email you when Verity Post Kids is live in the App Store.
           </div>
         ) : (
           <form
@@ -153,7 +152,7 @@ export default function KidsAppLanding() {
                 textAlign: 'left',
               }}
             >
-              Email me when Verity Kids is live.
+              Email me when Verity Post Kids is in the App Store.
             </label>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <input

@@ -4,7 +4,6 @@
 import { useState, useEffect, CSSProperties } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
-import { useToast } from '@/components/Toast';
 import ErrorState from '@/components/ErrorState';
 import type { Tables } from '@/types/database-helpers';
 import { formatDateTime } from '@/lib/dates';
@@ -27,12 +26,19 @@ type NotificationRow = Pick<
 
 type Filter = 'all' | 'unread';
 
+// S5-A96 — split the legacy single "Earlier" bucket into "Earlier this
+// month" and "Older" so a 6-month-old reply doesn't sit alongside a 10-day-
+// old one. `null`-stamped rows fall into "Older" and render last (the
+// caller already orders the feed by created_at DESC, so within "Older" the
+// dated rows appear first and the null-dated rows trail). Empty buckets
+// don't render — the existing `if (bucket.length)` guards continue to hold.
 function groupNotifications(
   notifications: NotificationRow[]
 ): { section: string; items: NotificationRow[] }[] {
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const weekStart = new Date(todayStart.getTime() - 6 * 24 * 60 * 60 * 1000);
+  const monthStart = new Date(todayStart.getTime() - 29 * 24 * 60 * 60 * 1000);
   const groups: { section: string; items: NotificationRow[] }[] = [];
   const today = notifications.filter(
     (n) => n.created_at != null && new Date(n.created_at) >= todayStart
@@ -43,12 +49,20 @@ function groupNotifications(
       new Date(n.created_at) >= weekStart &&
       new Date(n.created_at) < todayStart
   );
-  const earlier = notifications.filter(
-    (n) => n.created_at == null || new Date(n.created_at) < weekStart
+  const earlierThisMonth = notifications.filter(
+    (n) =>
+      n.created_at != null &&
+      new Date(n.created_at) >= monthStart &&
+      new Date(n.created_at) < weekStart
+  );
+  const older = notifications.filter(
+    (n) => n.created_at == null || new Date(n.created_at) < monthStart
   );
   if (today.length) groups.push({ section: 'Today', items: today });
   if (thisWeek.length) groups.push({ section: 'This week', items: thisWeek });
-  if (earlier.length) groups.push({ section: 'Earlier', items: earlier });
+  if (earlierThisMonth.length)
+    groups.push({ section: 'Earlier this month', items: earlierThisMonth });
+  if (older.length) groups.push({ section: 'Older', items: older });
   return groups;
 }
 
@@ -62,7 +76,6 @@ const C = {
 } as const;
 
 export default function NotificationsInbox() {
-  const toast = useToast();
   const [loading, setLoading] = useState<boolean>(true);
   const [items, setItems] = useState<NotificationRow[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
@@ -137,24 +150,44 @@ export default function NotificationsInbox() {
     });
     load();
   }
-  async function markOne(id: string) {
-    // Capture pre-mutation state for rollback.
-    const prevItems = items;
+  // S5-A104 — fire-and-forget mark-one-as-read.
+  //
+  // The previous implementation `await`-ed PATCH /api/notifications inside
+  // the row's onClick. When the row had an action_url, the browser's
+  // subsequent navigation frequently cancelled the in-flight request, so
+  // the badge sat unread on return. Two changes break the race:
+  //
+  //   1. Use navigator.sendBeacon — the browser hands the request to the
+  //      OS for delivery and decouples it from the page lifecycle.
+  //   2. Fall back to keepalive fetch when sendBeacon is unavailable or
+  //      refuses the payload (some browsers reject beacons over a
+  //      configurable byte threshold). keepalive lets the request finish
+  //      after the document unloads.
+  //
+  // Optimistic UI update flips is_read locally so the user doesn't see the
+  // row stay highlighted on back-navigation. Because the request is
+  // fire-and-forget and the user has already navigated, we can't roll
+  // back on failure — the trade-off is the rare ghost-read row that the
+  // server didn't actually persist, which the next inbox load self-heals.
+  function markOne(id: string) {
     setItems((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
-    try {
-      const res = await fetch('/api/notifications', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: [id], mark: 'read' }),
-      });
-      if (!res.ok) {
-        setItems(prevItems);
-        toast.error('Could not mark notification as read. Try again.');
+    const url = `/api/notifications/${id}/read`;
+    if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+      try {
+        const blob = new Blob([JSON.stringify({ id })], { type: 'application/json' });
+        if (navigator.sendBeacon(url, blob)) return;
+      } catch {
+        /* fall through to keepalive */
       }
-    } catch {
-      setItems(prevItems);
-      toast.error('Network error. Could not mark notification as read.');
     }
+    void fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+      keepalive: true,
+    }).catch(() => {
+      /* swallow — user has already navigated; next inbox load self-heals */
+    });
   }
 
   if (!permsReady || loading) {

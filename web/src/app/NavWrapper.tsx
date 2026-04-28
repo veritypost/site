@@ -19,6 +19,7 @@ import PageViewTrackListener from '../components/PageViewTrackListener';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '../lib/permissions';
 import type { Tables } from '@/types/database-helpers';
 import { Z } from '@/lib/zIndex';
+import { BRAND_NAME, BRAND_LEGAL_ENTITY } from '../lib/brand';
 
 type ProfileRow = Pick<
   Tables<'users'>,
@@ -335,6 +336,10 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
   // than /login as a CTA — anon traffic skews new-user). Notifications +
   // Most Informed render their own anon empty state with inline Sign-up
   // CTAs; middleware no longer bounces those routes for anon.
+  //
+  // Note: `/pricing` deliberately surfaces in the desktop top-bar +
+  // footer instead of the bottom nav. Bottom nav is the 4 high-frequency
+  // tasks; conversion CTAs route through the top-bar / footer.
   const navItems: NavItem[] = loggedIn
     ? [
         { label: 'Home', href: '/' },
@@ -452,17 +457,31 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
               }}
             >
               {[
+                // Product surfaces — discovery + conversion entry points.
                 { label: 'About', href: '/about' },
-                // LAUNCH: 'Help' link hidden from users pre-launch. The
-                // /help page itself stays reachable because Apple App
-                // Store submission requires a public Support URL — the
-                // page is registered as that URL. Put this back when
-                // ready for public launch:
-                // { label: 'Help', href: '/help' },
+                { label: 'How it works', href: '/how-it-works' },
+                { label: 'Pricing', href: '/pricing' },
+                // Trust-transparency surfaces (S7-F1 / S7-F2). Required
+                // for AdSense + Apple reviewer signals.
+                { label: 'Editorial standards', href: '/editorial-standards' },
+                { label: 'Corrections', href: '/corrections' },
+                // Support — exposed in BOTH anon and authed states. The
+                // /help page is registered with App Store Connect as the
+                // Support URL; Apple reviewers signed into a test account
+                // need to reach it.
+                { label: 'Help', href: '/help' },
                 { label: 'Contact', href: '/contact' },
+                // Legal + privacy strip.
                 { label: 'Privacy', href: '/privacy' },
                 { label: 'Kids Privacy', href: '/privacy/kids' },
                 { label: 'Your California Privacy Rights', href: '/privacy#california' },
+                // CCPA "Do Not Sell" link — required by CCPA when
+                // AdSense rolls out. Routes to the privacy page anchor;
+                // the toggle itself lives in /profile/settings (S8).
+                {
+                  label: 'Do Not Sell or Share My Personal Information',
+                  href: '/privacy#do-not-sell',
+                },
                 { label: 'Terms', href: '/terms' },
                 { label: 'Cookies', href: '/cookies' },
                 { label: 'Accessibility', href: '/accessibility' },
@@ -482,21 +501,21 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
               ))}
             </div>
             <div style={{ textAlign: 'center', fontSize: 10, color: 'var(--muted)' }}>
-              © {new Date().getFullYear()} Verity Post LLC. All rights reserved.
+              © {new Date().getFullYear()} {BRAND_LEGAL_ENTITY}. All rights reserved.
             </div>
           </footer>
         )}
       </div>
 
       {showTopBar && (
-        // Fixed top bar — "verity post" wordmark on the left, magnifier
-        // on the right when the viewer has search.basic. The icon lives
-        // alongside the brand so the search entry point is part of the
-        // global chrome rather than a per-surface affordance.
+        // Fixed top bar — Verity Post wordmark on the left, Pricing link
+        // + magnifier on the right. Pricing is the conversion CTA and
+        // belongs in the global chrome; how-it-works is contextual depth
+        // and lives in the footer.
         <header style={topBarStyle}>
           <a
             href={topBarHomeHref}
-            aria-label="Go to home"
+            aria-label={`Go to ${BRAND_NAME} home`}
             aria-current={topBarActive ? 'page' : undefined}
             style={{
               fontSize: 15,
@@ -506,39 +525,58 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
               textDecoration: 'none',
             }}
           >
-            verity post
+            {BRAND_NAME}
           </a>
-          {loggedIn && canSearch && (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             <a
-              href="/search"
-              aria-label="Search"
+              href="/pricing"
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                minWidth: 44,
                 minHeight: 44,
-                marginRight: -8,
-                color: C.dim,
+                padding: '0 12px',
+                fontSize: 13,
+                fontWeight: 600,
+                color: path === '/pricing' ? C.accent : C.dim,
                 textDecoration: 'none',
               }}
+              aria-current={path === '/pricing' ? 'page' : undefined}
             >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
+              Pricing
             </a>
-          )}
+            {loggedIn && canSearch && (
+              <a
+                href="/search"
+                aria-label="Search"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minWidth: 44,
+                  minHeight: 44,
+                  marginRight: -8,
+                  color: C.dim,
+                  textDecoration: 'none',
+                }}
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+              </a>
+            )}
+          </div>
         </header>
       )}
 

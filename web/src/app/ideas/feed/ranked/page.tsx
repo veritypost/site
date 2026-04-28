@@ -1,5 +1,6 @@
 import PhoneFrame from '../PhoneFrame';
 import { STORIES, EDITION_DATE, T, type Story } from '../sharedData';
+import { BRAND_NAME } from '../../../../lib/brand';
 
 function Header() {
   return (
@@ -12,7 +13,7 @@ function Header() {
           letterSpacing: '0.02em',
         }}
       >
-        verity post
+        {BRAND_NAME}
       </div>
       <div style={{ fontSize: 11, color: T.textMute, marginTop: 4, fontFamily: T.mono }}>
         {EDITION_DATE} \u00b7 ranked by the editors this morning
