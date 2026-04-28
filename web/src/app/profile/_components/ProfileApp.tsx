@@ -361,22 +361,6 @@ export function ProfileApp({ defaultSection }: Props) {
       render: () => <NotificationsSection preview={false} />,
     },
     {
-      id: 'feed',
-      glyph: '☰',
-      group: 'Settings',
-      title: 'Feed preferences',
-      reason: 'Tune what shows up in your home feed.',
-      keywords: ['feed', 'preferences', 'topics', 'algorithm'],
-      render: () => (
-        <LinkOutSection
-          glyph="☰"
-          title="Feed preferences"
-          body="Pick the topics and writers you want to see more of."
-          actions={[{ label: 'Open feed preferences', href: '/profile/settings/feed' }]}
-        />
-      ),
-    },
-    {
       id: 'privacy',
       glyph: '⊘',
       group: 'Settings',
