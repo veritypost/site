@@ -1,11 +1,11 @@
 // @feature-verified shared_pages 2026-04-27
 import type { CSSProperties } from 'react';
 import type { Metadata } from 'next';
+import { BRAND_NAME, BRAND_KIDS_NAME } from '@/lib/brand';
 
 export const metadata: Metadata = {
-  title: 'Kids Privacy Notice — Verity Post',
-  description:
-    'What Verity Post collects from children using Verity Post Kids, why we collect it, and how parents can review or delete it.',
+  title: `Kids Privacy Notice — ${BRAND_NAME}`,
+  description: `What ${BRAND_NAME} collects from children using ${BRAND_KIDS_NAME}, why we collect it, and how parents can review or delete it.`,
 };
 
 export default function KidsPrivacyPage() {
@@ -55,8 +55,9 @@ export default function KidsPrivacyPage() {
 
         <div style={sectionStyle}>
           <p style={paragraphStyle}>
-            This Kids Privacy Notice explains what data we collect from children using Verity Post Kids,
-            why we collect it, and how parents can review or delete it. This applies in addition to
+            This Kids Privacy Notice explains what data we collect from children using{' '}
+            {BRAND_KIDS_NAME}, why we collect it, and how parents can review or delete it. This
+            applies in addition to
             our main{' '}
             <a href="/privacy" style={linkStyle}>
               Privacy Policy

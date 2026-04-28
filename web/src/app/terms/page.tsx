@@ -2,10 +2,11 @@
 // @feature-verified shared_pages 2026-04-18
 import type { CSSProperties } from 'react';
 import type { Metadata } from 'next';
+import { BRAND_NAME, BRAND_KIDS_NAME } from '@/lib/brand';
 
 export const metadata: Metadata = {
-  title: 'Terms of Service — Verity Post',
-  description: 'Rules governing your use of Verity Post.',
+  title: `Terms of Service — ${BRAND_NAME}`,
+  description: `Rules governing your use of ${BRAND_NAME}.`,
 };
 
 export default function TermsPage() {
@@ -114,8 +115,8 @@ export default function TermsPage() {
           <h2 style={headingStyle}>4. Children & Minors</h2>
           <ul style={listStyle}>
             <li>
-              Users aged 13 to 17 may use Verity Post with parental consent. A dedicated Verity Post
-              Kids app provides age-appropriate content.
+              Users aged 13 to 17 may use {BRAND_NAME} with parental consent. A dedicated{' '}
+              {BRAND_KIDS_NAME} app provides age-appropriate content.
             </li>
             <li>
               Parents and guardians may manage child accounts, including content filters and usage

@@ -6,6 +6,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { BRAND_KIDS_NAME, BRAND_NAME } from '@/lib/brand';
 
 type Status = 'idle' | 'submitting' | 'success' | 'error';
 
@@ -80,10 +81,10 @@ export default function KidsAppLanding() {
     >
       <div style={{ maxWidth: '560px', width: '100%' }}>
         <h1 style={{ fontSize: '40px', fontWeight: 700, color: '#111111', margin: '0 0 12px' }}>
-          Verity Post Kids
+          {BRAND_KIDS_NAME}
         </h1>
         <p style={{ fontSize: '16px', color: '#666666', lineHeight: 1.6, margin: '0 0 32px' }}>
-          A separate iOS app for kid readers. Parents create profiles from their Verity Post
+          A separate iOS app for kid readers. Parents create profiles from their {BRAND_NAME}
           account; kids read, quiz, and earn streaks on their own device.
         </p>
 
@@ -126,7 +127,7 @@ export default function KidsAppLanding() {
               fontWeight: 500,
             }}
           >
-            Thanks. We&apos;ll email you when Verity Post Kids is live in the App Store.
+            Thanks. We&apos;ll email you when {BRAND_KIDS_NAME} is live in the App Store.
           </div>
         ) : (
           <form
@@ -152,7 +153,7 @@ export default function KidsAppLanding() {
                 textAlign: 'left',
               }}
             >
-              Email me when Verity Post Kids is in the App Store.
+              Email me when {BRAND_KIDS_NAME} is in the App Store.
             </label>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <input
