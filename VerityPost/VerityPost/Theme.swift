@@ -157,18 +157,19 @@ enum VP {
 // the clip gets clipped to invisibility.
 
 extension View {
-    /// Ambient card shadow. Subtle two-pass for depth on white surfaces.
+    /// Ambient card shadow. Single-pass — every `.shadow` is an off-screen
+    /// render pass; stacked on every card in a ScrollView the cost compounds.
+    /// One pass tuned for "subtle depth on white" reads ~95% the same as the
+    /// two-stack web reference and keeps frame time honest on older devices.
     func vpShadowAmbient() -> some View {
-        self
-            .shadow(color: Color.black.opacity(0.04), radius: 1, x: 0, y: 1)
-            .shadow(color: Color.black.opacity(0.06), radius: 3, x: 0, y: 1)
+        self.shadow(color: Color.black.opacity(0.06), radius: 2, x: 0, y: 1)
     }
 
-    /// Elevated shadow for floating controls (sheets, popovers).
+    /// Elevated shadow for floating controls (sheets, popovers). Single-pass
+    /// for the same reason as ambient — sheet/popover surfaces are smaller
+    /// and fewer per screen, but the principle holds.
     func vpShadowElevated() -> some View {
-        self
-            .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
-            .shadow(color: Color.black.opacity(0.06), radius: 12, x: 0, y: 4)
+        self.shadow(color: Color.black.opacity(0.10), radius: 8, x: 0, y: 3)
     }
 
     /// Focus ring overlay. Use as a strokeBorder on the *outside* of the
@@ -322,7 +323,11 @@ struct StatRowView: View {
     let label: String
     let value: Int
     let total: Int
-    var color: Color = VP.accent
+    /// Default flipped to brand blue 2026-04-28: per-category progress
+    /// (1-of-10-articles meters) is engagement, not tier identity, so brand
+    /// expression is appropriate here. Callers can opt out via explicit
+    /// `color:` param.
+    var color: Color = VP.brand
 
     private var pct: CGFloat {
         total > 0 ? min(1, CGFloat(value) / CGFloat(total)) : 0
