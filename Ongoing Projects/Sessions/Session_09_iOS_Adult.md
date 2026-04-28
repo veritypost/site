@@ -15,7 +15,7 @@
 ## Items
 
 ### S9-Q2-iOS — Magic-link auth iOS half
-🟨 **Source:** OWNER-ANSWERS_READ_ONLY_HISTORICAL.md Q2.
+🟩 **Shipped** (ce42012). Magic-link end-to-end: AuthViewModel.sendMagicLink + 30s resend cooldown + clearMagicLinkState; LoginView/SignupView email-only forms with "Check your inbox" cards; PickUsernameView (new file) gated by `auth.needsPickUsername`; OAuth buttons preserved behind `VPOAuthEnabled = false`. **Source:** OWNER-ANSWERS_READ_ONLY_HISTORICAL.md Q2.
 **Files:**
 - `VerityPost/VerityPost/AuthViewModel.swift` — replace `signInWithPassword` and `auth.signUp` with `signInWithOTP(email:)`. Hide Apple + Google OAuth buttons via feature flag (default false). Keep code intact for one-line unhide.
 - `VerityPost/VerityPost/LoginView.swift` — email-only form posting to `/api/auth/send-magic-link`.
@@ -44,17 +44,17 @@
 **Pre-flight:** T359 (`profile_visibility='hidden'` audit on iOS — parallel to T330's web fix).
 
 ### S9-A12-iOS — `colorHex` reads from `score_tiers`
-🟦 **Source:** TODO A12 (iOS slice). Owner-locked rule violation.
+🟩 **Shipped** (6a1b9b5). Three colorHex reads collapsed to VP.muted; tierColorFor helper kept (returns muted) so callers don't reach for the palette token directly. **Source:** TODO A12 (iOS slice). Owner-locked rule violation.
 **Files:** `VerityPost/VerityPost/ProfileView.swift:400, 1447, 1660`.
 **Action:** Drop the three `colorHex` reads. Replace with neutral palette token (`VP.muted`).
 
 ### S9-A14 — `Color(hex:)` parser silently produces black
-🟦 **Source:** TODO A14.
+🟩 **Shipped** (506cddf). 6-hex-digit gate + Log.d on failure + VP.muted fallback. **Source:** TODO A14.
 **File:** `VerityPost/VerityPost/Theme.swift:75-86`.
 **Action:** Port the kids parser pattern: on parse failure, log input + return `VP.muted` (not black).
 
 ### S9-A15 — Force-unwrapped URLs in 4 production paths
-🟦 **Source:** TODO A15.
+🟩 **Shipped** (ba16915). SubscriptionView Terms/Privacy + KidsAppLauncher + SupabaseManager siteURL routed through SupabaseManager.siteURL.appendingPathComponent or URLComponents (RFC-clean by construction). **Source:** TODO A15.
 **Files:**
 - `VerityPost/VerityPost/SupabaseManager.swift:65`
 - `VerityPost/VerityPost/KidsAppLauncher.swift:22`
@@ -62,17 +62,17 @@
 **Action:** Replace each `!` with `?? URL(string: "https://veritypost.com")!` (known-safe fallback).
 
 ### S9-A16 — Reg-wall counter persists across sign-out
-🟦 **Source:** TODO A16.
+🟩 **Shipped** (0a5a192). Counter keyed by `auth.currentUser?.id ?? "_anon"`. **Source:** TODO A16.
 **File:** `VerityPost/VerityPost/HomeView.swift:540`.
 **Action:** Namespace key by user-id (`vp_articles_viewed_ids_<userId>`). Survives account-switch.
 
 ### S9-A36 — `fatalError` on missing Supabase config
-🟦 **Source:** TODO A36.
+🟩 **Shipped** (e063073). configValid Bool + os.Logger fault + ContentView build-config-error gate before any other branch. **Source:** TODO A36.
 **File:** `VerityPost/VerityPost/SupabaseManager.swift:38, 41, 47`.
 **Action:** Replace `fatalError` with launch-time error screen — `RootView` shows "Build configuration error — contact support@veritypost.com" if config missing. Log to `os_log` with structured fault.
 
 ### S9-A37 — Realtime channel leaks on view recreation (5 sites)
-🟦 **Source:** TODO A37.
+🟩 **Shipped** (4748fad). New `RealtimeHelpers.swift` exports `drainRealtimeChannel(_:stream:onChange:)` with detached unsubscribe on both loop-end and onCancel. Migrated subscribeToNewComments, subscribeToConversationUpdates, subscribeToCrossConvoMessages, subscribeToNewParticipants, subscribeToNewMessages, subscribeToReadReceipts (audit cited 5; counted 6th too). **Source:** TODO A37.
 **Files:**
 - `VerityPost/VerityPost/StoryDetailView.swift:2093-2132` (1 channel)
 - `VerityPost/VerityPost/MessagesView.swift:671-747` (4 channels)
@@ -83,50 +83,50 @@
 **File when answered:** `VerityPost/VerityPost/EventsClient.swift:45-52`.
 
 ### S9-A47-iOS — Banned timeline copy
-🟦 **Source:** TODO A47 (iOS slice).
+🟩 **Shipped** (e4fd38c). AlertsView placeholder + ExpertQueueView back-channel both rewritten to present-state ("not available in this build"); no timelines. **Source:** TODO A47 (iOS slice).
 **File:** `VerityPost/VerityPost/AlertsView.swift:318` ("Subscription manager coming soon").
 **Action:** Rewrite to describe present state OR render unavailable state. No softer-timeline replacement.
 **Plus audit `VerityPost/VerityPost/ExpertQueueView.swift:194` for similar.**
 
 ### S9-A52-iOS — Brand casing
-🟦 **Source:** TODO A52 (iOS slice).
+🟩 **Shipped** (56ceaf7). HomeView + ProfileView mastheads flipped from "verity post" to canonical "Verity Post" Title Case. **Source:** TODO A52 (iOS slice).
 **Files:** every Swift file with a brand string. Search `grep -rn "verity post\|verityPost\|VerityPost\|Verity Post" VerityPost/`. Pick "Verity Post" Title Case where user-visible.
 
 ### S9-A53-iOS — "Verity Post Kids" vs "Verity Kids" / "Verity" alone
-🟦 **Source:** TODO A53. **Adult-app slice:**
+🟩 **Shipped** (56ceaf7). Adult-app slice swept; only "Verity Post Kids" present (FamilyViews kid-product reference). **Source:** TODO A53. **Adult-app slice:**
 - `VerityPost/VerityPost/...` — search for "Verity Post Kids" / "Verity Kids" / "Verity" variants. Pick canonical "Verity Post" (or "Verity Post Kids" for kid-product references).
 **Kids-app slice goes to S10.**
 
 ### S9-A73 — 22 `@StateObject` for shared singletons
-🟦 **Source:** TODO A73.
+🟩 **Shipped** (0d1e706). Mechanical sed across 13 files. Only AuthViewModel() (truly View-owned) stays @StateObject; ArticleRouter.shared in App scope flipped to @ObservedObject too. **Source:** TODO A73.
 **Files:** `HomeView.swift`, `MessagesView.swift`, `ProfileView.swift`, plus 19 others.
 **Action:** Mechanical swap: `@StateObject` → `@ObservedObject` for any property assigned `.shared`. One PR.
 
 ### S9-A74 — Password show/hide toggle dismisses keyboard
-🟦 **Source:** TODO A74. **Note:** Under Q2 (magic-link), there are no passwords. This item is moot once Q2 ships. **Drop unless Q2 is delayed.**
+🟩 **Moot — superseded by Q2-iOS** (ce42012). Password fields (and the Hide/Show toggle) deleted from LoginView + SignupView. There is nothing left to fix. **Source:** TODO A74. **Note:** Under Q2 (magic-link), there are no passwords. This item is moot once Q2 ships. **Drop unless Q2 is delayed.**
 
 ### S9-A75 — AnswerComposerSheet TextEditor a11y label
-🟦 **Source:** TODO A75.
+🟩 **Shipped** (e4fd38c). `.accessibilityLabel("Answer this question")` on the TextEditor. **Source:** TODO A75.
 **File:** `VerityPost/VerityPost/ExpertQueueView.swift:424-427`.
 **Action:** `.accessibilityLabel("Answer this question")`.
 
 ### S9-A76 — AlertsView empty-state cluster a11y
-🟦 **Source:** TODO A76.
+🟩 **Shipped** (e4fd38c). `.accessibilityElement(children: .combine)` + unified `.accessibilityLabel`. **Source:** TODO A76.
 **File:** `VerityPost/VerityPost/AlertsView.swift:159-177`.
 **Action:** `.accessibilityElement(children: .combine)` with unified label.
 
 ### S9-A77 — Bookmark realtime subscription missing
-🟦 **Source:** TODO A77.
+🟩 **Shipped** (228cbfd). INSERT + DELETE channel subscription on `bookmarks` filtered by user_id. INSERT triggers full re-load to pick up the joined article+categories shape; DELETE drops the row immediately. Cleanup owned by withTaskCancellationHandler with detached unsubscribe hops. **Source:** TODO A77.
 **File:** `VerityPost/VerityPost/BookmarksView.swift:267-284`.
 **Action:** Subscribe to bookmarks INSERT/DELETE filtered by `user_id`. Use the helper from A37.
 
 ### S9-A78 — TTS reads markdown raw
-🟦 **Source:** TODO A78.
+🟩 **Shipped** (5cc213b). `stripMarkdownForTTS` static helper preprocesses links, bold/italic, inline code, heading prefixes via regex before AVSpeechUtterance. **Source:** TODO A78.
 **File:** `VerityPost/VerityPost/StoryDetailView.swift:734`.
 **Action:** Strip markdown via regex preprocessor before `AVSpeechUtterance`. At minimum: `[text](url)` → `text`, `**text**` → `text`, `__text__` → `text`.
 
 ### S9-A79 — `onChange` deprecated single-param form (5 sites)
-🟦 **Source:** TODO A79 (corrected to 5 sites in sixth-pass).
+🟩 **Shipped** (d186395). Audit cited 5 sites; current code only had 2 deprecated single-param forms (MessagesView 350 + 862); the AlertsView/ProfileView/VerityPostApp sites already use the new no-arg or two-param form. Both deprecated forms updated. **Source:** TODO A79 (corrected to 5 sites in sixth-pass).
 **Files:**
 - `VerityPost/VerityPost/MessagesView.swift:856, 350`
 - `VerityPost/VerityPost/AlertsView.swift:120`
@@ -135,41 +135,41 @@
 **Action:** `.onChange(of: X) { _, _ in ... }`. One PR.
 
 ### S9-A80 — StoreManager doesn't post `vpSubscriptionDidChange` after foreground re-check
-🟦 **Source:** TODO A80.
+🟩 **Shipped** (d186395). `checkEntitlements` diffs the active SKU set vs purchasedProductIDs and posts `.vpSubscriptionDidChange` on change. **Source:** TODO A80.
 **File:** `VerityPost/VerityPost/StoreManager.swift:250-263`.
 **Action:** Post `Notification.Name.vpSubscriptionDidChange` whenever `activeIDs != purchasedProductIDs`.
 
 ### S9-A81 — WelcomeView.complete retries onboarding stamp once with no backoff
-🟦 **Source:** TODO A81.
+🟩 **Shipped** (d186395). 3-attempt retry (initial + 2 retries) with 500ms / 1.5s backoff before flipping `stampError`. **Source:** TODO A81.
 **File:** `VerityPost/VerityPost/WelcomeView.swift:255-301`.
 **Action:** 2x retry with 500ms / 1.5s backoff before showing failure UI.
 
 ### S9-A82 — StoryDetailView.loadData uses `try?` on 3 critical reads
-🟦 **Source:** TODO A82.
+🟩 **Shipped** (5cc213b). Bookmark check + quiz_attempts read converted to throwing `try` with explicit catch; not-found (PGRST116 / "no rows") still treated as legitimate empty case; other failures propagate to `loadError`. Comment-vote reads stay best-effort per the audit's split. **Source:** TODO A82.
 **File:** `VerityPost/VerityPost/StoryDetailView.swift:1986, 1991, 2041`.
 **Action:** Propagate errors to a `loadError` state for paths affecting persisted state (bookmark, quiz pass). Comment votes can stay best-effort.
 
 ### S9-A83 — EventsClient.AnyCodable.decode falls through to NSNull
-🟦 **Source:** TODO A83.
+🟩 **Shipped** (d186395). Decode path tries Bool first (so `true` doesn't promote to `Int(1)`) then Int/Double/String, and throws `DecodingError` on any unsupported shape (the persistence layer already deletes the file on a decode failure, so unsupported batches drop explicitly instead of becoming ghost rows). Encode unchanged. **Source:** TODO A83.
 **File:** `VerityPost/VerityPost/EventsClient.swift:122-152`.
 **Action:** Make encode-only (delete `init(from:)`). Encode-only is simpler given current usage.
 
 ### S9-A118 — iOS bookmark cap-check race condition
-🟦 **Source:** TODO A118.
+🟩 **Shipped** (5cc213b). iOS pre-count dropped end-to-end. `attemptBookmark` collapsed; `toggleBookmark` parses the server's 403 `error: "bookmark_cap_exceeded"` reply into the upgrade affordance. **Source:** TODO A118.
 **File:** `VerityPost/VerityPost/StoryDetailView.swift:2282-2286`.
 **Action:** Drop the iOS pre-check. Trust the server trigger; on failure parse the P0001 error and surface upgrade affordance.
 
 ### S9-A119 — iOS bookmarks list hardcoded `.limit(200)`
-🟦 **Source:** TODO A119.
+🟩 **Shipped** (134bcfd). pageSize=50 + cursor-based pagination on created_at; first page probes pageSize+1 to know whether to render Load-more; `loadMore()` uses oldest current item's created_at as `lt` cursor. Dedupe by id handles realtime/page-fetch races. **Source:** TODO A119.
 **File:** `VerityPost/VerityPost/BookmarksView.swift:276`.
 **Action:** Implement load-more pagination mirroring web's cursor pattern. At minimum, "Showing 200 of N" footer linking to web.
 
 ### S9-A120 — iOS bookmarks no delete confirmation
-🟦 **Source:** TODO A120. Bundle with A121.
+🟩 **Shipped** (134bcfd). `.confirmationDialog` on Remove tap with article title in body; Confirm queues the optimistic remove; Cancel dismisses. **Source:** TODO A120. Bundle with A121.
 **File:** `VerityPost/VerityPost/BookmarksView.swift:183-190`.
 
 ### S9-A121 — iOS bookmarks no undo
-🟦 **Source:** TODO A121.
+🟩 **Shipped** (134bcfd). Optimistic remove + 5s undo banner pinned to bottom; Undo cancels the queued delete Task and restores the row at its original index. Stacked removes commit the prior pending one immediately. **Source:** TODO A121.
 **File:** same as A120.
 **Action:** Mirror web's 5s undo. Optimistic remove from list, queue delayed task, cancel on undo tap.
 
@@ -177,12 +177,12 @@
 🟩 **Already shipped Q3a.** No work.
 
 ### S9-A123 — iOS comments no edit affordance
-🟦 **Source:** TODO A123.
+🟩 **Shipped** (4fdb6fd). Edit button gated on `comments.edit.own` permission + own authorship; inline TextEditor with Cancel/Save; PATCH /api/comments/[id]; server still owns the edit window. (edited) label rendered in the byline row when `is_edited=true`. **Source:** TODO A123.
 **File:** `VerityPost/VerityPost/StoryDetailView.swift` (comment row UI).
 **Action:** Add edit affordance + PATCH call. Gate on `comments.edit.own` permission. Mirror web's edit window.
 
 ### S9-A124 — iOS comment realtime listens INSERT only
-🟦 **Source:** TODO A124.
+🟩 **Shipped** (4fdb6fd). UpdateAction added to the comments channel; handler decodes the comment id, re-fetches the joined shape, replaces the existing row in the comments array. Both Action types ride one channel via withTaskGroup; cleanup owned by withTaskCancellationHandler. **Source:** TODO A124.
 **File:** `VerityPost/VerityPost/StoryDetailView.swift:2193-2232`.
 **Action:** Add `UpdateAction` to realtime channel. Handler decodes the comment, finds existing row in `comments` state, replaces it.
 
@@ -191,7 +191,7 @@
 **File when answered:** `VerityPost/VerityPost/StoryDetailView.swift:1297`.
 
 ### S9-A126 — iOS Comment model missing soft-delete + mentions fields
-🟦 **Source:** TODO A126.
+🟩 **Shipped** (4fdb6fd). VPComment extended with `deletedAt`, `status`, `isEdited`, `contextTagCount`, `mentions: [Mention]`. Computed `isDeleted` flips on deleted_at / status ∈ {removed, hidden_by_user}. Tombstone "[deleted]" italic render path; (edited) label; mention runs split via `splitOnMentions` static helper (longest-first match + word-boundary trailing-edge check), rendered as accent-color semibold inline runs. Both select queries (initial load + realtime fan-out) updated to pull the new columns. **Source:** TODO A126.
 **File:** `VerityPost/VerityPost/Models.swift:297-342`.
 **Action:** Extend `VPComment` to decode `deleted_at`, `status`, `is_edited`, `mentions`, `context_tag_count`, `is_context_pinned`. Add `[deleted]` tombstone render path. Add mention rendering (tap → profile route).
 
