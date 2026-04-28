@@ -61,8 +61,10 @@ import {
   KIDS_ARTICLE_PROMPT,
   KIDS_TIMELINE_PROMPT,
   KIDS_QUIZ_PROMPT,
-  // S6-Cleanup-§D3: TWEENS_* prompts retained in editorial-guide for AR1
-  // reintroduction; not imported here while the pipeline targets kids only.
+  TWEENS_HEADLINE_PROMPT,
+  TWEENS_ARTICLE_PROMPT,
+  TWEENS_TIMELINE_PROMPT,
+  TWEENS_QUIZ_PROMPT,
 } from '@/lib/pipeline/editorial-guide';
 import {
   persistGeneratedArticle,
@@ -116,12 +118,7 @@ const SourceUrlSchema = z
 const RequestSchema = z.object({
   cluster_id: z.string().uuid(),
   audience: z.enum(['adult', 'kid']),
-  // S6-Cleanup-§D3 (2026-04-28): pipeline no longer produces 'tweens' rows.
-  // The tweens UI was a stub with no editorial flow; AR1 will rebuild the
-  // writer-facing surface properly. The 'tweens' value stays in the DB
-  // schema (data band exists, historical rows readable), but the pipeline
-  // only writes 'kids' for kid runs. Reintroduce when AR1 ships.
-  age_band: z.enum(['kids']).optional(),
+  age_band: z.enum(['kids', 'tweens']).optional(),
   freeform_instructions: z.string().max(2000).optional(),
   provider: z.enum(['anthropic', 'openai']).default('anthropic'),
   model: z.string().min(3).max(100).default('claude-sonnet-4-6'),
@@ -482,12 +479,8 @@ export async function POST(req: Request) {
   }
 
   const { cluster_id, audience, freeform_instructions, provider, model, source_urls } = input;
-  // S6-Cleanup-§D3: kid runs always write age_band='kids'. The 'tweens'
-  // band stays in the DB schema for the historical rows but the pipeline
-  // does not target it pre-AR1.
-  const effectiveAgeBand: 'kids' | 'adult' =
-    audience === 'kid' ? 'kids' : 'adult';
-  void input.age_band;
+  const effectiveAgeBand: 'kids' | 'tweens' | 'adult' =
+    audience === 'kid' ? (input.age_band ?? 'kids') : 'adult';
   // De-dupe + drop empties; the schema already trimmed + validated each entry.
   // `sourceUrlsExplicit` tracks whether the client passed URLs in the body —
   // distinct from `sourceUrlsOverridden` (which may also be true after the
@@ -1111,11 +1104,12 @@ ${catListText}`;
       .slice(0, 10)}.${freeformBlock}\n\nSOURCES:\n${corpus}`;
     const categorizationUser = `Pick the best category for this cluster. Return ONLY the JSON.${freeformBlock}\n\nSOURCES:\n${corpus}`;
 
-    // S6-Cleanup-§D3: kid runs always target age_band='kids' pre-AR1.
-    // The TWEENS_* prompts stay imported for AR1's planned reintroduction
-    // but are not currently selected.
     const headlineSystem =
-      audience === 'kid' ? KIDS_HEADLINE_PROMPT : HEADLINE_PROMPT;
+      audience === 'adult'
+        ? HEADLINE_PROMPT
+        : effectiveAgeBand === 'tweens'
+          ? TWEENS_HEADLINE_PROMPT
+          : KIDS_HEADLINE_PROMPT;
 
     promptParts.push(
       { step: 'headline', system: headlineSystem, user: headlineUser },
@@ -1213,11 +1207,12 @@ ${catListText}`;
     const categoryAppend = CATEGORY_PROMPTS[catNameLower]
       ? `\n\n${CATEGORY_PROMPTS[catNameLower]}`
       : '';
-    // S6-Cleanup-§D3: kid runs always target age_band='kids' pre-AR1.
     const bodySystem =
-      audience === 'kid'
-        ? KIDS_ARTICLE_PROMPT
-        : `${EDITORIAL_GUIDE}${categoryAppend}\n\nIMPORTANT: Return your response as a JSON object. Do NOT include any HTML tags or code blocks in JSON fields. Markdown paragraphs ALLOWED in "body" (use \\n\\n between paragraphs, **bold** sparingly, no other markup).`;
+      audience === 'adult'
+        ? `${EDITORIAL_GUIDE}${categoryAppend}\n\nIMPORTANT: Return your response as a JSON object. Do NOT include any HTML tags or code blocks in JSON fields. Markdown paragraphs ALLOWED in "body" (use \\n\\n between paragraphs, **bold** sparingly, no other markup).`
+        : effectiveAgeBand === 'tweens'
+          ? TWEENS_ARTICLE_PROMPT
+          : KIDS_ARTICLE_PROMPT;
     const bodyUser = `Write an ORIGINAL news article from the sources below. Today is ${new Date()
       .toISOString()
       .slice(0, 10)}.
@@ -1466,9 +1461,12 @@ Return JSON:
       audience,
       step: timelineStepName,
     });
-    // S6-Cleanup-§D3: kid runs always target age_band='kids' pre-AR1.
     const timelineSystem =
-      audience === 'kid' ? KIDS_TIMELINE_PROMPT : TIMELINE_PROMPT;
+      audience === 'adult'
+        ? TIMELINE_PROMPT
+        : effectiveAgeBand === 'tweens'
+          ? TWEENS_TIMELINE_PROMPT
+          : KIDS_TIMELINE_PROMPT;
     const timelineUser = `ARTICLE BODY:\n${finalBodyMarkdown}\n\nGenerate the timeline as JSON:\n{\n  "events": [\n    {"event_date": "YYYY-MM-DDTHH:mm:ssZ", "event_label": "Short label", "event_body": "...", "source_url": "..."}\n  ]\n}${freeformBlock}\n\nSOURCES:\n${corpus}`;
     promptParts.push({
       step: timelineStepName,
@@ -1558,9 +1556,12 @@ Return JSON:
       audience,
       step: quizStepName,
     });
-    // S6-Cleanup-§D3: kid runs always target age_band='kids' pre-AR1.
     const quizSystem =
-      audience === 'kid' ? KIDS_QUIZ_PROMPT : QUIZ_PROMPT;
+      audience === 'adult'
+        ? QUIZ_PROMPT
+        : effectiveAgeBand === 'tweens'
+          ? TWEENS_QUIZ_PROMPT
+          : KIDS_QUIZ_PROMPT;
     const quizUser = `ARTICLE BODY:\n${finalBodyMarkdown}\n\nGenerate 5 Quick Check questions as JSON. Return EXACTLY this shape:
 {
   "questions": [
@@ -1714,11 +1715,6 @@ Empty array if all correct.`;
     );
     const payload: PersistArticlePayload = {
       audience,
-      // Phase 1 of AI + Plan Change Implementation: kid runs land in
-      // articles with is_kids_safe=true and age_band tagged. Phase 3 will
-      // band-split kid generation into two outputs (kids 7-9 + tweens
-      // 10-12); for now every kid run ships as 'tweens' (closer to the
-      // current single-tier kid voice). Adult runs leave age_band null.
       age_band: effectiveAgeBand,
       // Persist the kid summary onto articles.kids_summary for the kid iOS
       // app's existing kids_summary read path. Adult runs leave it null.
@@ -1759,8 +1755,6 @@ Empty array if all correct.`;
     stepTimings[persistStepName] = Date.now() - persistStart;
 
     // M4 / Q9 — flag for manual review when plagiarism step soft-degraded.
-    // Phase 1 of AI + Plan Change Implementation consolidated kid runs into
-    // articles, so both audiences write to the same table now.
     if (needsManualReview || plagiarismStatus !== 'ok') {
       // Cast: generated Database types lag behind migration 166; the
       // Trigger remains the SoT for plagiarism_status.
@@ -1839,11 +1833,10 @@ Empty array if all correct.`;
       last_generation_run_id: runId,
       updated_at: new Date().toISOString(),
     };
-    // S6-Cleanup-§D3: pre-AR1 the pipeline only writes age_band='kids' on
-    // kid runs. primary_tween_article_id is no longer populated by this
-    // route. The column stays for the historical rows.
     if (audience === 'adult') {
       clusterUpdate.primary_article_id = articleId;
+    } else if (effectiveAgeBand === 'tweens') {
+      clusterUpdate.primary_tween_article_id = articleId;
     } else if (effectiveAgeBand === 'kids') {
       clusterUpdate.primary_kid_article_id = articleId;
     }

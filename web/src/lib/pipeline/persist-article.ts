@@ -68,11 +68,6 @@ export interface PersistArticleQuizItem {
 
 export interface PersistArticlePayload {
   audience: 'adult' | 'kid';
-  // Phase 1 of AI + Plan Change Implementation: kid runs land in `articles`
-  // with is_kids_safe=true. Phase 3 will band-split (kids 7-9 vs tweens 10-12)
-  // by setting age_band; for now Phase 1 ships every kid run as 'tweens'
-  // (closest to the current single-tier kid voice). Adult runs leave it null
-  // or send 'adult'.
   age_band?: 'kids' | 'tweens' | 'adult' | null;
   // Optional kids-tier summary persisted onto articles.kids_summary so the
   // kid iOS app's existing `kids_summary` reads (ArticleListView.swift) work
@@ -133,7 +128,7 @@ export class PersistArticleError extends Error {
  * insert of articles + sources + timelines + quizzes with slug-collision
  * retry, all inside the RPC. Both adult and kid runs land in the same
  * articles table; kid runs set is_kids_safe=true and age_band per the
- * payload (Phase 1 of AI + Plan Change Implementation).
+ * payload.
  *
  * Returns the persisted (article_id, slug, audience) — status is always
  * 'draft'; admin publish action promotes later.
