@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { createServiceClient } from '@/lib/supabase/server';
 import { captureException, captureMessage } from '@/lib/observability';
 
@@ -10,7 +11,7 @@ import { captureException, captureMessage } from '@/lib/observability';
 // Schema reuse: webhook_log (reset_and_rebuild_v2.sql:221) carries
 // source/event_type/event_id/payload/processing_status/
 // processing_duration_ms/processing_error fields. Populating these
-// with `source='cron'` and `event_id='cron:{name}:{started_iso}'`
+// with `source='cron'` and `event_id='cron:{name}:{started_iso}:{rand8}'`
 // sidesteps the need for a new migration (owner directive for
 // Chunk 10).
 //
@@ -45,7 +46,12 @@ export function withCronLog(name, handler) {
       await service.from('webhook_log').insert({
         source: 'cron',
         event_type: `cron:${name}`,
-        event_id: `cron:${name}:${startedAt}`,
+        // A71 — under the */5 send-push/send-emails cadence (Q4.2),
+        // overlapping retries within the same ISO second collide on the
+        // (source, event_id) unique constraint. 4-byte random suffix
+        // (~4B distinct values) makes the chance of same-second + same-
+        // suffix collision negligible.
+        event_id: `cron:${name}:${startedAt}:${randomBytes(4).toString('hex')}`,
         payload: {
           cron: name,
           started_at: startedAt,
