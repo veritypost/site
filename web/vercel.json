@@ -25,6 +25,14 @@
       "schedule": "30 4 * * *"
     },
     {
+      "path": "/api/cron/send-emails",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/send-push",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/flag-expert-reverifications",
       "schedule": "40 4 * * 1"
     },
