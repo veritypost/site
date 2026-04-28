@@ -116,7 +116,7 @@ The umbrella item **S3-Q2 (magic-link AUTH-MIGRATION)** dominates this session. 
 
 ## 1. Foundation libraries (ship first)
 
-### S3-A129 — Centralized rate-limit constants 🟦
+### S3-A129 — Centralized rate-limit constants 🟩 fc5a88e
 
 **Source:** TODO_READ_ONLY_HISTORICAL.md A129. ~40 routes across the app hardcode `windowSec: 3600` (and matching `'Retry-After': '3600'` headers) inline. No central config; a policy change requires a 40-file edit. Drift risk: one route hardcodes 1800 instead of 3600 and creates inconsistent UX where users get throttled differently across surfaces.
 
@@ -219,7 +219,7 @@ export function getRateLimit(key: keyof typeof RATE_LIMITS): RateLimitPolicy {
 
 ---
 
-### S3-A128 — CORS allowlist consolidation 🟦
+### S3-A128 — CORS allowlist consolidation 🟩 0327664
 
 **Source:** TODO_READ_ONLY_HISTORICAL.md A128. Two endpoints redefine `isAllowedOrigin()` with hardcoded origin lists; middleware has the canonical list also hardcoded. Three places must update if prod URL ever changes.
 
@@ -318,7 +318,7 @@ The 8 sub-items below are the operative work. Q2-h is owner-side dashboard confi
 
 ---
 
-### S3-Q2-a — Build `/api/auth/send-magic-link` 🟦
+### S3-Q2-a — Build `/api/auth/send-magic-link` 🟩 37d02f4
 
 **Source:** OWNER-ANSWERS Q2 (item 1) + Q2b (item 4).
 
@@ -377,7 +377,7 @@ iOS `AuthViewModel.swift` calls this endpoint with the user's email, shows the s
 
 ---
 
-### S3-Q2-b — Replace `/login` UI with email-only form 🟦
+### S3-Q2-b — Replace `/login` UI with email-only form 🟩 a3159ac
 
 **Source:** OWNER-ANSWERS Q2 (item 1).
 
@@ -410,7 +410,7 @@ iOS `AuthViewModel.swift` calls this endpoint with the user's email, shows the s
 
 ---
 
-### S3-Q2-c — `/signup` becomes a real route 🟦
+### S3-Q2-c — `/signup` becomes a real route 🟩 a3159ac
 
 **Source:** OWNER-ANSWERS Q2c — locked. Resolves audit A46.
 
@@ -443,7 +443,7 @@ The 11 CTAs keep working unchanged. Analytics distinguishes `/signup` from `/log
 
 ---
 
-### S3-Q2-d — Hide OAuth buttons behind feature flag 🟦
+### S3-Q2-d — Hide OAuth buttons behind feature flag 🟩 a3159ac
 
 **Source:** OWNER-ANSWERS Q2 (item 3 + 4) + memory `feedback_launch_hides`.
 
@@ -483,7 +483,7 @@ The 11 CTAs keep working unchanged. Analytics distinguishes `/signup` from `/log
 
 ---
 
-### S3-Q2-e — Build post-signin pick-username flow 🟦
+### S3-Q2-e — Build post-signin pick-username flow 🟩 294adcc + 37d02f4
 
 **Source:** OWNER-ANSWERS Q2 (item 5) + Q2b (items 3, 7). Resolves T22, T200, T252 from TODO2.
 
@@ -531,7 +531,7 @@ This dissolves three TODO2 items by structural elimination:
 
 ---
 
-### S3-Q2-f — Publish iOS auth contract for S9 🟦
+### S3-Q2-f — Publish iOS auth contract for S9 🟩 37d02f4 (header in send-magic-link/route.js)
 
 **Source:** OWNER-ANSWERS Q2 (item 2 + 7).
 
@@ -595,7 +595,7 @@ This dissolves three TODO2 items by structural elimination:
 
 ---
 
-### S3-Q2-g — Soft-delete `/forgot-password` 🟦
+### S3-Q2-g — Soft-delete `/forgot-password` 🟩 6c04ffa
 
 **Source:** OWNER-ANSWERS Q2 (item — implicit; magic-link makes password-reset vestigial). Resolves A48, A111.
 
@@ -664,7 +664,7 @@ A48 (1-hour TTL claim) and A111 (cooldown-vs-expiry copy collision) are both moo
 
 ## 3. Privacy / correctness sweep (independent of Q2)
 
-### S3-A10 — `account/delete` revoke `public.sessions` rows 🟦
+### S3-A10 — `account/delete` revoke `public.sessions` rows 🟩 25ebecb (immediate-path; cron-path deferred to S1's anonymize_user RPC update)
 
 **Source:** TODO_READ_ONLY_HISTORICAL.md A10 + PotentialCleanup B8 (INHERITED — verified during investigator pass per memory `feedback_verify_audit_findings_before_acting`).
 
@@ -699,7 +699,7 @@ If S1 has already shipped `anonymize_user` without the revoke, S3 can either (a)
 
 ---
 
-### S3-A72 — `truncateIpV4` returns full IP for malformed v6 🟦
+### S3-A72 — `truncateIpV4` returns full IP for malformed v6 🟩 34c9723
 
 **Source:** TODO_READ_ONLY_HISTORICAL.md A72.
 
@@ -750,7 +750,7 @@ return `${parts[0]}.${parts[1]}.${parts[2]}.0`;
 
 ---
 
-### S3-A127 — Site URL fallback hardcodes 🟦
+### S3-A127 — Site URL fallback hardcodes 🟩 34c9723 (kids-route slice handed to S10)
 
 **Source:** TODO_READ_ONLY_HISTORICAL.md A127.
 
@@ -801,7 +801,7 @@ If `getSiteUrlOrNull()` returns `null` AND no per-recipient `unsubscribeUrl` was
 
 ## 4. Q2-adjacent items (most are moot once Q2 ships)
 
-### S3-Q2d — Graduate-kid claim rate limit + status-code collapse 🟦
+### S3-Q2d — Graduate-kid claim rate limit + status-code collapse 🟩 26c889c (option A — password-removal deferred to follow-up)
 
 **Source:** OWNER-ANSWERS Q2d (locked) + TODO_READ_ONLY_HISTORICAL.md A24.
 
@@ -874,7 +874,7 @@ The token-existence oracle (410 vs 400) means an attacker probing random token s
 
 ---
 
-### S3-Q2b — Drop enumeration oracles 🟦
+### S3-Q2b — Drop enumeration oracles 🟩 a3159ac + 37d02f4 (check-email + resolve-username deleted; check-username collapsed to boolean)
 
 **Source:** OWNER-ANSWERS Q2b (locked). Resolves audit A25.
 
@@ -955,7 +955,7 @@ Combined budget: ~14.4k probes/day at per-IP cap.
 
 ---
 
-### S3-A112 — `/verify-email` rate-limit copy "about an hour" 🟦
+### S3-A112 — `/verify-email` rate-limit copy "about an hour" 🟩 4f7d5c1
 
 **Source:** TODO_READ_ONLY_HISTORICAL.md A112.
 
@@ -989,7 +989,7 @@ Combined budget: ~14.4k probes/day at per-IP cap.
 
 ---
 
-### S3-A99 — `/signup/expert` step-1 race for authed users 🟦
+### S3-A99 — `/signup/expert` step-1 race for authed users 🟩 2e10ecc
 
 **Source:** TODO_READ_ONLY_HISTORICAL.md A99.
 
@@ -1068,7 +1068,7 @@ return <ExpertSignupStep2 />;
 
 ---
 
-## 5. Q3b — Middleware kid-blind fix + `kindAllowed` param 🟨 COORDINATED
+## 5. Q3b — Middleware kid-blind fix + `kindAllowed` param 🟨 BLOCKED on S1 (no [S1-Q3b] tags on main as of 2026-04-27)
 
 **Source:** OWNER-ANSWERS Q3b — RED audit verdict. Co-ships with S1 (RPC kid-rejects + RLS hardening) + S10 (kids/pair issuer flip).
 
@@ -1250,7 +1250,7 @@ A test that exercises this set runs as part of the post-impl review. The test co
 
 ---
 
-### S3-§D5 — `@admin-verified` marker remnant in `middleware.js` 🟦
+### S3-§D5 — `@admin-verified` marker remnant in `middleware.js` 🟩 8df73d2
 
 - **ID:** S3-§D5
 - **Title:** Rephrase the `@admin-verified` comment at `middleware.js:267` (memory-rule violation)
