@@ -169,7 +169,7 @@ const ALL_STEPS: readonly Step[] = [
 // passes. Hardcoded here (not DB-driven) because these are internal fixed
 // supporting calls, not admin-picker selections. If the picker switches
 // primary provider to OpenAI, we keep using Anthropic for these small probes.
-const HAIKU_MODEL = 'claude-haiku-4-5';
+const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
 
 // ----------------------------------------------------------------------------
 // Local error: audience safety mismatch (not in errors.ts because it's
