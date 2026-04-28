@@ -68,8 +68,8 @@ Every claim in this file was verified against the live database / current code o
 
 | ID | Severity | Category | Title | Status |
 |---|---|---|---|---|
-| S1-T0.2 | P0 | Production-broken | `post_comment` `blocks` → `blocked_users` rename | 🟦 |
-| S1-T0.3 | P0 | Production-broken | `claim_push_batch` + `ack_push_batch` + `claim_email_batch` + `ack_email_batch` RPC creation | 🟦 |
+| S1-T0.2 | P0 | Production-broken | `post_comment` `blocks` → `blocked_users` rename | 🟩 ready (`2026-04-27_S1_T0.2_post_comment_blocks_rename.sql`) |
+| S1-T0.3 | P0 | Production-broken | `claim_push_batch` + `ack_push_batch` + `claim_email_batch` + `ack_email_batch` RPC creation | 🟩 ready (`2026-04-27_S1_T0.3_drain_rpcs.sql`) |
 | S1-T0.5 | P0 | Production-broken | `current_kid_profile_id()` top-level read | 🟦 |
 | S1-T2.7 | P0 | Billing | `billing_change_plan` + `billing_resubscribe` idempotency | 🟦 |
 | S1-T2.2 | P0 | GDPR | `anonymize_user` redact comment + message bodies | 🟦 |
