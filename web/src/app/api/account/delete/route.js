@@ -125,6 +125,30 @@ export async function POST(request) {
       );
     }
 
+    // 3b. [S3-A10] Revoke `public.sessions` rows so other devices'
+    //    bearer tokens are dead before the auth row is gone. Without
+    //    this, a phone forgotten at the airport keeps a working
+    //    session until natural expiry, and analytics queries see
+    //    "active session" rows for deleted users. Best-effort: log on
+    //    error and continue — auth-row deletion is the canonical
+    //    revocation, sessions revoke is the belt-and-suspenders.
+    //    When S1 adds this to the anonymize_user RPC, the redundant
+    //    UPDATE here becomes a no-op (already-revoked rows just get
+    //    their revoked_at refreshed).
+    try {
+      await service
+        .from('sessions')
+        .update({
+          is_active: false,
+          revoked_at: new Date().toISOString(),
+          revoke_reason: 'user_deleted',
+        })
+        .eq('user_id', user.id)
+        .eq('is_active', true);
+    } catch (e) {
+      console.error('[account.delete.immediate] sessions revoke', e?.message || e);
+    }
+
     // 4. Drop the GoTrue credential row. Match the cron's tolerance:
     //    log on failure but tell the user the account is gone — the
     //    cron will retry the auth-row delete on its next sweep.
