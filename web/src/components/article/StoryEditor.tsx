@@ -925,7 +925,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
       )}
       <Button variant="secondary" size="sm" onClick={() => setViewMode('timeline')}>Timeline</Button>
       <Button variant="secondary" size="sm" onClick={() => setViewMode('preview')}>Preview</Button>
-      <Button variant="primary" size="sm" loading={saving} onClick={saveAll}>Save</Button>
+      <Button variant="primary" size="sm" loading={saving} onClick={() => saveAll()}>Save</Button>
     </>
   );
 
