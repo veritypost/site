@@ -43,10 +43,14 @@ BEGIN
   END IF;
 END $$;
 
-ALTER TABLE public.score_events
-  ADD CONSTRAINT fk_score_events_action
-  FOREIGN KEY (action) REFERENCES public.score_rules(action)
-  ON DELETE RESTRICT;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_score_events_action' AND conrelid = 'public.score_events'::regclass) THEN
+    ALTER TABLE public.score_events
+      ADD CONSTRAINT fk_score_events_action
+      FOREIGN KEY (action) REFERENCES public.score_rules(action)
+      ON DELETE RESTRICT;
+  END IF;
+END $$;
 
 DO $$
 BEGIN
@@ -98,9 +102,13 @@ BEGIN
   END IF;
 END $$;
 
-ALTER TABLE public.users
-  ADD CONSTRAINT users_mute_requires_until
-  CHECK (NOT is_muted OR muted_until IS NOT NULL);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_mute_requires_until' AND conrelid = 'public.users'::regclass) THEN
+    ALTER TABLE public.users
+      ADD CONSTRAINT users_mute_requires_until
+      CHECK (NOT is_muted OR muted_until IS NOT NULL);
+  END IF;
+END $$;
 
 DO $$
 BEGIN
@@ -495,9 +503,13 @@ ON CONFLICT (version) DO UPDATE
   SET is_current = EXCLUDED.is_current;
 
 -- FK from parental_consents.consent_version → consent_versions.version
-ALTER TABLE public.parental_consents
-  ADD CONSTRAINT fk_parental_consents_consent_version
-  FOREIGN KEY (consent_version) REFERENCES public.consent_versions(version);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_parental_consents_consent_version' AND conrelid = 'public.parental_consents'::regclass) THEN
+    ALTER TABLE public.parental_consents
+      ADD CONSTRAINT fk_parental_consents_consent_version
+      FOREIGN KEY (consent_version) REFERENCES public.consent_versions(version);
+  END IF;
+END $$;
 
 -- Re-consent columns on kid_profiles
 ALTER TABLE public.kid_profiles
@@ -532,6 +544,7 @@ CREATE TRIGGER consent_version_current_change
 
 -- RLS: service_role + parent can read their own consent version
 ALTER TABLE public.consent_versions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS consent_versions_public_read ON public.consent_versions;
 CREATE POLICY consent_versions_public_read ON public.consent_versions
   FOR SELECT USING (true);  -- version strings are not PII; all users can read
 
@@ -828,16 +841,20 @@ BEGIN
   END IF;
 END $$;
 
-CREATE TYPE public.user_state_t AS ENUM (
-  'active',
-  'banned',
-  'locked',
-  'muted',
-  'frozen',
-  'deletion_scheduled',
-  'beta_locked',
-  'comped'
-);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_state_t' AND typnamespace = 'public'::regnamespace) THEN
+    CREATE TYPE public.user_state_t AS ENUM (
+      'active',
+      'banned',
+      'locked',
+      'muted',
+      'frozen',
+      'deletion_scheduled',
+      'beta_locked',
+      'comped'
+    );
+  END IF;
+END $$;
 
 ALTER TABLE public.users
   ADD COLUMN IF NOT EXISTS user_state public.user_state_t;
@@ -870,20 +887,24 @@ ALTER TABLE public.users
 -- Unidirectional consistency CHECK: when enum = X, the primary flag for X must be set.
 -- Allows multi-flag scenarios (e.g., banned + frozen) as long as the enum matches
 -- the highest-priority flag (which the backfill and callers must enforce).
-ALTER TABLE public.users
-  ADD CONSTRAINT users_state_consistent CHECK (
-    CASE user_state
-      WHEN 'banned'             THEN is_banned = true
-      WHEN 'locked'             THEN locked_until IS NOT NULL
-      WHEN 'deletion_scheduled' THEN deletion_scheduled_for IS NOT NULL
-      WHEN 'frozen'             THEN frozen_at IS NOT NULL
-      WHEN 'muted'              THEN is_muted = true
-      WHEN 'beta_locked'        THEN verify_locked_at IS NOT NULL
-      WHEN 'comped'             THEN comped_until IS NOT NULL
-      WHEN 'active'             THEN true
-      ELSE false
-    END
-  );
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_state_consistent' AND conrelid = 'public.users'::regclass) THEN
+    ALTER TABLE public.users
+      ADD CONSTRAINT users_state_consistent CHECK (
+        CASE user_state
+          WHEN 'banned'             THEN is_banned = true
+          WHEN 'locked'             THEN locked_until IS NOT NULL
+          WHEN 'deletion_scheduled' THEN deletion_scheduled_for IS NOT NULL
+          WHEN 'frozen'             THEN frozen_at IS NOT NULL
+          WHEN 'muted'              THEN is_muted = true
+          WHEN 'beta_locked'        THEN verify_locked_at IS NOT NULL
+          WHEN 'comped'             THEN comped_until IS NOT NULL
+          WHEN 'active'             THEN true
+          ELSE false
+        END
+      );
+  END IF;
+END $$;
 
 DO $$
 DECLARE v_count bigint; v_null_count bigint;
@@ -1061,12 +1082,14 @@ CREATE TABLE IF NOT EXISTS public.subscription_topics (
 ALTER TABLE public.subscription_topics ENABLE ROW LEVEL SECURITY;
 
 -- Owner-rw: users manage their own subscriptions
+DROP POLICY IF EXISTS subscription_topics_owner_rw ON public.subscription_topics;
 CREATE POLICY subscription_topics_owner_rw ON public.subscription_topics
   FOR ALL
   USING     (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
 -- Kid-block: kid tokens cannot subscribe (inline JWT check until is_kid_delegated() lands)
+DROP POLICY IF EXISTS subscription_topics_block_kid_jwt ON public.subscription_topics;
 CREATE POLICY subscription_topics_block_kid_jwt ON public.subscription_topics
   AS RESTRICTIVE
   FOR ALL
@@ -2566,6 +2589,7 @@ $function$;
 -- ---------------------------------------------------------------------
 -- 4. register_push_token
 -- ---------------------------------------------------------------------
+DROP FUNCTION IF EXISTS public.register_push_token(uuid, text, text, text, text, text, text, text);
 CREATE OR REPLACE FUNCTION public.register_push_token(
   p_session_id uuid, p_provider text, p_token text,
   p_device_id text DEFAULT NULL::text, p_platform text DEFAULT NULL::text,
@@ -2601,6 +2625,7 @@ $function$;
 -- ---------------------------------------------------------------------
 -- 5. upsert_user_push_token
 -- ---------------------------------------------------------------------
+DROP FUNCTION IF EXISTS public.upsert_user_push_token(text, text, text, text, text, text, text);
 CREATE OR REPLACE FUNCTION public.upsert_user_push_token(
   p_provider text, p_token text,
   p_environment text DEFAULT NULL::text,
@@ -2697,6 +2722,7 @@ $function$;
 -- ---------------------------------------------------------------------
 -- 8. session_heartbeat
 -- ---------------------------------------------------------------------
+DROP FUNCTION IF EXISTS public.session_heartbeat(uuid, text, text);
 CREATE OR REPLACE FUNCTION public.session_heartbeat(
   p_session_id uuid, p_app_version text DEFAULT NULL::text, p_os_version text DEFAULT NULL::text
 )
@@ -2775,6 +2801,7 @@ $function$;
 -- ---------------------------------------------------------------------
 -- 10. mint_owner_referral_link
 -- ---------------------------------------------------------------------
+DROP FUNCTION IF EXISTS public.mint_owner_referral_link(uuid, text, integer, timestamp with time zone);
 CREATE OR REPLACE FUNCTION public.mint_owner_referral_link(
   p_actor_user_id uuid DEFAULT NULL::uuid,
   p_description text DEFAULT NULL::text,
@@ -3095,6 +3122,7 @@ $function$;
 -- ---------------------------------------------------------------------
 -- 15. get_own_login_activity
 -- ---------------------------------------------------------------------
+DROP FUNCTION IF EXISTS public.get_own_login_activity(integer);
 CREATE OR REPLACE FUNCTION public.get_own_login_activity(p_limit integer DEFAULT 50)
 RETURNS TABLE(id uuid, action character varying, created_at timestamp with time zone, metadata jsonb)
 LANGUAGE plpgsql
@@ -3187,6 +3215,7 @@ $function$;
 --      has no comments per architecture, but RPC must reject regardless).
 --      Body kept identical to the post-T0.2 (blocked_users) version.
 -- ---------------------------------------------------------------------
+DROP FUNCTION IF EXISTS public.post_comment(uuid, uuid, text, uuid, jsonb);
 CREATE OR REPLACE FUNCTION public.post_comment(
   p_user_id uuid,
   p_article_id uuid,
@@ -3618,8 +3647,11 @@ COMMIT;
 
 BEGIN;
 
--- Pre-flight: confirm the column exists.
+-- Pre-flight + UPDATE + post-check, all guarded so a post-stage-2 re-run
+-- (column already dropped) is a clean no-op rather than a failed UPDATE.
 DO $$
+DECLARE
+  remaining int;
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns
@@ -3630,17 +3662,11 @@ BEGIN
     RAISE NOTICE 'V1-fix-Q1b no-op: permissions.requires_verified already absent';
     RETURN;
   END IF;
-END $$;
 
-UPDATE public.permissions
-   SET requires_verified = false
- WHERE requires_verified = true;
+  UPDATE public.permissions
+     SET requires_verified = false
+   WHERE requires_verified = true;
 
--- Post-verification: confirm zero remaining true rows.
-DO $$
-DECLARE
-  remaining int;
-BEGIN
   SELECT COUNT(*) INTO remaining FROM public.permissions WHERE requires_verified = true;
   IF remaining > 0 THEN
     RAISE EXCEPTION 'V1-fix-Q1b post-check failed: % rows still requires_verified=true', remaining;
