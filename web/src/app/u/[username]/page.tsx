@@ -62,6 +62,7 @@ type TargetRow = Pick<
   | 'expert_title'
   | 'expert_organization'
   | 'is_verified_public_figure'
+  | 'created_at'
 >;
 
 type MeRow = Pick<Tables<'users'>, 'id'>;
@@ -187,7 +188,7 @@ export default function ProfilePage() {
       const { data: targetRow } = await supabase
         .from('public_profiles_v' as never)
         .select(
-          'id, username, display_name, bio, avatar_url, avatar_color, banner_url, verity_score, followers_count, following_count, articles_read_count, quizzes_completed_count, comment_count, profile_visibility, show_activity, is_expert, expert_title, expert_organization, is_verified_public_figure'
+          'id, username, display_name, bio, avatar_url, avatar_color, banner_url, verity_score, followers_count, following_count, articles_read_count, quizzes_completed_count, comment_count, profile_visibility, show_activity, is_expert, expert_title, expert_organization, is_verified_public_figure, created_at'
         )
         .eq('username' as never, username as never)
         .maybeSingle<TargetRow>();
@@ -449,16 +450,14 @@ export default function ProfilePage() {
               {target.display_name || target.username || 'Anonymous'}
               <VerifiedBadge user={target} />
               {tierInfo && (
+                // Tier renders as plain text in muted ink per
+                // feedback_no_color_per_tier (no hue, no gradient, no border tint).
                 <span
                   title={`Tier: ${tierInfo.display_name}`}
                   style={{
                     fontSize: 11,
-                    fontWeight: 700,
-                    padding: '2px 8px',
-                    borderRadius: 999,
-                    border: `1px solid ${tierInfo.color_hex}`,
-                    color: tierInfo.color_hex,
-                    background: 'transparent',
+                    fontWeight: 600,
+                    color: C.dim,
                     letterSpacing: '0.02em',
                     textTransform: 'uppercase',
                   }}
@@ -467,7 +466,10 @@ export default function ProfilePage() {
                 </span>
               )}
             </div>
-            <div style={{ fontSize: 13, color: '#666' }}>@{target.username}</div>
+            <div style={{ fontSize: 13, color: C.dim }}>
+              @{target.username}
+              {target.created_at ? ` · Member since ${formatMemberSince(target.created_at)}` : ''}
+            </div>
             {target.is_expert && canSeeExpert && (
               <div style={{ fontSize: 12, color: '#16a34a', fontWeight: 700, marginTop: 2 }}>
                 {target.expert_title ? `${target.expert_title}` : 'Expert'}
@@ -750,4 +752,15 @@ function secondaryActionStyle(busy: boolean): CSSProperties {
     fontFamily: 'inherit',
     opacity: busy ? 0.6 : 1,
   };
+}
+
+// Member-since string for the public hero — "Member since April 2026".
+// Day-precision is excessive for a public surface; month + year is the
+// industry norm (Reddit, GitHub, Twitter all do this) and avoids leaking
+// the exact account-creation timestamp, which is a soft fingerprinting
+// vector against the user.
+function formatMemberSince(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 }
