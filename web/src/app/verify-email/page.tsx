@@ -116,8 +116,13 @@ export default function VerifyEmailPage() {
       const res = await fetch('/api/auth/resend-verification', { method: 'POST' });
       if (res.status === 429) {
         // H1 — dedicated rate_limited state instead of reusing `expired`.
+        // [S3-A112] Drop the "in an hour" claim — server-side window
+        // is 60-minute rolling, so the actual time-until-allowed
+        // depends on when within the window the cap was hit. Keep the
+        // copy generic; rely on the cooldown-and-resend UX rather
+        // than a precise time promise.
         setStatus('rate_limited');
-        setError('Too many verification resends. Try again in an hour.');
+        setError('Too many verification resends. Please try again later.');
         setResending(false);
         return;
       }
@@ -331,7 +336,7 @@ export default function VerifyEmailPage() {
               lineHeight: 1.55,
             }}
           >
-            {error || 'Too many verification resends. Try again in about an hour.'}
+            {error || 'Too many verification resends. Please try again later.'}
           </p>
         </div>
       </div>
