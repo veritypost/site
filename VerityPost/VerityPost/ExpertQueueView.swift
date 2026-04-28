@@ -186,12 +186,15 @@ struct ExpertQueueView: View {
     }
 
     private var backChannelBody: some View {
+        // No timeline copy ("coming soon" / "in the next pass"). Owner rule:
+        // describe present state — the back-channel surface isn't available
+        // in this build, full stop (`feedback_no_user_facing_timelines`).
         VStack(spacing: 10) {
             Spacer().frame(height: 40)
             Text("Back-channel")
                 .font(.system(.headline, design: .default, weight: .bold))
                 .foregroundColor(VP.text)
-            Text("Private discussion among experts in your categories. Coming soon in a dedicated screen.")
+            Text("Private discussion among experts in your categories isn\u{2019}t available in this build.")
                 .font(.footnote)
                 .foregroundColor(VP.dim)
                 .multilineTextAlignment(.center)
@@ -425,6 +428,7 @@ private struct AnswerComposerSheet: View {
                         .frame(minHeight: 200)
                         .padding(10)
                         .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border))
+                        .accessibilityLabel("Answer this question")
                 } else {
                     ScrollView {
                         let attributed = try? AttributedString(markdown: answerText)

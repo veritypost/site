@@ -235,6 +235,11 @@ struct AlertsView: View {
                             .foregroundColor(VP.dim)
                             .multilineTextAlignment(.center)
                     }
+                    // A76 — collapse the icon + headline + body into a
+                    // single VoiceOver focus stop so the empty-state
+                    // reads as one announcement instead of three.
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("You're all caught up. Breaking news and interactions with your content will show up here. Subscribe to categories in Manage to get alerts.")
                     .padding(.top, 80)
                     .padding(.horizontal, 40)
                     .padding(.bottom, 100)
@@ -309,16 +314,21 @@ struct AlertsView: View {
     }
 
     private var manageContentPlaceholder: some View {
+        // No timeline copy. Owner rule: describe present state OR render
+        // unavailable state — no softer-timeline replacement
+        // (`feedback_no_user_facing_timelines`). Alerts inbox is fully
+        // functional; the per-topic subscription manager simply isn't
+        // available in this build, so we say so.
         VStack(spacing: 12) {
             Spacer().frame(height: 48)
             Image(systemName: "bell.badge")
                 .font(.largeTitle)
                 .foregroundColor(VP.dim)
                 .accessibilityHidden(true)
-            Text("Subscription manager coming soon")
+            Text("Subscription manager not available")
                 .font(.system(.callout, design: .default, weight: .semibold))
                 .foregroundColor(VP.text)
-            Text("We\u{2019}re redesigning how you subscribe to categories, subcategories, and keywords. Your inbox still works \u{2014} just check the Alerts tab.")
+            Text("Per-category, per-subcategory, and keyword subscriptions aren\u{2019}t available in this build. The Alerts tab still receives breaking news, replies, and mentions.")
                 .font(.caption)
                 .foregroundColor(VP.dim)
                 .multilineTextAlignment(.center)
