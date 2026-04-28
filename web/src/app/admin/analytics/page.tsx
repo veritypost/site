@@ -12,7 +12,7 @@ import NumberInput from '@/components/admin/NumberInput';
 import Badge from '@/components/admin/Badge';
 import Spinner from '@/components/admin/Spinner';
 import EmptyState from '@/components/admin/EmptyState';
-import { ToastProvider, useToast } from '@/components/admin/Toast';
+import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 import type { Tables } from '@/types/database-helpers';
 
@@ -27,14 +27,13 @@ type QuizFailure = {
   flagged: boolean;
 };
 
-const RESOURCE_USAGE = [
-  { resource: 'Supabase Database', used: '45 MB', limit: '500 MB', pct: 9 },
-  { resource: 'Supabase Bandwidth', used: '1.2 GB', limit: '5 GB', pct: 24 },
-  { resource: 'Realtime Connections', used: '34', limit: '200', pct: 17 },
-  { resource: 'Edge Functions', used: '12K', limit: '500K', pct: 2 },
-  { resource: 'Vercel Invocations', used: '28K', limit: '100K', pct: 28 },
-  { resource: 'Vercel Bandwidth', used: '8.2 GB', limit: '100 GB', pct: 8 },
-];
+// S6-A33: Resources tab + period selector dropped 2026-04-28. The
+// tab rendered RESOURCE_USAGE — a hardcoded fake list of Supabase/Vercel
+// limits with invented percentages. Operator-trust collapse class:
+// capacity decisions made on bars that look credible at a glance but
+// were imagined. The period selector exposed only 7d (a TODO sat on
+// 30d/90d while the fetch hardcoded 7 days). Reintroduce when live
+// Supabase / Vercel usage wiring is shipped; do not ship demo bars.
 
 function AnalyticsInner() {
   const router = useRouter();
@@ -42,13 +41,10 @@ function AnalyticsInner() {
   const { push } = useToast();
 
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'overview' | 'stories' | 'quizzes' | 'resources'>('overview');
-  const [, setPeriod] = useState<'7d' | '30d' | '90d'>('7d');
+  const [tab, setTab] = useState<'overview' | 'stories' | 'quizzes'>('overview');
   const [quizSort, setQuizSort] = useState<'failRate' | 'attempts' | 'flagged'>('failRate');
   const [failRedThreshold, setFailRedThreshold] = useState(40);
   const [failYellowThreshold, setFailYellowThreshold] = useState(25);
-  const [resourceWarnPct, setResourceWarnPct] = useState(50);
-  const [resourceDangerPct, setResourceDangerPct] = useState(80);
 
   const [totalUsers, setTotalUsers] = useState(0);
   const [totalStories, setTotalStories] = useState(0);
@@ -181,14 +177,7 @@ function AnalyticsInner() {
     <Page>
       <PageHeader
         title="Analytics"
-        subtitle="Traffic, engagement, quiz quality, and resource usage."
-        actions={
-          // TODO: 30d/90d options hidden — fetch currently hardcodes 7 days.
-          // Re-enable once the fetch reads the selected period.
-          <div style={{ display: 'flex', gap: S[1] }}>
-            <Button size="sm" variant="primary" onClick={() => setPeriod('7d')}>7d</Button>
-          </div>
-        }
+        subtitle="Traffic, engagement, and quiz quality (last 7 days)."
       />
 
       {loadError && (
@@ -219,7 +208,6 @@ function AnalyticsInner() {
           { k: 'overview', l: 'Traffic' },
           { k: 'stories', l: 'Top articles' },
           { k: 'quizzes', l: 'Quiz failures' },
-          { k: 'resources', l: 'Resources' },
         ] as const).map((t) => (
           <button
             key={t.k}
@@ -363,59 +351,6 @@ function AnalyticsInner() {
         </PageSection>
       )}
 
-      {tab === 'resources' && (
-        <PageSection title="Resource usage">
-          <div style={{
-            padding: S[3], marginBottom: S[3], borderRadius: 8,
-            background: 'rgba(234,179,8,0.08)', border: `1px solid ${C.warn}`,
-            color: C.warn, fontSize: F.sm, fontWeight: 600,
-          }}>
-            [Demo data] These figures are placeholders. Live Supabase / Vercel usage wiring is pending — do not use for capacity decisions.
-          </div>
-          <div style={{
-            display: 'flex', gap: S[4], alignItems: 'center', flexWrap: 'wrap',
-            padding: S[3], marginBottom: S[3], borderRadius: 8, border: `1px solid ${C.divider}`, background: C.bg,
-          }}>
-            <div>
-              <label style={lblStyle}>Warning at</label>
-              <NumberInput block={false} style={{ width: 80 }} value={resourceWarnPct}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setResourceWarnPct(parseInt(e.target.value) || 0)} />
-            </div>
-            <div>
-              <label style={lblStyle}>Danger at</label>
-              <NumberInput block={false} style={{ width: 80 }} value={resourceDangerPct}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setResourceDangerPct(parseInt(e.target.value) || 0)} />
-            </div>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: S[2] }}>
-            {RESOURCE_USAGE.map((r) => {
-              const color =
-                r.pct > resourceDangerPct ? C.danger :
-                r.pct > resourceWarnPct ? C.warn : C.success;
-              return (
-                <div key={r.resource} style={{
-                  padding: S[3], borderRadius: 8,
-                  background: C.bg, border: `1px solid ${C.divider}`,
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: S[1], gap: S[2], flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: F.base, fontWeight: 500, color: C.white }}>{r.resource}</span>
-                    <span style={{ fontSize: F.sm, color: C.dim }}>{r.used} / {r.limit}</span>
-                  </div>
-                  <div style={{ height: 6, borderRadius: 3, background: C.card }}>
-                    <div style={{ height: 6, borderRadius: 3, background: color, width: `${r.pct}%`, transition: 'width 300ms' }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <div style={{
-            marginTop: S[3], padding: S[3], background: C.card, border: `1px solid ${C.divider}`,
-            borderRadius: 8, fontSize: F.sm, color: C.dim, lineHeight: 1.5,
-          }}>
-            Free-tier limits shown. Upgrade Supabase or Vercel when any bar passes your danger threshold.
-          </div>
-        </PageSection>
-      )}
     </Page>
   );
 }
@@ -426,9 +361,5 @@ const lblStyle: React.CSSProperties = {
 };
 
 export default function AnalyticsAdmin() {
-  return (
-    <ToastProvider>
-      <AnalyticsInner />
-    </ToastProvider>
-  );
+  return <AnalyticsInner />;
 }

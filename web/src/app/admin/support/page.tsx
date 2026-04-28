@@ -13,8 +13,6 @@ import Toolbar from '@/components/admin/Toolbar';
 import Button from '@/components/admin/Button';
 import Textarea from '@/components/admin/Textarea';
 import Select from '@/components/admin/Select';
-import Switch from '@/components/admin/Switch';
-import Checkbox from '@/components/admin/Checkbox';
 import StatCard from '@/components/admin/StatCard';
 import Badge from '@/components/admin/Badge';
 import Drawer from '@/components/admin/Drawer';
@@ -61,120 +59,27 @@ function prettyTime(iso: string | null | undefined): string {
   try { return new Date(iso).toLocaleString(); } catch { return iso; }
 }
 
-function ChatWidgetConfig() {
-  const { push } = useToast();
-  const [expanded, setExpanded] = useState(false);
-  const [masterOn, setMasterOn] = useState(false);
-  const [conditions, setConditions] = useState<Record<string, boolean>>({
-    gracePeriod: true,
-    paymentFailed: true,
-    paidPlans: true,
-    recentSupport: false,
-    allUsers: false,
-  });
-
-  const CONDITION_LABELS: Record<string, string> = {
-    gracePeriod:   'Show to users in grace period',
-    paymentFailed: 'Show to users with payment failed',
-    paidPlans:     'Show to paid users / Experts',
-    recentSupport: 'Show to users who contacted support in last 7 days',
-    allUsers:      'Show to all users',
-  };
-
-  const activeCount = Object.values(conditions).filter(Boolean).length;
-  const estimated = !masterOn ? 0
-    : conditions.allUsers ? '~all'
-    : activeCount === 0 ? 0
-    : `~${[
-        conditions.gracePeriod ? 120 : 0,
-        conditions.paymentFailed ? 85 : 0,
-        conditions.paidPlans ? 3400 : 0,
-        conditions.recentSupport ? 210 : 0,
-      ].reduce((a, b) => a + b, 0).toLocaleString()}`;
-
+// S6-A32: ChatWidgetConfig was deleted 2026-04-28. The component shipped
+// fake state — the master toggle, condition checkboxes, and estimated-user
+// count all lived in useState only. Toggling did nothing, the count was
+// invented (`gracePeriod ? 120 : 0`, `paidPlans ? 3400 : 0`, etc.).
+// Operator-trust collapse class. There is no chat-widget integration in
+// the product to wire to. When one ships, build the surface from the
+// real integration. Until then this static panel reflects truth.
+function ChatWidgetPanel() {
   return (
-    <PageSection title="Live chat widget" description="Who sees the chat widget in-app">
-      <div style={{ border: `1px solid ${C.divider}`, borderRadius: 8, background: C.bg }}>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: S[3],
-            padding: `${S[3]}px ${S[4]}px`,
-            borderBottom: expanded ? `1px solid ${C.divider}` : 'none',
-          }}
-        >
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: F.base, fontWeight: 600, color: C.white }}>Chat widget</div>
-            <div style={{ fontSize: F.xs, color: C.dim }}>
-              When disabled, users see the Contact Us form instead.
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: S[2] }}>
-            <Switch
-              checked={masterOn}
-              onChange={(next: boolean) => {
-                setMasterOn(next);
-                push({ message: next ? 'Chat widget enabled' : 'Chat widget disabled', variant: 'success' });
-              }}
-            />
-            <Button variant="ghost" size="sm" onClick={() => setExpanded((v) => !v)}>
-              {expanded ? 'Hide' : 'Configure'}
-            </Button>
-          </div>
-        </div>
-
-        {expanded && (
-          <div style={{ padding: S[4] }}>
-            {!masterOn ? (
-              <div style={{ fontSize: F.sm, color: C.dim }}>
-                Enable the toggle to configure which users see the widget.
-              </div>
-            ) : (
-              <>
-                <div
-                  style={{
-                    fontSize: F.xs,
-                    fontWeight: 600,
-                    color: C.dim,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
-                    marginBottom: S[2],
-                  }}
-                >
-                  Show widget when…
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: S[1] }}>
-                  {Object.entries(CONDITION_LABELS).map(([key, label]) => (
-                    <Checkbox
-                      key={key}
-                      checked={!!conditions[key]}
-                      onChange={() => setConditions((prev) => ({ ...prev, [key]: !prev[key] }))}
-                      label={label}
-                    />
-                  ))}
-                </div>
-                <div
-                  style={{
-                    marginTop: S[3],
-                    padding: `${S[2]}px ${S[3]}px`,
-                    border: `1px solid ${C.divider}`,
-                    borderRadius: 6,
-                    fontSize: F.sm,
-                    color: C.soft,
-                  }}
-                >
-                  Would appear for{' '}
-                  <span style={{ color: C.white, fontWeight: 600 }}>
-                    {estimated === 0 ? 'no users' : `${estimated} users`}
-                  </span>{' '}
-                  based on current conditions.
-                </div>
-              </>
-            )}
-          </div>
-        )}
+    <PageSection title="Live chat widget">
+      <div
+        style={{
+          border: `1px solid ${C.divider}`,
+          borderRadius: 8,
+          background: C.bg,
+          padding: `${S[3]}px ${S[4]}px`,
+          fontSize: F.sm,
+          color: C.dim,
+        }}
+      >
+        Live chat is not enabled. To enable, ship a chat-widget integration first.
       </div>
     </PageSection>
   );
@@ -422,7 +327,7 @@ export default function SupportAdmin() {
         <StatCard label="Total" value={tickets.length} />
       </div>
 
-      <ChatWidgetConfig />
+      <ChatWidgetPanel />
 
       <PageSection title="Tickets" description="Click a ticket to read the thread and reply">
         <Toolbar
