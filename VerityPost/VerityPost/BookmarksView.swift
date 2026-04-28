@@ -19,6 +19,23 @@ struct BookmarksView: View {
     @State private var errorText: String? = nil
     @State private var hasUnlimitedBookmarks: Bool = false
     @State private var hasCollections: Bool = false
+    /// A119 — pagination state. The list page shows up to `pageSize`
+    /// rows; if the server returns a full page we offer "Load more"
+    /// which appends the next page using created_at as the cursor.
+    @State private var loadingMore: Bool = false
+    @State private var canLoadMore: Bool = false
+    private static let pageSize = 50
+    /// A121 — pending undo state. After a Remove tap, the row is removed
+    /// from the visible list optimistically and a 5-second undo banner
+    /// appears at the bottom. The actual server DELETE is queued via
+    /// `pendingDeleteTask`; tapping Undo cancels the task and restores
+    /// the row.
+    @State private var pendingDelete: BookmarkItem?
+    @State private var pendingDeleteOriginalIndex: Int?
+    @State private var pendingDeleteTask: Task<Void, Never>?
+    /// A120 — confirmation-dialog target. Set when the user taps Remove,
+    /// cleared when they confirm or cancel.
+    @State private var confirmRemoveTarget: BookmarkItem?
 
     private var isFreeTier: Bool { !hasUnlimitedBookmarks }
 
@@ -78,6 +95,26 @@ struct BookmarksView: View {
                         ForEach(filtered) { b in
                             bookmarkCard(b)
                         }
+                        if canLoadMore {
+                            Button {
+                                Task { await loadMore() }
+                            } label: {
+                                if loadingMore {
+                                    ProgressView()
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 12)
+                                } else {
+                                    Text("Load more")
+                                        .font(.system(.footnote, design: .default, weight: .semibold))
+                                        .foregroundColor(VP.accent)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 12)
+                                }
+                            }
+                            .disabled(loadingMore)
+                            .buttonStyle(.plain)
+                            .padding(.top, 4)
+                        }
                     }
                     .padding(.horizontal, 16)
                 }
@@ -97,6 +134,146 @@ struct BookmarksView: View {
         .navigationDestination(item: $navigatedStory) { story in
             StoryDetailView(story: story).environmentObject(auth)
         }
+        // A120 — confirmation prompt. Native dialog matches platform
+        // expectations and avoids a custom alert sheet.
+        .confirmationDialog(
+            "Remove this bookmark?",
+            isPresented: confirmRemoveBinding,
+            titleVisibility: .visible,
+            presenting: confirmRemoveTarget
+        ) { target in
+            Button("Remove", role: .destructive) {
+                queueOptimisticRemove(target)
+                confirmRemoveTarget = nil
+            }
+            Button("Cancel", role: .cancel) {
+                confirmRemoveTarget = nil
+            }
+        } message: { target in
+            if let title = target.articles?.title, !title.isEmpty {
+                Text(title)
+            } else {
+                Text("You'll have 5 seconds to undo.")
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if let pending = pendingDelete {
+                undoBanner(for: pending)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .padding(.bottom, 16)
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: pendingDelete?.id)
+    }
+
+    /// A120 — binding adapter so `.confirmationDialog(isPresented:)` can
+    /// flip false on the dialog's own dismiss path while still using
+    /// `confirmRemoveTarget` as the source of truth.
+    private var confirmRemoveBinding: Binding<Bool> {
+        Binding(
+            get: { confirmRemoveTarget != nil },
+            set: { newValue in
+                if !newValue { confirmRemoveTarget = nil }
+            }
+        )
+    }
+
+    // MARK: - A121 — optimistic remove + 5s undo
+
+    private func queueOptimisticRemove(_ target: BookmarkItem) {
+        // Cancel any prior pending delete first so two fast removes
+        // don't stack overlapping banners; commit the prior one
+        // immediately to honour the prior intent.
+        if let prior = pendingDelete {
+            pendingDeleteTask?.cancel()
+            Task { await commitRemove(prior) }
+        }
+        guard let idx = items.firstIndex(where: { $0.id == target.id }) else { return }
+        pendingDelete = target
+        pendingDeleteOriginalIndex = idx
+        items.remove(at: idx)
+        pendingDeleteTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 5 * 1_000_000_000)
+            guard let self, !Task.isCancelled else { return }
+            await self.commitRemove(target)
+            await MainActor.run {
+                if self.pendingDelete?.id == target.id {
+                    self.pendingDelete = nil
+                    self.pendingDeleteOriginalIndex = nil
+                    self.pendingDeleteTask = nil
+                }
+            }
+        }
+    }
+
+    private func undo() {
+        pendingDeleteTask?.cancel()
+        pendingDeleteTask = nil
+        if let pending = pendingDelete {
+            let idx = pendingDeleteOriginalIndex ?? 0
+            let safeIdx = min(max(0, idx), items.count)
+            items.insert(pending, at: safeIdx)
+        }
+        pendingDelete = nil
+        pendingDeleteOriginalIndex = nil
+    }
+
+    private func commitRemove(_ b: BookmarkItem) async {
+        guard let session = try? await client.auth.session else {
+            // Restore on auth-loss so the user doesn't lose the row
+            // silently — the optimistic UI already removed it locally.
+            await MainActor.run {
+                if pendingDelete?.id == b.id {
+                    let idx = pendingDeleteOriginalIndex ?? 0
+                    let safeIdx = min(max(0, idx), items.count)
+                    items.insert(b, at: safeIdx)
+                    pendingDelete = nil
+                    pendingDeleteOriginalIndex = nil
+                    errorText = "Sign in to manage your bookmarks."
+                }
+            }
+            return
+        }
+        let site = SupabaseManager.shared.siteURL
+        guard let url = URL(string: "/api/bookmarks/\(b.id)", relativeTo: site) else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "DELETE"
+        req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        do {
+            let (_, response) = try await URLSession.shared.data(for: req)
+            if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+                Log.d("[Bookmarks] DELETE non-200:", http.statusCode)
+            }
+        } catch {
+            Log.d("[Bookmarks] DELETE failed:", error)
+        }
+    }
+
+    @ViewBuilder
+    private func undoBanner(for pending: BookmarkItem) -> some View {
+        HStack(spacing: 12) {
+            Text("Removed")
+                .font(.system(.footnote, design: .default, weight: .semibold))
+                .foregroundColor(.white)
+            if let title = pending.articles?.title, !title.isEmpty {
+                Text(title)
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.85))
+                    .lineLimit(1)
+            }
+            Spacer()
+            Button("Undo") { undo() }
+                .font(.system(.footnote, design: .default, weight: .bold))
+                .foregroundColor(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .frame(minHeight: 36)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(VP.text)
+        .cornerRadius(10)
+        .padding(.horizontal, 20)
     }
 
     // MARK: - Realtime
@@ -243,8 +420,11 @@ struct BookmarksView: View {
                             .foregroundColor(VP.dim)
                     }
                     Spacer()
-                    Button {
-                        Task { await removeBookmark(b) }
+                    Button(role: .destructive) {
+                        // A120 — confirmation prompt before remove. A121 —
+                        // optimistic remove + 5s undo banner; server DELETE
+                        // is queued so an Undo tap cancels it cleanly.
+                        confirmRemoveTarget = b
                     } label: {
                         Text("Remove")
                             .font(.system(.caption, design: .default, weight: .semibold))
@@ -332,49 +512,72 @@ struct BookmarksView: View {
         loading = true
         defer { loading = false }
         do {
+            // A119 — first page. `limit(pageSize + 1)` is the standard
+            // "is there a next page?" probe — if we got back exactly
+            // pageSize+1 rows, the (pageSize+1)th is dropped from the
+            // visible list and `canLoadMore` flips true.
             let rows: [BookmarkItem] = try await client.from("bookmarks")
                 .select("id, notes, collection_id, collection_name, created_at, articles(id, title, slug, excerpt, published_at, categories(name))")
                 .eq("user_id", value: userId)
                 .order("created_at", ascending: false)
-                .limit(200)
+                .limit(BookmarksView.pageSize + 1)
                 .execute().value
-            items = rows
-            let names = Set(rows.compactMap { $0.collectionName }.filter { !$0.isEmpty })
+            if rows.count > BookmarksView.pageSize {
+                items = Array(rows.prefix(BookmarksView.pageSize))
+                canLoadMore = true
+            } else {
+                items = rows
+                canLoadMore = false
+            }
+            let names = Set(items.compactMap { $0.collectionName }.filter { !$0.isEmpty })
             collections = Array(names).sorted()
         } catch {
             errorText = "Couldn\u{2019}t load bookmarks."
         }
     }
 
-    private func removeBookmark(_ b: BookmarkItem) async {
-        let original = items.firstIndex(where: { $0.id == b.id })
-        if let i = original { items.remove(at: i) }
-        guard let session = try? await client.auth.session else {
-            if let i = original, i <= items.count { items.insert(b, at: i) }
-            errorText = "Sign in to manage your bookmarks."
-            return
-        }
-        let site = SupabaseManager.shared.siteURL
-        guard let url = URL(string: "/api/bookmarks/\(b.id)", relativeTo: site) else {
-            if let i = original, i <= items.count { items.insert(b, at: i) }
-            errorText = "Couldn\u{2019}t remove."
-            return
-        }
-        var req = URLRequest(url: url)
-        req.httpMethod = "DELETE"
-        req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+    /// A119 — append the next page. Uses the oldest current item's
+    /// created_at as the cursor (`created_at < oldestCursor`) so the
+    /// pagination stays stable even if a realtime INSERT lands between
+    /// pulls. Probes pageSize+1 to know whether to keep the load-more
+    /// affordance visible.
+    private func loadMore() async {
+        guard let userId = auth.currentUser?.id else { return }
+        guard let cursor = items.compactMap({ $0.createdAt }).min() else { return }
+        loadingMore = true
+        defer { loadingMore = false }
         do {
-            let (_, response) = try await URLSession.shared.data(for: req)
-            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                if let i = original, i <= items.count { items.insert(b, at: i) }
-                errorText = "Couldn\u{2019}t remove."
-                return
+            let cursorIso = ISO8601DateFormatter().string(from: cursor)
+            let rows: [BookmarkItem] = try await client.from("bookmarks")
+                .select("id, notes, collection_id, collection_name, created_at, articles(id, title, slug, excerpt, published_at, categories(name))")
+                .eq("user_id", value: userId)
+                .lt("created_at", value: cursorIso)
+                .order("created_at", ascending: false)
+                .limit(BookmarksView.pageSize + 1)
+                .execute().value
+            let appended: [BookmarkItem]
+            if rows.count > BookmarksView.pageSize {
+                appended = Array(rows.prefix(BookmarksView.pageSize))
+                canLoadMore = true
+            } else {
+                appended = rows
+                canLoadMore = false
             }
+            // Dedupe by id in case realtime + page-fetch race.
+            let known = Set(items.map { $0.id })
+            items.append(contentsOf: appended.filter { !known.contains($0.id) })
+            let names = Set(items.compactMap { $0.collectionName }.filter { !$0.isEmpty })
+            collections = Array(names).sorted()
         } catch {
-            if let i = original, i <= items.count { items.insert(b, at: i) }
-            errorText = "Couldn\u{2019}t remove."
+            errorText = "Couldn\u{2019}t load more bookmarks."
         }
     }
+
+    // A120 + A121 — the prior immediate-remove `removeBookmark` was
+    // replaced by `queueOptimisticRemove` (5s undo) → `commitRemove`
+    // (server DELETE). The confirmation dialog gates the queue entry
+    // point. The 5-second undo banner replaces the earlier on-success-or-
+    // failure inline error revert.
 
     private func fetchStoryBySlug(_ slug: String) async -> Story? {
         do {
