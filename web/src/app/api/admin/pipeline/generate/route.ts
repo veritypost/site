@@ -76,6 +76,10 @@ import {
 } from '@/lib/pipeline/persist-article';
 import { renderBodyHtml } from '@/lib/pipeline/render-body';
 import { pipelineLog } from '@/lib/pipeline/logger';
+import {
+  reserveCostOrFail,
+  reconcileCostReservation,
+} from '@/lib/pipeline/cost-reservation';
 import type { Database, Json } from '@/types/database';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -116,13 +120,18 @@ const SourceUrlSchema = z
   );
 
 const RequestSchema = z.object({
-  cluster_id: z.string().uuid(),
+  // Session A — cluster_id is optional when mode='standalone' is paired
+  // with at least one source_urls entry. The route synthesizes a real
+  // feed_clusters row in that case so cluster lock + audience-state +
+  // Discovery filtering all behave consistently.
+  cluster_id: z.string().uuid().optional(),
   audience: z.enum(['adult', 'kid']),
   age_band: z.enum(['kids', 'tweens']).optional(),
   freeform_instructions: z.string().max(2000).optional(),
   provider: z.enum(['anthropic', 'openai']).default('anthropic'),
   model: z.string().min(3).max(100).default('claude-sonnet-4-6'),
   source_urls: z.array(SourceUrlSchema).max(10).optional(),
+  mode: z.enum(['cluster', 'standalone']).optional(),
 });
 type RequestInput = z.infer<typeof RequestSchema>;
 
@@ -167,6 +176,15 @@ const ALL_STEPS: readonly Step[] = [
 // supporting calls, not admin-picker selections. If the picker switches
 // primary provider to OpenAI, we keep using Anthropic for these small probes.
 const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
+
+// Session A — per-run reservation envelope (Decision 14). Mirrors the
+// `pipeline.per_run_cost_usd_cap` setting (default $0.50). Reserved
+// atomically at run start via reserve_cost_or_fail; settled in the
+// finally block via reconcile_cost_reservation. Concurrent generates see
+// this amount in the cap-check sum until each run completes — eliminates
+// the check-then-spend race that 3 simultaneous Story-card clicks
+// trigger.
+const RUN_RESERVATION_USD = 0.5;
 
 // ----------------------------------------------------------------------------
 // Local error: audience safety mismatch (not in errors.ts because it's
@@ -478,7 +496,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
   }
 
-  const { cluster_id, audience, freeform_instructions, provider, model, source_urls } = input;
+  const { audience, freeform_instructions, provider, model, source_urls, mode } = input;
   const effectiveAgeBand: 'kids' | 'tweens' | 'adult' =
     audience === 'kid' ? (input.age_band ?? 'kids') : 'adult';
   // De-dupe + drop empties; the schema already trimmed + validated each entry.
@@ -492,6 +510,41 @@ export async function POST(req: Request) {
   let sourceUrlsOverridden = sourceUrlsExplicit;
   const service = createServiceClient();
 
+  // Session A — standalone-mode: synthesize a real feed_clusters row when
+  // the caller didn't supply a cluster_id but is supplying source URLs
+  // directly. Inserting a real row (not skipping cluster lookup) keeps
+  // cluster lock + audience-state seeding + Discovery filtering coherent.
+  // Marker: keywords=['standalone'] (feed_clusters has no metadata jsonb
+  // column today; AI-today.md asks for `metadata={'standalone': true}`,
+  // flagged in PR description as a schema delta from the spec).
+  let cluster_id: string;
+  if (input.cluster_id) {
+    cluster_id = input.cluster_id;
+  } else if (mode === 'standalone' && sourceUrlsExplicit) {
+    const { data: synth, error: synthErr } = await service
+      .from('feed_clusters')
+      .insert({ title: 'Standalone draft', keywords: ['standalone'], audience: 'adult' })
+      .select('id')
+      .single();
+    if (synthErr || !synth) {
+      pipelineLog.error('newsroom.generate.standalone_cluster_failed', {
+        step: 'standalone_cluster',
+        error_type: 'unknown',
+        error_message: synthErr?.message ?? 'no row returned',
+      });
+      return NextResponse.json(
+        { error: 'Could not create standalone cluster' },
+        { status: 500 }
+      );
+    }
+    cluster_id = synth.id as string;
+  } else {
+    return NextResponse.json(
+      { error: 'cluster_id required (or pass mode="standalone" with source_urls)' },
+      { status: 400 }
+    );
+  }
+
   // 3. Kill switch
   const enabled = await isGenerationEnabled(service, audience);
   if (!enabled) {
@@ -503,51 +556,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Generation disabled' }, { status: 503 });
   }
 
-  // 4. Daily cost cap pre-flight
-  try {
-    const { data: todayUsd, error: costErr } = await service.rpc('pipeline_today_cost_usd');
-    if (costErr) {
-      pipelineLog.error('newsroom.generate.cost_cap_check', {
-        cluster_id,
-        audience,
-        step: 'cost_cap_check',
-        error_type: 'unknown',
-        error_message: costErr.message,
-      });
-      return NextResponse.json({ error: 'Cost check unavailable' }, { status: 503 });
-    }
-    const { data: capData } = await service
-      .from('settings')
-      .select('value')
-      .eq('key', 'pipeline.daily_cost_usd_cap')
-      .maybeSingle();
-    const cap = Number(capData?.value ?? 10);
-    const today = Number(todayUsd ?? 0);
-    if (Number.isFinite(cap) && today >= cap) {
-      pipelineLog.warn('newsroom.generate.cost_cap_check', {
-        cluster_id,
-        audience,
-        step: 'cost_cap_check',
-        today_usd: today,
-        cap_usd: cap,
-      });
-      return NextResponse.json(
-        { error: 'Daily cost cap reached', today_usd: today, cap_usd: cap },
-        { status: 402 }
-      );
-    }
-  } catch (err) {
-    pipelineLog.error('newsroom.generate.cost_cap_check', {
-      cluster_id,
-      audience,
-      step: 'cost_cap_check',
-      error_type: 'unknown',
-      error_message: err instanceof Error ? err.message : String(err),
-    });
-    return NextResponse.json({ error: 'Cost check unavailable' }, { status: 503 });
-  }
-
-  // 5. Rate limit
+  // 4. Rate limit
   const rl = await checkRateLimit(service, {
     key: `newsroom_generate:user:${actorId}`,
     policyKey: 'newsroom_generate',
@@ -621,8 +630,13 @@ export async function POST(req: Request) {
       input_params: {
         cluster_id,
         audience,
+        // Session A — age_band on the run row so the cancel route can
+        // resolve the audience_band for release_cluster_lock_v2 +
+        // audience-state reset without re-deriving from the request body.
+        age_band: effectiveAgeBand,
         provider,
         model,
+        ...(mode === 'standalone' ? { mode: 'standalone' } : {}),
         ...(sourceUrlsOverridden
           ? { source_urls_overridden: true, source_urls: sourceUrlOverride }
           : {}),
@@ -657,6 +671,61 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Could not start generate run' }, { status: 500 });
   }
   const runId = runRow.id as string;
+
+  // 6b. Session A — atomic cost reservation (Decision 14). Replaces the
+  // previous check-then-run pre-flight: reserve_cost_or_fail takes an
+  // advisory xact lock so concurrent generates can no longer each pass
+  // before any has spent. Distinct from the kill-switch above
+  // (different error_type so dashboards can split). The reservation is
+  // settled in the finally block via reconcile_cost_reservation.
+  try {
+    const reservation = await reserveCostOrFail(runId, RUN_RESERVATION_USD);
+    if (!reservation.accepted) {
+      pipelineLog.warn('newsroom.generate.cost_cap_check', {
+        cluster_id,
+        audience,
+        run_id: runId,
+        step: 'cost_cap_check',
+        today_usd: reservation.today_usd,
+        cap_usd: reservation.cap_usd,
+      });
+      await failRun(
+        service,
+        runId,
+        startedAtMs,
+        'cost_cap_exceeded',
+        'Daily cost cap reached',
+        0
+      );
+      return NextResponse.json(
+        {
+          error: 'Daily cost cap reached',
+          today_usd: reservation.today_usd,
+          cap_usd: reservation.cap_usd,
+          run_id: runId,
+        },
+        { status: 402 }
+      );
+    }
+  } catch (reserveErr) {
+    pipelineLog.error('newsroom.generate.cost_cap_check', {
+      cluster_id,
+      audience,
+      run_id: runId,
+      step: 'cost_cap_check',
+      error_type: 'unknown',
+      error_message: reserveErr instanceof Error ? reserveErr.message : String(reserveErr),
+    });
+    await failRun(
+      service,
+      runId,
+      startedAtMs,
+      'unknown',
+      reserveErr instanceof Error ? reserveErr.message : String(reserveErr),
+      0
+    );
+    return NextResponse.json({ error: 'Cost check unavailable' }, { status: 503 });
+  }
 
   // 7. Load cluster + discovery items (before acquiring lock so 404/audience
   //    mismatch short-circuit without claiming)
@@ -826,9 +895,14 @@ export async function POST(req: Request) {
     }
   }
 
-  // 8. Acquire cluster lock
-  const { data: lockData, error: lockErr } = await service.rpc('claim_cluster_lock', {
+  // 8. Acquire cluster lock — Session A: per-audience lock (Decision 5/H1).
+  // claim_cluster_lock_v2 keys on (cluster_id, audience_band) so adult /
+  // tweens / kids generates run independently against the same Story.
+  // The legacy claim_cluster_lock RPC stays callable for any unmigrated
+  // caller; this route no longer uses it.
+  const { data: lockData, error: lockErr } = await service.rpc('claim_cluster_lock_v2', {
     p_cluster_id: cluster_id,
+    p_audience_band: effectiveAgeBand,
     p_locked_by: runId,
     p_ttl_sec: 600,
   });
@@ -843,17 +917,34 @@ export async function POST(req: Request) {
       runId,
       startedAtMs,
       'cluster_locked',
-      'Cluster lock held by another run',
+      'Audience already generating for this Story',
       0
     );
     return NextResponse.json(
       {
-        error: 'Cluster currently generating',
+        error: 'Audience already generating for this Story',
         locked_by: lockRow?.locked_by ?? null,
         locked_at: lockRow?.locked_at ?? null,
       },
       { status: 409 }
     );
+  }
+
+  // Session A — flip audience-state to 'generating' immediately after lock
+  // claim and before any LLM work. The seed-on-cluster-insert trigger
+  // ensures the row already exists for non-standalone clusters, and the
+  // standalone synth path triggers the same seed; this is an UPDATE not
+  // an INSERT. Best-effort: a missed write doesn't block the run, but
+  // the new Newsroom card won't show "Generating" until the run row
+  // updates.
+  try {
+    await service
+      .from('feed_cluster_audience_state')
+      .update({ state: 'generating' })
+      .eq('cluster_id', cluster_id)
+      .eq('audience_band', effectiveAgeBand);
+  } catch (audErr) {
+    console.error('[newsroom.generate.audience_state.generating]', audErr);
   }
 
   // Mark discovery_items state='generating' (Task 11 primitive). Skipped on
@@ -1754,6 +1845,23 @@ Empty array if all correct.`;
     slug = persisted.slug;
     stepTimings[persistStepName] = Date.now() - persistStart;
 
+    // Session A — flip audience-state to 'generated' as soon as the
+    // article id is known so the new Newsroom card transitions to
+    // "View article" without waiting for the run row's status update.
+    try {
+      await service
+        .from('feed_cluster_audience_state')
+        .update({
+          state: 'generated',
+          article_id: articleId,
+          generated_at: new Date().toISOString(),
+        })
+        .eq('cluster_id', cluster_id)
+        .eq('audience_band', effectiveAgeBand);
+    } catch (audErr) {
+      console.error('[newsroom.generate.audience_state.generated]', audErr);
+    }
+
     // M4 / Q9 — flag for manual review when plagiarism step soft-degraded.
     if (needsManualReview || plagiarismStatus !== 'ok') {
       // Cast: generated Database types lag behind migration 166; the
@@ -1896,14 +2004,41 @@ Empty array if all correct.`;
       }
     }
 
-    // b. Release cluster lock
+    // b. Release cluster lock — Session A: per-audience release.
     try {
-      await service.rpc('release_cluster_lock', {
+      await service.rpc('release_cluster_lock_v2', {
         p_cluster_id: cluster_id,
+        p_audience_band: effectiveAgeBand,
         p_locked_by: runId,
       });
     } catch (lockReleaseErr) {
       console.error('[newsroom.generate.finally.unlock]', lockReleaseErr);
+    }
+
+    // b2. Session A — audience-state terminal write on failure. The
+    // success path already flipped to 'generated' inline after persist;
+    // only the failed branch needs handling here. Guard with
+    // state='generating' so a concurrent cancel that reset to 'pending'
+    // isn't clobbered.
+    if (finalStatus !== 'completed') {
+      try {
+        await service
+          .from('feed_cluster_audience_state')
+          .update({ state: 'failed' })
+          .eq('cluster_id', cluster_id)
+          .eq('audience_band', effectiveAgeBand)
+          .eq('state', 'generating');
+      } catch (audErr) {
+        console.error('[newsroom.generate.finally.audience_state]', audErr);
+      }
+    }
+
+    // b3. Session A — reconcile the cost reservation. Fire-and-forget;
+    // log on error. Unsettled reservations age out via the cron sweep.
+    try {
+      await reconcileCostReservation(runId);
+    } catch (reconcileErr) {
+      console.error('[newsroom.generate.finally.reconcile_reservation]', reconcileErr);
     }
 
     // c. Update pipeline_runs row

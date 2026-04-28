@@ -67,7 +67,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
 
   const { data: run, error: fetchErr } = await service
     .from('pipeline_runs')
-    .select('id, status, pipeline_type, cluster_id, audience, started_at')
+    .select('id, status, pipeline_type, cluster_id, audience, started_at, input_params')
     .eq('id', params.id)
     .maybeSingle();
 
@@ -114,10 +114,32 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     return NextResponse.json({ error: 'Cancel failed' }, { status: 500 });
   }
 
-  if (run.cluster_id) {
+  // Session A — derive audience_band from input_params.age_band (written
+  // by generate at run start). Falls back to the legacy mapping if the
+  // run predates that field: audience='adult' → 'adult', audience='kid'
+  // without explicit age_band → 'kids'. A run with audience='kid' and no
+  // captured age_band is conservatively treated as kids — mirrors the
+  // generate route's effectiveAgeBand default.
+  let audienceBand: 'adult' | 'tweens' | 'kids' | null = null;
+  if (run.audience === 'adult') {
+    audienceBand = 'adult';
+  } else if (run.audience === 'kid') {
+    const ip =
+      run.input_params && typeof run.input_params === 'object' && !Array.isArray(run.input_params)
+        ? (run.input_params as Record<string, unknown>)
+        : {};
+    const fromParams = typeof ip.age_band === 'string' ? ip.age_band : null;
+    audienceBand =
+      fromParams === 'tweens' || fromParams === 'kids' || fromParams === 'adult'
+        ? (fromParams as 'tweens' | 'kids' | 'adult')
+        : 'kids';
+  }
+
+  if (run.cluster_id && audienceBand) {
     try {
-      await service.rpc('release_cluster_lock', {
+      await service.rpc('release_cluster_lock_v2', {
         p_cluster_id: run.cluster_id,
+        p_audience_band: audienceBand,
         p_locked_by: params.id,
       });
     } catch (lockErr) {
@@ -126,8 +148,6 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   }
 
   if (run.cluster_id && run.audience) {
-    // Phase 1 of AI + Plan Change Implementation consolidated kid runs into
-    // discovery_items; kid_discovery_items table is dropped.
     try {
       await service
         .from('discovery_items')
@@ -136,6 +156,23 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
         .eq('state', 'generating');
     } catch (stateErr) {
       console.error('[admin.pipeline.runs.cancel.state]', stateErr);
+    }
+  }
+
+  // Session A — reset the audience-state row from 'generating' back to
+  // 'pending' so the new Newsroom card returns to its idle state. Guard
+  // with state='generating' so a generate finally that has already run
+  // (and wrote 'failed') isn't clobbered.
+  if (run.cluster_id && audienceBand) {
+    try {
+      await service
+        .from('feed_cluster_audience_state')
+        .update({ state: 'pending' })
+        .eq('cluster_id', run.cluster_id)
+        .eq('audience_band', audienceBand)
+        .eq('state', 'generating');
+    } catch (stateErr) {
+      console.error('[admin.pipeline.runs.cancel.audience_state]', stateErr);
     }
   }
 

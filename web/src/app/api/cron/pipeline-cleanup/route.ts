@@ -158,20 +158,23 @@ async function run(request: Request) {
     }
   }
 
-  // 3. Orphan locks. Migration 116 has no `locked_until` column; lock expiry
-  //    is computed from locked_at + TTL (default 600s in claim_cluster_lock
-  //    RPC). Cron sweeps locks older than 15 min — exceeds RPC's TTL so we
-  //    only catch truly stuck locks, not live ones mid-grace.
+  // 3. Orphan locks — Session A: now sweeps feed_cluster_locks (per-audience
+  //    table) instead of feed_clusters.locked_by/locked_at. Lock expiry is
+  //    computed from locked_at + TTL (default 600s in claim_cluster_lock_v2).
+  //    Cron sweeps locks older than 15 min — exceeds the RPC's TTL so we
+  //    only catch truly stuck locks, not live ones mid-grace. Legacy
+  //    feed_clusters.locked_at columns are no longer written by any
+  //    in-tree caller (Session E drops them); skipping them here is
+  //    intentional.
   const lockThresholdIso = new Date(now.getTime() - 15 * 60 * 1000).toISOString();
   let orphanLocksCount = 0;
   let orphanLocksErrCode: string | null = null;
   try {
     const { data, error } = await service
-      .from('feed_clusters')
-      .update({ locked_by: null, locked_at: null, generation_state: null })
-      .not('locked_at', 'is', null)
+      .from('feed_cluster_locks')
+      .delete()
       .lt('locked_at', lockThresholdIso)
-      .select('id');
+      .select('cluster_id');
     if (error) {
       console.error('[cron.pipeline-cleanup.orphan_locks]', error.message);
       await captureMessage('pipeline-cleanup orphan_locks failed', 'warning', {
@@ -191,6 +194,55 @@ async function run(request: Request) {
       lock_threshold_iso: lockThresholdIso,
     });
     orphanLocksErrCode = 'orphan_locks_failed';
+  }
+
+  // 3b. Orphan audience-state — Session A. Reset feed_cluster_audience_state
+  //     rows stuck in 'generating' older than 10 min back to 'pending'.
+  //     Guard: skip if a pipeline_run with that (cluster, audience) is still
+  //     in 'running' status, so a slow run that hasn't terminalized yet
+  //     doesn't get its card pulled out from under it.
+  let orphanAudienceCount = 0;
+  let orphanAudienceErrCode: string | null = null;
+  try {
+    const { data: stuck, error: stuckErr } = await service
+      .from('feed_cluster_audience_state')
+      .select('cluster_id, audience_band')
+      .eq('state', 'generating')
+      .lt('updated_at', thresholdIso);
+    if (stuckErr) throw stuckErr;
+    for (const row of stuck ?? []) {
+      const audienceFilter = row.audience_band === 'adult' ? 'adult' : 'kid';
+      const { count, error: liveErr } = await service
+        .from('pipeline_runs')
+        .select('id', { count: 'exact', head: true })
+        .eq('cluster_id', row.cluster_id)
+        .eq('audience', audienceFilter)
+        .eq('status', 'running');
+      if (liveErr) {
+        orphanAudienceErrCode = 'orphan_audience_partial';
+        continue;
+      }
+      if ((count ?? 0) > 0) continue;
+      const { error: updErr } = await service
+        .from('feed_cluster_audience_state')
+        .update({ state: 'pending' })
+        .eq('cluster_id', row.cluster_id)
+        .eq('audience_band', row.audience_band)
+        .eq('state', 'generating');
+      if (updErr) {
+        orphanAudienceErrCode = 'orphan_audience_partial';
+        continue;
+      }
+      orphanAudienceCount += 1;
+    }
+  } catch (err) {
+    console.error('[cron.pipeline-cleanup.orphan_audience]', err);
+    await captureMessage('pipeline-cleanup orphan_audience failed', 'warning', {
+      error: err instanceof Error ? err.message : String(err),
+      sweep: 'orphan_audience',
+      threshold_iso: thresholdIso,
+    });
+    orphanAudienceErrCode = 'orphan_audience_failed';
   }
 
   // 4. Cluster expiry (Stream 7 / Stage 3). Soft-archive feed_clusters
@@ -293,6 +345,7 @@ async function run(request: Request) {
     orphan_runs: orphanRunsErrCode,
     orphan_items: orphanItemsErrCode,
     orphan_locks: orphanLocksErrCode,
+    orphan_audience: orphanAudienceErrCode,
     cluster_expiry: clustersArchivedErrCode,
   };
   const anyErr = Object.values(errors).some((e) => e !== null);
@@ -300,6 +353,7 @@ async function run(request: Request) {
     orphan_runs_cleaned: orphanRunsCount,
     orphan_items_cleaned: orphanItemsCount,
     orphan_locks_cleaned: orphanLocksCount,
+    orphan_audience_cleaned: orphanAudienceCount,
     clusters_archived: clustersArchivedCount,
     errors,
   };
@@ -313,6 +367,7 @@ async function run(request: Request) {
     orphan_runs_cleaned: orphanRunsCount,
     orphan_items_cleaned: orphanItemsCount,
     orphan_locks_cleaned: orphanLocksCount,
+    orphan_audience_cleaned: orphanAudienceCount,
     clusters_archived: clustersArchivedCount,
     errors,
   });

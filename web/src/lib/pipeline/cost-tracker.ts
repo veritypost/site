@@ -105,24 +105,48 @@ async function getCaps(): Promise<Caps> {
 }
 
 // ----------------------------------------------------------------------------
-// Today cumulative spend — RPC pipeline_today_cost_usd()
+// Today cumulative spend — RPC pipeline_today_cost_usd() + active reservations
 // ----------------------------------------------------------------------------
+//
+// Session A — committed costs alone aren't enough once concurrent generates
+// can each pre-reserve before any has spent (Decision 14). The
+// in-step cap check in call-model now sees reservation totals too, so a
+// run that has reserved $0.40 of the $10 cap is correctly accounted for
+// by sibling runs deciding whether their next LLM hop fits.
 
 export async function getTodayCumulativeUsd(): Promise<number> {
   const supabase = createServiceClient();
-  const { data, error } = await supabase.rpc('pipeline_today_cost_usd');
-  if (error) {
+  const { data: committed, error: rpcErr } = await supabase.rpc('pipeline_today_cost_usd');
+  if (rpcErr) {
     throw new Error(
-      `[cost-tracker:getTodayCumulativeUsd] RPC failed: ${error.message}`
+      `[cost-tracker:getTodayCumulativeUsd] RPC failed: ${rpcErr.message}`
     );
   }
-  const n = Number(data);
-  if (!Number.isFinite(n)) {
+  const committedNum = Number(committed);
+  if (!Number.isFinite(committedNum)) {
     throw new Error(
-      `[cost-tracker:getTodayCumulativeUsd] RPC returned non-numeric: ${String(data)}`
+      `[cost-tracker:getTodayCumulativeUsd] RPC returned non-numeric: ${String(committed)}`
     );
   }
-  return n;
+
+  const startOfDayUtc = new Date();
+  startOfDayUtc.setUTCHours(0, 0, 0, 0);
+  const { data: reservations, error: resErr } = await supabase
+    .from('pipeline_cost_reservations')
+    .select('reserved_usd')
+    .eq('status', 'active')
+    .gte('created_at', startOfDayUtc.toISOString());
+  if (resErr) {
+    throw new Error(
+      `[cost-tracker:getTodayCumulativeUsd] reservations probe failed: ${resErr.message}`
+    );
+  }
+  const reservedSum = (reservations ?? []).reduce((acc, row) => {
+    const v = Number((row as { reserved_usd: number | string | null }).reserved_usd ?? 0);
+    return Number.isFinite(v) ? acc + v : acc;
+  }, 0);
+
+  return committedNum + reservedSum;
 }
 
 // ----------------------------------------------------------------------------

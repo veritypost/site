@@ -354,6 +354,42 @@ async function loadEffectivePerms(supabase, userId) {
   return result;
 }
 
+// Session A — permission alias bridge.
+// Single-string callers transparently dual-check via permission_key_aliases
+// so a route still passing 'admin.pipeline.run_generate' is satisfied by a
+// role granted only 'newsroom.generate' (and vice versa), without each call
+// site having to know the bridge exists. Cached 60s; the table only changes
+// via migration. Sessions B/C will pass arrays directly; Session E drops
+// the bridge.
+const ALIAS_TTL_MS = 60_000;
+let _aliasCache = null;
+async function loadAliasesFor(client, key) {
+  const now = Date.now();
+  if (_aliasCache && _aliasCache.expiresAt > now) {
+    return _aliasCache.byKey.get(key) || [];
+  }
+  const { data, error } = await client
+    .from('permission_key_aliases')
+    .select('old_key, new_key');
+  if (error || !data) {
+    // Table absent (pre-migration) or RLS denies — treat as no aliases.
+    _aliasCache = { byKey: new Map(), expiresAt: now + ALIAS_TTL_MS };
+    return [];
+  }
+  const byKey = new Map();
+  const push = (k, v) => {
+    if (!byKey.has(k)) byKey.set(k, []);
+    byKey.get(k).push(v);
+  };
+  for (const row of data) {
+    if (!row || !row.old_key || !row.new_key) continue;
+    push(row.old_key, row.new_key);
+    push(row.new_key, row.old_key);
+  }
+  _aliasCache = { byKey, expiresAt: now + ALIAS_TTL_MS };
+  return byKey.get(key) || [];
+}
+
 export async function requirePermission(permissionKey, client, options = {}) {
   const { kindAllowed = 'user' } = options;
   const supabase = await resolveAuthedClient(client);
@@ -367,12 +403,27 @@ export async function requirePermission(permissionKey, client, options = {}) {
     throw err;
   }
 
-  const row = rows.find((r) => r && r.permission_key === permissionKey);
-  if (row && row.granted === true) return user;
+  // Build the candidate key set: array → all entries; string → key plus its
+  // alias siblings (looked up only when the direct check fails, to keep the
+  // hot path one Map lookup).
+  const keysIn = Array.isArray(permissionKey) ? permissionKey : [permissionKey];
+  const grantedRow = (k) => rows.find((r) => r && r.permission_key === k && r.granted === true);
 
-  const err = new Error(`PERMISSION_DENIED:${permissionKey}`);
+  for (const k of keysIn) {
+    if (grantedRow(k)) return user;
+  }
+  if (!Array.isArray(permissionKey)) {
+    const aliases = await loadAliasesFor(supabase, permissionKey);
+    for (const k of aliases) {
+      if (grantedRow(k)) return user;
+    }
+  }
+
+  const denyKey = Array.isArray(permissionKey) ? permissionKey.join('|') : permissionKey;
+  const probeKey = Array.isArray(permissionKey) ? permissionKey[0] : permissionKey;
+  const row = rows.find((r) => r && r.permission_key === probeKey);
+  const err = new Error(`PERMISSION_DENIED:${denyKey}`);
   err.status = 403;
-  // attach resolver detail so callers (or error reporters) can log why
   err.detail = row
     ? {
         granted_via: row.granted_via,
