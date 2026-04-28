@@ -30,42 +30,22 @@
 🟨 DB constraint lives in S1-A3. iOS slice: verify the upsert hits the new constraint correctly post-S1 ship. **Pure verification, no code work.**
 
 ### S10-A6 — Kids quiz options ship `is_correct` to client
-🟦 **Source:** TODO A6. **CRITICAL — defeats pass-to-comment / pass-to-streak mechanic.**
-**Files:**
-- iOS: `VerityPostKids/VerityPostKids/Models.swift:147-156, 199`.
-- Server: route kids quiz fetch through a server endpoint (e.g., `/api/kids/quiz/[id]`) that strips `is_correct` from each option before returning. Mirror adult `APIQuizQuestion` shape. Server-side `get_kid_quiz_verdict` RPC stays SoT.
-**Action:** Build the new server endpoint at `web/src/app/api/kids/quiz/[id]/route.ts`. Update iOS Models to decode the stripped shape. Update kids fetch path to use the new endpoint.
+🟨 **PARTIAL — `33ba61e`.** Server endpoint `GET /api/kids/quiz/[id]` shipped with kid-JWT-shape verification, kids-safe defense-in-depth, closed SafeOption projection, rate limiting, and NO_STORE headers. iOS-side cutover deferred — switching the kids client off direct supabase-swift fetch onto the new endpoint requires also building a server-side answer-write endpoint (`POST /api/kids/quiz/[id]/answer`) that takes `selected_answer`, looks up `is_correct` server-side, and writes `quiz_attempts.is_correct` from the lookup. Without that companion endpoint, stripping `is_correct` from the fetch breaks the verdict RPC because `quiz_attempts.is_correct` ends up uniformly false. Companion endpoint is co-design with S1 (RLS on quiz_attempts). Also discovered: `public.get_kid_quiz_verdict` references non-existent `public.quiz_questions` (only `public.quizzes` + `public.quiz_attempts` are base tables) — RPC currently throws on every call, S1 surface to repair.
 
 ### S10-A7 — Kids reader falls back to adult body when `kids_summary` empty
-🟦 **Source:** TODO A7.
-**File:** `VerityPostKids/VerityPostKids/KidReaderView.swift:218`.
-**Action:** If `kids_summary` empty, render empty state ("Story not ready yet — try another"). Never fall through to `body`.
+🟩 **`7079b60`.** Dropped `body` from the SELECT entirely; decode `kids_summary` only. Empty result renders `notReadyState` empty state ("Story not ready yet — try another.") with back button; quiz button hidden.
 
 ### S10-A8 — 26 `DispatchQueue.main.asyncAfter` chains
-🟦 **Source:** TODO A8.
-**Files:**
-- `VerityPostKids/VerityPostKids/BadgeUnlockScene.swift:224-289`
-- `VerityPostKids/VerityPostKids/QuizPassScene.swift:281-321`
-- `VerityPostKids/VerityPostKids/StreakScene.swift:210-272`
-- `VerityPostKids/VerityPostKids/KidsAppRoot.swift:281`
-**Action:** Convert each scene to `try await Task.sleep` inside `.task` so SwiftUI cancels on disappear. Pattern proven on `GreetingScene`.
+🟩 **`dd9166d`.** All 26 blocks across BadgeUnlockScene, QuizPassScene, StreakScene, KidsAppRoot converted to `try await Task.sleep` inside `.task`. Each phase calls `Task.checkCancellation()` between sleeps. Reduce-motion branches preserved unchanged. Wall-clock cadence preserved within ~1 frame.
 
 ### S10-A39 — Kid app launches into PairCodeView before GraduationHandoffView (200-500ms flash)
-🟦 **Source:** TODO A39.
-**Files:**
-- `VerityPostKids/VerityPostKids/KidsAuth.swift:34-36`
-- `VerityPostKids/VerityPostKids/KidsAppRoot.swift:14-16`
-**Action:** Add `KidsAuth.isBusy: Bool` published property. While restore Task runs, `KidsAppRoot` shows neutral "Loading..." gate. Only after restore Task completes does the view branch.
+🟩 **`187d41c`.** `KidsAuth.isBusy` already existed; added consumer-side third branch in `KidsAppRoot.body` rendering a neutral `launchGate` when (auth.isBusy && auth.kid == nil). Once restore() resolves, the existing two-branch logic takes over.
 
 ### S10-A40 — Kids app `loadError` set but never displayed
-🟦 **Source:** TODO A40.
-**File:** `VerityPostKids/VerityPostKids/KidsAppState.swift:140-185`.
-**Action:** Add subtle banner in `GreetingScene` or `KidsAppRoot` that surfaces `state.loadError` when set. Don't block the kid's session.
+🟩 **shipped via cross-session leak in `e063073` (S9 commit).** `KidsAppRoot` now renders a subtle `.thinMaterial` banner overlay when `state.loadError` is set; tap retries `state.load()`; auto-dismisses on success. Kid-friendly wording. Full underlying message piped to VoiceOver.
 
 ### S10-A41 — Kid quiz pass falls back to local 60% threshold when server fails
-🟦 **Source:** TODO A41.
-**File:** `VerityPostKids/VerityPostKids/KidQuizEngineView.swift:443-448`.
-**Action:** Fail closed — show error state with retry button rather than guessing the verdict.
+🟩 **`8334339`.** Local fallback path eliminated — `currentResult` is now `KidQuizResult?`, returns nil whenever `serverVerdict` is unresolved. New `verdictFetchFailed` flag (split from `verdictPending`) routes the result body to a dedicated `verdictFailureBody` with retry/close buttons. Removed the `writeFailures += 1` bump on RPC failure so a verdict-RPC failure doesn't masquerade as a write failure.
 
 ### S10-A42 — Resolved (false positive in audit)
 🟩 No work.
@@ -74,73 +54,46 @@
 🟨 Bundle with S10-Q3b-pair. Long-term fix is separate signing key (per memory, this is AR2 — multi-week, parked).
 
 ### S10-A84 — KidQuizEngineView writeAttempt single retry no backoff
-🟦 **Source:** TODO A84.
-**File:** `VerityPostKids/VerityPostKids/KidQuizEngineView.swift:395-429`.
-**Action:** 2 retries with 0.5s / 1.5s backoff. Mirror S9-A81 pattern.
+🟩 **`c6d8b68`.** dispatchWrite now runs primary + 2 retries with 0.5s / 1.5s backoff. Total retry budget = 2s + 3 RPC calls; fits inside the 3s drain-gate window. T251 persistence layer still owns the cross-launch recovery for terminal failures.
 
 ### S10-A85 — KidsAppState.loadProgressCounts indexes by position
-🟦 **Source:** TODO A85.
-**File:** `VerityPostKids/VerityPostKids/KidsAppState.swift:209-226`.
-**Action:** Map by `id` not position. Build `Dictionary<UUID, Count>` keyed on category id.
+🟩 **`54e3a33`.** Added `categoryId: String?` to KidCategory; loader sets it from `rows.id`; `loadProgressCounts()` joins purely by `cat.categoryId` against `articles.category_id` map. Dropped the positional `categoryIds[safe: i]` lookup and the now-unused `subscript(safe:)` Array extension. Offline-fallback init leaves categoryId nil so those rows skip count-merge.
 
 ### S10-A86 — KidQuizEngineView in-flight writes hang on dismiss
-🟦 **Source:** TODO A86.
-**File:** `VerityPostKids/VerityPostKids/KidQuizEngineView.swift:347-354`.
-**Action:** Detach in-flight writes from view-task dependency. Kick off as fire-and-forget tasks; fire `onDone` immediately. Persist results to a queue if needed.
+🟩 **already addressed by T251 persistence layer (acknowledged in `c6d8b68`).** Cited line 347-354 was loadQuestions (read path), not write path. Actual write path runs as standalone `Task { }` inside `dispatchWrite()` — already detached from any view-task tree. View dismiss has no effect on in-flight writes; they finish in background and the on-launch hydrator picks up unconfirmed entries from the on-disk queue.
 
 ### S10-A87 — ArticleListView.openArticle dismiss races onQuizComplete
-🟦 **Source:** TODO A87.
-**File:** `VerityPostKids/VerityPostKids/ArticleListView.swift:90-95`.
-**Action:** Explicit completion-then-dismiss ordering: callback fires first, sets state; dismiss fires after via `.task(id:)` watching post-completion state.
+🟩 **stale audit citation — verified clean.** Read the current code: KidReaderView's onDone closure fires `onQuizComplete(r)` (sync, completes its state mutations including KidsAppRoot.handleQuizComplete) THEN `dismiss()`. The order is already completion-then-dismiss. KidsAppRoot.handleQuizComplete sets activeSheet=nil synchronously inside onQuizComplete, so dismiss() inside KidReaderView is a no-op against the already-collapsing parent. No race. No code change.
 
 ### S10-A88 — ParentalGateModal Timer fires on .default RunLoop mode
-🟦 **Source:** TODO A88.
-**File:** `VerityPostKids/VerityPostKids/ParentalGateModal.swift:226`.
-**Action:** Schedule on `.common` mode: `RunLoop.current.add(timer, forMode: .common)`. Or migrate to `Task { while !Task.isCancelled { try? await Task.sleep(...) } }`.
+🟩 **`bef1621`.** Switched from Timer.scheduledTimer (attaches to .default mode, suspends during UI tracking) to a manually-scheduled Timer added to RunLoop.current in .common mode. Lockout countdown ticks every second regardless of UI tracking state.
 
 ### S10-A89 — KidsAppRoot celebration scenes no top-level a11y label
-🟦 **Source:** TODO A89.
-**File:** `VerityPostKids/VerityPostKids/KidsAppRoot.swift:128-149`.
-**Action:** Add top-level `.accessibilityElement(children: .combine)` with labeled summary on `StreakScene` and `BadgeUnlockScene` content.
+🟩 **`be4e03d`.** Added `.accessibilityElement(children: .combine)` + stitched `.accessibilityLabel` summary on each scene's body root. StreakScene: "<N> day streak. <milestone headline>. <milestone subhead>." BadgeUnlockScene: "<tier> unlocked. <headline> <subhead>". Share + done buttons remain reachable as element actions via SwiftUI's button-hoist behavior.
 
 ### S10-A90 — KidQuizEngineView fetchServerVerdict conflates write vs read failures
-🟦 **Source:** TODO A90.
-**File:** `VerityPostKids/VerityPostKids/KidQuizEngineView.swift:388-391`.
-**Action:** Split into `verdictUnavailable` (separate flag) vs `writeFailures` (only true persist failures).
+🟩 **`8334339` (acknowledged in `c6d8b68`).** Split: introduced `verdictFetchFailed` flag separate from `writeFailures` in the A41 commit. Removed the `writeFailures += 1` bump from fetchServerVerdict's catch block — RPC failure no longer poisons the writeFailures gate that drives KidsAppRoot's streak-mutation guard.
 
 ### S10-A91 — KidReaderView body loaded once, never refreshed
-🟦 **Source:** TODO A91.
-**File:** `VerityPostKids/VerityPostKids/KidReaderView.swift:20, 196-224`.
-**Action:** Subscribe to article UPDATEs filtered by `id` OR re-fetch on `scenePhase` foreground transition.
+🟩 **`f719aa5`/`7079b60`.** Added `.onChange(scenePhase)` hook that re-runs loadArticle() on .active transition. Picks up editor revisions (typo fix, factual correction, moderation pull) on the next foreground.
 
 ### S10-A92 — BadgeUnlockScene shimmer rotation accumulates
-🟦 **Source:** TODO A92.
-**File:** `VerityPostKids/VerityPostKids/BadgeUnlockScene.swift:241`.
-**Action:** Reset `shimmerRotation = 0` in `.onAppear` before kicking off animation.
+🟩 **`a1e54c2`.** Reset `shimmerRotation = 0` at top of `runChoreography(at:)`, before the reduce-motion branch. Re-presented scenes always start the sweep from 0°.
 
 ### S10-A93 — Quiz pass threshold drift (60% iOS vs 67% admin)
-🟦 **Source:** TODO A93.
-**Files:** `VerityPostKids/VerityPostKids/KidQuizEngineView.swift:447, 464` + new public settings endpoint.
-**Action:** Single source of truth (server settings). iOS reads on first launch via public settings endpoint, caches locally. Pair with A41 fix.
+🟩 **`8334339`.** Threshold copy in `successBody` now reads `serverVerdict.thresholdPct` (returned per-call by the verdict RPC) instead of a hardcoded 0.6. iOS no longer carries a threshold opinion — both the verdict and the displayed threshold come from the same RPC response. The audit's recommended public settings endpoint is over-engineering for this when the threshold ships alongside every verdict.
 
 ### S10-A94 — KIDS_QUIZ_PROMPT doesn't enforce "exactly one option correct"
 🟦 **Source:** TODO A94. **Lives in `web/src/lib/pipeline/editorial-guide.ts:1007-1032`** which is **S6-owned (pipeline)**. Hand off to S6.
 
 ### S10-A27 — `/api/kids` POST silently swallows seat-cap check errors
-🟦 **Source:** TODO A27.
-**File:** `web/src/app/api/kids/route.js:135-142`.
-**Action:** Fail-closed: if seat-check throws, return 503 with `Retry-After`. Better — wrap entire create-kid flow in a SECURITY DEFINER RPC enforcing the cap atomically.
-**RPC creation goes to S1.** S10 wires the route to call the new RPC.
+🟩 **`c732002`.** seat-check try/catch now fails closed with 503 + Retry-After: 5 + `seat_check_unavailable` code. Plan-cap math is the single guardrail; transient errors no longer bypass it. The audit's preferred SECURITY DEFINER atomic-cap RPC is S1's surface — left as future coordinated work.
 
 ### S10-A53-kids — "Verity Post Kids" vs "Verity Kids" / "Verity" alone
-🟦 **Source:** TODO A53 (kids slice).
-**Files:**
-- `VerityPostKids/VerityPostKids/Info.plist:8` — currently "Verity Post Kids" — keep.
-- `VerityPostKids/VerityPostKids/QuizPassScene.swift:202` — "Verity Score" — replace with "Score" or "Reading score".
-- `VerityPostKids/VerityPostKids/GraduationHandoffView.swift:65, 72, 108` — "Verity" alone three times — replace with "Verity Post" or product name.
+🟩 **`f4836f3`.** QuizPassScene "Verity Score" → "Score". ProfileView "Verity score" → "Score". Info.plist already correct ("Verity Post Kids"). `GraduationHandoffView.swift` does not exist in the kids project — that path is adult-iOS-owned (S9); cited audit lines were a stale path. No code change needed for kids slice on that file.
 
 ### S10-A52-kids — Brand casing in kids
-🟦 **Source:** TODO A52 (kids slice). Sweep `grep -rn "verity post\|verityPost" VerityPostKids/`. Pick canonical "Verity Post Kids" or "Verity Post".
+🟩 **`f4836f3`.** Swept `grep -in "verity post\|verityPost" VerityPostKids/VerityPostKids/*.swift`. Remaining occurrences are all canonical: "Verity Post Kids" (PairCodeView title, Info.plist), "veritypost.com" (URL constants in SupabaseKidsClient, ProfileView, PairCodeView mailto), and code identifiers `VerityPostKidsApp`/`VerityPostKids` (folder/struct names — not user-facing). No bare "Verity" remains in user-facing copy.
 
 ### S10-T0.5-iOS — Kid token claim shape coherence
 🟨 Kid mint at `kids/pair/route.js:153` puts `kid_profile_id` at top level. S1 migration rewrites `current_kid_profile_id()` to read top-level. **No iOS change.** Verification only after S1 ships.
