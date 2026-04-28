@@ -18,7 +18,7 @@ export const runtime = 'nodejs';
 
 const DEFAULT_EXPIRY_DAYS = 7;
 
-export async function POST(_request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, { params }: { params: { id: string } }) {
   const id = params?.id;
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
 
@@ -28,6 +28,10 @@ export async function POST(_request: Request, { params }: { params: { id: string
   } catch (err) {
     return permissionError(err);
   }
+
+  // S6-A55: capture operator-attested reason for the audit trail.
+  const body = await request.json().catch(() => ({} as { reason?: string }));
+  const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
 
   const service = createServiceClient();
   const rate = await checkRateLimit(service, {
@@ -130,17 +134,24 @@ export async function POST(_request: Request, { params }: { params: { id: string
     return NextResponse.json({ error: 'Approve marked but DB update failed' }, { status: 500 });
   }
 
-  await recordAdminAction({
-    action: 'access_request.approve',
-    targetTable: 'access_requests',
-    targetId: id,
-    newValue: {
-      status: 'approved',
-      access_code_id: codeId,
-      email: req.email,
-      email_sent: !!emailId,
-    },
-  });
+  try {
+    await recordAdminAction({
+      action: 'access_request.approve',
+      targetTable: 'access_requests',
+      targetId: id,
+      reason: reason || null,
+      newValue: {
+        status: 'approved',
+        access_code_id: codeId,
+        email: req.email,
+        email_sent: !!emailId,
+      },
+    });
+  } catch {
+    // S6-A5: recordAdminAction already logged + attempted fallback. Do
+    // NOT roll back the approval over an audit-write failure — the
+    // credential is already minted and the email may already be sent.
+  }
 
   return NextResponse.json({
     ok: true,

@@ -19,6 +19,7 @@ import Drawer from '@/components/admin/Drawer';
 import Spinner from '@/components/admin/Spinner';
 import Field from '@/components/admin/Field';
 import TextInput from '@/components/admin/TextInput';
+import DestructiveActionConfirm from '@/components/admin/DestructiveActionConfirm';
 import { ToastProvider, useToast } from '@/components/admin/Toast';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 import type { Tables } from '@/types/database-helpers';
@@ -45,6 +46,9 @@ function RequestsInner() {
   const [busy, setBusy] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [showReject, setShowReject] = useState(false);
+  // S6-A55: approve mints credentials. Wrap in DestructiveActionConfirm
+  // with required reason capture.
+  const [showApproveConfirm, setShowApproveConfirm] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -85,14 +89,20 @@ function RequestsInner() {
     total: rows.length,
   };
 
-  const approve = async (r: Req) => {
+  const approve = async (r: Req, reason: string) => {
     setBusy(true);
     try {
-      const res = await fetch(`/api/admin/access-requests/${r.id}/approve`, { method: 'POST' });
+      const res = await fetch(`/api/admin/access-requests/${r.id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         push({ message: json.error || 'Approve failed', variant: 'danger' });
-        return;
+        // Throw so DestructiveActionConfirm skips the audit-write step on
+        // a failed mutation (no phantom audit row).
+        throw new Error(json.error || 'Approve failed');
       }
       push({
         message: json.email_sent
@@ -100,6 +110,7 @@ function RequestsInner() {
           : `Approved. Email send failed — copy link manually: ${json.invite_url}`,
         variant: json.email_sent ? 'success' : 'warn',
       });
+      setShowApproveConfirm(false);
       setActive(null);
       await loadAll();
     } finally {
@@ -248,7 +259,7 @@ function RequestsInner() {
                 loading={busy}
                 disabled={!active.email_confirmed_at}
                 title={!active.email_confirmed_at ? 'Awaiting email confirmation from requester' : undefined}
-                onClick={() => active && approve(active)}
+                onClick={() => active && setShowApproveConfirm(true)}
               >
                 Approve & email link
               </Button>
@@ -306,6 +317,29 @@ function RequestsInner() {
           />
         </Field>
       </Drawer>
+
+      <DestructiveActionConfirm
+        open={showApproveConfirm && !!active}
+        onClose={() => setShowApproveConfirm(false)}
+        title="Approve access request?"
+        message={
+          <span>
+            This mints a one-time 7-day signup link for{' '}
+            <strong>{active?.email}</strong> and emails it. Provide a reason
+            for the audit trail.
+          </span>
+        }
+        confirmLabel="Approve & email link"
+        reasonRequired
+        action="access_requests.approve"
+        targetTable="access_requests"
+        targetId={active?.id ?? null}
+        oldValue={active ? { status: active.status } : null}
+        newValue={{ status: 'approved' }}
+        onConfirm={async ({ reason }) => {
+          if (active) await approve(active, reason);
+        }}
+      />
     </Page>
   );
 }
