@@ -470,6 +470,11 @@ function ScreenThree({ stories }: { stories: FeedStory[] }) {
       >
         Ready?
       </div>
+      {/* S7-A97 + S7-K6 — heading is conditional. The previous static
+          "Your first read is waiting." rendered even when stories was
+          empty, lying to the user. Empty fallback now describes present
+          state and ships an inline CTA back to the home feed (rule 3.1
+          forbids "stories will appear here soon" timeline copy). */}
       <h2
         style={{
           fontSize: 28,
@@ -481,7 +486,9 @@ function ScreenThree({ stories }: { stories: FeedStory[] }) {
           fontFamily: 'var(--font-source-serif), Georgia, "Times New Roman", serif',
         }}
       >
-        Your first read is waiting.
+        {stories.length > 0
+          ? 'Your first read is waiting.'
+          : 'Browse stories to start reading.'}
       </h2>
 
       {stories.length > 0 ? (
@@ -520,9 +527,27 @@ function ScreenThree({ stories }: { stories: FeedStory[] }) {
           ))}
         </div>
       ) : (
-        <p style={{ fontSize: 14, lineHeight: 1.6, color: C.dim, margin: 0 }}>
-          Head to the home feed — pick any article, read it, and the quiz will be right below.
-        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <p style={{ fontSize: 14, lineHeight: 1.6, color: C.dim, margin: 0 }}>
+            Head to the home feed — pick any article, read it, and the quiz will be right below.
+          </p>
+          <a
+            href="/"
+            style={{
+              display: 'inline-block',
+              alignSelf: 'flex-start',
+              padding: '10px 18px',
+              borderRadius: 8,
+              background: C.accent,
+              color: '#fff',
+              fontSize: 14,
+              fontWeight: 600,
+              textDecoration: 'none',
+            }}
+          >
+            Browse stories
+          </a>
+        </div>
       )}
     </div>
   );
@@ -653,7 +678,7 @@ function GraduationClaim({ token }: { token: string }) {
               fontWeight: 700,
             }}
           >
-            Log in to continue
+            Sign in to continue
           </a>
         </div>
       </div>
