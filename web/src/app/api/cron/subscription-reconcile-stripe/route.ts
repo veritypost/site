@@ -160,10 +160,11 @@ async function handle() {
 }
 
 export const GET = withCronLog(CRON_NAME, async (request: Request) => {
-  if (!verifyCronAuth(request)) {
+  if (!verifyCronAuth(request).ok) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
+  await logCronHeartbeat(CRON_NAME, 'start');
   const result = await handle();
-  await logCronHeartbeat(CRON_NAME, result);
+  await logCronHeartbeat(CRON_NAME, 'end', result);
   return NextResponse.json(result);
 });
