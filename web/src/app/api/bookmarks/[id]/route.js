@@ -4,11 +4,30 @@ import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 // T170/T209 — authenticated user data must never be cacheable by a CDN
 // or shared proxy. Apply private/no-store to every response on this
 // route (success + error paths).
 const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
+
+// S5-Notification-table-cleanup audit — checklist:
+//   1. Idempotency       — DELETE on a missing/foreign row is a no-op
+//                          (RLS limits the delete to user's own rows;
+//                          PATCH on a foreign row 404s before the write).
+//   2. Rate limits       — POST is gated upstream at /api/bookmarks
+//                          (60/min). PATCH/DELETE add 60/min keyed per
+//                          user here so a runaway client editing notes
+//                          or thrashing collection moves can't fan out.
+//   3. Error hygiene     — generic { error: 'reason' }; safeErrorResponse
+//                          maps RPC codes uniformly.
+//   4. RLS coherence     — service client used; ownership check pre-write
+//                          on PATCH; DELETE limited by .eq('user_id',
+//                          user.id) so RLS-bypass-via-service is bounded.
+//   5. Service-role audit — service client only after auth.uid()-bound
+//                          permission resolved; no public-data writes.
+const PATCH_RATE = { policyKey: 'bookmarks_edit', max: 60, windowSec: 60 };
+const DELETE_RATE = { policyKey: 'bookmarks_remove', max: 60, windowSec: 60 };
 
 // PATCH /api/bookmarks/[id] — update notes / move between collections.
 // Notes + collections are paid-only (D13) — we refuse on the server
@@ -51,6 +70,19 @@ export async function PATCH(request, { params }) {
   }
 
   const service = createServiceClient();
+
+  const rate = await checkRateLimit(service, {
+    key: `bookmarks-edit:${user.id}`,
+    policyKey: PATCH_RATE.policyKey,
+    max: PATCH_RATE.max,
+    windowSec: PATCH_RATE.windowSec,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { ...NO_STORE, 'Retry-After': String(PATCH_RATE.windowSec) } }
+    );
+  }
 
   // Verify ownership before the paid-feature check so we can return the
   // right status code.
@@ -107,6 +139,20 @@ export async function DELETE(_request, { params }) {
   }
 
   const service = createServiceClient();
+
+  const rate = await checkRateLimit(service, {
+    key: `bookmarks-remove:${user.id}`,
+    policyKey: DELETE_RATE.policyKey,
+    max: DELETE_RATE.max,
+    windowSec: DELETE_RATE.windowSec,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { ...NO_STORE, 'Retry-After': String(DELETE_RATE.windowSec) } }
+    );
+  }
+
   const { error } = await service
     .from('bookmarks')
     .delete()
