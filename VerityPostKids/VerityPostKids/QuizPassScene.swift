@@ -199,7 +199,7 @@ struct QuizPassScene: View {
                     )
                     .foregroundStyle(K.text)
 
-                    Text("Verity Score")
+                    Text("Score")
                         .font(.scaledSystem(size: 11, weight: .semibold, design: .rounded))
                         .foregroundStyle(K.dim)
                         .padding(.top, 2)

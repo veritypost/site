@@ -151,7 +151,7 @@ struct ProfileView: View {
         let cols = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
         return LazyVGrid(columns: cols, spacing: 12) {
             StatBubble(value: state.streakDays, label: "Day streak",    color: K.coral)
-            StatBubble(value: state.verityScore, label: "Verity score",  color: K.teal)
+            StatBubble(value: state.verityScore, label: "Score",         color: K.teal)
             StatBubble(value: state.quizzesPassed, label: "Quizzes",      color: K.purple)
             StatBubble(value: badges.count,      label: "Badges",        color: K.gold)
         }
