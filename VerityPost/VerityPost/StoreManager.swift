@@ -247,6 +247,15 @@ final class StoreManager: ObservableObject {
 
     // MARK: - Check Entitlements
 
+    /// Walk `Transaction.currentEntitlements` and refresh the in-memory
+    /// active SKU set. A80 — when the new set differs from
+    /// `purchasedProductIDs`, post `.vpSubscriptionDidChange` so
+    /// AuthViewModel + the UI's plan gates pick up the change immediately.
+    /// Foreground re-checks (`VerityPostApp.swift`'s
+    /// `.onChange(of: scenePhase)`) call this on every wake; without the
+    /// diff-and-post, a cross-device tier change (Stripe upgrade on web
+    /// while iOS slept) would leave the app flashing the prior tier
+    /// until a manual restore.
     func checkEntitlements() async {
         var activeIDs: Set<String> = []
         for await result in Transaction.currentEntitlements {
@@ -259,7 +268,11 @@ final class StoreManager: ObservableObject {
                 Log.d("Entitlement verification failed:", error)
             }
         }
+        let changed = activeIDs != purchasedProductIDs
         purchasedProductIDs = activeIDs
+        if changed {
+            NotificationCenter.default.post(name: .vpSubscriptionDidChange, object: nil)
+        }
     }
 
     // MARK: - Sync to server

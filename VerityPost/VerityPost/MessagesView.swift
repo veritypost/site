@@ -347,7 +347,7 @@ struct MessagesView: View {
                         .foregroundColor(VP.muted)
                     TextField("Search by username...", text: $searchQuery)
                         .font(.subheadline)
-                        .onChange(of: searchQuery) { _ in Task { await searchUsers() } }
+                        .onChange(of: searchQuery) { _, _ in Task { await searchUsers() } }
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
@@ -859,7 +859,7 @@ struct DMThreadView: View {
                         .padding(16)
                     }
                 }
-                .onChange(of: messages.count) { _ in
+                .onChange(of: messages.count) { _, _ in
                     if let last = messages.last {
                         proxy.scrollTo(last.id, anchor: .bottom)
                     }

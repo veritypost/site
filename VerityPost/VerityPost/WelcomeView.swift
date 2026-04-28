@@ -257,11 +257,27 @@ struct WelcomeView: View {
         submitting = true
         stampError = false
         Task {
-            let ok = await stampOnboarding()
+            // A81 — three-attempt retry with 500ms / 1.5s backoff before
+            // surfacing the failure UI. The original single attempt had no
+            // backoff: a transient 5xx (cold-start lambda, brief network
+            // dip) dropped the user into the "Continue anyway" recovery
+            // flow needlessly. The total upper-bound delay is ~2s, which
+            // is well inside the user's tolerance for a "Finishing setup"
+            // spinner and avoids the bypass path on a flaky first try.
+            let backoffsNs: [UInt64] = [500_000_000, 1_500_000_000]
+            var ok = false
+            for attempt in 0...2 {
+                if Task.isCancelled { break }
+                ok = await stampOnboarding()
+                if ok { break }
+                if attempt < 2 {
+                    try? await Task.sleep(nanoseconds: backoffsNs[attempt])
+                }
+            }
             await MainActor.run {
                 submitting = false
                 if !ok {
-                    // If the stamp failed we surface an error rather than
+                    // After 3 attempts we surface an error rather than
                     // silently dropping the user on the tab bar with no
                     // server record — matches the web's finishError shape.
                     stampError = true

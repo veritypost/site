@@ -348,6 +348,16 @@ private struct EventsPersistence {
 
 /// Type-erased Codable wrapper so heterogeneous payload dictionaries
 /// can be encoded without a per-event Codable struct.
+///
+/// A83 — encode side enumerates the value-shapes we actually emit
+/// (`String` / `Int` / `Double` / `Bool` / `NSNull`) and stringifies the
+/// rest. Decode side mirrors the same set and THROWS on anything else
+/// instead of silently substituting `NSNull` — the only legitimate
+/// caller is `EventsPersistence.load()`, which already deletes the file
+/// on a decode failure. Surfacing the throw means persisted batches
+/// that have somehow drifted shape (e.g., a pre-A83 build that wrote
+/// arrays or dicts) are dropped explicitly, not turned into ghost
+/// rows whose nullified payload pollutes downstream analytics.
 private struct AnyCodable: Codable {
     let value: Any
     init(_ value: Any) { self.value = value }
@@ -368,16 +378,22 @@ private struct AnyCodable: Codable {
         let container = try decoder.singleValueContainer()
         if container.decodeNil() {
             self.value = NSNull()
-        } else if let v = try? container.decode(String.self) {
+        } else if let v = try? container.decode(Bool.self) {
+            // Bool first — Foundation's JSON decoder happily promotes a
+            // `true` literal to `Int(1)` if Int is tried first, which
+            // round-trips wrong on the next encode.
             self.value = v
         } else if let v = try? container.decode(Int.self) {
             self.value = v
         } else if let v = try? container.decode(Double.self) {
             self.value = v
-        } else if let v = try? container.decode(Bool.self) {
+        } else if let v = try? container.decode(String.self) {
             self.value = v
         } else {
-            self.value = NSNull()
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "AnyCodable: unsupported value shape (only Bool/Int/Double/String/null are encoded)"
+            )
         }
     }
 }
