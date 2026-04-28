@@ -12,14 +12,12 @@ enum KidsAppLauncher {
     // who taps "Open Kids App" before installing the kids app lands on a
     // page explaining what it is. Apple-block: swap to the real App Store
     // listing the same session the kids app is approved.
+    //
+    // Resolved through `SupabaseManager.siteURL` (already RFC-validated +
+    // env-overridable for staging) so the launcher never depends on a
+    // hardcoded force-unwrapped literal.
     static let fallbackURL: URL = {
-        // Defensive: literal is well-formed, but the force-unwrap pattern
-        // mirrors test-only assumptions. A guard-let with a deliberately
-        // safe fallback keeps the call site total.
-        if let url = URL(string: "https://veritypost.com/kids-app") {
-            return url
-        }
-        return URL(string: "https://veritypost.com")!
+        SupabaseManager.shared.siteURL.appendingPathComponent("kids-app")
     }()
 
     static func open(kidId: String? = nil) {

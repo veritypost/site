@@ -83,12 +83,19 @@ final class SupabaseManager {
     /// Base URL of the Next.js site. Used when we need to hit server-side API
     /// routes (e.g. comment posting) that enforce rate-limits and moderation
     /// checks iOS can't run locally. Resolved from INFOPLIST_KEY_VP_SITE_URL,
-    /// defaults to production.
+    /// defaults to production. Constructed via `URLComponents` with explicit
+    /// scheme + host so we can't trip on a malformed string literal — every
+    /// piece is statically validated, no force-unwrap.
     lazy var siteURL: URL = {
         if let raw = SupabaseManager.resolve("VP_SITE_URL"), let url = URL(string: raw) {
             return url
         }
-        return URL(string: "https://veritypost.com")!
+        var comps = URLComponents()
+        comps.scheme = "https"
+        comps.host = "veritypost.com"
+        // `URLComponents.url` returns nil only if scheme+host+path violate
+        // RFC-3986; the values above are RFC-clean by construction.
+        return comps.url ?? URL(fileURLWithPath: "/")
     }()
 
     private init() {}

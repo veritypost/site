@@ -88,12 +88,15 @@ struct SubscriptionView: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             HStack(spacing: 16) {
+                // Resolve through SupabaseManager.siteURL so the host
+                // tracks staging/production via INFOPLIST_KEY_VP_SITE_URL
+                // and we never depend on a force-unwrapped string literal.
                 Link("Terms of Service",
-                     destination: URL(string: "https://veritypost.com/terms")!)
+                     destination: SupabaseManager.shared.siteURL.appendingPathComponent("terms"))
                     .font(.system(.caption, design: .default, weight: .semibold))
                     .foregroundColor(VP.accent)
                 Link("Privacy Policy",
-                     destination: URL(string: "https://veritypost.com/privacy")!)
+                     destination: SupabaseManager.shared.siteURL.appendingPathComponent("privacy"))
                     .font(.system(.caption, design: .default, weight: .semibold))
                     .foregroundColor(VP.accent)
                 Spacer()
