@@ -88,7 +88,7 @@ Every claim in this file was verified against the live database / current code o
 | S1-A101 | P1 | RBAC | Silent-mute CHECK constraint | 🟩 ready (`2026-04-27_S1_A101_mute_check.sql`) |
 | S1-A12 | P2 | Brand | Drop `score_tiers.color_hex` column | 🟨 (depends S6 + S9) |
 | S1-A67 | P1 | COPPA | `parental_consents.parent_user_id` FK alignment | 🟩 ready (`2026-04-27_S1_A67_parental_consents_fk_alignment.sql`; re-points graduation_tokens+kid_dob_* FKs from auth.users→public.users) |
-| S1-Q3b | P0 | Kid-JWT | Kid JWT issuer flip — DB hardening (RED verdict) | 🟨 (peer-coord S3 + S10) |
+| S1-Q3b | P0 | Kid-JWT | Kid JWT issuer flip — DB hardening (RED verdict) | 🟩 DB hardening ready (4 migrations: `2026-04-28_S1_Q3b_users_rls_restrictive.sql` + `_weekly_recap_kid_block.sql` + `_events_partition_rls.sql` + `_rpc_kid_rejects.sql`); kid issuer flip itself still 🟨 (peer-coord S3 + S10). DB layer hardens regardless of which issuer S10 picks. |
 | S1-Q4.7 | P1 | Billing | Admin manual-sync `frozen_at` clear | 🟩 ready (`2026-04-27_S1_Q4.7_clear_frozen_on_free.sql`) |
 | S1-Q4.8 | P0 | RBAC | Freeze content-lockout RLS | 🟩 ready (`2026-04-27_S1_Q4.8_freeze_content_lockout_rls.sql`) |
 | S1-Q4.9 | P2 | Public-profile | `public_profiles_v` `is_pro` exposure | 🟩 ready (`2026-04-27_S1_Q4.9_public_profiles_v_is_pro.sql`) |
@@ -1548,3 +1548,26 @@ Before declaring S1 complete:
 - [ ] No `TODO`, `HACK`, `FIXME`, `XXX` comments in any shipped migration. Per `feedback_genuine_fixes_not_patches`.
 
 When the checklist clears, S1 closes. Other sessions reading this file have everything they need to integrate downstream.
+
+---
+
+## Note on duplicate migration files (2026-04-28 closeout)
+
+A second autonomous run produced parallel migrations dated `2026-04-28_S1_*.sql` for five P0 items already covered by the canonical `2026-04-27_S1_*.sql` set:
+
+- T0.2: `2026-04-28_S1_T0.2_post_comment_blocks_rename.sql` (parallel to `2026-04-27_S1_T0.2_post_comment_blocks_rename.sql`)
+- T0.3: `2026-04-28_S1_T0.3_drain_rpcs.sql` (parallel)
+- T0.5: `2026-04-28_S1_T0.5_current_kid_profile_id_top_level.sql` (parallel)
+- T2.2: `2026-04-28_S1_T2.2_anonymize_user_body_redact.sql` (parallel)
+- T2.7: `2026-04-28_S1_T2.7_billing_idempotency.sql` (parallel)
+
+**Owner action:** apply ONE of each pair, not both. The `2026-04-27_S1_*` files are the canonical set (peer-reviewed + index-tracked above). Each `2026-04-28_S1_*` file targets the same DDL with comparable bodies; CREATE OR REPLACE FUNCTION / ALTER POLICY are idempotent so a double-apply is safe but redundant. Recommend applying only the `2026-04-27` set.
+
+The 2026-04-28 run also shipped the **Q3b DB hardening set** (4 files; no `2026-04-27` parallel exists for these — apply all four):
+
+- `2026-04-28_S1_Q3b_users_rls_restrictive.sql`
+- `2026-04-28_S1_Q3b_weekly_recap_kid_block.sql`
+- `2026-04-28_S1_Q3b_events_partition_rls.sql`
+- `2026-04-28_S1_Q3b_rpc_kid_rejects.sql`
+
+These are the four migrations the manual called for under §S1-Q3b "The migrations (4 separate files for blast-radius isolation)." DB hardens regardless of which kid-issuer option S10 ultimately picks.
