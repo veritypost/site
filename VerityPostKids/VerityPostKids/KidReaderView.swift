@@ -15,6 +15,7 @@ struct KidReaderView: View {
     var onQuizComplete: (KidQuizResult) -> Void = { _ in }
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var auth: KidsAuth
 
     @State private var body_: String = ""
@@ -93,6 +94,16 @@ struct KidReaderView: View {
             }
         }
         .task { await loadArticle() }
+        // OwnersAudit Kids A91 — body is loaded once on .task and never
+        // re-fetched. A kid who opens an article, backgrounds the app
+        // for hours/days, and comes back is reading a stale snapshot —
+        // an editor revision (typo fix, factual correction, or
+        // moderation pull) on the server side won't reach them. Re-fetch
+        // on foreground transition to keep the kid on the live revision.
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task { await loadArticle() }
+        }
     }
 
     // MARK: Sub-views
