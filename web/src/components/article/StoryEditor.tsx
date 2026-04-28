@@ -600,12 +600,16 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
     setIsDirty(true);
   };
 
-  const saveAll = async () => {
+  // Optional override lets publishStory force status='published' on the
+  // very same save dispatch instead of relying on a setState that won't
+  // have flushed by the time saveAll reads `story.status` from closure.
+  const saveAll = async (override?: Partial<StoryForm>) => {
     setSaving(true);
     try {
-      let categoryId = story.category_id;
-      if (!categoryId && story.category) {
-        const { data: catData } = await supabase.from('categories').select('id').eq('name', story.category).single();
+      const effective: StoryForm = { ...story, ...(override || {}) };
+      let categoryId = effective.category_id;
+      if (!categoryId && effective.category) {
+        const { data: catData } = await supabase.from('categories').select('id').eq('name', effective.category).single();
         if (catData) categoryId = catData.id;
       }
 
@@ -615,12 +619,12 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
         entries.find((e) => e.is_current && e.type === 'story')
         || [...entries].reverse().find((e) => e.type === 'story')
         || null;
-      const drivingTitle = drivingEntry?.title || story.title || '';
-      const drivingSummary = drivingEntry?.summary || story.summary || '';
-      const drivingBody = drivingEntry?.content || story.body || '';
-      const drivingDate = drivingEntry?.event_date || story.published_at || '';
+      const drivingTitle = drivingEntry?.title || effective.title || '';
+      const drivingSummary = drivingEntry?.summary || effective.summary || '';
+      const drivingBody = drivingEntry?.content || effective.body || '';
+      const drivingDate = drivingEntry?.event_date || effective.published_at || '';
 
-      const slug = story.slug || (drivingTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now());
+      const slug = effective.slug || (drivingTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now());
       const publishedAtIso = drivingDate
         ? new Date(drivingDate + 'T00:00:00Z').toISOString()
         : null;
@@ -635,11 +639,11 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
             slug,
             excerpt: drivingSummary,
             body: drivingBody,
-            status: story.status,
+            status: effective.status,
             category_id: categoryId,
-            is_breaking: story.is_breaking || false,
-            is_developing: story.is_developing || false,
-            hero_pick_for_date: story.hero_pick_for_date,
+            is_breaking: effective.is_breaking || false,
+            is_developing: effective.is_developing || false,
+            hero_pick_for_date: effective.hero_pick_for_date,
             published_at: publishedAtIso,
           },
           timeline_entries: entries.map((entry) => ({
@@ -650,7 +654,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
             event_body: entry.summary || null,
             sort_order: entry.sort_order || 0,
           })),
-          sources: (story.sources || []).filter((s) => s.outlet || s.url || s.headline).map((s, i) => ({
+          sources: (effective.sources || []).filter((s) => s.outlet || s.url || s.headline).map((s, i) => ({
             publisher: s.outlet || '',
             url: s.url || '',
             title: s.headline || '',
@@ -680,12 +684,16 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
       lastPersistedSlugRef.current = slug;
 
       // Keep the local `story` state in sync with what we just persisted.
+      // `status` is included because publishStory passes it via override —
+      // without this, UI would still show the pre-publish status until
+      // the next reload.
       setStory((prev) => ({
         ...prev,
         title: drivingTitle,
         summary: drivingSummary,
         body: drivingBody,
         slug,
+        status: effective.status,
         published_at: drivingDate,
       }));
 
@@ -730,8 +738,10 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
   };
 
   const publishStory = async () => {
-    updateStory('status', 'published');
-    await saveAll();
+    // Pass status='published' via the saveAll override — relying on
+    // updateStory + setState here would race the immediate saveAll() and
+    // the request would go out with the stale 'draft' status.
+    await saveAll({ status: 'published' });
   };
 
   const deleteStory = () => {
