@@ -239,10 +239,13 @@ export default function SingleDoorForm({ notice }: Props) {
             }}
           >
             <p style={{ margin: '0 0 4px 0', fontSize: '13px', color: C.text, fontWeight: 600 }}>
-              Verity Post is invite-only.
+              Verity Post is invite-only right now.
             </p>
             <p style={{ margin: 0, fontSize: '13px', color: C.dim }}>
-              You&rsquo;ll need a personal invite link to create an account.
+              Have an invite? Use your link to get in.{' '}
+              <a href="/login?mode=waitlist" style={{ color: C.accent, fontWeight: 600 }}>
+                Join the waitlist →
+              </a>
             </p>
           </div>
         )}

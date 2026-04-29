@@ -13,6 +13,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { usePageViewTrack } from '@/lib/useTrack';
 import SingleDoorForm from './_SingleDoorForm';
+import WaitlistForm from './_WaitlistForm';
 
 const C = {
   bg: 'var(--bg)',
@@ -81,7 +82,7 @@ function LoginPageInner() {
           </div>
         </a>
 
-        <SingleDoorForm notice={notice} />
+        {mode === 'waitlist' ? <WaitlistForm /> : <SingleDoorForm notice={notice} />}
       </div>
     </div>
   );

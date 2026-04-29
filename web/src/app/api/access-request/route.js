@@ -29,6 +29,8 @@ import { getRateLimitPolicy } from '@/lib/rateLimits';
 import { isAsciiEmail } from '@/lib/emailNormalize';
 import { REF_COOKIE_NAME, verifyRef } from '@/lib/referralCookie';
 import { cookies } from 'next/headers';
+import { renderTemplate, sendEmail } from '@/lib/email';
+import { WAITLIST_TEMPLATE, buildWaitlistVars } from '@/lib/waitlistEmail';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -242,6 +244,22 @@ export async function POST(request) {
         metadata: { email_lc: email, ip_24: ipTruncated, cohort: cohortSnapshot },
       });
     } catch {}
+
+    // Send waitlist confirmation email. Best-effort — failure never blocks
+    // the response or changes the DB state.
+    try {
+      const tpl = renderTemplate(WAITLIST_TEMPLATE, buildWaitlistVars(name));
+      await sendEmail({
+        to: email,
+        subject: tpl.subject,
+        html: tpl.html,
+        text: tpl.text,
+        fromName: tpl.fromName,
+        fromEmail: tpl.fromEmail,
+      });
+    } catch (e) {
+      console.error('[access-request] waitlist confirmation email failed:', e);
+    }
 
     return genericOk();
   } catch (err) {
