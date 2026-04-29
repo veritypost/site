@@ -18,6 +18,10 @@ interface CommentComposerProps {
   onPosted?: (comment: CommentRow | null) => void;
   onCancel?: () => void;
   autoFocus?: boolean;
+  // Locked-composer gate: when false and the user is not muted/banned,
+  // renders a locked state instead of the form. Defaults to true so
+  // existing call sites that don't pass this prop are unaffected.
+  quizPassed?: boolean;
 }
 
 type MuteState = {
@@ -32,6 +36,7 @@ export default function CommentComposer({
   onPosted,
   onCancel,
   autoFocus = false,
+  quizPassed = true,
 }: CommentComposerProps) {
   const [body, setBody] = useState<string>('');
   const [busy, setBusy] = useState<boolean>(false);
@@ -209,6 +214,23 @@ export default function CommentComposer({
     return (
       <div style={muteBannerStyle}>
         Posting is disabled while the account notice at the top of the page applies.
+      </div>
+    );
+  }
+
+  if (quizPassed === false && !muteState && permsLoaded) {
+    return (
+      <div
+        style={{
+          padding: '14px 16px',
+          border: '1px solid var(--border, #e5e5e5)',
+          borderRadius: 12,
+          color: 'var(--dim, #888)',
+          fontSize: 13,
+          lineHeight: 1.5,
+        }}
+      >
+        Pass the quiz to join the discussion.
       </div>
     );
   }

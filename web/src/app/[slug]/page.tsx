@@ -24,6 +24,7 @@ import { renderBodyHtml } from '@/lib/pipeline/render-body';
 import { JsonLd, newsArticle } from '@/components/JsonLd';
 import { getSiteUrlOrNull } from '@/lib/siteUrl';
 import ArticleSurface from '@/components/article/ArticleSurface';
+import ArticleEngagementZone from '@/components/ArticleEngagementZone';
 
 export const dynamic = 'force-dynamic';
 
@@ -90,14 +91,42 @@ export default async function ArticleSlugPage({ params }: { params: { slug: stri
   // 5-key set so the existing admin role works without a re-grant. Session
   // E drops the legacy half.
   const supabase = createClient();
-  const [canEditNew, canEditLegacy, canPublishNew, canPublishLegacy] = await Promise.all([
+
+  // Fetch user first; pass check depends on user.id being available.
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // Run permissions, quiz count, and pass check in parallel.
+  const service = createServiceClient();
+  const [
+    canEditNew,
+    canEditLegacy,
+    canPublishNew,
+    canPublishLegacy,
+    quizCountResult,
+    passCheckResult,
+  ] = await Promise.all([
     hasPermissionServer('articles.edit', supabase),
     hasPermissionServer('admin.articles.edit.any', supabase),
     hasPermissionServer('articles.publish', supabase),
     hasPermissionServer('admin.articles.publish', supabase),
+    service
+      .from('quizzes')
+      .select('*', { count: 'exact', head: true })
+      .eq('article_id', article.id)
+      .eq('is_active', true)
+      .is('deleted_at', null),
+    user
+      ? service.rpc('user_passed_article_quiz', {
+          p_user_id: user.id,
+          p_article_id: article.id,
+        })
+      : Promise.resolve({ data: null, error: null }),
   ]);
+
   const canEdit = canEditNew || canEditLegacy;
   const canPublish = canPublishNew || canPublishLegacy;
+  const hasQuiz = (quizCountResult.count ?? 0) > 0;
+  const initialPassed = !!passCheckResult.data;
 
   // Drafts and archived: hidden from non-editors (404 — same surface as a
   // missing slug, no draft existence leak).
@@ -143,6 +172,14 @@ export default async function ArticleSlugPage({ params }: { params: { slug: stri
         canEdit={canEdit}
         canPublish={canPublish}
       />
+      {!isCoppa && article.status === 'published' && (
+        <ArticleEngagementZone
+          articleId={article.id}
+          hasQuiz={hasQuiz}
+          initialPassed={initialPassed}
+          currentUserId={user?.id ?? null}
+        />
+      )}
     </>
   );
 }

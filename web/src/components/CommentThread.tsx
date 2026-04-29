@@ -62,6 +62,10 @@ interface CommentThreadProps {
   // when they don't want to be the first to post. Story page passes a
   // compact "More in [Category]" list.
   emptyStateExtra?: React.ReactNode;
+  // Locked-composer gate: logged-in users who haven't passed the quiz see
+  // the composer in a locked state. Defaults to true so existing call
+  // sites that don't pass this prop are unaffected.
+  quizPassed?: boolean;
 }
 
 type DialogAction = 'delete' | 'report' | 'flag' | 'hide' | 'block';
@@ -84,6 +88,7 @@ export default function CommentThread({
   currentUserTier,
   justRevealed = false,
   emptyStateExtra,
+  quizPassed = true,
 }: CommentThreadProps) {
   const supabase = createClient();
   const [comments, setComments] = useState<CommentWithAuthor[]>([]);
@@ -683,6 +688,7 @@ export default function CommentThread({
           currentUserTier={currentUserTier}
           onPosted={handlePosted}
           autoFocus={justRevealed}
+          quizPassed={quizPassed}
         />
       )}
 

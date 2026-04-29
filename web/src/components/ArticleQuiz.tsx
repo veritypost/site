@@ -19,14 +19,12 @@ interface QuizQuestion {
 
 interface AttemptMeta {
   attempt_number: number;
-  attempts_used: number;
-  max_attempts: number;
 }
 
 interface QuizResultRow {
   quiz_id: string;
   question_text: string;
-  selected_answer: number;
+  selected_answer: string;
   correct_answer: number;
   is_correct: boolean;
   options: QuizOption[];
@@ -38,7 +36,6 @@ interface QuizResult {
   correct: number;
   total: number;
   percentile: number;
-  attempts_remaining: number | null;
   results: QuizResultRow[];
 }
 
@@ -83,27 +80,21 @@ export default function ArticleQuiz({
   const [stage, setStage] = useState<Stage>(initialPassed ? 'passed' : 'idle');
   const [error, setError] = useState<string>('');
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
-  const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [answers, setAnswers] = useState<Record<string, string>>({});
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [attemptMeta, setAttemptMeta] = useState<AttemptMeta | null>(null);
   const [result, setResult] = useState<QuizResult | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [showInterstitial, setShowInterstitial] = useState<boolean>(false);
-  // T149 — flag the dead-end "you've seen every question" path so the
-  // result block can render a recovery CTA below it instead of leaving
-  // the reader stuck on a terminal message.
-  const [poolExhausted, setPoolExhausted] = useState<boolean>(false);
   const trackEvent = useTrack();
 
   const canStart = hasPermission('quiz.attempt.start');
   const canRetake = hasPermission('quiz.retake');
-  const isPaid = hasPermission('quiz.retake.after_fail');
   const seeInterstitialAd = !hasPermission('article.view.ad_free');
 
   async function startAttempt() {
     setStage('loading-start');
     setError('');
-    setPoolExhausted(false);
     try {
       const res = await fetch('/api/quiz/start', {
         method: 'POST',
@@ -115,17 +106,11 @@ export default function ArticleQuiz({
         const msg = data?.error || 'Could not start quiz';
         if (/pool not ready/i.test(msg))
           throw new Error('Quiz is not yet available for this article.');
-        if (/pool exhausted/i.test(msg)) {
-          setPoolExhausted(true);
-          throw new Error('You have seen every question in this article\u2019s pool.');
-        }
         throw new Error(msg);
       }
       setQuestions(data.questions || []);
       setAttemptMeta({
         attempt_number: data.attempt_number,
-        attempts_used: data.attempts_used,
-        max_attempts: data.max_attempts,
       });
       setAnswers({});
       setCurrentIndex(0);
@@ -136,7 +121,6 @@ export default function ArticleQuiz({
         article_id: articleId,
         payload: {
           attempt_number: data.attempt_number,
-          max_attempts: data.max_attempts,
           question_count: (data.questions || []).length,
         },
       });
@@ -146,7 +130,7 @@ export default function ArticleQuiz({
     }
   }
 
-  async function submitAttempt(finalAnswers: Record<string, number> = answers) {
+  async function submitAttempt(finalAnswers: Record<string, string> = answers) {
     const payload = {
       article_id: articleId,
       kid_profile_id: kidProfileId,
@@ -203,7 +187,7 @@ export default function ArticleQuiz({
 
   function selectOption(q: QuizQuestion, oi: number) {
     if (answers[q.id] != null) return;
-    const next = { ...answers, [q.id]: oi };
+    const next = { ...answers, [q.id]: q.options[oi].text };
     setAnswers(next);
     const isLast = currentIndex >= questions.length - 1;
     setTimeout(() => {
@@ -286,26 +270,8 @@ export default function ArticleQuiz({
         </div>
         <div style={{ fontSize: 13, color: C.dim, marginBottom: 14, lineHeight: 1.5 }}>
           Answer 5 questions about this article. 3 correct unlocks the comment section.
-          {!isPaid
-            ? ' Free accounts get 2 attempts; each pulls a fresh set of questions.'
-            : ' Unlimited attempts on your plan.'}
         </div>
         {error && <div style={{ fontSize: 12, color: C.danger, marginBottom: 10 }}>{error}</div>}
-        {/* T149 — pool exhaustion is engagement-terminal otherwise. Give
-            the reader a one-line escape hatch back to the catalog. T11
-            owns same-category recommendations; this stays minimal. */}
-        {poolExhausted && (
-          <div style={{ fontSize: 12, color: C.dim, marginBottom: 12, lineHeight: 1.5 }}>
-            Try a different article —{' '}
-            <a
-              href="/browse"
-              style={{ color: C.accent, textDecoration: 'underline', fontWeight: 600 }}
-            >
-              browse more
-            </a>
-            .
-          </div>
-        )}
         <button
           onClick={startAttempt}
           disabled={stage === 'loading-start'}
@@ -350,11 +316,6 @@ export default function ArticleQuiz({
           <div style={{ fontSize: 13, fontWeight: 700, color: C.dim }}>
             Question {currentIndex + 1} of {questions.length}
           </div>
-          {!isPaid && attemptMeta?.max_attempts && (
-            <div style={{ fontSize: 11, color: C.dim }}>
-              {attemptMeta.attempts_used} of {attemptMeta.max_attempts} used
-            </div>
-          )}
         </div>
 
         <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
@@ -385,7 +346,7 @@ export default function ArticleQuiz({
               {q.question_text}
             </div>
             {q.options?.map((opt, oi) => {
-              const selected = answers[q.id] === oi;
+              const selected = answers[q.id] === opt.text;
               const anySelected = answers[q.id] != null;
               return (
                 <button
@@ -425,9 +386,8 @@ export default function ArticleQuiz({
   }
 
   if (stage === 'result' && result) {
-    const { passed, correct, total, percentile, attempts_remaining, results } = result;
-    const outOfAttempts = !isPaid && attempts_remaining === 0 && !passed;
-    const showRetakeButton = !passed && !outOfAttempts && canRetake;
+    const { passed, correct, total, percentile, results } = result;
+    const showRetakeButton = !passed && canRetake;
 
     // Signature moment per Future Projects/13_QUIZ_UNLOCK_MOMENT.md:
     // passing isn't winning, it's *arriving*. Calm card, no fanfare,
@@ -518,11 +478,6 @@ export default function ArticleQuiz({
           </div>
           <div style={{ fontSize: 13, color: C.text, marginBottom: 14 }}>
             Better than {percentile}% of readers on this article.
-            {/* Quiz Gate Brand: keep the cap visible (no surprise wall),
-                but drop the punitive "X attempts left" framing for a
-                quieter voice. The hard cap on free tier is enforced by
-                `attempts_remaining` going to 0; that triggers the
-                `outOfAttempts` panel below. */}
           </div>
 
           {results?.map((r, i) => (
@@ -549,7 +504,7 @@ export default function ArticleQuiz({
               >
                 {r.is_correct
                   ? 'Correct'
-                  : `Incorrect \u2014 you picked "${r.options?.[r.selected_answer]?.text ?? '\u2014'}"`}
+                  : `Incorrect \u2014 you picked "${r.selected_answer ?? '\u2014'}"`}
               </div>
               {!r.is_correct && (
                 <div style={{ fontSize: 13, color: C.text, marginTop: 2 }}>
@@ -581,47 +536,6 @@ export default function ArticleQuiz({
             >
               Take another look and try again
             </button>
-          )}
-          {outOfAttempts && (
-            <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: 13, color: C.text, marginBottom: 8 }}>
-                Both free attempts used on this article. Verity Pro removes the cap, or come back
-                and try a different article &mdash; each one has its own quiz.
-              </div>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                <a
-                  href="/profile/settings#billing"
-                  style={{
-                    display: 'inline-block',
-                    padding: '10px 20px',
-                    borderRadius: 9,
-                    background: C.accent,
-                    color: '#fff',
-                    fontSize: 14,
-                    fontWeight: 700,
-                    textDecoration: 'none',
-                  }}
-                >
-                  View plans
-                </a>
-                <a
-                  href="/"
-                  style={{
-                    display: 'inline-block',
-                    padding: '10px 20px',
-                    borderRadius: 9,
-                    border: `1px solid ${C.border}`,
-                    background: 'transparent',
-                    color: C.text,
-                    fontSize: 14,
-                    fontWeight: 600,
-                    textDecoration: 'none',
-                  }}
-                >
-                  Try another article
-                </a>
-              </div>
-            </div>
           )}
         </div>
       </>

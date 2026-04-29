@@ -31,9 +31,9 @@ export async function POST(request) {
     return NextResponse.json({ error: 'article_id and answers[] required' }, { status: 400 });
   }
   for (const a of answers) {
-    if (!a?.quiz_id || typeof a.selected_answer !== 'number') {
+    if (!a?.quiz_id || typeof a.selected_answer !== 'string' || !a.selected_answer.trim()) {
       return NextResponse.json(
-        { error: 'each answer needs {quiz_id, selected_answer:int}' },
+        { error: 'each answer needs {quiz_id, selected_answer: string (option text)}' },
         { status: 400 }
       );
     }
