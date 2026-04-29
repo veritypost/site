@@ -2,11 +2,8 @@
  * F7 Phase 4 Tasks 23-25 — GET + PATCH /api/admin/articles/:id
  *
  * Unified admin endpoint backing the article review / edit / publish /
- * reject flow. Phase 1 of AI + Plan Change Implementation consolidated kid
- * runs into the `articles` table (with is_kids_safe=true and age_band
- * tagged); both audiences now live in the same table with identical column
- * shape. Audience is derived from `articles.is_kids_safe` rather than which
- * table the row lives in.
+ * reject flow. Both audiences live in the `articles` table with identical
+ * column shape; audience is derived from `articles.is_kids_safe`.
  *
  * GET fetches article + sources + timelines + quizzes in one round-trip
  * from the unified `articles` + `sources` / `timelines` / `quizzes` tables.

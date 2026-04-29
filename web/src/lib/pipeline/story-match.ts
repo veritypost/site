@@ -130,11 +130,6 @@ export async function loadStoryMatchCandidates(
   }));
 }
 
-// Phase 1 of AI + Plan Change Implementation: dropped loadKidStoryMatchCandidates.
-// Was a kid_articles-targeted helper with zero callers in the codebase.
-// Kid story-match should use loadStoryMatchCandidates filtered by is_kids_safe
-// once kid clustering needs it.
-
 /**
  * Settings helper — 60s cached. Mirrors cluster.ts `getClusterOverlapPct`
  * pattern.

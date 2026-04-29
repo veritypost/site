@@ -12,8 +12,7 @@
  *      older than 10 min are reset to 'clustered' so next ingest cycle can
  *      re-queue them. Generate's finally normally handles this reset; this
  *      sweep catches the case where the lambda was killed before its finally
- *      ran. (Phase 1 of AI + Plan Change Implementation dropped
- *      kid_discovery_items; the unified discovery_items table covers both.)
+ *      ran. The unified discovery_items table covers both audiences.
  *
  *   3. Orphan locks: feed_clusters rows where locked_at is older than
  *      15 minutes (> the RPC's 10-minute TTL + 5-minute grace) are
