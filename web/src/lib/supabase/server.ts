@@ -48,6 +48,36 @@ export function createClient(): SupabaseClient<Database> {
   );
 }
 
+// OTP-flow client — implicit (not PKCE). Used for signInWithOtp and
+// verifyOtp so a code_verifier is never generated or required. This lets
+// the user request a code on one device and enter it on another, which is
+// the whole point of 8-digit codes over magic links.
+export function createOtpClient(): SupabaseClient<Database> {
+  const cookieStore = cookies();
+  return createServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL as string,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string,
+    {
+      auth: { flowType: 'implicit' },
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+        set(name: string, value: string, options: Record<string, unknown> | undefined) {
+          try {
+            cookieStore.set({ name, value, ...mergeCookieOptions(options) });
+          } catch {}
+        },
+        remove(name: string, options: Record<string, unknown> | undefined) {
+          try {
+            cookieStore.set({ name, value: '', ...mergeCookieOptions(options) });
+          } catch {}
+        },
+      },
+    }
+  );
+}
+
 // L7: a JWT is three base64url segments separated by dots. Reject any bearer
 // that doesn't match the shape before handing it to PostgREST — a malformed
 // string passes the function today and first explodes at the first query,

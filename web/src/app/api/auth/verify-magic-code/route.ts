@@ -17,7 +17,7 @@
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { createOtpClient, createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import { getRateLimitPolicy } from '@/lib/rateLimits';
 import { isAsciiEmail } from '@/lib/emailNormalize';
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
   // Verify the OTP. Supabase resolves type='email' against OTP codes sent
   // via signInWithOtp. The Supabase dashboard email template must use
   // {{ .Token }} (6-digit code) rather than {{ .ConfirmationURL }}.
-  const supabase = createClient();
+  const supabase = createOtpClient();
   const { data, error } = await supabase.auth.verifyOtp({
     email,
     token: rawToken,

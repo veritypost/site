@@ -61,7 +61,7 @@
 //   AUTH_SIGNUP_SUBMIT_PER_IP       5/hour per truncated /24
 
 import { NextResponse } from 'next/server';
-import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { createOtpClient, createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import { getRateLimitPolicy } from '@/lib/rateLimits';
 import { isAsciiEmail } from '@/lib/emailNormalize';
@@ -254,7 +254,7 @@ export async function POST(request) {
   // signin AND signup — Supabase resolves which is which from the
   // existence of the auth row. Errors swallowed (fail-CLOSED on response
   // shape, error captured in audit log).
-  const supabase = await createClient();
+  const supabase = createOtpClient();
   const siteUrl = getSiteUrl();
   let otpError = null;
   try {
