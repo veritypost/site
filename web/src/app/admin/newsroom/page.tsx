@@ -483,7 +483,7 @@ function NewArticleModal({ onClose }: { onClose: () => void }) {
             onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setMode(e.target.value as 'manual' | 'ai_generate')}
           >
             <option value="manual">Manual write — empty draft</option>
-            <option value="ai_generate">AI generate from sources</option>
+            <option value="ai_generate">Generate from sources</option>
           </Select>
         </Field>
         {mode === 'manual' ? (

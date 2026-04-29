@@ -154,7 +154,7 @@ function ReportsAdminInner() {
       .order('created_at', { ascending: false })
       .limit(200);
     if (error) {
-      toast.push({ message: 'Failed to load AI-flagged comments', variant: 'danger' });
+      toast.push({ message: 'Failed to load Auto-flagged comments', variant: 'danger' });
       return;
     }
     setAiFlagged((data ?? []) as AiFlaggedItem[]);
@@ -370,7 +370,7 @@ function ReportsAdminInner() {
                   size="sm"
                   onClick={() => { setFilter(s); setSelected(null); setSelectedAi(null); setTargetComment(null); setModerationHistory([]); }}
                 >
-                  {s === 'ai_flagged' ? 'AI-flagged' : s[0].toUpperCase() + s.slice(1)}
+                  {s === 'ai_flagged' ? 'Auto-flagged' : s[0].toUpperCase() + s.slice(1)}
                 </Button>
               ))}
               {filter !== 'ai_flagged' && (
@@ -408,7 +408,7 @@ function ReportsAdminInner() {
         >
           {filter === 'ai_flagged' ? (
             aiFlagged.length === 0 ? (
-              <EmptyState title="No AI-flagged comments" description="The scoring cron hasn't flagged anything above threshold." size="sm" />
+              <EmptyState title="No Auto-flagged comments" description="The scoring cron hasn't flagged anything above threshold." size="sm" />
             ) : (
               aiFlagged.map((item) => {
                 const isActive = selectedAi?.id === item.id;
@@ -429,7 +429,7 @@ function ReportsAdminInner() {
                     }}
                   >
                     <div style={{ fontSize: F.base, fontWeight: 700, marginBottom: 2 }}>
-                      AI-flagged · <span style={{ fontWeight: 400, color: ADMIN_C.soft }}>{item.reason ?? 'high toxicity score'}</span>
+                      Auto-flagged · <span style={{ fontWeight: 400, color: ADMIN_C.soft }}>{item.reason ?? 'high toxicity score'}</span>
                     </div>
                     <div style={{ fontSize: F.xs, color: ADMIN_C.muted }}>{new Date(item.created_at).toLocaleString()}</div>
                   </button>
@@ -486,7 +486,7 @@ function ReportsAdminInner() {
           ) : selectedAi ? (
             <div style={{ border: `1px solid ${ADMIN_C.divider}`, borderRadius: 10, background: ADMIN_C.bg, padding: S[4], display: 'flex', flexDirection: 'column', gap: S[3] }}>
               <div style={{ fontSize: F.lg, fontWeight: 700, color: ADMIN_C.white }}>
-                AI-flagged comment
+                Auto-flagged comment
               </div>
               {selectedAi.reason && (
                 <div style={{ fontSize: F.base, color: ADMIN_C.soft }}>{selectedAi.reason}</div>
@@ -502,7 +502,7 @@ function ReportsAdminInner() {
                       <div style={{ fontSize: F.xs, color: ADMIN_C.dim }}>
                         {moderationHistory[0].moderator_username
                           ? `${moderationHistory[0].action} by @${moderationHistory[0].moderator_username} on ${new Date(moderationHistory[0].created_at).toLocaleDateString()}${moderationHistory[0].reason ? ` — ${moderationHistory[0].reason}` : ''}`
-                          : `${moderationHistory[0].action} (AI) on ${new Date(moderationHistory[0].created_at).toLocaleDateString()}${moderationHistory[0].reason ? ` — ${moderationHistory[0].reason}` : ''}`
+                          : `${moderationHistory[0].action} on ${new Date(moderationHistory[0].created_at).toLocaleDateString()}${moderationHistory[0].reason ? ` — ${moderationHistory[0].reason}` : ''}`
                         }
                       </div>
                       {moderationHistory.length > 1 && !showFullHistory && (
@@ -512,7 +512,7 @@ function ReportsAdminInner() {
                       )}
                       {showFullHistory && moderationHistory.slice(1).map((h) => (
                         <div key={h.id} style={{ fontSize: F.xs, color: ADMIN_C.dim, marginTop: 4 }}>
-                          {h.moderator_username ? `${h.action} by @${h.moderator_username} on ${new Date(h.created_at).toLocaleDateString()}` : `${h.action} (AI) on ${new Date(h.created_at).toLocaleDateString()}`}
+                          {h.moderator_username ? `${h.action} by @${h.moderator_username} on ${new Date(h.created_at).toLocaleDateString()}` : `${h.action} on ${new Date(h.created_at).toLocaleDateString()}`}
                           {h.reason && ` — ${h.reason}`}
                         </div>
                       ))}
@@ -560,7 +560,7 @@ function ReportsAdminInner() {
                       <div style={{ fontSize: F.xs, color: ADMIN_C.dim }}>
                         {moderationHistory[0].moderator_username
                           ? `${moderationHistory[0].action} by @${moderationHistory[0].moderator_username} on ${new Date(moderationHistory[0].created_at).toLocaleDateString()}${moderationHistory[0].reason ? ` — ${moderationHistory[0].reason}` : ''}`
-                          : `${moderationHistory[0].action} (AI) on ${new Date(moderationHistory[0].created_at).toLocaleDateString()}${moderationHistory[0].reason ? ` — ${moderationHistory[0].reason}` : ''}`
+                          : `${moderationHistory[0].action} on ${new Date(moderationHistory[0].created_at).toLocaleDateString()}${moderationHistory[0].reason ? ` — ${moderationHistory[0].reason}` : ''}`
                         }
                       </div>
                       {moderationHistory.length > 1 && !showFullHistory && (
@@ -570,7 +570,7 @@ function ReportsAdminInner() {
                       )}
                       {showFullHistory && moderationHistory.slice(1).map((h) => (
                         <div key={h.id} style={{ fontSize: F.xs, color: ADMIN_C.dim, marginTop: 4 }}>
-                          {h.moderator_username ? `${h.action} by @${h.moderator_username} on ${new Date(h.created_at).toLocaleDateString()}` : `${h.action} (AI) on ${new Date(h.created_at).toLocaleDateString()}`}
+                          {h.moderator_username ? `${h.action} by @${h.moderator_username} on ${new Date(h.created_at).toLocaleDateString()}` : `${h.action} on ${new Date(h.created_at).toLocaleDateString()}`}
                           {h.reason && ` — ${h.reason}`}
                         </div>
                       ))}

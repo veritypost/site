@@ -501,7 +501,7 @@ function FeedsAdminInner() {
             <KV label="Feed type" value={selected.feed_type || 'rss'} />
             <KV label="Language" value={selected.language || '—'} />
             <KV label="Auto-publish" value={selected.is_auto_publish ? 'Yes' : 'No'} />
-            <KV label="AI rewrite" value={selected.is_ai_rewrite ? 'Yes' : 'No'} />
+            <KV label="Wire rewrite" value={selected.is_ai_rewrite ? 'Yes' : 'No'} />
             {selected.last_error && (
               <div>
                 <div style={labelStyle}>Last error</div>

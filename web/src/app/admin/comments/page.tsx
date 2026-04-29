@@ -41,11 +41,11 @@ const SETTINGS: SettingGroup[] = [
     { k: 'quiz_retry_unlimited', l: 'Unlimited retries', desc: 'Allow users to retake quiz without limit', on: true },
     { k: 'show_comments_before_quiz', l: 'Show comments before quiz', desc: 'Let users read comments without passing (read-only)', on: false },
   ]},
-  { group: 'AI Features', items: [
-    { k: 'ai_auto_tag', l: 'AI auto-tag comments', desc: 'Classify comments as Question, Opinion, Perspective, Challenge, etc.', on: true },
-    { k: 'ai_clustering', l: 'AI comment clustering', desc: 'Group comments by theme (Adding Context, Challenging, General)', on: false },
-    { k: 'ai_discussion_summary', l: 'AI discussion summary', desc: 'Generate summary at top of comments section', on: false },
-    { k: 'ai_bridge_text', l: 'AI bridge text between clusters', desc: 'Factual summaries between comment groups', on: false },
+  { group: 'Automation', items: [
+    { k: 'ai_auto_tag', l: 'Auto-tag comments', desc: 'Classify comments as Question, Opinion, Perspective, Challenge, etc.', on: true },
+    { k: 'ai_clustering', l: 'Comment clustering', desc: 'Group comments by theme (Adding Context, Challenging, General)', on: false },
+    { k: 'ai_discussion_summary', l: 'Discussion summary', desc: 'Generate summary at top of comments section', on: false },
+    { k: 'ai_bridge_text', l: 'Bridge text between clusters', desc: 'Factual summaries between comment groups', on: false },
   ]},
   { group: 'Sorting & Display', items: [
     { k: 'default_sort', l: 'Default sort: Top', desc: 'Sort by quality_score (upvotes weighted by reader score)', on: true },
@@ -54,12 +54,12 @@ const SETTINGS: SettingGroup[] = [
     { k: 'collapse_low_quiz', l: 'Collapse low-quiz comments', desc: 'Auto-collapse comments from users who scored below pass threshold', on: true },
   ]},
   { group: 'Comment Tags', items: [
-    { k: 'tag_question', l: 'Question tag', desc: 'AI-assigned tag for questions', on: true },
-    { k: 'tag_opinion', l: 'Opinion tag', desc: 'AI-assigned tag for opinions', on: true },
-    { k: 'tag_perspective', l: 'Perspective tag', desc: 'AI-assigned tag for unique perspectives', on: true },
-    { k: 'tag_challenge', l: 'Challenge tag', desc: 'AI-assigned tag for challenges/pushback', on: true },
-    { k: 'tag_evidence', l: 'Evidence tag', desc: 'AI-assigned tag for source-backed claims', on: true },
-    { k: 'tag_answer', l: 'Answer tag', desc: 'AI-assigned tag for direct answers', on: true },
+    { k: 'tag_question', l: 'Question tag', desc: 'Auto-assigned tag for questions', on: true },
+    { k: 'tag_opinion', l: 'Opinion tag', desc: 'Auto-assigned tag for opinions', on: true },
+    { k: 'tag_perspective', l: 'Perspective tag', desc: 'Auto-assigned tag for unique perspectives', on: true },
+    { k: 'tag_challenge', l: 'Challenge tag', desc: 'Auto-assigned tag for challenges/pushback', on: true },
+    { k: 'tag_evidence', l: 'Evidence tag', desc: 'Auto-assigned tag for source-backed claims', on: true },
+    { k: 'tag_answer', l: 'Answer tag', desc: 'Auto-assigned tag for direct answers', on: true },
   ]},
   { group: 'Role Badges', items: [
     { k: 'badge_owner', l: 'Owner badge', desc: 'Show badge for Owner role on comments', on: true },

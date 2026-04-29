@@ -53,7 +53,7 @@ const MONITORING_SETTINGS: { k: string; l: string; desc: string }[] = [
   { k: 'vercel_analytics',  l: 'Vercel Analytics',         desc: 'Page load performance and Web Vitals' },
   { k: 'db_backup_auto',    l: 'Automatic DB backups',     desc: 'Daily automated database backups' },
   { k: 'uptime_monitoring', l: 'Uptime monitoring',        desc: 'Alert if site goes down (external service)' },
-  { k: 'api_logging',       l: 'API call logging',         desc: 'Log every AI API call with model, tokens, cost, latency' },
+  { k: 'api_logging',       l: 'API call logging',         desc: 'Log every API call with model, tokens, cost, latency' },
   { k: 'anomaly_alerts',    l: 'Anomaly detection alerts', desc: 'Email when nightly anomaly scan finds suspicious activity' },
 ];
 
