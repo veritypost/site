@@ -390,3 +390,42 @@ iOS callers fixed:
 **What's blocked or deferred.** None blocking Slice 06 D1.
 
 **What next session should pick up.** Slice 06 D1 — mount `ArticleEngagementZone` in the web reader (`/[slug]/page.tsx`). The component exists (`web/src/components/article/ArticleEngagementZone.tsx`); the story-page architecture is now stable.
+
+---
+
+## Session 10 — 2026-04-29 — Slice 06 completion + post-slug RPC sweep
+
+**Phase entering:** 10 (all web/iOS callers updated for slug migration; Slice 06 D1 unblocked).
+**Phase leaving:** 11 (all six slices fully implemented; article-lifecycle program complete).
+
+**What happened.** Audited every Slice 06 decision against current code to establish what remained.
+
+**Slice 06 status on entry:**
+- D1 (ArticleEngagementZone mounting): already done — `[slug]/page.tsx` already mounts `<ArticleEngagementZone key={article.id} ...>` with `hasQuiz`, `initialPassed`, `currentUserId` props.
+- D2 (NCMEC stub): no code change needed — confirmed.
+- D3 (AI moderation cron): already done — `api/cron/score-comments/route.ts` exists, wired to `vercel.json` at `*/15 * * * *`, reads threshold from settings, inserts `moderation_actions` rows on flagged comments.
+- D4 (moderation_actions table + write points): already done — hide and unhide routes both INSERT to `moderation_actions` after RPC success.
+- D5 (expert inline rendering): already done — `CommentThread.tsx` has expert filter toggle, `CommentRow.tsx` has badge + highlight + blur paywall; iOS `StoryDetailView.swift` has expert badge + filter.
+- D6 (T300 realtime fix): confirmed already live per session 9 — no action taken.
+- D7 (composer quiz-lock): already done — `CommentComposer.tsx` renders locked state with "Pass the quiz to join the discussion." when `quizPassed=false`.
+- Migration B (`comments.story_id` FK): already applied as part of `slice05_stories_as_containers` migration.
+- Migration C (AI settings rows): already applied as `ai_comment_moderation_settings` migration.
+
+**New finding: three RPCs broken by articles.slug removal.** The slice05 migration dropped `articles.slug` but three RPCs still referenced it and would fail at runtime:
+
+1. `post_comment`: `SELECT a.title, a.slug FROM articles` — always fails on comment post. Also: `story_id` not set on INSERT, notification URLs used `/story/<slug>` instead of `/<slug>`.
+2. `send_breaking_news`: `SELECT slug FROM articles` — fails on every breaking news dispatch. URL used `/story/<slug>`.
+3. `approve_expert_answer`: notification URL used `/story/<article_id>` (article UUID, not slug — never worked correctly, just happened to be a fallback).
+
+All three fixed via migrations applied to DB:
+- `2026-04-29_slice06_fix_post_comment_rpc.sql`: joins `stories` for slug + `story_id`, sets `story_id` on INSERT, uses `/<slug>` URLs.
+- `2026-04-29_slice06_fix_send_breaking_news_rpc.sql`: joins `stories` for slug, uses `/<slug>`.
+- `2026-04-29_slice06_fix_approve_expert_answer_rpc.sql`: resolves story slug after RETURNING, uses `/<slug>`.
+
+Post-fix DB scan for `articles.slug` references and `/story/` URL patterns in all public RPCs returned zero rows. TypeScript passes clean.
+
+**What got locked.** Slice 06 fully complete. All six slices implemented. Article-lifecycle program complete.
+
+**What's blocked or deferred.** Nothing. The program is done.
+
+**What next session should pick up.** A full end-to-end verification pass against the slice 06 implementer checklist (in `slices/06-comments.md`) before shipping — specifically the comment-post flow, quiz-lock UX, expert inline rendering on both platforms, and the AI scoring cron.

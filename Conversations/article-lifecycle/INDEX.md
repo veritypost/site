@@ -1,8 +1,8 @@
 # Article Lifecycle Redesign — Index
 
-**Last updated:** 2026-04-29 (session 9)
-**Phase:** 10 — slices 01–05 fully implemented; slice 06 partial (D1 ArticleEngagementZone ready to ship)
-**Next session should pick up:** Slice 06 D1 (ArticleEngagementZone mounting — no longer blocked)
+**Last updated:** 2026-04-29 (session 10)
+**Phase:** 11 — all six slices fully implemented. Program complete.
+**Next session should pick up:** nothing — full verification pass against the slice 06 implementer checklist is recommended before shipping.
 
 ---
 
@@ -15,7 +15,7 @@
 | 03 | Viewing | **implemented** | 2026-04-29 | `slices/03-viewing.md` |
 | 04 | Quizzes | **implemented** | 2026-04-29 | `slices/04-quizzes.md` |
 | 05 | Timelines | **implemented** | 2026-04-29 | `slices/05-timelines.md` |
-| 06 | Comments | **partial** (D6 AI-flagged tab + moderation history done; D1 ArticleEngagementZone ready — slice 05 unblocked) | 2026-04-29 | `slices/06-comments.md` |
+| 06 | Comments | **implemented** | 2026-04-29 | `slices/06-comments.md` |
 
 **Default ordering** is generation → publishing → viewing → quizzes → timelines → comments. Owner can redirect any time.
 
