@@ -143,7 +143,7 @@ struct ReadingLogInsert: Encodable {
 }
 
 // MARK: - Quiz + Quiz attempts
-// Table: public.quizzes (one question per row; grouped by article_id + pool_group)
+// Table: public.quizzes (one question per row; grouped by article_id)
 // Options are stored as jsonb: [{"text": "...", "is_correct": true/false}, ...]
 struct QuizOption: Codable, Equatable, Identifiable {
     let text: String
@@ -166,7 +166,6 @@ struct QuizQuestion: Codable, Identifiable, Equatable {
     let explanation: String?
     let difficulty: String?
     let points: Int?
-    let poolGroup: Int?
     let sortOrder: Int?
 
     enum CodingKeys: String, CodingKey {
@@ -178,7 +177,6 @@ struct QuizQuestion: Codable, Identifiable, Equatable {
         case explanation
         case difficulty
         case points
-        case poolGroup = "pool_group"
         case sortOrder = "sort_order"
     }
 

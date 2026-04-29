@@ -20,7 +20,7 @@
 // Input:  Authorization: Bearer <kid JWT>; path param `id` = article_id.
 // Output: { questions: [{ id, article_id, question_text, question_type,
 //                          options: [{ text }, ...], explanation,
-//                          difficulty, points, pool_group, sort_order }] }
+//                          difficulty, points, sort_order }] }
 //
 // Failure modes:
 //   401 — missing / invalid / non-kid bearer
@@ -49,7 +49,6 @@ interface RawQuestion {
   explanation: string | null;
   difficulty: string | null;
   points: number | null;
-  pool_group: number | null;
   sort_order: number | null;
 }
 
@@ -66,7 +65,6 @@ interface SafeQuestion {
   explanation: string | null;
   difficulty: string | null;
   points: number | null;
-  pool_group: number | null;
   sort_order: number | null;
 }
 
@@ -192,7 +190,7 @@ export async function GET(
     const { data: rawRows, error: quizErr } = await svc
       .from('quizzes')
       .select(
-        'id, article_id, question_text, question_type, options, explanation, difficulty, points, pool_group, sort_order'
+        'id, article_id, question_text, question_type, options, explanation, difficulty, points, sort_order'
       )
       .eq('article_id', articleId)
       .eq('is_active', true)
@@ -225,7 +223,6 @@ export async function GET(
       explanation: q.explanation,
       difficulty: q.difficulty,
       points: q.points,
-      pool_group: q.pool_group,
       sort_order: q.sort_order,
     }));
 

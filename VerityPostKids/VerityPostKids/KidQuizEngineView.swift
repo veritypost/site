@@ -376,7 +376,7 @@ struct KidQuizEngineView: View {
         do {
             let rows: [QuizQuestion] = try await client
                 .from("quizzes")
-                .select("id, article_id, question_text, question_type, options, explanation, difficulty, points, pool_group, sort_order")
+                .select("id, article_id, question_text, question_type, options, explanation, difficulty, points, sort_order")
                 .eq("article_id", value: article.id)
                 .eq("is_active", value: true)
                 .is("deleted_at", value: nil)
