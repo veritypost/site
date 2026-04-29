@@ -1,6 +1,6 @@
 export const metadata = {
-  title: 'Sign up — Verity Post',
-  description: 'Join Verity Post to read, prove, and discuss news.',
+  title: 'Verity Post',
+  description: 'Verified news. Invite-only during beta.',
 };
 
 export default function SignupLayout({ children }) {
