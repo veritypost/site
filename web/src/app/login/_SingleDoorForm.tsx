@@ -238,14 +238,11 @@ export default function SingleDoorForm({ notice }: Props) {
               marginBottom: '16px',
             }}
           >
-            <p style={{ margin: '0 0 6px 0', fontSize: '13px', color: C.text, fontWeight: 600 }}>
-              Verity Post is invite-only right now.
+            <p style={{ margin: '0 0 4px 0', fontSize: '13px', color: C.text, fontWeight: 600 }}>
+              Verity Post is invite-only.
             </p>
             <p style={{ margin: 0, fontSize: '13px', color: C.dim }}>
-              Have an invite link? Use it to get in.{' '}
-              <a href="/login?mode=request" style={{ color: C.accent, fontWeight: 600 }}>
-                No invite? Request access →
-              </a>
+              You&rsquo;ll need a personal invite link to create an account.
             </p>
           </div>
         )}
@@ -293,12 +290,6 @@ export default function SingleDoorForm({ notice }: Props) {
         </form>
 
         <p style={{ fontSize: 13, color: C.dim, textAlign: 'center', marginTop: 20, marginBottom: 0 }}>
-          new here?{' '}
-          <a href="/login?mode=request" style={{ color: C.accent, fontWeight: 600 }}>
-            request access →
-          </a>
-        </p>
-        <p style={{ fontSize: 13, color: C.dim, textAlign: 'center', marginTop: 8, marginBottom: 0 }}>
           having trouble?{' '}
           <a href="/contact" style={{ color: C.accent, fontWeight: 600 }}>
             get help →

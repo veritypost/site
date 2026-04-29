@@ -13,7 +13,6 @@ import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { usePageViewTrack } from '@/lib/useTrack';
 import SingleDoorForm from './_SingleDoorForm';
-import RequestAccessForm from './_RequestAccessForm';
 
 const C = {
   bg: 'var(--bg)',
@@ -82,7 +81,7 @@ function LoginPageInner() {
           </div>
         </a>
 
-        {mode === 'request' ? <RequestAccessForm /> : <SingleDoorForm notice={notice} />}
+        <SingleDoorForm notice={notice} />
       </div>
     </div>
   );
