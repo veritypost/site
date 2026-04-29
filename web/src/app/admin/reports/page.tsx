@@ -179,7 +179,7 @@ function ReportsAdminInner() {
     if (!data) { setModerationHistory([]); return; }
     const rows = data as Array<{ id: number; action: string; reason: string | null; created_at: string; moderator_id: string | null }>;
     const moderatorIds = [...new Set(rows.map((r) => r.moderator_id).filter(Boolean))] as string[];
-    let usernameMap: Record<string, string> = {};
+    const usernameMap: Record<string, string> = {};
     if (moderatorIds.length > 0) {
       const { data: profiles } = await supabase
         .from('public_profiles_v')
