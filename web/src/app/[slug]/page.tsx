@@ -205,6 +205,7 @@ export default async function ArticleSlugPage({ params }: { params: { slug: stri
       />
       {!isCoppa && article.status === 'published' && (
         <ArticleEngagementZone
+          key={article.id}
           articleId={article.id}
           hasQuiz={hasQuiz}
           initialPassed={initialPassed}
