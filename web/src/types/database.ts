@@ -130,6 +130,8 @@ export type Database = {
       access_codes: {
         Row: {
           code: string
+          cohort_medium: string | null
+          cohort_source: string | null
           created_at: string
           created_by: string | null
           current_uses: number
@@ -150,6 +152,8 @@ export type Database = {
         }
         Insert: {
           code: string
+          cohort_medium?: string | null
+          cohort_source?: string | null
           created_at?: string
           created_by?: string | null
           current_uses?: number
@@ -170,6 +174,8 @@ export type Database = {
         }
         Update: {
           code?: string
+          cohort_medium?: string | null
+          cohort_source?: string | null
           created_at?: string
           created_by?: string | null
           current_uses?: number
@@ -254,15 +260,13 @@ export type Database = {
           approved_by: string | null
           created_at: string
           email: string
-          email_confirm_expires_at: string | null
-          email_confirm_token: string | null
-          email_confirmed_at: string | null
           id: string
           invite_sent_at: string | null
           ip_address: string | null
           metadata: Json
           name: string | null
           reason: string | null
+          referral_medium: string | null
           referral_source: string | null
           status: string
           type: string
@@ -275,15 +279,13 @@ export type Database = {
           approved_by?: string | null
           created_at?: string
           email: string
-          email_confirm_expires_at?: string | null
-          email_confirm_token?: string | null
-          email_confirmed_at?: string | null
           id?: string
           invite_sent_at?: string | null
           ip_address?: string | null
           metadata?: Json
           name?: string | null
           reason?: string | null
+          referral_medium?: string | null
           referral_source?: string | null
           status?: string
           type: string
@@ -296,15 +298,13 @@ export type Database = {
           approved_by?: string | null
           created_at?: string
           email?: string
-          email_confirm_expires_at?: string | null
-          email_confirm_token?: string | null
-          email_confirmed_at?: string | null
           id?: string
           invite_sent_at?: string | null
           ip_address?: string | null
           metadata?: Json
           name?: string | null
           reason?: string | null
+          referral_medium?: string | null
           referral_source?: string | null
           status?: string
           type?: string
@@ -8019,7 +8019,6 @@ export type Database = {
           metadata: Json
           options: Json
           points: number
-          pool_group: number
           question_text: string
           question_type: string
           sort_order: number
@@ -8040,7 +8039,6 @@ export type Database = {
           metadata?: Json
           options?: Json
           points?: number
-          pool_group?: number
           question_text: string
           question_type?: string
           sort_order?: number
@@ -8061,7 +8059,6 @@ export type Database = {
           metadata?: Json
           options?: Json
           points?: number
-          pool_group?: number
           question_text?: string
           question_type?: string
           sort_order?: number
@@ -10265,6 +10262,8 @@ export type Database = {
           cohort_joined_at: string | null
           comment_count: number
           comped_until: string | null
+          trial_extension_until: string | null
+          trial_extended_seen_at: string | null
           country_code: string | null
           created_at: string
           date_of_birth: string | null
@@ -10289,6 +10288,7 @@ export type Database = {
           gender: string | null
           has_kids_profiles: boolean
           id: string
+          invite_cap_override: number | null
           is_active: boolean
           is_banned: boolean
           is_expert: boolean
@@ -10366,6 +10366,8 @@ export type Database = {
           cohort_joined_at?: string | null
           comment_count?: number
           comped_until?: string | null
+          trial_extension_until?: string | null
+          trial_extended_seen_at?: string | null
           country_code?: string | null
           created_at?: string
           date_of_birth?: string | null
@@ -10390,6 +10392,7 @@ export type Database = {
           gender?: string | null
           has_kids_profiles?: boolean
           id?: string
+          invite_cap_override?: number | null
           is_active?: boolean
           is_banned?: boolean
           is_expert?: boolean
@@ -10467,6 +10470,8 @@ export type Database = {
           cohort_joined_at?: string | null
           comment_count?: number
           comped_until?: string | null
+          trial_extension_until?: string | null
+          trial_extended_seen_at?: string | null
           country_code?: string | null
           created_at?: string
           date_of_birth?: string | null
@@ -10491,6 +10496,7 @@ export type Database = {
           gender?: string | null
           has_kids_profiles?: boolean
           id?: string
+          invite_cap_override?: number | null
           is_active?: boolean
           is_banned?: boolean
           is_expert?: boolean
