@@ -51,7 +51,7 @@ function visual(state: AccountState): Visual | null {
         body: state.until
           ? `Too many sign-in attempts. Try again after ${formatTime(state.until)}.`
           : 'Too many sign-in attempts. Try again later.',
-        cta: { label: 'Reset password', href: '/forgot-password' },
+        cta: { label: 'Sign in again', href: '/login' },
       };
     case 'verify_locked':
       return {

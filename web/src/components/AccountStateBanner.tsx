@@ -56,8 +56,8 @@ function pickStates(user: UserRow | null | undefined): BannerState[] {
     states.push({
       severity: 'high',
       message: `Account temporarily locked after repeated failed sign-ins. Try again after ${until}.`,
-      ctaLabel: 'Reset password',
-      ctaHref: '/forgot-password',
+      ctaLabel: 'Sign in again',
+      ctaHref: '/login',
     });
   }
 

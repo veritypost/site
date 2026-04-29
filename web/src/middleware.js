@@ -352,10 +352,9 @@ export async function middleware(request) {
   const betaGateEnabled = process.env.NEXT_PUBLIC_BETA_GATE === '1';
   const betaGateAllowed =
     pathname === '/login' ||
+    pathname === '/signup' ||
     pathname === '/beta-locked' ||
     pathname === '/request-access' ||
-    pathname === '/forgot-password' ||
-    pathname === '/reset-password' ||
     pathname === '/preview' ||
     pathname === '/welcome' ||
     pathname.startsWith('/r/') ||
@@ -420,13 +419,13 @@ export async function middleware(request) {
   }
 
   if (betaGateEnabled && !betaGateAllowed && !user) {
-    const loginUrl = request.nextUrl.clone();
-    loginUrl.pathname = '/login';
-    loginUrl.search = '';
-    if (pathname !== '/' && pathname !== '/login') {
-      loginUrl.searchParams.set('next', pathname + request.nextUrl.search);
+    const signupUrl = request.nextUrl.clone();
+    signupUrl.pathname = '/signup';
+    signupUrl.search = '';
+    if (pathname !== '/' && pathname !== '/signup') {
+      signupUrl.searchParams.set('next', pathname + request.nextUrl.search);
     }
-    const redirect = NextResponse.redirect(loginUrl, { status: 302 });
+    const redirect = NextResponse.redirect(signupUrl, { status: 302 });
     redirect.headers.set('x-request-id', requestId);
     setCspHeader(redirect, csp, cspStrictReport);
     return redirect;

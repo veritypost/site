@@ -1,12 +1,12 @@
-// Emails — primary address + verification status. Change-email flow is
-// handled by Supabase auth (`updateUser({email})`); we surface the
-// pending-change banner consistently so the user knows what's in flight.
+// Emails — primary address + verification status. Change-email flow
+// routes through /api/auth/email-change (Supabase updateUser under the
+// hood), and requires an in-session "you sure?" confirm step before
+// the API call is made.
 
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 
-import { createClient } from '@/lib/supabase/client';
 import type { Tables } from '@/types/database-helpers';
 
 import { Card } from '../../_components/Card';
@@ -22,14 +22,14 @@ interface Props {
 }
 
 export function EmailsCard({ user, preview }: Props) {
-  const supabase = useMemo(() => createClient(), []);
   const toast = useToast();
 
   const u = user as UserRow & { email?: string | null; email_verified?: boolean | null };
   const [newEmail, setNewEmail] = useState('');
+  const [confirming, setConfirming] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const onChange = async () => {
+  const handleRequestChange = () => {
     if (preview) {
       toast.info('Sign in on :3333 to change your email.');
       return;
@@ -38,16 +38,105 @@ export function EmailsCard({ user, preview }: Props) {
       toast.error('Enter a valid email address.');
       return;
     }
-    setSubmitting(true);
-    const { error } = await supabase.auth.updateUser({ email: newEmail });
-    setSubmitting(false);
-    if (error) {
-      toast.error(error.message);
+    if (newEmail.toLowerCase() === (u.email ?? '').toLowerCase()) {
+      toast.error("That's already your email address.");
       return;
     }
-    toast.success(`Verification link sent to ${newEmail}. Click it to confirm the change.`);
-    setNewEmail('');
+    // Show the confirm step before sending the API call.
+    setConfirming(true);
   };
+
+  const handleConfirm = async () => {
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/auth/email-change', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: newEmail }),
+      });
+      const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!res.ok || !json.ok) {
+        toast.error(json.error || 'Could not send verification link. Please try again.');
+        setConfirming(false);
+        return;
+      }
+      toast.success(`Verification link sent to ${newEmail}. Click it to confirm the change.`);
+      setNewEmail('');
+      setConfirming(false);
+    } catch {
+      toast.error('Network issue. Please try again.');
+      setConfirming(false);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Confirm step — shown after the user clicks "Send link" and before
+  // the API call is made. Keeps an accidental typo from locking them out.
+  if (confirming) {
+    return (
+      <Card
+        title="Email"
+        description="Your sign-in address and where account notifications are sent."
+      >
+        <div style={{ display: 'grid', gap: S[4] }}>
+          <div
+            style={{
+              padding: S[4],
+              background: C.warnSoft,
+              borderRadius: R.md,
+              border: `1px solid ${C.warn}`,
+            }}
+          >
+            <div style={{ fontSize: F.sm, fontWeight: 600, color: C.warn, marginBottom: S[2] }}>
+              Confirm email change
+            </div>
+            <div style={{ fontSize: F.sm, color: C.ink }}>
+              Send a verification link to{' '}
+              <strong style={{ wordBreak: 'break-all' }}>{newEmail}</strong>?
+            </div>
+            <div style={{ fontSize: F.xs, color: C.inkMuted, marginTop: S[2] }}>
+              The change only takes effect after you click the link in that inbox.
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: S[2] }}>
+            <button
+              type="button"
+              onClick={handleConfirm}
+              disabled={submitting}
+              style={{
+                ...buttonPrimaryStyle,
+                flex: 1,
+                opacity: submitting ? 0.55 : 1,
+                cursor: submitting ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {submitting ? 'Sending…' : 'Yes, send link'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirming(false)}
+              disabled={submitting}
+              style={{
+                flex: 1,
+                padding: '8px 16px',
+                borderRadius: R.md,
+                border: `1px solid ${C.border}`,
+                background: C.surface,
+                color: C.ink,
+                fontSize: F.sm,
+                fontWeight: 500,
+                cursor: submitting ? 'not-allowed' : 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card
@@ -102,7 +191,7 @@ export function EmailsCard({ user, preview }: Props) {
               />
               <button
                 type="button"
-                onClick={onChange}
+                onClick={handleRequestChange}
                 disabled={submitting}
                 style={{
                   ...buttonPrimaryStyle,
@@ -110,7 +199,7 @@ export function EmailsCard({ user, preview }: Props) {
                   cursor: submitting ? 'not-allowed' : 'pointer',
                 }}
               >
-                {submitting ? 'Sending…' : 'Send link'}
+                Send link
               </button>
             </div>
           )}

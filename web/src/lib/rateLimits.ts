@@ -66,6 +66,16 @@ export const RATE_LIMITS = {
   // a minute is rare. Key on SHA-256(token), never the raw token.
   AUTH_GRADUATE_CLAIM_TOKEN: { windowSec: 60, max: 5 },
 
+  // OTP verify (verify-magic-code). Per email per hour — brute-forcing
+  // a 6-digit code requires ~10^6 guesses; 10/hr makes it uneconomic.
+  AUTH_VERIFY_MAGIC_CODE_PER_EMAIL: { windowSec: 3600, max: 10 },
+  // Daily failure cap — separate counter so a burst of failures within
+  // the hour limit still accumulates toward the day-level block.
+  AUTH_VERIFY_MAGIC_CODE_DAILY_FAILURES: { windowSec: 86400, max: 10 },
+  // Per-code attempt cap. A single OTP token may only be tried 5 times
+  // in a 30-minute window regardless of email-level limits.
+  AUTH_VERIFY_MAGIC_CODE_ATTEMPTS_PER_CODE: { windowSec: 1800, max: 5 },
+
   // Beta access-request intake. Per IP cap is loose enough for a normal
   // visitor retrying on a flaky connection but tight enough that one IP
   // can't burst-flood the queue. Per email cap is 1/day so a single

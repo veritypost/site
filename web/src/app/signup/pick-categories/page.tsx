@@ -5,7 +5,6 @@
 import { CSSProperties, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/client';
-import { resolveNext } from '@/lib/authRedirect';
 
 // Onboarding step 3 of 4 — pick 3-7 categories. Lightweight personalization
 // step inserted between username pick and the welcome carousel so a fresh
@@ -36,15 +35,6 @@ const C = {
 const MIN_PICKS = 3;
 const MAX_PICKS = 7;
 
-// Forward an OAuth-callback `?next=` through to /welcome so the carousel's
-// final hop can validate + honor it. resolveNext() is the same allowlist
-// used server-side in /api/auth/callback.
-function readValidatedNext(): string {
-  if (typeof window === 'undefined') return '';
-  const raw = new URLSearchParams(window.location.search).get('next');
-  const safe = resolveNext(raw, null);
-  return safe ? `?next=${encodeURIComponent(safe)}` : '';
-}
 
 type CategoryRow = {
   id: string;
@@ -100,14 +90,14 @@ export default function PickCategoriesPage() {
         // Username step still unfinished: bounce back to it. Mirrors the
         // /welcome guard so users can't open this URL out of order.
         if (me && !me.username) {
-          router.replace(`/signup/pick-username${readValidatedNext()}`);
+          router.replace('/');
           return;
         }
 
         const existingCats = me?.metadata?.feed?.cats ?? [];
         const alreadyPicked = Array.isArray(existingCats) && existingCats.length >= MIN_PICKS;
         if (me?.onboarding_completed_at || alreadyPicked) {
-          router.replace(`/welcome${readValidatedNext()}`);
+          router.replace('/');
           return;
         }
 
@@ -207,7 +197,7 @@ export default function PickCategoriesPage() {
     const ok = await persistCats([...selected]);
     setSaving(false);
     if (ok) {
-      router.replace(`/welcome${readValidatedNext()}`);
+      router.replace('/');
     }
   };
 
@@ -217,7 +207,7 @@ export default function PickCategoriesPage() {
     // No write on skip — leaving metadata.feed.cats absent means the feed
     // falls back to its default ranking, exactly as it would for any
     // user who never visited /profile/settings#feed.
-    router.replace(`/welcome${readValidatedNext()}`);
+    router.replace('/');
   };
 
   const shell: CSSProperties = {

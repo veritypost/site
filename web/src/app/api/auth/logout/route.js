@@ -2,6 +2,7 @@
 // @feature-verified system_auth 2026-04-18
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
+import { REF_COOKIE_NAME } from '@/lib/referralCookie';
 
 export async function POST() {
   try {
@@ -34,7 +35,15 @@ export async function POST() {
       }
     }
 
-    return NextResponse.json({ ok: true });
+    const res = NextResponse.json({ ok: true });
+    res.cookies.set(REF_COOKIE_NAME, '', {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: 0,
+    });
+    return res;
   } catch (err) {
     console.error('[logout]', err);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });

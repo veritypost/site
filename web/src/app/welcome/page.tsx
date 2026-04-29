@@ -52,22 +52,27 @@ type FeedStory = {
 };
 
 export default function WelcomePage() {
-  // Phase 6 of AI + Plan Change Implementation: detect graduation-token
-  // URL early. If present, render the dedicated claim flow; otherwise
-  // fall through to the standard onboarding carousel below.
+  // Onboarding carousel removed — WelcomeModal in NavWrapper handles
+  // username pick for new signups. This page now exists solely for the
+  // kids graduation-token deep link (/welcome?graduation_token=...).
+  const router = useRouter();
   const [graduationToken, setGraduationToken] = useState<string | null>(null);
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const t = new URLSearchParams(window.location.search).get('graduation_token');
-    if (t && t.length >= 16) setGraduationToken(t);
-  }, []);
+    if (t && t.length >= 16) {
+      setGraduationToken(t);
+    } else {
+      router.replace('/');
+    }
+  }, [router]);
   if (graduationToken) {
     return <GraduationClaim token={graduationToken} />;
   }
-
-  return <WelcomePageOnboarding />;
+  return null;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function WelcomePageOnboarding() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);

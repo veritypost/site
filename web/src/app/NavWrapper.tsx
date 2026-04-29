@@ -16,6 +16,7 @@ import { usePathname } from 'next/navigation';
 import { createClient } from '../lib/supabase/client';
 import AccountStateBanner from '../components/AccountStateBanner';
 import PageViewTrackListener from '../components/PageViewTrackListener';
+import WelcomeModalMount from '../components/welcome/WelcomeModalMount';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '../lib/permissions';
 import type { Tables } from '@/types/database-helpers';
 import { Z } from '@/lib/zIndex';
@@ -40,6 +41,7 @@ type ProfileRow = Pick<
   | 'plan_grace_period_ends_at'
   | 'deletion_scheduled_for'
   | 'created_at'
+  | 'onboarding_completed_at'
 > & {
   // Ext-B3 — joined `plans.tier` so deriveTier reads the canonical tier
   // string instead of substring-matching the plan_id UUID. Inner-join
@@ -128,10 +130,6 @@ const SHOW_FOOTER = true; // Help / Contact / Privacy / Terms / etc.
 const AUTH_HIDE = [
   '/login',
   '/signup',
-  '/signup/pick-username',
-  '/signup/expert',
-  '/forgot-password',
-  '/reset-password',
   '/verify-email',
   '/api/auth/callback',
   '/logout',
@@ -139,7 +137,6 @@ const AUTH_HIDE = [
   // Closed-beta surfaces — no nav chrome on the invite-only entry path
   '/beta-locked',
   '/request-access',
-  '/request-access/confirmed',
 ];
 const isAdmin = (p: string) => p.startsWith('/admin');
 const isIdeasPreview = (p: string) => p.startsWith('/ideas');
@@ -213,7 +210,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
       const { data: profile } = await supabase
         .from('users')
         .select(
-          'id, username, avatar_url, avatar_color, verity_score, plan_id, plan_status, email_verified, streak_current, is_banned, is_muted, muted_until, locked_until, frozen_at, plan_grace_period_ends_at, deletion_scheduled_for, created_at, plans!fk_users_plan_id(tier)'
+          'id, username, avatar_url, avatar_color, verity_score, plan_id, plan_status, email_verified, streak_current, is_banned, is_muted, muted_until, locked_until, frozen_at, plan_grace_period_ends_at, deletion_scheduled_for, created_at, onboarding_completed_at, plans!fk_users_plan_id(tier)'
         )
         .eq('id', authUser.id)
         .maybeSingle<ProfileRow>();
@@ -426,6 +423,15 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
         <PageViewTrackListener />
       </Suspense>
       {loggedIn && user && <AccountStateBanner user={user} />}
+      {loggedIn && user && (
+        <Suspense fallback={null}>
+          <WelcomeModalMount
+            authLoaded={authLoaded}
+            username={user.username ?? null}
+            onboardingCompletedAt={user.onboarding_completed_at ?? null}
+          />
+        </Suspense>
+      )}
       <div
         style={{
           // Bug 1 fix: reserve the FULL rendered top-bar height
