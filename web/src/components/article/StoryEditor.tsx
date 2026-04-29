@@ -240,6 +240,10 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
   const [destructive, setDestructive] = useState<DestructiveState>(null);
   const [saving, setSaving] = useState(false);
   const [regenQuizLoading, setRegenQuizLoading] = useState(false);
+  const [followupLoading, setFollowupLoading] = useState(false);
+  const [followupSourceUrls, setFollowupSourceUrls] = useState('');
+  const [followupOpen, setFollowupOpen] = useState(false);
+  const [articleAgeBand, setArticleAgeBand] = useState<string | null>(null);
 
   // T-018: DB-loaded category + subcategory dropdowns.
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
@@ -351,6 +355,9 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
     setExpandedEntry(null);
     setIsDirty(false);
     setShowPicker(false);
+    setArticleAgeBand(null);
+    setFollowupOpen(false);
+    setFollowupSourceUrls('');
   };
 
   const loadStory = async (id: string) => {
@@ -392,6 +399,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
         })),
       });
       setStoryId(id);
+      setArticleAgeBand(cast.age_band ?? null);
 
       const { data: eventData } = await supabase
         .from('timelines')
@@ -657,6 +665,44 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
       toast.push({ message: 'Quiz regeneration failed', variant: 'danger' });
     } finally {
       setRegenQuizLoading(false);
+    }
+  };
+
+  const generateFollowup = async () => {
+    if (!storyId || followupLoading) return;
+    const urls = followupSourceUrls
+      .split('\n')
+      .map((s) => s.trim())
+      .filter((s) => s.startsWith('http'));
+    if (urls.length === 0) {
+      toast.push({ message: 'Add at least one source URL', variant: 'warn' });
+      return;
+    }
+    setFollowupLoading(true);
+    try {
+      const res = await fetch('/api/admin/pipeline/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          audience: articleAgeBand === 'kids' || articleAgeBand === 'tweens' ? 'kid' : 'adult',
+          age_band: articleAgeBand ?? undefined,
+          mode: 'standalone',
+          source_urls: urls,
+          existing_story_id: storyId,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        toast.push({ message: (json as { error?: string }).error || 'Generation failed', variant: 'danger' });
+        return;
+      }
+      setFollowupOpen(false);
+      setFollowupSourceUrls('');
+      toast.push({ message: 'Follow-up article generated — select it from the article list to review.', variant: 'success' });
+    } catch {
+      toast.push({ message: 'Generation failed', variant: 'danger' });
+    } finally {
+      setFollowupLoading(false);
     }
   };
 
@@ -1019,6 +1065,78 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
           </Button>
           {storyId && <Button variant="ghost" size="sm" onClick={deleteStory} style={{ color: C.danger }}>Delete article</Button>}
         </div>
+
+        {storyId && (
+          <div style={{ marginTop: S[3] }}>
+            {!followupOpen ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={followupLoading}
+                onClick={() => setFollowupOpen(true)}
+              >
+                Generate follow-up article
+              </Button>
+            ) : (
+              <div
+                style={{
+                  padding: S[3],
+                  border: `1px solid ${C.divider}`,
+                  borderRadius: 8,
+                  background: C.card,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: S[2],
+                }}
+              >
+                <label style={labelStyle}>Source URLs (one per line)</label>
+                <textarea
+                  value={followupSourceUrls}
+                  onChange={(e) => setFollowupSourceUrls(e.target.value)}
+                  placeholder={'https://example.com/article-1\nhttps://example.com/article-2'}
+                  rows={4}
+                  style={{
+                    width: '100%',
+                    background: C.bg,
+                    color: C.white,
+                    border: `1px solid ${C.divider}`,
+                    borderRadius: 6,
+                    padding: `${S[2]}px ${S[2]}px`,
+                    fontSize: F.sm,
+                    fontFamily: 'ui-monospace, monospace',
+                    resize: 'vertical',
+                    boxSizing: 'border-box',
+                  }}
+                />
+                <div style={{ display: 'flex', gap: S[2], alignItems: 'center' }}>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    loading={followupLoading}
+                    onClick={generateFollowup}
+                  >
+                    Generate
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => { setFollowupOpen(false); setFollowupSourceUrls(''); }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: C.dim,
+                      fontSize: F.sm,
+                      padding: 0,
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </Section>
 
       <Section embedded={embedded} title="Metadata">

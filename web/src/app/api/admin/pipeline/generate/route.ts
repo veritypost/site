@@ -132,6 +132,7 @@ const RequestSchema = z.object({
   model: z.string().min(3).max(100).default('claude-sonnet-4-6'),
   source_urls: z.array(SourceUrlSchema).max(10).optional(),
   mode: z.enum(['cluster', 'standalone']).optional(),
+  existing_story_id: z.string().uuid().optional(),
 });
 type RequestInput = z.infer<typeof RequestSchema>;
 
@@ -1827,6 +1828,7 @@ Empty array if all correct.`;
       sources: sourcesPayload,
       timeline: timelinePayload,
       quizzes: quizzesPayload,
+      existing_story_id: input.existing_story_id ?? null,
     };
 
     // ────────────────────────────────────────────────────────────────────────

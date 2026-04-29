@@ -92,6 +92,8 @@ export interface PersistArticlePayload {
   seo_description?: string | null;
   seo_keywords?: string[];
   metadata?: Record<string, unknown>;
+  // If set, attaches the article to this story instead of creating a new one.
+  existing_story_id?: string | null;
   sources: PersistArticleSource[];
   timeline: PersistArticleTimelineEntry[];
   quizzes: PersistArticleQuizItem[];

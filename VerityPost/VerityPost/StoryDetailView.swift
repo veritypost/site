@@ -173,6 +173,7 @@ struct StoryDetailView: View {
     @State private var upNextStories: [Story] = []
     @State private var upNextRequested = false
     @State private var endOfArticleHit = false
+    @State private var linkedArticle: Story? = nil
 
     // MARK: - Formatters (static to avoid per-render allocation)
     private static let muteDateFormatter: DateFormatter = {
@@ -331,6 +332,16 @@ struct StoryDetailView: View {
         }
         .background(VP.bg)
         .sheet(isPresented: $showUpNext) { upNextSheet }
+        .sheet(isPresented: Binding(
+            get: { linkedArticle != nil },
+            set: { if !$0 { linkedArticle = nil } }
+        )) {
+            if let s = linkedArticle {
+                NavigationStack {
+                    StoryDetailView(story: s).environmentObject(auth)
+                }
+            }
+        }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
@@ -945,38 +956,81 @@ struct StoryDetailView: View {
     }
 
     private func timelineRow(event: TimelineEvent, isCurrent: Bool, isLast: Bool) -> some View {
-        HStack(alignment: .top, spacing: 14) {
-            VStack(spacing: 0) {
-                if isCurrent {
-                    Circle()
-                        .fill(VP.bg)
-                        .frame(width: 12, height: 12)
-                        .overlay(Circle().stroke(VP.accent, lineWidth: 2))
-                } else {
-                    Circle().fill(VP.dim).frame(width: 8, height: 8)
-                }
-                if !isLast {
-                    Rectangle().fill(VP.tlLine).frame(width: 1).frame(maxHeight: .infinity)
-                }
-            }
-            .frame(width: 14)
+        Group {
+            if event.type == "article", let articleId = event.linkedArticleId {
+                // Article-type entry: tappable, disclosure indicator, no date dot.
+                Button {
+                    Task {
+                        if let story = await fetchStoryByArticleId(articleId) {
+                            linkedArticle = story
+                        }
+                    }
+                } label: {
+                    HStack(alignment: .top, spacing: 14) {
+                        VStack(spacing: 0) {
+                            Circle().fill(VP.accent.opacity(0.35)).frame(width: 8, height: 8)
+                            if !isLast {
+                                Rectangle().fill(VP.tlLine).frame(width: 1).frame(maxHeight: .infinity)
+                            }
+                        }
+                        .frame(width: 14)
 
-            VStack(alignment: .leading, spacing: 4) {
-                if isCurrent {
-                    Text("NOW")
-                        .font(.system(.caption2, design: .default, weight: .bold))
-                        .tracking(1)
-                        .foregroundColor(VP.accent)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(event.text ?? event.summary ?? "")
+                                .font(.subheadline)
+                                .foregroundColor(VP.text)
+                                .lineSpacing(3)
+                                .multilineTextAlignment(.leading)
+                            Text("Read this coverage")
+                                .font(.caption)
+                                .foregroundColor(VP.dim)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.bottom, 22)
+
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(VP.dim)
+                            .padding(.top, 2)
+                    }
                 }
-                Text(event.eventDate.map { formatDate($0) } ?? "")
-                    .font(.system(.caption, design: .default, weight: .semibold))
-                    .foregroundColor(VP.dim)
-                Text(event.text ?? event.summary ?? "")
-                    .font(.subheadline)
-                    .foregroundColor(VP.soft)
-                    .lineSpacing(3)
+                .buttonStyle(.plain)
+            } else {
+                // Standard event-type entry: static, date dot.
+                HStack(alignment: .top, spacing: 14) {
+                    VStack(spacing: 0) {
+                        if isCurrent {
+                            Circle()
+                                .fill(VP.bg)
+                                .frame(width: 12, height: 12)
+                                .overlay(Circle().stroke(VP.accent, lineWidth: 2))
+                        } else {
+                            Circle().fill(VP.dim).frame(width: 8, height: 8)
+                        }
+                        if !isLast {
+                            Rectangle().fill(VP.tlLine).frame(width: 1).frame(maxHeight: .infinity)
+                        }
+                    }
+                    .frame(width: 14)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        if isCurrent {
+                            Text("NOW")
+                                .font(.system(.caption2, design: .default, weight: .bold))
+                                .tracking(1)
+                                .foregroundColor(VP.accent)
+                        }
+                        Text(event.eventDate.map { formatDate($0) } ?? "")
+                            .font(.system(.caption, design: .default, weight: .semibold))
+                            .foregroundColor(VP.dim)
+                        Text(event.text ?? event.summary ?? "")
+                            .font(.subheadline)
+                            .foregroundColor(VP.soft)
+                            .lineSpacing(3)
+                    }
+                    .padding(.bottom, 22)
+                }
             }
-            .padding(.bottom, 22)
         }
     }
 
@@ -2308,13 +2362,23 @@ struct StoryDetailView: View {
         return StoryDetailView.displayDateFormatter.string(from: date)
     }
 
+    private func fetchStoryByArticleId(_ articleId: String) async -> Story? {
+        let c = SupabaseManager.shared.client
+        return try? await c.from("articles")
+            .select("*, stories(slug)")
+            .eq("id", value: articleId)
+            .single()
+            .execute()
+            .value
+    }
+
     // MARK: - Data loading
     private func loadData() async {
         await SettingsService.shared.loadIfNeeded()
         do {
             // D1/D6/D8: the quiz pool is NEVER loaded client-side. Questions
             // arrive only through /api/quiz/start, which strips is_correct.
-            async let tReq: [TimelineEvent] = client.from("timelines").select().eq("story_id", value: story.storyId ?? "").eq("type", value: "event").order("event_date", ascending: true).execute().value
+            async let tReq: [TimelineEvent] = client.from("timelines").select().eq("story_id", value: story.storyId ?? "").order("event_date", ascending: true).execute().value
             async let sReq: [SourceLink] = client.from("sources").select().eq("article_id", value: story.id).execute().value
             async let cReq: [VPComment] = client.from("comments")
                 // A126 — pull the soft-delete + edit + mentions fields so

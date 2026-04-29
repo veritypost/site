@@ -2,9 +2,8 @@
  * Slice 05 — `/<slug>` is a story page (Decision 10).
  *
  * Resolves the slug against `stories.slug`. Stories own the canonical URL;
- * articles hang off stories via story_id. For the current 1:1 shape (one
- * article per story) we load the single article for the story. The `?a=`
- * query param is reserved for future multi-article story pages.
+ * articles hang off stories via story_id. Supports multi-article stories via
+ * the `?a=<article-id>` search param; defaults to the most-recent article.
  *
  * Metadata:
  *   - adult       → JsonLd NewsArticle + indexable
@@ -21,6 +20,7 @@ import { incrementViewCount } from '@/lib/counters';
 import ArticleSurface from '@/components/article/ArticleSurface';
 import ArticleEngagementZone from '@/components/ArticleEngagementZone';
 import ArticleTracker from '@/components/article/ArticleTracker';
+import StoryArticlePicker from '@/components/article/StoryArticlePicker';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,7 +57,9 @@ function isCoppaBand(row: { age_band: string | null; is_kids_safe: boolean | nul
   return row.age_band === 'kids' || row.age_band === 'tweens' || row.is_kids_safe === true;
 }
 
-async function fetchBySlug(slug: string): Promise<{ story: StoryRow; article: ArticleRow } | null> {
+async function fetchBySlug(
+  slug: string,
+): Promise<{ story: StoryRow; articles: ArticleRow[]; article: ArticleRow } | null> {
   const service = createServiceClient();
   const { data: story } = await service
     .from('stories')
@@ -66,15 +68,20 @@ async function fetchBySlug(slug: string): Promise<{ story: StoryRow; article: Ar
     .maybeSingle();
   if (!story) return null;
 
-  const { data: article } = await service
+  const { data: articles } = await service
     .from('articles')
     .select(ARTICLE_SELECT)
     .eq('story_id', story.id)
     .is('deleted_at', null)
-    .maybeSingle();
-  if (!article) return null;
+    .order('published_at', { ascending: false })
+    .order('created_at', { ascending: false });
+  if (!articles || articles.length === 0) return null;
 
-  return { story: story as StoryRow, article: article as ArticleRow };
+  return {
+    story: story as StoryRow,
+    articles: articles as ArticleRow[],
+    article: articles[0] as ArticleRow,
+  };
 }
 
 export async function generateMetadata({
@@ -96,11 +103,21 @@ export async function generateMetadata({
   return meta;
 }
 
-export default async function ArticleSlugPage({ params }: { params: { slug: string } }) {
+export default async function ArticleSlugPage({
+  params,
+  searchParams,
+}: {
+  params: { slug: string };
+  searchParams: { a?: string };
+}) {
   const found = await fetchBySlug(params.slug);
   if (!found) notFound();
 
-  const { story, article } = found;
+  const { story, articles } = found;
+  const article =
+    searchParams.a
+      ? (found.articles.find((a) => a.id === searchParams.a) ?? found.article)
+      : found.article;
 
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -182,6 +199,18 @@ export default async function ArticleSlugPage({ params }: { params: { slug: stri
       {jsonLd && <JsonLd data={jsonLd} />}
       {!isCoppa && article.status === 'published' && (
         <ArticleTracker articleId={article.id} articleSlug={story.slug} />
+      )}
+      {articles.length > 1 && (
+        <StoryArticlePicker
+          articles={articles.map((a) => ({
+            id: a.id,
+            title: a.title,
+            published_at: a.published_at,
+            status: a.status,
+          }))}
+          currentArticleId={article.id}
+          storySlug={story.slug}
+        />
       )}
       <ArticleSurface
         article={{
