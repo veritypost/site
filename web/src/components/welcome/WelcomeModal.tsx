@@ -160,15 +160,16 @@ export default function WelcomeModal({ nextPath }: Props) {
             marginBottom: '24px',
           }}
         >
-          Verity Post
+          verity post
         </div>
 
         <h1 style={{ fontSize: '24px', fontWeight: 700, color: C.text, margin: '0 0 8px 0' }}>
-          Pick a username
+          you&rsquo;re in.
         </h1>
         <p style={{ fontSize: 14, color: C.dim, margin: '0 0 22px 0', lineHeight: 1.55 }}>
-          This is how others will see you. Lowercase letters, numbers, and underscores only.
-          3&ndash;20 characters.
+          welcome to verity post. pick a handle &mdash; this is what shows up next to your
+          comments and on leaderboards. lowercase letters, numbers, and underscores, 3&ndash;20
+          characters.
         </p>
 
         {saveError && (

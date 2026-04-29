@@ -8,6 +8,7 @@ import { headers } from 'next/headers';
 // Crash on boot rather than serve traffic with rate limits effectively
 // off. Mirrors the IS_PROD check below.
 if (
+  process.env.NEXT_PHASE !== 'phase-production-build' &&
   (process.env.VERCEL_ENV === 'production' ||
     process.env.VERCEL_ENV === 'preview' ||
     process.env.NODE_ENV === 'production') &&

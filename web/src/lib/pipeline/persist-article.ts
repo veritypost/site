@@ -61,7 +61,6 @@ export interface PersistArticleQuizItem {
   explanation?: string | null;
   difficulty?: string | null;
   points?: number;
-  pool_group?: number;
   sort_order?: number;
   correct_index: number; // 0-based index into options
 }

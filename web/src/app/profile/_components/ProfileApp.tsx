@@ -24,7 +24,7 @@ import { DataSection } from '../_sections/DataSection';
 import { ExpertProfileSection } from '../_sections/ExpertProfileSection';
 import { ExpertQueueSection } from '../_sections/ExpertQueueSection';
 import { IdentitySection } from '../_sections/IdentitySection';
-import InviteFriendsCard from '@/components/profile/InviteFriendsCard';
+import { InviteLinkCard } from '../_sections/InviteLinkCard';
 import { LinkOutSection } from '../_sections/LinkOutSection';
 import { MessagesSection } from '../_sections/MessagesSection';
 import { MilestonesSectionConnected } from '../_sections/MilestonesSection';
@@ -406,7 +406,7 @@ export function ProfileApp({ defaultSection }: Props) {
       title: 'Invite friends',
       reason: 'Two invite links to share. Each one lets one friend join Verity Post.',
       keywords: ['invite', 'refer', 'friend', 'share', 'link', 'signup', 'rewards'],
-      render: () => <InviteFriendsCard />,
+      render: () => <InviteLinkCard />,
     },
     {
       id: 'help',
@@ -422,7 +422,7 @@ export function ProfileApp({ defaultSection }: Props) {
           body="Browse the FAQ, check service status, or send a note to the team."
           actions={[
             { label: 'Open help center', href: '/help' },
-            { label: 'Contact support', href: '/support', variant: 'secondary' },
+            { label: 'Contact support', href: '/contact', variant: 'secondary' },
           ]}
         />
       ),
@@ -470,7 +470,19 @@ export function ProfileApp({ defaultSection }: Props) {
         >
           <div style={{ maxWidth: 1100, margin: '0 auto' }}>
             {banners.map((s, i) => (
-              <AccountStateBanner key={`${s.kind}-${i}`} state={s} />
+              <AccountStateBanner
+                key={`${s.kind}-${i}`}
+                state={s}
+                onAction={(kind) => {
+                  if (kind === 'trial_extended') {
+                    fetch('/api/profile/trial-banner-dismiss', { method: 'POST' })
+                      .then(() => {
+                        setUser((u) => u ? { ...u, trial_extended_seen_at: new Date().toISOString() } as typeof u : u);
+                      })
+                      .catch(() => {});
+                  }
+                }}
+              />
             ))}
           </div>
         </div>

@@ -149,7 +149,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     service
       .from(t.quizzes)
       .select(
-        'id, title, question_text, question_type, options, explanation, difficulty, points, pool_group, sort_order, metadata'
+        'id, title, question_text, question_type, options, explanation, difficulty, points, sort_order, metadata'
       )
       .eq('article_id', id)
       .order('sort_order', { ascending: true }),
@@ -230,7 +230,6 @@ const QuizSchema = z
     explanation: z.string().nullish(),
     difficulty: z.string().max(30).nullish(),
     points: z.number().int().nonnegative().optional(),
-    pool_group: z.number().int().nonnegative().optional(),
     sort_order: z.number().int().nonnegative().optional(),
     correct_index: z.number().int().nonnegative(),
   })
@@ -651,7 +650,6 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             explanation: q.explanation ?? null,
             difficulty: q.difficulty ?? null,
             points: q.points ?? 1,
-            pool_group: q.pool_group ?? 0,
             sort_order: q.sort_order ?? i,
             metadata: { correct_index: q.correct_index },
           };
