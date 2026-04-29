@@ -11,7 +11,6 @@ export type HomeStory = Pick<
   'id' | 'title' | 'excerpt' | 'category_id' | 'is_breaking' | 'published_at'
 > & {
   stories: { slug: string } | null;
-  hero_pick_for_date: string | null;
 };
 
 export const HOME_COLORS = {

@@ -1,16 +1,17 @@
 'use client';
 
-// T215 — client island that gates the home breaking strip behind the
-// `home.breaking_banner.view` permission. The permission cache lives in
-// the browser (compute_effective_perms is fetched per-session and stored
-// in a module-level Map), so the gate cannot run on the server. The
-// rest of the home feed renders synchronously in `page.tsx` — only this
-// strip waits on perms.
+// T215 — client island for the home breaking strip. The strip is
+// visible to all readers (free and anonymous). The permission cache is
+// fetched once per session and stored in a module-level Map; perms are
+// needed only to gate the timestamp perk for paid subscribers
+// (`home.breaking_banner.view.paid`). The strip is suppressed until
+// perms hydrate so the timestamp doesn't flash-appear then disappear
+// for free/anon users. refreshAllPermissions resolves immediately for
+// anonymous users (returns an empty Set), so there is no visible delay.
 //
-// Suspense semantics: the strip renders nothing until perms are
-// hydrated, then either the rendered band or null. No skeleton — the
-// strip lives above the masthead and the masthead doesn't depend on
-// it, so a brief gap during perms hydrate is invisible to the reader.
+// Slice 01 decision 4: the strip is proof of editorial judgment and
+// must be visible to the people we are asking to convert. The paywall
+// lives on the article, not the alert.
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -19,7 +20,6 @@ import { type HomeStory, timeShort } from './_homeShared';
 
 export default function HomeBreakingStrip({ story }: { story: HomeStory }) {
   const [permsReady, setPermsReady] = useState(false);
-  const [canSee, setCanSee] = useState(false);
   const [canSeePaid, setCanSeePaid] = useState(false);
 
   useEffect(() => {
@@ -28,7 +28,6 @@ export default function HomeBreakingStrip({ story }: { story: HomeStory }) {
       await refreshAllPermissions();
       await refreshIfStale();
       if (cancelled) return;
-      setCanSee(hasPermission('home.breaking_banner.view'));
       setCanSeePaid(hasPermission('home.breaking_banner.view.paid'));
       setPermsReady(true);
     })();
@@ -37,7 +36,7 @@ export default function HomeBreakingStrip({ story }: { story: HomeStory }) {
     };
   }, []);
 
-  if (!permsReady || !canSee) return null;
+  if (!permsReady) return null;
 
   return (
     <Link

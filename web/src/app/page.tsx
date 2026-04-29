@@ -39,13 +39,13 @@ import HomeFetchFailed from './_HomeFetchFailed';
 import HomeVisitTimestamp from './_HomeVisitTimestamp';
 
 // Hand-curated front page per Future Projects/09_HOME_FEED_REBUILD.md.
-// 1 hero + up to 7 supporting, dated, page ends. No category pills, no
+// 1 hero + up to 11 supporting, dated, page ends. No category pills, no
 // search, no ads, no algorithmic feed, no infinite scroll on this surface.
 //
-// Hero selection: one row in `articles` per editorial day flagged
-// `hero_pick_for_date = today` (in editorial TZ). When no row is flagged,
-// the most-recent published article fills the slot. The boolean is a
-// Phase-1 proxy for the front_page_state table — see schema/144.
+// Edition model: shows only articles published today (editorial TZ),
+// capped at 12. The first article in published_at DESC order becomes the
+// hero; the rest are supporting cards. The page is finite — readers can
+// finish it. A "That's today's edition." end state closes the feed.
 
 // Story projection the home feed renders lives in `_homeShared.ts` so the
 // client islands can import the same shape without pulling this server
@@ -63,8 +63,8 @@ type CategoryRow = Pick<Tables<'categories'>, 'id' | 'name' | 'slug' | 'color_he
 // stories without trial spend. The wall protects the *content*, not the index.
 
 // Today's editorial date, DST-aware. Returns:
-//   isoDate    — "YYYY-MM-DD" matching `hero_pick_for_date` shape
-//   startUtc   — ISO timestamp for midnight ETZ today, in UTC
+//   isoDate    — "YYYY-MM-DD" in editorial TZ (for future use)
+//   startUtc   — ISO timestamp for midnight ETZ today, in UTC (used to filter edition)
 //   humanDate  — "Thursday, April 23, 2026" for the masthead
 function editorialToday(): { isoDate: string; startUtc: string; humanDate: string } {
   const now = new Date();
@@ -99,7 +99,7 @@ function editorialToday(): { isoDate: string; startUtc: string; humanDate: strin
 }
 
 const SELECT_COLS =
-  'id, title, stories(slug), excerpt, category_id, is_breaking, published_at, hero_pick_for_date';
+  'id, title, stories(slug), excerpt, category_id, is_breaking, published_at';
 
 // Category accent palette. color_hex in DB is null for all live rows (2026-04-26);
 // this map provides a per-slug fallback until editorial populates the column.
@@ -189,7 +189,7 @@ export default async function HomePage() {
       .eq('status', 'published')
       .gte('published_at', today.startUtc)
       .order('published_at', { ascending: false })
-      .limit(20),
+      .limit(12),
     supabase
       .from('articles')
       .select(SELECT_COLS)
@@ -225,13 +225,7 @@ export default async function HomePage() {
   }
 
   const raw = (storiesRes.data as HomeStory[] | null) || [];
-  // Sort hero-pick first, then most-recent. Done in app code because
-  // PostgREST doesn't expose a cheap way to express "match a date and
-  // sort that group first" in a single .order().
   const stories = [...raw].sort((a, b) => {
-    const aHero = a.hero_pick_for_date === today.isoDate ? 1 : 0;
-    const bHero = b.hero_pick_for_date === today.isoDate ? 1 : 0;
-    if (aHero !== bHero) return bHero - aHero;
     const aT = a.published_at ? new Date(a.published_at).getTime() : 0;
     const bT = b.published_at ? new Date(b.published_at).getTime() : 0;
     return bT - aT;
@@ -257,6 +251,11 @@ export default async function HomePage() {
     return Number.isFinite(t) && t > lastVisitMs;
   };
 
+  // T109 — edition progress counter. Only computed for signed-in readers
+  // who have a readArticleIds set populated; anon readers always see 0/N.
+  const readTodayCount = stories.filter((s) => readArticleIds.has(s.id)).length;
+  const totalToday = stories.length;
+
   return (
     <div style={{ background: C.bg, color: C.text, minHeight: '100vh' }}>
       {/* Breaking strip — narrow, above masthead. Only renders when an
@@ -276,20 +275,27 @@ export default async function HomePage() {
         {/* T110 — disclose editorial timezone. The newsroom day is anchored
             to America/New_York; readers in other zones should know what
             "today" means here. Subtle masthead line, not a banner. */}
-        <div style={{ marginBottom: 24, lineHeight: 1.3 }}>
-          <div
-            style={{
-              fontFamily: serifStack,
-              fontSize: 13,
-              color: C.dim,
-              fontWeight: 500,
-            }}
-          >
-            {today.humanDate}
+        <div style={{ marginBottom: 24, lineHeight: 1.3, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+          <div>
+            <div
+              style={{
+                fontFamily: serifStack,
+                fontSize: 13,
+                color: C.dim,
+                fontWeight: 500,
+              }}
+            >
+              {today.humanDate}
+            </div>
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
+              Today&rsquo;s edition (Eastern Time)
+            </div>
           </div>
-          <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
-            Today&rsquo;s edition (Eastern Time)
-          </div>
+          {totalToday > 0 && (
+            <div style={{ fontSize: 12, color: C.muted, fontWeight: 500, textAlign: 'right', flexShrink: 0, paddingLeft: 16 }}>
+              {readTodayCount} of {totalToday} read today
+            </div>
+          )}
         </div>
 
         {fetchFailed && <HomeFetchFailed />}
@@ -320,6 +326,24 @@ export default async function HomePage() {
         )}
 
         {!fetchFailed && hero && <HomeFooter />}
+
+        {!fetchFailed && stories.length > 0 && (
+          <div
+            style={{
+              paddingTop: 48,
+              textAlign: 'center',
+            }}
+          >
+            <p style={{ fontSize: 14, color: C.muted, margin: 0 }}>
+              That&rsquo;s today&rsquo;s edition.
+            </p>
+            <p style={{ fontSize: 14, color: C.muted, margin: '8px 0 0' }}>
+              <Link href="/browse" style={{ color: C.muted, textDecoration: 'underline' }}>
+                Browse past editions &rarr;
+              </Link>
+            </p>
+          </div>
+        )}
       </main>
 
       {/* T91 — refresh the last-visit cookie after first paint. Never

@@ -1541,7 +1541,6 @@ export type Database = {
           is_ai_generated: boolean
           is_breaking: boolean
           is_developing: boolean
-          is_featured: boolean
           is_kids_safe: boolean
           is_opinion: boolean
           is_verified: boolean
@@ -1612,7 +1611,6 @@ export type Database = {
           is_ai_generated?: boolean
           is_breaking?: boolean
           is_developing?: boolean
-          is_featured?: boolean
           is_kids_safe?: boolean
           is_opinion?: boolean
           is_verified?: boolean
@@ -1683,7 +1681,6 @@ export type Database = {
           is_ai_generated?: boolean
           is_breaking?: boolean
           is_developing?: boolean
-          is_featured?: boolean
           is_kids_safe?: boolean
           is_opinion?: boolean
           is_verified?: boolean

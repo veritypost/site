@@ -6,15 +6,10 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 import { ADMIN_ROLES, MOD_ROLES } from '@/lib/roles';
-import type { Tables } from '@/types/database-helpers';
 import Page, { PageHeader } from '@/components/admin/Page';
 import PageSection from '@/components/admin/PageSection';
 import Badge from '@/components/admin/Badge';
 import Spinner from '@/components/admin/Spinner';
-
-type Article = Tables<'articles'>;
-type Category = Tables<'categories'>;
-type FeaturedStory = Article & { categories: Pick<Category, 'name' | 'slug'> | null };
 
 type HubPage = { href: string; title: string; desc: string };
 type HubGroup = { group: string; desc: string; items: HubPage[] };
@@ -88,7 +83,6 @@ export default function AdminHubPage() {
   const total = PAGES.reduce((a, g) => a + g.items.length, 0);
   const router = useRouter();
 
-  const [featuredStories, setFeaturedStories] = useState<FeaturedStory[]>([]);
   const [pendingRequestCount, setPendingRequestCount] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
   const [authorized, setAuthorized] = useState<boolean>(false);
@@ -125,16 +119,6 @@ export default function AdminHubPage() {
         setRestrictedRole(roleNames.find((r) => MOD_ROLES.has(r)) || 'moderator');
       }
       setAuthorized(true);
-
-      const { data: stories } = await supabase
-        .from('articles')
-        .select('*, categories!fk_articles_category_id(name, slug)')
-        .eq('status', 'published')
-        .eq('is_featured', true)
-        .order('published_at', { ascending: false })
-        .limit(5);
-
-      if (stories) setFeaturedStories(stories as unknown as FeaturedStory[]);
 
       // Pending access-request count — Phase 1 intake removed the
       // email-confirm gate, so all pending rows count.
@@ -248,62 +232,6 @@ export default function AdminHubPage() {
         </div>
       </PageSection>
 
-      {/* Featured Articles — render only when we actually have data, never
-          during the loading flash. */}
-      {featuredStories.length > 0 && (
-        <PageSection
-          title="Featured articles"
-          description="Currently featured on the homepage"
-        >
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-              gap: S[2],
-            }}
-          >
-            {featuredStories.map((story) => (
-              <Link
-                key={story.id}
-                href={`/admin/story-manager?id=${story.id}`}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: S[1],
-                  padding: `${S[3]}px ${S[4]}px`,
-                  border: `1px solid ${C.divider}`,
-                  borderRadius: 8,
-                  background: C.bg,
-                  color: C.white,
-                  textDecoration: 'none',
-                  transition: 'background 120ms ease, border-color 120ms ease',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = C.hover;
-                  e.currentTarget.style.borderColor = C.border;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = C.bg;
-                  e.currentTarget.style.borderColor = C.divider;
-                }}
-              >
-                <div style={{ fontSize: F.md, fontWeight: 600, lineHeight: 1.3 }}>
-                  {story.title}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: S[2], fontSize: F.xs, color: C.dim }}>
-                  {story.categories?.name && (
-                    <Badge variant="info" size="xs">{story.categories.name}</Badge>
-                  )}
-                  <span>
-                    {story.published_at ? new Date(story.published_at).toLocaleDateString() : ''}
-                  </span>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </PageSection>
-      )}
-
       {/* Page groups — grid of cards, collapses to single column ≤640px */}
       {PAGES.map((group) => (
         <PageSection
@@ -367,7 +295,6 @@ export default function AdminHubPage() {
         }}
       >
         <span>Verity Post Admin</span>
-        <span>{featuredStories.length} featured</span>
       </div>
     </Page>
   );
