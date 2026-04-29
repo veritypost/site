@@ -95,6 +95,15 @@ function malformed() {
   });
 }
 
+// Only used for NEW users blocked by the beta gate. Existing accounts
+// always get genericOk() so we never reveal whether an email has an account.
+function gated() {
+  return NextResponse.json(
+    { ok: false, reason: 'invite_required' },
+    { status: 200, headers: { 'Cache-Control': 'private, no-store, max-age=0' } }
+  );
+}
+
 // Best-effort audit log. Failures here never propagate to the response
 // (the response shape is generic regardless). audit_log writes go through
 // service-role; an INSERT failure is logged for ops but doesn't leak.
@@ -231,12 +240,12 @@ export async function POST(request) {
             reason: `closed_beta_${gate.reason || 'denied'}`,
             ipTruncated,
           });
-          return genericOk();
+          return gated();
         }
       } catch (err) {
         console.error('[auth.send-magic-link] beta gate threw:', err?.message || err);
         await writeAuditRow(service, { email, reason: 'beta_gate_error', ipTruncated });
-        return genericOk();
+        return gated();
       }
     }
   }

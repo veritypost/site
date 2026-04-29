@@ -83,9 +83,13 @@ export default function SingleDoorForm({ notice }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: trimmed }),
       });
+      const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; reason?: string };
       if (!res.ok) {
-        const json = (await res.json().catch(() => ({}))) as { error?: string };
         setEmailError(json.error || 'Could not send code. Please try again.');
+        return;
+      }
+      if (json.reason === 'invite_required') {
+        setEmailError('Verity Post is invite-only right now. You\'ll need an invite link to join.');
         return;
       }
       setSentEmail(trimmed);
