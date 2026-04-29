@@ -107,22 +107,24 @@ export default async function sitemap({ id }) {
   let storyRoutes = [];
   try {
     const supabase = createClient();
-    // Decision 22 — adults only. Kids + tweens stay out of Google. Path
-    // is the canonical /<slug> per Session C; /story/<slug> redirects
-    // to it but isn't worth listing.
-    const { data: stories } = await supabase
+    // Decision 22 — adults only. Kids + tweens stay out of Google.
+    // Slug lives on stories (Slice 05); filter adult by joining articles.
+    const { data: articleRows } = await supabase
       .from('articles')
-      .select('slug, published_at, updated_at, created_at')
+      .select('story_id, published_at, updated_at, created_at, stories(slug, published_at)')
       .eq('status', 'published')
       .eq('age_band', 'adult')
+      .not('story_id', 'is', null)
       .order('published_at', { ascending: false })
       .range(offset, offset + CHUNK_SIZE - 1);
-    storyRoutes = (stories || []).map((s) => ({
-      url: `${base}/${s.slug}`,
-      lastModified: s.updated_at || s.published_at || s.created_at || new Date(),
-      changeFrequency: 'daily',
-      priority: 0.8,
-    }));
+    storyRoutes = (articleRows || [])
+      .filter((r) => r.stories?.slug)
+      .map((r) => ({
+        url: `${base}/${r.stories.slug}`,
+        lastModified: r.updated_at || r.stories.published_at || r.published_at || r.created_at || new Date(),
+        changeFrequency: 'daily',
+        priority: 0.8,
+      }));
   } catch (err) {
     console.error('[sitemap.articles] chunk', id, 'failed:', err?.message || err);
   }

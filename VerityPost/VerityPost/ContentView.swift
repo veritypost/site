@@ -332,11 +332,12 @@ struct MainTabView: View {
 
     private func fetchStoryBySlug(_ slug: String) async -> Story? {
         do {
+            struct StoryIdRow: Decodable { let id: String }
+            let storyRows: [StoryIdRow] = try await deepLinkClient.from("stories")
+                .select("id").eq("slug", value: slug).limit(1).execute().value
+            guard let storyId = storyRows.first?.id else { return nil }
             let stories: [Story] = try await deepLinkClient.from("articles")
-                .select()
-                .eq("slug", value: slug)
-                .limit(1)
-                .execute().value
+                .select("*, stories(slug)").eq("story_id", value: storyId).limit(1).execute().value
             return stories.first
         } catch {
             Log.d("Failed to fetch story by slug:", error)

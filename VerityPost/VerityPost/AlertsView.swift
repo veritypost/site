@@ -544,9 +544,13 @@ struct AlertsView: View {
 
     private func fetchStoryBySlug(_ slug: String) async -> Story? {
         do {
+            struct StoryIdRow: Decodable { let id: String }
+            let storyRows: [StoryIdRow] = try await client.from("stories")
+                .select("id").eq("slug", value: slug).limit(1).execute().value
+            guard let storyId = storyRows.first?.id else { return nil }
             let stories: [Story] = try await client.from("articles")
-                .select()
-                .eq("slug", value: slug)
+                .select("*, stories(slug)")
+                .eq("story_id", value: storyId)
                 .limit(1)
                 .execute().value
             return stories.first

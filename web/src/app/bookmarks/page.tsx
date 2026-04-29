@@ -30,7 +30,8 @@ const PAGE_SIZE = 50;
 // that slices it this way.
 type BookmarkRow = Tables<'bookmarks'> & {
   articles:
-    | (Pick<Tables<'articles'>, 'id' | 'title' | 'slug' | 'excerpt' | 'published_at'> & {
+    | (Pick<Tables<'articles'>, 'id' | 'title' | 'excerpt' | 'published_at'> & {
+        stories: { slug: string } | null;
         categories: { name: string | null } | null;
       })
     | null;
@@ -150,7 +151,7 @@ export default function BookmarksPage() {
     const { data: bms, error: bmsErr } = await supabase
       .from('bookmarks')
       .select(
-        'id, notes, created_at, collection_id, articles!fk_bookmarks_article_id(id, title, slug, excerpt, published_at, categories!fk_articles_category_id(name))'
+        'id, notes, created_at, collection_id, articles!fk_bookmarks_article_id(id, title, excerpt, published_at, stories(slug), categories!fk_articles_category_id(name))'
       )
       .eq('user_id', authUser.id)
       .order('created_at', { ascending: false })
@@ -204,7 +205,7 @@ export default function BookmarksPage() {
     const { data: bms, error: bmsErr } = await supabase
       .from('bookmarks')
       .select(
-        'id, notes, created_at, collection_id, articles!fk_bookmarks_article_id(id, title, slug, excerpt, published_at, categories!fk_articles_category_id(name))'
+        'id, notes, created_at, collection_id, articles!fk_bookmarks_article_id(id, title, excerpt, published_at, stories(slug), categories!fk_articles_category_id(name))'
       )
       .eq('user_id', authUser.id)
       .lt('created_at', last.created_at)
@@ -577,7 +578,7 @@ export default function BookmarksPage() {
             >
               <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6, lineHeight: 1.4 }}>
                 <Link
-                  href={b.articles?.slug ? `/story/${b.articles.slug}` : '#'}
+                  href={b.articles?.stories?.slug ? `/${b.articles.stories.slug}` : '#'}
                   prefetch={false}
                   style={{ color: '#111', textDecoration: 'none' }}
                 >

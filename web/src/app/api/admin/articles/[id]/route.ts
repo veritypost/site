@@ -53,7 +53,7 @@ type Audience = 'adult' | 'kid';
 type ArticleRow = {
   id: string;
   title: string;
-  slug: string;
+  story_id: string | null;
   subtitle: string | null;
   body: string;
   body_html: string | null;
@@ -75,7 +75,7 @@ type ArticleRow = {
 // slug also allowed.
 const SLUG_SAFE = /^[a-z0-9][a-z0-9-]{0,118}[a-z0-9]$|^[a-z0-9]$/;
 
-const ARTICLE_SELECT = `id, title, slug, subtitle, body, body_html, excerpt, status,
+const ARTICLE_SELECT = `id, title, story_id, subtitle, body, body_html, excerpt, status,
   moderation_status, moderation_notes, retraction_reason, published_at, unpublished_at,
   author_id, cluster_id, category_id, is_kids_safe, updated_at`;
 
@@ -139,13 +139,16 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       )
       .eq('article_id', id)
       .order('sort_order', { ascending: true }),
-    service
-      .from(t.timelines)
-      .select(
-        'id, title, description, event_date, event_label, event_body, event_image_url, source_url, sort_order'
-      )
-      .eq('article_id', id)
-      .order('sort_order', { ascending: true }),
+    resolved.row.story_id
+      ? service
+          .from(t.timelines)
+          .select(
+            'id, title, description, event_date, event_label, event_body, event_image_url, source_url, sort_order'
+          )
+          .eq('story_id', resolved.row.story_id)
+          .eq('type', 'event')
+          .order('sort_order', { ascending: true })
+      : Promise.resolve({ data: [], error: null }),
     service
       .from(t.quizzes)
       .select(
@@ -371,13 +374,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     }
   }
 
-  // Session C — manual slug edit (Decision 3 + Decision 20). Lowercase
-  // the input, validate against SLUG_SAFE, then check collision against
-  // any other article. Same-id matches don't count (no-op edits don't
-  // 409). Editing a published article's slug 404s the old URL — accepted
-  // tradeoff per Decision 3 + greenfield.
+  // Slug now lives on stories (Slice 05). Lowercase, validate, then check
+  // collision against stories.slug. Same story_id doesn't count as collision.
   let nextSlug: string | null = null;
-  if (body.slug !== undefined) {
+  if (body.slug !== undefined && prior.story_id) {
     const candidate = body.slug.trim().toLowerCase();
     if (!SLUG_SAFE.test(candidate)) {
       return NextResponse.json(
@@ -385,13 +385,17 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         { status: 422 }
       );
     }
-    if (candidate !== prior.slug) {
+    const { data: currentStory } = await service
+      .from('stories')
+      .select('slug')
+      .eq('id', prior.story_id)
+      .maybeSingle();
+    if (candidate !== currentStory?.slug) {
       const { data: collision, error: lookupErr } = await service
-        .from('articles')
+        .from('stories')
         .select('id')
         .eq('slug', candidate)
-        .neq('id', id)
-        .is('deleted_at', null)
+        .neq('id', prior.story_id)
         .maybeSingle();
       if (lookupErr) {
         console.error('[admin.articles.patch] slug collision lookup failed:', lookupErr.message);
@@ -404,9 +408,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     }
   }
 
-  // Build article update payload.
+  // Build article update payload. Slug lives on stories — applied separately below.
   const update: Record<string, unknown> = {};
-  if (nextSlug !== null) update.slug = nextSlug;
   if (body.title !== undefined) update.title = body.title;
   if (body.subtitle !== undefined) update.subtitle = body.subtitle;
   if (body.excerpt !== undefined) update.excerpt = body.excerpt;
@@ -478,11 +481,6 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   }
 
   if (hasRowUpdates) {
-    // Supabase's generated update() type is a strict union across every
-    // column; since our `update` shape is conditionally built we cast
-    // through the never-index escape hatch that persist-article.ts uses
-    // for the same reason. Fields written have all been verified via
-    // information_schema to exist on articles (Phase 1 consolidation).
     const { error: upErr } = await service
       .from(t.articles)
       .update(update as never)
@@ -499,6 +497,22 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         });
       }
       return NextResponse.json({ error: 'Could not update article' }, { status: 500 });
+    }
+  }
+
+  // Slug lives on stories (Slice 05). Apply slug + published_at to stories row.
+  if (prior.story_id && (nextSlug !== null || (body.status === 'published' && prior.status !== 'published'))) {
+    const storyUpdate: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (nextSlug !== null) storyUpdate.slug = nextSlug;
+    if (body.status === 'published' && prior.status !== 'published') {
+      storyUpdate.published_at = (update.published_at as string) ?? new Date().toISOString();
+    }
+    const { error: storyErr } = await service
+      .from('stories')
+      .update(storyUpdate as never)
+      .eq('id', prior.story_id);
+    if (storyErr) {
+      console.error('[admin.articles.patch] stories update failed:', storyErr.message);
     }
   }
 
@@ -568,55 +582,64 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   }
 
   if (body.timeline !== undefined) {
-    try {
-      const { error: tDelErr } = await service.from(t.timelines).delete().eq('article_id', id);
-      if (tDelErr) {
-        await captureMessage('admin article PATCH inconsistent state', 'error', {
-          article_id: id,
-          audience,
-          table: t.timelines,
-          phase: 'delete',
-          error: tDelErr.message,
-        });
-        console.error('[admin.articles.patch] timeline delete failed:', tDelErr.message);
-        return NextResponse.json({ error: 'Could not save timeline' }, { status: 500 });
-      }
-      if (body.timeline.length > 0) {
-        const rows = body.timeline.map((tl, i) => ({
-          article_id: id,
-          title: tl.title ?? null,
-          description: tl.description ?? null,
-          event_date: tl.event_date,
-          event_label: tl.event_label,
-          event_body: tl.event_body ?? null,
-          event_image_url: tl.event_image_url ?? null,
-          source_url: tl.source_url ?? null,
-          sort_order: tl.sort_order ?? i,
-        }));
-        const { error: tErr } = await service.from(t.timelines).insert(rows);
-        if (tErr) {
+    if (!prior.story_id) {
+      console.error('[admin.articles.patch] timeline update skipped: article has no story_id');
+    } else {
+      try {
+        const { error: tDelErr } = await service
+          .from(t.timelines)
+          .delete()
+          .eq('story_id', prior.story_id)
+          .eq('type', 'event');
+        if (tDelErr) {
           await captureMessage('admin article PATCH inconsistent state', 'error', {
             article_id: id,
             audience,
             table: t.timelines,
-            phase: 'insert_after_delete',
-            row_count: rows.length,
-            error: tErr.message,
+            phase: 'delete',
+            error: tDelErr.message,
           });
-          console.error('[admin.articles.patch] timeline insert failed:', tErr.message);
+          console.error('[admin.articles.patch] timeline delete failed:', tDelErr.message);
           return NextResponse.json({ error: 'Could not save timeline' }, { status: 500 });
         }
+        if (body.timeline.length > 0) {
+          const rows = body.timeline.map((tl, i) => ({
+            story_id: prior.story_id!,
+            type: 'event' as const,
+            title: tl.title ?? null,
+            description: tl.description ?? null,
+            event_date: tl.event_date,
+            event_label: tl.event_label,
+            event_body: tl.event_body ?? null,
+            event_image_url: tl.event_image_url ?? null,
+            source_url: tl.source_url ?? null,
+            sort_order: tl.sort_order ?? i,
+          }));
+          const { error: tErr } = await service.from(t.timelines).insert(rows as never);
+          if (tErr) {
+            await captureMessage('admin article PATCH inconsistent state', 'error', {
+              article_id: id,
+              audience,
+              table: t.timelines,
+              phase: 'insert_after_delete',
+              row_count: rows.length,
+              error: tErr.message,
+            });
+            console.error('[admin.articles.patch] timeline insert failed:', tErr.message);
+            return NextResponse.json({ error: 'Could not save timeline' }, { status: 500 });
+          }
+        }
+      } catch (err) {
+        await captureMessage('admin article PATCH inconsistent state', 'error', {
+          article_id: id,
+          audience,
+          table: t.timelines,
+          phase: 'thrown',
+          error: err instanceof Error ? err.message : String(err),
+        });
+        console.error('[admin.articles.patch] timeline block threw:', err);
+        return NextResponse.json({ error: 'Could not save timeline' }, { status: 500 });
       }
-    } catch (err) {
-      await captureMessage('admin article PATCH inconsistent state', 'error', {
-        article_id: id,
-        audience,
-        table: t.timelines,
-        phase: 'thrown',
-        error: err instanceof Error ? err.message : String(err),
-      });
-      console.error('[admin.articles.patch] timeline block threw:', err);
-      return NextResponse.json({ error: 'Could not save timeline' }, { status: 500 });
     }
   }
 
@@ -783,7 +806,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   const service = createServiceClient();
   const { data: prior } = await service
     .from('articles')
-    .select('id, author_id, title, slug, status')
+    .select('id, author_id, title, status')
     .eq('id', id)
     .maybeSingle();
   if (!prior) return NextResponse.json({ error: 'Article not found' }, { status: 404 });
@@ -797,7 +820,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
     action: 'article.delete',
     targetTable: 'articles',
     targetId: id,
-    oldValue: { title: prior.title, slug: prior.slug, status: prior.status },
+    oldValue: { title: prior.title, status: prior.status },
   });
 
   // T233 — soft-delete via the admin_soft_delete_article RPC. Schema

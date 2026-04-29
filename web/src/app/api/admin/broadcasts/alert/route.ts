@@ -127,12 +127,22 @@ export async function POST(request: Request) {
   const slug = `breaking-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const now = new Date().toISOString();
 
+  const { data: newStory, error: storyInsErr } = await service
+    .from('stories')
+    .insert({ slug, title, published_at: now } as never)
+    .select('id')
+    .single();
+  if (storyInsErr || !newStory) {
+    console.error('[admin.broadcasts.alert] story insert', storyInsErr?.message || 'no row');
+    return NextResponse.json({ error: 'Could not create breaking alert' }, { status: 500 });
+  }
+
   const { data: article, error: insErr } = await service
     .from('articles')
     .insert({
+      story_id: newStory.id,
       title,
       body: articleBody,
-      slug,
       category_id: categoryId,
       author_id: actor.id,
       is_breaking: true,
@@ -140,7 +150,7 @@ export async function POST(request: Request) {
       visibility: 'public',
       published_at: now,
       metadata: { target },
-    })
+    } as never)
     .select('*, categories!fk_articles_category_id(name)')
     .single();
 

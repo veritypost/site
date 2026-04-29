@@ -112,7 +112,10 @@ type DestructiveState = {
   run: (args: { reason: string }) => Promise<void>;
 } | null;
 
-type ArticleRow = Tables<'articles'> & { categories: { name: string | null; is_kids_safe?: boolean } | null };
+type ArticleRow = Tables<'articles'> & {
+  categories: { name: string | null; is_kids_safe?: boolean } | null;
+  stories: { slug: string } | null;
+};
 
 // Defined at module level — NOT inside the component body. Inline
 // component declarations get a fresh function reference on every parent
@@ -303,7 +306,7 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
     setLoading(true);
     const { data: storyData } = await supabase
       .from('articles')
-      .select('*, categories!fk_articles_category_id(name, slug)')
+      .select('*, categories!fk_articles_category_id(name, slug), stories(slug)')
       .eq('id', id)
       .single();
 
@@ -314,10 +317,10 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
         .eq('article_id', id);
 
       const cast = storyData as unknown as ArticleRow;
-      lastPersistedSlugRef.current = cast.slug || '';
+      lastPersistedSlugRef.current = cast.stories?.slug || '';
       setStory({
         title: cast.title || '',
-        slug: cast.slug || '',
+        slug: cast.stories?.slug || '',
         summary: cast.excerpt || '',
         status: cast.status || 'draft',
         category: cast.categories?.name || '',
@@ -338,7 +341,8 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
       const { data: eventData } = await supabase
         .from('timelines')
         .select('*')
-        .eq('article_id', id)
+        .eq('story_id', cast.story_id as string)
+        .eq('type', 'event')
         .order('event_date', { ascending: true });
 
       const loadedEntries: TimelineEntry[] = (eventData || []).map((e) => {
@@ -786,20 +790,6 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
             }}
           >
             AI generate (kids)
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={async () => {
-              try {
-                const r = await fetch('/api/ai/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ storyId, type: 'timeline' }) });
-                if (r.status === 503) toast.push({ message: 'AI API key not configured', variant: 'danger' });
-                else if (r.ok) toast.push({ message: 'Timeline enriched', variant: 'success' });
-                else toast.push({ message: 'Timeline enrichment failed', variant: 'danger' });
-              } catch { toast.push({ message: 'AI API key not configured', variant: 'danger' }); }
-            }}
-          >
-            Enrich timeline
           </Button>
           <Button
             variant="secondary"

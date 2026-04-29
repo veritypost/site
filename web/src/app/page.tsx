@@ -99,7 +99,7 @@ function editorialToday(): { isoDate: string; startUtc: string; humanDate: strin
 }
 
 const SELECT_COLS =
-  'id, title, slug, excerpt, category_id, is_breaking, published_at, hero_pick_for_date';
+  'id, title, stories(slug), excerpt, category_id, is_breaking, published_at, hero_pick_for_date';
 
 // Category accent palette. color_hex in DB is null for all live rows (2026-04-26);
 // this map provides a per-slug fallback until editorial populates the column.
@@ -441,7 +441,7 @@ function Hero({
   return (
     <article style={{ marginBottom: 32 }}>
       <Link
-        href={`/story/${story.slug}`}
+        href={story.stories?.slug ? `/${story.stories.slug}` : '#'}
         style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
       >
         {/* Full-bleed band — escapes the 720px column using the standard
@@ -592,7 +592,7 @@ function SupportingCard({
   return (
     <article style={{ padding: '24px 0' }}>
       <Link
-        href={`/story/${story.slug}`}
+        href={story.stories?.slug ? `/${story.stories.slug}` : '#'}
         style={{
           textDecoration: 'none',
           color: 'inherit',

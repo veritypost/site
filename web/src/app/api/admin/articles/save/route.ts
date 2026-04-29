@@ -6,31 +6,22 @@
 //   4. delete-all + reinsert on quizzes
 //   5. stamp articles.kids_summary from the current timeline entry
 //
-// Supports both the adult and kids shapes by passing through whatever
-// fields the client sends (adult has `body`, `is_developing`,
-// `published_at`; kids has `kids_summary`, `type`, `content` on
-// timeline entries, and a different quiz options shape).
-//
-// The cascade is sequential (Supabase has no transaction API over the
-// JS client), so a mid-cascade failure leaves the DB in a partial
-// state. That's the same failure mode the client had — not made
-// worse here. A real transactional RPC is a follow-up.
+// Slice 05: slug now lives on stories. For new articles, a stories row is
+// created first; for updates, stories.slug is updated when the slug changes.
+// Timeline entries use story_id instead of article_id.
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction, requireAdminOutranks } from '@/lib/adminMutation';
 
-// Mirrors web/src/app/api/admin/articles/[id]/route.ts and
-// new-draft/route.ts. Same shape kept across all three so any slug that
-// the PATCH endpoint accepts is also accepted by save, and vice versa.
 const SLUG_SAFE = /^[a-z0-9][a-z0-9-]{0,118}[a-z0-9]$|^[a-z0-9]$/;
 
 type ArticleFields = Record<string, unknown>;
 type TimelineEntryPayload = {
   id?: string;
   _isNew?: boolean;
-  article_id?: string;
+  story_id?: string;
   event_date?: string;
   event_label?: string;
   event_body?: string | null;
@@ -84,11 +75,13 @@ export async function POST(request: Request) {
   }
 
   let articleId = body.article_id as string | null;
+  let existingStoryId: string | null = null;
   let priorHeroPickForDate: string | null = null;
+
   if (isUpdate) {
     const { data: prior } = await service
       .from('articles')
-      .select('id, author_id, status, hero_pick_for_date')
+      .select('id, author_id, status, hero_pick_for_date, story_id')
       .eq('id', articleId!)
       .maybeSingle();
     if (!prior) return NextResponse.json({ error: 'Article not found' }, { status: 404 });
@@ -98,13 +91,10 @@ export async function POST(request: Request) {
     }
     priorHeroPickForDate =
       (prior as { hero_pick_for_date?: string | null }).hero_pick_for_date ?? null;
+    existingStoryId = (prior as { story_id?: string | null }).story_id ?? null;
   }
 
-  // Slug normalization + validation + collision check. The legacy story-
-  // manager / kids-story-manager surfaces let the user type any string
-  // into the URL field; the save path used to bubble a generic 500 on
-  // unique-constraint violation. Validate up front and 409 on collision
-  // so the editor can show a clean "URL already taken" message.
+  // Slug validation + collision check against stories table.
   const rawSlug = String(body.article.slug ?? '').trim().toLowerCase();
   if (!SLUG_SAFE.test(rawSlug)) {
     return NextResponse.json(
@@ -113,30 +103,22 @@ export async function POST(request: Request) {
     );
   }
   const { data: collision, error: collisionErr } = await service
-    .from('articles')
+    .from('stories')
     .select('id')
     .eq('slug', rawSlug)
-    .is('deleted_at', null)
     .maybeSingle();
   if (collisionErr) {
     console.error('[admin.articles.save] slug collision lookup failed:', collisionErr.message);
     return NextResponse.json({ error: 'Could not check URL availability' }, { status: 500 });
   }
-  if (collision && (!isUpdate || collision.id !== articleId)) {
+  if (collision && (!isUpdate || collision.id !== existingStoryId)) {
     return NextResponse.json({ error: 'url_taken' }, { status: 409 });
   }
 
-  const articleRow: ArticleFields = { ...body.article, slug: rawSlug };
+  // Build article fields (no slug — that's on stories).
+  const { slug: _dropSlug, ...articleFieldsWithoutSlug } = body.article as ArticleFields & { slug?: unknown };
+  const articleRow: ArticleFields = { ...articleFieldsWithoutSlug };
 
-  // Audit trail for the hero-pick column (schema/144). Only stamp when
-  // the value actually changes — story-manager passes `hero_pick_for_date`
-  // on every save, so a no-op edit (e.g., owner re-publishes an article
-  // without touching the hero toggle) would otherwise overwrite the audit
-  // trail with the most recent save time + actor instead of the actual
-  // last-changed metadata. Compare prior vs incoming and skip if equal.
-  // Big-picture reviewer amendment 2026-04-23: preserves the "auditable"
-  // half of Charter Commitment 2 even before the full editor/
-  // front_page_state system ships.
   if (Object.prototype.hasOwnProperty.call(articleRow, 'hero_pick_for_date')) {
     const incoming = (articleRow.hero_pick_for_date as string | null) ?? null;
     const changed = isUpdate ? incoming !== priorHeroPickForDate : incoming !== null;
@@ -145,6 +127,8 @@ export async function POST(request: Request) {
       articleRow.hero_pick_set_at = new Date().toISOString();
     }
   }
+
+  let storyId: string | null = existingStoryId;
 
   if (isUpdate) {
     articleRow.updated_at = new Date().toISOString();
@@ -157,8 +141,34 @@ export async function POST(request: Request) {
       console.error('[admin.articles.save.update]', error.message);
       return NextResponse.json({ error: 'Could not save article' }, { status: 500 });
     }
+    // Update stories.slug if it changed.
+    if (storyId) {
+      const { data: currentStory } = await service
+        .from('stories')
+        .select('slug')
+        .eq('id', storyId)
+        .maybeSingle();
+      if (currentStory?.slug !== rawSlug) {
+        await service
+          .from('stories')
+          .update({ slug: rawSlug, title: String(body.article.title ?? ''), updated_at: new Date().toISOString() } as never)
+          .eq('id', storyId);
+      }
+    }
   } else {
+    // New article: create the story first, then the article with story_id.
+    const { data: newStory, error: storyErr } = await service
+      .from('stories')
+      .insert({ slug: rawSlug, title: String(body.article.title ?? '') } as never)
+      .select('id')
+      .single();
+    if (storyErr || !newStory) {
+      console.error('[admin.articles.save.story.insert]', storyErr?.message);
+      return NextResponse.json({ error: 'Could not create story' }, { status: 500 });
+    }
+    storyId = newStory.id;
     articleRow.author_id = actor.id;
+    articleRow.story_id = storyId;
     const { data, error } = await service
       .from('articles')
       // @ts-expect-error — passthrough partial shape.
@@ -172,16 +182,19 @@ export async function POST(request: Request) {
     articleId = data.id;
   }
 
-  // Timeline — upsert entry-by-entry (may be new or existing).
+  // Timeline — upsert entry-by-entry; uses story_id (Slice 05).
   const entryIdRemap: Record<string, string> = {};
   for (const entry of body.timeline_entries || []) {
+    if (!storyId) continue;
+    // UI 'story' type maps to DB 'article'; everything else is 'event'.
+    const dbType = entry.type === 'story' ? 'article' : 'event';
     const eventPayload = {
-      article_id: articleId!,
+      story_id: storyId,
+      type: dbType,
       event_date: entry.event_date,
       event_label: entry.event_label,
       event_body: entry.event_body ?? null,
       sort_order: entry.sort_order ?? 0,
-      ...(entry.type ? { type: entry.type } : {}),
       ...(entry.content !== undefined ? { content: entry.content } : {}),
     };
     if (entry._isNew || !entry.id) {
@@ -201,7 +214,7 @@ export async function POST(request: Request) {
     }
   }
 
-  // Sources — replace all.
+  // Sources — replace all (still article-level).
   await service.from('sources').delete().eq('article_id', articleId!);
   const sourceRows = (body.sources || [])
     .filter((s) => {
@@ -219,7 +232,7 @@ export async function POST(request: Request) {
     await service.from('sources').insert(sourceRows);
   }
 
-  // Quizzes — soft-delete existing rows (preserves quiz_attempts FK references).
+  // Quizzes — soft-delete + reinsert (still article-level).
   await service
     .from('quizzes')
     .update({ deleted_at: new Date().toISOString() })
@@ -235,12 +248,10 @@ export async function POST(request: Request) {
       ...q,
     }));
   if (quizRows.length > 0) {
-    // @ts-expect-error — bulk insert of flexible quiz rows; generated
-    // types insist on full required fields per-row but runtime accepts.
+    // @ts-expect-error — bulk insert of flexible quiz rows.
     await service.from('quizzes').insert(quizRows);
   }
 
-  // Optional kids_summary stamp (post-timeline).
   if (typeof body.kids_summary_stamp === 'string') {
     await service
       .from('articles')
@@ -254,7 +265,7 @@ export async function POST(request: Request) {
     targetId: articleId,
     newValue: {
       title: body.article.title,
-      slug: body.article.slug,
+      slug: rawSlug,
       status: body.article.status,
       is_kids_safe: !!body.article.is_kids_safe,
       timeline_count: (body.timeline_entries || []).length,
@@ -263,5 +274,5 @@ export async function POST(request: Request) {
     },
   });
 
-  return NextResponse.json({ ok: true, article_id: articleId, entry_id_remap: entryIdRemap });
+  return NextResponse.json({ ok: true, article_id: articleId, story_id: storyId, entry_id_remap: entryIdRemap });
 }

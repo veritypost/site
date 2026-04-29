@@ -1,15 +1,8 @@
 /**
- * Session C — GET /api/articles/by-slug/[slug]
+ * Slice 05 — GET /api/articles/by-slug/[slug]
  *
- * Resolves a slug → article + permission snapshot. Used by the article
- * page when it needs to refetch client-side (e.g., after a slug change
- * before redirecting to the new URL). Visibility of drafts is governed
- * by the route's own permission gate: non-editors get a 404 for any row
- * with status != 'published'.
- *
- * Permission: any authenticated viewer is allowed; the response itself
- * draws the permission line. Anonymous viewers get the published row
- * with a permissions snapshot of {edit:false, publish:false}.
+ * Resolves slug via stories table (slug moved from articles to stories).
+ * Returns the primary article for the story + permission snapshot.
  */
 import { NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
@@ -25,17 +18,32 @@ export async function GET(_req: Request, { params }: { params: { slug: string } 
   }
 
   const service = createServiceClient();
+
+  const { data: story, error: storyErr } = await service
+    .from('stories')
+    .select('id, slug')
+    .eq('slug', slug)
+    .maybeSingle();
+
+  if (storyErr) {
+    console.error('[api.articles.by-slug] story lookup failed:', storyErr.message);
+    return NextResponse.json({ error: 'Lookup failed' }, { status: 500 });
+  }
+  if (!story) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
   const { data, error } = await service
     .from('articles')
     .select(
-      'id, title, slug, subtitle, body, body_html, excerpt, status, age_band, is_kids_safe, is_ai_generated, ai_model, ai_provider, published_at, updated_at, deleted_at'
+      'id, story_id, title, subtitle, body, body_html, excerpt, status, age_band, is_kids_safe, is_ai_generated, ai_model, ai_provider, published_at, updated_at, deleted_at'
     )
-    .eq('slug', slug)
+    .eq('story_id', story.id)
     .is('deleted_at', null)
     .maybeSingle();
 
   if (error) {
-    console.error('[api.articles.by-slug] lookup failed:', error.message);
+    console.error('[api.articles.by-slug] article lookup failed:', error.message);
     return NextResponse.json({ error: 'Lookup failed' }, { status: 500 });
   }
   if (!data) {
@@ -58,7 +66,7 @@ export async function GET(_req: Request, { params }: { params: { slug: string } 
 
   return NextResponse.json({
     ok: true,
-    article: data,
+    article: { ...data, slug: story.slug },
     permissions: { edit: canEdit, publish: canPublish },
   });
 }

@@ -46,7 +46,7 @@ const C = {
 
 type FeedStory = {
   id: string;
-  slug: string;
+  stories: { slug: string } | null;
   title: string;
   category?: { name: string | null } | null;
 };
@@ -128,7 +128,7 @@ function WelcomePageOnboarding() {
       try {
         const { data: rows } = await supabase
           .from('articles')
-          .select('id, slug, title, category:categories(name)')
+          .select('id, story_id, title, stories(slug), category:categories(name)')
           .eq('status', 'published')
           .order('published_at', { ascending: false })
           .limit(3);
@@ -164,11 +164,11 @@ function WelcomePageOnboarding() {
         typeof window !== 'undefined'
           ? resolveNext(new URLSearchParams(window.location.search).get('next'), null)
           : null;
-      const firstStorySlug = stories?.[0]?.slug || null;
+      const firstStorySlug = stories?.[0]?.stories?.slug || null;
       const target = validatedNext
         ? validatedNext
         : firstStorySlug
-          ? `/story/${firstStorySlug}`
+          ? `/${firstStorySlug}`
           : '/browse';
       router.replace(target);
     } catch (err) {
@@ -501,7 +501,7 @@ function ScreenThree({ stories }: { stories: FeedStory[] }) {
           {stories.map((s) => (
             <a
               key={s.id}
-              href={`/story/${s.slug}`}
+              href={s.stories?.slug ? `/${s.stories.slug}` : '#'}
               style={{
                 display: 'block',
                 padding: '14px 16px',

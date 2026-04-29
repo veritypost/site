@@ -168,11 +168,23 @@ export async function POST(req: Request) {
       );
     }
     const finalSlug = await findFreeSlug(service, candidate);
+
+    // Slice 05: create story first (slug lives on stories), then article.
+    const { data: newStory, error: storyInsertErr } = await service
+      .from('stories')
+      .insert({ slug: finalSlug, title: 'Untitled draft' } as never)
+      .select('id')
+      .single();
+    if (storyInsertErr || !newStory) {
+      console.error('[admin.articles.new-draft.manual.story]', storyInsertErr?.message);
+      return NextResponse.json({ error: 'Could not create story' }, { status: 500 });
+    }
+
     const { data: row, error: insertErr } = await service
       .from('articles')
       .insert({
+        story_id: newStory.id,
         title: 'Untitled draft',
-        slug: finalSlug,
         body: '',
         status: 'draft',
         age_band: audienceBand,
@@ -180,7 +192,7 @@ export async function POST(req: Request) {
         category_id: categoryId,
         is_ai_generated: false,
       })
-      .select('id, slug')
+      .select('id')
       .single();
     if (insertErr || !row) {
       console.error('[admin.articles.new-draft.manual]', insertErr?.message);
@@ -192,13 +204,13 @@ export async function POST(req: Request) {
         action: 'article.new_draft',
         targetTable: 'articles',
         targetId: row.id as string,
-        newValue: { mode: 'manual', audience: input.audience, slug: row.slug },
+        newValue: { mode: 'manual', audience: input.audience, slug: finalSlug },
       });
     } catch (auditErr) {
       console.error('[admin.articles.new-draft.audit]', auditErr);
     }
 
-    return NextResponse.json({ ok: true, article_id: row.id, slug: row.slug });
+    return NextResponse.json({ ok: true, article_id: row.id, slug: finalSlug });
   }
 
   // 4b. AI-generate-from-scratch — delegate to pipeline/generate with

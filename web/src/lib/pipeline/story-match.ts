@@ -110,7 +110,7 @@ export async function loadStoryMatchCandidates(
   const sb = supabase ?? createServiceClient();
   const { data, error } = await sb
     .from('articles')
-    .select('id, title, slug, seo_keywords, tags, published_at')
+    .select('id, title, stories(slug), seo_keywords, tags, published_at')
     .eq('status', 'published')
     .order('published_at', { ascending: false })
     .limit(STORY_MATCH_CANDIDATE_LIMIT);
@@ -123,7 +123,7 @@ export async function loadStoryMatchCandidates(
   return (data ?? []).map((row) => ({
     id: row.id,
     title: row.title ?? '',
-    slug: row.slug ?? '',
+    slug: (row.stories as { slug: string } | null)?.slug ?? '',
     seoKeywords: row.seo_keywords ?? null,
     tags: row.tags ?? null,
     publishedAt: row.published_at ?? null,

@@ -142,7 +142,10 @@ type DestructiveState = {
   run: (args: { reason: string }) => Promise<void>;
 } | null;
 
-type ArticleRow = Tables<'articles'> & { categories: { name: string | null; slug?: string | null } | null };
+type ArticleRow = Tables<'articles'> & {
+  categories: { name: string | null; slug?: string | null } | null;
+  stories: { slug: string } | null;
+};
 
 const genId = (prefix: string) =>
   `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -236,6 +239,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
   const [showPicker, setShowPicker] = useState(false);
   const [destructive, setDestructive] = useState<DestructiveState>(null);
   const [saving, setSaving] = useState(false);
+  const [regenQuizLoading, setRegenQuizLoading] = useState(false);
 
   // T-018: DB-loaded category + subcategory dropdowns.
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
@@ -353,7 +357,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
     setLoading(true);
     const { data: storyData } = await supabase
       .from('articles')
-      .select('*, categories!fk_articles_category_id(name, slug)')
+      .select('*, categories!fk_articles_category_id(name, slug), stories(slug)')
       .eq('id', id)
       .single();
 
@@ -365,10 +369,10 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
         .order('sort_order', { ascending: true });
 
       const cast = storyData as unknown as ArticleRow;
-      lastPersistedSlugRef.current = cast.slug || '';
+      lastPersistedSlugRef.current = cast.stories?.slug || '';
       setStory({
         title: cast.title || '',
-        slug: cast.slug || '',
+        slug: cast.stories?.slug || '',
         summary: cast.excerpt || '',
         body: cast.body || '',
         published_at: cast.published_at ? cast.published_at.split('T')[0] : '',
@@ -392,7 +396,8 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
       const { data: eventData } = await supabase
         .from('timelines')
         .select('*')
-        .eq('article_id', id)
+        .eq('story_id', cast.story_id as string)
+        .eq('type', 'event')
         .order('event_date', { ascending: true });
 
       const loadedEntries: TimelineEntry[] = (eventData || []).map((e) => {
@@ -598,6 +603,61 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
         .filter((q) => !(q._isNew && q._deleted)),
     );
     setIsDirty(true);
+  };
+
+  const regenQuiz = async (articleId: string) => {
+    setRegenQuizLoading(true);
+    try {
+      const res = await fetch('/api/admin/pipeline/quiz-regenerate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ article_id: articleId }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.push({ message: json.error || 'Quiz regeneration failed', variant: 'danger' });
+        return;
+      }
+      // Reload fresh quizzes from DB
+      const primaryEntryId =
+        entries.find((e) => e.is_current && e.type === 'story')?.id
+        || [...entries].reverse().find((e) => e.type === 'story')?.id
+        || entries[entries.length - 1]?.id
+        || '';
+      const { data: quizData } = await supabase
+        .from('quizzes')
+        .select('*')
+        .eq('article_id', articleId)
+        .is('deleted_at', null)
+        .order('sort_order', { ascending: true });
+      const reloaded: QuizLocal[] = (quizData || []).map((q) => {
+        const qr = q as unknown as Record<string, unknown>;
+        const rawOpts = qr.options;
+        let options: QuizOption[] = [];
+        if (Array.isArray(rawOpts)) {
+          options = (rawOpts as unknown[]).map((o) => {
+            const obj = o && typeof o === 'object' ? (o as Record<string, unknown>) : {};
+            return { text: typeof obj.text === 'string' ? obj.text : '', is_correct: Boolean(obj.is_correct) };
+          });
+        }
+        if (options.length < 4) while (options.length < 4) options.push({ text: '', is_correct: false });
+        return {
+          id: (qr.id as string) || genId('q'),
+          entry_id: primaryEntryId,
+          question_text: (qr.question_text as string) || '',
+          question_type: 'multiple_choice' as const,
+          options,
+          explanation: (qr.explanation as string) || '',
+        };
+      });
+      setQuizzes(reloaded);
+      toast.push({ message: `Quiz regenerated — ${json.count as number} new questions`, variant: 'success' });
+    } catch (err) {
+      console.error('[regenQuiz]', err);
+      toast.push({ message: 'Quiz regeneration failed', variant: 'danger' });
+    } finally {
+      setRegenQuizLoading(false);
+    }
   };
 
   // Optional override lets publishStory force status='published' on the
@@ -953,26 +1013,6 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
           >
             AI generate
           </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={async () => {
-              try {
-                const res = await fetch('/api/ai/generate', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ storyId, type: 'timeline' }),
-                });
-                if (res.status === 503) toast.push({ message: 'AI API key not configured', variant: 'danger' });
-                else if (!res.ok) toast.push({ message: 'Timeline enrichment failed', variant: 'danger' });
-                else toast.push({ message: 'Timeline enriched — reload to see changes', variant: 'success' });
-              } catch {
-                toast.push({ message: 'AI API key not configured', variant: 'danger' });
-              }
-            }}
-          >
-            Enrich timeline
-          </Button>
           <div style={{ flex: 1 }} />
           <Button variant="primary" size="sm" onClick={publishStory}>
             {story.status === 'published' ? 'Update & publish' : 'Publish'}
@@ -1216,14 +1256,24 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
                             <span style={{ fontSize: F.xs, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: C.soft }}>
                               Quiz questions ({entryQuizzes.length} of {MAX_QUIZ_QUESTIONS})
                             </span>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              disabled={atLimit}
-                              onClick={() => addQuiz(entry.id)}
-                            >
-                              + Add question
-                            </Button>
+                            <div style={{ display: 'flex', gap: S[2], flexWrap: 'wrap' }}>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={!storyId || regenQuizLoading}
+                                onClick={() => storyId && regenQuiz(storyId)}
+                              >
+                                {regenQuizLoading ? 'Regenerating...' : 'Regenerate quiz'}
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                disabled={atLimit}
+                                onClick={() => addQuiz(entry.id)}
+                              >
+                                + Add question
+                              </Button>
+                            </div>
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: S[2] }}>
                             {entryQuizzes.map((q, qIdx) => (

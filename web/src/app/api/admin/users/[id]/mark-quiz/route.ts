@@ -44,10 +44,17 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return NextResponse.json({ error: 'score must be a non-negative number' }, { status: 400 });
   }
 
+  const { data: storyRow } = await service
+    .from('stories')
+    .select('id')
+    .eq('slug', slug)
+    .maybeSingle();
+  if (!storyRow)
+    return NextResponse.json({ error: `No article with slug "${slug}"` }, { status: 404 });
   const { data: story } = await service
     .from('articles')
     .select('id')
-    .eq('slug', slug)
+    .eq('story_id', storyRow.id)
     .maybeSingle();
   if (!story)
     return NextResponse.json({ error: `No article with slug "${slug}"` }, { status: 404 });

@@ -1,8 +1,8 @@
 # Article Lifecycle Redesign — Index
 
-**Last updated:** 2026-04-29 (session 8)
-**Phase:** 8 — slices 01–04 + 06 partially implemented; slice 05 deferred (structural scope)
-**Next session should pick up:** Slice 04 D1 (quiz-regenerate endpoint), then Slice 05 (stories schema migration)
+**Last updated:** 2026-04-29 (session 9)
+**Phase:** 10 — slices 01–05 fully implemented; slice 06 partial (D1 ArticleEngagementZone ready to ship)
+**Next session should pick up:** Slice 06 D1 (ArticleEngagementZone mounting — no longer blocked)
 
 ---
 
@@ -13,9 +13,9 @@
 | 01 | Generation | **implemented** | 2026-04-29 | `slices/01-generation.md` |
 | 02 | Publishing | **implemented** | 2026-04-29 | `slices/02-publishing.md` |
 | 03 | Viewing | **implemented** | 2026-04-29 | `slices/03-viewing.md` |
-| 04 | Quizzes | **partial** (D2/D3/D6 done; D1 quiz-regenerate pending) | 2026-04-29 | `slices/04-quizzes.md` |
-| 05 | Timelines | locked (deferred — stories schema, large session) | 2026-04-29 | `slices/05-timelines.md` |
-| 06 | Comments | **partial** (D6 AI-flagged tab + moderation history done; D1 ArticleEngagementZone pending slice 05) | 2026-04-29 | `slices/06-comments.md` |
+| 04 | Quizzes | **implemented** | 2026-04-29 | `slices/04-quizzes.md` |
+| 05 | Timelines | **implemented** | 2026-04-29 | `slices/05-timelines.md` |
+| 06 | Comments | **partial** (D6 AI-flagged tab + moderation history done; D1 ArticleEngagementZone ready — slice 05 unblocked) | 2026-04-29 | `slices/06-comments.md` |
 
 **Default ordering** is generation → publishing → viewing → quizzes → timelines → comments. Owner can redirect any time.
 

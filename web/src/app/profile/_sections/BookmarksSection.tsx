@@ -15,7 +15,7 @@ import { SkeletonBlock } from '../_components/Skeleton';
 import { C, F, FONT, R, S } from '../_lib/palette';
 
 type BookmarkRow = Pick<Tables<'bookmarks'>, 'id' | 'created_at' | 'article_id' | 'notes'> & {
-  articles: { title: string | null; slug: string | null; subtitle: string | null } | null;
+  articles: { title: string | null; subtitle: string | null; stories: { slug: string } | null } | null;
 };
 
 interface Props {
@@ -39,7 +39,7 @@ export function BookmarksSection({ preview }: Props) {
       }
       const { data } = await supabase
         .from('bookmarks')
-        .select('id, created_at, article_id, notes, articles(title, slug, subtitle)')
+        .select('id, created_at, article_id, notes, articles(title, subtitle, stories(slug))')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(50);
@@ -78,7 +78,7 @@ export function BookmarksSection({ preview }: Props) {
         }}
       >
         {rows.map((b) => {
-          const target = b.articles?.slug ? `/article/${b.articles.slug}` : '#';
+          const target = b.articles?.stories?.slug ? `/${b.articles.stories.slug}` : '#';
           return (
             <li
               key={b.id}

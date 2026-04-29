@@ -99,6 +99,7 @@ export interface PersistArticlePayload {
 
 export interface PersistArticleResult {
   article_id: string;
+  story_id: string;
   slug: string;
   audience: 'adult' | 'kid';
 }
@@ -152,8 +153,6 @@ export async function persistGeneratedArticle(
     );
   }
 
-  // RPC returns a one-row set; supabase-js may surface it as an array
-  // or a single object depending on .select() post-processing.
   const row = Array.isArray(data) ? data[0] : data;
   if (!row) {
     throw new PersistArticleError('persist_generated_article returned no row');

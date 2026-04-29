@@ -331,3 +331,62 @@ Implemented all locked decisions that don't depend on the slice 05 stories-as-co
 1. Slice 04 D1 — `quiz-regenerate` endpoint + StoryEditor button (small, self-contained).
 2. Slice 05 — full stories schema migration (large session, own commit chain).
 3. Post-slice-05: Slice 06 D1 — `ArticleEngagementZone` + `CommentThread` mounting in the new story reader.
+
+---
+
+## Session 9 — 2026-04-29 — Slice 04 D1: quiz-regenerate endpoint
+
+**Phase entering:** 8 (slices 01–04 partial, slice 05 deferred, slice 06 partial).
+**Phase leaving:** 9 (slice 04 fully implemented).
+
+**What happened.** Implemented the one remaining Slice 04 item: the manual quiz-regenerate admin action.
+
+- Verified T300 realtime fix was already live (both `CommentThread.tsx` and `StoryDetailView.swift` already use `public_profiles_v` — no action needed).
+- Created `web/src/app/api/admin/pipeline/quiz-regenerate/route.ts`: POST endpoint gated by `admin.pipeline.run_generate`. Fetches article body + audience from DB, runs quiz generation (Sonnet 4.6) and quiz_verification (Haiku 4.5) via Anthropic SDK directly (no `pipeline_runs` FK needed — this is an admin action, not a full pipeline run), soft-deletes existing quiz rows (`deleted_at` stamp), inserts fresh questions with `is_correct` in options (same format as admin save route), records admin action.
+- Updated `StoryEditor.tsx`: added `regenQuizLoading` state, `regenQuiz(articleId)` function (calls endpoint → reloads quizzes from DB on success), and "Regenerate quiz" ghost button in the quiz section header alongside "+ Add question". Button disabled when no article is loaded or regen is in progress.
+- TypeScript passes clean with no errors.
+
+**What got locked.** Slice 04 D1 implemented. All six slice decisions are now fully implemented except Slice 05 (stories schema) and Slice 06 D1 (ArticleEngagementZone — blocked on Slice 05).
+
+**What's blocked or deferred.**
+- Slice 05 (Stories schema): full structural migration — new `stories` table, `articles.story_id` FK, `articles.slug` removal, `timelines` parent FK to `story_id`, web reader becomes story page (`/[slug]` resolves `stories.slug`), iOS timeline fetch updates. Large session, own commit chain.
+- Slice 06 D1 (ArticleEngagementZone + CommentThread): blocked on Slice 05 reader architecture.
+
+**What next session should pick up.** Slice 05 — the stories-as-containers structural migration. This is the largest remaining item. Read `slices/05-timelines.md` decisions D5–D7 and INDEX.md item 14 before starting.
+
+---
+
+## Session 9 — 2026-04-29 — Slice 05 caller sweep (slug migration complete)
+
+**Phase entering:** 9 (Slice 05 migration applied, TypeScript types regenerated; remaining callers still reference `articles.slug` which no longer exists).
+**Phase leaving:** 10 (Slice 05 fully implemented across all web + iOS callers; TypeScript passes clean; Slice 06 D1 unblocked).
+
+**What happened.** Completed the Slice 05 caller sweep — fixed every file that still referenced `articles.slug` directly after the schema migration applied in session 8.
+
+Web callers fixed:
+- `app/search/page.tsx` + `app/api/search/route.js`: `ArticleHit` type and select updated to `stories(slug)` join.
+- `app/welcome/page.tsx`: dead `WelcomePageOnboarding` code (inactive, skip redirect owns the export) updated for compilation.
+- `app/_homeShared.ts`: `HomeStory` type updated; `slug` dropped from Pick, `stories: { slug } | null` added.
+- `app/page.tsx` (home): `SELECT_COLS` updated; both story links switched from `/story/${slug}` to `/${stories.slug}`.
+- `app/_HomeBreakingStrip.tsx`: breaking strip link updated.
+- `app/browse/page.tsx`: `ArticleRow` type, two selects, trending + featured slug accessors all updated.
+- `app/api/admin/users/[id]/mark-quiz/route.ts` + `mark-read/route.ts`: slug lookups now query `stories` table first, then articles by `story_id`.
+- `app/profile/kids/[id]/page.tsx`: `ReadingRow` — dropped `slug` from articles join (not rendered in any href).
+- `components/article/StoryEditor.tsx` + `KidsStoryEditor.tsx`: `ArticleRow` type gets `stories: { slug } | null`; select adds `stories(slug)`; `cast.slug` → `cast.stories?.slug`; timeline query `article_id` → `story_id` + `type='event'` filter.
+- `lib/pipeline/story-match.ts`: select + row mapping updated.
+- `app/api/admin/broadcasts/alert/route.ts`: alert creation now inserts `stories` row first (with `slug + published_at`), then `articles` with `story_id`.
+
+iOS callers fixed:
+- `Models.swift`: Added `StorySlugRef` struct; `Story` drops stored `slug`, adds `storyId`/`stories` props, `slug` becomes a computed property via `stories?.slug`; `TimelineEvent` switches `articleId` → `storyId` + adds `type`/`linkedArticleId`; `QuizAttempt.StoryRef` same computed-slug pattern.
+- `BookmarksView.swift`: `BookmarkStory` same computed-slug pattern; both selects updated to `articles(... stories(slug) ...)`.
+- `ProfileView.swift`: all four activity selects updated; `BookmarkJoined.ArticleJoin` updated; `fetchStoryBySlug` now queries `stories` table by slug then `articles` by `story_id`.
+- `StoryDetailView.swift`: article select adds `story_id, stories(slug)`; timeline query switches to `story_id` + `type='event'`.
+- `HomeView.swift`: all three article selects updated to `select("*, stories(slug)")`.
+- `AlertsView.swift`, `ContentView.swift`: `fetchStoryBySlug` updated (two-step: stories → articles).
+- `RecapView.swift`: article select updated to include `story_id, stories(slug)`.
+
+**What got locked.** Slice 05 fully complete. All 20+ callers updated. TypeScript zero errors.
+
+**What's blocked or deferred.** None blocking Slice 06 D1.
+
+**What next session should pick up.** Slice 06 D1 — mount `ArticleEngagementZone` in the web reader (`/[slug]/page.tsx`). The component exists (`web/src/components/article/ArticleEngagementZone.tsx`); the story-page architecture is now stable.

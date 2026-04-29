@@ -46,7 +46,7 @@ export async function GET(request) {
   let query = service
     .from('articles')
     .select(
-      'id, title, slug, excerpt, published_at, category_id, is_kids_safe, categories!fk_articles_category_id(name)'
+      'id, title, stories(slug), excerpt, published_at, category_id, is_kids_safe, categories!fk_articles_category_id(name)'
     )
     .eq('status', 'published')
     .limit(50)

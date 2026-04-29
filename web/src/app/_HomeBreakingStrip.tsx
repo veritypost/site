@@ -41,7 +41,7 @@ export default function HomeBreakingStrip({ story }: { story: HomeStory }) {
 
   return (
     <Link
-      href={`/story/${story.slug}`}
+      href={story.stories?.slug ? `/${story.stories.slug}` : '#'}
       aria-label={`Breaking news: ${story.title}`}
       style={{
         display: 'block',

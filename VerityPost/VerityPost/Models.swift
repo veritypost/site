@@ -130,12 +130,19 @@ struct VPUser: Codable, Identifiable {
     }
 }
 
+// MARK: - Story slug join (stories table)
+
+struct StorySlugRef: Codable {
+    var slug: String?
+}
+
 // MARK: - Story
 
 struct Story: Codable, Identifiable, Hashable {
     let id: String
+    var storyId: String?
+    var stories: StorySlugRef?
     var title: String?
-    var slug: String?
     var summary: String?
     var content: String?
     var imageUrl: String?
@@ -153,7 +160,8 @@ struct Story: Codable, Identifiable, Hashable {
     var heroPickForDate: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, title, slug, status
+        case id, title, status, stories
+        case storyId = "story_id"
         case summary = "excerpt"
         case content = "body"
         case imageUrl = "cover_image_url"
@@ -164,6 +172,10 @@ struct Story: Codable, Identifiable, Hashable {
         case createdAt = "created_at"
         case heroPickForDate = "hero_pick_for_date"
     }
+
+    /// Slug lives on the related stories row; this computed property
+    /// delegates to the join result so all existing callers continue to work.
+    var slug: String? { stories?.slug }
 
     /// Convenience alias for the home/reader views — same column as
     /// `summary` (PostgREST column is `excerpt`); keeping the alias
@@ -260,12 +272,14 @@ struct QuizAttempt: Codable, Identifiable {
 
     struct StoryRef: Codable {
         var title: String?
-        var slug: String?
         var categoryId: String?
         var subcategoryId: String?
+        var stories: StorySlugRef?
+
+        var slug: String? { stories?.slug }
 
         enum CodingKeys: String, CodingKey {
-            case title, slug
+            case title, stories
             case categoryId = "category_id"
             case subcategoryId = "subcategory_id"
         }
@@ -455,7 +469,9 @@ struct SourceLink: Codable, Identifiable {
 
 struct TimelineEvent: Codable, Identifiable {
     let id: String
-    var articleId: String?
+    var storyId: String?
+    var type: String?
+    var linkedArticleId: String?
     var eventDate: Date?
     var eventLabel: String?
     var eventBody: String?
@@ -467,8 +483,9 @@ struct TimelineEvent: Codable, Identifiable {
     var isCurrent: Bool? { nil }
 
     enum CodingKeys: String, CodingKey {
-        case id
-        case articleId = "article_id"
+        case id, type
+        case storyId = "story_id"
+        case linkedArticleId = "linked_article_id"
         case eventDate = "event_date"
         case eventLabel = "event_label"
         case eventBody = "event_body"

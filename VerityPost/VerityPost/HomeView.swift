@@ -455,7 +455,7 @@ struct HomeView: View {
             let todayStartIso = HomeView.loadDataISOFmt.string(from: today.startUtc)
 
             async let storiesReq: [Story] = client.from("articles")
-                .select()
+                .select("*, stories(slug)")
                 .eq("status", value: "published")
                 .gte("published_at", value: todayStartIso)
                 .order("published_at", ascending: false)
@@ -468,7 +468,7 @@ struct HomeView: View {
             // masthead even if the editor didn't flag it as today's hero.
             // Mirrors the web home (`web/src/app/page.tsx`).
             async let breakingReq: [Story] = client.from("articles")
-                .select()
+                .select("*, stories(slug)")
                 .eq("status", value: "published")
                 .eq("is_breaking", value: true)
                 .gte("published_at", value: todayStartIso)
@@ -776,7 +776,7 @@ private struct BrowseLanding: View {
                 let client = self.client
                 group.addTask {
                     async let previewReq: [Story] = client.from("articles")
-                        .select()
+                        .select("*, stories(slug)")
                         .eq("category_id", value: catId)
                         .eq("status", value: "published")
                         .eq("visibility", value: "public")
@@ -904,7 +904,7 @@ struct CategoryDetailView: View {
         loadFailed = false
         do {
             let s: [Story] = try await client.from("articles")
-                .select()
+                .select("*, stories(slug)")
                 .eq("category_id", value: category.id)
                 .eq("status", value: "published")
                 .eq("visibility", value: "public")

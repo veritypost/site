@@ -1,20 +1,14 @@
 /**
- * Session C — `/<slug>` IS the article page (Decision 10).
+ * Slice 05 — `/<slug>` is a story page (Decision 10).
  *
- * Resolves the path segment to a row in `articles.slug` and renders the
- * body server-side. Editors (articles.edit) get the inline editor +
- * toolbar layered on top via a client subtree; non-editors get a pure
- * read-only render. The editor bundle is code-split via next/dynamic so
- * the read-only path never pays for it.
- *
- * Drafts (status != 'published') are 404 to non-editors. RLS on the
- * articles table is intentionally NOT changed in this session — the
- * status check below is the gate.
+ * Resolves the slug against `stories.slug`. Stories own the canonical URL;
+ * articles hang off stories via story_id. For the current 1:1 shape (one
+ * article per story) we load the single article for the story. The `?a=`
+ * query param is reserved for future multi-article story pages.
  *
  * Metadata:
  *   - adult       → JsonLd NewsArticle + indexable
- *   - kids/tweens → robots noindex,nofollow (Decision 22 — COPPA risk
- *                   reduction; the kids iOS app is the canonical surface)
+ *   - kids/tweens → robots noindex,nofollow (COPPA; kids iOS app is canonical)
  */
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
@@ -30,10 +24,17 @@ import ArticleTracker from '@/components/article/ArticleTracker';
 
 export const dynamic = 'force-dynamic';
 
+type StoryRow = {
+  id: string;
+  slug: string;
+  title: string;
+  published_at: string | null;
+};
+
 type ArticleRow = {
   id: string;
+  story_id: string | null;
   title: string;
-  slug: string;
   subtitle: string | null;
   body: string | null;
   body_html: string | null;
@@ -50,21 +51,30 @@ type ArticleRow = {
 };
 
 const ARTICLE_SELECT =
-  'id, title, slug, subtitle, body, body_html, excerpt, status, age_band, is_kids_safe, is_ai_generated, ai_model, ai_provider, published_at, updated_at, deleted_at';
+  'id, story_id, title, subtitle, body, body_html, excerpt, status, age_band, is_kids_safe, is_ai_generated, ai_model, ai_provider, published_at, updated_at, deleted_at';
 
 function isCoppaBand(row: { age_band: string | null; is_kids_safe: boolean | null }): boolean {
   return row.age_band === 'kids' || row.age_band === 'tweens' || row.is_kids_safe === true;
 }
 
-async function fetchBySlug(slug: string): Promise<ArticleRow | null> {
+async function fetchBySlug(slug: string): Promise<{ story: StoryRow; article: ArticleRow } | null> {
   const service = createServiceClient();
-  const { data } = await service
+  const { data: story } = await service
+    .from('stories')
+    .select('id, slug, title, published_at')
+    .eq('slug', slug)
+    .maybeSingle();
+  if (!story) return null;
+
+  const { data: article } = await service
     .from('articles')
     .select(ARTICLE_SELECT)
-    .eq('slug', slug)
+    .eq('story_id', story.id)
     .is('deleted_at', null)
     .maybeSingle();
-  return (data as ArticleRow | null) ?? null;
+  if (!article) return null;
+
+  return { story: story as StoryRow, article: article as ArticleRow };
 }
 
 export async function generateMetadata({
@@ -72,9 +82,10 @@ export async function generateMetadata({
 }: {
   params: { slug: string };
 }): Promise<Metadata> {
-  const article = await fetchBySlug(params.slug);
-  if (!article) return { title: 'Article not found · Verity Post' };
+  const found = await fetchBySlug(params.slug);
+  if (!found) return { title: 'Article not found · Verity Post' };
 
+  const { article } = found;
   const meta: Metadata = {
     title: article.title,
     description: article.excerpt ?? undefined,
@@ -86,18 +97,14 @@ export async function generateMetadata({
 }
 
 export default async function ArticleSlugPage({ params }: { params: { slug: string } }) {
-  const article = await fetchBySlug(params.slug);
-  if (!article) notFound();
+  const found = await fetchBySlug(params.slug);
+  if (!found) notFound();
 
-  // Permission snapshot — dual-check legacy admin keys alongside the new
-  // 5-key set so the existing admin role works without a re-grant. Session
-  // E drops the legacy half.
+  const { story, article } = found;
+
   const supabase = createClient();
-
-  // Fetch user first; pass check depends on user.id being available.
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Run permissions, quiz count, and pass check in parallel.
   const service = createServiceClient();
   const [
     canEditNew,
@@ -133,7 +140,8 @@ export default async function ArticleSlugPage({ params }: { params: { slug: stri
     service
       .from('timelines')
       .select('id, event_date, event_label, event_body')
-      .eq('article_id', article.id)
+      .eq('story_id', story.id)
+      .eq('type', 'event')
       .order('event_date', { ascending: true }),
   ]);
 
@@ -144,11 +152,8 @@ export default async function ArticleSlugPage({ params }: { params: { slug: stri
   const sources = sourcesResult.data ?? [];
   const timeline = timelineResult.data ?? [];
 
-  // Drafts and archived: hidden from non-editors (404 — same surface as a
-  // missing slug, no draft existence leak).
   if (article.status !== 'published' && !canEdit) notFound();
 
-  // Fire-and-forget view count on every page render for published articles.
   if (article.status === 'published') {
     incrementViewCount(service, article.id).catch(() => {});
   }
@@ -161,7 +166,7 @@ export default async function ArticleSlugPage({ params }: { params: { slug: stri
     !isCoppa && article.status === 'published' && siteUrl
       ? newsArticle({
           headline: article.title,
-          url: `${siteUrl}/${article.slug}`,
+          url: `${siteUrl}/${story.slug}`,
           datePublished: article.published_at,
           dateModified: article.updated_at ?? article.published_at,
           description: article.excerpt,
@@ -176,12 +181,12 @@ export default async function ArticleSlugPage({ params }: { params: { slug: stri
     <>
       {jsonLd && <JsonLd data={jsonLd} />}
       {!isCoppa && article.status === 'published' && (
-        <ArticleTracker articleId={article.id} articleSlug={article.slug} />
+        <ArticleTracker articleId={article.id} articleSlug={story.slug} />
       )}
       <ArticleSurface
         article={{
           id: article.id,
-          slug: article.slug,
+          slug: story.slug,
           title: article.title,
           subtitle: article.subtitle,
           excerpt: article.excerpt,

@@ -8,8 +8,9 @@ import type { Tables } from '@/types/database-helpers';
 
 export type HomeStory = Pick<
   Tables<'articles'>,
-  'id' | 'title' | 'slug' | 'excerpt' | 'category_id' | 'is_breaking' | 'published_at'
+  'id' | 'title' | 'excerpt' | 'category_id' | 'is_breaking' | 'published_at'
 > & {
+  stories: { slug: string } | null;
   hero_pick_for_date: string | null;
 };
 

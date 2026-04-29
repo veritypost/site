@@ -27,13 +27,13 @@ export async function findFreeSlug(
   // we only round-trip once for the common case. In the rare collision
   // storm we fall back to per-suffix probes capped at MAX_PROBES.
   const { data: prefixRows, error: prefixErr } = await supabase
-    .from('articles')
+    .from('stories')
     .select('slug')
     .or(`slug.eq.${base},slug.like.${base}-%`)
     .limit(MAX_PROBES);
 
   if (prefixErr) {
-    throw new Error(`[slug-collide] articles probe failed: ${prefixErr.message}`);
+    throw new Error(`[slug-collide] stories probe failed: ${prefixErr.message}`);
   }
 
   const taken = new Set<string>((prefixRows ?? []).map((r) => String(r.slug)));

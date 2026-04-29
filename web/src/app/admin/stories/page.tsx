@@ -150,7 +150,7 @@ function StoriesAdminInner() {
       action: 'article.delete',
       targetTable: 'articles',
       targetId: story.id,
-      oldValue: { title: story.title, status: story.status, slug: story.slug },
+      oldValue: { title: story.title, status: story.status },
       newValue: null,
       run: async () => {
         const res = await fetch(`/api/admin/articles/${story.id}`, { method: 'DELETE' });

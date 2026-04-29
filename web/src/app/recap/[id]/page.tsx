@@ -148,12 +148,13 @@ export default function RecapPlayer() {
       const supabase = createClient();
       const { data: rows } = await supabase
         .from('articles')
-        .select('id, slug')
+        .select('id, stories(slug)')
         .in('id', articleIds);
       if (rows) {
         const map: Record<string, string> = {};
         for (const r of rows) {
-          if (r.slug) map[r.id] = r.slug;
+          const slug = (r.stories as { slug?: string } | null)?.slug;
+          if (slug) map[r.id] = slug;
         }
         setArticleSlugs(map);
       }
@@ -292,7 +293,7 @@ export default function RecapPlayer() {
               )}
               {!r.is_correct && r.article_id && articleSlugs[r.article_id] && (
                 <a
-                  href={`/story/${articleSlugs[r.article_id]}`}
+                  href={`/${articleSlugs[r.article_id]}`}
                   style={{
                     fontSize: 12,
                     color: C.accent,

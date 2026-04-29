@@ -31,7 +31,7 @@ type ArticleStatus = 'draft' | 'published' | 'archived' | 'failed';
 type ArticleRow = {
   id: string;
   title: string | null;
-  slug: string;
+  stories: { slug: string } | null;
   status: ArticleStatus;
   age_band: AudienceBand;
   category_id: string | null;
@@ -283,7 +283,7 @@ export default function ArticlesTable() {
               >
                 <td style={{ padding: `${S[2]}px ${S[3]}px` }}>
                   <Link
-                    href={`/${row.slug}`}
+                    href={row.stories?.slug ? `/${row.stories.slug}` : '#'}
                     style={{
                       color: C.white,
                       textDecoration: 'none',
@@ -293,7 +293,7 @@ export default function ArticlesTable() {
                       alignItems: 'baseline',
                     }}
                   >
-                    {row.title || row.slug}
+                    {row.title || row.stories?.slug || '—'}
                     {row.is_ai_generated && (
                       <Badge variant="info" size="xs">AI</Badge>
                     )}

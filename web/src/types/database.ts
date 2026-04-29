@@ -1564,11 +1564,11 @@ export type Database = {
           seo_keywords: string[] | null
           seo_title: string | null
           share_count: number
-          slug: string
           source_feed_id: string | null
           source_url: string | null
           sponsor_id: string | null
           status: string
+          story_id: string | null
           subcategory_id: string | null
           subtitle: string | null
           tags: string[] | null
@@ -1635,11 +1635,11 @@ export type Database = {
           seo_keywords?: string[] | null
           seo_title?: string | null
           share_count?: number
-          slug: string
           source_feed_id?: string | null
           source_url?: string | null
           sponsor_id?: string | null
           status?: string
+          story_id?: string | null
           subcategory_id?: string | null
           subtitle?: string | null
           tags?: string[] | null
@@ -1706,11 +1706,11 @@ export type Database = {
           seo_keywords?: string[] | null
           seo_title?: string | null
           share_count?: number
-          slug?: string
           source_feed_id?: string | null
           source_url?: string | null
           sponsor_id?: string | null
           status?: string
+          story_id?: string | null
           subcategory_id?: string | null
           subtitle?: string | null
           tags?: string[] | null
@@ -1744,6 +1744,13 @@ export type Database = {
             columns: ["hero_pick_set_by"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "articles_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "stories"
             referencedColumns: ["id"]
           },
           {
@@ -2841,6 +2848,7 @@ export type Database = {
           reply_count: number
           root_id: string | null
           status: string
+          story_id: string | null
           thread_depth: number
           updated_at: string
           upvote_count: number
@@ -2882,6 +2890,7 @@ export type Database = {
           reply_count?: number
           root_id?: string | null
           status?: string
+          story_id?: string | null
           thread_depth?: number
           updated_at?: string
           upvote_count?: number
@@ -2923,6 +2932,7 @@ export type Database = {
           reply_count?: number
           root_id?: string | null
           status?: string
+          story_id?: string | null
           thread_depth?: number
           updated_at?: string
           upvote_count?: number
@@ -2930,6 +2940,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "comments_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "stories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "fk_comments_article_id"
             columns: ["article_id"]
@@ -4507,6 +4524,117 @@ export type Database = {
         Relationships: []
       }
       events_20260429: {
+        Row: {
+          article_id: string | null
+          article_slug: string | null
+          author_id: string | null
+          category_slug: string | null
+          consent_ads: boolean | null
+          consent_analytics: boolean | null
+          content_type: string | null
+          country_iso2: string | null
+          created_at: string
+          device_id: string | null
+          device_type: string | null
+          event_category: string
+          event_id: string
+          event_name: string
+          experiment_bucket: string | null
+          ip_hash: string | null
+          is_bot: boolean
+          occurred_at: string
+          page: string | null
+          payload: Json
+          received_at: string
+          referrer_domain: string | null
+          region: string | null
+          session_id: string
+          subcategory_slug: string | null
+          user_agent_hash: string | null
+          user_id: string | null
+          user_tenure_days: number | null
+          user_tier: string | null
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          viewport_h: number | null
+          viewport_w: number | null
+        }
+        Insert: {
+          article_id?: string | null
+          article_slug?: string | null
+          author_id?: string | null
+          category_slug?: string | null
+          consent_ads?: boolean | null
+          consent_analytics?: boolean | null
+          content_type?: string | null
+          country_iso2?: string | null
+          created_at?: string
+          device_id?: string | null
+          device_type?: string | null
+          event_category: string
+          event_id: string
+          event_name: string
+          experiment_bucket?: string | null
+          ip_hash?: string | null
+          is_bot?: boolean
+          occurred_at: string
+          page?: string | null
+          payload?: Json
+          received_at?: string
+          referrer_domain?: string | null
+          region?: string | null
+          session_id: string
+          subcategory_slug?: string | null
+          user_agent_hash?: string | null
+          user_id?: string | null
+          user_tenure_days?: number | null
+          user_tier?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          viewport_h?: number | null
+          viewport_w?: number | null
+        }
+        Update: {
+          article_id?: string | null
+          article_slug?: string | null
+          author_id?: string | null
+          category_slug?: string | null
+          consent_ads?: boolean | null
+          consent_analytics?: boolean | null
+          content_type?: string | null
+          country_iso2?: string | null
+          created_at?: string
+          device_id?: string | null
+          device_type?: string | null
+          event_category?: string
+          event_id?: string
+          event_name?: string
+          experiment_bucket?: string | null
+          ip_hash?: string | null
+          is_bot?: boolean
+          occurred_at?: string
+          page?: string | null
+          payload?: Json
+          received_at?: string
+          referrer_domain?: string | null
+          region?: string | null
+          session_id?: string
+          subcategory_slug?: string | null
+          user_agent_hash?: string | null
+          user_id?: string | null
+          user_tenure_days?: number | null
+          user_tier?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          viewport_h?: number | null
+          viewport_w?: number | null
+        }
+        Relationships: []
+      }
+      events_20260430: {
         Row: {
           article_id: string | null
           article_slug: string | null
@@ -6653,48 +6781,6 @@ export type Database = {
         }
         Relationships: []
       }
-      moderation_actions: {
-        Row: {
-          id: number
-          comment_id: string
-          moderator_id: string | null
-          action: string
-          reason: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: number
-          comment_id: string
-          moderator_id?: string | null
-          action: string
-          reason?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: number
-          comment_id?: string
-          moderator_id?: string | null
-          action?: string
-          reason?: string | null
-          created_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: 'moderation_actions_comment_id_fkey'
-            columns: ['comment_id']
-            isOneToOne: false
-            referencedRelation: 'comments'
-            referencedColumns: ['id']
-          },
-          {
-            foreignKeyName: 'moderation_actions_moderator_id_fkey'
-            columns: ['moderator_id']
-            isOneToOne: false
-            referencedRelation: 'users'
-            referencedColumns: ['id']
-          }
-        ]
-      }
       message_receipts: {
         Row: {
           delivered_at: string | null
@@ -6838,6 +6924,62 @@ export type Database = {
           {
             foreignKeyName: "fk_messages_sender_id"
             columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      moderation_actions: {
+        Row: {
+          action: string
+          comment_id: string
+          created_at: string
+          id: number
+          moderator_id: string | null
+          reason: string | null
+        }
+        Insert: {
+          action: string
+          comment_id: string
+          created_at?: string
+          id?: number
+          moderator_id?: string | null
+          reason?: string | null
+        }
+        Update: {
+          action?: string
+          comment_id?: string
+          created_at?: string
+          id?: number
+          moderator_id?: string | null
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "moderation_actions_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "moderation_actions_moderator_id_fkey"
+            columns: ["moderator_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles_v"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "moderation_actions_moderator_id_fkey"
+            columns: ["moderator_id"]
+            isOneToOne: false
+            referencedRelation: "public_user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "moderation_actions_moderator_id_fkey"
+            columns: ["moderator_id"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
@@ -9131,6 +9273,33 @@ export type Database = {
         }
         Relationships: []
       }
+      stories: {
+        Row: {
+          created_at: string
+          id: string
+          published_at: string | null
+          slug: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          published_at?: string | null
+          slug: string
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          published_at?: string | null
+          slug?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       subscription_events: {
         Row: {
           amount: number | null
@@ -9659,7 +9828,6 @@ export type Database = {
       }
       timelines: {
         Row: {
-          article_id: string
           created_at: string
           description: string | null
           event_body: string | null
@@ -9667,14 +9835,16 @@ export type Database = {
           event_image_url: string | null
           event_label: string
           id: string
+          linked_article_id: string | null
           metadata: Json
           sort_order: number
           source_url: string | null
+          story_id: string
           title: string | null
+          type: string
           updated_at: string
         }
         Insert: {
-          article_id: string
           created_at?: string
           description?: string | null
           event_body?: string | null
@@ -9682,14 +9852,16 @@ export type Database = {
           event_image_url?: string | null
           event_label: string
           id?: string
+          linked_article_id?: string | null
           metadata?: Json
           sort_order?: number
           source_url?: string | null
+          story_id: string
           title?: string | null
+          type?: string
           updated_at?: string
         }
         Update: {
-          article_id?: string
           created_at?: string
           description?: string | null
           event_body?: string | null
@@ -9697,18 +9869,28 @@ export type Database = {
           event_image_url?: string | null
           event_label?: string
           id?: string
+          linked_article_id?: string | null
           metadata?: Json
           sort_order?: number
           source_url?: string | null
+          story_id?: string
           title?: string | null
+          type?: string
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "fk_timelines_article_id"
-            columns: ["article_id"]
+            foreignKeyName: "timelines_linked_article_id_fkey"
+            columns: ["linked_article_id"]
             isOneToOne: false
             referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timelines_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "stories"
             referencedColumns: ["id"]
           },
         ]
@@ -10301,8 +10483,6 @@ export type Database = {
           cohort_joined_at: string | null
           comment_count: number
           comped_until: string | null
-          trial_extension_until: string | null
-          trial_extended_seen_at: string | null
           country_code: string | null
           created_at: string
           date_of_birth: string | null
@@ -10382,6 +10562,8 @@ export type Database = {
           stripe_customer_id: string | null
           supervisor_opted_in: boolean
           timezone: string | null
+          trial_extended_seen_at: string | null
+          trial_extension_until: string | null
           updated_at: string
           user_state: Database["public"]["Enums"]["user_state_t"]
           username: string | null
@@ -10405,8 +10587,6 @@ export type Database = {
           cohort_joined_at?: string | null
           comment_count?: number
           comped_until?: string | null
-          trial_extension_until?: string | null
-          trial_extended_seen_at?: string | null
           country_code?: string | null
           created_at?: string
           date_of_birth?: string | null
@@ -10486,6 +10666,8 @@ export type Database = {
           stripe_customer_id?: string | null
           supervisor_opted_in?: boolean
           timezone?: string | null
+          trial_extended_seen_at?: string | null
+          trial_extension_until?: string | null
           updated_at?: string
           user_state?: Database["public"]["Enums"]["user_state_t"]
           username?: string | null
@@ -10509,8 +10691,6 @@ export type Database = {
           cohort_joined_at?: string | null
           comment_count?: number
           comped_until?: string | null
-          trial_extension_until?: string | null
-          trial_extended_seen_at?: string | null
           country_code?: string | null
           created_at?: string
           date_of_birth?: string | null
@@ -10590,6 +10770,8 @@ export type Database = {
           stripe_customer_id?: string | null
           supervisor_opted_in?: boolean
           timezone?: string | null
+          trial_extended_seen_at?: string | null
+          trial_extension_until?: string | null
           updated_at?: string
           user_state?: Database["public"]["Enums"]["user_state_t"]
           username?: string | null
@@ -11606,12 +11788,14 @@ export type Database = {
       }
       my_perms_version: { Args: never; Returns: Json }
       owns_kid_profile: { Args: { profile_id: string }; Returns: boolean }
+      parse_timeline_event_date: { Args: { p_input: string }; Returns: string }
       persist_generated_article: {
         Args: { p_payload: Json }
         Returns: {
           article_id: string
           audience: string
           slug: string
+          story_id: string
         }[]
       }
       pipeline_today_cost_usd: { Args: never; Returns: number }
@@ -11951,6 +12135,7 @@ export type Database = {
       sweep_beta_expirations: { Args: never; Returns: Json }
       sweep_expired_deletions: { Args: never; Returns: number }
       sweep_kid_trial_expiries: { Args: never; Returns: number }
+      sweep_trial_expiries: { Args: never; Returns: number }
       system_apply_dob_correction: {
         Args: { p_decision_reason?: string; p_request_id: string }
         Returns: undefined

@@ -2262,7 +2262,7 @@ struct StoryDetailView: View {
         guard let catId = story.categoryId else { return }
         do {
             let next: [Story] = try await client.from("articles")
-                .select("id, title, slug, excerpt, body, cover_image_url, category_id, status, is_breaking, is_developing, published_at, created_at")
+                .select("id, title, story_id, stories(slug), excerpt, body, cover_image_url, category_id, status, is_breaking, is_developing, published_at, created_at")
                 .eq("category_id", value: catId)
                 .eq("status", value: "published")
                 .neq("id", value: story.id)
@@ -2314,7 +2314,7 @@ struct StoryDetailView: View {
         do {
             // D1/D6/D8: the quiz pool is NEVER loaded client-side. Questions
             // arrive only through /api/quiz/start, which strips is_correct.
-            async let tReq: [TimelineEvent] = client.from("timelines").select().eq("article_id", value: story.id).order("event_date", ascending: true).execute().value
+            async let tReq: [TimelineEvent] = client.from("timelines").select().eq("story_id", value: story.storyId ?? "").eq("type", value: "event").order("event_date", ascending: true).execute().value
             async let sReq: [SourceLink] = client.from("sources").select().eq("article_id", value: story.id).execute().value
             async let cReq: [VPComment] = client.from("comments")
                 // A126 — pull the soft-delete + edit + mentions fields so

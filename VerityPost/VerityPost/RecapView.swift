@@ -483,7 +483,7 @@ struct RecapQuizView: View {
         guard !ids.isEmpty else { return }
         do {
             let rows: [Story] = try await client.from("articles")
-                .select("id, title, slug, excerpt, cover_image_url, category_id, published_at, body, status")
+                .select("id, title, story_id, stories(slug), excerpt, cover_image_url, category_id, published_at, body, status")
                 .in("id", values: ids)
                 .execute().value
             await MainActor.run { missedArticles = rows }

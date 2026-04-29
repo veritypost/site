@@ -33,7 +33,7 @@ type AchievementRow = Pick<Tables<'user_achievements'>, 'id' | 'earned_at'> & {
   achievements?: Pick<Tables<'achievements'>, 'key' | 'name' | 'icon_name'> | null;
 };
 type ReadingRow = Pick<Tables<'reading_log'>, 'id' | 'created_at' | 'completed'> & {
-  articles?: Pick<Tables<'articles'>, 'title' | 'slug'> | null;
+  articles?: Pick<Tables<'articles'>, 'title'> | null;
 };
 type QuestionRow = Pick<Tables<'kid_expert_questions'>, 'id' | 'created_at' | 'question_text'> & {
   kid_expert_sessions?: Pick<Tables<'kid_expert_sessions'>, 'title'> | null;
@@ -165,7 +165,7 @@ export default function KidDashboardPage() {
         .limit(20),
       supabase
         .from('reading_log')
-        .select('id, created_at, completed, articles(title, slug)')
+        .select('id, created_at, completed, articles(title)')
         .eq('kid_profile_id', id)
         .eq('completed', true)
         .gte('created_at', since30d)

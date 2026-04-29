@@ -520,7 +520,7 @@ struct BookmarksView: View {
             // pageSize+1 rows, the (pageSize+1)th is dropped from the
             // visible list and `canLoadMore` flips true.
             let rows: [BookmarkItem] = try await client.from("bookmarks")
-                .select("id, notes, collection_id, collection_name, created_at, articles(id, title, slug, excerpt, published_at, categories(name))")
+                .select("id, notes, collection_id, collection_name, created_at, articles(id, title, stories(slug), excerpt, published_at, categories(name))")
                 .eq("user_id", value: userId)
                 .order("created_at", ascending: false)
                 .limit(BookmarksView.pageSize + 1)
@@ -552,7 +552,7 @@ struct BookmarksView: View {
         do {
             let cursorIso = ISO8601DateFormatter().string(from: cursor)
             let rows: [BookmarkItem] = try await client.from("bookmarks")
-                .select("id, notes, collection_id, collection_name, created_at, articles(id, title, slug, excerpt, published_at, categories(name))")
+                .select("id, notes, collection_id, collection_name, created_at, articles(id, title, stories(slug), excerpt, published_at, categories(name))")
                 .eq("user_id", value: userId)
                 .lt("created_at", value: cursorIso)
                 .order("created_at", ascending: false)
@@ -584,11 +584,12 @@ struct BookmarksView: View {
 
     private func fetchStoryBySlug(_ slug: String) async -> Story? {
         do {
+            struct StoryIdRow: Decodable { let id: String }
+            let storyRows: [StoryIdRow] = try await client.from("stories")
+                .select("id").eq("slug", value: slug).limit(1).execute().value
+            guard let storyId = storyRows.first?.id else { return nil }
             let rows: [Story] = try await client.from("articles")
-                .select()
-                .eq("slug", value: slug)
-                .limit(1)
-                .execute().value
+                .select("*, stories(slug)").eq("story_id", value: storyId).limit(1).execute().value
             return rows.first
         } catch { return nil }
     }
@@ -625,13 +626,15 @@ struct BookmarkItem: Codable, Identifiable {
 struct BookmarkStory: Codable {
     var id: String?
     var title: String?
-    var slug: String?
     var excerpt: String?
     var publishedAt: Date?
     var categories: BookmarkCategory?
+    var stories: StorySlugRef?
+
+    var slug: String? { stories?.slug }
 
     enum CodingKeys: String, CodingKey {
-        case id, title, slug, excerpt, categories
+        case id, title, excerpt, categories, stories
         case publishedAt = "published_at"
     }
 }

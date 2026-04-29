@@ -1737,21 +1737,21 @@ struct ProfileView: View {
             // quizzes. (comments + bookmarks have no kid_profile_id
             // column; kids don't comment or bookmark.)
             async let r: [ReadingLogItem] = client.from("reading_log")
-                .select("id, read_at, completed, articles(title, slug)")
+                .select("id, read_at, completed, articles(title, stories(slug))")
                 .eq("user_id", value: userId)
                 .is("kid_profile_id", value: nil)
                 .order("created_at", ascending: false).limit(50).execute().value
             async let q: [QuizAttempt] = client.from("quiz_attempts")
-                .select("id, article_id, attempt_number, is_correct, points_earned, created_at, articles(title, slug)")
+                .select("id, article_id, attempt_number, is_correct, points_earned, created_at, articles(title, stories(slug))")
                 .eq("user_id", value: userId)
                 .is("kid_profile_id", value: nil)
                 .order("created_at", ascending: false).limit(200).execute().value
             async let c: [VPComment] = client.from("comments")
-                .select("id, body, created_at, articles(title, slug)")
+                .select("id, body, created_at, articles(title, stories(slug))")
                 .eq("user_id", value: userId)
                 .order("created_at", ascending: false).limit(50).execute().value
             async let b: [BookmarkJoined] = client.from("bookmarks")
-                .select("id, created_at, notes, articles(title, slug)")
+                .select("id, created_at, notes, articles(title, stories(slug))")
                 .eq("user_id", value: userId)
                 .order("created_at", ascending: false).limit(50).execute().value
             let reads = try await r
@@ -1921,8 +1921,12 @@ struct ProfileView: View {
 
     private func fetchStoryBySlug(_ slug: String) async -> Story? {
         do {
+            struct StoryIdRow: Decodable { let id: String }
+            let storyRows: [StoryIdRow] = try await client.from("stories")
+                .select("id").eq("slug", value: slug).limit(1).execute().value
+            guard let storyId = storyRows.first?.id else { return nil }
             let list: [Story] = try await client.from("articles")
-                .select().eq("slug", value: slug).limit(1).execute().value
+                .select("*, stories(slug)").eq("story_id", value: storyId).limit(1).execute().value
             return list.first
         } catch { return nil }
     }
@@ -1937,7 +1941,8 @@ private struct BookmarkJoined: Decodable {
     let articles: ArticleJoin?
     struct ArticleJoin: Decodable {
         let title: String?
-        let slug: String?
+        let stories: StorySlugRef?
+        var slug: String? { stories?.slug }
     }
     enum CodingKeys: String, CodingKey {
         case id, notes, articles

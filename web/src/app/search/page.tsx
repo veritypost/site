@@ -25,7 +25,8 @@ import ErrorState from '@/components/ErrorState';
 
 type CategoryRow = Pick<Tables<'categories'>, 'id' | 'name'>;
 
-type ArticleHit = Pick<Tables<'articles'>, 'id' | 'title' | 'slug' | 'excerpt' | 'published_at'> & {
+type ArticleHit = Pick<Tables<'articles'>, 'id' | 'title' | 'excerpt' | 'published_at'> & {
+  stories: { slug: string } | null;
   categories: { name: string | null } | null;
 };
 
@@ -250,7 +251,7 @@ export default function SearchPage() {
         {results.map((a) => (
           <Link
             key={a.id}
-            href={`/story/${a.slug}`}
+            href={a.stories?.slug ? `/${a.stories.slug}` : '#'}
             prefetch={false}
             style={{
               display: 'block',

@@ -14,17 +14,19 @@ import { EmptyState } from '../_components/EmptyState';
 import { SkeletonBlock } from '../_components/Skeleton';
 import { C, F, FONT, R, S, SH } from '../_lib/palette';
 
+type ArticleWithSlug = { title: string | null; stories: { slug: string } | null } | null;
+
 type ReadingLogJoined = Pick<
   Tables<'reading_log'>,
   'id' | 'created_at' | 'completed' | 'article_id'
 > & {
-  articles: { title: string | null; slug: string | null } | null;
+  articles: ArticleWithSlug;
 };
 type CommentJoined = Pick<Tables<'comments'>, 'id' | 'body' | 'created_at' | 'article_id'> & {
-  articles: { title: string | null; slug: string | null } | null;
+  articles: ArticleWithSlug;
 };
 type BookmarkJoined = Pick<Tables<'bookmarks'>, 'id' | 'created_at' | 'article_id' | 'notes'> & {
-  articles: { title: string | null; slug: string | null } | null;
+  articles: ArticleWithSlug;
 };
 
 type Filter = 'all' | 'articles' | 'comments' | 'bookmarks';
@@ -54,21 +56,21 @@ export function ActivitySection({ authUserId, preview, perms }: Props) {
     const [r, c, b] = await Promise.all([
       supabase
         .from('reading_log')
-        .select('id, created_at, completed, article_id, articles(title, slug)')
+        .select('id, created_at, completed, article_id, articles(title, stories(slug))')
         .eq('user_id', authUserId)
         .is('kid_profile_id', null)
         .order('created_at', { ascending: false })
         .limit(100),
       supabase
         .from('comments')
-        .select('id, body, created_at, article_id, articles(title, slug)')
+        .select('id, body, created_at, article_id, articles(title, stories(slug))')
         .eq('user_id', authUserId)
         .is('deleted_at', null)
         .order('created_at', { ascending: false })
         .limit(50),
       supabase
         .from('bookmarks')
-        .select('id, created_at, article_id, notes, articles(title, slug)')
+        .select('id, created_at, article_id, notes, articles(title, stories(slug))')
         .eq('user_id', authUserId)
         .order('created_at', { ascending: false })
         .limit(50),
@@ -157,7 +159,7 @@ export function ActivitySection({ authUserId, preview, perms }: Props) {
         id: r.id,
         when: r.created_at,
         title: r.articles?.title ?? 'Untitled article',
-        slug: r.articles?.slug ?? null,
+        slug: r.articles?.stories?.slug ?? null,
         completed: !!r.completed,
       });
     }
@@ -169,7 +171,7 @@ export function ActivitySection({ authUserId, preview, perms }: Props) {
         id: c.id,
         when: c.created_at,
         title: c.articles?.title ?? 'Untitled article',
-        slug: c.articles?.slug ?? null,
+        slug: c.articles?.stories?.slug ?? null,
         body: c.body ?? '',
       });
     }
@@ -181,7 +183,7 @@ export function ActivitySection({ authUserId, preview, perms }: Props) {
         id: b.id,
         when: b.created_at,
         title: b.articles?.title ?? 'Untitled article',
-        slug: b.articles?.slug ?? null,
+        slug: b.articles?.stories?.slug ?? null,
         notes: b.notes,
       });
     }
@@ -245,7 +247,7 @@ export function ActivitySection({ authUserId, preview, perms }: Props) {
             day: 'numeric',
             year: 'numeric',
           });
-          const target = it.slug ? `/article/${it.slug}` : '#';
+          const target = it.slug ? `/${it.slug}` : '#';
           return (
             <li
               key={`${it.kind}-${it.id}`}

@@ -55,8 +55,8 @@ const FEATURED_COLORS = ['#111111', '#6ee7b7', '#fca5a5', '#fcd34d', '#cccccc'] 
 type CategoryRow = Pick<Tables<'categories'>, 'id' | 'name' | 'slug'>;
 type ArticleRow = Pick<
   Tables<'articles'>,
-  'id' | 'title' | 'slug' | 'category_id' | 'published_at' | 'is_featured'
->;
+  'id' | 'title' | 'category_id' | 'published_at' | 'is_featured'
+> & { stories: { slug: string } | null };
 
 interface TrendingItem {
   title: string | null;
@@ -122,14 +122,14 @@ export default function BrowsePage() {
       // Fetch recent published stories (cap to prevent unbounded load).
       supabase
         .from('articles')
-        .select('id, title, slug, category_id, published_at, is_featured')
+        .select('id, title, stories(slug), category_id, published_at, is_featured')
         .eq('status', 'published')
         .order('published_at', { ascending: false })
         .limit(500),
       // Featured: editor-pinned first, then most-recent fallback.
       supabase
         .from('articles')
-        .select('id, title, slug, category_id, published_at, is_featured')
+        .select('id, title, stories(slug), category_id, published_at, is_featured')
         .eq('status', 'published')
         .order('is_featured', { ascending: false })
         .order('published_at', { ascending: false })
@@ -177,7 +177,7 @@ export default function BrowsePage() {
         ...cat,
         ...style,
         count: catStories.length,
-        trending: catStories.slice(0, 3).map((s) => ({ title: s.title, slug: s.slug })),
+        trending: catStories.slice(0, 3).map((s) => ({ title: s.title, slug: s.stories?.slug ?? null })),
       };
     });
 
@@ -192,7 +192,7 @@ export default function BrowsePage() {
       return {
         id: s.id,
         headline: s.title,
-        slug: s.slug || '',
+        slug: s.stories?.slug || '',
         category: cat ? cat.name : 'News',
         color: FEATURED_COLORS[i % FEATURED_COLORS.length],
         icon: style.icon,

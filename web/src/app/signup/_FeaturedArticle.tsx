@@ -4,12 +4,13 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { renderBodyHtml } from '@/lib/pipeline/render-body';
 
 const ARTICLE_SELECT =
-  'id, title, slug, subtitle, body, body_html, excerpt, published_at, author_id';
+  'id, title, story_id, subtitle, body, body_html, excerpt, published_at, author_id, stories(slug)';
 
 type ArticleRow = {
   id: string;
   title: string;
-  slug: string;
+  story_id: string | null;
+  stories: { slug: string } | null;
   subtitle: string | null;
   body: string;
   body_html: string | null;
@@ -46,22 +47,33 @@ export default async function FeaturedArticle() {
   if (featuredId) {
     const isUuid =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(featuredId);
-    const { data } = isUuid
-      ? await service
+    if (isUuid) {
+      const { data } = await service
+        .from('articles')
+        .select(ARTICLE_SELECT)
+        .eq('id', featuredId)
+        .eq('status', 'published')
+        .is('deleted_at', null)
+        .maybeSingle();
+      article = data as ArticleRow | null;
+    } else {
+      // slug lookup: resolve via stories table (slug moved in Slice 05)
+      const { data: story } = await service
+        .from('stories')
+        .select('id')
+        .eq('slug', featuredId)
+        .maybeSingle();
+      if (story) {
+        const { data } = await service
           .from('articles')
           .select(ARTICLE_SELECT)
-          .eq('id', featuredId)
-          .eq('status', 'published')
-          .is('deleted_at', null)
-          .maybeSingle()
-      : await service
-          .from('articles')
-          .select(ARTICLE_SELECT)
-          .eq('slug', featuredId)
+          .eq('story_id', story.id)
           .eq('status', 'published')
           .is('deleted_at', null)
           .maybeSingle();
-    article = data as ArticleRow | null;
+        article = data as ArticleRow | null;
+      }
+    }
   }
 
   if (!article) {
@@ -214,7 +226,7 @@ export default async function FeaturedArticle() {
       )}
 
       <a
-        href={`/${article.slug}`}
+        href={article.stories?.slug ? `/${article.stories.slug}` : '#'}
         style={{
           display: 'inline-block',
           marginTop: 16,
