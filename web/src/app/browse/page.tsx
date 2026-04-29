@@ -43,8 +43,6 @@ const UNIFORM_STYLE: CategoryStyle = { icon: '', color: '#f3f4f6', accent: '#6b7
 const DEFAULT_STYLE: CategoryStyle = UNIFORM_STYLE;
 const CAT_STYLE: Record<string, CategoryStyle> = {};
 
-// Featured card accent colors cycle for stories that have no category style match
-const FEATURED_COLORS = ['#111111', '#6ee7b7', '#fca5a5', '#fcd34d', '#cccccc'] as const;
 
 // T111 — Most Recent / Most Verified / Trending filter pills were
 // removed: the JSX rendering them was already commented out (data
@@ -55,7 +53,7 @@ const FEATURED_COLORS = ['#111111', '#6ee7b7', '#fca5a5', '#fcd34d', '#cccccc'] 
 type CategoryRow = Pick<Tables<'categories'>, 'id' | 'name' | 'slug'>;
 type ArticleRow = Pick<
   Tables<'articles'>,
-  'id' | 'title' | 'category_id' | 'published_at' | 'is_featured'
+  'id' | 'title' | 'category_id' | 'published_at'
 > & { stories: { slug: string } | null };
 
 interface TrendingItem {
@@ -68,33 +66,12 @@ interface EnrichedCategory extends CategoryRow, CategoryStyle {
   trending: TrendingItem[];
 }
 
-interface FeaturedCard {
-  id: string;
-  headline: string;
-  slug: string;
-  category: string;
-  color: string;
-  icon: string;
-  timeAgo: string;
-  isFeatured: boolean;
-}
-
-function timeAgo(dateString: string | null | undefined): string {
-  if (!dateString) return '';
-  const diff = Math.floor((Date.now() - new Date(dateString).getTime()) / 1000);
-  if (diff < 60) return `${diff}s ago`;
-  if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)} hr ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
-}
 
 export default function BrowsePage() {
   usePageViewTrack('browse');
   const [search, setSearch] = useState<string>('');
   const [expandedCat, setExpandedCat] = useState<string | null>(null);
 
-  const [featured, setFeatured] = useState<FeaturedCard[]>([]);
-  const [hasEditorPick, setHasEditorPick] = useState<boolean>(false);
   const [categories, setCategories] = useState<EnrichedCategory[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [loadFailed, setLoadFailed] = useState<boolean>(false);
@@ -107,13 +84,7 @@ export default function BrowsePage() {
     // Fetch categories. Pass 17 / UJ-507: adult /browse filters out
     // any `kids-*` slug so kid-only categories don't leak into the
     // adult catalogue.
-    // T239 — fetch a separate "featured" slice ordered is_featured DESC then
-    // published_at DESC, falling back to "most recent 3" when no editor pick
-    // exists. Kept distinct from the bulk fetch (used for category counts +
-    // per-category trending lists) so changing the featured-card ordering
-    // never reshuffles category counts. The bulk fetch keeps the original
-    // recency-only sort.
-    const [catsRes, storiesRes, featuredRes] = await Promise.all([
+    const [catsRes, storiesRes] = await Promise.all([
       supabase
         .from('categories')
         .select('id, name, slug')
@@ -122,44 +93,22 @@ export default function BrowsePage() {
       // Fetch recent published stories (cap to prevent unbounded load).
       supabase
         .from('articles')
-        .select('id, title, stories(slug), category_id, published_at, is_featured')
+        .select('id, title, stories(slug), category_id, published_at')
         .eq('status', 'published')
         .order('published_at', { ascending: false })
         .limit(500),
-      // Featured: editor-pinned first, then most-recent fallback.
-      supabase
-        .from('articles')
-        .select('id, title, stories(slug), category_id, published_at, is_featured')
-        .eq('status', 'published')
-        .order('is_featured', { ascending: false })
-        .order('published_at', { ascending: false })
-        .limit(3),
     ]);
 
     if (catsRes.error || storiesRes.error) {
       console.error('[browse.fetch]', catsRes.error?.message || storiesRes.error?.message);
       setCategories([]);
-      setFeatured([]);
-      setHasEditorPick(false);
       setLoadFailed(true);
       setLoading(false);
       return;
     }
-    // featuredRes errors are non-fatal — fall back to storyList.slice(0,3).
-    if (featuredRes.error) {
-      console.error('[browse.fetch.featured]', featuredRes.error.message);
-    }
 
     const storyList = (storiesRes.data as ArticleRow[] | null) || [];
     const catList = (catsRes.data as CategoryRow[] | null) || [];
-    const featuredSource: ArticleRow[] =
-      (featuredRes.data as ArticleRow[] | null) || storyList.slice(0, 3);
-
-    // Build a map of category id → category
-    const catById: Record<string, CategoryRow> = {};
-    catList.forEach((c) => {
-      catById[c.id] = c;
-    });
 
     // Bucket stories by category once (O(n)) instead of O(n*m) per-category filter.
     const storiesByCat: Record<string, ArticleRow[]> = {};
@@ -181,29 +130,7 @@ export default function BrowsePage() {
       };
     });
 
-    // T239 — Featured: prefer is_featured=true rows (server-side
-    // is_featured DESC, published_at DESC) and fall back to most-recent
-    // when no editor pick exists. Track whether ANY card on screen is
-    // an editor pick so the section can show a "Featured by editors"
-    // label.
-    const featuredStories: FeaturedCard[] = featuredSource.slice(0, 3).map((s, i) => {
-      const cat = s.category_id ? catById[s.category_id] : undefined;
-      const style = cat ? (cat.slug ? CAT_STYLE[cat.slug] : null) || DEFAULT_STYLE : DEFAULT_STYLE;
-      return {
-        id: s.id,
-        headline: s.title,
-        slug: s.stories?.slug || '',
-        category: cat ? cat.name : 'News',
-        color: FEATURED_COLORS[i % FEATURED_COLORS.length],
-        icon: style.icon,
-        timeAgo: timeAgo(s.published_at),
-        isFeatured: Boolean(s.is_featured),
-      };
-    });
-
     setCategories(enrichedCats);
-    setFeatured(featuredStories);
-    setHasEditorPick(featuredStories.some((f) => f.isFeatured));
     setLoading(false);
   }, []);
 
@@ -301,110 +228,6 @@ export default function BrowsePage() {
           </div>
         ) : (
           <>
-            {/* Trending Now */}
-            <div style={{ marginBottom: 28 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-                {/* S7-A107 — stable "Latest stories" label. Previously
-                    flipped to "Featured by editors" when a featured pin
-                    appeared in the top 3, but the public surface has no
-                    editor-of-record byline yet so "editors" framing
-                    implies a team that doesn't exist. Re-introduce a
-                    "Featured" header only after AR1 surfaces real editor
-                    attribution alongside the pin. */}
-                <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, letterSpacing: '-0.02em' }}>
-                  Latest stories
-                </h2>
-              </div>
-              {featured.length === 0 ? (
-                <div
-                  style={{
-                    textAlign: 'center',
-                    padding: '32px 12px',
-                    border: `1px dashed ${PALETTE.border}`,
-                    borderRadius: 12,
-                    color: PALETTE.dim,
-                    fontSize: 14,
-                  }}
-                >
-                  No new stories yet.
-                </div>
-              ) : (
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                    gap: 12,
-                  }}
-                >
-                  {featured.map((story) => (
-                    <Link
-                      key={story.id}
-                      href={`/story/${story.slug}`}
-                      style={{
-                        background: PALETTE.card,
-                        border: `1px solid ${PALETTE.border}`,
-                        borderRadius: 12,
-                        overflow: 'hidden',
-                        cursor: 'pointer',
-                        textDecoration: 'none',
-                        color: 'inherit',
-                      }}
-                    >
-                      <div
-                        style={{
-                          height: 80,
-                          background: story.color,
-                          opacity: 0.85,
-                          display: 'flex',
-                          alignItems: 'flex-end',
-                          padding: '0 12px 8px',
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 700,
-                            color: 'rgba(0,0,0,0.5)',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.04em',
-                          }}
-                        >
-                          {story.category}
-                        </span>
-                      </div>
-                      <div style={{ padding: '10px 12px' }}>
-                        <p
-                          style={{
-                            margin: '0 0 6px',
-                            fontWeight: 700,
-                            fontSize: 13,
-                            lineHeight: 1.4,
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
-                            overflow: 'hidden',
-                          }}
-                        >
-                          {story.headline}
-                        </p>
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                          }}
-                        >
-                          <span style={{ fontSize: 11, color: PALETTE.dim }}>
-                            {story.category} · {story.timeAgo}
-                          </span>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
-
             {/* Categories Grid */}
             <div>
               <h2
@@ -622,37 +445,6 @@ function BrowseSkeleton() {
   return (
     <div aria-hidden="true">
       <style>{`@keyframes vp-pulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.55 } }`}</style>
-      {/* Latest grid */}
-      <div style={{ marginBottom: 28 }}>
-        <div style={bar(80, 16)} />
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-            gap: 12,
-            marginTop: 14,
-          }}
-        >
-          {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              style={{
-                background: PALETTE.card,
-                border: `1px solid ${PALETTE.border}`,
-                borderRadius: 12,
-                overflow: 'hidden',
-              }}
-            >
-              <div style={{ height: 80, background: PALETTE.border, opacity: 0.6 }} />
-              <div style={{ padding: '10px 12px' }}>
-                <div style={bar('80%', 13)} />
-                <div style={bar('55%', 13, 6)} />
-                <div style={bar(70, 11, 8)} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
       {/* Categories grid */}
       <div>
         <div style={bar(120, 16)} />

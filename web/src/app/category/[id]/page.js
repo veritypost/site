@@ -57,9 +57,10 @@ export default function CategoryPage() {
 
         const { data: storiesData } = await supabase
           .from('articles')
-          .select('*')
+          .select('*, stories(slug)')
           .eq('category_id', categoryData.id)
-          .eq('status', 'published');
+          .eq('status', 'published')
+          .eq('visibility', 'public');
 
         const articles = storiesData ?? [];
         const {
@@ -391,7 +392,7 @@ export default function CategoryPage() {
             {visible.map((story) => (
               <a
                 key={story.id}
-                href={story.slug ? `/story/${story.slug}` : '#'}
+                href={story.stories?.slug ? `/story/${story.stories.slug}` : '#'}
                 style={{
                   background: '#f7f7f7',
                   border: '1px solid #e5e5e5',
@@ -504,20 +505,6 @@ export default function CategoryPage() {
             )}
           </div>
 
-          {/* Sidebar */}
-          <div style={{ flex: '0 0 200px', width: 200 }}>
-            <h3 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 800 }}>Top Contributors</h3>
-            <div
-              style={{
-                background: '#f7f7f7',
-                border: '1px solid #e5e5e5',
-                borderRadius: 12,
-                padding: '10px 12px',
-              }}
-            >
-              <p style={{ fontSize: 12, color: '#666666', margin: 0 }}>No contributors yet.</p>
-            </div>
-          </div>
         </div>
       </div>
     </div>

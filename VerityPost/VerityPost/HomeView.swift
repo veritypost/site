@@ -752,6 +752,7 @@ private struct BrowseLanding: View {
                 .select()
                 .eq("is_active", value: true)
                 .order("sort_order")
+                .not("slug", operator: .like, value: "kids-%")
                 .execute()
                 .value
             categories = cats
