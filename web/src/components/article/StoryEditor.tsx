@@ -689,6 +689,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
           mode: 'standalone',
           source_urls: urls,
           existing_story_id: storyId,
+          category_id: story.category_id ?? undefined,
         }),
       });
       const json = await res.json();
@@ -1133,6 +1134,11 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
                     Cancel
                   </button>
                 </div>
+                {followupLoading && (
+                  <span style={{ fontSize: F.sm, color: C.dim }}>
+                    Generating… this takes about a minute
+                  </span>
+                )}
               </div>
             )}
           </div>

@@ -38,7 +38,7 @@ import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction } from '@/lib/adminMutation';
 import * as Sentry from '@sentry/nextjs';
 import { captureWithRedact } from '@/lib/pipeline/redact';
-import { callModel } from '@/lib/pipeline/call-model';
+import { callModel, type CallModelResult } from '@/lib/pipeline/call-model';
 import {
   ModelNotSupportedError,
   CostCapExceededError,
@@ -133,6 +133,7 @@ const RequestSchema = z.object({
   source_urls: z.array(SourceUrlSchema).max(10).optional(),
   mode: z.enum(['cluster', 'standalone']).optional(),
   existing_story_id: z.string().uuid().optional(),
+  category_id: z.string().uuid().optional(),
 });
 type RequestInput = z.infer<typeof RequestSchema>;
 
@@ -1181,6 +1182,7 @@ export async function POST(req: Request) {
     const { data: cats, error: catsErr } = await service.from('categories').select('id, name');
     if (catsErr) throw new Error(`categories lookup failed: ${catsErr.message}`);
     const catRows = (cats ?? []) as Array<{ id: string; name: string }>;
+    const hintCatRow = input.category_id ? catRows.find((c) => c.id === input.category_id) : undefined;
     const catListText = catRows.map((c) => `- ${c.id}: ${c.name}`).join('\n');
     const CATEGORIZATION_PROMPT = `You are a news editor. Assign this story to EXACTLY ONE category from the list below. Return JSON: {"category_id": "<uuid>", "category_name": "<name>"}.
 
@@ -1206,8 +1208,10 @@ ${catListText}`;
     promptParts.push(
       { step: 'headline', system: headlineSystem, user: headlineUser },
       { step: 'summary', system: headlineSystem, user: summaryUser },
-      { step: 'categorization', system: CATEGORIZATION_PROMPT, user: categorizationUser }
     );
+    if (!hintCatRow) {
+      promptParts.push({ step: 'categorization', system: CATEGORIZATION_PROMPT, user: categorizationUser });
+    }
 
     pipelineLog.info('newsroom.generate.headline', {
       run_id: runId,
@@ -1221,14 +1225,16 @@ ${catListText}`;
       audience,
       step: 'summary',
     });
-    pipelineLog.info('newsroom.generate.categorization', {
-      run_id: runId,
-      cluster_id,
-      audience,
-      step: 'categorization',
-    });
+    if (!hintCatRow) {
+      pipelineLog.info('newsroom.generate.categorization', {
+        run_id: runId,
+        cluster_id,
+        audience,
+        step: 'categorization',
+      });
+    }
 
-    const [headlineRes, summaryRes, catRes] = await Promise.all([
+    const [headlineRes, summaryRes, catResOrNull] = await Promise.all([
       callModel({
         provider,
         model,
@@ -1251,28 +1257,32 @@ ${catListText}`;
         cluster_id,
         signal: req.signal,
       }),
-      callModel({
-        provider,
-        model,
-        system: composeSystemPrompt(CATEGORIZATION_PROMPT, promptOverrides.get('categorization')),
-        prompt: categorizationUser,
-        max_tokens: 200,
-        pipeline_run_id: runId,
-        step_name: 'categorization',
-        cluster_id,
-        signal: req.signal,
-      }),
+      hintCatRow
+        ? Promise.resolve<CallModelResult | null>(null)
+        : callModel({
+            provider,
+            model,
+            system: composeSystemPrompt(CATEGORIZATION_PROMPT, promptOverrides.get('categorization')),
+            prompt: categorizationUser,
+            max_tokens: 200,
+            pipeline_run_id: runId,
+            step_name: 'categorization',
+            cluster_id,
+            signal: req.signal,
+          }),
     ]);
-    totalCostUsd += headlineRes.cost_usd + summaryRes.cost_usd + catRes.cost_usd;
+    totalCostUsd += headlineRes.cost_usd + summaryRes.cost_usd + (catResOrNull?.cost_usd ?? 0);
     const headlineParsed = HeadlineSummarySchema.parse(extractJSON(headlineRes.text));
     const summaryParsed = HeadlineSummarySchema.parse(extractJSON(summaryRes.text));
-    const catParsed = CategorizationSchema.parse(extractJSON(catRes.text));
+    const catParsed: z.infer<typeof CategorizationSchema> = hintCatRow
+      ? { category_id: hintCatRow.id, category_name: hintCatRow.name }
+      : CategorizationSchema.parse(extractJSON(catResOrNull!.text));
     const headline = cleanText(headlineParsed.headline);
     const summary = cleanText(summaryParsed.summary || headlineParsed.summary || '');
     const batchDur = Date.now() - batchStart;
     stepTimings['headline'] = batchDur;
     stepTimings['summary'] = batchDur;
-    stepTimings['categorization'] = batchDur;
+    stepTimings['categorization'] = hintCatRow ? 0 : batchDur;
     pipelineLog.info('newsroom.generate.headline', {
       run_id: runId,
       cluster_id,
@@ -1757,7 +1767,9 @@ Empty array if all correct.`;
     // ────────────────────────────────────────────────────────────────────────
     let resolvedCategoryId: string | null = null;
     const catExists = catRows.some((c) => c.id === catParsed.category_id);
-    if (catExists) {
+    if (input.category_id && catRows.some((c) => c.id === input.category_id)) {
+      resolvedCategoryId = input.category_id;
+    } else if (catExists) {
       resolvedCategoryId = catParsed.category_id;
     } else if (clusterRow.category_id) {
       resolvedCategoryId = clusterRow.category_id;
