@@ -448,6 +448,18 @@ export async function middleware(request) {
     loginUrl.pathname = '/login';
     loginUrl.search = '';
     loginUrl.searchParams.set('next', pathname + request.nextUrl.search);
+    const _supabaseRef = (() => {
+      try { return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || '').hostname.split('.')[0]; }
+      catch { return ''; }
+    })();
+    const _authCookieBase = _supabaseRef ? `sb-${_supabaseRef}-auth-token` : '';
+    const _hasAuthCookie = _authCookieBase && (
+      request.cookies.get(_authCookieBase) ||
+      request.cookies.get(`${_authCookieBase}.0`) // chunked token (Supabase SSR splits large JWTs)
+    );
+    if (_hasAuthCookie) {
+      loginUrl.searchParams.set('toast', 'session_expired');
+    }
     const redirect = NextResponse.redirect(loginUrl, { status: 302 });
     redirect.headers.set('x-request-id', requestId);
     setCspHeader(redirect, csp, cspStrictReport);
