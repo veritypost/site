@@ -1004,13 +1004,19 @@ struct ProfileView: View {
                 }
             }
 
-            // My stuff — quick-link list. All entries are perm-gated. The
-            // earlier "Leaderboards" QuickLink was removed once the
-            // "Most Informed" tab returned to the bottom bar (2026-04-26
-            // second-pass IA revert) — the tab is the canonical entry now.
+            // My stuff — quick-link list. All entries are perm-gated.
+            // Alerts and Rankings live here now that the Notifications and
+            // Most Informed tabs were replaced by Browse and Following
+            // (Wave 4 / Slice 03 IA).
             VStack(alignment: .leading, spacing: 10) {
                 sectionTitle("My stuff")
                 VStack(spacing: 8) {
+                    quickLink(label: "Alerts",
+                              description: "Breaking news and reply notifications",
+                              destination: AnyView(AlertsView().environmentObject(auth)))
+                    quickLink(label: "Rankings",
+                              description: "See the most informed readers",
+                              destination: AnyView(LeaderboardView().environmentObject(auth)))
                     if canViewMessages {
                         quickLink(label: "Messages",
                                   description: "Your direct conversations",

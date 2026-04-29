@@ -604,7 +604,7 @@ struct HomeView: View {
 // — one count + one limit-2 preview per category. Category count is small
 // (~15-20), so 2N fanout against PostgREST is acceptable and keeps each
 // query cleanly scoped to a single index.
-private struct BrowseLanding: View {
+struct BrowseLanding: View {
     @State private var categories: [VPCategory] = []
     @State private var loading = true
     @State private var categoryPreviews: [String: [Story]] = [:]
