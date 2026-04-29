@@ -30,7 +30,7 @@ const CONTENT_PIPELINE: HubPage[] = [
 const PAGES: HubGroup[] = [
   { group: 'Content Pipeline', desc: 'Three consolidated panels — Newsroom, Feeds, Pipeline Config', items: CONTENT_PIPELINE },
   { group: 'Community & Moderation', desc: 'User-generated content, discussion rules, and content moderation', items: [
-    { href: '/admin/comments', title: 'Discussion Settings', desc: 'Quiz gate, AI tagging, role badges, threading depth, health scoring' },
+    { href: '/admin/comments', title: 'Discussion Settings', desc: 'Quiz gate, role badges, threading depth, health scoring' },
     { href: '/admin/reports', title: 'Reports & Moderation', desc: 'Flagged content queue, supervisor fast-lane' },
     { href: '/admin/moderation', title: 'Moderation Console', desc: 'User lookup, penalty stack, role grants, appeal review' },
     { href: '/admin/expert-sessions', title: 'Kid Expert Sessions', desc: 'Schedule live Q&A windows for kid profiles' },

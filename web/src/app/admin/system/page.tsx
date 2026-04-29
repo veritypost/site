@@ -42,9 +42,8 @@ const TRANSPARENCY_SETTINGS: { k: string; l: string; desc: string }[] = [
   { k: 'transparency_page',        l: 'Public transparency page',     desc: 'Show /transparency page with platform stats' },
   { k: 'show_source_count',        l: 'Source count on articles',     desc: 'Show "4 sources" in article meta' },
   { k: 'show_source_consensus',    l: 'Source consensus indicator',   desc: 'Show how many sources agree on key facts' },
-  { k: 'show_ai_label',            l: 'AI-generated label',           desc: 'Label articles as AI-synthesized from wire sources' },
+  { k: 'show_editorial_cost',      l: 'Per-article editorial cost',   desc: 'Show generation cost on admin article view' },
   { k: 'show_correction_history',  l: 'Correction history',           desc: 'Show when and what was corrected on updated articles' },
-  { k: 'show_editorial_cost',      l: 'Per-article AI cost',          desc: 'Show AI generation cost on admin article view' },
   { k: 'show_user_counts',         l: 'User statistics',              desc: 'Show total users, active users on transparency page' },
   { k: 'show_moderation_stats',    l: 'Moderation statistics',        desc: 'Show reports resolved, comments moderated on transparency page' },
 ];

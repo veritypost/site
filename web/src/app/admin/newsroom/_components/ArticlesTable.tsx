@@ -38,7 +38,6 @@ type ArticleRow = {
   author_id: string | null;
   published_at: string | null;
   updated_at: string | null;
-  is_ai_generated: boolean | null;
 };
 
 const ALL_BANDS: AudienceBand[] = ['adult', 'tweens', 'kids'];
@@ -294,9 +293,6 @@ export default function ArticlesTable() {
                     }}
                   >
                     {row.title || row.stories?.slug || '—'}
-                    {row.is_ai_generated && (
-                      <Badge variant="info" size="xs">AI</Badge>
-                    )}
                   </Link>
                 </td>
                 <td style={{ padding: `${S[2]}px ${S[3]}px`, color: C.dim }}>

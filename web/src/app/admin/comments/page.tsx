@@ -237,7 +237,7 @@ function CommentsAdminInner() {
     <Page maxWidth={880}>
       <PageHeader
         title="Discussion settings"
-        subtitle="Quiz gate, AI tagging, role badges, threading, health scoring, and moderation."
+        subtitle="Quiz gate, role badges, threading, health scoring, and moderation."
         actions={
           <Badge variant={settings.quiz_required ? 'success' : 'neutral'} dot>
             Quiz gate {settings.quiz_required ? 'on' : 'off'}
