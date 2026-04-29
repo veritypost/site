@@ -13,6 +13,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { usePageViewTrack } from '@/lib/useTrack';
 import SingleDoorForm from './_SingleDoorForm';
+import RequestAccessForm from './_RequestAccessForm';
 
 const C = {
   bg: 'var(--bg)',
@@ -33,6 +34,7 @@ function LoginPageInner() {
   const searchParams = useSearchParams();
   usePageViewTrack('login');
 
+  const mode = searchParams?.get('mode') ?? null;
   const [notice, setNotice] = useState<string | null>(null);
   useEffect(() => {
     const toastParam = searchParams?.get('toast') ?? null;
@@ -76,11 +78,11 @@ function LoginPageInner() {
               marginBottom: '24px',
             }}
           >
-            Verity Post
+            verity post
           </div>
         </a>
 
-        <SingleDoorForm notice={notice} />
+        {mode === 'request' ? <RequestAccessForm /> : <SingleDoorForm notice={notice} />}
       </div>
     </div>
   );

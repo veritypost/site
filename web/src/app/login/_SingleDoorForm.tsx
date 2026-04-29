@@ -266,6 +266,19 @@ export default function SingleDoorForm({ notice }: Props) {
           </button>
         </form>
 
+        <p style={{ fontSize: 13, color: C.dim, textAlign: 'center', marginTop: 20, marginBottom: 0 }}>
+          new here?{' '}
+          <a href="/signup" style={{ color: C.accent, fontWeight: 600 }}>
+            read about us →
+          </a>
+        </p>
+        <p style={{ fontSize: 13, color: C.dim, textAlign: 'center', marginTop: 8, marginBottom: 0 }}>
+          having trouble?{' '}
+          <a href="/contact" style={{ color: C.accent, fontWeight: 600 }}>
+            get help →
+          </a>
+        </p>
+
         {OAUTH_ENABLED && (
           <div style={{ marginTop: 20, borderTop: `1px solid ${C.border}`, paddingTop: 20 }}>
             <p style={{ fontSize: 12, color: C.dim, textAlign: 'center', marginBottom: 12 }}>
