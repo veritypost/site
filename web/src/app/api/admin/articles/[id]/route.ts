@@ -514,6 +514,22 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     if (storyErr) {
       console.error('[admin.articles.patch] stories update failed:', storyErr.message);
     }
+  } else if (!prior.story_id && body.status === 'published' && prior.status !== 'published') {
+    // Pre-slice05 orphan: no stories row exists. Create one on first publish.
+    const titleBase = (prior.title ?? '')
+      .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 70);
+    const storySlug = (titleBase || 'article') + '-' + id.replace(/-/g, '').slice(0, 8);
+    const publishedAt = (update.published_at as string) ?? new Date().toISOString();
+    const { data: newStory, error: storyCreateErr } = await service
+      .from('stories')
+      .insert({ slug: storySlug, title: prior.title ?? 'Untitled', published_at: publishedAt } as never)
+      .select('id')
+      .single();
+    if (storyCreateErr || !newStory) {
+      console.error('[admin.articles.patch] stories create for orphan failed:', storyCreateErr?.message);
+    } else {
+      await service.from('articles').update({ story_id: (newStory as { id: string }).id } as never).eq('id', id);
+    }
   }
 
   // Nested child tables: delete + reinsert for any array explicitly
