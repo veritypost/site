@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
   ) {
     return malformed();
   }
-  if (!/^\d{6}$/.test(rawToken)) {
+  if (!/^\d{8}$/.test(rawToken)) {
     return malformed();
   }
 
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
   const ipTruncated = truncateIpV4(rawIp);
 
   // Per-email attempts cap. Increments on every attempt so brute-forcing
-  // a 6-digit OTP code (10^6 space) over 10 attempts/hr is uneconomic.
+  // an 8-digit OTP code (10^8 space) over 10 attempts/hr is uneconomic.
   const emailPolicy = getRateLimitPolicy('AUTH_VERIFY_MAGIC_CODE_PER_EMAIL');
   const emailHit = await checkRateLimit(service, {
     key: `verify_magic_code:email:${email}`,

@@ -358,11 +358,11 @@ export default function SingleDoorForm({ notice }: Props) {
             name="code"
             type="text"
             inputMode="numeric"
-            pattern="\d{6}"
-            maxLength={6}
-            placeholder="123456"
+            pattern="\d{8}"
+            maxLength={8}
+            placeholder="12345678"
             value={code}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
             onFocus={() => setCodeFocused(true)}
             onBlur={() => setCodeFocused(false)}
             autoComplete="one-time-code"
@@ -375,8 +375,8 @@ export default function SingleDoorForm({ notice }: Props) {
 
         <button
           type="submit"
-          disabled={codeBusy || code.length < 6}
-          style={btnPrimary(!codeBusy && code.length === 6)}
+          disabled={codeBusy || code.length < 8}
+          style={btnPrimary(!codeBusy && code.length === 8)}
         >
           {codeBusy ? 'Signing in…' : 'Sign in'}
         </button>
