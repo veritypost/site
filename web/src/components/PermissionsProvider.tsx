@@ -51,14 +51,18 @@ export function PermissionsProvider({ children }: PermissionsProviderProps) {
     supabase.auth.getUser().then(({ data }) => {
       if (!mounted) return;
       setUser(data?.user ?? null);
-      setLoaded(true);
-      if (data?.user) {
+      if (!data?.user) {
+        setLoaded(true);
+      } else {
         refreshAllPermissions()
           .then(() => {
-            if (mounted) setTick((n) => n + 1);
+            if (!mounted) return;
+            setTick((n) => n + 1);
+            setLoaded(true);
           })
           .catch((err) => {
             console.error('[permissions] initial refresh', err);
+            if (mounted) setLoaded(true);
           });
       }
     });
