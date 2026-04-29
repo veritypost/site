@@ -192,7 +192,7 @@ export default function SingleDoorForm({ notice }: Props) {
           Sign in
         </h1>
         <p style={{ fontSize: 14, color: C.dim, margin: '0 0 22px 0', lineHeight: 1.55 }}>
-          Enter your email and we&rsquo;ll send a 6-digit sign-in code.
+          Enter your email to sign in.
         </p>
 
         {notice && (
