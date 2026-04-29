@@ -188,9 +188,6 @@ export default async function ArticleSlugPage({
           dateModified: article.updated_at ?? article.published_at,
           description: article.excerpt,
           siteUrl,
-          isAiGenerated: !!article.is_ai_generated,
-          aiModel: article.ai_model,
-          aiProvider: article.ai_provider,
         })
       : null;
 
