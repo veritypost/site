@@ -13,11 +13,9 @@
  *   - Freeform textarea is collapsible; resets to empty after a Generate
  *     click (host page calls reset()).
  *   - Both dropdowns + freeform reset to blank after each Generate click.
- *     Reset is host-driven via the imperative `reset()` ref method called
- *     from the page's onGenerateClick callback into GenerationModal.
+ *     Reset is host-driven via the imperative `reset()` ref method.
  *   - Selection state lives here, but lifted up via onChange so host pages
- *     can disable the per-cluster Generate button until both are picked
- *     and pass the chosen values into GenerationModal as props.
+ *     can disable the per-cluster Generate button until both are picked.
  *
  * Cost-preview helper exported alongside: estimateClusterCostUsd reads the
  * picked model's pricing + a typical-token-count constant per step. Returns
@@ -125,8 +123,7 @@ export type PipelineRunPickerHandle = {
 };
 
 type Props = {
-  /** Fired on any change so parent can gate Generate buttons + pass values
-   * into GenerationModal as props. */
+  /** Fired on any change so parent can gate Generate buttons. */
   onChange: (sel: PickerSelection) => void;
 };
 
