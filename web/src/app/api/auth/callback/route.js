@@ -205,43 +205,67 @@ export async function GET(request) {
       return oauthRedirect;
     }
 
-    // Returning-user fast path. Routing decisions (username + onboarding)
-    // are computed from `existing` (already fetched above) so we can
-    // redirect immediately. All side-effect writes — last_login_at,
-    // cancel_account_deletion, complete_email_verification, scoreDailyLogin
-    // — are fire-and-forget against the service client so the user's
-    // browser isn't held up by 4 awaited DB round-trips. Each write owns
-    // its own try/catch + Sentry capture; none are required for the next
-    // page to render correctly (idempotent or login-event-only).
     const serviceForExisting = createServiceClient();
     const isVerifyTransition =
       !!user.email_confirmed_at && existing.email_verified === false;
 
-    void (async () => {
-      try {
-        const updatePayload = { last_login_at: new Date().toISOString() };
-        if (user.email_confirmed_at) {
-          updatePayload.email_verified = true;
-          updatePayload.email_verified_at = user.email_confirmed_at;
-        }
-        await serviceForExisting.from('users').update(updatePayload).eq('id', user.id);
-      } catch (e) {
-        console.error('[callback] users.update threw', e);
+    // Three fast writes awaited before redirect — stale flags (email_verified,
+    // deletion state) must be correct by the time the user lands on the next page.
+    // scoreDailyLogin stays fire-and-forget: slowest call, idempotent, recoverable.
+    try {
+      const updatePayload = { last_login_at: new Date().toISOString() };
+      if (user.email_confirmed_at) {
+        updatePayload.email_verified = true;
+        updatePayload.email_verified_at = user.email_confirmed_at;
       }
+      await serviceForExisting.from('users').update(updatePayload).eq('id', user.id);
+    } catch (e) {
+      console.error('[callback] users.update threw', e);
       try {
-        await serviceForExisting.rpc('cancel_account_deletion', { p_user_id: user.id });
+        await serviceForExisting.from('audit_log').insert({
+          actor_id: user.id,
+          action: 'auth:login_update_failed',
+          target_type: 'user',
+          target_id: user.id,
+          metadata: { error: e?.message ?? String(e) },
+        });
       } catch {}
-      if (isVerifyTransition) {
+    }
+    try {
+      await serviceForExisting.rpc('cancel_account_deletion', { p_user_id: user.id });
+    } catch (e) {
+      console.error('[callback] cancel_account_deletion threw', e);
+      try {
+        await serviceForExisting.from('audit_log').insert({
+          actor_id: user.id,
+          action: 'auth:cancel_deletion_failed',
+          target_type: 'user',
+          target_id: user.id,
+          metadata: { error: e?.message ?? String(e) },
+        });
+      } catch {}
+    }
+    if (isVerifyTransition) {
+      try {
+        await serviceForExisting.rpc('complete_email_verification', { p_user_id: user.id });
+        void trackServer('verify_email_complete', 'product', {
+          user_id: user.id,
+          request,
+        });
+      } catch (e) {
+        console.error('[auth.callback] complete_email_verification threw:', e);
         try {
-          await serviceForExisting.rpc('complete_email_verification', { p_user_id: user.id });
-          void trackServer('verify_email_complete', 'product', {
-            user_id: user.id,
-            request,
+          await serviceForExisting.from('audit_log').insert({
+            actor_id: user.id,
+            action: 'auth:complete_verification_failed',
+            target_type: 'user',
+            target_id: user.id,
+            metadata: { error: e?.message ?? String(e) },
           });
-        } catch (e) {
-          console.error('[auth.callback] complete_email_verification threw:', e);
-        }
+        } catch {}
       }
+    }
+    void (async () => {
       try {
         const result = await scoreDailyLogin(serviceForExisting, { userId: user.id });
         if (result?.error) console.error('[callback] scoreDailyLogin', result.error);
