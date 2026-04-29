@@ -3,6 +3,7 @@
 // Admin: closed-beta access request queue.
 // Approve mints a 1-use, 7-day owner-link, sends email, marks approved.
 // Reject marks rejected with optional reason.
+// Bulk-approve: checkbox column + "Approve N selected" button.
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -25,6 +26,7 @@ import type { Tables } from '@/types/database-helpers';
 
 type Req = Tables<'access_requests'> & {
   access_codes: { code: string; expires_at: string | null; current_uses: number | null } | null;
+  referral_medium?: string | null;
 };
 
 function RequestsInner() {
@@ -40,8 +42,14 @@ function RequestsInner() {
   const [busy, setBusy] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [showReject, setShowReject] = useState(false);
-  // Approve is a single click. Audit log stamps actor + timestamp on
-  // the server side; no UI confirmation needed.
+
+  // Bulk-approve state
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  // Source/medium inputs for approve drawer
+  const [approveSource, setApproveSource] = useState('');
+  const [approveMedium, setApproveMedium] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -67,8 +75,6 @@ function RequestsInner() {
     setRows((data || []) as Req[]);
   }
 
-  // Phase 1 intake removed the email-confirm step — all pending rows are
-  // ready for review.
   const filtered = rows.filter((r) => {
     if (tab === 'all') return true;
     return r.status === tab;
@@ -80,13 +86,24 @@ function RequestsInner() {
     total: rows.length,
   };
 
+  // When the active drawer row changes, pre-fill source/medium from the row.
+  useEffect(() => {
+    if (active) {
+      setApproveSource(active.referral_source || '');
+      setApproveMedium((active.referral_medium as string | null | undefined) || '');
+    }
+  }, [active]);
+
   const approve = async (r: Req) => {
     setBusy(true);
     try {
       const res = await fetch(`/api/admin/access-requests/${r.id}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify({
+          cohort_source: approveSource.trim() || undefined,
+          cohort_medium: approveMedium.trim() || undefined,
+        }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -100,6 +117,8 @@ function RequestsInner() {
         variant: json.email_sent ? 'success' : 'warn',
       });
       setActive(null);
+      setApproveSource('');
+      setApproveMedium('');
       await loadAll();
     } finally {
       setBusy(false);
@@ -130,6 +149,43 @@ function RequestsInner() {
     }
   };
 
+  const bulkApprove = async () => {
+    if (selected.size === 0) return;
+    setBulkBusy(true);
+    try {
+      const res = await fetch('/api/admin/access-requests/bulk-approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selected) }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        push({ message: json.error || 'Bulk approve failed', variant: 'danger' });
+        return;
+      }
+      const { approved_count = 0, failed_ids = [], email_failed_ids = [] } = json;
+      if (failed_ids.length > 0) {
+        push({
+          message: `Approved ${approved_count}. Failed: ${failed_ids.length}. Check logs.`,
+          variant: 'warn',
+        });
+      } else if (email_failed_ids.length > 0) {
+        push({
+          message: `Approved ${approved_count}. Email failed for ${email_failed_ids.length} — copy links manually.`,
+          variant: 'warn',
+        });
+      } else {
+        push({ message: `Approved ${approved_count} request(s).`, variant: 'success' });
+      }
+      setSelected(new Set());
+      await loadAll();
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const pendingFiltered = filtered.filter((r) => r.status === 'pending');
+
   if (loading) {
     return (
       <Page>
@@ -141,7 +197,57 @@ function RequestsInner() {
   }
   if (!authorized) return null;
 
+  const allPendingSelected =
+    pendingFiltered.length > 0 && pendingFiltered.every((r) => selected.has(r.id));
+  const somePendingSelected = pendingFiltered.some((r) => selected.has(r.id));
+
   const cols = [
+    {
+      key: 'select', header: (
+        <input
+          type="checkbox"
+          checked={allPendingSelected}
+          ref={(el) => {
+            if (el) el.indeterminate = somePendingSelected && !allPendingSelected;
+          }}
+          onChange={(e) => {
+            if (e.target.checked) {
+              setSelected((prev) => {
+                const next = new Set(prev);
+                pendingFiltered.forEach((r) => next.add(r.id));
+                return next;
+              });
+            } else {
+              setSelected((prev) => {
+                const next = new Set(prev);
+                pendingFiltered.forEach((r) => next.delete(r.id));
+                return next;
+              });
+            }
+          }}
+          style={{ cursor: 'pointer' }}
+          aria-label="Select all pending"
+        />
+      ),
+      sortable: false,
+      render: (r: Req) => r.status === 'pending' ? (
+        <input
+          type="checkbox"
+          checked={selected.has(r.id)}
+          onChange={(e) => {
+            e.stopPropagation();
+            setSelected((prev) => {
+              const next = new Set(prev);
+              if (e.target.checked) next.add(r.id); else next.delete(r.id);
+              return next;
+            });
+          }}
+          onClick={(e) => e.stopPropagation()}
+          style={{ cursor: 'pointer' }}
+          aria-label={`Select ${r.email}`}
+        />
+      ) : null,
+    },
     {
       key: 'email', header: 'Email', sortable: false,
       render: (r: Req) => (
@@ -225,6 +331,18 @@ function RequestsInner() {
             })}
           </div>
         }
+        right={
+          selected.size > 0 ? (
+            <Button
+              variant="primary"
+              size="sm"
+              loading={bulkBusy}
+              onClick={bulkApprove}
+            >
+              Approve {selected.size} selected
+            </Button>
+          ) : undefined
+        }
       />
 
       <DataTable
@@ -242,7 +360,7 @@ function RequestsInner() {
 
       <Drawer
         open={!!active && !showReject}
-        onClose={() => setActive(null)}
+        onClose={() => { setActive(null); setApproveSource(''); setApproveMedium(''); }}
         title={active?.name || active?.email || 'Request'}
         description={active?.email}
         width="md"
@@ -273,6 +391,8 @@ function RequestsInner() {
               </Badge>
             </DetailRow>
             <DetailRow label="Email"><code>{active.email}</code></DetailRow>
+            {active.name && <DetailRow label="Name">{active.name}</DetailRow>}
+            {active.reason && <DetailRow label="Reason" small>{active.reason}</DetailRow>}
             <DetailRow label="Submitted">{active.created_at ? new Date(active.created_at).toLocaleString() : '—'}</DetailRow>
             {(() => {
               const meta = (active.metadata as {
@@ -327,6 +447,37 @@ function RequestsInner() {
             )}
             {active.ip_address && <DetailRow label="IP"><code style={{ fontSize: F.xs }}>{active.ip_address}</code></DetailRow>}
             {active.user_agent && <DetailRow label="User-Agent" small><code style={{ fontSize: F.xs, wordBreak: 'break-all' }}>{active.user_agent}</code></DetailRow>}
+
+            {/* Source/medium inputs — only shown for pending requests */}
+            {active.status === 'pending' && (
+              <div style={{
+                borderTop: `1px solid ${C.divider}`,
+                paddingTop: S[3],
+                display: 'flex',
+                flexDirection: 'column',
+                gap: S[3],
+              }}>
+                <div style={{ fontSize: F.xs, fontWeight: 600, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Cohort tagging (optional)
+                </div>
+                <Field label="Source">
+                  <TextInput
+                    value={approveSource}
+                    onChange={(e) => setApproveSource(e.target.value)}
+                    placeholder="twitter, press-day, direct…"
+                    maxLength={64}
+                  />
+                </Field>
+                <Field label="Medium">
+                  <TextInput
+                    value={approveMedium}
+                    onChange={(e) => setApproveMedium(e.target.value)}
+                    placeholder="post, referral, dm…"
+                    maxLength={64}
+                  />
+                </Field>
+              </div>
+            )}
           </div>
         )}
       </Drawer>
@@ -370,9 +521,6 @@ function DetailRow({ label, children, small }: { label: string; children: React.
   );
 }
 
-// Inline invite-URL display for approved rows. Always available — useful
-// when the auto-email failed (no RESEND_API_KEY, deliverability issue,
-// etc.) so the operator can copy + paste it manually.
 function ApprovedInviteLink({
   code,
   expiresAt,
@@ -391,7 +539,7 @@ function ApprovedInviteLink({
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1500);
     } catch {
-      // Browser blocked clipboard — fall back to manual select
+      // Browser blocked clipboard
     }
   };
   return (

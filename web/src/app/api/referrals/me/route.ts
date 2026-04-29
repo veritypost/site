@@ -1,10 +1,13 @@
-// Returns the caller's two referral slugs + redemption counts per slot.
-// Self-heals via mint_referral_codes (idempotent) so a user whose slugs
-// were skipped at signup (e.g., joined before this feature shipped, or
-// pre-email-verification) gets them on first profile-card load.
+// Returns the caller's referral slugs + redemption counts, plus the personal
+// invite link data needed by InviteFriendsCard.
+//
+// Self-heals via mint_referral_codes (idempotent) so users who joined before
+// this feature shipped get their codes on first profile-card load.
+//
+// Personal link: /r/<username> (Path A). The personal_url field lets the card
+// display the username-based URL without constructing it client-side.
 //
 // Counts only — no PII of redeemers (no emails, no names, no avatars).
-// Per the design review's privacy / harassment-vector mitigation.
 
 import { NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
@@ -33,22 +36,25 @@ export async function GET() {
 
   const service = createServiceClient();
 
-  // Banned users must not be able to mint or share referral codes —
-  // they're a back-channel growth vector for accounts that were
-  // explicitly removed from the platform. Return empty slugs so the
-  // client renders the "no links" state gracefully without leaking
-  // ban state.
+  // Banned users must not mint or share referral codes — they're a
+  // back-channel growth vector for accounts that were explicitly removed.
   try {
     const { data: row } = await service
       .from('users')
-      .select('is_banned')
+      .select('is_banned, username, invite_cap_override')
       .eq('id', user.id)
       .maybeSingle();
     if (row?.is_banned === true) {
-      return NextResponse.json({ slugs: [] });
+      return NextResponse.json({ slugs: [], invite_cap: 0, invites_left: 0, personal_url: null });
     }
+
+    // Stash user meta for cap calculation below.
+    (user as typeof user & { _username?: string | null; _cap_override?: number | null })._username =
+      row?.username ?? null;
+    (user as typeof user & { _cap_override?: number | null })._cap_override =
+      (row?.invite_cap_override as number | null) ?? null;
   } catch (e) {
-    console.error('[referrals.me] ban check threw:', e);
+    console.error('[referrals.me] user row check threw:', e);
   }
 
   const rate = await checkRateLimit(service, {
@@ -67,10 +73,7 @@ export async function GET() {
     );
   }
 
-  // Self-heal: mint slugs if missing. Function is gated to authenticated
-  // for self only (auth.uid() == p_user_id check inside the function).
-  // We run it via the service client to avoid an extra round-trip on the
-  // user-scoped client; the function still verifies the target.
+  // Self-heal: mint slugs if missing.
   try {
     await service.rpc('mint_referral_codes', { p_user_id: user.id });
   } catch (e) {
@@ -80,7 +83,7 @@ export async function GET() {
   const { data: codes, error } = await service
     .from('access_codes')
     .select(
-      'id, code, slot, is_active, disabled_at, current_uses, max_uses, expires_at, created_at'
+      'id, code, slot, is_active, disabled_at, current_uses, max_uses, expires_at, created_at, cohort_source, cohort_medium'
     )
     .eq('owner_user_id', user.id)
     .eq('type', 'referral')
@@ -92,7 +95,27 @@ export async function GET() {
     return NextResponse.json({ error: 'Could not load referrals' }, { status: 500 });
   }
 
+  // Resolve invite cap: per-user override ?? global setting default.
+  const capOverride = (user as { _cap_override?: number | null })._cap_override ?? null;
+  let inviteCap = 2;
+  try {
+    const { data: capSetting } = await service
+      .from('settings')
+      .select('value')
+      .eq('key', 'invite_cap_default')
+      .maybeSingle();
+    inviteCap = parseInt((capSetting?.value as string | undefined) ?? '2', 10) || 2;
+  } catch {
+    // Use default if settings read fails.
+  }
+  const effectiveCap = capOverride ?? inviteCap;
+
   const siteUrl = getSiteUrl();
+  const username = (user as { _username?: string | null })._username ?? null;
+
+  // Personal URL is /r/<username> if the user has a username.
+  const personalUrl = username ? `${siteUrl}/r/${username}` : null;
+
   const rows = (codes || []).map((c) => ({
     id: c.id,
     slot: c.slot,
@@ -103,7 +126,19 @@ export async function GET() {
     redemption_count: c.current_uses || 0,
     max_uses: c.max_uses,
     created_at: c.created_at,
+    cohort_source: c.cohort_source,
+    cohort_medium: c.cohort_medium,
   }));
 
-  return NextResponse.json({ slugs: rows });
+  // invites_left: how many more people can redeem the personal link (slot=1).
+  const slot1 = rows.find((r) => r.slot === 1);
+  const usedCount = slot1?.redemption_count ?? 0;
+  const invitesLeft = Math.max(0, effectiveCap - usedCount);
+
+  return NextResponse.json({
+    slugs: rows,
+    invite_cap: effectiveCap,
+    invites_left: invitesLeft,
+    personal_url: personalUrl,
+  });
 }

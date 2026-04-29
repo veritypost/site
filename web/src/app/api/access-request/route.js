@@ -118,6 +118,10 @@ export async function POST(request) {
     }
     const email = rawEmail.toLowerCase();
 
+    // Optional name + reason — schema columns already exist.
+    const name = typeof body?.name === 'string' ? body.name.trim().slice(0, 100) : null;
+    const reason = typeof body?.reason === 'string' ? body.reason.trim().slice(0, 500) : null;
+
     const rawIp = await getClientIp();
     const ipTruncated = truncateIp(rawIp);
 
@@ -185,9 +189,7 @@ export async function POST(request) {
     }
 
     // Idempotent insert / refresh. If a pending row exists we just bump
-    // updated_at + refresh attribution — no dup. New rows write through
-    // with email_confirmed_at = now() so the legacy admin filter (and the
-    // dashboard count) treat them as ready for review immediately.
+    // updated_at + refresh attribution — no dup.
     const { data: existingPending } = await service
       .from('access_requests')
       .select('id')
@@ -202,8 +204,9 @@ export async function POST(request) {
       const { error } = await service
         .from('access_requests')
         .update({
+          ...(name !== null ? { name } : {}),
+          ...(reason !== null ? { reason } : {}),
           metadata: attribution,
-          email_confirmed_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
         .eq('id', existingPending.id);
@@ -216,9 +219,10 @@ export async function POST(request) {
         email,
         type: 'beta',
         status: 'pending',
+        ...(name ? { name } : {}),
+        ...(reason ? { reason } : {}),
         ip_address: rawIp || null,
         user_agent: (request.headers.get('user-agent') || '').slice(0, 1024) || null,
-        email_confirmed_at: new Date().toISOString(),
         metadata: attribution,
       });
       if (error) {

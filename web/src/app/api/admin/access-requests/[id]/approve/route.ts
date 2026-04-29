@@ -29,9 +29,13 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return permissionError(err);
   }
 
-  // S6-A55: capture operator-attested reason for the audit trail.
-  const body = await request.json().catch(() => ({} as { reason?: string }));
+  // Capture operator-attested reason + optional cohort tags for the audit trail.
+  const body = await request.json().catch(
+    () => ({} as { reason?: string; cohort_source?: string; cohort_medium?: string })
+  );
   const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+  const cohortSource = typeof body.cohort_source === 'string' ? body.cohort_source.trim().slice(0, 64) : null;
+  const cohortMedium = typeof body.cohort_medium === 'string' ? body.cohort_medium.trim().slice(0, 64) : null;
 
   const service = createServiceClient();
   const rate = await checkRateLimit(service, {
@@ -115,6 +119,17 @@ export async function POST(request: Request, { params }: { params: { id: string 
     console.error('[admin.access_request.approve] sendEmail failed:', e);
   }
 
+  // Stamp cohort tags on the minted code if provided.
+  if (cohortSource || cohortMedium) {
+    await service
+      .from('access_codes')
+      .update({
+        ...(cohortSource ? { cohort_source: cohortSource } : {}),
+        ...(cohortMedium ? { cohort_medium: cohortMedium } : {}),
+      })
+      .eq('id', codeId);
+  }
+
   // Mark approved + bind code + stamp invite_sent_at if email succeeded.
   const updatePayload: TableUpdate<'access_requests'> = {
     status: 'approved',
@@ -122,7 +137,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
     approved_at: new Date().toISOString(),
     access_code_id: codeId,
     metadata: { approval_email_id: emailId, invite_url: inviteUrl },
-  };
+    ...(cohortSource ? { referral_source: cohortSource } : {}),
+    ...(cohortMedium ? { referral_medium: cohortMedium } : {}),
+  } as TableUpdate<'access_requests'>;
   if (emailId) updatePayload.invite_sent_at = new Date().toISOString();
 
   const { error: updErr } = await service
