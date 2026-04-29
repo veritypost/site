@@ -259,18 +259,27 @@ export default function CommentThread({
         },
         async (payload: { new: CommentDb }) => {
           if (payload.new.status && payload.new.status !== 'visible') return;
-          const { data } = await supabase
+          const { data: row } = await supabase
             .from('comments')
-            .select(
-              '*, users!user_id(id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert)'
-            )
+            .select('*')
             .eq('id', payload.new.id)
             .maybeSingle();
+          if (cancelled || !row) return;
+          type AuthorRow = NonNullable<CommentWithAuthor['users']>;
+          let author: AuthorRow | undefined;
+          if (row.user_id) {
+            const { data: authorRow } = await supabase
+              .from('public_profiles_v' as never)
+              .select('id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert')
+              .eq('id' as never, row.user_id as never)
+              .maybeSingle();
+            if (authorRow) author = authorRow as unknown as AuthorRow;
+          }
           if (cancelled) return;
-          if (data)
-            setComments((prev) =>
-              prev.find((c) => c.id === data.id) ? prev : [...prev, data as CommentWithAuthor]
-            );
+          const enriched: CommentWithAuthor = { ...row, users: author };
+          setComments((prev) =>
+            prev.find((c) => c.id === enriched.id) ? prev : [...prev, enriched]
+          );
         }
       )
       .on(
@@ -296,18 +305,27 @@ export default function CommentThread({
               : prev;
           });
           if (!alreadyPresent) {
-            const { data } = await supabase
+            const { data: row } = await supabase
               .from('comments')
-              .select(
-                '*, users!user_id(id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert)'
-              )
+              .select('*')
               .eq('id', id)
               .maybeSingle();
+            if (cancelled || !row) return;
+            type AuthorRow = NonNullable<CommentWithAuthor['users']>;
+            let author: AuthorRow | undefined;
+            if (row.user_id) {
+              const { data: authorRow } = await supabase
+                .from('public_profiles_v' as never)
+                .select('id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert')
+                .eq('id' as never, row.user_id as never)
+                .maybeSingle();
+              if (authorRow) author = authorRow as unknown as AuthorRow;
+            }
             if (cancelled) return;
-            if (data)
-              setComments((prev) =>
-                prev.find((c) => c.id === id) ? prev : [...prev, data as CommentWithAuthor]
-              );
+            const enriched: CommentWithAuthor = { ...row, users: author };
+            setComments((prev) =>
+              prev.find((c) => c.id === id) ? prev : [...prev, enriched]
+            );
           }
         }
       )

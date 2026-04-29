@@ -2355,7 +2355,7 @@ struct StoryDetailView: View {
                 // A126 — pull the soft-delete + edit + mentions fields so
                 // [deleted] tombstones, (edited) labels, and tap-to-profile
                 // mention runs render at parity with web.
-                .select("id, user_id, article_id, parent_id, body, is_pinned, is_context_pinned, is_expert_reply, upvote_count, downvote_count, created_at, deleted_at, status, is_edited, context_tag_count, mentions, users!user_id(id, username, avatar_url, avatar_color, is_expert, is_verified_public_figure)")
+                .select("id, user_id, article_id, parent_id, body, is_pinned, is_context_pinned, is_expert_reply, upvote_count, downvote_count, created_at, deleted_at, status, is_edited, context_tag_count, mentions")
                 .eq("article_id", value: story.id)
                 .eq("status", value: "visible")
                 .is("deleted_at", value: nil)
@@ -2364,7 +2364,26 @@ struct StoryDetailView: View {
                 .limit(100)
                 .execute().value
             let (t, s, c) = try await (tReq, sReq, cReq)
-            timeline = t; sources = s; comments = c
+            let authorIds = Array(Set(c.compactMap { $0.userId }))
+            var authorById: [String: VPComment.AuthorRef] = [:]
+            if !authorIds.isEmpty,
+               let authors: [VPComment.AuthorRef] = try? await client
+                   .from("public_profiles_v")
+                   .select("id, username, avatar_url, avatar_color, is_expert, is_verified_public_figure")
+                   .in("id", values: authorIds)
+                   .execute()
+                   .value {
+                for author in authors {
+                    if let aid = author.id { authorById[aid] = author }
+                }
+            }
+            timeline = t
+            sources = s
+            comments = c.map { row in
+                var mutable = row
+                if let uid = row.userId { mutable.users = authorById[uid] }
+                return mutable
+            }
             loadError = nil
 
             // Bug 32: article category label (was hardcoded "NEWS").
@@ -2564,27 +2583,36 @@ struct StoryDetailView: View {
                         guard let idValue = change.record["id"],
                               case let .string(newId) = idValue else { continue }
                         if comments.contains(where: { $0.id == newId }) { continue }
-                        if let fresh: VPComment = try? await client.from("comments")
-                            .select("id, user_id, article_id, parent_id, body, is_pinned, is_context_pinned, is_expert_reply, upvote_count, downvote_count, created_at, deleted_at, status, is_edited, context_tag_count, mentions, users!user_id(id, username, avatar_url, avatar_color, is_expert, is_verified_public_figure)")
+                        guard var fresh: VPComment = try? await client.from("comments")
+                            .select("id, user_id, article_id, parent_id, body, is_pinned, is_context_pinned, is_expert_reply, upvote_count, downvote_count, created_at, deleted_at, status, is_edited, context_tag_count, mentions")
                             .eq("id", value: newId)
                             .single()
                             .execute()
-                            .value {
-                            if !comments.contains(where: { $0.id == fresh.id }) {
-                                // Bug 41: initial load sorts by is_context_pinned DESC,
-                                // upvote_count DESC. Prepending a zero-upvote comment
-                                // lifts it above pinned + highly-upvoted rows. Append
-                                // and re-apply the sort so the order stays stable.
-                                comments.append(fresh)
-                                comments.sort { a, b in
-                                    let aPinned = a.isContextPinned == true
-                                    let bPinned = b.isContextPinned == true
-                                    if aPinned != bPinned { return aPinned && !bPinned }
-                                    return (a.upvoteCount ?? 0) > (b.upvoteCount ?? 0)
-                                }
-                                commentUpvoteCounts[fresh.id] = fresh.upvoteCount ?? 0
-                                commentDownvoteCounts[fresh.id] = fresh.downvoteCount ?? 0
+                            .value else { continue }
+                        if let uid = fresh.userId,
+                           let author: VPComment.AuthorRef = try? await client
+                               .from("public_profiles_v")
+                               .select("id, username, avatar_url, avatar_color, is_expert, is_verified_public_figure")
+                               .eq("id", value: uid)
+                               .single()
+                               .execute()
+                               .value {
+                            fresh.users = author
+                        }
+                        if !comments.contains(where: { $0.id == fresh.id }) {
+                            // Bug 41: initial load sorts by is_context_pinned DESC,
+                            // upvote_count DESC. Prepending a zero-upvote comment
+                            // lifts it above pinned + highly-upvoted rows. Append
+                            // and re-apply the sort so the order stays stable.
+                            comments.append(fresh)
+                            comments.sort { a, b in
+                                let aPinned = a.isContextPinned == true
+                                let bPinned = b.isContextPinned == true
+                                if aPinned != bPinned { return aPinned && !bPinned }
+                                return (a.upvoteCount ?? 0) > (b.upvoteCount ?? 0)
                             }
+                            commentUpvoteCounts[fresh.id] = fresh.upvoteCount ?? 0
+                            commentDownvoteCounts[fresh.id] = fresh.downvoteCount ?? 0
                         }
                     }
                 }
@@ -2592,20 +2620,33 @@ struct StoryDetailView: View {
                     for await change in updates {
                         guard let idValue = change.record["id"],
                               case let .string(updatedId) = idValue else { continue }
-                        // Re-fetch the joined shape so the author block
-                        // stays populated; postgres_changes only carries
-                        // bare columns.
-                        if let refreshed: VPComment = try? await client.from("comments")
-                            .select("id, user_id, article_id, parent_id, body, is_pinned, is_context_pinned, is_expert_reply, upvote_count, downvote_count, created_at, deleted_at, status, is_edited, context_tag_count, mentions, users!user_id(id, username, avatar_url, avatar_color, is_expert, is_verified_public_figure)")
+                        // Re-fetch the bare columns; postgres_changes only carries
+                        // bare columns. Author data is preserved from the existing
+                        // displayed comment (updates don't change authorship).
+                        guard var refreshed: VPComment = try? await client.from("comments")
+                            .select("id, user_id, article_id, parent_id, body, is_pinned, is_context_pinned, is_expert_reply, upvote_count, downvote_count, created_at, deleted_at, status, is_edited, context_tag_count, mentions")
                             .eq("id", value: updatedId)
                             .single()
                             .execute()
-                            .value {
-                            if let idx = comments.firstIndex(where: { $0.id == updatedId }) {
-                                comments[idx] = refreshed
-                                commentUpvoteCounts[refreshed.id] = refreshed.upvoteCount ?? 0
-                                commentDownvoteCounts[refreshed.id] = refreshed.downvoteCount ?? 0
-                            }
+                            .value else { continue }
+                        // Preserve existing author data if the comment is already displayed;
+                        // updates (edits, vote counts, status changes) don't change authorship.
+                        if let existing = comments.first(where: { $0.id == updatedId }) {
+                            refreshed.users = existing.users
+                        } else if let uid = refreshed.userId,
+                                  let author: VPComment.AuthorRef = try? await client
+                                      .from("public_profiles_v")
+                                      .select("id, username, avatar_url, avatar_color, is_expert, is_verified_public_figure")
+                                      .eq("id", value: uid)
+                                      .single()
+                                      .execute()
+                                      .value {
+                            refreshed.users = author
+                        }
+                        if let idx = comments.firstIndex(where: { $0.id == updatedId }) {
+                            comments[idx] = refreshed
+                            commentUpvoteCounts[refreshed.id] = refreshed.upvoteCount ?? 0
+                            commentDownvoteCounts[refreshed.id] = refreshed.downvoteCount ?? 0
                         }
                     }
                 }
