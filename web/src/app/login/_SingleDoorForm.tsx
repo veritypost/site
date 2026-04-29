@@ -89,7 +89,7 @@ export default function SingleDoorForm({ notice }: Props) {
         return;
       }
       if (json.reason === 'invite_required') {
-        setEmailError('Verity Post is invite-only right now. You\'ll need an invite link to join.');
+        setEmailError('invite_required');
         return;
       }
       setSentEmail(trimmed);
@@ -213,7 +213,7 @@ export default function SingleDoorForm({ notice }: Props) {
           </div>
         )}
 
-        {emailError && (
+        {emailError && emailError !== 'invite_required' && (
           <div
             role="alert"
             style={{
@@ -225,6 +225,28 @@ export default function SingleDoorForm({ notice }: Props) {
             }}
           >
             <p style={{ margin: 0, fontSize: '13px', color: C.danger }}>{emailError}</p>
+          </div>
+        )}
+        {emailError === 'invite_required' && (
+          <div
+            role="alert"
+            style={{
+              backgroundColor: 'var(--card)',
+              border: `1px solid ${C.border}`,
+              borderRadius: '10px',
+              padding: '12px 14px',
+              marginBottom: '16px',
+            }}
+          >
+            <p style={{ margin: '0 0 6px 0', fontSize: '13px', color: C.text, fontWeight: 600 }}>
+              Verity Post is invite-only right now.
+            </p>
+            <p style={{ margin: 0, fontSize: '13px', color: C.dim }}>
+              Have an invite link? Use it to get in.{' '}
+              <a href="/login?mode=request" style={{ color: C.accent, fontWeight: 600 }}>
+                No invite? Request access →
+              </a>
+            </p>
           </div>
         )}
 
@@ -272,8 +294,8 @@ export default function SingleDoorForm({ notice }: Props) {
 
         <p style={{ fontSize: 13, color: C.dim, textAlign: 'center', marginTop: 20, marginBottom: 0 }}>
           new here?{' '}
-          <a href="/signup" style={{ color: C.accent, fontWeight: 600 }}>
-            read about us →
+          <a href="/login?mode=request" style={{ color: C.accent, fontWeight: 600 }}>
+            request access →
           </a>
         </p>
         <p style={{ fontSize: 13, color: C.dim, textAlign: 'center', marginTop: 8, marginBottom: 0 }}>
