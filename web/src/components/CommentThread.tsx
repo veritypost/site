@@ -42,6 +42,7 @@ type CommentWithAuthor = CommentDb & {
     avatar_color?: string | null;
     is_verified_public_figure?: boolean;
     is_expert?: boolean;
+    expert_title?: string | null;
   };
 };
 
@@ -160,7 +161,7 @@ export default function CommentThread({
     if (userIds.length > 0) {
       const { data: authorRows } = await supabase
         .from('public_profiles_v' as never)
-        .select('id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert')
+        .select('id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert, expert_title')
         .in('id' as never, userIds as never);
       authorById = new Map(
         ((authorRows as unknown as AuthorRow[]) || [])
@@ -275,7 +276,7 @@ export default function CommentThread({
           if (row.user_id) {
             const { data: authorRow } = await supabase
               .from('public_profiles_v' as never)
-              .select('id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert')
+              .select('id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert, expert_title')
               .eq('id' as never, row.user_id as never)
               .maybeSingle();
             if (authorRow) author = authorRow as unknown as AuthorRow;
@@ -321,7 +322,7 @@ export default function CommentThread({
             if (row.user_id) {
               const { data: authorRow } = await supabase
                 .from('public_profiles_v' as never)
-                .select('id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert')
+                .select('id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert, expert_title')
                 .eq('id' as never, row.user_id as never)
                 .maybeSingle();
               if (authorRow) author = authorRow as unknown as AuthorRow;
@@ -541,6 +542,7 @@ export default function CommentThread({
     );
   }
 
+  const [expertFilter, setExpertFilter] = useState<boolean>(false);
   const [expertDialogOpen, setExpertDialogOpen] = useState<boolean>(false);
   const [expertQuestion, setExpertQuestion] = useState<string>('');
   const [expertSubmitting, setExpertSubmitting] = useState<boolean>(false);
@@ -607,9 +609,12 @@ export default function CommentThread({
   if (!canViewSection) return null;
 
   const visible = comments.filter((c) => !blockedIds.has(c.user_id));
-  const tops = visible.filter((c) => !c.parent_id);
+  const displayComments = expertFilter
+    ? visible.filter((c) => c.is_expert_question || c.is_expert_reply)
+    : visible;
+  const tops = displayComments.filter((c) => !c.parent_id);
   const childrenByParent: Record<string, CommentWithAuthor[]> = {};
-  visible
+  displayComments
     .filter((c) => c.parent_id)
     .forEach((c) => {
       const pid = c.parent_id as string;
@@ -677,9 +682,28 @@ export default function CommentThread({
               marginBottom: 12,
             }}
           >
-            {visible.length} {visible.length === 1 ? 'comment' : 'comments'}
+            {displayComments.length} {displayComments.length === 1 ? 'comment' : 'comments'}
           </div>
         </>
+      )}
+
+      {visible.some((c) => c.is_expert_reply || c.is_expert_question) && (
+        <button
+          onClick={() => setExpertFilter((v) => !v)}
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            padding: '4px 10px',
+            borderRadius: 20,
+            border: `1px solid ${expertFilter ? '#16a34a' : 'var(--border, #e5e5e5)'}`,
+            background: expertFilter ? 'rgba(34,197,94,0.10)' : 'transparent',
+            color: expertFilter ? '#16a34a' : 'var(--dim, #666)',
+            cursor: 'pointer',
+            marginBottom: 8,
+          }}
+        >
+          {expertFilter ? 'Expert · showing only' : 'Expert'}
+        </button>
       )}
 
       {currentUserId && (

@@ -79,6 +79,10 @@
     {
       "path": "/api/cron/rate-limit-cleanup",
       "schedule": "47 5 * * *"
+    },
+    {
+      "path": "/api/cron/score-comments",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

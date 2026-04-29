@@ -56,6 +56,13 @@ export async function POST(request, { params }) {
       fallbackStatus: 400,
     });
 
+  await service.from('moderation_actions').insert({
+    comment_id: params.id,
+    moderator_id: user.id,
+    action: mode === 'redact' ? 'redact' : 'hide',
+    reason: reason || null,
+  });
+
   if (mode === 'redact') {
     const { error: redactErr } = await service
       .from('comments')

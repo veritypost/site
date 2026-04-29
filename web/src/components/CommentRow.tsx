@@ -19,6 +19,7 @@ type CommentUser = {
   avatar_color?: string | null;
   is_verified_public_figure?: boolean;
   is_expert?: boolean;
+  expert_title?: string | null;
 };
 
 type Mention = { user_id?: string; username: string };
@@ -187,10 +188,18 @@ export default function CommentRow({
     <div
       style={{
         padding: '12px 0',
-        borderBottom: depth === 0 ? '1px solid rgba(0,0,0,0.06)' : 'none',
+        borderBottom: depth === 0 && !comment.is_expert_reply ? '1px solid rgba(0,0,0,0.06)' : 'none',
         marginLeft: depth > 0 ? 24 : 0,
         borderLeft: depth > 0 ? '2px solid var(--border, #e5e5e5)' : 'none',
         paddingLeft: depth > 0 ? 12 : 0,
+        ...(comment.is_expert_reply ? {
+          background: 'rgba(34,197,94,0.06)',
+          borderRadius: 10,
+          border: '1px solid rgba(34,197,94,0.15)',
+          padding: depth > 0 ? '12px 12px' : '12px',
+          marginTop: 4,
+          marginBottom: 4,
+        } : {}),
       }}
     >
       {comment.is_context_pinned && (
@@ -242,7 +251,7 @@ export default function CommentRow({
                   fontWeight: 600,
                 }}
               >
-                Expert
+                Expert{user.expert_title ? ` · ${user.expert_title}` : ''}
               </span>
             )}
             <span style={{ fontSize: 10, color: 'var(--dim, #666)', marginLeft: 'auto' }}>

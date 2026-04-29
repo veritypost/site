@@ -44,6 +44,14 @@ export async function POST(_request, { params }) {
       route: 'admin.moderation.comments.id.unhide',
       fallbackStatus: 400,
     });
+
+  await service.from('moderation_actions').insert({
+    comment_id: params.id,
+    moderator_id: user.id,
+    action: 'unhide',
+    reason: null,
+  });
+
   // Pairs with `moderation.comment.hide` from comments/[id]/hide/route.js
   // — same dotted resource path, opposite verb.
   await recordAdminAction({

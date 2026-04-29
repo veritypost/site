@@ -36,7 +36,6 @@ struct StoryDetailView: View {
     @State private var canTakeQuiz: Bool = false
     @State private var canRetakeQuiz: Bool = false
     @State private var hasUnlimitedQuizAttempts: Bool = false
-    @State private var canReadExpertResponses: Bool = false
     @State private var canMentionAutocomplete: Bool = false
     @State private var hasUnlimitedBookmarks: Bool = false
     @State private var canViewBody: Bool = true
@@ -123,8 +122,8 @@ struct StoryDetailView: View {
     // OwnersAudit Story Task 18 — anon Discussion tab → LoginView sheet
     @State private var showLogin = false
 
-    // Expert Q&A
-    @State private var expertAnswers: [(question: String, answer: String, expertName: String)] = []
+    // Expert filter
+    @State private var expertFilterActive: Bool = false
 
     // Toasts
     @State private var showAchievementToast = false
@@ -470,7 +469,6 @@ struct StoryDetailView: View {
             canTakeQuiz = await PermissionService.shared.has("quiz.attempt.start")
             canRetakeQuiz = await PermissionService.shared.has("quiz.retake")
             hasUnlimitedQuizAttempts = await PermissionService.shared.has("quiz.retake.after_fail")
-            canReadExpertResponses = await PermissionService.shared.has("article.expert_responses.read")
             canMentionAutocomplete = await PermissionService.shared.has("comments.mention.autocomplete")
             hasUnlimitedBookmarks = await PermissionService.shared.has("bookmarks.unlimited")
             canViewBody = await PermissionService.shared.has("article.view.body")
@@ -1271,12 +1269,34 @@ struct StoryDetailView: View {
     // MARK: - Discussion body
     @ViewBuilder private var discussionBody: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("DISCUSSION")
-                .font(.system(.caption2, design: .default, weight: .bold))
-                .tracking(1)
-                .foregroundColor(VP.dim)
-                .padding(.top, 20)
-                .padding(.horizontal, 20)
+            HStack(alignment: .center, spacing: 10) {
+                Text("DISCUSSION")
+                    .font(.system(.caption2, design: .default, weight: .bold))
+                    .tracking(1)
+                    .foregroundColor(VP.dim)
+                if comments.contains(where: { $0.isExpertReply == true }) {
+                    Button {
+                        expertFilterActive.toggle()
+                    } label: {
+                        Text(expertFilterActive ? "Expert · showing only" : "Expert")
+                            .font(.system(.caption, design: .default, weight: .semibold))
+                            .foregroundColor(expertFilterActive ? Color(hex: "#16a34a") : VP.dim)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(
+                                RoundedRectangle(cornerRadius: 20)
+                                    .fill(expertFilterActive ? Color(hex: "#16a34a").opacity(0.10) : Color.clear)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 20)
+                                    .stroke(expertFilterActive ? Color(hex: "#16a34a") : VP.border, lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.top, 20)
+            .padding(.horizontal, 20)
 
             if !auth.isLoggedIn {
                 Text("Sign in to join the discussion.")
@@ -1294,18 +1314,6 @@ struct StoryDetailView: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 12)
                     .id("composer")
-            }
-
-            // Expert insights (permission-gated via `article.expert_responses.read`).
-            if !expertAnswers.isEmpty {
-                if canReadExpertResponses {
-                    expertInsights
-                        .padding(.top, 20)
-                } else {
-                    lockedExpertCard
-                        .padding(.horizontal, 20)
-                        .padding(.top, 20)
-                }
             }
 
             // Comments
@@ -1330,7 +1338,10 @@ struct StoryDetailView: View {
     /// block filter applied before threading so blocked-user replies don't
     /// reveal a parent thread structure to the viewer.
     private var threadedCommentList: some View {
-        let visible = comments.filter { !blocks.isBlocked($0.userId) }
+        let unblocked = comments.filter { !blocks.isBlocked($0.userId) }
+        let visible = expertFilterActive
+            ? unblocked.filter { $0.isExpertReply == true }
+            : unblocked
         var childrenByParent: [String: [VPComment]] = [:]
         var topLevel: [VPComment] = []
         for c in visible {
@@ -1619,6 +1630,15 @@ struct StoryDetailView: View {
                         .font(.system(.caption2, design: .default, weight: .bold))
                         .foregroundColor(VP.accent)
                 }
+                if comment.isExpertReply == true {
+                    Text("Expert")
+                        .font(.system(.caption2, design: .default, weight: .bold))
+                        .tracking(0.3)
+                        .foregroundColor(Color.green)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(RoundedRectangle(cornerRadius: 4).fill(Color.green.opacity(0.12)))
+                }
                 HStack(spacing: 6) {
                     if let uname = u?.username {
                         NavigationLink {
@@ -1769,6 +1789,13 @@ struct StoryDetailView: View {
         .overlay(alignment: .bottom) {
             Rectangle().fill(VP.rule).frame(height: 1)
         }
+        .padding(comment.isExpertReply == true ? 10 : 0)
+        .background(comment.isExpertReply == true ? Color.green.opacity(0.06) : Color.clear)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(comment.isExpertReply == true ? Color.green.opacity(0.18) : Color.clear, lineWidth: 1)
+        )
+        .cornerRadius(comment.isExpertReply == true ? 10 : 0)
         // Apple Guideline 1.2 — long-press affords Report + Block on every
         // comment. Author-self check skips blocking yourself; the API also
         // rejects it but we suppress the option entirely to avoid a dead-end.
@@ -1957,68 +1984,6 @@ struct StoryDetailView: View {
     private func startReply(to parent: VPComment) {
         replyingTo = parent
         composerFocused = true
-    }
-
-    private var expertInsights: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("EXPERT INSIGHTS")
-                .font(.system(.caption2, design: .default, weight: .bold))
-                .tracking(1)
-                .foregroundColor(VP.dim)
-                .padding(.horizontal, 20)
-
-            VStack(spacing: 10) {
-                ForEach(Array(expertAnswers.enumerated()), id: \.offset) { _, item in
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(item.question)
-                            .font(.system(.footnote, design: .default, weight: .semibold))
-                            .foregroundColor(VP.text)
-                        Text(item.answer)
-                            .font(.footnote)
-                            .foregroundColor(VP.soft)
-                            .lineSpacing(4)
-                        HStack(spacing: 4) {
-                            Image(systemName: "person.fill.checkmark")
-                                .font(.caption2)
-                            Text(item.expertName)
-                                .font(.system(.caption, design: .default, weight: .medium))
-                        }
-                        .foregroundColor(VP.accent)
-                    }
-                    .padding(12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(VP.accent.opacity(0.04))
-                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.accent.opacity(0.2), lineWidth: 1))
-                    .cornerRadius(10)
-                }
-            }
-            .padding(.horizontal, 20)
-        }
-    }
-
-    private var lockedExpertCard: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "lock.fill").font(.title).foregroundColor(VP.dim)
-            Text("Expert insights require a paid plan")
-                .font(.system(.footnote, design: .default, weight: .semibold))
-                .foregroundColor(VP.text)
-            Text("Upgrade to see expert analysis for this story.")
-                .font(.caption)
-                .foregroundColor(VP.soft)
-                .multilineTextAlignment(.center)
-            Button("Upgrade") { showSubscription = true }
-                .font(.system(.footnote, design: .default, weight: .semibold))
-                .foregroundColor(.white)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 8)
-                .background(RoundedRectangle(cornerRadius: 8).fill(VP.accent))
-                .buttonStyle(.plain)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 20)
-        .background(VP.card)
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(VP.border))
-        .cornerRadius(12)
     }
 
     // MARK: - Toast overlay
