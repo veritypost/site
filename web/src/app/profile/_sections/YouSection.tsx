@@ -97,7 +97,7 @@ export function YouSection({ user, tier, next, perms }: Props) {
             body="Set how you show up in comments, expert answers, and the leaderboard."
           />
           <ActionCard
-            href="?section=public-profile"
+            href="?section=public"
             title="Bio &amp; expertise"
             body="A short blurb readers see next to your name. Helps replies land."
           />

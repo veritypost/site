@@ -63,3 +63,51 @@ export async function POST(request) {
   }
   return NextResponse.json({ application_id: data });
 }
+
+// PATCH /api/expert/apply
+// Body: { credentials: string }
+// Updates the credentials bio on the user's most recent expert application.
+export async function PATCH(request) {
+  let user;
+  try {
+    user = await requirePermission('expert.application.view_own');
+  } catch (err) {
+    if (err.status) {
+      console.error('[expert.apply.patch.permission]', err?.message || err);
+      return NextResponse.json(
+        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status: err.status }
+      );
+    }
+    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+  }
+
+  const service = createServiceClient();
+  const b = await request.json().catch(() => ({}));
+
+  if (typeof b.credentials !== 'string') {
+    return NextResponse.json({ error: 'credentials must be a string.' }, { status: 400 });
+  }
+  if (b.credentials.length > 600) {
+    return NextResponse.json({ error: 'credentials must be 600 characters or fewer.' }, { status: 400 });
+  }
+
+  const { data, error } = await service
+    .from('expert_applications')
+    .update({ credentials: b.credentials })
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .select('id');
+
+  if (error) {
+    console.error('[expert.apply.patch]', error.message);
+    return NextResponse.json({ error: 'Could not update credentials.' }, { status: 500 });
+  }
+
+  if (!data || data.length === 0) {
+    return NextResponse.json({ error: 'No application found.' }, { status: 404 });
+  }
+
+  return NextResponse.json({ ok: true });
+}
