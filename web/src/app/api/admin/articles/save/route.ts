@@ -219,8 +219,12 @@ export async function POST(request: Request) {
     await service.from('sources').insert(sourceRows);
   }
 
-  // Quizzes — replace all.
-  await service.from('quizzes').delete().eq('article_id', articleId!);
+  // Quizzes — soft-delete existing rows (preserves quiz_attempts FK references).
+  await service
+    .from('quizzes')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('article_id', articleId!)
+    .is('deleted_at', null);
   const quizRows = (body.quizzes || [])
     .filter((q) => {
       const qt = (q as { question_text?: string }).question_text;

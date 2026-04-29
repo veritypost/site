@@ -3,10 +3,10 @@ import Supabase
 
 /// iOS mirror of `site/src/lib/permissions.js` Wave 1 path.
 ///
-/// Reads `public.compute_effective_perms(p_user_id)` once and caches the
-/// rows in memory. `refreshIfStale()` polls `my_perms_version()` and
-/// refreshes when the global or user version changes, matching the web
-/// client's cache-invalidation contract.
+/// Reads `public.my_permission_keys()` once and caches the keys in a Set.
+/// `refreshIfStale()` polls `my_perms_version()` and refreshes when the
+/// global or user version changes, matching the web client's
+/// cache-invalidation contract.
 ///
 /// Concurrency: the cache itself lives on an `actor` so reads/writes
 /// cannot race. A tiny `@MainActor` `ObservableObject` mirror
@@ -15,6 +15,9 @@ import Supabase
 final actor PermissionService {
     static let shared = PermissionService()
 
+    /// Synthesized permission row returned by `get()`. Only `permission_key`
+    /// and `granted` are meaningful; remaining fields are nil placeholders
+    /// until the DB function grows them.
     struct PermissionRow: Decodable, Sendable {
         let permission_key: String
         let granted: Bool
@@ -30,9 +33,11 @@ final actor PermissionService {
         let global_version: Int?
     }
 
-    private struct ComputeArgs: Encodable { let p_user_id: String }
+    private struct PermissionKeyRow: Decodable, Sendable {
+        let permission_key: String
+    }
 
-    private var cache: [String: PermissionRow] = [:]
+    private var cache: Set<String> = []
     private var loaded: Bool = false
     private var userVersion: Int = 0
     private var globalVersion: Int = 0
@@ -62,13 +67,23 @@ final actor PermissionService {
     /// the cache has not loaded yet — callers that need load-on-demand
     /// semantics should `await loadAll()` first.
     func has(_ key: String) -> Bool {
-        guard let row = cache[key] else { return false }
-        return row.granted
+        cache.contains(key)
     }
 
-    /// Full row lookup for callers that need `granted_via` / `lock_message`.
+    /// Row lookup for callers that need `granted_via` / `lock_message`.
+    /// Returns a synthesized row (granted=true) when the key is in the cache;
+    /// nil when absent. Extra fields are nil placeholders.
     func get(_ key: String) -> PermissionRow? {
-        cache[key]
+        guard cache.contains(key) else { return nil }
+        return PermissionRow(
+            permission_key: key,
+            granted: true,
+            granted_via: nil,
+            source_detail: nil,
+            deny_mode: nil,
+            requires_verified: nil,
+            lock_message: nil
+        )
     }
 
     /// Check `my_perms_version()`; if the user or global version has
@@ -87,7 +102,7 @@ final actor PermissionService {
 
     /// Drop the cache (call on sign-out / account switch).
     func invalidate() {
-        cache = [:]
+        cache = []
         loaded = false
         userVersion = 0
         globalVersion = 0
@@ -96,27 +111,27 @@ final actor PermissionService {
     // MARK: - Internals
 
     private func performLoad() async {
-        guard let userId = await currentUserId() else {
-            cache = [:]
+        guard let _ = await currentUserId() else {
+            cache = []
             loaded = true
             await PermissionStore.shared.bump()
             return
         }
         do {
-            let rows: [PermissionRow] = try await client
-                .rpc("compute_effective_perms", params: ComputeArgs(p_user_id: userId))
+            let rows: [PermissionKeyRow] = try await client
+                .rpc("my_permission_keys")
                 .execute()
                 .value
-            var next: [String: PermissionRow] = [:]
+            var next: Set<String> = []
             next.reserveCapacity(rows.count)
             for row in rows {
-                next[row.permission_key] = row
+                next.insert(row.permission_key)
             }
             cache = next
             loaded = true
             await PermissionStore.shared.bump()
         } catch {
-            Log.d("PermissionService: compute_effective_perms failed: \(error)")
+            Log.d("PermissionService: my_permission_keys failed: \(error)")
             // Leave prior cache intact on error so stale reads keep working.
         }
     }

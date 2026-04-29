@@ -62,15 +62,18 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return NextResponse.json({ error: `No active quiz questions for "${slug}"` }, { status: 400 });
   }
 
-  const { error } = await service.from('quiz_attempts').insert({
+  const passed = score >= Math.ceil(total * 0.6);
+  const rows = (pool ?? []).map((q) => ({
     user_id: targetId,
     article_id: story.id,
-    quiz_id: pool![0].id,
-    is_correct: score >= Math.ceil(total * 0.6),
+    quiz_id: q.id,
+    is_correct: passed,
     selected_answer: `admin_manual:${score}/${total}`,
     attempt_number: 1,
     points_earned: score,
-  });
+  }));
+
+  const { error } = await service.from('quiz_attempts').insert(rows);
   if (error) {
     console.error('[admin.users.mark-quiz]', error.message);
     return NextResponse.json({ error: 'Could not log quiz' }, { status: 500 });

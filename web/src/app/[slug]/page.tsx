@@ -23,8 +23,10 @@ import { hasPermissionServer } from '@/lib/auth';
 import { renderBodyHtml } from '@/lib/pipeline/render-body';
 import { JsonLd, newsArticle } from '@/components/JsonLd';
 import { getSiteUrlOrNull } from '@/lib/siteUrl';
+import { incrementViewCount } from '@/lib/counters';
 import ArticleSurface from '@/components/article/ArticleSurface';
 import ArticleEngagementZone from '@/components/ArticleEngagementZone';
+import ArticleTracker from '@/components/article/ArticleTracker';
 
 export const dynamic = 'force-dynamic';
 
@@ -104,6 +106,8 @@ export default async function ArticleSlugPage({ params }: { params: { slug: stri
     canPublishLegacy,
     quizCountResult,
     passCheckResult,
+    sourcesResult,
+    timelineResult,
   ] = await Promise.all([
     hasPermissionServer('articles.edit', supabase),
     hasPermissionServer('admin.articles.edit.any', supabase),
@@ -121,16 +125,33 @@ export default async function ArticleSlugPage({ params }: { params: { slug: stri
           p_article_id: article.id,
         })
       : Promise.resolve({ data: null, error: null }),
+    service
+      .from('sources')
+      .select('title, url, publisher, sort_order')
+      .eq('article_id', article.id)
+      .order('sort_order', { ascending: true }),
+    service
+      .from('timelines')
+      .select('id, event_date, event_label, event_body')
+      .eq('article_id', article.id)
+      .order('event_date', { ascending: true }),
   ]);
 
   const canEdit = canEditNew || canEditLegacy;
   const canPublish = canPublishNew || canPublishLegacy;
   const hasQuiz = (quizCountResult.count ?? 0) > 0;
   const initialPassed = !!passCheckResult.data;
+  const sources = sourcesResult.data ?? [];
+  const timeline = timelineResult.data ?? [];
 
   // Drafts and archived: hidden from non-editors (404 — same surface as a
   // missing slug, no draft existence leak).
   if (article.status !== 'published' && !canEdit) notFound();
+
+  // Fire-and-forget view count on every page render for published articles.
+  if (article.status === 'published') {
+    incrementViewCount(service, article.id).catch(() => {});
+  }
 
   const bodyHtml = article.body_html ?? (article.body ? renderBodyHtml(article.body) : '');
   const isCoppa = isCoppaBand(article);
@@ -154,6 +175,9 @@ export default async function ArticleSlugPage({ params }: { params: { slug: stri
   return (
     <>
       {jsonLd && <JsonLd data={jsonLd} />}
+      {!isCoppa && article.status === 'published' && (
+        <ArticleTracker articleId={article.id} articleSlug={article.slug} />
+      )}
       <ArticleSurface
         article={{
           id: article.id,
@@ -171,6 +195,8 @@ export default async function ArticleSlugPage({ params }: { params: { slug: stri
         bodyHtml={bodyHtml}
         canEdit={canEdit}
         canPublish={canPublish}
+        sources={sources}
+        timeline={timeline}
       />
       {!isCoppa && article.status === 'published' && (
         <ArticleEngagementZone

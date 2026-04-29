@@ -12,6 +12,8 @@
 import dynamic from 'next/dynamic';
 import { useState } from 'react';
 import type { ArticleEditorProps } from './ArticleEditor';
+import SourcesSection, { type SourceItem } from './SourcesSection';
+import TimelineSection, { type TimelineItem } from './TimelineSection';
 
 export type ArticleSurfaceArticle = {
   id: string;
@@ -32,6 +34,8 @@ export type ArticleSurfaceProps = {
   bodyHtml: string;
   canEdit: boolean;
   canPublish: boolean;
+  sources?: SourceItem[];
+  timeline?: TimelineItem[];
 };
 
 const ArticleEditor = dynamic<ArticleEditorProps>(
@@ -67,7 +71,7 @@ const BODY_STYLE: React.CSSProperties = {
 };
 
 export default function ArticleSurface(props: ArticleSurfaceProps) {
-  const { article, bodyHtml, canEdit, canPublish } = props;
+  const { article, bodyHtml, canEdit, canPublish, sources = [], timeline = [] } = props;
   const [reader] = useState(article);
 
   if (canEdit) {
@@ -90,6 +94,8 @@ export default function ArticleSurface(props: ArticleSurfaceProps) {
         // never user-supplied raw HTML at this point.
         dangerouslySetInnerHTML={{ __html: bodyHtml }}
       />
+      <TimelineSection events={timeline} />
+      <SourcesSection sources={sources} />
     </article>
   );
 }

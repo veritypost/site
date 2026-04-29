@@ -175,7 +175,7 @@ const ALL_STEPS: readonly Step[] = [
 // passes. Hardcoded here (not DB-driven) because these are internal fixed
 // supporting calls, not admin-picker selections. If the picker switches
 // primary provider to OpenAI, we keep using Anthropic for these small probes.
-const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
+const HAIKU_MODEL = 'claude-haiku-4-5';
 
 // Session A — per-run reservation envelope (Decision 14). Mirrors the
 // `pipeline.per_run_cost_usd_cap` setting (default $0.50). Reserved
@@ -357,7 +357,7 @@ const CategorizationSchema = z.object({
 const BodySchema = z.object({
   title: z.string().min(1).max(200),
   body: z.string().min(50),
-  word_count: z.number().int().positive().optional(),
+  word_count: z.number().int().min(250).max(400).optional(),
   reading_time_minutes: z.number().positive().optional(),
 });
 
@@ -1190,7 +1190,7 @@ ${catListText}`;
     const headlineUser = `Generate headline + summary for this news cluster. Return JSON: {"headline":"...","summary":"...","slug":"..."}. Today: ${new Date()
       .toISOString()
       .slice(0, 10)}.${freeformBlock}\n\nSOURCES:\n${corpus}`;
-    const summaryUser = `Write a 2-sentence plain-text summary (max 40 words) distilling the core facts of this cluster. Return JSON with ONLY a "summary" field: {"summary":"<your summary>"}. Today: ${new Date()
+    const summaryUser = `Write a plain-text summary (40–60 words, up to 3 sentences) capturing the who/what/where of this story. A reader who sees only the summary must know what actually happened — not a tease, not a hook. Must not restate the headline. Must contain different facts than the headline. Return JSON with ONLY a "summary" field: {"summary":"<your summary>"}. Today: ${new Date()
       .toISOString()
       .slice(0, 10)}.${freeformBlock}\n\nSOURCES:\n${corpus}`;
     const categorizationUser = `Pick the best category for this cluster. Return ONLY the JSON.${freeformBlock}\n\nSOURCES:\n${corpus}`;
@@ -1311,8 +1311,8 @@ ${catListText}`;
 Return ONLY a valid JSON object:
 {
   "title": "${cleanText(headline)}",
-  "body": "The full article in markdown. Paragraphs separated by \\n\\n. 80-400 words. 100% original language — not rephrased source text.",
-  "word_count": 150,
+  "body": "The full article in markdown. Paragraphs separated by \\n\\n. 250-400 words. 100% original language — not rephrased source text.",
+  "word_count": 300,
   "reading_time_minutes": 1
 }${freeformBlock}
 

@@ -71,7 +71,7 @@ struct StoryDetailView: View {
     enum QuizStage { case idle, loading, answering, submitting, result }
     @State private var quizStage: QuizStage = .idle
     @State private var quizQuestions: [APIQuizQuestion] = []
-    @State private var quizAnswers: [String: Int] = [:]   // quiz_id -> selected index
+    @State private var quizAnswers: [String: String] = [:]   // quiz_id -> selected option text
     @State private var quizCurrent = 0
     @State private var quizStartedAt: Date? = nil
     @State private var quizAttemptMeta: APIQuizAttemptMeta? = nil
@@ -1221,7 +1221,7 @@ struct StoryDetailView: View {
 
     private func quizOption(quizId: String, oi: Int, text: String) -> some View {
         let answered = quizAnswers[quizId] != nil
-        let selected = quizAnswers[quizId] == oi
+        let selected = quizAnswers[quizId] == text
         let border = selected ? VP.accent : VP.border
         return Button {
             guard !answered, quizStage == .answering else { return }
@@ -1229,7 +1229,7 @@ struct StoryDetailView: View {
             // .selectionChanged for "value-picker"-style discrete choices,
             // which matches how the quiz reads (one of N options per card).
             UISelectionFeedbackGenerator().selectionChanged()
-            quizAnswers[quizId] = oi
+            quizAnswers[quizId] = text
             let isLast = quizCurrent >= quizQuestions.count - 1
             // Match web ArticleQuiz: 350ms settle, then auto-advance or submit.
             // Cancellable so a re-tap, view disappear, or stage transition
@@ -2804,7 +2804,7 @@ struct StoryDetailView: View {
         }
         struct AnswerEntry: Encodable {
             let quiz_id: String
-            let selected_answer: Int
+            let selected_answer: String
         }
         struct Body: Encodable {
             let article_id: String
@@ -2813,7 +2813,7 @@ struct StoryDetailView: View {
             let time_taken_seconds: Int?
         }
         let answers: [AnswerEntry] = quizQuestions.map { q in
-            AnswerEntry(quiz_id: q.id, selected_answer: quizAnswers[q.id] ?? -1)
+            AnswerEntry(quiz_id: q.id, selected_answer: quizAnswers[q.id] ?? "")
         }
         let elapsed = quizStartedAt.map { Int(Date().timeIntervalSince($0)) }
         let payload = Body(article_id: story.id, answers: answers, kid_profile_id: nil, time_taken_seconds: elapsed)

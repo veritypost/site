@@ -43,22 +43,18 @@ repeat what the other covers.
 WORD COUNT
 ═══════════════════════════════════════════════════════════
 
-Target: 175 words. Most stories land between 140-200.
-Ceiling: 250 words. Some stories genuinely need more — a
-trade deal with multiple provisions, a military operation
-with simultaneous developments, a court ruling with three
-legal questions. If the story needs 240 words to be clear,
-240 is better than a confusing 175.
-Hard limit: 300 words. Never exceed this. If you're past 300,
+Target: 300 words. Range: 250–400 words.
+250 is the floor — a body shorter than this is almost always
+under-reported. 400 is the ceiling — if you're past 400,
 you're carrying context that belongs in the timeline.
 
 The rule: as short as it can be while the reader fully
-understands today's development. Don't amputate a story to
-hit 175 if it sacrifices comprehension. Don't pad a simple
-story to hit 175 if 140 covers it.
+understands today's development. Don't pad a story to reach
+300 if 260 covers it. Don't amputate the story to stay under
+400 if the complexity genuinely needs more.
 
-COUNT YOUR WORDS BEFORE RETURNING. If over 250, cut. If
-under 140, you probably left out something important.
+COUNT YOUR WORDS BEFORE RETURNING. If under 250, you probably
+left out something important. If over 400, cut.
 
 The reason this works short: the timeline carries everything
 else. You do not need to explain backstory. You do not need to
@@ -314,8 +310,8 @@ The route wraps your output in a JSON object. Caller passes
 explicit JSON shape in the user turn. Follow that shape.
 Body field carries paragraphs separated by \\n\\n. **Bold**
 allowed sparingly. No headers, no bullets, no horizontal rules.
-After writing, count your words. If over 250, cut unless the
-story's complexity justifies it. Never exceed 300.`;
+After writing, count your words. Target 250–400 words. If under
+250, you probably left out something important. Never exceed 400.`;
 
 // Category-specific append blocks — keys MUST match categories.name.toLowerCase() from DB
 export const CATEGORY_PROMPTS: Record<string, string> = {
@@ -920,21 +916,21 @@ VOICE:
 - No graphic violence, no political opinion, no fear-mongering. State facts gently.
 - "Whoa" moments first — start with the most interesting fact.
 
-LENGTH: 80-120 words. Tight. Every sentence earns its place.
+LENGTH: 250-400 words. Every sentence earns its place, but cover the full story.
 
 STRUCTURE:
-- Sentence 1-2: What happened. The most surprising fact.
-- Middle: How it happened, who was involved, what changed.
-- Last sentence: Why this matters to the reader's world. One concrete connection.
+- Paragraph 1 (1-3 sentences): What happened. The most surprising fact first.
+- Middle paragraphs: How it happened, who was involved, what changed. Use concrete examples from a kid's daily life.
+- Last paragraph: Why this matters to the reader's world. One concrete connection.
 
 EVERY WORD MUST BE 100% ORIGINAL. Do NOT copy phrasing from any source. Read the facts, close them, write fresh for kids.
 
 OUTPUT JSON (matches BodySchema; route persists into articles with is_kids_safe=true and age_band='kids'):
 {
   "title": "kid-friendly headline, max 8 words",
-  "body": "the article body in 7-9 voice, 80-120 words, paragraphs separated by \\n\\n. Markdown paragraph breaks allowed; **bold** sparingly.",
-  "word_count": 100,
-  "reading_time_minutes": 1
+  "body": "the article body in 7-9 voice, 250-400 words, paragraphs separated by \\n\\n. Markdown paragraph breaks allowed; **bold** sparingly.",
+  "word_count": 300,
+  "reading_time_minutes": 2
 }`;
 
 export const TWEENS_ARTICLE_PROMPT: string = `You are writing a news article for tweens aged 10-12. Real news voice, just unpacked.
@@ -949,22 +945,22 @@ VOICE:
 - Active voice. Direct attribution ("according to [source]") for any contested claim.
 - No graphic violence, no political opinion. Tween-appropriate handling of disturbing topics: state facts, skip lurid detail.
 
-LENGTH: 120-180 words. Tight news writing.
+LENGTH: 250-400 words. Tight news writing.
 
 STRUCTURE:
 - Paragraph 1 (1-3 sentences): What happened. The lede.
 - Paragraph 2 (2-3 sentences): The critical details. How it happened, who was involved.
-- Optional paragraph 3 (1-2 sentences): Secondary development.
-- "So what" closer (1 sentence): Why this matters to the reader's world. Attributed if it's a claim.
+- Paragraph 3 (2-3 sentences): Secondary development or context.
+- "So what" closer (1-2 sentences): Why this matters to the reader's world. Attributed if it's a claim.
 
 EVERY WORD MUST BE 100% ORIGINAL. Do NOT copy phrasing from any source.
 
 OUTPUT JSON (matches BodySchema; route persists into articles with is_kids_safe=true and age_band='tweens'):
 {
   "title": "tween headline, max 9 words",
-  "body": "the article body in 10-12 voice, 120-180 words, paragraphs separated by \\n\\n. Markdown paragraph breaks allowed; **bold** sparingly.",
-  "word_count": 150,
-  "reading_time_minutes": 1
+  "body": "the article body in 10-12 voice, 250-400 words, paragraphs separated by \\n\\n. Markdown paragraph breaks allowed; **bold** sparingly.",
+  "word_count": 300,
+  "reading_time_minutes": 2
 }`;
 
 export const KIDS_TIMELINE_PROMPT: string = `Generate a timeline for children aged 7-9 about this news story.

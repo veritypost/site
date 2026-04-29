@@ -32,6 +32,21 @@ type ReportItem = {
   reporter?: { username?: string | null } | null;
 };
 
+type AiFlaggedItem = {
+  id: number;
+  comment_id: string;
+  reason: string | null;
+  created_at: string;
+};
+
+type ModActionRow = {
+  id: number;
+  action: string;
+  reason: string | null;
+  created_at: string;
+  moderator_username: string | null;
+};
+
 type TargetComment = {
   id: string;
   body: string | null;
@@ -62,11 +77,15 @@ function ReportsAdminInner() {
 
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
-  const [filter, setFilter] = useState<'pending' | 'resolved'>('pending');
+  const [filter, setFilter] = useState<'pending' | 'resolved' | 'ai_flagged'>('pending');
   const [supervisorOnly, setSupervisorOnly] = useState(false);
   const [reports, setReports] = useState<ReportItem[]>([]);
+  const [aiFlagged, setAiFlagged] = useState<AiFlaggedItem[]>([]);
+  const [selectedAi, setSelectedAi] = useState<AiFlaggedItem | null>(null);
   const [selected, setSelected] = useState<ReportItem | null>(null);
   const [targetComment, setTargetComment] = useState<TargetComment | null>(null);
+  const [moderationHistory, setModerationHistory] = useState<ModActionRow[]>([]);
+  const [showFullHistory, setShowFullHistory] = useState(false);
   // C23 mirror — actor and target hierarchy levels so penalty buttons
   // disable when the operator does not strictly outrank the comment
   // author. Server-side `require_outranks` enforces the same rule at
@@ -126,15 +145,83 @@ function ReportsAdminInner() {
     setReports(list);
   }, [toast]);
 
-  useEffect(() => {
-    if (authorized) load(filter, supervisorOnly);
-  }, [filter, supervisorOnly, authorized, load]);
+  const modActionsTable = () => supabase.from('moderation_actions');
 
-  async function selectReport(r: ReportItem) {
-    setSelected(r);
+  const loadAiFlagged = useCallback(async () => {
+    const { data, error } = await modActionsTable()
+      .select('id, comment_id, reason, created_at')
+      .eq('action', 'ai_flagged')
+      .order('created_at', { ascending: false })
+      .limit(200);
+    if (error) {
+      toast.push({ message: 'Failed to load AI-flagged comments', variant: 'danger' });
+      return;
+    }
+    setAiFlagged((data ?? []) as AiFlaggedItem[]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase, toast]);
+
+  useEffect(() => {
+    if (!authorized) return;
+    if (filter === 'ai_flagged') {
+      loadAiFlagged();
+    } else {
+      load(filter, supervisorOnly);
+    }
+  }, [filter, supervisorOnly, authorized, load, loadAiFlagged]);
+
+  async function loadModerationHistory(commentId: string) {
+    const { data } = await modActionsTable()
+      .select('id, action, reason, created_at, moderator_id')
+      .eq('comment_id', commentId)
+      .order('created_at', { ascending: false })
+      .limit(20);
+    if (!data) { setModerationHistory([]); return; }
+    const rows = data as Array<{ id: number; action: string; reason: string | null; created_at: string; moderator_id: string | null }>;
+    const moderatorIds = [...new Set(rows.map((r) => r.moderator_id).filter(Boolean))] as string[];
+    let usernameMap: Record<string, string> = {};
+    if (moderatorIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('public_profiles_v')
+        .select('id, username')
+        .in('id', moderatorIds);
+      for (const p of profiles ?? []) if (p.id) usernameMap[p.id] = p.username ?? 'admin';
+    }
+    setModerationHistory(
+      rows.map((r) => ({
+        id: r.id,
+        action: r.action,
+        reason: r.reason,
+        created_at: r.created_at,
+        moderator_username: r.moderator_id ? (usernameMap[r.moderator_id] ?? 'admin') : null,
+      }))
+    );
+    setShowFullHistory(false);
+  }
+
+  async function selectAiFlagged(item: AiFlaggedItem) {
+    setSelectedAi(item);
+    setSelected(null);
     setNotes('');
     setTargetComment(null);
     setTargetMaxLevel(0);
+    const { data } = await supabase
+      .from('comments')
+      .select('id, body, article_id, user_id, status, users!fk_comments_user_id(username, avatar_color)')
+      .eq('id', item.comment_id)
+      .maybeSingle();
+    const comment = (data as unknown as TargetComment | null) || null;
+    setTargetComment(comment);
+    await loadModerationHistory(item.comment_id);
+  }
+
+  async function selectReport(r: ReportItem) {
+    setSelected(r);
+    setSelectedAi(null);
+    setNotes('');
+    setTargetComment(null);
+    setTargetMaxLevel(0);
+    setModerationHistory([]);
     if (r.target_type === 'comment') {
       const { data } = await supabase
         .from('comments')
@@ -143,6 +230,7 @@ function ReportsAdminInner() {
         .maybeSingle();
       const comment = (data as unknown as TargetComment | null) || null;
       setTargetComment(comment);
+      if (comment?.id) await loadModerationHistory(comment.id);
       // C23 mirror — load the comment author's roles to compute their
       // max hierarchy level so penalty buttons can disable when the
       // actor does not strictly outrank them.
@@ -275,24 +363,26 @@ function ReportsAdminInner() {
         <Toolbar
           left={
             <>
-              {(['pending', 'resolved'] as const).map((s) => (
+              {(['pending', 'resolved', 'ai_flagged'] as const).map((s) => (
                 <Button
                   key={s}
                   variant={filter === s ? 'primary' : 'secondary'}
                   size="sm"
-                  onClick={() => setFilter(s)}
+                  onClick={() => { setFilter(s); setSelected(null); setSelectedAi(null); setTargetComment(null); setModerationHistory([]); }}
                 >
-                  {s[0].toUpperCase() + s.slice(1)}
+                  {s === 'ai_flagged' ? 'AI-flagged' : s[0].toUpperCase() + s.slice(1)}
                 </Button>
               ))}
-              <Checkbox
-                label="Supervisor flags only"
-                checked={supervisorOnly}
-                onChange={(e) => setSupervisorOnly((e.target as HTMLInputElement).checked)}
-              />
+              {filter !== 'ai_flagged' && (
+                <Checkbox
+                  label="Supervisor flags only"
+                  checked={supervisorOnly}
+                  onChange={(e) => setSupervisorOnly((e.target as HTMLInputElement).checked)}
+                />
+              )}
             </>
           }
-          right={<Badge variant="neutral">{reports.length} in queue</Badge>}
+          right={<Badge variant="neutral">{filter === 'ai_flagged' ? aiFlagged.length : reports.length} in queue</Badge>}
         />
       </PageSection>
 
@@ -316,7 +406,37 @@ function ReportsAdminInner() {
             maxWidth: 320,
           }}
         >
-          {reports.length === 0 ? (
+          {filter === 'ai_flagged' ? (
+            aiFlagged.length === 0 ? (
+              <EmptyState title="No AI-flagged comments" description="The scoring cron hasn't flagged anything above threshold." size="sm" />
+            ) : (
+              aiFlagged.map((item) => {
+                const isActive = selectedAi?.id === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => selectAiFlagged(item)}
+                    style={{
+                      textAlign: 'left',
+                      padding: `${S[2]}px ${S[3]}px`,
+                      borderRadius: 8,
+                      border: `1px solid ${isActive ? ADMIN_C.accent : ADMIN_C.divider}`,
+                      background: isActive ? ADMIN_C.hover : ADMIN_C.bg,
+                      cursor: 'pointer',
+                      color: ADMIN_C.white,
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    <div style={{ fontSize: F.base, fontWeight: 700, marginBottom: 2 }}>
+                      AI-flagged · <span style={{ fontWeight: 400, color: ADMIN_C.soft }}>{item.reason ?? 'high toxicity score'}</span>
+                    </div>
+                    <div style={{ fontSize: F.xs, color: ADMIN_C.muted }}>{new Date(item.created_at).toLocaleString()}</div>
+                  </button>
+                );
+              })
+            )
+          ) : reports.length === 0 ? (
             <EmptyState
               title="Queue is empty"
               description="Nothing needs review right now. Switch to resolved to see history."
@@ -358,12 +478,57 @@ function ReportsAdminInner() {
         </div>
 
         <div style={{ flex: '1 1 320px', minWidth: 0 }}>
-          {!selected ? (
+          {!selected && !selectedAi ? (
             <EmptyState
               title="Pick a report"
               description="Select a row on the left to see its body, target comment, and resolution actions."
             />
-          ) : (
+          ) : selectedAi ? (
+            <div style={{ border: `1px solid ${ADMIN_C.divider}`, borderRadius: 10, background: ADMIN_C.bg, padding: S[4], display: 'flex', flexDirection: 'column', gap: S[3] }}>
+              <div style={{ fontSize: F.lg, fontWeight: 700, color: ADMIN_C.white }}>
+                AI-flagged comment
+              </div>
+              {selectedAi.reason && (
+                <div style={{ fontSize: F.base, color: ADMIN_C.soft }}>{selectedAi.reason}</div>
+              )}
+              {targetComment && (
+                <div style={{ padding: S[3], border: `1px solid ${ADMIN_C.divider}`, borderRadius: 8, background: ADMIN_C.card }}>
+                  <div style={{ fontSize: F.xs, color: ADMIN_C.dim, marginBottom: S[1] }}>
+                    @{targetComment.users?.username || 'user'} · status: {targetComment.status}
+                  </div>
+                  <div style={{ fontSize: F.base, color: ADMIN_C.white, lineHeight: 1.5 }}>{targetComment.body}</div>
+                  {moderationHistory.length > 0 && (
+                    <div style={{ marginTop: S[2], paddingTop: S[2], borderTop: `1px solid ${ADMIN_C.divider}` }}>
+                      <div style={{ fontSize: F.xs, color: ADMIN_C.dim }}>
+                        {moderationHistory[0].moderator_username
+                          ? `${moderationHistory[0].action} by @${moderationHistory[0].moderator_username} on ${new Date(moderationHistory[0].created_at).toLocaleDateString()}${moderationHistory[0].reason ? ` — ${moderationHistory[0].reason}` : ''}`
+                          : `${moderationHistory[0].action} (AI) on ${new Date(moderationHistory[0].created_at).toLocaleDateString()}${moderationHistory[0].reason ? ` — ${moderationHistory[0].reason}` : ''}`
+                        }
+                      </div>
+                      {moderationHistory.length > 1 && !showFullHistory && (
+                        <button type="button" onClick={() => setShowFullHistory(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: F.xs, color: ADMIN_C.accent, padding: 0, marginTop: 4 }}>
+                          see {moderationHistory.length - 1} more
+                        </button>
+                      )}
+                      {showFullHistory && moderationHistory.slice(1).map((h) => (
+                        <div key={h.id} style={{ fontSize: F.xs, color: ADMIN_C.dim, marginTop: 4 }}>
+                          {h.moderator_username ? `${h.action} by @${h.moderator_username} on ${new Date(h.created_at).toLocaleDateString()}` : `${h.action} (AI) on ${new Date(h.created_at).toLocaleDateString()}`}
+                          {h.reason && ` — ${h.reason}`}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: S[1], flexWrap: 'wrap', marginTop: S[3] }}>
+                    {targetComment.status !== 'hidden' ? (
+                      <Button variant="primary" size="sm" onClick={hide} loading={busy === 'hide'}>Hide comment</Button>
+                    ) : (
+                      <Button variant="secondary" size="sm" onClick={unhide} loading={busy === 'unhide'}>Unhide comment</Button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : selected ? (
             <div style={{ border: `1px solid ${ADMIN_C.divider}`, borderRadius: 10, background: ADMIN_C.bg, padding: S[4], display: 'flex', flexDirection: 'column', gap: S[3] }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: S[2], flexWrap: 'wrap' }}>
                 <div>
@@ -390,6 +555,27 @@ function ReportsAdminInner() {
                     @{targetComment.users?.username || 'user'} · comment · status: {targetComment.status}
                   </div>
                   <div style={{ fontSize: F.base, color: ADMIN_C.white, lineHeight: 1.5 }}>{targetComment.body}</div>
+                  {moderationHistory.length > 0 && (
+                    <div style={{ marginTop: S[2], paddingTop: S[2], borderTop: `1px solid ${ADMIN_C.divider}` }}>
+                      <div style={{ fontSize: F.xs, color: ADMIN_C.dim }}>
+                        {moderationHistory[0].moderator_username
+                          ? `${moderationHistory[0].action} by @${moderationHistory[0].moderator_username} on ${new Date(moderationHistory[0].created_at).toLocaleDateString()}${moderationHistory[0].reason ? ` — ${moderationHistory[0].reason}` : ''}`
+                          : `${moderationHistory[0].action} (AI) on ${new Date(moderationHistory[0].created_at).toLocaleDateString()}${moderationHistory[0].reason ? ` — ${moderationHistory[0].reason}` : ''}`
+                        }
+                      </div>
+                      {moderationHistory.length > 1 && !showFullHistory && (
+                        <button type="button" onClick={() => setShowFullHistory(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: F.xs, color: ADMIN_C.accent, padding: 0, marginTop: 4 }}>
+                          see {moderationHistory.length - 1} more
+                        </button>
+                      )}
+                      {showFullHistory && moderationHistory.slice(1).map((h) => (
+                        <div key={h.id} style={{ fontSize: F.xs, color: ADMIN_C.dim, marginTop: 4 }}>
+                          {h.moderator_username ? `${h.action} by @${h.moderator_username} on ${new Date(h.created_at).toLocaleDateString()}` : `${h.action} (AI) on ${new Date(h.created_at).toLocaleDateString()}`}
+                          {h.reason && ` — ${h.reason}`}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <div style={{ display: 'flex', gap: S[1], flexWrap: 'wrap', marginTop: S[3] }}>
                     {targetComment.status !== 'hidden' ? (
                       <Button variant="primary" size="sm" onClick={hide} loading={busy === 'hide'}>Hide comment</Button>
@@ -434,7 +620,7 @@ function ReportsAdminInner() {
                 <Button variant="secondary" onClick={() => resolve('duplicate')} disabled={busy === 'resolve'}>Duplicate</Button>
               </div>
             </div>
-          )}
+          ) : null}
         </div>
       </div>
 

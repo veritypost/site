@@ -98,7 +98,7 @@ export async function refreshIfStale() {
   }
 }
 
-// --------- New path: compute_effective_perms ---------
+// --------- New path: my_permission_keys ---------
 export async function refreshAllPermissions() {
   if (allPermsInflight) return allPermsInflight;
 
@@ -108,13 +108,13 @@ export async function refreshAllPermissions() {
       const { data: auth } = await supabase.auth.getUser();
       const userId = auth?.user?.id;
       if (!userId) {
-        allPermsCache = new Map();
+        allPermsCache = new Set();
         _allPermsFetchedAt = Date.now();
         return allPermsCache;
       }
-      const { data, error } = await supabase.rpc('compute_effective_perms', { p_user_id: userId });
+      const { data, error } = await supabase.rpc('my_permission_keys');
       if (error) {
-        console.warn('[permissions] compute_effective_perms failed', error);
+        console.warn('[permissions] my_permission_keys failed', error);
         // L2 — on refetch error AFTER a version-bump hard-clear we leave
         // allPermsCache = null so hasPermission continues to deny-all. That's
         // fail-closed; a next poll or focus event will retry and swap in the
@@ -124,10 +124,10 @@ export async function refreshAllPermissions() {
         // grant that the revoke-driven version bump was trying to clear.
         return allPermsCache;
       }
-      const next = new Map();
+      const next = new Set();
       for (const row of Array.isArray(data) ? data : []) {
         if (row && typeof row.permission_key === 'string') {
-          next.set(row.permission_key, row);
+          next.add(row.permission_key);
         }
       }
       allPermsCache = next;
@@ -168,24 +168,22 @@ export async function getCapabilities(section) {
 }
 
 // --------- Lookup helpers ---------
-// Full-perms cache path (compute_effective_perms). Returns false when cache
+// Full-perms cache path (my_permission_keys). Returns false when cache
 // has not loaded yet (allPermsCache null) — fail-closed by design. Callers
 // must await refreshAllPermissions() before reading this function.
 export function hasPermission(key) {
   if (allPermsCache) {
-    const row = allPermsCache.get(key);
-    if (row) return !!row.granted;
-    // Cache loaded but key not present — treat as deny (NOT_IN_RESOLVED_SET).
-    return false;
+    return allPermsCache.has(key);
   }
   return false;
 }
 
-// Full-cache row lookup. Returns null when the cache has not loaded yet
-// or when the key is not in the resolved set.
+// Key presence check. Returns null when cache not loaded; a minimal
+// synthetic object when the key is granted; null when absent.
 export function getPermission(key) {
   if (!allPermsCache) return null;
-  return allPermsCache.get(key) || null;
+  if (!allPermsCache.has(key)) return null;
+  return { permission_key: key, granted: true };
 }
 
 // Legacy section-cache lookup. Retained for callers that still use

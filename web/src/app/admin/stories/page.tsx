@@ -24,7 +24,7 @@ type ArticleRow = Tables<'articles'> & {
   users: { username: string | null } | null;
 };
 
-type StatusFilter = 'all' | 'published' | 'draft' | 'scheduled';
+type StatusFilter = 'all' | 'published' | 'draft';
 
 type DestructiveState = {
   title: string;
@@ -44,7 +44,6 @@ function timeAgo(ts: string | null | undefined) {
   if (!ts) return 'never';
   const diff = Date.now() - new Date(ts).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 0) return 'scheduled';
   if (mins < 60) return `${mins}m ago`;
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h ago`;
@@ -53,7 +52,6 @@ function timeAgo(ts: string | null | undefined) {
 
 const statusVariant = (s: string | null): 'success' | 'warn' | 'neutral' => {
   if (s === 'published') return 'success';
-  if (s === 'scheduled') return 'warn';
   return 'neutral';
 };
 
@@ -304,7 +302,6 @@ function StoriesAdminInner() {
                       { value: 'all', label: 'All statuses' },
                       { value: 'published', label: 'Published' },
                       { value: 'draft', label: 'Draft' },
-                      { value: 'scheduled', label: 'Scheduled' },
                     ]}
                   />
                   <Select

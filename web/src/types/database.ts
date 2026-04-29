@@ -1554,7 +1554,6 @@ export type Database = {
           nsfw_score: number | null
           plagiarism_status: string | null
           prompt_fingerprint: string | null
-          publish_at: string | null
           published_at: string | null
           push_sent: boolean
           reading_time_minutes: number | null
@@ -1626,7 +1625,6 @@ export type Database = {
           nsfw_score?: number | null
           plagiarism_status?: string | null
           prompt_fingerprint?: string | null
-          publish_at?: string | null
           published_at?: string | null
           push_sent?: boolean
           reading_time_minutes?: number | null
@@ -1698,7 +1696,6 @@ export type Database = {
           nsfw_score?: number | null
           plagiarism_status?: string | null
           prompt_fingerprint?: string | null
-          publish_at?: string | null
           published_at?: string | null
           push_sent?: boolean
           reading_time_minutes?: number | null
@@ -6655,6 +6652,48 @@ export type Database = {
           user_agent?: string | null
         }
         Relationships: []
+      }
+      moderation_actions: {
+        Row: {
+          id: number
+          comment_id: string
+          moderator_id: string | null
+          action: string
+          reason: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: number
+          comment_id: string
+          moderator_id?: string | null
+          action: string
+          reason?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: number
+          comment_id?: string
+          moderator_id?: string | null
+          action?: string
+          reason?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'moderation_actions_comment_id_fkey'
+            columns: ['comment_id']
+            isOneToOne: false
+            referencedRelation: 'comments'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'moderation_actions_moderator_id_fkey'
+            columns: ['moderator_id']
+            isOneToOne: false
+            referencedRelation: 'users'
+            referencedColumns: ['id']
+          }
+        ]
       }
       message_receipts: {
         Row: {

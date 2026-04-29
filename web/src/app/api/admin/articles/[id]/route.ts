@@ -184,7 +184,6 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 // value slips in without conscious wiring.
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   draft: ['published', 'archived'],
-  scheduled: ['published', 'archived', 'draft'],
   published: ['archived'],
   archived: ['draft'],
 };
@@ -245,7 +244,7 @@ const PatchSchema = z
     excerpt: z.string().max(2000).nullish(),
     body: z.string().min(1).optional(),
     moderation_notes: z.string().nullish(),
-    status: z.enum(['draft', 'published', 'archived', 'scheduled']).optional(),
+    status: z.enum(['draft', 'published', 'archived']).optional(),
     retraction_reason: z.string().max(2000).nullish(),
     // Session C — manual URL edits (Decision 3). Editable anytime,
     // including post-publish; collisions return 409 below.
@@ -623,7 +622,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
   if (body.quizzes !== undefined) {
     try {
-      const { error: qDelErr } = await service.from(t.quizzes).delete().eq('article_id', id);
+      const { error: qDelErr } = await service
+        .from(t.quizzes)
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('article_id', id)
+        .is('deleted_at', null);
       if (qDelErr) {
         await captureMessage('admin article PATCH inconsistent state', 'error', {
           article_id: id,
