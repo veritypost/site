@@ -24,6 +24,9 @@ export type AccountState =
   | { kind: 'deletion_scheduled'; scheduledFor: string | null }
   | { kind: 'plan_grace'; endsAt: string | null }
   | { kind: 'comped'; until: string | null }
+  | { kind: 'trial-ending-day'; until: string | null }
+  | { kind: 'trial-ending-week'; until: string | null }
+  | { kind: 'trial_extended'; until: string | null }
   | { kind: 'expert_pending' }
   | { kind: 'expert_rejected'; reason: string | null }
   | { kind: 'beta_cohort_welcome' };
@@ -53,7 +56,10 @@ const SEVERITY: AccountState['kind'][] = [
   'expert_rejected',
   'plan_grace',
   'expert_pending',
+  'trial-ending-day',
   'comped',
+  'trial-ending-week',
+  'trial_extended',
   'beta_cohort_welcome',
   'ok',
 ];
@@ -89,6 +95,8 @@ export function deriveAccountStates(
     deletion_scheduled_for?: string | null;
     plan_grace_period_ends_at?: string | null;
     comped_until?: string | null;
+    trial_extension_until?: string | null;
+    trial_extended_seen_at?: string | null;
     cohort?: string | null;
   };
 
@@ -142,8 +150,23 @@ export function deriveAccountStates(
   if (opts.expertStatus === 'pending') {
     states.push({ kind: 'expert_pending' });
   }
-  if (isFutureOrNow(u.comped_until)) {
-    states.push({ kind: 'comped', until: u.comped_until ?? null });
+  // Comped / trial-ending states. Uses coalesce(trial_extension_until, comped_until)
+  // so an admin override shifts the effective expiry. trial-ending-week and
+  // trial-ending-day replace `comped` in the final days; they're mutually exclusive.
+  const effectiveExpiry = u.trial_extension_until ?? u.comped_until ?? null;
+  if (effectiveExpiry && isFutureOrNow(effectiveExpiry)) {
+    const msUntil = Date.parse(effectiveExpiry) - Date.now();
+    if (msUntil < 24 * 60 * 60 * 1000) {
+      states.push({ kind: 'trial-ending-day', until: effectiveExpiry });
+    } else if (msUntil < 7 * 24 * 60 * 60 * 1000) {
+      states.push({ kind: 'trial-ending-week', until: effectiveExpiry });
+    } else {
+      states.push({ kind: 'comped', until: effectiveExpiry });
+    }
+  }
+  // One-time "trial was extended" banner — shows until the user dismisses it.
+  if (u.trial_extension_until && isFutureOrNow(u.trial_extension_until) && !u.trial_extended_seen_at) {
+    states.push({ kind: 'trial_extended', until: u.trial_extension_until });
   }
   if (opts.betaWelcomePending && u.cohort === 'beta') {
     states.push({ kind: 'beta_cohort_welcome' });

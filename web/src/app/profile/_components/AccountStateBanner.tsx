@@ -39,7 +39,7 @@ function visual(state: AccountState): Visual | null {
         body: state.reason
           ? `Reason: ${state.reason}. Contact support if you believe this is a mistake.`
           : 'Your account has been suspended. Contact support if you believe this is a mistake.',
-        cta: { label: 'Contact support', href: '/support' },
+        cta: { label: 'Contact support', href: '/contact' },
       };
     case 'locked_login':
       return {
@@ -158,6 +158,42 @@ function visual(state: AccountState): Visual | null {
           ? `Premium features are unlocked through ${formatDate(state.until)}.`
           : 'Premium features are unlocked on your account.',
       };
+    case 'trial-ending-week':
+      return {
+        bg: C.warnSoft,
+        ink: C.warn,
+        border: C.warn,
+        glyph: '⏳',
+        title: 'Your trial ends in less than a week',
+        body: state.until
+          ? `Access to premium features ends on ${formatDate(state.until)}. Subscribe to keep them.`
+          : 'Your trial access ends soon. Subscribe to keep premium features.',
+        cta: { label: 'See plans', href: '/profile/settings?section=plan' },
+      };
+    case 'trial-ending-day':
+      return {
+        bg: C.warnSoft,
+        ink: C.warn,
+        border: C.warn,
+        glyph: '⚠️',
+        title: 'Your trial ends today',
+        body: state.until
+          ? `Premium features turn off at ${formatTime(state.until)}. Subscribe now to keep uninterrupted access.`
+          : 'Your trial ends today. Subscribe to keep premium features.',
+        cta: { label: 'Subscribe now', href: '/profile/settings?section=plan' },
+      };
+    case 'trial_extended':
+      return {
+        bg: C.successSoft,
+        ink: C.success,
+        border: C.success,
+        glyph: '🎉',
+        title: 'Your trial was extended',
+        body: state.until
+          ? `Good news — your trial now runs through ${formatDate(state.until)}.`
+          : 'Good news — your trial has been extended.',
+        cta: { label: 'Got it', kind: 'action' },
+      };
     case 'beta_cohort_welcome':
       return {
         bg: C.infoSoft,
@@ -166,7 +202,7 @@ function visual(state: AccountState): Visual | null {
         glyph: '🚀',
         title: 'Welcome to the Verity Post beta',
         body: "You have early access to features still being polished. Tell us what works and what doesn't.",
-        cta: { label: 'Send feedback', href: '/support?topic=beta' },
+        cta: { label: 'Send feedback', href: '/contact' },
       };
   }
 }

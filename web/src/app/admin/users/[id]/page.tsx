@@ -31,6 +31,7 @@ import StatCard from '@/components/admin/StatCard';
 import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C, F, S } from '@/lib/adminPalette';
 import type { Tables } from '@/types/database-helpers';
+import { TrialOverrideCard } from './_sections/TrialOverrideCard';
 
 type UserRow = Tables<'users'> & {
   plans?: { name: string | null; display_name?: string | null } | null;
@@ -81,6 +82,16 @@ export default function UserDossierPage() {
   const [actionsBy, setActionsBy] = useState<AuditRow[]>([]);
   const [warnings, setWarnings] = useState<WarningRow[]>([]);
   const [scoreTiers, setScoreTiers] = useState<ScoreTier[]>([]);
+
+  async function refreshUser() {
+    if (!userId) return;
+    const { data } = await supabase
+      .from('users')
+      .select('*, plans(name, display_name), user_roles!fk_user_roles_user_id(roles(name))')
+      .eq('id', userId)
+      .maybeSingle();
+    if (data) setUser(data as unknown as UserRow);
+  }
 
   useEffect(() => {
     (async () => {
@@ -300,6 +311,14 @@ export default function UserDossierPage() {
           <StatCard label="Streak" value={user.streak_current || 0} />
         </div>
       </PageSection>
+
+      {/* Trial override */}
+      <TrialOverrideCard
+        userId={userId!}
+        compedUntil={user.comped_until}
+        trialExtensionUntil={user.trial_extension_until}
+        onUpdated={refreshUser}
+      />
 
       {/* Kid profiles */}
       {kidProfiles.length > 0 && (

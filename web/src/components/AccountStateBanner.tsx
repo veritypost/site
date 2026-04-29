@@ -106,6 +106,33 @@ function pickStates(user: UserRow | null | undefined): BannerState[] {
     }
   }
 
+  // Trial warning banners. Use coalesce(trial_extension_until, comped_until).
+  // mutually exclusive with each other (most urgent wins).
+  const effectiveExpiry = user.trial_extension_until ?? user.comped_until ?? null;
+  if (effectiveExpiry) {
+    const end = new Date(effectiveExpiry);
+    if (end > new Date()) {
+      const msUntil = end.getTime() - Date.now();
+      if (msUntil < 24 * 60 * 60 * 1000) {
+        const when = end.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+        states.push({
+          severity: 'low',
+          message: `Your trial ends today at ${when}. Subscribe to keep premium features.`,
+          ctaLabel: 'Subscribe now',
+          ctaHref: '/profile/settings?section=plan',
+        });
+      } else if (msUntil < 7 * 24 * 60 * 60 * 1000) {
+        const when = end.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        states.push({
+          severity: 'low',
+          message: `Your trial ends ${when}. Subscribe to keep premium features.`,
+          ctaLabel: 'See plans',
+          ctaHref: '/profile/settings?section=plan',
+        });
+      }
+    }
+  }
+
   // High-severity first. Within a severity, preserve insertion order
   // (mirror the legacy first-match priority: banned > locked > deletion >
   // frozen > muted > plan_grace).
