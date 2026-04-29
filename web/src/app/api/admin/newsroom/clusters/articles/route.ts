@@ -2,9 +2,7 @@
  * F7 Newsroom Redesign — POST /api/admin/newsroom/clusters/articles
  *
  * Batch lookup of generated-article existence per cluster across BOTH
- * audiences. Phase 1 of AI + Plan Change Implementation consolidated kid
- * runs into the `articles` table with is_kids_safe=true; this route now
- * reads only `articles` and partitions by is_kids_safe to surface
+ * audiences. Reads `articles` and partitions by is_kids_safe to surface
  * "Adult: View" / "Kid: View" badges per cluster row.
  *
  * Permission: admin.pipeline.clusters.manage

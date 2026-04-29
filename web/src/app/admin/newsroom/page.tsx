@@ -26,7 +26,7 @@
  * (service-role; bypasses the `admin.system.view` SELECT RLS on
  * discovery_items). Article-existence reads route through
  * /api/admin/newsroom/clusters/articles (service-role; reads `articles`
- * partitioned by is_kids_safe per Phase 1 of AI + Plan Change Implementation).
+ * partitioned by is_kids_safe).
  *
  * URL persistence:
  *   ?cat=<uuid>           top-level category

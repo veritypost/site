@@ -250,8 +250,6 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
       // Picker list is only used by the legacy admin wrapper.
       if (!embedded) {
         // Kids Story Manager is scoped to age_band='kids' specifically.
-        // Historical age_band='tweens' rows stay in the schema but the
-        // pipeline no longer produces them pre-AR1 (S6-Cleanup-§D3).
         // NULL age_band rows surface here as legacy single-tier kid content.
         const { data: stories } = await supabase
           .from('articles')
@@ -507,9 +505,6 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
             is_breaking: effective.is_breaking || false,
             is_kids_safe: true,
             kids_summary: effective.summary || '',
-            // S6-Cleanup-§D3: this manager saves the kids-band variant.
-            // Tweens band is parked pre-AR1 — historical rows readable, no
-            // new writes from the pipeline.
             age_band: 'kids',
           },
           timeline_entries: entries.map((entry) => ({
