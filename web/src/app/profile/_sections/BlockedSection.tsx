@@ -51,7 +51,7 @@ export function BlockedSection({ preview }: Props) {
     const { data, error } = await supabase
       .from('blocked_users')
       .select(
-        'blocked_id, user:users!blocked_users_blocked_id_fkey(id, username, display_name, avatar_url, avatar_color)'
+        'blocked_id, user:users!fk_blocked_users_blocked_id(id, username, display_name, avatar_url, avatar_color)'
       )
       .eq('blocker_id', user.id);
     if (error) {

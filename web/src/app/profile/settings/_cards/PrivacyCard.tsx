@@ -101,7 +101,7 @@ export function PrivacyCard({ user, preview }: Props) {
     const { data, error } = await supabase
       .from('follows')
       .select(
-        'follower_id, user:users!follows_follower_id_fkey(id, username, display_name, avatar_url, avatar_color)'
+        'follower_id, user:users!fk_follows_follower_id(id, username, display_name, avatar_url, avatar_color)'
       )
       .eq('following_id', authUser.id)
       .order('created_at', { ascending: false })
