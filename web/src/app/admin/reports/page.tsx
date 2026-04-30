@@ -171,11 +171,12 @@ function ReportsAdminInner() {
   }, [filter, supervisorOnly, authorized, load, loadAiFlagged]);
 
   async function loadModerationHistory(commentId: string) {
-    const { data } = await modActionsTable()
+    const { data, error } = await modActionsTable()
       .select('id, action, reason, created_at, moderator_id')
       .eq('comment_id', commentId)
       .order('created_at', { ascending: false })
       .limit(20);
+    if (error) { console.error('[reports] loadModerationHistory failed', error); setModerationHistory([]); return; }
     if (!data) { setModerationHistory([]); return; }
     const rows = data as Array<{ id: number; action: string; reason: string | null; created_at: string; moderator_id: string | null }>;
     const moderatorIds = [...new Set(rows.map((r) => r.moderator_id).filter(Boolean))] as string[];
@@ -205,11 +206,12 @@ function ReportsAdminInner() {
     setNotes('');
     setTargetComment(null);
     setTargetMaxLevel(0);
-    const { data } = await supabase
+    const { data, error: commentErr } = await supabase
       .from('comments')
       .select('id, body, article_id, user_id, status, users!fk_comments_user_id(username, avatar_color)')
       .eq('id', item.comment_id)
       .maybeSingle();
+    if (commentErr) console.error('[reports] selectAiFlagged comment fetch failed', commentErr);
     const comment = (data as unknown as TargetComment | null) || null;
     setTargetComment(comment);
     await loadModerationHistory(item.comment_id);
@@ -223,11 +225,12 @@ function ReportsAdminInner() {
     setTargetMaxLevel(0);
     setModerationHistory([]);
     if (r.target_type === 'comment') {
-      const { data } = await supabase
+      const { data, error: commentErr } = await supabase
         .from('comments')
         .select('id, body, article_id, user_id, status, users!fk_comments_user_id(username, avatar_color)')
         .eq('id', r.target_id)
         .maybeSingle();
+      if (commentErr) console.error('[reports] selectReport comment fetch failed', commentErr);
       const comment = (data as unknown as TargetComment | null) || null;
       setTargetComment(comment);
       if (comment?.id) await loadModerationHistory(comment.id);
@@ -593,10 +596,10 @@ function ReportsAdminInner() {
                         : undefined;
                       return (
                         <>
-                          <Button variant="secondary" size="sm" disabled={cannotPenalise} title={title} onClick={() => penaltyLevel(1)}>Warn author</Button>
-                          <Button variant="secondary" size="sm" disabled={cannotPenalise} title={title} onClick={() => penaltyLevel(2)}>24h mute</Button>
-                          <Button variant="secondary" size="sm" disabled={cannotPenalise} title={title} onClick={() => penaltyLevel(3)}>7-day mute</Button>
-                          <Button variant="danger" size="sm" disabled={cannotPenalise} title={title} onClick={() => penaltyLevel(4)}>Ban</Button>
+                          <Button variant="secondary" size="sm" disabled={cannotPenalise || busy === 'penalty'} title={title} onClick={() => penaltyLevel(1)}>Warn author</Button>
+                          <Button variant="secondary" size="sm" disabled={cannotPenalise || busy === 'penalty'} title={title} onClick={() => penaltyLevel(2)}>24h mute</Button>
+                          <Button variant="secondary" size="sm" disabled={cannotPenalise || busy === 'penalty'} title={title} onClick={() => penaltyLevel(3)}>7-day mute</Button>
+                          <Button variant="danger" size="sm" disabled={cannotPenalise || busy === 'penalty'} title={title} onClick={() => penaltyLevel(4)}>Ban</Button>
                         </>
                       );
                     })()}
