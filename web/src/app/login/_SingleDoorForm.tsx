@@ -140,14 +140,18 @@ export default function SingleDoorForm({ notice }: Props) {
     setCodeError(null);
     setEmailBusy(true);
     try {
-      await fetch('/api/auth/send-magic-link', {
+      const res = await fetch('/api/auth/send-magic-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: sentEmail }),
       });
-      startResendCooldown();
+      if (res.ok) {
+        startResendCooldown();
+      } else {
+        setCodeError('Could not resend. Please try again.');
+      }
     } catch {
-      // silently ignore — user can try again after cooldown
+      setCodeError('Could not resend. Check your connection.');
     } finally {
       setEmailBusy(false);
     }

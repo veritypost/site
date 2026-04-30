@@ -43,7 +43,7 @@ export default function WaitlistForm() {
     if (!trimmedEmail) { setError('Email is required.'); return; }
     setBusy(true);
     try {
-      await fetch('/api/access-request', {
+      const res = await fetch('/api/access-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -51,6 +51,11 @@ export default function WaitlistForm() {
           name: name.trim() || undefined,
         }),
       });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setError((body as { error?: string }).error ?? 'Something went wrong. Please try again.');
+        return;
+      }
       setStage('sent');
     } catch {
       setError('Network issue. Please try again.');

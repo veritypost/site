@@ -58,7 +58,7 @@ export async function GET(request) {
         try {
           await gateService.auth.admin.deleteUser(user.id);
         } catch (e) {
-          console.error('[auth.callback] gate-deny: deleteUser failed:', e);
+          console.error('[NEEDS_CLEANUP] auth.users orphan:', user.id, e?.message ?? String(e));
         }
         return NextResponse.redirect(
           `${siteUrl}/beta-locked?reason=${encodeURIComponent(gate.reason)}`

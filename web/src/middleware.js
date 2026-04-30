@@ -345,7 +345,19 @@ export async function middleware(request) {
     pathname === '/kids' ||
     pathname.startsWith('/kids/') ||
     (betaGateEnabled && !betaGateAllowed);
-  const user = needsUser ? (await supabase.auth.getUser()).data.user : null;
+  let user = null;
+  if (needsUser) {
+    try {
+      user = (await supabase.auth.getUser()).data.user ?? null;
+    } catch {
+      if (isProtected(pathname)) {
+        const dest = new URL('/login', request.url);
+        dest.searchParams.set('next', pathname);
+        return NextResponse.redirect(dest);
+      }
+      // Public routes: pass through; page-level fetches will handle degradation.
+    }
+  }
 
   // S3-Q3b — explicit kid reject. Runs BEFORE beta-gate, before
   // protected-route redirect, before the /kids redirect — anything

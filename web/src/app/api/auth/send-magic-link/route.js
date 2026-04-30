@@ -266,13 +266,13 @@ export async function POST(request) {
         const msg = (createErr.message || '').toLowerCase();
         const alreadyExists = msg.includes('already') || msg.includes('registered') || msg.includes('exists');
         if (!alreadyExists) {
-          console.error('[auth.send-magic-link] admin.createUser error:', createErr.message);
+          console.error('[NEEDS_CLEANUP] auth.users orphan:', email, createErr.message);
           await writeAuditRow(service, { email, reason: 'create_user_error', ipTruncated });
           return genericOk();
         }
       }
     } catch (err) {
-      console.error('[auth.send-magic-link] admin.createUser threw:', err?.message || err);
+      console.error('[NEEDS_CLEANUP] auth.users orphan:', email, err?.message || err);
       await writeAuditRow(service, { email, reason: 'create_user_error', ipTruncated });
       return genericOk();
     }

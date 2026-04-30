@@ -70,7 +70,7 @@ export default function RequestAccessForm() {
     if (!trimmedEmail) { setError('Email is required.'); return; }
     setBusy(true);
     try {
-      await fetch('/api/access-request', {
+      const res = await fetch('/api/access-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -79,7 +79,11 @@ export default function RequestAccessForm() {
           reason: reason.trim() || undefined,
         }),
       });
-      // Always show the confirmation — we never reveal whether the email exists.
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setError((body as { error?: string }).error ?? 'Something went wrong. Please try again.');
+        return;
+      }
       setStage('sent');
     } catch {
       setError('Network issue. Please try again.');
