@@ -92,19 +92,21 @@ type ClusterRow = {
   categories: { name: string | null } | null;
   feed_cluster_articles: {
     added_at: string | null;
-    articles: { title: string | null; published_at: string | null } | null;
+    articles: { title: string | null; published_at: string | null; status: string | null } | null;
   }[];
 };
 
 function toStory(row: ClusterRow): Story | null {
   if (!row.title) return null;
   const articles = (row.feed_cluster_articles ?? [])
-    .filter(fca => fca.articles?.title && fca.articles?.published_at)
+    .filter(fca => fca.articles?.status === 'published' && fca.articles?.title && fca.articles?.published_at)
     .map(fca => ({
       date: fca.articles!.published_at!.slice(0, 10),
       headline: fca.articles!.title!,
     }))
     .sort((a, b) => a.date.localeCompare(b.date));
+
+  if (articles.length === 0) return null;
 
   return {
     id: row.id,
@@ -124,7 +126,7 @@ async function loadStories(): Promise<Story[]> {
     .select(`
       id, title, is_breaking, is_active, archived_at, updated_at,
       categories(name),
-      feed_cluster_articles(added_at, articles(title, published_at))
+      feed_cluster_articles(added_at, articles(title, published_at, status))
     `)
     .is('dismissed_at', null)
     .gte('updated_at', cutoff)
