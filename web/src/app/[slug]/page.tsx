@@ -23,6 +23,7 @@ import ArticleActions from '@/components/ArticleActions';
 import ArticleTracker from '@/components/article/ArticleTracker';
 import StoryArticlePicker from '@/components/article/StoryArticlePicker';
 import ArticleFetchFailed from './_ArticleFetchFailed';
+import NextStoryFooter from '@/components/NextStoryFooter';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,6 +37,7 @@ type StoryRow = {
 type ArticleRow = {
   id: string;
   story_id: string | null;
+  category_id: string | null;
   title: string;
   subtitle: string | null;
   body: string | null;
@@ -53,7 +55,7 @@ type ArticleRow = {
 };
 
 const ARTICLE_SELECT =
-  'id, story_id, title, subtitle, body, body_html, excerpt, status, age_band, is_kids_safe, is_ai_generated, ai_model, ai_provider, published_at, updated_at, deleted_at';
+  'id, story_id, category_id, title, subtitle, body, body_html, excerpt, status, age_band, is_kids_safe, is_ai_generated, ai_model, ai_provider, published_at, updated_at, deleted_at';
 
 function isCoppaBand(row: { age_band: string | null; is_kids_safe: boolean | null }): boolean {
   return row.age_band === 'kids' || row.age_band === 'tweens' || row.is_kids_safe === true;
@@ -158,6 +160,24 @@ export default async function ArticleSlugPage({
             .select('id, event_date, event_label, event_body, type, linked_article_id')
             .eq('story_id', story.id)
             .order('event_date', { ascending: true }),
+          article.category_id
+            ? service
+                .from('categories')
+                .select('name, slug')
+                .eq('id', article.category_id)
+                .maybeSingle()
+            : Promise.resolve({ data: null, error: null }),
+          article.category_id
+            ? service
+                .from('articles')
+                .select('title, story_id, stories!articles_story_id_fkey(slug)')
+                .eq('category_id', article.category_id)
+                .eq('status', 'published')
+                .is('deleted_at', null)
+                .neq('story_id', story.id)
+                .order('published_at', { ascending: false })
+                .limit(3)
+            : Promise.resolve({ data: [], error: null }),
         ]),
       };
     } catch (e) {
@@ -179,10 +199,14 @@ export default async function ArticleSlugPage({
     passCheckResult,
     sourcesResult,
     timelineResult,
+    categoryResult,
+    nearbyStoriesResult,
   ] = fetchResult.data;
 
   if (quizCountResult.error) console.error('[article] quiz count query failed', quizCountResult.error);
   if (passCheckResult.error) console.error('[article] quiz pass query failed', passCheckResult.error);
+  if (categoryResult.error) console.error('[article] category query failed', categoryResult.error);
+  if (nearbyStoriesResult.error) console.error('[article] nearby stories query failed', nearbyStoriesResult.error);
 
   const canEdit = canEditNew || canEditLegacy;
   const canPublish = canPublishNew || canPublishLegacy;
@@ -190,6 +214,13 @@ export default async function ArticleSlugPage({
   const initialPassed = passCheckResult.error ? false : !!passCheckResult.data;
   const sources = sourcesResult.data ?? [];
   const timeline = timelineResult.data ?? [];
+  const category = categoryResult.error ? null : (categoryResult.data as { name: string; slug: string } | null);
+  type NearbyRow = { title: string; story_id: string | null; stories: { slug: string } | null };
+  const nearbyStories: { slug: string; title: string }[] = nearbyStoriesResult.error
+    ? []
+    : ((nearbyStoriesResult.data ?? []) as NearbyRow[])
+        .filter((r) => r.stories?.slug)
+        .map((r) => ({ slug: r.stories!.slug, title: r.title }));
 
   if (article.status !== 'published' && !canEdit) notFound();
 
@@ -266,6 +297,7 @@ export default async function ArticleSlugPage({
           />
         </>
       )}
+      <NextStoryFooter category={category} nearbyStories={nearbyStories} />
     </>
   );
 }
