@@ -237,7 +237,7 @@ export async function POST(request) {
         await handleDisputeClosed(service, event.data.object);
         break;
       default:
-        // Unknown event types are logged but not treated as errors.
+        console.log('[stripe.webhook] unhandled event type:', event.type);
         break;
     }
     await service
