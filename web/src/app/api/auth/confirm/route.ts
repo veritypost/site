@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { createOtpClient, createServiceClient } from '@/lib/supabase/server';
 import { getSiteUrl } from '@/lib/siteUrl';
+import { resolveNextForRedirect } from '@/lib/authRedirect';
 import {
   runSignupBookkeeping,
   runReturningUserBookkeeping,
@@ -14,6 +15,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const t = searchParams.get('t');
   const e = searchParams.get('e');
+  const rawNext = searchParams.get('next');
   const siteUrl = getSiteUrl();
 
   if (!t || !e) {
@@ -45,7 +47,7 @@ export async function GET(request: NextRequest) {
 
   // Build the redirect response first. runSignupBookkeeping writes the
   // referral cookie-clear to this object — must be the same object returned.
-  const redirectResponse = NextResponse.redirect(`${siteUrl}/`);
+  const redirectResponse = NextResponse.redirect(resolveNextForRedirect(siteUrl, rawNext, '/'));
 
   if (!existing) {
     const provider = (user.app_metadata?.provider as string | undefined) || 'email';

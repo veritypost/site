@@ -446,7 +446,10 @@ export async function middleware(request) {
   if (pathname === '/kids' || pathname.startsWith('/kids/')) {
     const dest = request.nextUrl.clone();
     dest.search = '';
-    dest.pathname = user ? '/profile/kids' : '/kids-app';
+    const isKidUser =
+      user?.app_metadata?.is_kid_delegated === true ||
+      !!user?.app_metadata?.kid_profile_id;
+    dest.pathname = (user && !isKidUser) ? '/profile/kids' : '/kids-app';
     return NextResponse.redirect(dest, { status: 302 });
   }
 

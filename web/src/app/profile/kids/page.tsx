@@ -121,7 +121,13 @@ export default function ParentKidsPage() {
       return;
     }
 
-    await refreshAllPermissions();
+    try {
+      await refreshAllPermissions();
+    } catch {
+      setLoadError(true);
+      setLoading(false);
+      return;
+    }
     await refreshIfStale();
     const parentView = hasPermission('kids.parent.view');
     setCanAdd(hasPermission('family.add_kid'));

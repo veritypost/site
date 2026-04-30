@@ -66,6 +66,7 @@ import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import { getRateLimitPolicy } from '@/lib/rateLimits';
 import { isAsciiEmail } from '@/lib/emailNormalize';
 import { getSiteUrl } from '@/lib/siteUrl';
+import { resolveNext } from '@/lib/authRedirect';
 import { truncateIpV4 } from '@/lib/apiErrors';
 import { checkSignupGate, isApprovedEmail } from '@/lib/betaGate';
 import { REF_COOKIE_NAME } from '@/lib/referralCookie';
@@ -138,6 +139,7 @@ export async function POST(request) {
   }
 
   const rawEmail = typeof payload?.email === 'string' ? payload.email.trim() : '';
+  const rawNext = typeof payload?.next === 'string' ? payload.next : null;
   // Format gate. Reject anything that doesn't look like local@domain
   // with ASCII-only codepoints. isAsciiEmail handles the homoglyph
   // guard (T299) so a Cyrillic-bypass attempt 400s here, identical to
@@ -295,7 +297,8 @@ export async function POST(request) {
       await writeAuditRow(service, { email, reason: 'generate_link_error', ipTruncated });
       return genericOk();
     }
-    actionLink = `${siteUrl}/api/auth/confirm?t=${encodeURIComponent(linkData.properties.hashed_token)}&e=${encodeURIComponent(email)}`;
+    const safeNext = resolveNext(rawNext, null);
+    actionLink = `${siteUrl}/api/auth/confirm?t=${encodeURIComponent(linkData.properties.hashed_token)}&e=${encodeURIComponent(email)}${safeNext ? `&next=${encodeURIComponent(safeNext)}` : ''}`;
     emailOtp = linkData.properties.email_otp;
   } catch (err) {
     console.error('[auth.send-magic-link] generateLink threw:', err?.message || err);

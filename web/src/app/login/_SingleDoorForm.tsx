@@ -81,7 +81,7 @@ export default function SingleDoorForm({ notice }: Props) {
       const res = await fetch('/api/auth/send-magic-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: trimmed }),
+        body: JSON.stringify({ email: trimmed, ...(rawNext ? { next: rawNext } : {}) }),
       });
       const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; reason?: string };
       if (!res.ok) {

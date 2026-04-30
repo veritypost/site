@@ -36,12 +36,16 @@ export function createClient(): SupabaseClient<Database> {
         set(name: string, value: string, options: Record<string, unknown> | undefined) {
           try {
             cookieStore.set({ name, value, ...mergeCookieOptions(options) });
-          } catch {}
+          } catch (e) {
+            console.error('[supabase] cookie-set failed', (e as Error)?.message ?? String(e));
+          }
         },
         remove(name: string, options: Record<string, unknown> | undefined) {
           try {
             cookieStore.set({ name, value: '', ...mergeCookieOptions(options) });
-          } catch {}
+          } catch (e) {
+            console.error('[supabase] cookie-remove failed', (e as Error)?.message ?? String(e));
+          }
         },
       },
     }
@@ -66,12 +70,16 @@ export function createOtpClient(): SupabaseClient<Database> {
         set(name: string, value: string, options: Record<string, unknown> | undefined) {
           try {
             cookieStore.set({ name, value, ...mergeCookieOptions(options) });
-          } catch {}
+          } catch (e) {
+            console.error('[supabase] cookie-set failed', (e as Error)?.message ?? String(e));
+          }
         },
         remove(name: string, options: Record<string, unknown> | undefined) {
           try {
             cookieStore.set({ name, value: '', ...mergeCookieOptions(options) });
-          } catch {}
+          } catch (e) {
+            console.error('[supabase] cookie-remove failed', (e as Error)?.message ?? String(e));
+          }
         },
       },
     }
