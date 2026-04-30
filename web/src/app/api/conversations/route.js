@@ -31,7 +31,7 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401, headers: NO_STORE });
   }
 
-  const { other_user_id } = await request.json().catch(() => ({}));
+  const { other_user_id } = await request.json().catch((e) => { console.error('[conversations.post] json-parse failed', e); return {}; });
   if (!other_user_id) {
     return NextResponse.json(
       { error: 'other_user_id required' },

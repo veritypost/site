@@ -32,7 +32,7 @@ export async function POST(request) {
   // can't force the runtime to buffer/parse an unbounded body. 50 KB is
   // ample for any legitimate DM payload (post_message RPC enforces a
   // tighter content cap downstream).
-  const text = await request.text().catch(() => '');
+  const text = await request.text().catch((e) => { console.error('[messages.post] body-read failed', e); return ''; });
   if (text.length > 50_000) {
     return NextResponse.json({ error: 'payload too large' }, { status: 413, headers: NO_STORE });
   }
