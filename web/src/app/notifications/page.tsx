@@ -86,6 +86,7 @@ export default function NotificationsInbox() {
   // the generic "Sign in" denied-but-authed copy below. Stays `null`
   // until the auth check resolves so we don't flash the wrong message.
   const [isAnon, setIsAnon] = useState<boolean | null>(null);
+  const [markingAll, setMarkingAll] = useState<boolean>(false);
 
   async function load() {
     setError(null);
@@ -143,12 +144,17 @@ export default function NotificationsInbox() {
   }, [filter, permsReady, canView]);
 
   async function markAllRead() {
-    await fetch('/api/notifications', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ all: true, mark: 'read' }),
-    });
-    load();
+    setMarkingAll(true);
+    try {
+      await fetch('/api/notifications', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ all: true, mark: 'read' }),
+      });
+      await load();
+    } finally {
+      setMarkingAll(false);
+    }
   }
   // S5-A104 — fire-and-forget mark-one-as-read.
   //
@@ -352,6 +358,7 @@ export default function NotificationsInbox() {
           </a>
           <button
             onClick={markAllRead}
+            disabled={markingAll}
             style={{
               padding: '6px 14px',
               borderRadius: 8,
@@ -359,7 +366,8 @@ export default function NotificationsInbox() {
               background: 'transparent',
               fontSize: 12,
               fontWeight: 600,
-              cursor: 'pointer',
+              cursor: markingAll ? 'not-allowed' : 'pointer',
+              opacity: markingAll ? 0.5 : 1,
               minHeight: 36,
             }}
           >
