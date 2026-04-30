@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/app/NavWrapper';
+import ErrorState from '@/components/ErrorState';
 
 const C = {
   bg: 'var(--bg)',
@@ -50,46 +51,63 @@ export default function FollowingPage() {
   const { loggedIn, authLoaded } = useAuth();
   const [stories, setStories] = useState<StoryRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  async function loadStories() {
+    setError(null);
+    setLoading(true);
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setLoading(false); return; }
+
+    // Step 1: story IDs the user has read via reading_log
+    const { data: logRows, error: logErr } = await supabase
+      .from('reading_log')
+      .select('article_id, articles(story_id)')
+      .eq('user_id', user.id)
+      .limit(500);
+
+    if (logErr) {
+      setError('Couldn\'t load your reading history. Try again.');
+      setLoading(false);
+      return;
+    }
+
+    const storyIds = [
+      ...new Set(
+        ((logRows || []) as Array<{ articles: { story_id: string | null } | null }>)
+          .map((r) => r.articles?.story_id)
+          .filter((id): id is string => typeof id === 'string' && id.length > 0)
+      ),
+    ];
+
+    if (storyIds.length === 0) { setLoading(false); return; }
+
+    // Step 2: active stories from that set
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: storyRows, error: storyErr } = await (supabase as any)
+      .from('stories')
+      .select('id, title, lifecycle_status, published_at, slug')
+      .in('id', storyIds)
+      .in('lifecycle_status', ['breaking', 'developing'])
+      .order('published_at', { ascending: false })
+      .limit(50);
+
+    if (storyErr) {
+      setError('Couldn\'t load stories. Try again.');
+      setLoading(false);
+      return;
+    }
+
+    setStories((storyRows || []) as StoryRow[]);
+    setLoading(false);
+  }
 
   useEffect(() => {
     if (!authLoaded) return;
     if (!loggedIn) { setLoading(false); return; }
-
-    (async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setLoading(false); return; }
-
-      // Step 1: story IDs the user has read via reading_log
-      const { data: logRows } = await supabase
-        .from('reading_log')
-        .select('article_id, articles(story_id)')
-        .eq('user_id', user.id)
-        .limit(500);
-
-      const storyIds = [
-        ...new Set(
-          ((logRows || []) as Array<{ articles: { story_id: string | null } | null }>)
-            .map((r) => r.articles?.story_id)
-            .filter((id): id is string => typeof id === 'string' && id.length > 0)
-        ),
-      ];
-
-      if (storyIds.length === 0) { setLoading(false); return; }
-
-      // Step 2: active stories from that set
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: storyRows } = await (supabase as any)
-        .from('stories')
-        .select('id, title, lifecycle_status, published_at, slug')
-        .in('id', storyIds)
-        .in('lifecycle_status', ['breaking', 'developing'])
-        .order('published_at', { ascending: false })
-        .limit(50);
-
-      setStories((storyRows || []) as StoryRow[]);
-      setLoading(false);
-    })();
+    loadStories();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoaded, loggedIn]);
 
   const hairline: React.CSSProperties = {
@@ -137,6 +155,8 @@ export default function FollowingPage() {
               Sign in
             </Link>
           </div>
+        ) : error ? (
+          <ErrorState inline message={error} onRetry={loadStories} style={{ marginTop: 48 }} />
         ) : stories.length === 0 ? (
           <p style={{ color: C.dim, fontSize: 14, paddingTop: 48, textAlign: 'center' }}>
             Stories you&rsquo;ve read articles from will appear here once they&rsquo;re active.
