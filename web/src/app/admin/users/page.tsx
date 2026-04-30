@@ -95,6 +95,9 @@ export default function UsersAdmin() {
   const [destructive, setDestructive] = useState<DestructivePayload | null>(null);
 
   // Manual-action inline state (drawer sub-sections).
+  const [markReadBusy, setMarkReadBusy] = useState(false);
+  const [markQuizBusy, setMarkQuizBusy] = useState(false);
+  const [awardBusy, setAwardBusy] = useState(false);
   const [readSlug, setReadSlug] = useState('');
   const [quizSlug, setQuizSlug] = useState('');
   const [quizScore, setQuizScore] = useState('');
@@ -298,50 +301,66 @@ export default function UsersAdmin() {
   // genuine-fixes rule. Reintroduce when the device-lookup endpoint
   // exists; this page can re-add the prop + section then.
   const handleMarkRead = async (u: UserRow) => {
-    if (!readSlug.trim()) return;
-    const res = await fetch(`/api/admin/users/${u.id}/mark-read`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug: readSlug.trim() }),
-    });
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      toast.push({ message: j.error || 'Mark-read failed', variant: 'danger' });
-      return;
+    if (!readSlug.trim() || markReadBusy) return;
+    setMarkReadBusy(true);
+    try {
+      const res = await fetch(`/api/admin/users/${u.id}/mark-read`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: readSlug.trim() }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        toast.push({ message: j.error || 'Mark-read failed', variant: 'danger' });
+        return;
+      }
+      setReadSlug('');
+      toast.push({ message: 'Read logged', variant: 'success' });
+    } finally {
+      setMarkReadBusy(false);
     }
-    setReadSlug('');
-    toast.push({ message: 'Read logged', variant: 'success' });
   };
 
   const handleMarkQuiz = async (u: UserRow) => {
-    if (!quizSlug.trim() || !quizScore.trim()) return;
-    const score = Number(quizScore);
-    const res = await fetch(`/api/admin/users/${u.id}/mark-quiz`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug: quizSlug.trim(), score }),
-    });
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      toast.push({ message: j.error || 'Mark-quiz failed', variant: 'danger' });
-      return;
+    if (!quizSlug.trim() || !quizScore.trim() || markQuizBusy) return;
+    setMarkQuizBusy(true);
+    try {
+      const score = Number(quizScore);
+      const res = await fetch(`/api/admin/users/${u.id}/mark-quiz`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: quizSlug.trim(), score }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        toast.push({ message: j.error || 'Mark-quiz failed', variant: 'danger' });
+        return;
+      }
+      setQuizSlug(''); setQuizScore('');
+      toast.push({ message: 'Quiz attempt logged', variant: 'success' });
+    } finally {
+      setMarkQuizBusy(false);
     }
-    setQuizSlug(''); setQuizScore('');
-    toast.push({ message: 'Quiz attempt logged', variant: 'success' });
   };
 
   const handleAwardAchievement = async (u: UserRow) => {
-    const res = await fetch(`/api/admin/users/${u.id}/achievements`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ achievement_name: achievement }),
-    });
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      toast.push({ message: j.error || 'Award failed', variant: 'danger' });
-      return;
+    if (awardBusy) return;
+    setAwardBusy(true);
+    try {
+      const res = await fetch(`/api/admin/users/${u.id}/achievements`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ achievement_name: achievement }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        toast.push({ message: j.error || 'Award failed', variant: 'danger' });
+        return;
+      }
+      toast.push({ message: `Awarded "${achievement}"`, variant: 'success' });
+    } finally {
+      setAwardBusy(false);
     }
-    toast.push({ message: `Awarded "${achievement}"`, variant: 'success' });
   };
 
   const openDialog = (kind: 'role' | 'plan', userId: string) => {
@@ -597,6 +616,9 @@ export default function UsersAdmin() {
           onMarkRead={() => handleMarkRead(selected)}
           onMarkQuiz={() => handleMarkQuiz(selected)}
           onAwardAchievement={() => handleAwardAchievement(selected)}
+          markReadBusy={markReadBusy}
+          markQuizBusy={markQuizBusy}
+          awardBusy={awardBusy}
           readSlug={readSlug} setReadSlug={setReadSlug}
           quizSlug={quizSlug} setQuizSlug={setQuizSlug}
           quizScore={quizScore} setQuizScore={setQuizScore}
@@ -673,6 +695,9 @@ function UserDetail(props: {
   onMarkRead: () => void;
   onMarkQuiz: () => void;
   onAwardAchievement: () => void;
+  markReadBusy: boolean;
+  markQuizBusy: boolean;
+  awardBusy: boolean;
   readSlug: string; setReadSlug: (v: string) => void;
   quizSlug: string; setQuizSlug: (v: string) => void;
   quizScore: string; setQuizScore: (v: string) => void;
@@ -683,6 +708,7 @@ function UserDetail(props: {
   const {
     user, onToggleBan, onDelete, onExport, onChangeRole, onChangePlan,
     onMarkRead, onMarkQuiz, onAwardAchievement,
+    markReadBusy, markQuizBusy, awardBusy,
     readSlug, setReadSlug, quizSlug, setQuizSlug, quizScore, setQuizScore,
     achievement, setAchievement, achievementsList, scoreTiers,
   } = props;
@@ -757,7 +783,7 @@ function UserDetail(props: {
               placeholder="story-slug"
               style={{ flex: '1 1 200px', minWidth: 160 }}
             />
-            <Button variant="secondary" onClick={onMarkRead}>Log</Button>
+            <Button variant="secondary" loading={markReadBusy} disabled={markReadBusy} onClick={onMarkRead}>Log</Button>
           </div>
         </Field>
         <Field label="Mark quiz completed">
@@ -775,7 +801,7 @@ function UserDetail(props: {
               inputMode="numeric"
               style={{ flex: '0 0 100px' }}
             />
-            <Button variant="secondary" onClick={onMarkQuiz}>Log</Button>
+            <Button variant="secondary" loading={markQuizBusy} disabled={markQuizBusy} onClick={onMarkQuiz}>Log</Button>
           </div>
         </Field>
         <Field label="Award achievement">
@@ -791,8 +817,9 @@ function UserDetail(props: {
             />
             <Button
               variant="secondary"
+              loading={awardBusy}
+              disabled={!achievement || achievementsList.length === 0 || awardBusy}
               onClick={onAwardAchievement}
-              disabled={!achievement || achievementsList.length === 0}
             >Award</Button>
           </div>
         </Field>
