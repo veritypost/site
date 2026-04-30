@@ -19,6 +19,7 @@ import { getSiteUrlOrNull } from '@/lib/siteUrl';
 import { incrementViewCount } from '@/lib/counters';
 import ArticleSurface from '@/components/article/ArticleSurface';
 import ArticleEngagementZone from '@/components/ArticleEngagementZone';
+import ArticleActions from '@/components/ArticleActions';
 import ArticleTracker from '@/components/article/ArticleTracker';
 import StoryArticlePicker from '@/components/article/StoryArticlePicker';
 import ArticleFetchFailed from './_ArticleFetchFailed';
@@ -251,13 +252,19 @@ export default async function ArticleSlugPage({
         timeline={timeline}
       />
       {!isCoppa && article.status === 'published' && (
-        <ArticleEngagementZone
-          key={article.id}
-          articleId={article.id}
-          hasQuiz={hasQuiz}
-          initialPassed={initialPassed}
-          currentUserId={user?.id ?? null}
-        />
+        <>
+          <ArticleActions
+            articleId={article.id}
+            currentUserId={user?.id ?? null}
+          />
+          <ArticleEngagementZone
+            key={article.id}
+            articleId={article.id}
+            hasQuiz={hasQuiz}
+            initialPassed={initialPassed}
+            currentUserId={user?.id ?? null}
+          />
+        </>
       )}
     </>
   );
