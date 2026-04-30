@@ -34,10 +34,13 @@ export function BlockedSection({ preview }: Props) {
   const toast = useToast();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
+    setBusy(null);
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -53,6 +56,7 @@ export function BlockedSection({ preview }: Props) {
       .eq('blocker_id', user.id);
     if (error) {
       toast.error(error.message ?? 'Could not load blocks.');
+      setLoadError(true);
       setLoading(false);
       return;
     }
@@ -85,6 +89,28 @@ export function BlockedSection({ preview }: Props) {
   };
 
   if (loading) return <SkeletonBlock height={120} />;
+  if (loadError) {
+    return (
+      <div
+        style={{
+          padding: S[5],
+          textAlign: 'center',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: S[3],
+          alignItems: 'center',
+          fontFamily: FONT.sans,
+        }}
+      >
+        <p style={{ margin: 0, fontSize: F.sm, color: C.inkSoft }}>
+          Could not load blocked users.
+        </p>
+        <button type="button" onClick={load} style={buttonSecondaryStyle}>
+          Retry
+        </button>
+      </div>
+    );
+  }
   if (rows.length === 0) {
     return (
       <EmptyState
@@ -133,7 +159,7 @@ export function BlockedSection({ preview }: Props) {
             <button
               type="button"
               onClick={() => unblock(r.blocked_id)}
-              disabled={busy === r.blocked_id}
+              disabled={busy === r.blocked_id || preview}
               style={buttonSecondaryStyle}
             >
               {busy === r.blocked_id ? 'Unblocking…' : 'Unblock'}

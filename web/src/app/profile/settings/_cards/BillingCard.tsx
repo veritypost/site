@@ -93,6 +93,7 @@ export function BillingCard({ user, preview }: Props) {
       const res = await fetch('/api/stripe/portal', { method: 'POST' });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`);
+      if (!data.url) throw new Error('Could not get billing portal link.');
       window.location.href = data.url;
     } catch (err) {
       setBusy(null);

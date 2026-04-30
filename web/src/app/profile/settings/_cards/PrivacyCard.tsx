@@ -270,17 +270,20 @@ export function PrivacyCard({ user, preview }: Props) {
       ids.map((id) => fetch(`/api/users/${encodeURIComponent(id)}/block`, { method: 'POST' }))
     );
     setBusyKey(null);
-    const failed = results.filter(
-      (r) => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok)
-    ).length;
+    const succeededIds = new Set(
+      ids.filter((_, i) => {
+        const r = results[i];
+        return r.status === 'fulfilled' && r.value.ok;
+      })
+    );
+    const failed = ids.length - succeededIds.size;
     if (failed > 0) {
-      toast.error(`Blocked ${ids.length - failed}, ${failed} failed.`);
+      toast.error(`Blocked ${succeededIds.size}, ${failed} failed.`);
     } else {
       toast.success(`Blocked ${ids.length}.`);
     }
-    // Blocked users are also implicitly removed as followers server-side
-    // in the existing block flow — refresh to reflect it.
-    setFollowers((rows) => rows.filter((r) => !picked.has(r.follower_id)));
+    // Only remove followers whose block succeeded — failed ones are still following.
+    setFollowers((rows) => rows.filter((r) => !succeededIds.has(r.follower_id)));
     setPicked(new Set());
   };
 
