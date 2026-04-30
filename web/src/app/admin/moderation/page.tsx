@@ -149,6 +149,8 @@ function ModerationConsoleInner() {
         // hierarchy_level, not a hardcoded map that can drift.
         supabase.from('roles').select('name, hierarchy_level'),
       ]);
+      if (actorRolesRes.error) console.error('[moderation.init] actor roles fetch failed', actorRolesRes.error);
+      if (allRolesRes.error) console.error('[moderation.init] roles table fetch failed', allRolesRes.error);
       const roleRows = (actorRolesRes.data || [])
         .map((r) => (r as { roles: { name: string | null; hierarchy_level: number | null } | null }).roles)
         .filter((r): r is { name: string | null; hierarchy_level: number | null } => Boolean(r));
@@ -218,6 +220,8 @@ function ModerationConsoleInner() {
         .order('created_at', { ascending: false })
         .limit(20),
     ]);
+    if (rolesRes.error) console.error('[moderation.search] roles fetch failed', rolesRes.error);
+    if (warningsRes.error) console.error('[moderation.search] warnings fetch failed', warningsRes.error);
 
     const targetRoleRows = (rolesRes.data || [])
       .map((x) => (x as { roles?: { name?: string | null; hierarchy_level?: number | null } | null }).roles)
@@ -254,28 +258,30 @@ function ModerationConsoleInner() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ role_name: roleName }),
     });
-    setBusy('');
     if (!res.ok) {
       const d = await res.json().catch(() => ({}));
       toast.push({ message: d?.error || 'Grant failed', variant: 'danger' });
+      setBusy('');
       return;
     }
     toast.push({ message: `Role granted: ${roleName}`, variant: 'success' });
-    search();
+    await search();
+    setBusy('');
   }
 
   async function revokeRole(roleName: string) {
     if (!target) return;
     setBusy(`revoke:${roleName}`);
     const res = await fetch(`/api/admin/users/${target.id}/roles?role_name=${roleName}`, { method: 'DELETE' });
-    setBusy('');
     if (!res.ok) {
       const d = await res.json().catch(() => ({}));
       toast.push({ message: d?.error || 'Revoke failed', variant: 'danger' });
+      setBusy('');
       return;
     }
     toast.push({ message: `Role revoked: ${roleName}`, variant: 'success' });
-    search();
+    await search();
+    setBusy('');
   }
 
   function penalty(level: number) {
@@ -531,10 +537,10 @@ function ModerationConsoleInner() {
                     <div style={{ fontSize: F.xs, color: ADMIN_C.dim }}>{new Date(a.created_at).toLocaleString()}</div>
                   </div>
                   <div style={{ display: 'flex', gap: S[1], flexWrap: 'wrap' }}>
-                    <Button variant="primary" size="sm" onClick={() => { setAppealNotes(''); setAppealModal({ mode: 'approve', id: a.id, username: a.users?.username }); }}>
+                    <Button variant="primary" size="sm" disabled={busy.startsWith('app:')} onClick={() => { setAppealNotes(''); setAppealModal({ mode: 'approve', id: a.id, username: a.users?.username }); }}>
                       Approve
                     </Button>
-                    <Button variant="danger" size="sm" onClick={() => { setAppealNotes(''); setAppealModal({ mode: 'deny', id: a.id, username: a.users?.username }); }}>
+                    <Button variant="danger" size="sm" disabled={busy.startsWith('app:')} onClick={() => { setAppealNotes(''); setAppealModal({ mode: 'deny', id: a.id, username: a.users?.username }); }}>
                       Deny
                     </Button>
                   </div>
