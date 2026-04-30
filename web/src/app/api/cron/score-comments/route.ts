@@ -74,7 +74,8 @@ async function run(request: Request) {
         let parsed: { toxicity?: number; sentiment?: string; tag?: string } = {};
         try {
           parsed = JSON.parse(text);
-        } catch {
+        } catch (err) {
+          console.error('[score-comments] json-parse failed on comment', comment.id, err);
           continue;
         }
 
