@@ -85,7 +85,8 @@ export default function HomeFirstLoginMoment() {
         }
 
         setCopy('you made it.');
-      } catch {
+      } catch (e) {
+        console.error('[home.first-login-moment] fetch error', e);
         setCopy(null);
       }
     })();
@@ -116,7 +117,9 @@ export default function HomeFirstLoginMoment() {
             .from('users')
             .update({ onboarding_completed_at: new Date().toISOString() })
             .eq('id', userId);
-        } catch {}
+        } catch (e) {
+          console.error('[home.first-login-moment] update error', e);
+        }
       }
     }, 1600);
 
