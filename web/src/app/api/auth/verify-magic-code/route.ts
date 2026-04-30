@@ -102,14 +102,13 @@ export async function POST(request: NextRequest) {
     return genericOk();
   }
 
-  // Verify the OTP. Supabase resolves type='email' against OTP codes sent
-  // via signInWithOtp. The Supabase dashboard email template must use
-  // {{ .Token }} (6-digit code) rather than {{ .ConfirmationURL }}.
+  // Verify the OTP. type='magiclink' matches the token issued by
+  // admin.generateLink({ type: 'magiclink' }) in send-magic-link.
   const supabase = createOtpClient();
   const { data, error } = await supabase.auth.verifyOtp({
     email,
     token: rawToken,
-    type: 'email',
+    type: 'magiclink',
   });
 
   if (error || !data.user) {

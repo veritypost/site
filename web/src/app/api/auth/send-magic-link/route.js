@@ -303,17 +303,6 @@ export async function POST(request) {
     return genericOk();
   }
 
-  // Step 3: Issue OTP for typed-code fallback. Non-fatal — the link-click
-  // path works independently even if this call fails.
-  try {
-    await createOtpClient().auth.signInWithOtp({
-      email,
-      options: { shouldCreateUser: false },
-    });
-  } catch (err) {
-    console.error('[auth.send-magic-link] signInWithOtp (typed-code fallback) error:', err?.message || err);
-  }
-
   // Step 4: Compute days_on_list for new users. Non-fatal.
   let daysOnList = null;
   if (!existingUserId) {
