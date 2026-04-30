@@ -152,6 +152,9 @@ function MessagesPageInner() {
   const [showReportDialog, setShowReportDialog] = useState<boolean>(false);
   const [reportReason, setReportReason] = useState<string>('');
   const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set());
+  const [sending, setSending] = useState<boolean>(false);
+  const [blocking, setBlocking] = useState<boolean>(false);
+  const [submittingReport, setSubmittingReport] = useState<boolean>(false);
   // T113 — viewer-controlled dismiss for the DM paywall (× button +
   // Esc key). Resets on every fresh page mount so the paywall is
   // re-shown for new sessions.
@@ -498,44 +501,49 @@ function MessagesPageInner() {
   const sendMessage = async () => {
     if (!input.trim() || !selected || !currentUser) return;
     if (dmLocked) return; // D40: can't send while locked
+    if (sending) return;
     const body = input.trim();
     setInput('');
+    setSending(true);
+    try {
+      const res = await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversation_id: selected, body }),
+      });
+      const payload: unknown = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        // Soft error — restore the draft so the user can edit or retry.
+        setInput(body);
+        toast.error('Message failed to send. Try again.');
+        return;
+      }
+      toast.success('Message sent.');
+      // T162 — runtime shape guard before consuming the row.
+      const maybeMessage =
+        payload && typeof payload === 'object'
+          ? (payload as { message?: unknown }).message
+          : undefined;
+      const data: MessageRow | undefined =
+        maybeMessage && typeof maybeMessage === 'object' ? (maybeMessage as MessageRow) : undefined;
 
-    const res = await fetch('/api/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ conversation_id: selected, body }),
-    });
-    const payload: unknown = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      // Soft error — restore the draft so the user can edit or retry.
-      setInput(body);
-      toast.error('Message failed to send. Try again.');
-      return;
-    }
-    toast.success('Message sent.');
-    // T162 — runtime shape guard before consuming the row.
-    const maybeMessage =
-      payload && typeof payload === 'object'
-        ? (payload as { message?: unknown }).message
-        : undefined;
-    const data: MessageRow | undefined =
-      maybeMessage && typeof maybeMessage === 'object' ? (maybeMessage as MessageRow) : undefined;
-
-    if (data) {
-      setMessages((prev) => [...prev, data]);
-      setConversations((prev) =>
-        prev.map((c) =>
-          c.id === selected
-            ? {
-                ...c,
-                last_message_preview: body.slice(0, 100),
-                last_message_at: new Date().toISOString(),
-              }
-            : c
-        )
-      );
-      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+      if (data) {
+        setMessages((prev) => [...prev, data]);
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.id === selected
+              ? {
+                  ...c,
+                  last_message_preview: body.slice(0, 100),
+                  last_message_at: new Date().toISOString(),
+                }
+              : c
+          )
+        );
+        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+      }
+    } finally {
+      setSending(false);
     }
   };
 
@@ -670,6 +678,7 @@ function MessagesPageInner() {
   // open convo. Route is POST-to-block, DELETE-to-unblock (Apple Guideline
   // 1.2 split); we pick the method from `blockedUserIds` state.
   const blockOtherUser = async () => {
+    if (blocking) return;
     const convo = conversations.find((c) => c.id === selected);
     const other = convo?.conversation_participants?.find((p) => p.user_id !== currentUser?.id);
     const otherId = other?.user_id;
@@ -678,6 +687,7 @@ function MessagesPageInner() {
       return;
     }
     const isBlocked = blockedUserIds.has(otherId);
+    setBlocking(true);
     try {
       const res = await fetch(`/api/users/${otherId}/block`, {
         method: isBlocked ? 'DELETE' : 'POST',
@@ -699,6 +709,8 @@ function MessagesPageInner() {
     } catch (e) {
       console.error('[messages] block mutation', e);
       toast.error('Network error. Try again.');
+    } finally {
+      setBlocking(false);
     }
     setShowConvoMenu(false);
   };
@@ -708,6 +720,7 @@ function MessagesPageInner() {
   // (targetType / targetId / reason), not the spec's subject_* names.
   const submitReport = async () => {
     if (!reportReason.trim()) return;
+    if (submittingReport) return;
     const convo = conversations.find((c) => c.id === selected);
     const other = convo?.conversation_participants?.find((p) => p.user_id !== currentUser?.id);
     const otherId = other?.user_id;
@@ -715,6 +728,7 @@ function MessagesPageInner() {
       toast.error('Could not find the other participant.');
       return;
     }
+    setSubmittingReport(true);
     try {
       const res = await fetch('/api/reports', {
         method: 'POST',
@@ -734,6 +748,8 @@ function MessagesPageInner() {
     } catch (e) {
       console.error('[messages] report user', e);
       toast.error('Network error. Try again.');
+    } finally {
+      setSubmittingReport(false);
     }
     setShowReportDialog(false);
     setReportReason('');
@@ -1292,6 +1308,7 @@ function MessagesPageInner() {
                     >
                       <button
                         onClick={blockOtherUser}
+                        disabled={blocking}
                         role="menuitem"
                         style={{
                           display: 'block',
@@ -1302,7 +1319,8 @@ function MessagesPageInner() {
                           border: 'none',
                           fontSize: 13,
                           color: '#111',
-                          cursor: 'pointer',
+                          cursor: blocking ? 'default' : 'pointer',
+                          opacity: blocking ? 0.5 : 1,
                         }}
                       >
                         {(() => {
@@ -1423,16 +1441,16 @@ function MessagesPageInner() {
                   </button>
                   <button
                     onClick={submitReport}
-                    disabled={!reportReason.trim()}
+                    disabled={!reportReason.trim() || submittingReport}
                     style={{
                       padding: '8px 14px',
                       borderRadius: 8,
                       border: 'none',
-                      background: reportReason.trim() ? '#111' : '#ccc',
+                      background: reportReason.trim() && !submittingReport ? '#111' : '#ccc',
                       color: '#fff',
                       fontSize: 13,
                       fontWeight: 600,
-                      cursor: reportReason.trim() ? 'pointer' : 'default',
+                      cursor: reportReason.trim() && !submittingReport ? 'pointer' : 'default',
                     }}
                   >
                     Submit
@@ -1597,16 +1615,16 @@ function MessagesPageInner() {
               />
               <button
                 onClick={sendMessage}
-                disabled={!input.trim() || !!dmLocked}
+                disabled={!input.trim() || !!dmLocked || sending}
                 style={{
                   padding: '8px 16px',
                   borderRadius: 8,
                   border: 'none',
-                  background: input.trim() && !dmLocked ? '#111' : '#ccc',
+                  background: input.trim() && !dmLocked && !sending ? '#111' : '#ccc',
                   color: '#fff',
                   fontSize: 13,
                   fontWeight: 600,
-                  cursor: input.trim() && !dmLocked ? 'pointer' : 'default',
+                  cursor: input.trim() && !dmLocked && !sending ? 'pointer' : 'default',
                   flexShrink: 0,
                   alignSelf: 'center',
                 }}
