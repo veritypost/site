@@ -155,6 +155,7 @@ function MessagesPageInner() {
   const [sending, setSending] = useState<boolean>(false);
   const [blocking, setBlocking] = useState<boolean>(false);
   const [submittingReport, setSubmittingReport] = useState<boolean>(false);
+  const [starting, setStarting] = useState<boolean>(false);
   // T113 — viewer-controlled dismiss for the DM paywall (× button +
   // Esc key). Resets on every fresh page mount so the paywall is
   // re-shown for new sessions.
@@ -586,68 +587,75 @@ function MessagesPageInner() {
       setShowSearch(false);
       return;
     }
-
-    // Round 7 Bug 1 -- route through POST /api/conversations so the
-    // start_conversation RPC runs the paid gate (user_has_dm_access),
-    // mute/ban check, and atomically inserts convo + both participant
-    // rows. Direct `conversations.insert` + `conversation_participants.
-    // insert` were letting free accounts create empty solo-owner convos
-    // because the recipient participant insert failed RLS while the
-    // owner row + convo row went through.
-    const res = await fetch('/api/conversations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ other_user_id: otherUserId }),
-    });
-    const json: unknown = await res.json().catch(() => ({}));
-    // T162 — guard the conversation/error fields before reading.
-    const isObj = json && typeof json === 'object';
-    if (!res.ok) {
-      const errMsg =
-        isObj && typeof (json as { error?: unknown }).error === 'string'
-          ? (json as { error: string }).error
+    if (starting) return;
+    setStarting(true);
+    try {
+      // Round 7 Bug 1 -- route through POST /api/conversations so the
+      // start_conversation RPC runs the paid gate (user_has_dm_access),
+      // mute/ban check, and atomically inserts convo + both participant
+      // rows. Direct `conversations.insert` + `conversation_participants.
+      // insert` were letting free accounts create empty solo-owner convos
+      // because the recipient participant insert failed RLS while the
+      // owner row + convo row went through.
+      const res = await fetch('/api/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ other_user_id: otherUserId }),
+      });
+      const json: unknown = await res.json().catch(() => ({}));
+      // T162 — guard the conversation/error fields before reading.
+      const isObj = json && typeof json === 'object';
+      if (!res.ok) {
+        const errMsg =
+          isObj && typeof (json as { error?: unknown }).error === 'string'
+            ? (json as { error: string }).error
+            : undefined;
+        console.error('start conversation failed', errMsg);
+        toast.error(errMsg || 'Could not start conversation. Try again.');
+        setShowSearch(false);
+        return;
+      }
+      const conversation = isObj ? (json as { conversation?: unknown }).conversation : undefined;
+      const convoId: string | undefined =
+        conversation &&
+        typeof conversation === 'object' &&
+        typeof (conversation as { id?: unknown }).id === 'string'
+          ? (conversation as { id: string }).id
           : undefined;
-      console.error('start conversation failed', errMsg);
-      setShowSearch(false);
-      return;
-    }
-    const conversation = isObj ? (json as { conversation?: unknown }).conversation : undefined;
-    const convoId: string | undefined =
-      conversation &&
-      typeof conversation === 'object' &&
-      typeof (conversation as { id?: unknown }).id === 'string'
-        ? (conversation as { id: string }).id
-        : undefined;
-    if (!convoId) {
-      setShowSearch(false);
-      return;
-    }
+      if (!convoId) {
+        setShowSearch(false);
+        return;
+      }
 
-    // Re-fetch the single convo row so downstream UI has the shape it expects.
-    const { data: convo } = await supabase
-      .from('conversations')
-      .select('*')
-      .eq('id', convoId)
-      .single<ConversationRow>();
-    if (!convo) {
-      setShowSearch(false);
-      return;
-    }
+      // Re-fetch the single convo row so downstream UI has the shape it expects.
+      const { data: convo } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('id', convoId)
+        .single<ConversationRow>();
+      if (!convo) {
+        toast.error('Could not open conversation. Try again.');
+        setShowSearch(false);
+        return;
+      }
 
-    const otherUser = searchResults.find((u) => u.id === otherUserId);
-    setConversations((prev) => [
-      {
-        ...convo,
-        otherUser: otherUser
-          ? { username: otherUser.username, avatar_color: otherUser.avatar_color }
-          : null,
-        conversation_participants: [],
-        unread: 0,
-      },
-      ...prev,
-    ]);
-    setSelected(convo.id);
-    setShowSearch(false);
+      const otherUser = searchResults.find((u) => u.id === otherUserId);
+      setConversations((prev) => [
+        {
+          ...convo,
+          otherUser: otherUser
+            ? { username: otherUser.username, avatar_color: otherUser.avatar_color }
+            : null,
+          conversation_participants: [],
+          unread: 0,
+        },
+        ...prev,
+      ]);
+      setSelected(convo.id);
+      setShowSearch(false);
+    } finally {
+      setStarting(false);
+    }
   };
 
   // ?to=<userId> auto-open. Waits for auth + conversations + canCompose,
@@ -1780,7 +1788,9 @@ function MessagesPageInner() {
                     alignItems: 'center',
                     gap: 12,
                     padding: '10px 16px',
-                    cursor: 'pointer',
+                    cursor: starting ? 'default' : 'pointer',
+                    opacity: starting ? 0.5 : 1,
+                    pointerEvents: starting ? 'none' : 'auto',
                     borderBottom: '1px solid #f0f0f0',
                   }}
                 >
