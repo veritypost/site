@@ -453,11 +453,14 @@ async function handleCheckoutCompleted(service, session) {
       );
     }
     if (!userRow.stripe_customer_id) {
-      await service
+      const { error: bindErr } = await service
         .from('users')
         .update({ stripe_customer_id: customerId })
         .eq('id', userRow.id)
         .is('stripe_customer_id', null);
+      if (bindErr) {
+        throw new Error(`checkout.completed: stripe_customer_id bind failed: ${bindErr.message}`);
+      }
     }
   }
 
@@ -587,13 +590,16 @@ async function handleSubscriptionUpdated(service, sub) {
       // column clear so un-cancel still works before the next schema
       // migration. Audit the fallback for observability.
       if (/billing_uncancel_subscription/i.test(rpcErr?.message || '')) {
-        await service
+        const { error: fallbackErr } = await service
           .from('users')
           .update({
             plan_grace_period_ends_at: null,
             plan_status: 'active',
           })
           .eq('id', userRow.id);
+        if (fallbackErr) {
+          throw new Error(`subscription.updated: uncancel fallback UPDATE failed: ${fallbackErr.message}`);
+        }
         // B1 tail: direct write bypasses the RPC, so bump explicitly.
         // billing_uncancel_subscription bumps internally (migration 189);
         // this fallback path skips the RPC so must bump at the call-site.
@@ -714,7 +720,10 @@ async function handleChargeRefunded(service, charge) {
 
   if (autoFreeze) {
     // Immediate-freeze path (billing.refund_auto_freeze = 'true').
-    await service.rpc('billing_freeze_profile', { p_user_id: userRow.id });
+    const { error: freezeErr } = await service.rpc('billing_freeze_profile', { p_user_id: userRow.id });
+    if (freezeErr) {
+      throw new Error(`charge.refunded: billing_freeze_profile failed: ${freezeErr.message}`);
+    }
     // Tell the user their paid features are paused. Best-effort.
     try {
       await service.rpc('create_notification', {
@@ -1050,13 +1059,16 @@ async function handlePaymentSucceeded(service, invoice) {
     return;
   }
 
-  await service
+  const { error: graceErr } = await service
     .from('users')
     .update({
       plan_grace_period_ends_at: null,
       plan_status: 'active',
     })
     .eq('id', userRow.id);
+  if (graceErr) {
+    throw new Error(`payment.succeeded: grace period clear failed: ${graceErr.message}`);
+  }
 
   // B1 tail — bump perms cache so paid-feature revocations from the
   // prior grace window clear immediately when the user returns to
@@ -1210,11 +1222,15 @@ async function handleCustomerDeleted(service, customer) {
   // fresh Stripe Customer. The .eq('stripe_customer_id', customerId)
   // guard prevents clobbering a user whose row was reassigned between
   // the SELECT and UPDATE.
-  await service
+  const { error: clearErr } = await service
     .from('users')
     .update({ stripe_customer_id: null })
     .eq('id', userRow.id)
     .eq('stripe_customer_id', customerId);
+  if (clearErr) {
+    console.error('[stripe.webhook.customer_deleted] stripe_customer_id clear failed', clearErr);
+    throw new Error(`customer.deleted: stripe_customer_id clear failed: ${clearErr.message}`);
+  }
 
   await service.from('audit_log').insert({
     actor_id: userRow.id,
