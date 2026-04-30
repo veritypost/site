@@ -158,3 +158,77 @@ Stories-as-containers migration verified clean across home, browse, search, lead
 **What's blocked.** Nothing.
 
 **What next session should pick up.** Slice 03 — Article reading. Focus on the `web/src/app/[slug]/` story page and the article-lifecycle client islands: `ArticleEngagementZone`, `ArticleTracker`, `SourcesSection`, `TimelineSection`. Verify event tracking, quiz mount, comment mount. Check all `stories(slug)` joins for FK hint correctness. Cover anon, free, pro, and admin account types. Spawn parallel Explore agents as per slice session protocol.
+
+---
+
+## Session 5 — 2026-04-30 — Slice 03: Article reading investigation
+
+**Phase entering:** 3 (slice 03 not-started).
+**Phase leaving:** 3 (slice 03 locked — 6 confirmed issues + 1 wont-fix).
+
+**What happened.** Four parallel Explore agents investigated the story page and article surface (Agent A), quiz flow end-to-end (Agent B), comment thread / composer / realtime (Agent C), and event tracking / ArticleTracker (Agent D). After synthesizing 7 prioritized findings, a fresh adversarial agent was spawned.
+
+Adversarial review made three meaningful changes:
+1. **Finding 3 upgraded from "unverified" to "confirmed broken":** `users!user_id` in `api/comments/route.js:185` is the wrong FK hint — `database.ts` defines `foreignKeyName: "fk_comments_user_id"`; two other callers in the codebase use the correct form.
+2. **Finding 6 (userTier prop) → wont-fix:** `userTier` is declared in `ArticleQuiz` props interface but never destructured or read inside the component. No functionality affected.
+3. **New finding added (03-05):** `page.tsx:167–170` accesses `.count` / `.data` from Supabase results without checking `.error` — Supabase errors return `{ data: null, error }`, not thrown exceptions, so they bypass the try/catch from 03-00. Companion issue to 03-00.
+
+The adversary also confirmed: no `error.tsx` exists inside `web/src/app/[slug]/` (only `loading.tsx` and `not-found.tsx`); root `error.js` is the only fallback for unhandled rejections from the article page.
+
+**Large clean surface:** Quiz flow (pool exhaustion stripped, selected_answer as option text, RPC takes article_id UUID), T300 realtime fix (both initial load AND realtime inserts use `public_profiles_v`), comment lock/unlock in-place, notification URLs (`/<slug>`), post_comment story_id, events/batch anon-allowed by design (sendBeacon works correctly), quiz FK sweep clean.
+
+**What got locked.** Slice doc written at `slices/03-article-reading.md` with 6 confirmed issues and 1 wont-fix:
+- 03-00 (P0): `page.tsx:126–163` Promise.all() no try/catch; no `[slug]/error.tsx`; root error.js only fallback
+- 03-01 (P1): `ArticleTracker.tsx:41` sentinels at `${pct}vh` from document.body, not article-relative — all scroll analytics wrong
+- 03-02 (P1): `api/comments/route.js:185` wrong FK hint `users!user_id` — correct is `users!fk_comments_user_id` — response join silently returns no author data
+- 03-03 (P2): `page.tsx:161` timeline fetch hardcodes `.eq('type', 'event')` — `type='article'` entries never fetched
+- 03-04 (P2): `page.tsx:175` `incrementViewCount` `.catch(() => {})` with no logging
+- 03-05 (P2): `page.tsx:167–170` `.count` / `.data` accessed without `.error` check — Supabase errors bypass try/catch
+- 03-06 (P3): `page.tsx:119` invalid `?a=` param falls through to first article silently
+- wont-fix: `userTier` dead prop in ArticleQuiz
+
+**Implementation order:** 03-00 + 03-05 together (page.tsx), then 03-02 (comments route — one character), then 03-01 (ArticleTracker — element-relative sentinels), then 03-03 + 03-04 (page.tsx batch), then 03-06 (P3 — discuss redirect vs. silent fallback before touching).
+
+**What's blocked.** 03-03 (timeline type filter removal) requires a check of `TimelineSection.tsx` to confirm it handles `type='article'` entries before the filter is removed — if it only renders `type='event'`, the section code needs updating too. The implementation agent must read both files before writing anything.
+
+**What next session should pick up.** Slice 03 implementation. Read `slices/03-article-reading.md` in full. Confirm current code still matches investigation descriptions before touching anything. Fix in priority order: 03-00 + 03-05 first (P0 crash risk + companion), then 03-02 (P1, one-line FK fix), then 03-01 (P1, ArticleTracker sentinel placement), then 03-03 + 03-04 (P2), then 03-06 (P3, confirm owner prefers redirect vs. silent fallback). TypeScript check after each commit group.
+
+---
+
+## Session 6 — 2026-04-30 — Slice 03: Article reading implementation
+
+**Phase entering:** 3 (slice 03 locked).
+**Phase leaving:** 4 (slice 03 shipped — all 6 issues resolved, zero TypeScript errors).
+
+**What happened.** Read slice doc, README, and auto-memory. Read all cited files before writing anything: `page.tsx` (confirmed Promise.all at 126–163 without try/catch, `.catch(() => {})` at 175, `.eq('type','event')` filter at 161), `ArticleTracker.tsx` (confirmed `${pct}vh` sentinel placement at 41), `api/comments/route.js:185` (confirmed `users!user_id` wrong hint), `TimelineSection.tsx` (confirmed only `event_label`/`event_body` rendered, no type handling), `database.ts` timelines section (confirmed `linked_article_id` + `type` fields, FK name `timelines_linked_article_id_fkey`). Pre-implementation check found that 03-03 required updating both the query select string AND TimelineSection, since the component had no type field at all.
+
+For 03-06, owner chose Option A (redirect to `/<slug>`) over Option B (silent warn) — stale share links now land on the canonical story URL instead of silently rendering the wrong article.
+
+**Commit `fee1eb5` — 03-00 + 03-05 (P0):**
+- `page.tsx`: IIFE pattern wraps Promise.all in try/catch; fetchResult.ok guard returns `<ArticleFetchFailed />` on any thrown exception.
+- After destructure: `quizCountResult.error` and `passCheckResult.error` checked; failing results default to `hasQuiz=false` / `initialPassed=false` with console.error.
+- Timeline query updated at the same time to include `type, linked_article_id` (needed for 03-03 fix landed in `9df8ca5`).
+- New `_ArticleFetchFailed.tsx` — client island with `router.refresh()` retry button, matching `_HomeFetchFailed` pattern.
+- New `error.tsx` — Next.js error boundary for the `[slug]` segment; calls `reset()` on retry.
+
+**Commit `8166fde` — 03-02 (P1):**
+- `api/comments/route.js:185`: `users!user_id(` → `users!fk_comments_user_id(`. Matches `foreignKeyName` in `database.ts`; matches two other callers in the codebase.
+
+**Commit `9afd119` — 03-01 (P1):**
+- `ArticleTracker.tsx`: `placeSentinels()` function queries `[data-article-body]` element; computes `articleTop = el.getBoundingClientRect().top + window.scrollY` and `articleHeight = el.offsetHeight`; places each sentinel at `articleTop + (pct/100) * articleHeight`. Falls back to window.innerHeight with console.warn if element absent. `ResizeObserver` repositions on height change (e.g. lazy image loads).
+- `ArticleSurface.tsx`: added `data-article-body` attribute to the body `<div>`.
+
+**Commit `9df8ca5` — 03-03 + 03-04 (P2):**
+- `page.tsx:161`: removed `.eq('type', 'event')` filter; select string already included `type, linked_article_id` from the 03-00 commit.
+- `TimelineSection.tsx`: `TimelineItem` gains `type: 'event' | 'article' | string` and `linked_article_id: string | null`; component gains optional `storySlug?: string` prop; `type='article'` entries with a non-null `linked_article_id` render as `<a href="/<storySlug>?a=<id>">` anchors. Latent bug — no production type='article' entries exist yet.
+- `ArticleSurface.tsx`: passes `storySlug={article.slug}` to `<TimelineSection>`.
+- `page.tsx:175`: `.catch(() => {})` → `.catch((e) => console.error('[article] incrementViewCount failed', e))`.
+
+**Commit `291b354` — 03-06 (P3):**
+- `page.tsx`: added `redirect` to `next/navigation` import; replaced fallthrough `?? found.article` with an explicit check — if `searchParams.a` is present and no article matches, calls `redirect(\`/${story.slug}\`)`. Clean canonical URL; no ghost param in the reader's address bar.
+
+**TypeScript check:** `npx tsc --noEmit` — zero errors after each commit.
+
+**What's blocked.** Nothing.
+
+**What next session should pick up.** Slice 04 — Reader engagement & social. Surfaces: bookmarks (`/api/bookmarks/`, `BookmarkButton`), following (`/api/follows/`, `FollowButton`), notifications (`/notifications`, `/api/notifications/`), public profiles (`/profile/[username]/`), expert queue (`/api/expert/queue/`), recap. Cover anon, free, pro, and admin. Verify FK hints on any `.select()` with `!` syntax. Spawn parallel Explore agents per slice session protocol.

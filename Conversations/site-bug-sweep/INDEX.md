@@ -1,8 +1,8 @@
 # Site Bug-Sweep — Index
 
-**Last updated:** 2026-04-30 (session 4 — slice 02 shipped)
-**Phase:** 2 — slice 02 shipped; ready for slice 03
-**Next session should pick up:** Slice 03 — Article reading (investigation pass)
+**Last updated:** 2026-04-30 (session 6 — slice 03 shipped)
+**Phase:** 4 — slice 03 shipped; ready for slice 04
+**Next session should pick up:** Slice 04 — Reader engagement & social
 
 ---
 
@@ -12,7 +12,7 @@
 |---|---|---|---|---|
 | 01 | Auth & account gates | **shipped** | 2026-04-30 | `slices/01-auth-gates.md` |
 | 02 | Navigation & discovery | **shipped** | 2026-04-30 | `slices/02-nav-discovery.md` |
-| 03 | Article reading | **not-started** | — | — |
+| 03 | Article reading | **shipped** | 2026-04-30 | `slices/03-article-reading.md` |
 | 04 | Reader engagement & social | **not-started** | — | — |
 | 05 | Messaging | **not-started** | — | — |
 | 06 | Billing & subscription | **not-started** | — | — |
@@ -53,6 +53,7 @@ FK hints that were wrong and have already been fixed. Carried here so future age
 |---|---|---|
 | `blocked_users_blocked_id_fkey` | `fk_blocked_users_blocked_id` | profile-bugfix session 3 (`95abb13`) |
 | `follows_follower_id_fkey` | `fk_follows_follower_id` | profile-bugfix session 3 (`95abb13`) |
+| `users!user_id` (comments POST) | `users!fk_comments_user_id` | slice 03 session 6 (`8166fde`) |
 
 ---
 
