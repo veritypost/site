@@ -26,7 +26,7 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 
-  const { planName } = await request.json();
+  const { planName } = await request.json().catch(() => ({}));
   if (!planName) {
     return NextResponse.json({ error: 'planName required' }, { status: 400 });
   }
