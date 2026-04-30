@@ -34,35 +34,54 @@ export default function AppealPage() {
   const [flash, setFlash] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [hasPenalty, setHasPenalty] = useState<boolean>(false);
+  const [submitting, setSubmitting] = useState<string | null>(null);
 
   async function load() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-    // Pass 17 / UJ-513 + Task 140d: gate the page on active penalty state.
-    // Banned + still-active-mute users see the appeal list. Everyone else
-    // sees the empty state — the AccountStateBanner handles "no penalty"
-    // messaging globally; this page is the penalty-specific surface.
-    const { data: profile } = await supabase
-      .from('users')
-      .select('is_banned, is_muted, muted_until')
-      .eq('id', user.id)
-      .maybeSingle<PenaltyProfile>();
-    const muteActive =
-      !!profile?.is_muted && (!profile.muted_until || new Date(profile.muted_until) > new Date());
-    setHasPenalty(!!(profile?.is_banned || muteActive));
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+      // Pass 17 / UJ-513 + Task 140d: gate the page on active penalty state.
+      // Banned + still-active-mute users see the appeal list. Everyone else
+      // sees the empty state — the AccountStateBanner handles "no penalty"
+      // messaging globally; this page is the penalty-specific surface.
+      const { data: profile, error: profileErr } = await supabase
+        .from('users')
+        .select('is_banned, is_muted, muted_until')
+        .eq('id', user.id)
+        .maybeSingle<PenaltyProfile>();
+      if (profileErr) {
+        console.error('[appeal] profile fetch failed', profileErr);
+        setError('Could not load your account status. Try refreshing.');
+        setLoading(false);
+        return;
+      }
+      const muteActive =
+        !!profile?.is_muted && (!profile.muted_until || new Date(profile.muted_until) > new Date());
+      setHasPenalty(!!(profile?.is_banned || muteActive));
 
-    const { data } = await supabase
-      .from('user_warnings')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-    setWarnings((data as WarningRow[] | null) || []);
-    setLoading(false);
+      const { data, error: warnErr } = await supabase
+        .from('user_warnings')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      if (warnErr) {
+        console.error('[appeal] warnings fetch failed', warnErr);
+        setError('Could not load your warnings. Try refreshing.');
+        setLoading(false);
+        return;
+      }
+      setWarnings((data as WarningRow[] | null) || []);
+      setLoading(false);
+    } catch (e) {
+      console.error('[appeal] load error', e);
+      setError('Something went wrong. Try refreshing.');
+      setLoading(false);
+    }
   }
   useEffect(() => {
     load();
@@ -77,23 +96,28 @@ export default function AppealPage() {
     }
     setError('');
     setFlash('');
-    const res = await fetch('/api/appeals', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ warning_id: id, text }),
-    });
-    const data = await res.json().catch(() => ({}) as { error?: string });
-    if (!res.ok) {
-      setError(data?.error || 'Appeal failed');
-      return;
+    setSubmitting(id);
+    try {
+      const res = await fetch('/api/appeals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ warning_id: id, text }),
+      });
+      const data = await res.json().catch(() => ({}) as { error?: string });
+      if (!res.ok) {
+        setError(data?.error || 'Appeal failed');
+        return;
+      }
+      setFlash('Appeal submitted. A moderator will review it.');
+      setDrafts((prev) => {
+        const n = { ...prev };
+        delete n[id];
+        return n;
+      });
+      load();
+    } finally {
+      setSubmitting(null);
     }
-    setFlash('Appeal submitted. A moderator will review it.');
-    setDrafts((prev) => {
-      const n = { ...prev };
-      delete n[id];
-      return n;
-    });
-    load();
   }
 
   if (loading) return <div style={{ padding: 40, color: '#666' }}>Loading…</div>;
@@ -211,6 +235,7 @@ export default function AppealPage() {
                   />
                   <button
                     onClick={() => submitAppeal(w.id)}
+                    disabled={submitting === w.id}
                     style={{
                       marginTop: 6,
                       padding: '7px 16px',
@@ -220,10 +245,11 @@ export default function AppealPage() {
                       color: '#fff',
                       fontSize: 12,
                       fontWeight: 700,
-                      cursor: 'pointer',
+                      cursor: submitting === w.id ? 'not-allowed' : 'pointer',
+                      opacity: submitting === w.id ? 0.6 : 1,
                     }}
                   >
-                    File appeal
+                    {submitting === w.id ? 'Submitting…' : 'File appeal'}
                   </button>
                 </>
               ) : (

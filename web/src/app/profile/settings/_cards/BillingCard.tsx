@@ -56,27 +56,43 @@ export function BillingCard({ user, preview }: Props) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const sRes = await supabase
-        .from('subscriptions')
-        .select('status, plan_id, current_period_end, cancel_at')
-        .eq('user_id', user.id)
-        .order('current_period_end', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (cancelled) return;
-      const subData = (sRes.data ?? null) as SubscriptionRow | null;
-      setSub(subData);
-
-      if (subData?.plan_id) {
-        const pRes = await supabase
-          .from('plans')
-          .select('id, tier, name, monthly_price_cents, annual_price_cents')
-          .eq('id', subData.plan_id)
+      try {
+        const sRes = await supabase
+          .from('subscriptions')
+          .select('status, plan_id, current_period_end, cancel_at')
+          .eq('user_id', user.id)
+          .order('current_period_end', { ascending: false })
+          .limit(1)
           .maybeSingle();
         if (cancelled) return;
-        setPlan((pRes.data ?? null) as PlanRow | null);
+        if (sRes.error) {
+          console.error('[billing] subscriptions fetch failed', sRes.error);
+          setLoading(false);
+          return;
+        }
+        const subData = (sRes.data ?? null) as SubscriptionRow | null;
+        setSub(subData);
+
+        if (subData?.plan_id) {
+          const pRes = await supabase
+            .from('plans')
+            .select('id, tier, name, monthly_price_cents, annual_price_cents')
+            .eq('id', subData.plan_id)
+            .maybeSingle();
+          if (cancelled) return;
+          if (!pRes.error) {
+            setPlan((pRes.data ?? null) as PlanRow | null);
+          } else {
+            console.error('[billing] plan fetch failed', pRes.error);
+          }
+        }
+        setLoading(false);
+      } catch (e) {
+        if (!cancelled) {
+          console.error('[billing] load error', e);
+          setLoading(false);
+        }
       }
-      setLoading(false);
     })();
     return () => {
       cancelled = true;
@@ -132,7 +148,11 @@ export function BillingCard({ user, preview }: Props) {
     }
     setBusy('resume');
     try {
-      const res = await fetch('/api/billing/resubscribe', { method: 'POST' });
+      const res = await fetch('/api/billing/resubscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planName: plan?.name }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? 'Could not resume.');
       toast.success('Subscription resumed.');
