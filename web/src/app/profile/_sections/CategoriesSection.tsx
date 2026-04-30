@@ -1,7 +1,7 @@
 // "Categories" — per-topic breakdown for the signed-in viewer. Mirrors the
 // leaderboard's two-row pill UX: parent categories on top, sub-categories
 // of the active parent below, and a scope card showing this user's stats
-// (score, articles read, quizzes correct) for whatever leaf is selected.
+// (score, reads, quizzes passed, comments, upvotes received) for whatever leaf is selected.
 //
 // Drilling in is inline — clicking a sub-pill swaps the scope card content;
 // no route change. Categories list is loaded once and cached for the
@@ -39,10 +39,14 @@ export type CategoryRow = Pick<
   Tables<'categories'>,
   'id' | 'name' | 'slug' | 'parent_id' | 'sort_order'
 >;
-export type CategoryScoreRow = Pick<
-  Tables<'category_scores'>,
-  'category_id' | 'score' | 'articles_read' | 'quizzes_correct'
->;
+export type CategoryScoreRow = {
+  category_id: string;
+  score: number;
+  reads: number;
+  quizzes_passed: number;
+  comments: number;
+  upvotes_received: number;
+};
 
 export interface CategoriesSectionProps {
   // The full set of adult-side categories (parents + subs), pre-filtered
@@ -241,11 +245,19 @@ export function CategoriesSection({ categories, scores, loading }: CategoriesSec
         >
           <DrillStat
             label="Articles read"
-            value={(scopeRow?.articles_read ?? 0).toLocaleString()}
+            value={(scopeRow?.reads ?? 0).toLocaleString()}
           />
           <DrillStat
-            label="Quizzes correct"
-            value={(scopeRow?.quizzes_correct ?? 0).toLocaleString()}
+            label="Quizzes passed"
+            value={(scopeRow?.quizzes_passed ?? 0).toLocaleString()}
+          />
+          <DrillStat
+            label="Comments"
+            value={(scopeRow?.comments ?? 0).toLocaleString()}
+          />
+          <DrillStat
+            label="Upvotes received"
+            value={(scopeRow?.upvotes_received ?? 0).toLocaleString()}
           />
         </div>
         {!scopeRow ? (
@@ -306,8 +318,8 @@ export function CategoriesSection({ categories, scores, loading }: CategoriesSec
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: F.md, fontWeight: 600, color: C.ink }}>{p.name}</div>
                   <div style={{ fontSize: F.xs, color: C.inkMuted, marginTop: 2 }}>
-                    {(score?.articles_read ?? 0).toLocaleString()} read ·{' '}
-                    {(score?.quizzes_correct ?? 0).toLocaleString()} quizzes correct
+                    {(score?.reads ?? 0).toLocaleString()} read ·{' '}
+                    {(score?.quizzes_passed ?? 0).toLocaleString()} quizzes passed
                     {subCount > 0 ? ` · ${subCount} subcategories` : ''}
                   </div>
                 </div>
@@ -346,7 +358,7 @@ export function CategoriesSection({ categories, scores, loading }: CategoriesSec
 }
 
 // Connected wrapper — the data-loading layer used by the live profile
-// shell. Loads categories + the viewer's category_scores, then renders
+// shell. Loads categories + the viewer's category metrics via RPC, then renders
 // the pure CategoriesSection above. This is the only consumer of
 // supabase / network in this file, by design.
 export interface CategoriesSectionConnectedProps {
@@ -376,7 +388,7 @@ export function CategoriesSectionConnected({ authUserId }: CategoriesSectionConn
       // kids surface; same filter the /leaderboard page applies). Scores
       // are scoped to this user's adult rows — kid_profile_id IS NULL
       // ensures we don't pull family-shared kid scores into the adult view.
-      const [catsRes, scoresRes] = await Promise.all([
+      const [catsRes, metricsRes] = await Promise.all([
         supabase
           .from('categories')
           .select('id, name, slug, parent_id, sort_order')
@@ -384,21 +396,37 @@ export function CategoriesSectionConnected({ authUserId }: CategoriesSectionConn
           .is('deleted_at', null)
           .eq('is_kids_safe', false)
           .order('sort_order'),
-        supabase
-          .from('category_scores')
-          .select('category_id, score, articles_read, quizzes_correct')
-          .eq('user_id', authUserId)
-          .is('kid_profile_id', null),
+        supabase.rpc('get_user_category_metrics', { p_user_id: authUserId }),
       ]);
 
       if (cancelled) return;
-      if (catsRes.error || scoresRes.error) {
+      if (catsRes.error || metricsRes.error) {
         setError(true);
         setLoading(false);
         return;
       }
+
+      type MetricsRow = {
+        category_id: string;
+        subcategory_id: string | null;
+        name: string;
+        reads: number;
+        quizzes_passed: number;
+        comments: number;
+        upvotes_received: number;
+        score: number;
+      };
+      const scoreRows: CategoryScoreRow[] = ((metricsRes.data ?? []) as MetricsRow[]).map((r) => ({
+        category_id: r.category_id,
+        score: r.score,
+        reads: r.reads,
+        quizzes_passed: r.quizzes_passed,
+        comments: r.comments,
+        upvotes_received: r.upvotes_received,
+      }));
+
       setCategories((catsRes.data ?? []) as CategoryRow[]);
-      setScores((scoresRes.data ?? []) as CategoryScoreRow[]);
+      setScores(scoreRows);
       setLoading(false);
     })();
     return () => {

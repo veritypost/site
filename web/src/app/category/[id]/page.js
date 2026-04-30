@@ -22,10 +22,14 @@ export default function CategoryPage() {
   // count were removed in Round 12. No `category_follows` table, no route,
   // no client state remains.
   const [visibleCount, setVisibleCount] = useState(5);
+  const [subcategories, setSubcategories] = useState([]);
+  const [activeSubcat, setActiveSubcat] = useState(null);
 
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
+      setActiveSubcat(null);
+      setSubcategories([]);
 
       // Try fetching category by id first, then by slug
       let { data: categoryData, error: categoryError } = await supabase
@@ -54,6 +58,14 @@ export default function CategoryPage() {
           return;
         }
         setCategory(categoryData);
+
+        const { data: subcatData } = await supabase
+          .from('categories')
+          .select('id, name')
+          .eq('parent_id', categoryData.id)
+          .eq('is_active', true)
+          .order('name', { ascending: true });
+        setSubcategories(subcatData ?? []);
 
         const { data: storiesData } = await supabase
           .from('articles')
@@ -128,7 +140,11 @@ export default function CategoryPage() {
     }
   };
 
-  const sorted = [...stories].sort((a, b) => {
+  const filtered = activeSubcat
+    ? stories.filter((s) => s.subcategory_id === activeSubcat)
+    : stories;
+
+  const sorted = [...filtered].sort((a, b) => {
     if (sort === 'Trending') return (b.view_count ?? 0) - (a.view_count ?? 0);
     return new Date(b.published_at ?? 0) - new Date(a.published_at ?? 0);
   });
@@ -364,6 +380,45 @@ export default function CategoryPage() {
               ))}
             </div>
 
+            {/* Subcategory filter — only renders when this category has subs */}
+            {subcategories.length > 0 && (
+              <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => { setActiveSubcat(null); setVisibleCount(5); }}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: 8,
+                    border: `1.5px solid ${activeSubcat === null ? '#111111' : '#e5e5e5'}`,
+                    background: activeSubcat === null ? '#111111' : '#ffffff',
+                    color: activeSubcat === null ? '#fff' : '#666666',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  All
+                </button>
+                {subcategories.map((sc) => (
+                  <button
+                    key={sc.id}
+                    onClick={() => { setActiveSubcat(sc.id); setVisibleCount(5); }}
+                    style={{
+                      padding: '6px 14px',
+                      borderRadius: 8,
+                      border: `1.5px solid ${activeSubcat === sc.id ? '#111111' : '#e5e5e5'}`,
+                      background: activeSubcat === sc.id ? '#111111' : '#ffffff',
+                      color: activeSubcat === sc.id ? '#fff' : '#666666',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {sc.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* Article Cards */}
             {stories.length === 0 && (
               <div
@@ -483,7 +538,20 @@ export default function CategoryPage() {
               </a>
             ))}
 
-            {visibleCount < stories.length && (
+            {activeSubcat !== null && filtered.length === 0 && stories.length > 0 && (
+              <div
+                style={{
+                  padding: '32px 20px',
+                  textAlign: 'center',
+                  color: '#666666',
+                  fontSize: 13,
+                }}
+              >
+                No articles in this subcategory yet.
+              </div>
+            )}
+
+            {visibleCount < sorted.length && (
               <button
                 onClick={() => setVisibleCount((v) => v + 3)}
                 style={{
