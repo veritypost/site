@@ -387,3 +387,50 @@ Key pre-implementation findings (all verified against current code before touchi
 **What's blocked.** Nothing.
 
 **What next session should pick up.** Slice 07 — Admin surfaces. Read `web/src/app/admin/layout.tsx` (auth + role check entry point), then spawn parallel Explore agents across the admin sub-tree. Key areas: newsroom, moderation/reports (rewritten in article-lifecycle session 8), pipeline, users, and the service-client routes that bypass RLS — each must verify it checks permission before executing. The `quiz-regenerate` endpoint rejects on any verification disagreement (known gap from article-lifecycle). The `v2_live` kill switch has no admin UI (DB-direct only — known gap). Confirm the AI-flagged tab in reports uses `moderation_actions` rows with `action='ai_flagged'` correctly.
+
+---
+
+## Session 11 — 2026-04-30 — Slice 07: Admin surfaces (full session)
+
+**Phase entering:** 8 (slice 07 not-started).
+**Phase leaving:** 9 (slice 07 shipped — 9 confirmed issues resolved, zero TypeScript errors).
+
+**What happened.** Session ran Phase 1 (investigation + slice doc) and Phase 2 (implementation) back-to-back. Four parallel Explore agents investigated: admin layout + reports page (Agent A), newsroom + moderation pages (Agent B), users + pipeline pages + quiz-regenerate route (Agent C), and admin API route permission-before-execution security audit (Agent D). A fresh adversarial agent reviewed all confirmed findings against current code before locking.
+
+Key pre-implementation findings (all verified against current code before touching anything):
+
+- `admin/layout.tsx` — CLEAN: auth + role check correct, `MOD_ROLES.has()` gate, `notFound()` for non-staff.
+- `admin/newsroom/page.tsx` — CLEAN: all fetches handle errors, buttons gated by `busyIngest`/`busy`.
+- `admin/pipeline/` (settings, cleanup, costs, runs, runs/[id]) — CLEAN: all action buttons properly gated, no FK hints.
+- `admin/reports/page.tsx` — AI-flagged tab query correct: `moderation_actions` with `action='ai_flagged'`, error toast on failure. FK hints `users!fk_comments_user_id` at lines 210, 228 verified correct.
+- **Critical API security gap confirmed:** `PATCH /api/admin/articles/[id]` at line 313 — `createServiceClient()` called before `requirePermission()` at lines 330–335. GET handler follows correct order; PATCH did not.
+- **Privilege escalation scan:** 11 admin API handlers checked; only the PATCH handler was out of order. All others had permission check before service client.
+
+**Commit `cadf577` — 07-00 (CRITICAL):**
+- `api/admin/articles/[id]/route.ts`: Added `requireAuth` to import. Extracted `cookieClient = createClient()` before `createServiceClient()` call. Added `await requireAuth(cookieClient)` in try/catch before the service client is used. Reused `cookieClient` in the `requirePermission` loop (replaced locally-scoped `createClient()` there).
+
+**Commit `71f2640` — 07-01 + 07-04 (P1 + P2):**
+- `admin/reports/page.tsx`: Penalty buttons (Warn/24h/7d/Ban) now include `busy === 'penalty'` in disabled check.
+- `loadModerationHistory` line 174: destructures `error`, console.error + early return.
+- `selectAiFlagged` line 208: destructures `commentErr`, console.error.
+- `selectReport` line 228: destructures `commentErr`, console.error.
+
+**Commit `5bb496b` — 07-02 + 07-03 + 07-06 + 07-08 (P2):**
+- `admin/moderation/page.tsx`: Approve/Deny appeal buttons now `disabled={busy.startsWith('app:')}`.
+- `actorRolesRes.error` + `allRolesRes.error` now console.error'd after `Promise.all` in init.
+- `rolesRes.error` + `warningsRes.error` now console.error'd after `Promise.all` in `search()`.
+- `grantRole`/`revokeRole`: moved `setBusy('')` to after `await search()`; error path now clears `busy` before returning.
+
+**Commit `5f2a5bc` — 07-05 (P2):**
+- `admin/users/page.tsx`: Added `markReadBusy`, `markQuizBusy`, `awardBusy` state. All three handlers wrapped in try/finally. Props added to `UserDetail` type and component destructure. Three buttons updated with `loading` + `disabled`.
+
+**Commit `5a4669c` — 07-07 (P2):**
+- `api/admin/pipeline/quiz-regenerate/route.ts`: Replaced 422 rejection on `verifyParsed.fixes.length > 0` with an apply-fixes loop: `quizQuestions[fix.question_index].correct_index = fix.correct_answer` for each in-bounds fix, then proceeds to insert.
+
+**TypeScript check:** `npx tsc --noEmit` — zero errors after each commit.
+
+**Clean surfaces:** `layout.tsx`, `newsroom/page.tsx`, all `pipeline/` sub-pages, FK hints in reports + moderation + users pages, all sampled admin API routes (articles/list, articles/save, articles/new-draft, articles/[id] GET, users/[id] DELETE+PATCH, users/[id]/ban, moderation/reports, newsroom/clusters/list, pipeline/generate, categories, settings).
+
+**What's blocked.** Nothing.
+
+**What next session should pick up.** Slice 08 — API routes cross-cut. Surfaces: cron jobs (score-comments, send-push, pipeline-cleanup, achievement crons, subscription sweeps, data lifecycle, log purge), events/batch ingestion endpoint, CSP report, health, push token routes, iOS/kids API surfaces. Key known fragilities: score-comments uses old Haiku model string `'claude-haiku-4-5-20251001'` at route.ts:60 (one-line fix); events/batch auth compatibility with `sendBeacon` (can't set auth headers on page-hide — may silently drop events); Vercel cron schedule verification against `vercel.json`.
