@@ -341,7 +341,8 @@ export async function POST(request) {
       MAGIC_LINK_TEMPLATE,
       buildMagicLinkVars({ action_link: actionLink, email_otp: emailOtp, days_on_list: daysOnList })
     );
-    await sendEmail({ to: email, subject, html, text, fromName, fromEmail });
+    const mailRes = await sendEmail({ to: email, subject, html, text, fromName, fromEmail });
+    console.log('MAIL_OK id=' + mailRes?.id + ' to=' + email + ' from=' + fromEmail);
   } catch (err) {
     console.error('MAIL_ERR:', err?.message, JSON.stringify(err?.response ?? err?.cause ?? null));
   }
