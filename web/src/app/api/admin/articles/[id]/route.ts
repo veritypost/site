@@ -33,7 +33,7 @@
 
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requirePermission } from '@/lib/auth';
+import { requirePermission, requireAuth } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction, requireAdminOutranks } from '@/lib/adminMutation';
@@ -307,6 +307,16 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   }
   const body = parsed.data;
 
+  // Auth gate — reject unauthenticated callers before the RLS-bypassing
+  // service client is used. Per-operation permission check comes later
+  // (after the article fetch that determines which key to require).
+  const cookieClient = createClient();
+  try {
+    await requireAuth(cookieClient);
+  } catch (err) {
+    return permissionError(err);
+  }
+
   // Fetch current row first so we can (a) determine audience via
   // is_kids_safe, (b) capture old state for audit, (c) validate status
   // transition. Use service client — admin-scope route, RLS bypass.
@@ -327,11 +337,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
   let actor;
   try {
-    const supabase = createClient();
     for (const key of perms) {
       // Each permission check independently — if the actor lacks any of
       // them, the request is rejected.
-      actor = await requirePermission(key, supabase);
+      actor = await requirePermission(key, cookieClient);
     }
   } catch (err) {
     return permissionError(err);
