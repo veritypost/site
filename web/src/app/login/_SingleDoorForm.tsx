@@ -338,7 +338,7 @@ export default function SingleDoorForm({ notice }: Props) {
         Check your email
       </h1>
       <p style={{ fontSize: 14, color: C.dim, margin: '0 0 22px 0', lineHeight: 1.55 }}>
-        We sent a 6-digit code to{' '}
+        We sent an 8-digit code to{' '}
         <strong style={{ color: C.text, wordBreak: 'break-all' }}>{sentEmail}</strong>. Enter
         it below.
       </p>

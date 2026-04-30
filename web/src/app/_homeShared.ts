@@ -8,9 +8,9 @@ import type { Tables } from '@/types/database-helpers';
 
 export type HomeStory = Pick<
   Tables<'articles'>,
-  'id' | 'title' | 'excerpt' | 'category_id' | 'is_breaking' | 'published_at'
+  'id' | 'title' | 'excerpt' | 'category_id' | 'is_breaking' | 'is_developing' | 'published_at'
 > & {
-  stories: { slug: string } | null;
+  stories: { slug: string | null; lifecycle_status: string | null } | null;
 };
 
 export const HOME_COLORS = {

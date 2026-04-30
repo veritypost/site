@@ -99,7 +99,9 @@ function editorialToday(): { isoDate: string; startUtc: string; humanDate: strin
 }
 
 const SELECT_COLS =
-  'id, title, stories(slug), excerpt, category_id, is_breaking, published_at';
+  'id, title, stories(slug, lifecycle_status), excerpt, category_id, is_breaking, is_developing, published_at';
+
+type TopStoryRow = { position: number; articles: HomeStory | null };
 
 // Category accent palette. color_hex in DB is null for all live rows (2026-04-26);
 // this map provides a per-slug fallback until editorial populates the column.
@@ -182,7 +184,7 @@ export default async function HomePage() {
         }));
     });
 
-  const [storiesRes, breakingRes, catsRes, readLogRes] = await Promise.all([
+  const [storiesRes, breakingRes, catsRes, readLogRes, topStoriesRes] = await Promise.all([
     supabase
       .from('articles')
       .select(SELECT_COLS)
@@ -207,6 +209,10 @@ export default async function HomePage() {
         nullsFirst: false,
       }),
     readLogPromise,
+    supabase
+      .from('top_stories')
+      .select('position, articles(id, title, stories(slug, lifecycle_status), excerpt, category_id, is_breaking, is_developing, published_at)')
+      .order('position'),
   ]);
 
   const readArticleIds = new Set<string>();
@@ -215,21 +221,27 @@ export default async function HomePage() {
     if (row?.article_id) readArticleIds.add(row.article_id);
   }
 
-  // If the primary fetch errored we don't know whether today is empty or
-  // the request failed — surface a retry banner instead of an empty-state
-  // UI which would silently lie. The breaking + categories queries are
-  // decorative; only the stories failure flips this.
-  const fetchFailed = !!storiesRes.error;
+  // Top Stories: if any pinned slots exist, they become the display list.
+  // Falls back to the published_at DESC date query when empty.
+  const topRows = (topStoriesRes.data as TopStoryRow[] | null) || [];
+  const topArticles = topRows
+    .filter((r) => r.articles != null)
+    .map((r) => r.articles as HomeStory);
+
+  // If the primary date-query errored AND top_stories is also empty, surface
+  // a retry banner. If top_stories has rows, we can still render the page.
+  const fetchFailed = topArticles.length === 0 && !!storiesRes.error;
   if (storiesRes.error) {
     console.error('[home.fetch.stories]', storiesRes.error.message);
   }
 
-  const raw = (storiesRes.data as HomeStory[] | null) || [];
-  const stories = [...raw].sort((a, b) => {
+  const dateSorted = [...((storiesRes.data as HomeStory[] | null) || [])].sort((a, b) => {
     const aT = a.published_at ? new Date(a.published_at).getTime() : 0;
     const bT = b.published_at ? new Date(b.published_at).getTime() : 0;
     return bT - aT;
   });
+
+  const displayedStories = topArticles.length > 0 ? topArticles : dateSorted;
 
   const breaking = ((breakingRes.data as HomeStory[] | null) || [])[0] || null;
 
@@ -239,8 +251,8 @@ export default async function HomePage() {
     categoryById[c.id] = c;
   });
 
-  const hero = stories[0] || null;
-  const supporting = stories.slice(1);
+  const hero = displayedStories[0] || null;
+  const supporting = displayedStories.slice(1);
 
   // T91 — "New since last visit" predicate. If we have no prior cookie
   // value, isNew is always false (first-time visitor sees no badges).
@@ -251,10 +263,9 @@ export default async function HomePage() {
     return Number.isFinite(t) && t > lastVisitMs;
   };
 
-  // T109 — edition progress counter. Only computed for signed-in readers
-  // who have a readArticleIds set populated; anon readers always see 0/N.
-  const readTodayCount = stories.filter((s) => readArticleIds.has(s.id)).length;
-  const totalToday = stories.length;
+  // T109 — edition progress counter reflects whichever set is displayed.
+  const readTodayCount = displayedStories.filter((s) => readArticleIds.has(s.id)).length;
+  const totalToday = displayedStories.length;
 
   return (
     <div style={{ background: C.bg, color: C.text, minHeight: '100vh' }}>
@@ -412,6 +423,33 @@ function ReadTag() {
   );
 }
 
+function LifecyclePill({ status, dark = false }: { status: string; dark?: boolean }) {
+  const isBreaking = status === 'breaking';
+  return (
+    <span
+      style={{
+        display: 'inline-block',
+        fontSize: 10,
+        fontWeight: 700,
+        letterSpacing: '0.08em',
+        textTransform: 'uppercase' as const,
+        padding: '2px 6px',
+        borderRadius: 2,
+        lineHeight: 1.2,
+        verticalAlign: 'middle',
+        background: dark
+          ? 'rgba(0,0,0,0.25)'
+          : isBreaking ? '#dc2626' : '#d97706',
+        color: dark
+          ? isBreaking ? 'rgba(255,255,255,0.9)' : '#fcd34d'
+          : '#ffffff',
+      }}
+    >
+      {isBreaking ? 'Breaking' : 'Developing'}
+    </span>
+  );
+}
+
 function Eyebrow({ category }: { category: CategoryRow | undefined }) {
   if (!category) return null;
   return (
@@ -485,7 +523,7 @@ function Hero({
         >
           {/* Inner column mirrors the 720px reading column */}
           <div style={{ maxWidth: 720, margin: '0 auto', padding: '0 20px' }}>
-            {(category || isNew || isRead) && (
+            {(category || isNew || isRead || story.stories?.lifecycle_status) && (
               <div
                 style={{
                   marginBottom: 16,
@@ -495,6 +533,9 @@ function Hero({
                   flexWrap: 'wrap',
                 }}
               >
+                {story.stories?.lifecycle_status && (
+                  <LifecyclePill status={story.stories.lifecycle_status} dark />
+                )}
                 {category && (
                   <span
                     style={{
@@ -632,6 +673,9 @@ function SupportingCard({
             flexWrap: 'wrap',
           }}
         >
+          {story.stories?.lifecycle_status && (
+            <LifecyclePill status={story.stories.lifecycle_status} />
+          )}
           <Eyebrow category={category} />
           {isNew && <NewPill />}
           {isRead && <ReadTag />}

@@ -266,6 +266,27 @@ struct HomeView: View {
                         .foregroundColor(.white.opacity(0.65))
                         .padding(.bottom, 14)
                 }
+                if story.isBreaking == true {
+                    Text("Breaking")
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(0.8)
+                        .textCase(.uppercase)
+                        .foregroundColor(.white.opacity(0.9))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(RoundedRectangle(cornerRadius: 3).fill(Color.black.opacity(0.25)))
+                        .padding(.bottom, 8)
+                } else if story.isDeveloping == true {
+                    Text("Developing")
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(0.8)
+                        .textCase(.uppercase)
+                        .foregroundColor(VP.warn)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(RoundedRectangle(cornerRadius: 3).fill(Color.black.opacity(0.25)))
+                        .padding(.bottom, 8)
+                }
                 Text(story.title ?? "Untitled")
                     .font(.system(size: 32, weight: .bold, design: .serif))
                     .tracking(-0.4)
@@ -298,6 +319,21 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 0) {
             if let cat = categoryName(for: story.categoryId) {
                 eyebrow(cat).padding(.bottom, 8)
+            }
+            if story.isBreaking == true {
+                Text("Breaking")
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(0.8)
+                    .textCase(.uppercase)
+                    .foregroundColor(VP.breaking)
+                    .padding(.bottom, 4)
+            } else if story.isDeveloping == true {
+                Text("Developing")
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(0.8)
+                    .textCase(.uppercase)
+                    .foregroundColor(VP.warn)
+                    .padding(.bottom, 4)
             }
 
             Text(story.title ?? "Untitled")
@@ -444,6 +480,11 @@ struct HomeView: View {
 
     // MARK: - Data
 
+    private struct TopStoryRow: Decodable {
+        let position: Int
+        let articles: Story
+    }
+
     private func loadData() async {
         await SettingsService.shared.loadIfNeeded()
         if Task.isCancelled { return }
@@ -463,10 +504,8 @@ struct HomeView: View {
                 .execute()
                 .value
 
-            // Dedicated breaking query — runs independently of the 8-slot
-            // top-of-feed so a breaking story always surfaces above the
-            // masthead even if the editor didn't flag it as today's hero.
-            // Mirrors the web home (`web/src/app/page.tsx`).
+            // Dedicated breaking query — runs independently of the top-of-feed
+            // so a breaking story always surfaces above the masthead.
             async let breakingReq: [Story] = client.from("articles")
                 .select("*, stories(slug)")
                 .eq("status", value: "published")
@@ -484,21 +523,35 @@ struct HomeView: View {
                 .execute()
                 .value
 
+            async let topStoriesReq: [TopStoryRow] = client.from("top_stories")
+                .select("position, articles!inner(id, title, story_id, published_at, excerpt, cover_image_url, category_id, is_breaking, is_developing, stories(slug))")
+                .order("position")
+                .execute()
+                .value
+
             let raw = try await storiesReq
             let breakingFirst = try await breakingReq.first
             let cats = try await catsReq
-            // Hero-pick first, then most-recent. Same logic as web.
-            let ranked = raw.sorted { a, b in
-                let aHero = (a.heroPickForDate == today.isoDate) ? 1 : 0
-                let bHero = (b.heroPickForDate == today.isoDate) ? 1 : 0
-                if aHero != bHero { return aHero > bHero }
-                let aT = a.publishedAt ?? .distantPast
-                let bT = b.publishedAt ?? .distantPast
-                return aT > bT
+            let topRows = (try? await topStoriesReq) ?? []
+
+            // If top_stories has pinned rows, use them in position order.
+            // Otherwise fall back to hero_pick_for_date sort on today’s articles.
+            let ranked: [Story]
+            if topRows.isEmpty {
+                ranked = raw.sorted { a, b in
+                    let aHero = (a.heroPickForDate == today.isoDate) ? 1 : 0
+                    let bHero = (b.heroPickForDate == today.isoDate) ? 1 : 0
+                    if aHero != bHero { return aHero > bHero }
+                    let aT = a.publishedAt ?? .distantPast
+                    let bT = b.publishedAt ?? .distantPast
+                    return aT > bT
+                }
+            } else {
+                ranked = topRows.map { $0.articles }
             }
-            // T244b — bail before mutating state so a cancelled task (replaced
-            // by a pull-to-refresh that already kicked off a new fetch) can't
-            // overwrite the newer task's results with its stale payload.
+
+            // T244b — bail before mutating state so a cancelled task can’t
+            // overwrite a newer task’s results with a stale payload.
             if Task.isCancelled { return }
             stories = ranked
             breakingStory = breakingFirst
@@ -605,18 +658,25 @@ struct HomeView: View {
 // (~15-20), so 2N fanout against PostgREST is acceptable and keeps each
 // query cleanly scoped to a single index.
 struct BrowseLanding: View {
+    private struct ActiveStoryRow: Decodable {
+        let categoryId: String
+        let storyId: String
+        enum CodingKeys: String, CodingKey {
+            case categoryId = "category_id"
+            case storyId = "story_id"
+        }
+    }
+
     @State private var categories: [VPCategory] = []
     @State private var loading = true
-    @State private var categoryPreviews: [String: [Story]] = [:]
-    @State private var categoryCounts7d: [String: Int] = [:]
+    @State private var activeStoryCounts: [String: Int] = [:]
+    @State private var searchText = ""
     private let client = SupabaseManager.shared.client
 
-    private static let timeShortFmt: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US")
-        f.dateFormat = "MMM d"
-        return f
-    }()
+    private var filteredCategories: [VPCategory] {
+        if searchText.isEmpty { return categories }
+        return categories.filter { $0.displayName.localizedCaseInsensitiveContains(searchText) }
+    }
 
     var body: some View {
         ScrollView {
@@ -626,7 +686,29 @@ struct BrowseLanding: View {
                     .tracking(-0.4)
                     .foregroundColor(VP.text)
                     .padding(.top, 24)
-                    .padding(.bottom, 24)
+                    .padding(.bottom, 16)
+
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(VP.muted)
+                    TextField("Search stories, topics, timelines…", text: $searchText)
+                        .font(.system(size: 15, design: .serif))
+                        .foregroundColor(VP.text)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(VP.bg)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(VP.rule, lineWidth: 1)
+                        )
+                )
+                .padding(.bottom, 20)
 
                 if loading {
                     Text("Loading…")
@@ -635,15 +717,15 @@ struct BrowseLanding: View {
                         .foregroundColor(VP.dim)
                         .padding(.vertical, 48)
                         .frame(maxWidth: .infinity)
-                } else if categories.isEmpty {
-                    Text("No categories available.")
+                } else if filteredCategories.isEmpty {
+                    Text(searchText.isEmpty ? "No categories available." : "No results.")
                         .font(.system(size: 14, design: .serif))
                         .italic()
                         .foregroundColor(VP.dim)
                         .padding(.vertical, 48)
                         .frame(maxWidth: .infinity)
                 } else {
-                    ForEach(categories) { cat in
+                    ForEach(filteredCategories) { cat in
                         categoryBlock(cat)
                         Rectangle()
                             .fill(VP.rule)
@@ -666,84 +748,37 @@ struct BrowseLanding: View {
 
     @ViewBuilder
     private func categoryBlock(_ cat: VPCategory) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            NavigationLink(value: cat) {
-                HStack(alignment: .firstTextBaseline) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(cat.displayName)
-                            .font(.system(size: 20, weight: .semibold, design: .serif))
-                            .foregroundColor(VP.text)
-                        Text(countLabel(for: cat))
-                            .font(.system(size: 12, weight: .regular, design: .serif))
-                            .foregroundColor(VP.dim)
-                    }
-                    Spacer(minLength: 8)
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(VP.dim)
+        NavigationLink(value: cat) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(cat.displayName)
+                        .font(.system(size: 20, weight: .semibold, design: .serif))
+                        .foregroundColor(VP.text)
+                    activityLabel(for: cat)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-                .padding(.vertical, 12)
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(VP.dim)
             }
-            .buttonStyle(.plain)
-
-            let previews = categoryPreviews[cat.id] ?? []
-            if !previews.isEmpty {
-                VStack(alignment: .leading, spacing: 12) {
-                    ForEach(previews) { story in
-                        NavigationLink(value: story) {
-                            previewRow(story)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.bottom, 10)
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .padding(.vertical, 12)
         }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
-    private func previewRow(_ story: Story) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(story.title ?? "Untitled")
-                .font(.system(size: 15, weight: .semibold, design: .serif))
-                .foregroundColor(VP.text)
-                .multilineTextAlignment(.leading)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
-            if let excerpt = story.excerpt, !excerpt.isEmpty {
-                Text(excerpt)
-                    .font(.system(size: 13, weight: .regular, design: .serif))
-                    .foregroundColor(VP.soft)
-                    .lineLimit(1)
-                    .multilineTextAlignment(.leading)
-            }
-            Text(timeShort(story.publishedAt))
-                .font(.system(size: 11, weight: .medium))
+    private func activityLabel(for cat: VPCategory) -> some View {
+        if let n = activeStoryCounts[cat.id], n > 0 {
+            Text(n == 1 ? "1 active story" : "\(n) active stories")
+                .font(.system(size: 12, weight: .regular, design: .serif))
+                .foregroundColor(VP.dim)
+        } else {
+            Text("quiet this week")
+                .font(.system(size: 12, weight: .regular, design: .serif))
                 .foregroundColor(VP.muted)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .contentShape(Rectangle())
-    }
-
-    private func countLabel(for cat: VPCategory) -> String {
-        switch categoryCounts7d[cat.id] {
-        case nil: return "—"
-        case .some(0): return "No articles this week"
-        case .some(1): return "1 article this week"
-        case .some(let n): return "\(n) articles this week"
-        }
-    }
-
-    private func timeShort(_ date: Date?) -> String {
-        guard let date else { return "" }
-        let mins = Int(Date().timeIntervalSince(date) / 60)
-        if mins < 1 { return "just now" }
-        if mins < 60 { return "\(mins)m ago" }
-        let hours = mins / 60
-        if hours < 24 { return "\(hours)h ago" }
-        return BrowseLanding.timeShortFmt.string(from: date)
     }
 
     private func load() async {
@@ -757,78 +792,86 @@ struct BrowseLanding: View {
                 .value
             categories = cats
             loading = false
-
-            await loadPreviewsAndCounts(for: cats)
+            await loadActiveStoryCounts()
         } catch {
             Log.d("Browse load failed: \(error)")
             loading = false
         }
     }
 
-    private func loadPreviewsAndCounts(for cats: [VPCategory]) async {
-        // 7-day window so the count reflects "this week" copy. ISO-8601 since
-        // PostgREST gte on timestamp columns expects RFC3339.
-        let weekAgo = Date().addingTimeInterval(-7 * 24 * 60 * 60)
-        let weekAgoIso = ISO8601DateFormatter().string(from: weekAgo)
-
-        await withTaskGroup(of: (String, [Story], Int).self) { group in
-            for cat in cats {
-                let catId = cat.id
-                let client = self.client
-                group.addTask {
-                    async let previewReq: [Story] = client.from("articles")
-                        .select("*, stories(slug)")
-                        .eq("category_id", value: catId)
-                        .eq("status", value: "published")
-                        .eq("visibility", value: "public")
-                        .order("published_at", ascending: false)
-                        .limit(2)
-                        .execute()
-                        .value
-                    // `count: .exact, head: true` returns a HEAD response with
-                    // the row count in the Content-Range header — no payload
-                    // body shipped, so this stays cheap even on hot categories.
-                    async let countReq: PostgrestResponse<Void> = client.from("articles")
-                        .select("id", head: true, count: .exact)
-                        .eq("category_id", value: catId)
-                        .eq("status", value: "published")
-                        .eq("visibility", value: "public")
-                        .gte("published_at", value: weekAgoIso)
-                        .execute()
-
-                    let previews = (try? await previewReq) ?? []
-                    let countResp = try? await countReq
-                    let count = countResp?.count ?? 0
-                    return (catId, previews, count)
-                }
+    private func loadActiveStoryCounts() async {
+        do {
+            let rows: [ActiveStoryRow] = try await client
+                .from("articles")
+                .select("category_id, story_id, stories!inner(lifecycle_status)")
+                .in("stories.lifecycle_status", values: ["breaking", "developing"])
+                .not("story_id", operator: .is, value: "null")
+                .execute()
+                .value
+            var seenByCategory: [String: Set<String>] = [:]
+            for row in rows {
+                seenByCategory[row.categoryId, default: []].insert(row.storyId)
             }
-            for await (id, previews, count) in group {
-                categoryPreviews[id] = previews
-                categoryCounts7d[id] = count
-            }
+            activeStoryCounts = seenByCategory.mapValues { $0.count }
+        } catch {
+            Log.d("Browse active story count failed: \(error)")
         }
     }
 }
 
 // MARK: - CategoryDetailView
-//
-// Lists published articles in a single category. Reuses the same row
-// shape as the home feed so tapping a story still navigates into
-// StoryDetailView. Covers the gap reported by the owner: tapping a
-// row in BrowseLanding previously did nothing because the rows were
-// static Text, not Buttons / NavigationLinks.
-//
-// Internal (not private) so any per-category list affordance — currently
-// HomeView's category sections — can push the same destination as the
-// single source of truth for the per-category feed.
+
 struct CategoryDetailView: View {
+    private struct ArticleRow: Decodable {
+        let id: String
+        let storyId: String?
+        let publishedAt: Date?
+        let stories: StoryRef?
+
+        struct StoryRef: Decodable {
+            let id: String
+            let title: String
+            let lifecycleStatus: String
+            let createdAt: Date?
+            enum CodingKeys: String, CodingKey {
+                case id, title
+                case lifecycleStatus = "lifecycle_status"
+                case createdAt = "created_at"
+            }
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case id
+            case storyId = "story_id"
+            case publishedAt = "published_at"
+            case stories
+        }
+    }
+
+    private struct StoryItem: Identifiable {
+        let id: String
+        let title: String
+        let lifecycleStatus: String
+        let createdAt: Date?
+        let articleCount: Int
+        let mostRecentDate: Date?
+    }
+
     let category: VPCategory
 
-    @State private var stories: [Story] = []
+    @State private var storyItems: [StoryItem] = []
+    @State private var latestArticle: [String: Story] = [:]
     @State private var loading = true
     @State private var loadFailed = false
     @State private var refreshTask: Task<Void, Never>? = nil
     private let client = SupabaseManager.shared.client
+
+    private static let dateFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US")
+        f.dateFormat = "MMM d"
+        return f
+    }()
 
     var body: some View {
         ScrollView {
@@ -854,34 +897,23 @@ struct CategoryDetailView: View {
                         .foregroundColor(VP.dim)
                         .padding(.vertical, 48)
                         .frame(maxWidth: .infinity)
-                } else if stories.isEmpty {
-                    Text("No stories in this category yet.")
+                } else if storyItems.isEmpty {
+                    Text("No active stories in this category.")
                         .font(.system(size: 14, design: .serif))
                         .italic()
                         .foregroundColor(VP.dim)
                         .padding(.vertical, 48)
                         .frame(maxWidth: .infinity)
                 } else {
-                    ForEach(stories) { story in
-                        NavigationLink(value: story) {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(story.title ?? "Untitled")
-                                    .font(.system(size: 20, weight: .semibold, design: .serif))
-                                    .foregroundColor(VP.text)
-                                    .multilineTextAlignment(.leading)
-                                if let excerpt = story.excerpt, !excerpt.isEmpty {
-                                    Text(excerpt)
-                                        .font(.system(size: 15, design: .serif))
-                                        .foregroundColor(VP.dim)
-                                        .lineLimit(3)
-                                        .multilineTextAlignment(.leading)
-                                }
+                    ForEach(storyItems) { item in
+                        if let article = latestArticle[item.id] {
+                            NavigationLink(value: article) {
+                                storyRow(item)
                             }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.vertical, 16)
+                            .buttonStyle(.plain)
+                        } else {
+                            storyRow(item)
                         }
-                        .buttonStyle(.plain)
-
                         Rectangle().fill(VP.rule).frame(height: 1)
                     }
                 }
@@ -900,20 +932,123 @@ struct CategoryDetailView: View {
         .task { await load() }
     }
 
+    @ViewBuilder
+    private func storyRow(_ item: StoryItem) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(lifecycleLabel(item.lifecycleStatus))
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(0.8)
+                    .foregroundColor(lifecycleColor(item.lifecycleStatus))
+                    .textCase(.uppercase)
+                Text(item.title)
+                    .font(.system(.subheadline, design: .serif, weight: .semibold))
+                    .foregroundColor(VP.text)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Text(scopeText(item))
+                .font(.system(size: 12, weight: .regular))
+                .foregroundColor(VP.muted)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 14)
+    }
+
+    private func scopeText(_ item: StoryItem) -> String {
+        let n = item.articleCount
+        let days = daysIn(from: item.createdAt)
+        var parts = ["\(n) \(n == 1 ? "article" : "articles")", "\(days) \(days == 1 ? "day" : "days") in"]
+        if let date = item.mostRecentDate {
+            parts.append(Self.dateFmt.string(from: date))
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private func lifecycleLabel(_ status: String) -> String {
+        switch status.lowercased() {
+        case "breaking": return "Breaking"
+        case "developing": return "Developing"
+        default: return status
+        }
+    }
+
+    private func lifecycleColor(_ status: String) -> Color {
+        switch status.lowercased() {
+        case "breaking": return VP.breaking
+        case "developing": return VP.warn
+        default: return VP.dim
+        }
+    }
+
+    private func daysIn(from date: Date?) -> Int {
+        guard let date else { return 0 }
+        return max(0, Calendar.current.dateComponents([.day], from: date, to: Date()).day ?? 0)
+    }
+
     private func load() async {
         loading = true
         loadFailed = false
         do {
-            let s: [Story] = try await client.from("articles")
-                .select("*, stories(slug)")
+            let articleRows: [ArticleRow] = try await client
+                .from("articles")
+                .select("id, story_id, published_at, stories(id, title, lifecycle_status, created_at)")
                 .eq("category_id", value: category.id)
                 .eq("status", value: "published")
                 .eq("visibility", value: "public")
+                .not("story_id", operator: .is, value: "null")
+                .in("stories.lifecycle_status", values: ["breaking", "developing", "resolved"])
                 .order("published_at", ascending: false)
-                .limit(50)
+                .limit(200)
                 .execute()
                 .value
-            stories = s
+
+            var orderedIds: [String] = []
+            var seenIds: Set<String> = []
+            var storyRefs: [String: ArticleRow.StoryRef] = [:]
+            var articleCounts: [String: Int] = [:]
+            var mostRecentDates: [String: Date] = [:]
+            var latestArticleIds: [String: String] = [:]
+
+            for row in articleRows {
+                guard let sid = row.storyId, let ref = row.stories else { continue }
+                if !seenIds.contains(sid) {
+                    seenIds.insert(sid)
+                    orderedIds.append(sid)
+                    storyRefs[sid] = ref
+                    mostRecentDates[sid] = row.publishedAt
+                    latestArticleIds[sid] = row.id
+                }
+                articleCounts[sid, default: 0] += 1
+            }
+
+            storyItems = orderedIds.compactMap { sid in
+                guard let ref = storyRefs[sid] else { return nil }
+                return StoryItem(
+                    id: sid,
+                    title: ref.title,
+                    lifecycleStatus: ref.lifecycleStatus,
+                    createdAt: ref.createdAt,
+                    articleCount: articleCounts[sid] ?? 0,
+                    mostRecentDate: mostRecentDates[sid]
+                )
+            }
+
+            let articleIds = Array(latestArticleIds.values)
+            if !articleIds.isEmpty {
+                let navArticles: [Story] = try await client
+                    .from("articles")
+                    .select("id, title, story_id, published_at, excerpt, cover_image_url, category_id, is_breaking, is_developing, stories(slug)")
+                    .in("id", values: articleIds)
+                    .execute()
+                    .value
+                var byStory: [String: Story] = [:]
+                for article in navArticles {
+                    guard let sid = article.storyId else { continue }
+                    byStory[sid] = article
+                }
+                latestArticle = byStory
+            }
             loading = false
         } catch {
             Log.d("CategoryDetailView load failed: \(error)")
