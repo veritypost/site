@@ -1,8 +1,8 @@
 # Site Bug-Sweep — Index
 
-**Last updated:** 2026-04-30 (session 6 — slice 03 shipped)
-**Phase:** 4 — slice 03 shipped; ready for slice 04
-**Next session should pick up:** Slice 04 — Reader engagement & social
+**Last updated:** 2026-04-30 (session 10 — slice 06 shipped)
+**Phase:** 8 — slice 06 shipped; ready for slice 07
+**Next session should pick up:** Slice 07 — Admin surfaces
 
 ---
 
@@ -13,9 +13,9 @@
 | 01 | Auth & account gates | **shipped** | 2026-04-30 | `slices/01-auth-gates.md` |
 | 02 | Navigation & discovery | **shipped** | 2026-04-30 | `slices/02-nav-discovery.md` |
 | 03 | Article reading | **shipped** | 2026-04-30 | `slices/03-article-reading.md` |
-| 04 | Reader engagement & social | **not-started** | — | — |
-| 05 | Messaging | **not-started** | — | — |
-| 06 | Billing & subscription | **not-started** | — | — |
+| 04 | Reader engagement & social | **shipped** | 2026-04-30 | `slices/04-engagement-social.md` |
+| 05 | Messaging | **shipped** | 2026-04-30 | `slices/05-messaging.md` |
+| 06 | Billing & subscription | **shipped** | 2026-04-30 | `slices/06-billing.md` |
 | 07 | Admin surfaces | **not-started** | — | — |
 | 08 | API routes cross-cut | **not-started** | — | — |
 

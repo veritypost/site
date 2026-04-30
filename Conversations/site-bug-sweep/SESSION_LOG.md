@@ -232,3 +232,158 @@ For 03-06, owner chose Option A (redirect to `/<slug>`) over Option B (silent wa
 **What's blocked.** Nothing.
 
 **What next session should pick up.** Slice 04 — Reader engagement & social. Surfaces: bookmarks (`/api/bookmarks/`, `BookmarkButton`), following (`/api/follows/`, `FollowButton`), notifications (`/notifications`, `/api/notifications/`), public profiles (`/profile/[username]/`), expert queue (`/api/expert/queue/`), recap. Cover anon, free, pro, and admin. Verify FK hints on any `.select()` with `!` syntax. Spawn parallel Explore agents per slice session protocol.
+
+---
+
+## Session 7 — 2026-04-30 — Slice 04: Reader engagement & social investigation
+
+**Phase entering:** 5 (slice 04 not-started).
+**Phase leaving:** 5 (slice 04 locked — 6 confirmed issues + 1 wont-fix).
+
+**What happened.** Carried forward: NotificationsCard GET/PATCH fix (N-01, `09fdb4f`), BookmarksSection null slug fix (P-08, `a548c9a`), and three known-fixed FK mismatches from profile-bugfix and slice 03.
+
+Four parallel Explore agents investigated bookmarks + following (Agent A), notifications + public profiles (Agent B), leaderboard + expert queue + recap (Agent C), and engagement API routes (Agent D). After synthesizing 7 prioritized findings, a fresh adversarial agent reviewed all claimed issues against current code.
+
+Adversarial review: confirmed all 7 claims with exact file:line; classified Finding 4 (follows API RPC-only ownership) as wont-fix — `user.id` is auth-derived, route already has `requirePermission('profile.follow')`, no second user ID exists to spoof; adversary's analysis found no missed bugs beyond what was already captured in Issue 1 (expert queue buttons — A1 and A2 were sub-items, not new findings).
+
+**What got locked.** Slice doc written at `slices/04-engagement-social.md` with 6 confirmed issues and 1 wont-fix:
+- 04-01 (P1): Expert queue action buttons (Claim, Decline, Post answer, Post back-channel) — no per-action loading state; double-fire risk. `expert-queue/page.tsx:362, 365, 490, 610`
+- 04-02 (P2): Bookmarks delete Remove button — no disabled state; rapid clicks queue multiple DELETEs via undo-timer pattern. `bookmarks/page.tsx:629-642`
+- 04-03 (P2): Notifications markAllRead button — no loading/disabled state; double-fire risk. `notifications/page.tsx:354`
+- 04-04 (P2): Following page — both queries discard `error`; fetch failures silently show empty state. `following/page.tsx:64-68, 82-88`
+- 04-05 (P3): Recap — `.catch(() => ({}))` swallows all fetch errors; "No recaps ready yet" on 500. `recap/page.tsx:112-123`
+- 04-06 (P3): Expert queue `btn()` helper — `cursor: 'pointer'` unconditional; disabled buttons show no visual change. `expert-queue/page.tsx:623-644` (implement together with 04-01)
+- wont-fix: Follows API passes `p_follower_id: user.id` to RPC only — auth-derived, not spoofable; `requirePermission` already gates.
+
+**Large clean surface:** All FK hints correct. Bookmarks slug pattern correct (`stories?.slug`). Bookmarks API ownership checks all present. Notifications API ownership checks present. Public profile reads only `public_profiles_v`, `notFound()` on missing username, no private field leaks. Leaderboard anon CTA present, bounded queries. Expert queue permission gate correct. Recap empty/launch-hide/paywall states all correct.
+
+**What's blocked.** Nothing. All 6 issues have complete fix plans.
+
+**What next session should pick up.** Slice 04 implementation. Read `slices/04-engagement-social.md` in full. Confirm current code still matches investigation descriptions before writing anything. Suggested implementation order: 04-01 + 04-06 together (expert queue buttons + CSS, same file, same commit), then 04-02 (bookmarks delete), then 04-03 (notifications markAllRead), then 04-04 (following error state), then 04-05 (recap error state). TypeScript check after each commit. One commit per issue (or paired where noted).
+
+---
+
+## Session 8 — 2026-04-30 — Slice 04: Reader engagement & social implementation
+
+**Phase entering:** 5 (slice 04 locked).
+**Phase leaving:** 6 (slice 04 shipped — all 6 issues resolved, zero TypeScript errors).
+
+**What happened.** Read all five cited files before writing anything — all descriptions matched current code exactly. Implemented in five commits.
+
+**Commit `5cbc050` — 04-01 + 04-06 (P1/P3):**
+- `expert-queue/page.tsx`: Added `pendingId` and `postingBack` state. Wrapped `handleClaim`, `handleDecline`, `handleAnswer` in try/finally — each sets `setPendingId(id)` before fetch, clears in finally. `postBackMessage` sets `setPostingBack(true)` before fetch, clears in finally. All four button callsites updated with `disabled` prop and pass computed disabled state to `btn()` / inline spread for `btnGhost`. `btn()` now accepts `disabled` param: `cursor: 'not-allowed'`, `opacity: 0.5` when true.
+
+**Commit `6577e76` — 04-02 (P2):**
+- `bookmarks/page.tsx`: Added `deletingId` state. `removeBookmark()` returns early if `deletingId === id`. Sets `deletingId` before `setItems`. Clears on: undo callback (item restored), DELETE success, DELETE failure (item restored). Remove button: `disabled={deletingId === b.id}`, `cursor`/`opacity` conditional.
+
+**Commit `d47bc60` — 04-03 (P2):**
+- `notifications/page.tsx`: Added `markingAll` state. `markAllRead()` wraps in try/finally — `setMarkingAll(true)` before fetch, clears in finally. Now `await`s `load()` so button stays disabled until inbox refreshes. "Mark all read" button: `disabled={markingAll}`, `cursor`/`opacity` conditional.
+
+**Commit `4412bec` — 04-04 (P2):**
+- `following/page.tsx`: Extracted IIFE into named `loadStories()`. Added `error` state and `ErrorState` import. Both Supabase queries now destructure `error`; on error, sets message and returns early. Render: `error ?` branch before `stories.length === 0` branch; `onRetry={loadStories}` gives users a recovery path.
+
+**Commit `ae6eb00` — 04-05 (P3):**
+- `recap/page.tsx`: Added `fetchError` and `reloadKey` state (both with launch-hide `eslint-disable` comments). `setFetchError(null)` + `setLoading(true)` at start of IIFE. Existing `try/finally` gains explicit `catch` block setting `fetchError`. Effect deps changed from `[]` to `[reloadKey]`. Added `ErrorState` import. Render: `fetchError ?` branch before `recaps.length === 0` branch; retry increments `reloadKey`.
+
+**TypeScript check:** `npx tsc --noEmit` — zero errors after each commit.
+
+**What's blocked.** Nothing.
+
+**What next session should pick up.** Slice 05 — Messaging. Read `web/src/app/messages/page.tsx`, the message thread component, and the conversation list component. Read `web/src/app/api/messages/` and `web/src/app/api/conversations/` routes. Cover: realtime subscription state, pro-only DM gate, silent catch blocks (profile-bugfix P-09 pattern). Spawn parallel Explore agents per slice session protocol.
+
+---
+
+## Session 9 — 2026-04-30 — Slice 05: Messaging (full session)
+
+**Phase entering:** 6 (slice 05 not-started).
+**Phase leaving:** 7 (slice 05 shipped — all 8 issues resolved, zero TypeScript errors).
+
+**What happened.** Session ran Phase 1 (slice doc) and Phase 2 (implementation) back-to-back. Before writing anything, opened all cited files and verified every line number exactly. All descriptions matched current code.
+
+Key pre-implementation findings:
+- `sendMessage` (line 498): `setInput('')` called before `await fetch()` with no `sending` gate — confirmed double-fire vector.
+- `blockOtherUser` (lines 672–704): try/catch present but no `blocking` state — button at 1293 had no `disabled`.
+- `submitReport` (lines 709–741): `disabled={!reportReason.trim()}` only — no in-flight guard.
+- `startConversation` (lines 570–643): `!res.ok` path at 605 — `console.error` + close, no toast; null convo re-fetch at 632 — close, no toast; no `starting` guard on search result items at 1785+.
+- `get_unread_counts` (line 270): error discarded, confirmed.
+- `searchUsers` (line 569): `setSearchResults(res.ok ? users : [])` — no error state, confirmed.
+- `api/messages/route.js:35` and `api/conversations/route.js:34`: silent catch fallbacks confirmed.
+
+**Commit `0a52580` — 05-01 + 05-02 + 05-03:**
+- `messages/page.tsx`: Added `sending`, `blocking`, `submittingReport` states.
+- `sendMessage`: `if (sending) return` guard; `setSending(true)` before fetch; try/finally clears; Send button: `disabled={!input.trim() || !!dmLocked || sending}`.
+- `blockOtherUser`: `if (blocking) return` guard; `setBlocking(true)` before fetch; finally clears; Block button: `disabled={blocking}`, `cursor`/`opacity` conditional.
+- `submitReport`: `if (submittingReport) return` guard; `setSubmittingReport(true)` before fetch; finally clears; Submit button: `disabled={!reportReason.trim() || submittingReport}`.
+
+**Commit `541dc90` — 05-04:**
+- `messages/page.tsx`: Added `starting` state. `startConversation`: `if (starting) return` guard; `setStarting(true)` before fetch block; try/finally clears. `!res.ok` path: `toast.error(errMsg || 'Could not start conversation. Try again.')`. Null convo re-fetch path: `toast.error('Could not open conversation. Try again.')`. Search result items: `pointerEvents: starting ? 'none' : 'auto'`, `opacity: starting ? 0.5 : 1`.
+
+**Commit `e6b13b5` — 05-05:**
+- `messages/page.tsx:270`: destructured `countsErr`; `if (countsErr) console.error('[messages] get_unread_counts', countsErr)`; continued with existing `|| []` fallback.
+
+**Commit `4e9d0cf` — 05-06:**
+- `messages/page.tsx`: Added `searchError` state. `searchUsers`: clears error at start; on `!res.ok` sets `'Search failed. Try again.'` and returns. Modal: error renders in red above results; "No users found." hidden while error is set. Escape handler and backdrop click both clear `searchError`.
+
+**Commit `b78eb3a` — 05-07 + 05-08:**
+- `api/messages/route.js:35`: `.catch(() => '')` → `.catch((e) => { console.error('[messages.post] body-read failed', e); return ''; })`.
+- `api/conversations/route.js:34`: `.catch(() => ({}))` → `.catch((e) => { console.error('[conversations.post] json-parse failed', e); return {}; })`.
+
+**TypeScript check:** `npx tsc --noEmit` — zero errors after each commit.
+
+**Clean surfaces:** No FK hints found in messaging queries. Realtime channel cleanup correct. DM paywall and pro gate correct. Read receipts opt-out correct. `/api/conversations` rate limit present.
+
+**What's blocked.** Nothing.
+
+**What next session should pick up.** Slice 06 — Billing & subscription. Surfaces: `/billing`, Stripe checkout/portal/webhook, plan gates, `/pricing`. Cover: anon, free, pro, admin. Verify FK hints. Watch for silent fetch failures in Stripe webhook handler and plan-gate checks.
+
+---
+
+## Session 10 — 2026-04-30 — Slice 06: Billing & subscription (full session)
+
+**Phase entering:** 7 (slice 06 not-started).
+**Phase leaving:** 8 (slice 06 shipped — 12 issues resolved + 1 wont-fix, zero TypeScript errors).
+
+**What happened.** Session ran Phase 1 (investigation + slice doc) and Phase 2 (implementation) back-to-back. Four parallel Explore agents investigated: billing page + appeal + subscription API routes (Agent A), pricing page + plan gates + promo route (Agent B), Stripe checkout + portal routes (Agent C), and Stripe webhook handler full security audit (Agent D). A fresh adversarial agent reviewed all confirmed findings against current code before locking.
+
+Key pre-implementation findings (all verified against current code before touching anything):
+
+- `billing/page.tsx` is a redirect shim only — no bugs.
+- `pricing/page.tsx` is fully static — no fetches, no bugs.
+- `api/stripe/checkout/route.js` and `portal/route.js` clean — try/catch present, customer_id verified, idempotency key on checkout.
+- Webhook: signature verification, idempotency (UNIQUE constraint + status machine), and raw body handling all correct. 7 DB write sites lacked error checks.
+- **Critical regression found in investigation:** `resume()` in `BillingCard.tsx:135` sends POST with no body; `resubscribe/route.js:32` requires `planName`; function permanently broken with 500 response.
+- **FK hint check:** zero `!` hints found in any billing file. Clean.
+- Adversarial review confirmed all 11 original issues, added 06-12 (webhook `handleChargeRefunded` auto-freeze RPC unguarded) and classified 06-13 as wont-fix.
+
+**Commit `01b188a` — P1 client (06-00 frontend + 06-01 + 06-02 + 06-03):**
+- `BillingCard.tsx:135` `resume()`: now sends `planName: plan?.name` in POST body; without it the API always 500d.
+- `BillingCard.tsx:56-80` async load IIFE: wrapped in try/catch; `sRes.error` and `pRes.error` now checked; Supabase failures no longer coerce to null and leave spinner stuck.
+- `appeal/page.tsx:38-66` `load()`: wrapped in try/catch; `profileErr` and `warnErr` checked; on failure surfaces user-visible error and returns early instead of silently showing wrong penalty state.
+- `appeal/page.tsx:212` submit button: `submitting` state tracks in-flight warning ID; button `disabled` + opacity + label change; `finally` clears.
+
+**Commit `023b2e0` — P1 API routes (06-05 + 06-00 backend):**
+- `resubscribe/route.js:32` and `change-plan/route.js:29`: `await request.json()` → `await request.json().catch(() => ({}))`. Matches `checkout/route.js:47` pattern. Missing body no longer throws SyntaxError → 500.
+
+**Commit `2bccb70` — P1 webhook (06-04):**
+- `webhook/route.js:1175-1186` `handleCustomerDeleted`: destructured `cancelErr`; throws on DB failure so webhook returns 500 and Stripe retries rather than silently skipping the account freeze.
+
+**Commit `28f76cd` — P2 webhook batch (06-06 + 06-07 + 06-08 + 06-09 + 06-12):**
+- Line 456: `stripe_customer_id` bind UPDATE — throw on error.
+- Line 1053: grace period clear UPDATE — throw on error.
+- Line 1210: `stripe_customer_id` clear UPDATE — console.error + throw on error.
+- Line 590: uncancel fallback UPDATE — throw on error.
+- Line 717: `handleChargeRefunded` auto-freeze RPC — destructured `freezeErr`; throw on error.
+
+**Commit `df4620a` — P2 post-checkout (06-10):**
+- `ProfileApp.tsx`: added `useEffect` that fires once `resolved=true` and `searchParams.get('success') === '1'`: fires `toast.success`, calls `refreshAllPermissions()` + bumps `permsTick`, then `router.replace` strips the param. The `void searchParams` placeholder removed. Import of `refreshAllPermissions` added.
+
+**Commit `45cdd99` — P3 logging (06-11):**
+- `webhook/route.js:240`: added `console.log('[stripe.webhook] unhandled event type:', event.type)` to the default case. Comment claimed logging; now it's true.
+
+**TypeScript check:** `npx tsc --noEmit` — zero errors after each commit.
+
+**Clean surfaces:** Stripe checkout + portal routes (try/catch, idempotency, validation, customer_id check, null URL guard all present). Pricing page (static, no fetch). Promo route (rate-limited, LIKE-escaped, duplicate-checked, rollback on failure). `billing/page.tsx` redirect shim. No FK hints anywhere in billing files.
+
+**What's blocked.** Nothing.
+
+**What next session should pick up.** Slice 07 — Admin surfaces. Read `web/src/app/admin/layout.tsx` (auth + role check entry point), then spawn parallel Explore agents across the admin sub-tree. Key areas: newsroom, moderation/reports (rewritten in article-lifecycle session 8), pipeline, users, and the service-client routes that bypass RLS — each must verify it checks permission before executing. The `quiz-regenerate` endpoint rejects on any verification disagreement (known gap from article-lifecycle). The `v2_live` kill switch has no admin UI (DB-direct only — known gap). Confirm the AI-flagged tab in reports uses `moderation_actions` rows with `action='ai_flagged'` correctly.
