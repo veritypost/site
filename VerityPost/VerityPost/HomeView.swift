@@ -786,8 +786,8 @@ struct BrowseLanding: View {
             let cats: [VPCategory] = try await client.from("categories")
                 .select()
                 .eq("is_active", value: true)
-                .order("sort_order")
                 .not("slug", operator: .like, value: "kids-%")
+                .order("sort_order")
                 .execute()
                 .value
             categories = cats
