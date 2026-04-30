@@ -1,491 +1,695 @@
-// @migrated-to-permissions 2026-04-18
-// @feature-verified shared_pages 2026-04-18
 'use client';
-import { useState, useEffect, useCallback, CSSProperties } from 'react';
-import Link from 'next/link';
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { createClient } from '../../lib/supabase/client';
 import { usePageViewTrack } from '@/lib/useTrack';
-import type { Tables } from '@/types/database-helpers';
 
-// /browse is a public category directory. RLS lets anonymous viewers read
-// published articles + active categories, so there's no tier/role gate to
-// invert — anyone lands on this surface. The former audit called out
-// `browse.view` / `browse.article.anon_read` as hypothetical keys; neither
-// currently exists in the resolver seed, and RLS already enforces the
-// equivalent access, so no hasPermission() call is added here.
+const SERIF = "var(--font-serif, 'Source Serif 4', Georgia, serif)";
+const SANS  = "var(--font-sans, Inter, system-ui, sans-serif)";
 
-// T82 — values point at globals.css CSS vars so brand-color edits cascade.
-const PALETTE = {
-  bg: 'var(--bg)',
-  card: 'var(--card)',
-  border: 'var(--border)',
-  text: 'var(--text)',
-  dim: 'var(--dim)',
-  accent: 'var(--accent)',
-  success: 'var(--success)',
+const C = {
+  bg:           'var(--bg, #ffffff)',
+  surface:      'var(--card, #f7f7f7)',
+  text:         'var(--text, #111111)',
+  soft:         '#444444',
+  dim:          'var(--dim, #5a5a5a)',
+  muted:        '#999999',
+  border:       'var(--border, #e5e5e5)',
+  breaking:     '#ef4444',
+  breakingBg:   'rgba(239,68,68,0.04)',
+  developing:   '#f59e0b',
+  developingBg: 'rgba(245,158,11,0.025)',
+  resolved:     '#9ca3af',
 } as const;
 
-interface CategoryStyle {
-  icon: string;
-  color: string;
-  accent: string;
+type Lifecycle    = 'breaking' | 'developing' | 'resolved';
+type DisplayGroup = 'today' | 'yesterday' | 'this_week' | 'earlier';
+type SortKey      = 'recent' | 'coverage' | 'duration';
+type CoverageKey  = 'any' | 'light' | 'medium' | 'heavy';
+type QuizKey      = 'all' | 'quizzed' | 'unquizzed';
+
+interface Article { date: string; headline: string }
+interface Story {
+  id: string;
+  lifecycle: Lifecycle;
+  title: string;
+  category: string;
+  articles: Article[];
+  displayGroup: DisplayGroup;
 }
 
-// S7-A106 — uniform expanded card design. The previous per-category
-// CAT_STYLE map populated only ~6 of N categories; everything else fell
-// to DEFAULT_STYLE and the expansion flatlined inconsistently. Per
-// rule 3.2 (no color-per-tier) and the genuine-fix principle, we drop
-// per-category hue entirely. The CategoryStyle interface stays so the
-// existing call sites keep their shape; UNIFORM_STYLE is the only
-// supplier. Re-introduce per-category color only after every active
-// category gets a brand decision (high friction, owner call).
-const UNIFORM_STYLE: CategoryStyle = { icon: '', color: '#f3f4f6', accent: '#6b7280' };
-const DEFAULT_STYLE: CategoryStyle = UNIFORM_STYLE;
-const CAT_STYLE: Record<string, CategoryStyle> = {};
+interface FilterState {
+  lifecycle: Lifecycle[];
+  dateFrom: string;
+  dateTo: string;
+  coverage: CoverageKey;
+  quiz: QuizKey;
+  sort: SortKey;
+}
 
+const DEFAULT_FILTERS: FilterState = {
+  lifecycle: [], dateFrom: '', dateTo: '',
+  coverage: 'any', quiz: 'all', sort: 'recent',
+};
 
-// T111 — Most Recent / Most Verified / Trending filter pills were
-// removed: the JSX rendering them was already commented out (data
-// fetch never read activeFilter). Killing the dead constant + state
-// per "no parallel paths" — restore as a real wired-up control when
-// view_count tracking ships (Phase B), not as fake-functional UI.
+function lcColor(lc: Lifecycle) {
+  if (lc === 'breaking')   return C.breaking;
+  if (lc === 'developing') return C.developing;
+  return C.resolved;
+}
+function latestMs(s: Story)     { return Math.max(...s.articles.map(a => +new Date(a.date))); }
+function earliestMs(s: Story)   { return Math.min(...s.articles.map(a => +new Date(a.date))); }
+function durationDays(s: Story) { return Math.round((latestMs(s) - earliestMs(s)) / 86_400_000); }
+function latestHeadline(s: Story) { return s.articles[s.articles.length - 1]?.headline ?? ''; }
+function relTime(ms: number) {
+  const h = Math.floor((Date.now() - ms) / 3_600_000);
+  if (h < 1) return 'just now';
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return d < 7
+    ? `${d}d ago`
+    : new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(ms));
+}
+function fmtDate(s: string) {
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(s));
+}
+function getDisplayGroup(updatedAt: string): DisplayGroup {
+  const h = (Date.now() - new Date(updatedAt).getTime()) / 3_600_000;
+  if (h < 24)      return 'today';
+  if (h < 48)      return 'yesterday';
+  if (h < 7 * 24)  return 'this_week';
+  return 'earlier';
+}
 
-type CategoryRow = Pick<Tables<'categories'>, 'id' | 'name' | 'slug'>;
-type ArticleRow = Pick<
-  Tables<'articles'>,
-  'id' | 'title' | 'category_id' | 'published_at'
-> & { stories: { slug: string } | null };
+// ── Data fetching ──────────────────────────────────────────────────────────
 
-interface TrendingItem {
+type ClusterRow = {
+  id: string;
   title: string | null;
-  slug: string | null;
+  is_breaking: boolean | null;
+  is_active: boolean | null;
+  archived_at: string | null;
+  updated_at: string | null;
+  categories: { name: string | null } | null;
+  feed_cluster_articles: {
+    added_at: string | null;
+    articles: { title: string | null; published_at: string | null } | null;
+  }[];
+};
+
+function toStory(row: ClusterRow): Story | null {
+  if (!row.title) return null;
+  const articles = (row.feed_cluster_articles ?? [])
+    .filter(fca => fca.articles?.title && fca.articles?.published_at)
+    .map(fca => ({
+      date: fca.articles!.published_at!.slice(0, 10),
+      headline: fca.articles!.title!,
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  return {
+    id: row.id,
+    lifecycle: row.archived_at ? 'resolved' : row.is_breaking ? 'breaking' : 'developing',
+    title: row.title,
+    category: row.categories?.name ?? 'General',
+    articles,
+    displayGroup: getDisplayGroup(row.updated_at ?? new Date().toISOString()),
+  };
 }
 
-interface EnrichedCategory extends CategoryRow, CategoryStyle {
-  count: number;
-  trending: TrendingItem[];
+async function loadStories(): Promise<Story[]> {
+  const supabase = createClient();
+  const cutoff = new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from('feed_clusters')
+    .select(`
+      id, title, is_breaking, is_active, archived_at, updated_at,
+      categories(name),
+      feed_cluster_articles(added_at, articles(title, published_at))
+    `)
+    .is('dismissed_at', null)
+    .gte('updated_at', cutoff)
+    .order('updated_at', { ascending: false })
+    .limit(80);
+
+  if (error || !data) return [];
+  return (data as unknown as ClusterRow[]).map(toStory).filter((s): s is Story => s !== null);
 }
 
+// ── Coverage mini-timeline ─────────────────────────────────────────────────
+
+function CoverageTimeline({ story }: { story: Story }) {
+  const color  = lcColor(story.lifecycle);
+  const tipRef = useRef<HTMLDivElement>(null);
+  const [tip, setTip] = useState<{ x: number; label: string } | null>(null);
+
+  const dayMap = new Map<string, number>();
+  for (const a of story.articles) dayMap.set(a.date, (dayMap.get(a.date) ?? 0) + 1);
+  const dates  = Array.from(dayMap.keys()).sort();
+  const minT   = dates.length >= 2 ? +new Date(dates[0]) : 0;
+  const maxT   = dates.length >= 2 ? +new Date(dates[dates.length - 1]) : 0;
+  const range  = maxT - minT || 1;
+  const maxCnt = dates.length > 0 ? Math.max(...Array.from(dayMap.values())) : 1;
+  const MAX_H  = 20, MIN_H = 4;
+
+  const handleMove = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    if (dates.length < 2) return;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const targetT = minT + pct * range;
+    let closest = dates[0];
+    let closestDiff = Infinity;
+    for (const d of dates) {
+      const diff = Math.abs(+new Date(d) - targetT);
+      if (diff < closestDiff) { closestDiff = diff; closest = d; }
+    }
+    const cnt = dayMap.get(closest) ?? 0;
+    const barPct = ((+new Date(closest) - minT) / range) * 100;
+    setTip({ x: barPct, label: `${fmtDate(closest)} · ${cnt} article${cnt !== 1 ? 's' : ''}` });
+  }, [dates, dayMap, minT, range]);
+
+  if (dates.length < 2) return null;
+
+  return (
+    <div style={{ position: 'relative', marginBottom: 14, cursor: 'crosshair' }}
+      onMouseMove={handleMove}
+      onMouseLeave={() => setTip(null)}
+    >
+      {tip && (
+        <div ref={tipRef} style={{
+          position: 'absolute', bottom: '100%',
+          left: `clamp(40px, ${tip.x}%, calc(100% - 60px))`,
+          transform: 'translateX(-50%)',
+          background: C.text, color: '#fff', fontSize: 10, fontFamily: SANS,
+          fontWeight: 600, padding: '3px 8px', borderRadius: 5, whiteSpace: 'nowrap',
+          pointerEvents: 'none', marginBottom: 6, zIndex: 10,
+        }}>
+          {tip.label}
+          <div style={{
+            position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)',
+            borderLeft: '4px solid transparent', borderRight: '4px solid transparent',
+            borderTop: `4px solid ${C.text}`,
+          }}/>
+        </div>
+      )}
+      <div style={{ height: MAX_H + 4, position: 'relative' }}>
+        {dates.map((date) => {
+          const pct    = ((+new Date(date) - minT) / range);
+          const cnt    = dayMap.get(date) ?? 1;
+          const h      = MIN_H + ((cnt / maxCnt) * (MAX_H - MIN_H));
+          const isLast = date === dates[dates.length - 1];
+          return (
+            <div key={date} style={{
+              position: 'absolute', bottom: 0,
+              left: `${Math.min(pct * 100, 97)}%`,
+              width: isLast ? 4 : 3, height: h,
+              background: isLast ? color : `${color}50`,
+              borderRadius: 2,
+              boxShadow: isLast ? `0 0 5px ${color}88` : 'none',
+            }}/>
+          );
+        })}
+      </div>
+      <div style={{ height: 1, background: C.border, marginTop: 3, position: 'relative' }}>
+        <span style={{ position: 'absolute', left: 0, top: 3, fontSize: 9, color: C.muted, fontFamily: SANS, fontWeight: 500 }}>
+          {fmtDate(dates[0])}
+        </span>
+        <span style={{ position: 'absolute', right: 0, top: 3, fontSize: 9, color, fontFamily: SANS, fontWeight: 600 }}>
+          {fmtDate(dates[dates.length - 1])}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ── Following strip ────────────────────────────────────────────────────────
+
+function FollowingStrip({ stories, followed, onToggle }: {
+  stories: Story[]; followed: Set<string>; onToggle: (id: string) => void;
+}) {
+  const active = stories.filter(s => followed.has(s.id));
+  if (active.length === 0) return null;
+  return (
+    <div style={{ marginBottom: 4 }}>
+      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: C.muted, fontFamily: SANS, padding: '14px 20px 8px' }}>
+        Following
+      </div>
+      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '0 20px 16px', scrollbarWidth: 'none', maskImage: 'linear-gradient(to right, transparent, black 12px, black calc(100% - 12px), transparent)', WebkitMaskImage: 'linear-gradient(to right, transparent, black 12px, black calc(100% - 12px), transparent)' }}>
+        {active.map(s => {
+          const color = lcColor(s.lifecycle);
+          return (
+            <div key={s.id} style={{ flexShrink: 0, background: C.surface, border: `1px solid ${C.border}`, borderLeft: `3px solid ${color}`, borderRadius: 10, padding: '10px 14px', maxWidth: 200, cursor: 'pointer' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 5 }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0, boxShadow: s.lifecycle === 'breaking' ? `0 0 6px ${color}` : 'none' }}/>
+                <span style={{ fontSize: 9, fontWeight: 700, color, fontFamily: SANS, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{s.lifecycle}</span>
+              </div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: C.text, fontFamily: SERIF, lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                {s.title}
+              </div>
+              <div style={{ fontSize: 10, color: C.muted, fontFamily: SANS, marginTop: 5 }}>
+                {s.articles.length} articles
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ height: 1, background: C.border, margin: '0 0 4px' }}/>
+    </div>
+  );
+}
+
+// ── Story card ─────────────────────────────────────────────────────────────
+
+function StoryCard({ story, followed, onToggleFollow }: {
+  story: Story; followed: boolean; onToggleFollow: (id: string) => void;
+}) {
+  const color      = lcColor(story.lifecycle);
+  const dur        = durationDays(story);
+  const latest     = latestHeadline(story);
+  const lms        = story.articles.length > 0 ? latestMs(story) : Date.now();
+  const isResolved = story.lifecycle === 'resolved';
+
+  const titleSize   = story.lifecycle === 'breaking' ? 22 : story.lifecycle === 'developing' ? 18 : 15;
+  const titleWeight = story.lifecycle === 'breaking' ? 800 : story.lifecycle === 'developing' ? 700 : 400;
+  const borderLeft  = story.lifecycle === 'breaking' ? `4px solid ${C.breaking}` : story.lifecycle === 'developing' ? `2px solid ${C.developing}` : `1px solid ${C.border}`;
+
+  return (
+    <div style={{
+      borderLeft,
+      background: story.lifecycle === 'breaking' ? C.breakingBg : story.lifecycle === 'developing' ? C.developingBg : 'transparent',
+      paddingLeft: 16, paddingRight: 20, paddingTop: 18, paddingBottom: 16,
+      borderBottom: `1px solid ${C.border}`,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            {story.lifecycle === 'breaking' && (
+              <span className="vp-live-dot" style={{ width: 7, height: 7, borderRadius: '50%', background: C.breaking, display: 'inline-block', flexShrink: 0 }}/>
+            )}
+            <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase', color, fontFamily: SANS }}>
+              {story.lifecycle}
+            </span>
+          </div>
+          <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: C.muted, fontFamily: SANS }}>
+            {story.category}
+          </span>
+        </div>
+        <span style={{ fontSize: 10, color: isResolved ? C.muted : color, fontFamily: SANS, fontWeight: 500, flexShrink: 0 }}>
+          {relTime(lms)}
+        </span>
+      </div>
+
+      <div style={{ fontFamily: SERIF, fontSize: titleSize, fontWeight: titleWeight, lineHeight: 1.22, letterSpacing: titleSize >= 20 ? '-0.02em' : '-0.01em', color: isResolved ? C.dim : C.text, marginBottom: 12 }}>
+        {story.title}
+      </div>
+
+      <CoverageTimeline story={story} />
+
+      {latest && (
+        <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 10, marginBottom: 12 }}>
+          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: isResolved ? C.muted : color, fontFamily: SANS, marginRight: 6 }}>
+            {isResolved ? 'Final' : 'Latest'}
+          </span>
+          <span style={{ fontSize: 13, color: isResolved ? C.dim : C.soft, fontFamily: SERIF, lineHeight: 1.45 }}>
+            {latest}
+          </span>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 11, color: C.muted, fontFamily: SANS }}>
+          {story.articles.length} articles
+          {dur > 0 && <> · <span style={{ color: isResolved ? C.muted : C.dim }}>{dur}d story</span></>}
+        </span>
+        <button
+          onClick={() => onToggleFollow(story.id)}
+          title={followed ? 'Unfollow story' : 'Follow story'}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', color: followed ? color : C.muted, transition: 'color 150ms ease' }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill={followed ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+            <path d="M13.73 21a2 2 0 01-3.46 0"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Section header ─────────────────────────────────────────────────────────
+
+function SectionHeader({ label, count }: { label: string; count: number }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '20px 20px 12px' }}>
+      <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', color: C.muted, fontFamily: SANS, flexShrink: 0 }}>
+        {label}
+      </span>
+      <div style={{ flex: 1, height: 1, background: C.border }}/>
+      <span style={{ fontSize: 10, color: C.muted, fontFamily: SANS, flexShrink: 0 }}>{count}</span>
+    </div>
+  );
+}
+
+// ── Filter pill ────────────────────────────────────────────────────────────
+
+function PillToggle({ label, active, color, onClick }: { label: string; active: boolean; color?: string; onClick: () => void }) {
+  const c = color || C.text;
+  return (
+    <button onClick={onClick} style={{ padding: '6px 14px', borderRadius: 20, fontFamily: SANS, fontSize: 12, fontWeight: active ? 700 : 500, cursor: 'pointer', border: active ? 'none' : `1px solid ${C.border}`, background: active ? c : 'transparent', color: active ? '#fff' : C.dim, transition: 'all 150ms ease', whiteSpace: 'nowrap', minHeight: 34 }}>
+      {label}
+    </button>
+  );
+}
+
+// ── Filter sheet ───────────────────────────────────────────────────────────
+
+function FilterSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: C.muted, fontFamily: SANS, marginBottom: 10 }}>
+        {title}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function FilterSheet({ open, filters, onClose, onChange, resultCount }: {
+  open: boolean; filters: FilterState; onClose: () => void; onChange: (f: FilterState) => void; resultCount: number;
+}) {
+  const toggleLc = (lc: Lifecycle) => {
+    const next = filters.lifecycle.includes(lc) ? filters.lifecycle.filter(x => x !== lc) : [...filters.lifecycle, lc];
+    onChange({ ...filters, lifecycle: next });
+  };
+  const hasFilters = filters.lifecycle.length > 0 || filters.dateFrom || filters.dateTo || filters.coverage !== 'any' || filters.quiz !== 'all' || filters.sort !== 'recent';
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.35)', opacity: open ? 1 : 0, pointerEvents: open ? 'auto' : 'none', transition: 'opacity 250ms ease', backdropFilter: 'blur(2px)' }}/>
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 201, background: C.bg, borderRadius: '18px 18px 0 0', boxShadow: '0 -4px 40px rgba(0,0,0,0.12)', transform: open ? 'translateY(0)' : 'translateY(110%)', transition: 'transform 320ms cubic-bezier(0.4,0,0.2,1)', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 6px' }}>
+          <div style={{ width: 36, height: 4, borderRadius: 2, background: C.border }}/>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 20px 16px', borderBottom: `1px solid ${C.border}` }}>
+          <span style={{ fontSize: 16, fontWeight: 700, color: C.text, fontFamily: SANS }}>Advanced Filters</span>
+          <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+            {hasFilters && (
+              <button onClick={() => onChange(DEFAULT_FILTERS)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: C.breaking, fontFamily: SANS, fontWeight: 600, padding: 0 }}>
+                Clear all
+              </button>
+            )}
+            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', color: C.dim }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div style={{ overflowY: 'auto', flex: 1, padding: '20px 20px 0' }}>
+          <FilterSection title="Sort by">
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {(['recent', 'coverage', 'duration'] as SortKey[]).map(s => (
+                <PillToggle key={s} label={s === 'recent' ? 'Most Recent' : s === 'coverage' ? 'Most Coverage' : 'Longest Running'} active={filters.sort === s} onClick={() => onChange({ ...filters, sort: s })}/>
+              ))}
+            </div>
+          </FilterSection>
+          <FilterSection title="Status">
+            <div style={{ display: 'flex', gap: 8 }}>
+              <PillToggle label="Breaking"  active={filters.lifecycle.includes('breaking')}  color={C.breaking}  onClick={() => toggleLc('breaking')} />
+              <PillToggle label="Developing" active={filters.lifecycle.includes('developing')} color={C.developing} onClick={() => toggleLc('developing')} />
+              <PillToggle label="Resolved"  active={filters.lifecycle.includes('resolved')}  color={C.dim}       onClick={() => toggleLc('resolved')} />
+            </div>
+          </FilterSection>
+          <FilterSection title="Date range">
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 10, color: C.muted, fontFamily: SANS, marginBottom: 5 }}>From</div>
+                <input type="date" value={filters.dateFrom} onChange={e => onChange({ ...filters, dateFrom: e.target.value })} style={{ width: '100%', padding: '9px 12px', borderRadius: 10, border: `1px solid ${filters.dateFrom ? C.text : C.border}`, fontSize: 13, fontFamily: SANS, color: C.text, background: C.bg, boxSizing: 'border-box', outline: 'none' }}/>
+              </div>
+              <span style={{ color: C.muted, fontSize: 12, marginTop: 18 }}>→</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 10, color: C.muted, fontFamily: SANS, marginBottom: 5 }}>To</div>
+                <input type="date" value={filters.dateTo} onChange={e => onChange({ ...filters, dateTo: e.target.value })} style={{ width: '100%', padding: '9px 12px', borderRadius: 10, border: `1px solid ${filters.dateTo ? C.text : C.border}`, fontSize: 13, fontFamily: SANS, color: C.text, background: C.bg, boxSizing: 'border-box', outline: 'none' }}/>
+              </div>
+            </div>
+          </FilterSection>
+          <FilterSection title="Coverage depth">
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {([['any', 'Any'], ['light', 'Light  <5'], ['medium', 'In Depth  5–15'], ['heavy', 'Major  15+']] as [CoverageKey, string][]).map(([k, label]) => (
+                <PillToggle key={k} label={label} active={filters.coverage === k} onClick={() => onChange({ ...filters, coverage: k })}/>
+              ))}
+            </div>
+          </FilterSection>
+          <div style={{ height: 20 }}/>
+        </div>
+        <div style={{ padding: '16px 20px', borderTop: `1px solid ${C.border}`, background: C.bg, paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))' }}>
+          <button onClick={onClose} style={{ width: '100%', padding: '14px', borderRadius: 12, background: C.text, color: '#fff', border: 'none', cursor: 'pointer', fontSize: 15, fontWeight: 700, fontFamily: SANS }}>
+            Show {resultCount} {resultCount === 1 ? 'story' : 'stories'}
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Active filter pills ────────────────────────────────────────────────────
+
+function ActiveFilters({ filters, onChange }: { filters: FilterState; onChange: (f: FilterState) => void }) {
+  const pills: { label: string; clear: () => void }[] = [];
+  filters.lifecycle.forEach(lc => pills.push({ label: lc.charAt(0).toUpperCase() + lc.slice(1), clear: () => onChange({ ...filters, lifecycle: filters.lifecycle.filter(x => x !== lc) }) }));
+  if (filters.dateFrom) pills.push({ label: `From ${fmtDate(filters.dateFrom)}`, clear: () => onChange({ ...filters, dateFrom: '' }) });
+  if (filters.dateTo)   pills.push({ label: `To ${fmtDate(filters.dateTo)}`,     clear: () => onChange({ ...filters, dateTo: '' }) });
+  if (filters.coverage !== 'any') pills.push({ label: `Coverage: ${filters.coverage}`, clear: () => onChange({ ...filters, coverage: 'any' }) });
+  if (filters.sort !== 'recent')  pills.push({ label: `Sort: ${filters.sort}`,         clear: () => onChange({ ...filters, sort: 'recent' }) });
+  if (pills.length === 0) return null;
+  return (
+    <div style={{ display: 'flex', gap: 6, padding: '0 16px 10px', overflowX: 'auto', scrollbarWidth: 'none' }}>
+      {pills.map((p, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 20, padding: '4px 10px 4px 12px', fontSize: 11, color: C.text, fontFamily: SANS, fontWeight: 500, flexShrink: 0, whiteSpace: 'nowrap' }}>
+          {p.label}
+          <button onClick={p.clear} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, padding: 0, lineHeight: 1, fontSize: 14, display: 'flex', alignItems: 'center' }}>×</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Skeleton ───────────────────────────────────────────────────────────────
+
+function BrowseSkeleton() {
+  return (
+    <div aria-hidden="true" style={{ paddingTop: 188 }}>
+      <style>{`@keyframes vp-sk { 0%,100%{opacity:1}50%{opacity:0.45} }`}</style>
+      {[0, 1, 2, 3].map(i => (
+        <div key={i} style={{ borderBottom: `1px solid ${C.border}`, padding: '18px 20px 16px', borderLeft: `${i === 0 ? 4 : 2}px solid ${i === 0 ? C.breaking : C.developing}`, background: i === 0 ? C.breakingBg : C.developingBg }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            <div style={{ width: 52, height: 10, borderRadius: 4, background: C.border, animation: 'vp-sk 1.6s ease-in-out infinite' }}/>
+            <div style={{ width: 64, height: 10, borderRadius: 4, background: C.border, animation: 'vp-sk 1.6s ease-in-out infinite' }}/>
+          </div>
+          <div style={{ width: '80%', height: i === 0 ? 22 : 18, borderRadius: 4, background: C.border, animation: 'vp-sk 1.6s ease-in-out infinite', marginBottom: 8 }}/>
+          <div style={{ width: '60%', height: i === 0 ? 22 : 18, borderRadius: 4, background: C.border, animation: 'vp-sk 1.6s ease-in-out infinite' }}/>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Constants ──────────────────────────────────────────────────────────────
+
+const GROUP_ORDER: DisplayGroup[] = ['today', 'yesterday', 'this_week', 'earlier'];
+const GROUP_LABELS: Record<DisplayGroup, string> = {
+  today: 'TODAY', yesterday: 'YESTERDAY', this_week: 'THIS WEEK', earlier: 'EARLIER',
+};
+
+// ── Main page ──────────────────────────────────────────────────────────────
 
 export default function BrowsePage() {
   usePageViewTrack('browse');
-  const [search, setSearch] = useState<string>('');
-  const [expandedCat, setExpandedCat] = useState<string | null>(null);
 
-  const [categories, setCategories] = useState<EnrichedCategory[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [loadFailed, setLoadFailed] = useState<boolean>(false);
-
-  const fetchData = useCallback(async () => {
-    const supabase = createClient();
-    setLoading(true);
-    setLoadFailed(false);
-
-    // Fetch categories. Pass 17 / UJ-507: adult /browse filters out
-    // any `kids-*` slug so kid-only categories don't leak into the
-    // adult catalogue.
-    const [catsRes, storiesRes] = await Promise.all([
-      supabase
-        .from('categories')
-        .select('id, name, slug')
-        .not('slug', 'like', 'kids-%')
-        .order('name'),
-      // Fetch recent published stories (cap to prevent unbounded load).
-      supabase
-        .from('articles')
-        .select('id, title, stories(slug), category_id, published_at')
-        .eq('status', 'published')
-        .order('published_at', { ascending: false })
-        .limit(500),
-    ]);
-
-    if (catsRes.error || storiesRes.error) {
-      console.error('[browse.fetch]', catsRes.error?.message || storiesRes.error?.message);
-      setCategories([]);
-      setLoadFailed(true);
-      setLoading(false);
-      return;
-    }
-
-    const storyList = (storiesRes.data as ArticleRow[] | null) || [];
-    const catList = (catsRes.data as CategoryRow[] | null) || [];
-
-    // Bucket stories by category once (O(n)) instead of O(n*m) per-category filter.
-    const storiesByCat: Record<string, ArticleRow[]> = {};
-    storyList.forEach((s) => {
-      if (!s.category_id) return;
-      if (!storiesByCat[s.category_id]) storiesByCat[s.category_id] = [];
-      storiesByCat[s.category_id].push(s);
-    });
-
-    // Build categories with count + trending titles
-    const enrichedCats: EnrichedCategory[] = catList.map((cat) => {
-      const catStories = storiesByCat[cat.id] || [];
-      const style = (cat.slug ? CAT_STYLE[cat.slug] : null) || DEFAULT_STYLE;
-      return {
-        ...cat,
-        ...style,
-        count: catStories.length,
-        trending: catStories.slice(0, 3).map((s) => ({ title: s.title, slug: s.stories?.slug ?? null })),
-      };
-    });
-
-    setCategories(enrichedCats);
-    setLoading(false);
-  }, []);
+  const [stories,     setStories]     = useState<Story[]>([]);
+  const [loading,     setLoading]     = useState(true);
+  const [loadFailed,  setLoadFailed]  = useState(false);
+  const [query,       setQuery]       = useState('');
+  const [category,    setCategory]    = useState('All');
+  const [filterOpen,  setFilterOpen]  = useState(false);
+  const [filters,     setFilters]     = useState<FilterState>(DEFAULT_FILTERS);
+  const [followed,    setFollowed]    = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    loadStories()
+      .then(data => { setStories(data); setLoading(false); })
+      .catch(() => { setLoadFailed(true); setLoading(false); });
+  }, []);
 
-  // T125 — drop slug-null rows from the rendered list. A category
-  // without a slug has no /category/<slug> destination and would
-  // render as a plain-text card that looks broken on tap. Filtering
-  // here keeps the rest of the data-flow intact (counts/featured
-  // upstream are unaffected).
-  const filtered = categories.filter(
-    (c) => c.slug && (!search || (c.name || '').toLowerCase().includes(search.toLowerCase()))
+  const toggleFollow = useCallback((id: string) => {
+    setFollowed(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) { next.delete(id); } else { next.add(id); }
+      return next;
+    });
+  }, []);
+
+  const cats = useMemo(() => {
+    const seen = new Set<string>();
+    stories.forEach(s => seen.add(s.category));
+    return ['All', ...Array.from(seen).sort()];
+  }, [stories]);
+
+  const activeFilterCount = useMemo(() => {
+    let n = filters.lifecycle.length;
+    if (filters.dateFrom)          n++;
+    if (filters.dateTo)            n++;
+    if (filters.coverage !== 'any') n++;
+    if (filters.sort !== 'recent')  n++;
+    return n;
+  }, [filters]);
+
+  const isMatch = useCallback((story: Story): boolean => {
+    if (category !== 'All' && story.category !== category) return false;
+    if (filters.lifecycle.length > 0 && !filters.lifecycle.includes(story.lifecycle)) return false;
+    if (filters.coverage !== 'any') {
+      const n = story.articles.length;
+      if (filters.coverage === 'light'  && n >= 5)          return false;
+      if (filters.coverage === 'medium' && (n < 5 || n > 15)) return false;
+      if (filters.coverage === 'heavy'  && n <= 15)          return false;
+    }
+    if (filters.dateFrom) {
+      if (story.articles.length > 0 && latestMs(story) < +new Date(filters.dateFrom)) return false;
+    }
+    if (filters.dateTo) {
+      if (story.articles.length > 0 && earliestMs(story) > +new Date(filters.dateTo)) return false;
+    }
+    if (query.trim().length >= 2) {
+      const q = query.toLowerCase();
+      if (!story.title.toLowerCase().includes(q) &&
+          !story.category.toLowerCase().includes(q) &&
+          !story.articles.some(a => a.headline.toLowerCase().includes(q))) return false;
+    }
+    return true;
+  }, [query, category, filters]);
+
+  const sorted = useCallback((list: Story[]) => {
+    return [...list].sort((a, b) => {
+      if (filters.sort === 'coverage') return b.articles.length - a.articles.length;
+      if (filters.sort === 'duration') return durationDays(b) - durationDays(a);
+      if (a.articles.length === 0) return 1;
+      if (b.articles.length === 0) return -1;
+      return latestMs(b) - latestMs(a);
+    });
+  }, [filters.sort]);
+
+  const grouped = useMemo(() => {
+    const map = new Map<DisplayGroup, Story[]>();
+    for (const g of GROUP_ORDER) map.set(g, []);
+    for (const story of stories) map.get(story.displayGroup)?.push(story);
+    const result: { group: DisplayGroup; stories: Story[] }[] = [];
+    for (const g of GROUP_ORDER) {
+      const matching = sorted((map.get(g) ?? []).filter(isMatch));
+      if (matching.length > 0) result.push({ group: g, stories: matching });
+    }
+    return result;
+  }, [stories, isMatch, sorted]);
+
+  const totalMatching = useMemo(() => stories.filter(isMatch).length, [stories, isMatch]);
+
+  if (loading) return <BrowseSkeleton />;
+
+  if (loadFailed) return (
+    <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, padding: 24 }}>
+      <div style={{ fontSize: 15, fontWeight: 700, color: C.text, fontFamily: SANS }}>Couldn&rsquo;t load stories</div>
+      <div style={{ fontSize: 13, color: C.muted, fontFamily: SANS }}>Check your connection and try again.</div>
+      <button onClick={() => { setLoadFailed(false); setLoading(true); loadStories().then(d => { setStories(d); setLoading(false); }).catch(() => { setLoadFailed(true); setLoading(false); }); }} style={{ padding: '10px 20px', borderRadius: 10, background: C.text, color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: SANS }}>
+        Retry
+      </button>
+    </div>
   );
 
-  const shell: CSSProperties = {
-    background: PALETTE.bg,
-    minHeight: '100vh',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-    color: PALETTE.text,
-  };
-
   return (
-    // Ext-NN1 — wrap top-level page content in <main> so screen readers
-    // reach a "main" landmark on browse. Skip-links in layout.tsx target
-    // the first <main>; without it, AT users land in the nav forever.
-    <main style={shell}>
-      {/* Header */}
-      <div
-        style={{
-          borderBottom: `1px solid ${PALETTE.border}`,
-          background: PALETTE.bg,
-          padding: '16px 16px 0',
-        }}
-      >
-        <div style={{ maxWidth: 720, margin: '0 auto' }}>
-          <h1
-            style={{ margin: '0 0 14px', fontSize: 22, fontWeight: 800, letterSpacing: '-0.03em' }}
-          >
-            Browse
-          </h1>
+    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: SANS }}>
+      <style>{`
+        @keyframes vp-live-pulse { 0%,100%{opacity:0.5;transform:scale(0.8)} 15%{opacity:1;transform:scale(1.3);box-shadow:0 0 0 4px rgba(239,68,68,0.2)} }
+        .vp-live-dot { animation: vp-live-pulse 2.4s cubic-bezier(0.4,0,0.6,1) infinite; }
+        * { -webkit-tap-highlight-color: transparent; }
+        input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.4; cursor: pointer; }
+        ::-webkit-scrollbar { display: none; }
+      `}</style>
 
-          {/* Search */}
-          <div style={{ position: 'relative', marginBottom: 14 }}>
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search categories..."
-              style={{
-                width: '100%',
-                minHeight: 44,
-                border: `1px solid ${PALETTE.border}`,
-                borderRadius: 10,
-                paddingLeft: 38,
-                paddingRight: 12,
-                fontSize: 14,
-                background: PALETTE.card,
-                color: PALETTE.text,
-                outline: 'none',
-                boxSizing: 'border-box',
-              }}
-            />
-          </div>
+      {/* Fixed header */}
+      <div style={{ position: 'fixed', top: 'var(--vp-top-bar-h, 0px)', left: 0, right: 0, zIndex: 100, background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderBottom: `1px solid ${C.border}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px 8px', maxWidth: 720, margin: '0 auto' }}>
+          <span style={{ fontFamily: SERIF, fontWeight: 800, fontSize: 20, letterSpacing: '-0.02em', color: C.text }}>Browse</span>
+          <span style={{ fontSize: 10, color: C.muted, fontFamily: SANS, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            {totalMatching} {totalMatching === 1 ? 'story' : 'stories'}
+          </span>
         </div>
-      </div>
 
-      <div style={{ maxWidth: 720, margin: '0 auto', padding: '20px 16px 40px' }}>
-        {loading ? (
-          <BrowseSkeleton />
-        ) : loadFailed ? (
-          <div style={{ textAlign: 'center', padding: '60px 16px' }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: PALETTE.text, marginBottom: 6 }}>
-              Couldn&rsquo;t load content
-            </div>
-            <div style={{ fontSize: 13, color: PALETTE.dim, marginBottom: 14, lineHeight: 1.5 }}>
-              Check your connection and try again.
-            </div>
-            <button
-              onClick={fetchData}
-              style={{
-                padding: '10px 18px',
-                minHeight: 44,
-                background: PALETTE.accent,
-                color: '#fff',
-                border: 'none',
-                borderRadius: 8,
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              Retry
+        {/* Search bar */}
+        <div style={{ padding: '0 16px 8px', maxWidth: 720, margin: '0 auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: C.surface, borderRadius: 12, padding: '10px 14px', border: `1px solid ${query ? C.text + '44' : 'transparent'}`, transition: 'border-color 150ms ease' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search stories and headlines…" style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 14, color: C.text, width: '100%', fontFamily: SANS }}/>
+            {query && <button onClick={() => setQuery('')} style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.muted, fontSize: 18, padding: 0, lineHeight: 1, flexShrink: 0 }}>×</button>}
+            <div style={{ width: 1, height: 16, background: C.border, flexShrink: 0 }}/>
+            <button onClick={() => setFilterOpen(true)} style={{ border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, padding: 0 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={activeFilterCount > 0 ? C.text : C.muted} strokeWidth="2" strokeLinecap="round">
+                <line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/>
+              </svg>
+              <span style={{ fontSize: 12, fontWeight: activeFilterCount > 0 ? 700 : 500, color: activeFilterCount > 0 ? C.text : C.muted, fontFamily: SANS }}>
+                {activeFilterCount > 0 ? `Filters · ${activeFilterCount}` : 'Filters'}
+              </span>
             </button>
           </div>
-        ) : (
-          <>
-            {/* Categories Grid */}
-            <div>
-              <h2
-                style={{
-                  margin: '0 0 14px',
-                  fontSize: 16,
-                  fontWeight: 800,
-                  letterSpacing: '-0.02em',
-                }}
-              >
-                All Categories
-              </h2>
-              {filtered.length === 0 && (
-                <div style={{ textAlign: 'center', padding: '32px 0' }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: '#111', marginBottom: 6 }}>
-                    No categories match
-                  </div>
-                  <div
-                    style={{ fontSize: 13, color: PALETTE.dim, marginBottom: 14, lineHeight: 1.5 }}
-                  >
-                    Try shorter keywords, or clear your search to see all categories.
-                  </div>
-                  {search && (
-                    <button
-                      onClick={() => setSearch('')}
-                      aria-label="Clear category search"
-                      style={{
-                        padding: '9px 18px',
-                        background: '#111',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: 8,
-                        fontSize: 13,
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Clear search
-                    </button>
-                  )}
-                </div>
-              )}
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
-                  gap: 12,
-                }}
-              >
-                {filtered.map((cat) => (
-                  // Ext-NN3 — keyboard-accessible without changing the tag
-                  // (the expanded card embeds <a> story links, so a real
-                  // <button> would be invalid HTML). role + tabIndex +
-                  // Enter/Space handler give screen readers and keyboard
-                  // users the same affordance as the click.
-                  <div
-                    key={cat.id}
-                    role="button"
-                    tabIndex={0}
-                    aria-expanded={expandedCat === cat.id}
-                    onClick={() => setExpandedCat(expandedCat === cat.id ? null : cat.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        setExpandedCat(expandedCat === cat.id ? null : cat.id);
-                      }
-                    }}
-                    style={{
-                      background: expandedCat === cat.id ? cat.color : PALETTE.card,
-                      border: `1.5px solid ${expandedCat === cat.id ? cat.accent : PALETTE.border}`,
-                      borderRadius: 12,
-                      padding: '14px',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s',
-                      gridColumn: expandedCat === cat.id ? '1 / -1' : undefined,
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 10,
-                        marginBottom: expandedCat === cat.id ? 10 : 0,
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: 42,
-                          height: 42,
-                          minWidth: 42,
-                          background: cat.color,
-                          borderRadius: 10,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: 18,
-                          fontWeight: 800,
-                          color: cat.accent,
-                        }}
-                      >
-                        {cat.name ? cat.name.charAt(0).toUpperCase() : '?'}
-                      </span>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: 14 }}>{cat.name}</div>
-                        <div style={{ fontSize: 11, color: PALETTE.dim }}>
-                          {cat.count.toLocaleString()} articles
-                        </div>
-                      </div>
-                    </div>
-
-                    {expandedCat === cat.id && (
-                      <div>
-                        <div
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 700,
-                            color: cat.accent,
-                            letterSpacing: '0.05em',
-                            marginBottom: 8,
-                            textTransform: 'uppercase',
-                          }}
-                        >
-                          Latest in {cat.name}
-                        </div>
-                        {cat.trending.length === 0 ? (
-                          <div style={{ fontSize: 13, color: PALETTE.dim, padding: '8px 0' }}>
-                            No articles yet.
-                          </div>
-                        ) : (
-                          cat.trending.map((h, i) => {
-                            // Audit fix: numbered titles were plain
-                            // divs — looked clickable, weren't. Wrap
-                            // in a Link to /story/<slug> when slug
-                            // present; fall back to non-link text on
-                            // the rare slug-null row.
-                            const inner = (
-                              <>
-                                <span
-                                  style={{
-                                    color: cat.accent,
-                                    fontWeight: 800,
-                                    minWidth: 18,
-                                  }}
-                                >
-                                  {i + 1}.
-                                </span>
-                                <span style={{ flex: 1 }}>{h.title}</span>
-                              </>
-                            );
-                            const rowStyle: CSSProperties = {
-                              padding: '8px 0',
-                              borderTop: i === 0 ? 'none' : `1px solid ${PALETTE.border}`,
-                              fontSize: 13,
-                              fontWeight: 600,
-                              color: PALETTE.text,
-                              display: 'flex',
-                              alignItems: 'flex-start',
-                              gap: 8,
-                              textDecoration: 'none',
-                            };
-                            return h.slug ? (
-                              <Link key={i} href={`/${h.slug}`} style={rowStyle}>
-                                {inner}
-                              </Link>
-                            ) : (
-                              <div key={i} style={rowStyle}>
-                                {inner}
-                              </div>
-                            );
-                          })
-                        )}
-                        <Link
-                          href={`/category/${cat.slug}`}
-                          style={{
-                            marginTop: 10,
-                            width: '100%',
-                            padding: '8px',
-                            borderRadius: 8,
-                            background: cat.accent,
-                            color: '#fff',
-                            border: 'none',
-                            cursor: 'pointer',
-                            fontSize: 13,
-                            fontWeight: 700,
-                            display: 'block',
-                            textAlign: 'center',
-                            textDecoration: 'none',
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          View all {cat.name} articles
-                        </Link>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-    </main>
-  );
-}
-
-function BrowseSkeleton() {
-  const bar = (w: number | string, h: number, mt = 0): CSSProperties => ({
-    background: PALETTE.border,
-    borderRadius: 4,
-    width: typeof w === 'number' ? w : w,
-    height: h,
-    marginTop: mt,
-    animation: 'vp-pulse 1.6s ease-in-out infinite',
-  });
-  return (
-    <div aria-hidden="true">
-      <style>{`@keyframes vp-pulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.55 } }`}</style>
-      {/* Categories grid */}
-      <div>
-        <div style={bar(120, 16)} />
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
-            gap: 12,
-            marginTop: 14,
-          }}
-        >
-          {[0, 1, 2, 3, 4, 5].map((i) => (
-            <div
-              key={i}
-              style={{
-                background: PALETTE.card,
-                border: `1px solid ${PALETTE.border}`,
-                borderRadius: 12,
-                padding: 14,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-              }}
-            >
-              <div
-                style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 10,
-                  background: PALETTE.border,
-                  animation: 'vp-pulse 1.6s ease-in-out infinite',
-                }}
-              />
-              <div style={{ flex: 1 }}>
-                <div style={bar('70%', 14)} />
-                <div style={bar('50%', 11, 6)} />
-              </div>
-            </div>
-          ))}
         </div>
+
+        {/* Category chips */}
+        <div style={{ display: 'flex', gap: 6, padding: '0 16px 12px', overflowX: 'auto', scrollbarWidth: 'none', maxWidth: 720, margin: '0 auto', maskImage: 'linear-gradient(to right, transparent, black 8px, black calc(100% - 8px), transparent)', WebkitMaskImage: 'linear-gradient(to right, transparent, black 8px, black calc(100% - 8px), transparent)' }}>
+          {cats.map(cat => {
+            const active = cat === category;
+            return (
+              <button key={cat} onClick={() => setCategory(cat)} style={{ border: active ? 'none' : `1px solid ${C.border}`, background: active ? C.text : 'transparent', color: active ? '#fff' : C.dim, fontSize: 12, fontWeight: active ? 700 : 500, borderRadius: 20, padding: '5px 14px', cursor: 'pointer', flexShrink: 0, fontFamily: SANS, transform: active ? 'scale(1.04)' : 'scale(1)', transition: 'all 140ms cubic-bezier(0.34,1.56,0.64,1)', minHeight: 32 }}>
+                {cat}
+              </button>
+            );
+          })}
+        </div>
+
+        <ActiveFilters filters={filters} onChange={setFilters} />
       </div>
+
+      {/* Content */}
+      <main style={{ maxWidth: 720, margin: '0 auto', paddingTop: activeFilterCount > 0 ? 220 : 188, paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 0px))' }}>
+        <FollowingStrip stories={stories} followed={followed} onToggle={toggleFollow} />
+
+        {grouped.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>◎</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: C.text, fontFamily: SERIF, marginBottom: 6 }}>
+              {stories.length === 0 ? 'No stories yet' : 'No stories match'}
+            </div>
+            <div style={{ fontSize: 13, color: C.muted, fontFamily: SANS, marginBottom: 20 }}>
+              {query ? `Nothing found for "${query}"` : 'Try adjusting your filters'}
+            </div>
+            {(query || activeFilterCount > 0) && (
+              <button onClick={() => { setQuery(''); setCategory('All'); setFilters(DEFAULT_FILTERS); }} style={{ padding: '10px 20px', borderRadius: 10, background: C.text, color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: SANS }}>
+                Clear all filters
+              </button>
+            )}
+          </div>
+        )}
+
+        {grouped.map(({ group, stories: groupStories }) => (
+          <div key={group}>
+            <SectionHeader label={GROUP_LABELS[group]} count={groupStories.length} />
+            {groupStories.map(story => (
+              <StoryCard key={story.id} story={story} followed={followed.has(story.id)} onToggleFollow={toggleFollow} />
+            ))}
+          </div>
+        ))}
+      </main>
+
+      <FilterSheet open={filterOpen} filters={filters} onClose={() => setFilterOpen(false)} onChange={setFilters} resultCount={totalMatching} />
     </div>
   );
 }
