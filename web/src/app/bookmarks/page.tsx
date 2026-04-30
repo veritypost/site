@@ -91,6 +91,7 @@ export default function BookmarksPage() {
   // so rapid clicks don't fire overlapping queries.
   const [hasMore, setHasMore] = useState<boolean>(false);
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const atCap = !canUnlimited && items.length >= bookmarkCap;
   // T-088: show a proactive cap counter when a free user is at or above 50% of their cap.
@@ -225,6 +226,8 @@ export default function BookmarksPage() {
 
   function removeBookmark(bookmark: BookmarkRow) {
     const id = bookmark.id;
+    if (deletingId === id) return;
+    setDeletingId(id);
     const originalIndex = items.findIndex((b) => b.id === id);
     setItems((prev) => prev.filter((b) => b.id !== id));
 
@@ -239,6 +242,7 @@ export default function BookmarksPage() {
               clearTimeout(t);
               undoTimerRef.current.delete(id);
             }
+            setDeletingId(null);
             setItems((prev) => {
               const idx =
                 originalIndex >= 0 && originalIndex <= prev.length ? originalIndex : prev.length;
@@ -270,6 +274,7 @@ export default function BookmarksPage() {
       const res = await fetch(`/api/bookmarks/${id}`, { method: 'DELETE' });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
+        setDeletingId(null);
         setItems((prev) => {
           const idx =
             originalIndex >= 0 && originalIndex <= prev.length ? originalIndex : prev.length;
@@ -278,6 +283,8 @@ export default function BookmarksPage() {
           return next;
         });
         setError(d?.error || 'Remove failed');
+      } else {
+        setDeletingId(null);
       }
     }, 5000);
     undoTimerRef.current.set(id, timer);
@@ -628,13 +635,15 @@ export default function BookmarksPage() {
                   )}
                   <button
                     onClick={() => removeBookmark(b)}
+                    disabled={deletingId === b.id}
                     style={{
                       background: 'none',
                       border: 'none',
                       fontSize: 12,
                       color: '#dc2626',
                       fontWeight: 600,
-                      cursor: 'pointer',
+                      cursor: deletingId === b.id ? 'not-allowed' : 'pointer',
+                      opacity: deletingId === b.id ? 0.5 : 1,
                       minHeight: 44,
                     }}
                   >
