@@ -343,10 +343,10 @@ async function loadEffectivePerms(supabase, userId) {
     }
   }
 
-  const { data, error } = await supabase.rpc('compute_effective_perms', { p_user_id: userId });
+  const { data, error } = await supabase.rpc('my_permission_keys');
   const result = error
     ? { rows: null, error }
-    : { rows: Array.isArray(data) ? data : [], error: null };
+    : { rows: (Array.isArray(data) ? data : []).map((r) => ({ ...r, granted: true })), error: null };
 
   if (supabase.__permsCache instanceof Map && !error) {
     supabase.__permsCache.set(userId, result);
