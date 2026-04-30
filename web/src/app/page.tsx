@@ -166,6 +166,8 @@ export default async function HomePage() {
   let readLogRes: { data: any; error: any } = { data: null, error: null };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let topStoriesRes: { data: any; error: any } = { data: null, error: null };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let userMetaRes: { data: any; error: any } = { data: null, error: null };
   let lastVisitMs: number | null = null;
   let fetchThrew = false;
 
@@ -202,7 +204,24 @@ export default async function HomePage() {
           }));
       });
 
-    [storiesRes, breakingRes, catsRes, readLogRes, topStoriesRes] = await Promise.all([
+    // Fetch signed-in user's feed preferences. Isolated in an IIFE so a
+    // failure here never cascades into a full-page fetch error.
+    const userMetaPromise = (async () => {
+      try {
+        const { data: authData } = await supabase.auth.getUser();
+        if (!authData.user) return { data: null, error: null };
+        const r = await supabase
+          .from('users')
+          .select('metadata')
+          .eq('id', authData.user.id)
+          .single();
+        return { data: r.data as { metadata: unknown } | null, error: null };
+      } catch {
+        return { data: null, error: null };
+      }
+    })();
+
+    [storiesRes, breakingRes, catsRes, readLogRes, topStoriesRes, userMetaRes] = await Promise.all([
       supabase
         .from('articles')
         .select(SELECT_COLS)
@@ -232,6 +251,7 @@ export default async function HomePage() {
         .from('top_stories')
         .select('position, articles(id, title, stories(slug, lifecycle_status), excerpt, category_id, is_breaking, is_developing, published_at)')
         .order('position'),
+      userMetaPromise,
     ]);
   } catch (e) {
     console.error('[home.fetch]', e);
@@ -243,6 +263,18 @@ export default async function HomePage() {
   for (const row of readRows) {
     if (row?.article_id) readArticleIds.add(row.article_id);
   }
+
+  // users.metadata.feed.showBreaking — lets signed-in users suppress the
+  // breaking strip. Other flags (showTrending, showRecommended, hideLowCred,
+  // display) require consumer components that don't exist yet.
+  const rawFeedMeta = (() => {
+    const m = (userMetaRes.data as { metadata: unknown } | null)?.metadata;
+    if (typeof m === 'object' && m !== null && 'feed' in m) {
+      return (m as { feed?: Record<string, unknown> }).feed;
+    }
+    return undefined;
+  })();
+  const showBreaking = (rawFeedMeta?.showBreaking ?? true) as boolean;
 
   // Top Stories: if any pinned slots exist, they become the display list.
   // Falls back to the published_at DESC date query when empty.
@@ -301,7 +333,7 @@ export default async function HomePage() {
           the permission. The permission check is client-only (the perms
           cache lives in the browser), so the strip is rendered through a
           small client island that hydrates the perms before showing. */}
-      {breaking && <HomeBreakingStrip story={breaking} />}
+      {breaking && showBreaking && <HomeBreakingStrip story={breaking} />}
 
       <main
         style={{
