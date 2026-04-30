@@ -247,7 +247,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
 
   // T-018: DB-loaded category + subcategory dropdowns.
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
-  const [subcategoriesByParent, setSubcategoriesByParent] = useState<Record<string, string[]>>({});
+  const [subcategoriesByParent, setSubcategoriesByParent] = useState<Record<string, Array<{ id: string; name: string }>>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -310,11 +310,11 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
       catRows.forEach((c) => { idToName[c.id] = c.name; });
       const parents = catRows.filter((c) => !c.parent_id);
       const subs = catRows.filter((c) => !!c.parent_id);
-      const subMap: Record<string, string[]> = {};
+      const subMap: Record<string, Array<{ id: string; name: string }>> = {};
       subs.forEach((s) => {
         const parentName = s.parent_id ? idToName[s.parent_id] : null;
         if (!parentName) return;
-        (subMap[parentName] ||= []).push(s.name);
+        (subMap[parentName] ||= []).push({ id: s.id, name: s.name });
       });
       setCategories(parents.map((c) => ({ id: c.id, name: c.name })));
       setSubcategoriesByParent(subMap);
@@ -748,6 +748,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
             body: drivingBody,
             status: effective.status,
             category_id: categoryId,
+            subcategory_id: story.subcategory || null,
             is_breaking: effective.is_breaking || false,
             is_developing: effective.is_developing || false,
             hero_pick_for_date: effective.hero_pick_for_date,
@@ -1162,7 +1163,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
               onChange={(e) => updateStory('subcategory', e.target.value)}
               options={[
                 { value: '', label: 'Select...' },
-                ...(subcategoriesByParent[story.category] || []).map((s) => ({ value: s, label: s })),
+                ...(subcategoriesByParent[story.category] || []).map((s) => ({ value: s.id, label: s.name })),
               ]}
             />
           </div>

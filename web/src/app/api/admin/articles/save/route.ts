@@ -17,7 +17,23 @@ import { permissionError, recordAdminAction, requireAdminOutranks } from '@/lib/
 
 const SLUG_SAFE = /^[a-z0-9][a-z0-9-]{0,118}[a-z0-9]$|^[a-z0-9]$/;
 
-type ArticleFields = Record<string, unknown>;
+type ArticleFields = {
+  title?: string;
+  slug?: string;
+  excerpt?: string;
+  body?: string;
+  status?: string;
+  category_id?: string | null;
+  subcategory_id?: string | null;
+  is_breaking?: boolean;
+  is_developing?: boolean;
+  is_kids_safe?: boolean;
+  kids_summary?: string;
+  age_band?: string | null;
+  hero_pick_for_date?: string | null;
+  published_at?: string | null;
+  [key: string]: unknown;
+};
 type TimelineEntryPayload = {
   id?: string;
   _isNew?: boolean;

@@ -506,6 +506,7 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
             excerpt: effective.summary || '',
             status: effective.status,
             category_id: categoryId,
+            subcategory_id: story.subcategory || null,
             is_breaking: effective.is_breaking || false,
             is_kids_safe: true,
             kids_summary: effective.summary || '',
@@ -833,7 +834,7 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
               onChange={(e) => updateStory('subcategory', e.target.value)}
               options={[
                 { value: '', label: 'Select...' },
-                ...((subcategories[story.category] || []).map((s) => ({ value: s.name, label: s.name }))),
+                ...((subcategories[story.category] || []).map((s) => ({ value: s.id, label: s.name }))),
               ]}
             />
           </div>
