@@ -267,7 +267,8 @@ function MessagesPageInner() {
 
         // Unread counts — one RPC call, map merges into each conversation.
         // Migration 038 (public.get_unread_counts) returns bigint so we coerce.
-        const { data: counts } = await supabase.rpc('get_unread_counts');
+        const { data: counts, error: countsErr } = await supabase.rpc('get_unread_counts');
+        if (countsErr) console.error('[messages] get_unread_counts', countsErr);
         const countRows = (counts as unknown as UnreadCountRow[] | null) || [];
         const unreadByConvo: Record<string, number> = Object.fromEntries(
           countRows.map((r) => [r.conversation_id, Number(r.unread) || 0])
