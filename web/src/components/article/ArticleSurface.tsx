@@ -88,6 +88,7 @@ export default function ArticleSurface(props: ArticleSurfaceProps) {
     <article style={PAGE_STYLE}>
       <h1 style={TITLE_STYLE}>{reader.title}</h1>
       {reader.subtitle && <p style={SUBTITLE_STYLE}>{reader.subtitle}</p>}
+      <p style={{ fontSize: 12, color: 'var(--dim, #5a5a5a)', marginBottom: 16, letterSpacing: '0.03em' }}>verity post</p>
       <div
         data-article-body
         style={BODY_STYLE}
