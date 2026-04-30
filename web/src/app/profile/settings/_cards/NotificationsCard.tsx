@@ -103,7 +103,11 @@ export function NotificationsCard({ preview }: Props) {
       const res = await fetch('/api/notifications/preferences', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channels: next }),
+        body: JSON.stringify({
+          alert_type: 'channel_defaults',
+          channel_push: next.push,
+          channel_in_app: next.in_app,
+        }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       toast.success('Notifications updated.');

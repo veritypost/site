@@ -40,7 +40,18 @@ export async function GET() {
       fallbackStatus: 400,
       headers: NO_STORE,
     });
-  return NextResponse.json({ preferences: data || [] }, { headers: NO_STORE });
+  const defaultsRow = (data || []).find((r) => r.alert_type === 'channel_defaults');
+  return NextResponse.json(
+    {
+      preferences: data || [],
+      channels: {
+        email: true,
+        push: defaultsRow?.channel_push ?? true,
+        in_app: defaultsRow?.channel_in_app ?? true,
+      },
+    },
+    { headers: NO_STORE }
+  );
 }
 
 export async function PATCH(request) {
