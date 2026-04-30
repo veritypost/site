@@ -1172,7 +1172,7 @@ async function handleCustomerDeleted(service, customer) {
   // because past_due rows are still billable until Stripe gives up.
   // .select('id') returns the cancelled rows so we can record them in
   // the audit metadata for forensic reconstruction.
-  const { data: cancelledRows } = await service
+  const { data: cancelledRows, error: cancelErr } = await service
     .from('subscriptions')
     .update({
       status: 'cancelled',
@@ -1184,6 +1184,9 @@ async function handleCustomerDeleted(service, customer) {
     .in('status', ['active', 'trialing', 'past_due'])
     .not('stripe_subscription_id', 'is', null)
     .select('id, stripe_subscription_id');
+  if (cancelErr) {
+    throw new Error(`customer.deleted: subscriptions cancel failed: ${cancelErr.message}`);
+  }
   const cancelledIds = (cancelledRows || []).map((r) => r.id);
 
   // Step 2: freeze the user — same RPC customer.subscription.deleted uses.
