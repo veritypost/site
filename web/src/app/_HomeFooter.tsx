@@ -65,7 +65,7 @@ export default function HomeFooter() {
               lineHeight: 1.5,
             }}
           >
-            Create a free account to unlock comments and track your reading streak.
+            Create a free account to take the quiz and join the discussion.
           </p>
           <p style={{ margin: '12px 0 0' }}>
             <Link

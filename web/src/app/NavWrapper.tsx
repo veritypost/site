@@ -144,6 +144,9 @@ const isIdeasPreview = (p: string) => p.startsWith('/ideas');
 // experience is kept clean on both /story/<slug> and any deeper /story
 // route (e.g. /story/<slug>/something future).
 const isStory = (p: string) => p.startsWith('/story');
+// Mockup/prototype pages carry their own full-screen chrome; suppress
+// the global top bar, nav, and footer so they don't double-stack.
+const isMockup = (p: string) => p.startsWith('/mockup');
 
 interface NavItem {
   label: string;
@@ -303,9 +306,9 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
   // Per-surface rules. Top bar shows on story pages so a reader can tap
   // the wordmark to return home; bottom nav and footer stay off there to
   // keep the reading viewport clean.
-  const showTopBar = mounted && SHOW_TOP_BAR && !fullyBare;
-  const showNav = mounted && SHOW_BOTTOM_NAV && !fullyBare && !isStory(path);
-  const showFooter = mounted && SHOW_FOOTER && !fullyBare && !isStory(path);
+  const showTopBar = mounted && SHOW_TOP_BAR && !fullyBare && !isMockup(path);
+  const showNav = mounted && SHOW_BOTTOM_NAV && !fullyBare && !isStory(path) && !isMockup(path);
+  const showFooter = mounted && SHOW_FOOTER && !fullyBare && !isStory(path) && !isMockup(path);
   const onAdminPage = mounted && isAdmin(path);
   // UJ-200 (Pass 17): banner is strictly admin+ territory. Editor and
   // moderator roles can reach the admin routes they're authorised for
@@ -341,13 +344,13 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
     ? [
         { label: 'Home', href: '/' },
         { label: 'Browse', href: '/mockup-explore' },
-        { label: 'Following', href: '/following' },
+        { label: 'Active Stories', href: '/following' },
         { label: 'Profile', href: '/profile' },
       ]
     : [
         { label: 'Home', href: '/' },
         { label: 'Browse', href: '/mockup-explore' },
-        { label: 'Following', href: '/following' },
+        { label: 'Active Stories', href: '/following' },
         { label: 'Sign up', href: '/signup' },
       ];
 

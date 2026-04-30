@@ -129,8 +129,11 @@ export default function FollowingPage() {
             letterSpacing: '-0.02em',
           }}
         >
-          Following
+          Active Stories
         </h1>
+        <p style={{ fontFamily: SERIF, fontSize: 15, color: C.dim, margin: '0 0 24px', fontWeight: 400 }}>
+          Stories you&rsquo;ve been reading that are still active.
+        </p>
 
         {!authLoaded || loading ? (
           <p style={{ color: C.dim, fontSize: 14 }}>Loading…</p>
