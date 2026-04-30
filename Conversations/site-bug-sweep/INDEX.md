@@ -1,8 +1,8 @@
 # Site Bug-Sweep — Index
 
-**Last updated:** 2026-04-30 (session 11 — slice 07 shipped)
-**Phase:** 9 — slice 07 shipped; ready for slice 08
-**Next session should pick up:** Slice 08 — API routes cross-cut
+**Last updated:** 2026-04-30 (session 12 — slice 08 shipped)
+**Phase:** 10 — all 8 slices shipped; program complete
+**Next session should pick up:** Program complete — no further slices.
 
 ---
 
@@ -17,7 +17,7 @@
 | 05 | Messaging | **shipped** | 2026-04-30 | `slices/05-messaging.md` |
 | 06 | Billing & subscription | **shipped** | 2026-04-30 | `slices/06-billing.md` |
 | 07 | Admin surfaces | **shipped** | 2026-04-30 | `slices/07-admin.md` |
-| 08 | API routes cross-cut | **not-started** | — | — |
+| 08 | API routes cross-cut | **shipped** | 2026-04-30 | `slices/08-api-crosscut.md` |
 
 **Profile section:** covered by `Conversations/profile-bugfix/` — 15 bugs shipped across 3 sessions (2026-04-30). Do not re-open here. Cross-surface findings from that program are noted in the "Cross-surface findings" section below.
 

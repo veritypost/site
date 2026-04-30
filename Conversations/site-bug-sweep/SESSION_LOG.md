@@ -434,3 +434,31 @@ Key pre-implementation findings (all verified against current code before touchi
 **What's blocked.** Nothing.
 
 **What next session should pick up.** Slice 08 — API routes cross-cut. Surfaces: cron jobs (score-comments, send-push, pipeline-cleanup, achievement crons, subscription sweeps, data lifecycle, log purge), events/batch ingestion endpoint, CSP report, health, push token routes, iOS/kids API surfaces. Key known fragilities: score-comments uses old Haiku model string `'claude-haiku-4-5-20251001'` at route.ts:60 (one-line fix); events/batch auth compatibility with `sendBeacon` (can't set auth headers on page-hide — may silently drop events); Vercel cron schedule verification against `vercel.json`.
+
+---
+
+## Session 12 — 2026-04-30 — Slice 08: API routes cross-cut (full session)
+
+**Phase entering:** 9 (slice 08 not-started).
+**Phase leaving:** 10 (slice 08 shipped — 1 confirmed issue resolved, zero TypeScript errors; program complete).
+
+**What happened.** Session ran Phase 1 (investigation + slice doc) and Phase 2 (implementation) back-to-back. Four parallel Explore agents investigated: score-comments model string + vercel.json schedules (Agent A), events/batch auth vs sendBeacon compatibility (Agent B), CRON_SECRET pattern across all 22 cron routes (Agent C), and silent errors + CSP report + health + push + errors routes + FK hints (Agent D). A fresh adversarial agent reviewed all confirmed findings and "clean" classifications against current code.
+
+**All three known fragilities from the system map were false positives in the current code:**
+
+- **score-comments model string** — `route.ts:60` already uses `claude-haiku-4-5-20251001`, which IS the correct current Haiku 4.5 model ID. The system-map note was incorrect.
+- **events/batch auth vs sendBeacon** — endpoint is explicitly anon-allowed by design (`route.ts:194` comment). `authedUserId` resolved from session cookie for attribution but never gates access. No event drops on tab-hide.
+- **CRON_SECRET pattern** — all 22 cron routes import `verifyCronAuth` from `web/src/lib/cronAuth.js` and call it as first guard. Helper uses `crypto.timingSafeEqual` + accepts `x-vercel-cron: 1` Vercel header. No publicly triggerable crons.
+
+**Other clean surfaces:** vercel.json — 21 entries, all valid, all route paths exist, score-comments at `*/15 * * * *`. CSP report — rate-limited (30/min), standard raw-log behavior. Health — public returns only DB health; detailed mode with env var presence gated behind constant-time `HEALTH_CHECK_SECRET` check. Push `/send` + `/status` — admin-gated + auth-gated respectively; null/empty array handling correct. Errors route — silent insert intentional (circular logging), documented in code. FK hints — none found in any sampled route.
+
+**One real issue confirmed + shipped:**
+
+**Commit `8b5f604` — 08-01 (P3):**
+- `score-comments/route.ts:77–79`: `catch { continue; }` → `catch (err) { console.error('[score-comments] json-parse failed on comment', comment.id, err); continue; }`. When Claude returns non-JSON the comment was previously silently skipped with no log trace; now it's observable.
+
+**TypeScript check:** `npx tsc --noEmit` — zero errors.
+
+**What's blocked.** Nothing.
+
+**Program complete.** All 8 slices shipped across sessions 1–12 on 2026-04-30. 59 bugs fixed across the full web surface. No open issues.

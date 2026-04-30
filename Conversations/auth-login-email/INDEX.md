@@ -10,7 +10,7 @@
 
 | # | Slice | Status | Last touched | Slice doc |
 |---|---|---|---|---|
-| 01 | Ops — Resend env vars | **not-started** | 2026-04-29 | `slices/01-ops.md` |
+| 01 | Ops — Resend env vars | **shipped** | 2026-04-29 | `slices/01-ops.md` |
 | 02 | Email templates | **shipped** | 2026-04-29 | `slices/02-email-templates.md` |
 | 03 | Send flow | **shipped** | 2026-04-29 | `slices/03-send-flow.md` |
 | 04 | Confirm route | **shipped** | 2026-04-29 | `slices/04-confirm-route.md` |

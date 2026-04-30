@@ -86,6 +86,22 @@ None. All slice sessions have resolved their questions; locked answers are in sl
 
 ---
 
+## Known implementation gaps (post-program review)
+
+These were not caught during the planning sessions. They exist in the shipped code and should be addressed before or during the execution program.
+
+1. **`score-comments` cron uses old Haiku model string.** `web/src/app/api/cron/score-comments/route.ts:60` hardcodes `'claude-haiku-4-5-20251001'`. Slice 01 D3 locked updating the constant to `'claude-haiku-4-5'` in the generate route (done correctly), but the score-comments cron was written after that decision and doesn't use it. One-line fix.
+
+2. **`ArticleTracker` sentinels use viewport-height units, not article-relative depth.** `web/src/components/article/ArticleTracker.tsx:41` places sentinels at `${pct}vh` from the top of `document.body`. For a long article (5+ screen heights) the 25% milestone fires in the first screen. For a short article the milestones cluster at the same point. Sentinels should be placed at proportional positions within the article body element itself. This quietly corrupts all scroll-depth analytics.
+
+3. **`stories` table is missing `subtitle` and `description` columns from the spec.** Slice 05 D5 schema explicitly includes `subtitle text` and `description text`. The actual migration (`2026-04-29_slice05_stories_as_containers.sql:19-26`) creates neither column. The deferred "story subtitle/description admin UI" item can't be built without another migration.
+
+4. **`comments.story_id` FK uses `ON DELETE CASCADE`, not `ON DELETE SET NULL`.** Slice 06 Migration B spec says `ON DELETE SET NULL`. The actual migration uses `ON DELETE CASCADE`, meaning deleting a story hard-deletes all comments under it. For a moderation-sensitive surface this is almost certainly wrong — comment history should survive story deletion.
+
+5. **`quiz-regenerate` rejects on any verification disagreement instead of applying fixes.** `web/src/app/api/admin/pipeline/quiz-regenerate/route.ts:249-256`: if `verifyParsed.fixes.length > 0`, the endpoint returns a 422 "Try again." The main pipeline applies the corrections from the verification step rather than rejecting. A single Haiku mis-identification surfaces as a hard user-facing error. Should apply the fix and return the corrected quiz.
+
+---
+
 ## Conventions
 
 - Slice docs live at `slices/<NN>-<name>.md` and follow the shape of `Convo 1.md` — narrative with reasoning, not bullets.

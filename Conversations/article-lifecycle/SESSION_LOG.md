@@ -356,7 +356,7 @@ Implemented all locked decisions that don't depend on the slice 05 stories-as-co
 
 ---
 
-## Session 9 — 2026-04-29 — Slice 05 caller sweep (slug migration complete)
+## Session 9b — 2026-04-29 — Slice 05 caller sweep (slug migration complete)
 
 **Phase entering:** 9 (Slice 05 migration applied, TypeScript types regenerated; remaining callers still reference `articles.slug` which no longer exists).
 **Phase leaving:** 10 (Slice 05 fully implemented across all web + iOS callers; TypeScript passes clean; Slice 06 D1 unblocked).
