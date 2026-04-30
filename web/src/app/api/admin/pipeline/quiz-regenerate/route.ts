@@ -246,13 +246,10 @@ Each option MUST be an object with a "text" field — never a bare string.`;
 
   try {
     const verifyParsed = QuizVerifySchema.parse(extractJSON(verifyText));
-    if (verifyParsed.fixes.length > 0) {
-      return NextResponse.json(
-        {
-          error: `Quiz verification found ${verifyParsed.fixes.length} mis-keyed question(s). Try again.`,
-        },
-        { status: 422 }
-      );
+    for (const fix of verifyParsed.fixes) {
+      if (fix.question_index >= 0 && fix.question_index < quizQuestions.length) {
+        quizQuestions[fix.question_index].correct_index = fix.correct_answer;
+      }
     }
   } catch (err) {
     console.error('[quiz-regenerate] verify parse failed', err);
