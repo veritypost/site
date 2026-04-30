@@ -100,6 +100,8 @@ export default function ExpertQueuePage() {
   const [answerTab, setAnswerTab] = useState<Record<string, 'edit' | 'preview'>>({});
   const [error, setError] = useState<string>('');
   const [flash, setFlash] = useState<string>('');
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [postingBack, setPostingBack] = useState<boolean>(false);
 
   async function init() {
     const {
@@ -180,64 +182,72 @@ export default function ExpertQueuePage() {
   }, [tab, authorized, activeCategory]);
 
   async function handleClaim(id: string) {
-    const res = await fetch(`/api/expert/queue/${id}/claim`, { method: 'POST' });
-    const data = await res.json().catch(() => ({}) as { error?: string });
-    if (!res.ok) {
-      setError(data?.error || 'Claim failed');
-      return;
+    setPendingId(id);
+    try {
+      const res = await fetch(`/api/expert/queue/${id}/claim`, { method: 'POST' });
+      const data = await res.json().catch(() => ({}) as { error?: string });
+      if (!res.ok) { setError(data?.error || 'Claim failed'); return; }
+      loadItems(tab);
+    } finally {
+      setPendingId(null);
     }
-    loadItems(tab);
   }
   async function handleDecline(id: string) {
-    const res = await fetch(`/api/expert/queue/${id}/decline`, { method: 'POST' });
-    const data = await res.json().catch(() => ({}) as { error?: string });
-    if (!res.ok) {
-      setError(data?.error || 'Decline failed');
-      return;
+    setPendingId(id);
+    try {
+      const res = await fetch(`/api/expert/queue/${id}/decline`, { method: 'POST' });
+      const data = await res.json().catch(() => ({}) as { error?: string });
+      if (!res.ok) { setError(data?.error || 'Decline failed'); return; }
+      loadItems(tab);
+    } finally {
+      setPendingId(null);
     }
-    loadItems(tab);
   }
   async function handleAnswer(id: string) {
     const body = (answerDraft[id] || '').trim();
     if (!body) return;
-    const res = await fetch(`/api/expert/queue/${id}/answer`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ body }),
-    });
-    const data = (await res.json().catch(() => ({}))) as AnswerResponse;
-    if (!res.ok) {
-      setError(data?.error || 'Answer failed');
-      return;
+    setPendingId(id);
+    try {
+      const res = await fetch(`/api/expert/queue/${id}/answer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body }),
+      });
+      const data = (await res.json().catch(() => ({}))) as AnswerResponse;
+      if (!res.ok) { setError(data?.error || 'Answer failed'); return; }
+      if (data.pending_review) {
+        setFlash(
+          'Saved. Your answer is in probation review and will go live once an editor approves it.'
+        );
+        setTimeout(() => setFlash(''), 5000);
+      }
+      setAnswerDraft((prev) => {
+        const n = { ...prev };
+        delete n[id];
+        return n;
+      });
+      loadItems(tab);
+    } finally {
+      setPendingId(null);
     }
-    if (data.pending_review) {
-      setFlash(
-        'Saved. Your answer is in probation review and will go live once an editor approves it.'
-      );
-      setTimeout(() => setFlash(''), 5000);
-    }
-    setAnswerDraft((prev) => {
-      const n = { ...prev };
-      delete n[id];
-      return n;
-    });
-    loadItems(tab);
   }
   async function postBackMessage() {
     const body = backDraft.trim();
     if (!body || !activeCategory) return;
-    const res = await fetch('/api/expert/back-channel', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ category_id: activeCategory, body }),
-    });
-    const data = (await res.json().catch(() => ({}))) as BackChannelResponse;
-    if (!res.ok) {
-      setError(data?.error || 'Post failed');
-      return;
+    setPostingBack(true);
+    try {
+      const res = await fetch('/api/expert/back-channel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category_id: activeCategory, body }),
+      });
+      const data = (await res.json().catch(() => ({}))) as BackChannelResponse;
+      if (!res.ok) { setError(data?.error || 'Post failed'); return; }
+      setBackDraft('');
+      loadBackChannel(activeCategory);
+    } finally {
+      setPostingBack(false);
     }
-    setBackDraft('');
-    loadBackChannel(activeCategory);
   }
 
   if (loading) return <div style={{ padding: 40, color: C.dim }}>Loading…</div>;
@@ -359,10 +369,22 @@ export default function ExpertQueuePage() {
 
               {tab === 'pending' && (
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <button onClick={() => handleClaim(it.id)} style={btn(C.accent)}>
+                  <button
+                    onClick={() => handleClaim(it.id)}
+                    disabled={pendingId === it.id}
+                    style={btn(C.accent, pendingId === it.id)}
+                  >
                     Claim
                   </button>
-                  <button onClick={() => handleDecline(it.id)} style={btnGhost}>
+                  <button
+                    onClick={() => handleDecline(it.id)}
+                    disabled={pendingId === it.id}
+                    style={{
+                      ...btnGhost,
+                      cursor: pendingId === it.id ? 'not-allowed' : 'pointer',
+                      opacity: pendingId === it.id ? 0.5 : 1,
+                    }}
+                  >
                     Decline
                   </button>
                 </div>
@@ -488,8 +510,8 @@ export default function ExpertQueuePage() {
                   )}
                   <button
                     onClick={() => handleAnswer(it.id)}
-                    disabled={!(answerDraft[it.id] || '').trim()}
-                    style={btn(C.accent)}
+                    disabled={!(answerDraft[it.id] || '').trim() || pendingId === it.id}
+                    style={btn(C.accent, !(answerDraft[it.id] || '').trim() || pendingId === it.id)}
                   >
                     Post answer
                   </button>
@@ -608,8 +630,8 @@ export default function ExpertQueuePage() {
             />
             <button
               onClick={postBackMessage}
-              disabled={!backDraft.trim()}
-              style={{ ...btn(C.accent), marginTop: 6 }}
+              disabled={!backDraft.trim() || postingBack}
+              style={{ ...btn(C.accent, !backDraft.trim() || postingBack), marginTop: 6 }}
             >
               Post
             </button>
@@ -620,7 +642,7 @@ export default function ExpertQueuePage() {
   );
 }
 
-function btn(color: string): CSSProperties {
+function btn(color: string, disabled = false): CSSProperties {
   return {
     padding: '7px 14px',
     borderRadius: 7,
@@ -629,7 +651,8 @@ function btn(color: string): CSSProperties {
     color: '#fff',
     fontSize: 12,
     fontWeight: 700,
-    cursor: 'pointer',
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    opacity: disabled ? 0.5 : 1,
   };
 }
 const btnGhost: CSSProperties = {
