@@ -209,7 +209,8 @@ export default async function HomePage() {
         nullsFirst: false,
       }),
     readLogPromise,
-    supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any)
       .from('top_stories')
       .select('position, articles(id, title, stories(slug, lifecycle_status), excerpt, category_id, is_breaking, is_developing, published_at)')
       .order('position'),
@@ -338,7 +339,7 @@ export default async function HomePage() {
 
         {!fetchFailed && hero && <HomeFooter />}
 
-        {!fetchFailed && stories.length > 0 && (
+        {!fetchFailed && displayedStories.length > 0 && (
           <div
             style={{
               paddingTop: 48,

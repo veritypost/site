@@ -52,7 +52,8 @@ function TopStoriesInner() {
   const [mutating, setMutating] = useState(false);
 
   const fetchSlots = useCallback(async () => {
-    const { data } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await (supabase as any)
       .from('top_stories')
       .select('position, articles(id, title, published_at, categories!fk_articles_category_id(name))')
       .order('position');
@@ -107,7 +108,8 @@ function TopStoriesInner() {
   const pinArticle = async (position: number, article: PinnedArticle) => {
     if (!userId || mutating) return;
     setMutating(true);
-    const { error } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any)
       .from('top_stories')
       .upsert({ position, article_id: article.id, pinned_by: userId }, { onConflict: 'position' });
     if (error) {
@@ -125,7 +127,8 @@ function TopStoriesInner() {
   const removeSlot = async (position: number) => {
     if (mutating) return;
     setMutating(true);
-    const { error } = await supabase.from('top_stories').delete().eq('position', position);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any).from('top_stories').delete().eq('position', position);
     if (error) {
       push({ message: `Failed to remove: ${error.message}`, variant: 'danger' });
     } else {
