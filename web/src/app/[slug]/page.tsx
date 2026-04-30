@@ -21,6 +21,7 @@ import ArticleSurface from '@/components/article/ArticleSurface';
 import ArticleEngagementZone from '@/components/ArticleEngagementZone';
 import ArticleTracker from '@/components/article/ArticleTracker';
 import StoryArticlePicker from '@/components/article/StoryArticlePicker';
+import ArticleFetchFailed from './_ArticleFetchFailed';
 
 export const dynamic = 'force-dynamic';
 
@@ -123,6 +124,49 @@ export default async function ArticleSlugPage({
   const { data: { user } } = await supabase.auth.getUser();
 
   const service = createServiceClient();
+  const fetchResult = await (async () => {
+    try {
+      return {
+        ok: true as const,
+        data: await Promise.all([
+          hasPermissionServer('articles.edit', supabase),
+          hasPermissionServer('admin.articles.edit.any', supabase),
+          hasPermissionServer('articles.publish', supabase),
+          hasPermissionServer('admin.articles.publish', supabase),
+          service
+            .from('quizzes')
+            .select('*', { count: 'exact', head: true })
+            .eq('article_id', article.id)
+            .eq('is_active', true)
+            .is('deleted_at', null),
+          user
+            ? service.rpc('user_passed_article_quiz', {
+                p_user_id: user.id,
+                p_article_id: article.id,
+              })
+            : Promise.resolve({ data: null, error: null }),
+          service
+            .from('sources')
+            .select('title, url, publisher, sort_order')
+            .eq('article_id', article.id)
+            .order('sort_order', { ascending: true }),
+          service
+            .from('timelines')
+            .select('id, event_date, event_label, event_body, type, linked_article_id')
+            .eq('story_id', story.id)
+            .order('event_date', { ascending: true }),
+        ]),
+      };
+    } catch (e) {
+      console.error('[article.fetch]', e);
+      return { ok: false as const };
+    }
+  })();
+
+  if (!fetchResult.ok) {
+    return <ArticleFetchFailed />;
+  }
+
   const [
     canEditNew,
     canEditLegacy,
@@ -132,40 +176,15 @@ export default async function ArticleSlugPage({
     passCheckResult,
     sourcesResult,
     timelineResult,
-  ] = await Promise.all([
-    hasPermissionServer('articles.edit', supabase),
-    hasPermissionServer('admin.articles.edit.any', supabase),
-    hasPermissionServer('articles.publish', supabase),
-    hasPermissionServer('admin.articles.publish', supabase),
-    service
-      .from('quizzes')
-      .select('*', { count: 'exact', head: true })
-      .eq('article_id', article.id)
-      .eq('is_active', true)
-      .is('deleted_at', null),
-    user
-      ? service.rpc('user_passed_article_quiz', {
-          p_user_id: user.id,
-          p_article_id: article.id,
-        })
-      : Promise.resolve({ data: null, error: null }),
-    service
-      .from('sources')
-      .select('title, url, publisher, sort_order')
-      .eq('article_id', article.id)
-      .order('sort_order', { ascending: true }),
-    service
-      .from('timelines')
-      .select('id, event_date, event_label, event_body')
-      .eq('story_id', story.id)
-      .eq('type', 'event')
-      .order('event_date', { ascending: true }),
-  ]);
+  ] = fetchResult.data;
+
+  if (quizCountResult.error) console.error('[article] quiz count query failed', quizCountResult.error);
+  if (passCheckResult.error) console.error('[article] quiz pass query failed', passCheckResult.error);
 
   const canEdit = canEditNew || canEditLegacy;
   const canPublish = canPublishNew || canPublishLegacy;
-  const hasQuiz = (quizCountResult.count ?? 0) > 0;
-  const initialPassed = !!passCheckResult.data;
+  const hasQuiz = quizCountResult.error ? false : (quizCountResult.count ?? 0) > 0;
+  const initialPassed = passCheckResult.error ? false : !!passCheckResult.data;
   const sources = sourcesResult.data ?? [];
   const timeline = timelineResult.data ?? [];
 
