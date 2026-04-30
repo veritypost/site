@@ -4,7 +4,7 @@
 
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import { C, F, FONT, R, S, SH } from '../_lib/palette';
 
@@ -53,12 +53,19 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
-  const value: ToastContext = {
-    show,
-    success: (m) => show('success', m),
-    error: (m) => show('error', m),
-    info: (m) => show('info', m),
-  };
+  // Memoize so `toast` from useToast() is a stable reference. Without this,
+  // every toast fired causes ToastProvider to re-render with a new value
+  // object, invalidating any useCallback that lists `toast` as a dep and
+  // re-triggering those effects in a loop (observed on BlockedSection).
+  const value = useMemo<ToastContext>(
+    () => ({
+      show,
+      success: (m) => show('success', m),
+      error: (m) => show('error', m),
+      info: (m) => show('info', m),
+    }),
+    [show]
+  );
 
   return (
     <Ctx.Provider value={value}>
