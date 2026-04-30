@@ -164,6 +164,7 @@ export function ProfileApp({ defaultSection }: Props) {
   const perms = useMemo(
     () => ({
       activity: hasPermission('profile.activity'),
+      activityFullHistory: hasPermission('profile.activity.full_history'),
       categories: hasPermission('profile.categories'),
       milestones: hasPermission('profile.achievements'),
       cardShare: hasPermission('profile.card_share'),
@@ -264,6 +265,7 @@ export function ProfileApp({ defaultSection }: Props) {
           authUserId={authUserId}
           preview={false}
           perms={{ activity: perms.activity }}
+          isPro={perms.activityFullHistory}
         />
       ),
     },
@@ -272,7 +274,6 @@ export function ProfileApp({ defaultSection }: Props) {
       glyph: '◧',
       group: 'Library',
       title: 'Bookmarks',
-      locked: !perms.bookmarksList,
       reason: 'The articles you saved for later.',
       keywords: ['saved', 'reading list', 'later'],
       render: () => <BookmarksSection preview={false} />,
@@ -294,7 +295,6 @@ export function ProfileApp({ defaultSection }: Props) {
       glyph: '◇',
       group: 'Library',
       title: 'Categories',
-      locked: !perms.categories,
       reason: 'Your strongest topics and where to grow.',
       keywords: ['topics', 'subjects', 'interests', 'feed'],
       render: () => <CategoriesSectionConnected authUserId={authUserId} />,
@@ -304,7 +304,6 @@ export function ProfileApp({ defaultSection }: Props) {
       glyph: '✺',
       group: 'Library',
       title: 'Milestones',
-      locked: !perms.milestones,
       reason: 'The badges you’ve earned and what’s next on the ladder.',
       keywords: ['achievements', 'badges', 'awards', 'streak'],
       render: () => <MilestonesSectionConnected authUserId={authUserId} user={user} />,
