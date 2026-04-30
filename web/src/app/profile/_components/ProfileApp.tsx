@@ -18,7 +18,6 @@ import { useToast } from './Toast';
 import { C, S } from '../_lib/palette';
 import { deriveAccountStates, isHardBlock } from '../_lib/states';
 import { ActivitySection } from '../_sections/ActivitySection';
-import { BlockedSection } from '../_sections/BlockedSection';
 import { BookmarksSection } from '../_sections/BookmarksSection';
 import { CategoriesSectionConnected } from '../_sections/CategoriesSection';
 import { DataSection } from '../_sections/DataSection';
@@ -409,16 +408,6 @@ export function ProfileApp({ defaultSection }: Props) {
       ],
       render: () => <PrivacySection user={user} preview={false} />,
     },
-    {
-      id: 'blocked',
-      glyph: '⊝',
-      group: 'Settings',
-      title: 'Blocked users',
-      reason: 'People you’ve hidden from your feed and inbox.',
-      keywords: ['block', 'mute', 'hide'],
-      render: () => <BlockedSection preview={false} />,
-    },
-
     // ── Account ──────────────────────────────────────────────────────────
     {
       id: 'plan',

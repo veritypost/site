@@ -208,6 +208,56 @@ export function SessionsSection({ preview }: Props) {
         onConfirm={revokeOthers}
         onCancel={() => setConfirmRevokeAll(false)}
       />
+      <LoginAuditLog preview={preview} />
     </>
+  );
+}
+
+interface LoginEntry {
+  id: string;
+  action: string;
+  created_at: string;
+  metadata: Record<string, unknown>;
+}
+
+function LoginAuditLog({ preview }: { preview: boolean }) {
+  const [entries, setEntries] = useState<LoginEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (preview) { setLoading(false); return; }
+    fetch('/api/account/login-activity')
+      .then((r) => r.json())
+      .then((d) => { setEntries(d.entries ?? []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [preview]);
+
+  if (preview) return null;
+
+  return (
+    <Card title="Recent sign-in activity" description="The last 50 logins to your account.">
+      {loading ? (
+        <SkeletonBlock height={80} />
+      ) : entries.length === 0 ? (
+        <p style={{ color: C.inkMuted, fontSize: F.sm, margin: 0 }}>No sign-in history recorded yet.</p>
+      ) : (
+        <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+          {entries.map((e) => (
+            <li
+              key={e.id}
+              style={{ padding: `${S[2]}px 0`, borderBottom: `1px solid ${C.border}` }}
+            >
+              <span style={{ fontWeight: 500, fontSize: F.sm, color: C.ink }}>{e.action}</span>
+              <span style={{ color: C.inkMuted, fontSize: F.xs, marginLeft: S[2] }}>
+                {new Date(e.created_at).toLocaleString()}
+                {(e.metadata as Record<string, string>)?.ip
+                  ? ` · ${(e.metadata as Record<string, string>).ip}`
+                  : ''}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
   );
 }

@@ -8,6 +8,7 @@
 import type { Tables } from '@/types/database-helpers';
 
 import { PrivacyCard } from '../settings/_cards/PrivacyCard';
+import { BlockedSection } from './BlockedSection';
 
 type UserRow = Tables<'users'>;
 
@@ -17,5 +18,10 @@ interface Props {
 }
 
 export function PrivacySection({ user, preview }: Props) {
-  return <PrivacyCard user={user} preview={preview} />;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <PrivacyCard user={user} preview={preview} />
+      <BlockedSection preview={preview} />
+    </div>
+  );
 }
