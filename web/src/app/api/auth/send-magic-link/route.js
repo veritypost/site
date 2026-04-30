@@ -70,6 +70,8 @@ import { truncateIpV4 } from '@/lib/apiErrors';
 import { checkSignupGate, isApprovedEmail } from '@/lib/betaGate';
 import { REF_COOKIE_NAME } from '@/lib/referralCookie';
 import { cookies } from 'next/headers';
+import { renderTemplate, sendEmail } from '@/lib/email';
+import { MAGIC_LINK_TEMPLATE, buildMagicLinkVars } from '@/lib/magicLinkEmail';
 
 // Frozen response shapes. The success message is identical across every
 // success / silent-reject / rate-limit-cap path so the response body
@@ -250,40 +252,101 @@ export async function POST(request) {
     }
   }
 
-  // Send the OTP. shouldCreateUser=true makes the same call work for
-  // signin AND signup — Supabase resolves which is which from the
-  // existence of the auth row. Errors swallowed (fail-CLOSED on response
-  // shape, error captured in audit log).
-  const supabase = createOtpClient();
+  // Step 1: Create auth.users row for new emails. generateLink throws
+  // "User not found" if the row doesn't exist yet. Silently skip errors
+  // that mean the row already exists (race or trigger beat us here).
   const siteUrl = getSiteUrl();
-  let otpError = null;
-  try {
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        shouldCreateUser: true,
-        emailRedirectTo: `${siteUrl}/api/auth/callback`,
-      },
-    });
-    otpError = error || null;
-  } catch (err) {
-    otpError = err;
+  if (!existingUserId) {
+    try {
+      const { error: createErr } = await service.auth.admin.createUser({
+        email,
+        email_confirm: true,
+      });
+      if (createErr) {
+        const msg = (createErr.message || '').toLowerCase();
+        const alreadyExists = msg.includes('already') || msg.includes('registered') || msg.includes('exists');
+        if (!alreadyExists) {
+          console.error('[auth.send-magic-link] admin.createUser error:', createErr.message);
+          await writeAuditRow(service, { email, reason: 'create_user_error', ipTruncated });
+          return genericOk();
+        }
+      }
+    } catch (err) {
+      console.error('[auth.send-magic-link] admin.createUser threw:', err?.message || err);
+      await writeAuditRow(service, { email, reason: 'create_user_error', ipTruncated });
+      return genericOk();
+    }
   }
 
-  if (otpError) {
-    console.error('[auth.send-magic-link] signInWithOtp error:', otpError?.message || otpError);
-    await writeAuditRow(service, {
+  // Step 2: Generate the magic link. We build our own confirm URL from
+  // hashed_token so the button lands directly on our Route Handler
+  // without a Supabase redirect in between (avoids implicit-flow hash
+  // fragment issues and gives us full control over the URL params).
+  let actionLink = null;
+  let emailOtp = null;
+  try {
+    const { data: linkData, error: linkErr } = await service.auth.admin.generateLink({
+      type: 'magiclink',
       email,
-      reason: `otp_error:${(otpError?.message || 'unknown').slice(0, 80)}`,
-      ipTruncated,
+      options: { redirectTo: `${siteUrl}/api/auth/confirm` },
     });
+    if (linkErr || !linkData?.properties?.hashed_token || !linkData?.properties?.email_otp) {
+      console.error('[auth.send-magic-link] generateLink error:', linkErr?.message || 'missing fields');
+      await writeAuditRow(service, { email, reason: 'generate_link_error', ipTruncated });
+      return genericOk();
+    }
+    actionLink = `${siteUrl}/api/auth/confirm?t=${encodeURIComponent(linkData.properties.hashed_token)}&e=${encodeURIComponent(email)}`;
+    emailOtp = linkData.properties.email_otp;
+  } catch (err) {
+    console.error('[auth.send-magic-link] generateLink threw:', err?.message || err);
+    await writeAuditRow(service, { email, reason: 'generate_link_error', ipTruncated });
     return genericOk();
   }
 
-  // Success. Referral / beta-cohort grant for new users runs in the
-  // callback handler post-redemption (when the auth row actually exists).
-  // We can't do it here because signInWithOtp doesn't create the auth
-  // row until the user clicks.
+  // Step 3: Issue OTP for typed-code fallback. Non-fatal — the link-click
+  // path works independently even if this call fails.
+  try {
+    await createOtpClient().auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: false },
+    });
+  } catch (err) {
+    console.error('[auth.send-magic-link] signInWithOtp (typed-code fallback) error:', err?.message || err);
+  }
+
+  // Step 4: Compute days_on_list for new users. Non-fatal.
+  let daysOnList = null;
+  if (!existingUserId) {
+    try {
+      const { data: req } = await service
+        .from('access_requests')
+        .select('created_at')
+        .eq('email', email)
+        .eq('status', 'approved')
+        .order('created_at')
+        .limit(1)
+        .maybeSingle();
+      if (req?.created_at) {
+        const days = Math.floor((Date.now() - new Date(req.created_at).getTime()) / (1000 * 60 * 60 * 24));
+        daysOnList = days >= 1 ? days : null;
+      }
+    } catch (err) {
+      console.error('[auth.send-magic-link] days_on_list query threw:', err?.message || err);
+    }
+  }
+
+  // Step 5: Send via Resend. Fail-open — auth rows exist; user can re-request.
+  try {
+    const { html, text, subject, fromName, fromEmail } = renderTemplate(
+      MAGIC_LINK_TEMPLATE,
+      buildMagicLinkVars({ action_link: actionLink, email_otp: emailOtp, days_on_list: daysOnList })
+    );
+    await sendEmail({ to: email, subject, html, text, fromName, fromEmail });
+  } catch (err) {
+    console.error('[auth.send-magic-link] sendEmail error:', err?.message || err);
+  }
+
+  // Step 6: Audit + return.
   await writeAuditRow(service, {
     email,
     reason: existingUserId ? 'sent_signin' : 'sent_signup',

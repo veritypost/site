@@ -37,6 +37,7 @@ import HomeBreakingStrip from './_HomeBreakingStrip';
 import HomeFooter from './_HomeFooter';
 import HomeFetchFailed from './_HomeFetchFailed';
 import HomeVisitTimestamp from './_HomeVisitTimestamp';
+import HomeFirstLoginMoment from './_HomeFirstLoginMoment';
 
 // Hand-curated front page per Future Projects/09_HOME_FEED_REBUILD.md.
 // 1 hero + up to 11 supporting, dated, page ends. No category pills, no
@@ -270,6 +271,10 @@ export default async function HomePage() {
 
   return (
     <div style={{ background: C.bg, color: C.text, minHeight: '100vh' }}>
+      {/* First-login attribution moment — position:fixed overlay, fades in/out
+          automatically. No-ops for signed-out and returning users. */}
+      <HomeFirstLoginMoment />
+
       {/* Breaking strip — narrow, above masthead. Only renders when an
           active breaking-flagged article exists today AND the viewer has
           the permission. The permission check is client-only (the perms
