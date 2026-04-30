@@ -236,22 +236,21 @@ const GROUP_LABELS: Record<DisplayGroup, string> = {
 // ── Coverage mini-timeline ─────────────────────────────────────────────────
 
 function CoverageTimeline({ story }: { story: Story }) {
-  const color   = lcColor(story.lifecycle);
-  const tipRef  = useRef<HTMLDivElement>(null);
+  const color  = lcColor(story.lifecycle);
+  const tipRef = useRef<HTMLDivElement>(null);
   const [tip, setTip] = useState<{ x: number; label: string } | null>(null);
 
   const dayMap = new Map<string, number>();
   for (const a of story.articles) dayMap.set(a.date, (dayMap.get(a.date) ?? 0) + 1);
-  const dates   = Array.from(dayMap.keys()).sort();
-  if (dates.length < 2) return null;
-
-  const minT    = +new Date(dates[0]);
-  const maxT    = +new Date(dates[dates.length - 1]);
-  const range   = maxT - minT || 1;
-  const maxCnt  = Math.max(...Array.from(dayMap.values()));
-  const MAX_H   = 20, MIN_H = 4;
+  const dates  = Array.from(dayMap.keys()).sort();
+  const minT   = dates.length >= 2 ? +new Date(dates[0]) : 0;
+  const maxT   = dates.length >= 2 ? +new Date(dates[dates.length - 1]) : 0;
+  const range  = maxT - minT || 1;
+  const maxCnt = dates.length > 0 ? Math.max(...Array.from(dayMap.values())) : 1;
+  const MAX_H  = 20, MIN_H = 4;
 
   const handleMove = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    if (dates.length < 2) return;
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
@@ -266,6 +265,8 @@ function CoverageTimeline({ story }: { story: Story }) {
     const barPct = ((+new Date(closest) - minT) / range) * 100;
     setTip({ x: barPct, label: `${fmtDate(closest)} · ${cnt} article${cnt !== 1 ? 's' : ''}` });
   }, [dates, dayMap, minT, range]);
+
+  if (dates.length < 2) return null;
 
   return (
     <div style={{ position: 'relative', marginBottom: 14, cursor: 'crosshair' }}
@@ -925,7 +926,7 @@ export default function BrowsePage() {
   const toggleFollow = useCallback((id: string) => {
     setFollowed(prev => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) { next.delete(id); } else { next.add(id); }
       return next;
     });
   }, []);
