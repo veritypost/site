@@ -153,69 +153,90 @@ export default async function HomePage() {
   // from a server component's render pass throw in App Router). On the
   // first ever visit there's no cookie, so we render no "New" tags and
   // just let the island plant the cookie for next time.
-  const lastVisitRaw = cookies().get('vp_last_home_visit_at')?.value;
+
+  // Declare mutable holders outside the try block so post-fetch code can
+  // reference them even when a network/client throw short-circuits the fetch.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let storiesRes: { data: any; error: any } = { data: null, error: null };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let breakingRes: { data: any; error: any } = { data: null, error: null };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let catsRes: { data: any; error: any } = { data: null, error: null };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let readLogRes: { data: any; error: any } = { data: null, error: null };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let topStoriesRes: { data: any; error: any } = { data: null, error: null };
   let lastVisitMs: number | null = null;
-  if (lastVisitRaw) {
-    const t = Date.parse(lastVisitRaw);
-    if (Number.isFinite(t)) lastVisitMs = t;
+  let fetchThrew = false;
+
+  try {
+    const lastVisitRaw = cookies().get('vp_last_home_visit_at')?.value;
+    if (lastVisitRaw) {
+      const t = Date.parse(lastVisitRaw);
+      if (Number.isFinite(t)) lastVisitMs = t;
+    }
+
+    // T109 — read-state for signed-in viewers. We pull the 200 most-recent
+    // reading_log rows for this user from the last 30 days and use that set
+    // to dim cards already read. Anon viewers have no reading_log; the
+    // chained .then() turns auth.getUser() into a single thenable that
+    // either yields the read-set or resolves to an empty payload, so the
+    // whole flow stays parallel with the article + category fetches and
+    // doesn't add a serial round-trip for signed-in viewers vs anon.
+    const thirtyDaysAgoIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const readLogPromise: Promise<{ data: Array<{ article_id: string }> | null; error: null }> = supabase.auth
+      .getUser()
+      .then(({ data }) => {
+        const u = data.user;
+        if (!u) return { data: null, error: null };
+        return supabase
+          .from('reading_log')
+          .select('article_id')
+          .eq('user_id', u.id)
+          .gte('created_at', thirtyDaysAgoIso)
+          .order('created_at', { ascending: false })
+          .limit(200)
+          .then((r) => ({
+            data: (r.data as Array<{ article_id: string }> | null) ?? null,
+            error: null,
+          }));
+      });
+
+    [storiesRes, breakingRes, catsRes, readLogRes, topStoriesRes] = await Promise.all([
+      supabase
+        .from('articles')
+        .select(SELECT_COLS)
+        .eq('status', 'published')
+        .gte('published_at', today.startUtc)
+        .order('published_at', { ascending: false })
+        .limit(12),
+      supabase
+        .from('articles')
+        .select(SELECT_COLS)
+        .eq('status', 'published')
+        .eq('is_breaking', true)
+        .gte('published_at', today.startUtc)
+        .order('published_at', { ascending: false })
+        .limit(1),
+      supabase
+        .from('categories')
+        .select('id, name, slug, color_hex')
+        .eq('is_active', true)
+        .order('sort_order', {
+          ascending: true,
+          nullsFirst: false,
+        }),
+      readLogPromise,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase as any)
+        .from('top_stories')
+        .select('position, articles(id, title, stories(slug, lifecycle_status), excerpt, category_id, is_breaking, is_developing, published_at)')
+        .order('position'),
+    ]);
+  } catch (e) {
+    console.error('[home.fetch]', e);
+    fetchThrew = true;
   }
-
-  // T109 — read-state for signed-in viewers. We pull the 200 most-recent
-  // reading_log rows for this user from the last 30 days and use that set
-  // to dim cards already read. Anon viewers have no reading_log; the
-  // chained .then() turns auth.getUser() into a single thenable that
-  // either yields the read-set or resolves to an empty payload, so the
-  // whole flow stays parallel with the article + category fetches and
-  // doesn't add a serial round-trip for signed-in viewers vs anon.
-  const thirtyDaysAgoIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  const readLogPromise: Promise<{ data: Array<{ article_id: string }> | null }> = supabase.auth
-    .getUser()
-    .then(({ data }) => {
-      const u = data.user;
-      if (!u) return { data: null };
-      return supabase
-        .from('reading_log')
-        .select('article_id')
-        .eq('user_id', u.id)
-        .gte('created_at', thirtyDaysAgoIso)
-        .order('created_at', { ascending: false })
-        .limit(200)
-        .then((r) => ({
-          data: (r.data as Array<{ article_id: string }> | null) ?? null,
-        }));
-    });
-
-  const [storiesRes, breakingRes, catsRes, readLogRes, topStoriesRes] = await Promise.all([
-    supabase
-      .from('articles')
-      .select(SELECT_COLS)
-      .eq('status', 'published')
-      .gte('published_at', today.startUtc)
-      .order('published_at', { ascending: false })
-      .limit(12),
-    supabase
-      .from('articles')
-      .select(SELECT_COLS)
-      .eq('status', 'published')
-      .eq('is_breaking', true)
-      .gte('published_at', today.startUtc)
-      .order('published_at', { ascending: false })
-      .limit(1),
-    supabase
-      .from('categories')
-      .select('id, name, slug, color_hex')
-      .eq('is_active', true)
-      .order('sort_order', {
-        ascending: true,
-        nullsFirst: false,
-      }),
-    readLogPromise,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any)
-      .from('top_stories')
-      .select('position, articles(id, title, stories(slug, lifecycle_status), excerpt, category_id, is_breaking, is_developing, published_at)')
-      .order('position'),
-  ]);
 
   const readArticleIds = new Set<string>();
   const readRows = (readLogRes.data as Array<{ article_id: string | null }> | null) || [];
@@ -232,7 +253,7 @@ export default async function HomePage() {
 
   // If the primary date-query errored AND top_stories is also empty, surface
   // a retry banner. If top_stories has rows, we can still render the page.
-  const fetchFailed = topArticles.length === 0 && !!storiesRes.error;
+  const fetchFailed = (topArticles.length === 0 && !!storiesRes.error) || fetchThrew;
   if (storiesRes.error) {
     console.error('[home.fetch.stories]', storiesRes.error.message);
   }
