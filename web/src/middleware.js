@@ -118,40 +118,12 @@ function buildCsp(nonce) {
   ].join('; ');
 }
 
-// Ext-OO.2 — second CSP shipped as Report-Only WITHOUT 'unsafe-inline'
-// in style-src. We still ship the primary CSP with 'unsafe-inline' (the
-// codebase has many inline style attributes; tightening live would break
-// the page). This second header collects violation reports against the
-// stricter policy so we can plan the migration to nonce-based styles.
-// When /api/csp-report is quiet under this policy, swap the primary CSP
-// to drop 'unsafe-inline'.
-function buildCspStrictReport(nonce) {
-  const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  const supabaseOrigin = (() => {
-    try {
-      return new URL(SUPABASE_URL).origin;
-    } catch {
-      return '';
-    }
-  })();
-  const supabaseWss = supabaseOrigin ? supabaseOrigin.replace('https://', 'wss://') : '';
-  return [
-    "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://js.stripe.com`,
-    `style-src 'self' 'nonce-${nonce}' https://fonts.googleapis.com`,
-    "img-src 'self' data: blob: https:",
-    "font-src 'self' data: https://fonts.gstatic.com",
-    `connect-src 'self' ${supabaseOrigin} ${supabaseWss} https://api.stripe.com https://api.openai.com https://*.ingest.sentry.io`
-      .replace(/\s+/g, ' ')
-      .trim(),
-    'frame-src https://js.stripe.com https://hooks.stripe.com',
-    "frame-ancestors 'none'",
-    "base-uri 'self'",
-    "form-action 'self'",
-    "object-src 'none'",
-    'report-uri /api/csp-report?policy=strict',
-  ].join('; ');
-}
+// Ext-OO.2 — strict Report-Only header (no unsafe-inline in style-src)
+// was removed 2026-04-30. The profile shell uses heavy inline styles;
+// on iPhone Safari the flood of per-element violation reports caused
+// ~20k function invocations in 5 minutes. Diagnostic result: the
+// profile/settings components need a CSS-class migration before this
+// policy can be enforced. Re-add once that migration ships.
 
 // M-17 / T311 — CORS allow-list for `/api/*`. Source of truth is
 // `lib/cors.js` (S3-A128). Env vars are NOT trusted for credentialed
@@ -175,25 +147,14 @@ const CSP_HEADER_NAME =
   process.env.CSP_ENFORCE === 'true'
     ? 'Content-Security-Policy'
     : 'Content-Security-Policy-Report-Only';
-function setCspHeader(res, csp, strictReportCsp) {
+function setCspHeader(res, csp) {
   res.headers.set(CSP_HEADER_NAME, csp);
-  // Ext-OO.2 — emit a SECOND report-only header carrying the strict
-  // policy (no 'unsafe-inline' in style-src). Browsers evaluate every
-  // CSP independently; this one only reports violations to
-  // /api/csp-report?policy=strict so we can quantify the migration
-  // before flipping the primary CSP. Always Report-Only — never
-  // enforced — even when CSP_ENFORCE=true (which only affects the
-  // primary header).
-  if (strictReportCsp) {
-    res.headers.append('Content-Security-Policy-Report-Only', strictReportCsp);
-  }
 }
 
 export async function middleware(request) {
   const requestId = getOrMintRequestId(request);
   const nonce = mintNonce();
   const csp = buildCsp(nonce);
-  const cspStrictReport = buildCspStrictReport(nonce);
   const pathname = request.nextUrl.pathname;
 
   // Standalone-preview short-circuit. /ideas/* renders inline sample data
@@ -235,7 +196,7 @@ export async function middleware(request) {
   // one. The env switch lets the owner enable enforce in prod once
   // /api/csp-report shows zero violations for a day — no code change
   // needed. Default remains Report-Only.
-  setCspHeader(response, csp, cspStrictReport);
+  setCspHeader(response, csp);
 
   // M-17 — CORS allow-list for /api/* on normal (non-preflight) requests.
   if (pathname.startsWith('/api/')) {
@@ -253,7 +214,7 @@ export async function middleware(request) {
     dest.search = '';
     const redirect = NextResponse.redirect(dest, { status: 301 });
     redirect.headers.set('x-request-id', requestId);
-    setCspHeader(redirect, csp, cspStrictReport);
+    setCspHeader(redirect, csp);
     return redirect;
   }
 
@@ -302,7 +263,7 @@ export async function middleware(request) {
       dest.search = '';
       const redirect = NextResponse.redirect(dest, { status: 307 });
       redirect.headers.set('x-request-id', requestId);
-      setCspHeader(redirect, csp, cspStrictReport);
+      setCspHeader(redirect, csp);
       redirect.headers.set('X-Robots-Tag', 'noindex, nofollow');
       return redirect;
     }
@@ -324,7 +285,7 @@ export async function middleware(request) {
             request: { headers: forwardedHeaders },
           });
           response.headers.set('x-request-id', requestId);
-          setCspHeader(response, csp, cspStrictReport);
+          setCspHeader(response, csp);
           if (pathname.startsWith('/api/')) applyCors(request, response);
           response.cookies.set({ name, value, ...options });
         },
@@ -334,7 +295,7 @@ export async function middleware(request) {
             request: { headers: forwardedHeaders },
           });
           response.headers.set('x-request-id', requestId);
-          setCspHeader(response, csp, cspStrictReport);
+          setCspHeader(response, csp);
           if (pathname.startsWith('/api/')) applyCors(request, response);
           response.cookies.set({ name, value: '', ...options });
         },
@@ -357,6 +318,7 @@ export async function middleware(request) {
     pathname === '/request-access' ||
     pathname === '/preview' ||
     pathname === '/welcome' ||
+    pathname === '/browse' ||
     pathname.startsWith('/r/') ||
     pathname.startsWith('/api/') ||
     pathname.startsWith('/_next/') ||
@@ -413,7 +375,7 @@ export async function middleware(request) {
         headers: { 'content-type': 'application/json' },
       });
       reject.headers.set('x-request-id', requestId);
-      setCspHeader(reject, csp, cspStrictReport);
+      setCspHeader(reject, csp);
       return reject;
     }
   }
@@ -427,7 +389,7 @@ export async function middleware(request) {
     }
     const redirect = NextResponse.redirect(signupUrl, { status: 302 });
     redirect.headers.set('x-request-id', requestId);
-    setCspHeader(redirect, csp, cspStrictReport);
+    setCspHeader(redirect, csp);
     return redirect;
   }
 
@@ -461,7 +423,7 @@ export async function middleware(request) {
     }
     const redirect = NextResponse.redirect(loginUrl, { status: 302 });
     redirect.headers.set('x-request-id', requestId);
-    setCspHeader(redirect, csp, cspStrictReport);
+    setCspHeader(redirect, csp);
     return redirect;
   }
 
@@ -496,7 +458,7 @@ export async function middleware(request) {
         request: { headers: forwardedHeaders },
       });
       rewritten.headers.set('x-request-id', requestId);
-      setCspHeader(rewritten, csp, cspStrictReport);
+      setCspHeader(rewritten, csp);
       return rewritten;
     }
   }
