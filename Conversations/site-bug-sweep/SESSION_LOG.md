@@ -102,3 +102,59 @@ Adversarial review also: expanded Finding 5 to include a second orphaning vector
 **What's blocked.** Nothing.
 
 **What next session should pick up.** Slice 02 — Navigation & discovery. Read `NavWrapper.tsx` (uncommitted changes in git status at session start), `_homeShared.ts`, `page.tsx`, `browse/`, `search/`, `leaderboard/`, and the `/story/` directory. Verify FK hints on any `.select()` with `!` syntax. Spawn parallel Explore agents as per slice session protocol.
+
+---
+
+## Session 3 — 2026-04-30 — Slice 02: Navigation & discovery investigation
+
+**Phase entering:** 2 (slice 02 not-started).
+**Phase leaving:** 2 (slice 02 locked — 3 confirmed issues).
+
+**What happened.** Four parallel Explore agents investigated the home feed (Agent A), browse/search/leaderboard (Agent B), NavWrapper and routing (Agent C), and static/utility pages (Agent D). After synthesizing 4 prioritized findings (one dropped per owner: `/mockup-explore` vs `/browse` mismatch is an in-progress test surface, not a bug), a fresh adversarial agent was spawned.
+
+Adversarial review expanded the scope of two findings: 02-00 scope confirmed to cover `readLogPromise` chain as well as Promise.all; 02-01 scope expanded from 1 page (browse) to 3 pages (browse, category, following). Adversary also identified 4 potential wont-fix items, all triaged out as either defended by existing guards, architectural scope, or already handled by type constraints.
+
+Cross-surface finding #1 (`/community-guidelines` dead link) closed: full-repo grep found zero callers in `web/src`. Route missing but nothing points to it.
+
+Stories-as-containers migration verified clean across home, browse, search, leaderboard. All `stories(slug)` joins correct. FK hint `categories!fk_articles_category_id` verified against `database.ts:1782`. NavWrapper anon/free/pro/admin states all correct. Referral handler, static pages, and `/category/[id]/` all clean.
+
+**What got locked.** Slice doc written at `slices/02-nav-discovery.md` with 3 confirmed issues:
+- 02-00 (P1): Home feed `Promise.all` at `page.tsx:156–218` has no try/catch; no app-root error boundary; thrown exceptions show raw Next.js 500
+- 02-01 (P2): Article links use `/story/` prefix in `browse/page.tsx:392`, `category/[id]/page.js:395`, `following/page.tsx:150` — extra redirect hop; canonical URL is `/<slug>`
+- 02-02 (P3): `_HomeFirstLoginMoment.tsx:88–90` and `114–119` — two silent catch blocks with no logging
+
+**What's blocked.** `following/page.tsx:150` uses `story.slug` directly — implementation agent must read the full file to verify query shape before changing the href.
+
+**What next session should pick up.** Slice 02 implementation. Read `slices/02-nav-discovery.md` in full. Confirm current code still matches investigation descriptions before touching anything. Fix in priority order: 02-00 first (P1 crash risk), then 02-01 (three files), then 02-02 (two catch blocks). TypeScript check after each issue group. One commit per issue.
+
+---
+
+## Session 4 — 2026-04-30 — Slice 02: Implementation
+
+**Phase entering:** 2 (slice 02 locked).
+**Phase leaving:** 2 (slice 02 shipped — all 3 issues resolved, zero TypeScript errors).
+
+**What happened.** Read slice doc, README, and auto-memory. Read all cited files and verified current code matched investigation descriptions before writing anything. Key pre-edit finding: `following/page.tsx:150` queries the `stories` table as a flat row (not a join), so `story.slug` is a direct column guarded by the outer ternary — the href fix is a straight `/story/` → `/` drop with no null-guard change needed.
+
+**02-00 commit `2ce74ae`** — try/catch wrap for home fetch:
+- Declared five response holders (`storiesRes`, `breakingRes`, `catsRes`, `readLogRes`, `topStoriesRes`) as `let` with null defaults before the try block, plus `lastVisitMs` and `fetchThrew = false`.
+- Wrapped `page.tsx:156–218` in a single try/catch covering the `cookies()` call, `readLogPromise` construction, and the `Promise.all` destructuring.
+- On catch, logs `[home.fetch]` + error and sets `fetchThrew = true`.
+- Updated `fetchFailed` from `topArticles.length === 0 && !!storiesRes.error` to `(topArticles.length === 0 && !!storiesRes.error) || fetchThrew` — routes any throw to `<HomeFetchFailed />`.
+- Also updated `readLogPromise` return type and both return objects to include `error: null` so TypeScript accepts the assignment into the typed holder.
+
+**02-01 commit `4523058`** — canonical article URLs:
+- `browse/page.tsx:392` — `\`/story/${h.slug}\`` → `\`/${h.slug}\``
+- `category/[id]/page.js:395` — `\`/story/${story.stories.slug}\`` → `\`/${story.stories.slug}\``
+- `following/page.tsx:150` — `\`/story/${story.slug}\`` → `\`/${story.slug}\``
+
+**02-02 commit `dc6659d`** — observable catch blocks:
+- `_HomeFirstLoginMoment.tsx:88–90` catch block: `catch {}` → `catch (e) { console.error('[home.first-login-moment] fetch error', e); }`
+- `_HomeFirstLoginMoment.tsx:114–119` catch block: `catch {}` → `catch (e) { console.error('[home.first-login-moment] update error', e); }`
+- Fallback behavior (overlay omitted, update skipped) unchanged.
+
+**TypeScript check:** `npx tsc --noEmit` — zero errors after each commit.
+
+**What's blocked.** Nothing.
+
+**What next session should pick up.** Slice 03 — Article reading. Focus on the `web/src/app/[slug]/` story page and the article-lifecycle client islands: `ArticleEngagementZone`, `ArticleTracker`, `SourcesSection`, `TimelineSection`. Verify event tracking, quiz mount, comment mount. Check all `stories(slug)` joins for FK hint correctness. Cover anon, free, pro, and admin account types. Spawn parallel Explore agents as per slice session protocol.

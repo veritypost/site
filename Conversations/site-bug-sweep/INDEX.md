@@ -1,8 +1,8 @@
 # Site Bug-Sweep — Index
 
-**Last updated:** 2026-04-30 (session 2 — slice 01 shipped)
-**Phase:** 1 — slice 01 shipped
-**Next session should pick up:** Slice 02 — Navigation & discovery
+**Last updated:** 2026-04-30 (session 4 — slice 02 shipped)
+**Phase:** 2 — slice 02 shipped; ready for slice 03
+**Next session should pick up:** Slice 03 — Article reading (investigation pass)
 
 ---
 
@@ -11,7 +11,7 @@
 | # | Slice | Status | Last touched | Slice doc |
 |---|---|---|---|---|
 | 01 | Auth & account gates | **shipped** | 2026-04-30 | `slices/01-auth-gates.md` |
-| 02 | Navigation & discovery | **not-started** | — | — |
+| 02 | Navigation & discovery | **shipped** | 2026-04-30 | `slices/02-nav-discovery.md` |
 | 03 | Article reading | **not-started** | — | — |
 | 04 | Reader engagement & social | **not-started** | — | — |
 | 05 | Messaging | **not-started** | — | — |
@@ -39,7 +39,7 @@
 
 Findings that surfaced in one slice investigation but touch a different slice. Each one is deferred to the slice that should decide it — listed here to stay visible at program level.
 
-1. **`/community-guidelines` route does not exist** (from profile-bugfix P-13). `AccountStateBanner` dead link was fixed; no other callers found in that sweep. Any surface that links to `/community-guidelines` will 404. Track here until a full-repo grep is run.
+1. ~~**`/community-guidelines` route does not exist**~~ — **closed in slice 02 session 3**. Full-repo grep confirmed zero callers in `web/src`. Nothing links to the missing route.
 
 2. ~~**`auth.js:346` calls `compute_effective_perms` (potentially dead RPC)**~~ — **fixed in `d2da5a0`** (slice 01, issue 01-00). Renamed to `my_permission_keys`; response normalized with `granted: true`. Cross-cutting risk to slices 03–08 is resolved.
 
