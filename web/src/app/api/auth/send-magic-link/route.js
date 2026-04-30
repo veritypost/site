@@ -343,7 +343,7 @@ export async function POST(request) {
     );
     await sendEmail({ to: email, subject, html, text, fromName, fromEmail });
   } catch (err) {
-    console.error('[auth.send-magic-link] sendEmail error:', err?.message || err);
+    console.error('MAIL_ERR:', err?.message, JSON.stringify(err?.response ?? err?.cause ?? null));
   }
 
   // Step 6: Audit + return.
