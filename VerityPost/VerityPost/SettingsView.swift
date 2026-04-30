@@ -648,6 +648,7 @@ struct SettingsView: View {
     // PermissionService on mount and refreshed when perms.changeToken
     // bumps (admin-driven grants land without a relaunch).
     @State private var canApplyExpert: Bool = false
+    @State private var expertApplicationStatus: String? = nil
     @State private var canEditProfile: Bool = false
     @State private var canEditEmail: Bool = false
     @State private var canChangePassword: Bool = false
@@ -1100,6 +1101,17 @@ struct SettingsView: View {
                                onTap: onTap))
             })
         }
+        if auth.currentUser?.isExpert == true || expertApplicationStatus == "pending" || expertApplicationStatus == "approved" {
+            out.append(HubRowSpec(id: "expert-profile",
+                                  keywords: ["expert", "profile", "credentials", "vacation", "status"]) { isLast, onTap in
+                AnyView(HubRow(icon: "star.fill",
+                               title: "Expert profile",
+                               subtitle: "Manage your expert account",
+                               showDivider: !isLast,
+                               kind: .push(AnyView(ExpertProfileView().environmentObject(auth))),
+                               onTap: onTap))
+            })
+        }
         return out
     }
 
@@ -1162,16 +1174,27 @@ struct SettingsView: View {
 
     private func loadPerms() async {
         canApplyExpert = await PermissionService.shared.has("expert.application.apply")
-        canEditProfile = await PermissionService.shared.has("settings.view")
-        canEditEmail = await PermissionService.shared.has("settings.account.edit_email")
-        canChangePassword = await PermissionService.shared.has("settings.account.change_password")
-        canViewMFA = await PermissionService.shared.has("settings.account.2fa.enable")
-        canViewLoginActivity = await PermissionService.shared.has("settings.login_activity.view")
+        canEditProfile = true
+        canEditEmail = true
+        canChangePassword = true
+        canViewMFA = true
+        canViewLoginActivity = await PermissionService.shared.has("settings.account.login_activity.view")
         canViewBilling = await PermissionService.shared.has("billing.view.plan")
         canViewFeedPrefs = await PermissionService.shared.has("settings.feed.view")
         canViewAlerts = await PermissionService.shared.has("notifications.prefs.view")
-        canViewDataPrivacy = await PermissionService.shared.has("settings.data.request_export")
+        canViewDataPrivacy = true
         hasActiveSubscription = await PermissionService.shared.has("billing.subscription.view_own")
+        if let userId = auth.currentUser?.id {
+            struct EARow: Decodable { let status: String }
+            let rows: [EARow] = (try? await SupabaseManager.shared.client
+                .from("expert_applications")
+                .select("status")
+                .eq("user_id", value: userId)
+                .order("created_at", ascending: false)
+                .limit(1)
+                .execute().value) ?? []
+            expertApplicationStatus = rows.first?.status
+        }
     }
 
     /// Hydrates every preview the hub shows. Called on mount and again by
@@ -2578,6 +2601,249 @@ struct VerificationRequestView: View {
 
 // MARK: - Expert settings (role=expert)
 
+private struct ExpertProfileView: View {
+    @EnvironmentObject var auth: AuthViewModel
+
+    @State private var status: String = ""
+    @State private var rejectionReason: String? = nil
+    @State private var credentialsText: String = ""
+    @State private var vacationUntil: Date? = nil
+    @State private var isOnVacation: Bool = false
+    @State private var verifiedAreas: [String] = []
+    @State private var applicationId: String? = nil
+    @State private var isLoading = true
+    @State private var isSavingCredentials = false
+    @State private var credentialsSaved = false
+    @State private var credentialsError: String? = nil
+    @State private var vacationError: String? = nil
+
+    var body: some View {
+        List {
+            Section("Queue") {
+                SettingsToggleRow(title: "On vacation",
+                                  subtitle: vacationUntil != nil
+                                      ? "Returns \(formatted(vacationUntil!))"
+                                      : "Pauses your assignment queue for 14 days",
+                                  isOn: $isOnVacation,
+                                  showDivider: false)
+                    .onChange(of: isOnVacation) { _, newVal in
+                        Task { await toggleVacation(newVal) }
+                    }
+                if let err = vacationError {
+                    Text(err).font(.caption).foregroundColor(VP.danger)
+                }
+            }
+
+            Section("Credentials") {
+                TextEditor(text: $credentialsText)
+                    .frame(minHeight: 100)
+                    .onChange(of: credentialsText) { _, val in
+                        if val.count > 600 { credentialsText = String(val.prefix(600)) }
+                    }
+                HStack {
+                    if isSavingCredentials {
+                        ProgressView().scaleEffect(0.8)
+                    } else if credentialsSaved {
+                        Image(systemName: "checkmark").foregroundColor(VP.success)
+                        Text("Saved").font(.caption).foregroundColor(VP.success)
+                    }
+                    Spacer()
+                    Button("Save credentials") {
+                        Task { await saveCredentials() }
+                    }
+                    .disabled(isSavingCredentials)
+                }
+                if let err = credentialsError {
+                    Text(err).font(.caption).foregroundColor(VP.danger)
+                }
+            }
+
+            Section("Application status") {
+                HStack {
+                    Text(statusLabel())
+                        .font(.subheadline)
+                        .foregroundColor(statusColor())
+                    Spacer()
+                }
+                if status == "rejected", let reason = rejectionReason {
+                    Text(reason).font(.caption).foregroundColor(VP.dim)
+                }
+            }
+
+            if !verifiedAreas.isEmpty {
+                Section("Verified areas") {
+                    ExpertAreaPills(items: verifiedAreas)
+                }
+            }
+        }
+        .navigationTitle("Expert profile")
+        .task { await load() }
+        .overlay {
+            if isLoading { ProgressView() }
+        }
+    }
+
+    private func load() async {
+        guard let userId = auth.currentUser?.id else { isLoading = false; return }
+        let client = SupabaseManager.shared.client
+
+        struct AppRow: Decodable {
+            let id: String
+            let status: String
+            let vacationUntil: String?
+            let rejectionReason: String?
+            var credentialsText: String = ""
+
+            enum CodingKeys: String, CodingKey {
+                case id, status, credentials
+                case vacationUntil = "vacation_until"
+                case rejectionReason = "rejection_reason"
+            }
+
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                id = try c.decode(String.self, forKey: .id)
+                status = try c.decode(String.self, forKey: .status)
+                vacationUntil = try? c.decodeIfPresent(String.self, forKey: .vacationUntil)
+                rejectionReason = try? c.decodeIfPresent(String.self, forKey: .rejectionReason)
+                credentialsText = ""
+                // credentials is stored as json — may be String or [String]
+                if let arr = try? c.decodeIfPresent([String].self, forKey: .credentials) {
+                    credentialsText = arr.joined(separator: "\n")
+                } else if let str = try? c.decodeIfPresent(String.self, forKey: .credentials) {
+                    credentialsText = str
+                }
+            }
+        }
+
+        struct AreaJoin: Decodable {
+            let categories: CategoryName
+            struct CategoryName: Decodable { let name: String }
+        }
+
+        let apps: [AppRow] = (try? await client
+            .from("expert_applications")
+            .select("id, status, credentials, vacation_until, rejection_reason")
+            .eq("user_id", value: userId)
+            .order("created_at", ascending: false)
+            .limit(1)
+            .execute().value) ?? []
+
+        if let app = apps.first {
+            applicationId = app.id
+            status = app.status
+            rejectionReason = app.rejectionReason
+            credentialsText = app.credentialsText
+            if let vacStr = app.vacationUntil,
+               let vacDate = ISO8601DateFormatter().date(from: vacStr) {
+                vacationUntil = vacDate
+                isOnVacation = vacDate > Date()
+            }
+            let areas: [AreaJoin] = (try? await client
+                .from("expert_application_categories")
+                .select("categories(name)")
+                .eq("application_id", value: app.id)
+                .execute().value) ?? []
+            verifiedAreas = areas.map(\.categories.name)
+        }
+        isLoading = false
+    }
+
+    private func toggleVacation(_ on: Bool) async {
+        guard let session = try? await SupabaseManager.shared.client.auth.session else { return }
+        let untilStr: String? = on
+            ? ISO8601DateFormatter().string(from: Date().addingTimeInterval(14 * 24 * 3600))
+            : nil
+        let site = SupabaseManager.shared.siteURL
+        guard let url = URL(string: "/api/expert/vacation", relativeTo: site) else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        let bodyObj: [String: Any] = ["vacation_until": untilStr as Any? ?? NSNull()]
+        req.httpBody = try? JSONSerialization.data(withJSONObject: bodyObj)
+        do {
+            _ = try await URLSession.shared.data(for: req)
+            vacationUntil = on ? Date().addingTimeInterval(14 * 24 * 3600) : nil
+            vacationError = nil
+        } catch {
+            vacationError = "Could not update vacation."
+        }
+    }
+
+    private func saveCredentials() async {
+        guard let session = try? await SupabaseManager.shared.client.auth.session else { return }
+        isSavingCredentials = true
+        credentialsSaved = false
+        credentialsError = nil
+        let site = SupabaseManager.shared.siteURL
+        guard let url = URL(string: "/api/expert/apply", relativeTo: site) else {
+            isSavingCredentials = false; return
+        }
+        var req = URLRequest(url: url)
+        req.httpMethod = "PATCH"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["credentials": credentialsText.trimmingCharacters(in: .whitespaces)])
+        do {
+            let (data, _) = try await URLSession.shared.data(for: req)
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let err = json["error"] as? String {
+                credentialsError = err
+            } else {
+                credentialsSaved = true
+            }
+        } catch {
+            credentialsError = "Could not save credentials."
+        }
+        isSavingCredentials = false
+    }
+
+    private func statusLabel() -> String {
+        switch status {
+        case "approved": return "Verified expert"
+        case "pending":  return "Under review"
+        case "rejected": return "Not approved"
+        case "revoked":  return "Revoked"
+        default:         return status
+        }
+    }
+
+    private func statusColor() -> Color {
+        switch status {
+        case "approved": return VP.success
+        case "pending":  return VP.brand
+        case "rejected", "revoked": return VP.danger
+        default: return VP.dim
+        }
+    }
+
+    private func formatted(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .none
+        return f.string(from: date)
+    }
+}
+
+// Flow pill layout for expert verified areas — file-scope to satisfy Swift's
+// restriction on View-conforming types nested inside other View-conforming structs.
+private struct ExpertAreaPills: View {
+    let items: [String]
+    var body: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 80), alignment: .leading)], spacing: 6) {
+            ForEach(items, id: \.self) { item in
+                Text(item)
+                    .font(.caption)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(VP.surface)
+                    .overlay(RoundedRectangle(cornerRadius: 99).stroke(VP.border))
+                    .cornerRadius(99)
+            }
+        }
+    }
+}
 
 // MARK: - Data & Privacy
 

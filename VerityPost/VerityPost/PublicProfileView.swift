@@ -120,7 +120,7 @@ struct PublicProfileView: View {
         .task(id: perms.changeToken) {
             canViewOtherTotal = await PermissionService.shared.has("profile.score.view.other.total")
             canFollow = await PermissionService.shared.has("profile.follow")
-            canShareCard = await PermissionService.shared.has("profile.card.share_link")
+            canShareCard = await PermissionService.shared.has("profile.card_share")
         }
     }
 

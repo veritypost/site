@@ -49,6 +49,7 @@ struct ProfileView: View {
     @State private var canViewCategories: Bool = false
     @State private var canViewAchievements: Bool = false
     @State private var canViewBookmarks: Bool = false
+    @State private var canViewActivityFullHistory: Bool = false
     @State private var canViewMessages: Bool = false
     @State private var canViewExpertQueue: Bool = false
     @State private var canViewFamily: Bool = false
@@ -193,7 +194,7 @@ struct ProfileView: View {
         }
         .task(id: tab) { loadTabData() }
         .task(id: perms.changeToken) {
-            canShareProfileCard = await PermissionService.shared.has("profile.card.share_link")
+            canShareProfileCard = await PermissionService.shared.has("profile.card_share")
             canViewCard = await PermissionService.shared.has("profile.card.view")
             // OwnersAudit Profile Task 5 — switched to canonical short-form
             // keys (per CLAUDE.md). Web has always used these; iOS was on the
@@ -203,6 +204,7 @@ struct ProfileView: View {
             // FIRST — see Ongoing Projects/migrations/
             // 2026-04-26_profile_categories_canonical_binding.sql.
             canViewActivity = await PermissionService.shared.has("profile.activity")
+            canViewActivityFullHistory = await PermissionService.shared.has("profile.activity.full_history")
             canViewCategories = await PermissionService.shared.has("profile.categories")
             canViewAchievements = await PermissionService.shared.has("profile.achievements")
             canViewBookmarks = await PermissionService.shared.has("bookmarks.list.view")
@@ -608,17 +610,15 @@ struct ProfileView: View {
         let showShare = canShareProfileCard && (user.username?.isEmpty == false)
 
         HStack(spacing: 8) {
-            if canViewBookmarks {
-                NavigationLink {
-                    BookmarksView().environmentObject(auth)
-                } label: {
-                    quickActionChip(icon: "bookmark.fill", label: "Saved")
-                }
-                .buttonStyle(.plain)
-                .simultaneousGesture(TapGesture().onEnded {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                })
+            NavigationLink {
+                BookmarksView().environmentObject(auth)
+            } label: {
+                quickActionChip(icon: "bookmark.fill", label: "Saved")
             }
+            .buttonStyle(.plain)
+            .simultaneousGesture(TapGesture().onEnded {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            })
             if canViewMessages {
                 NavigationLink {
                     MessagesView().environmentObject(auth)
@@ -916,40 +916,10 @@ struct ProfileView: View {
     private func tabContent(_ user: VPUser) -> some View {
         switch tab {
         case .overview:   overviewTab(user)
-        case .activity:   if canViewActivity { activityTab } else { lockedTabView() }
-        case .categories: if canViewCategories { categoriesTab } else { lockedTabView() }
-        case .milestones: if canViewAchievements { milestonesTab(user) } else { lockedTabView() }
+        case .activity:   activityTab
+        case .categories: categoriesTab
+        case .milestones: milestonesTab(user)
         }
-    }
-
-    // OwnersAudit Profile Task 2 — single locked-tab view for permission-gated
-    // tabs. Mirrors web's `LockedTab` but with the iOS subscription sheet wired
-    // through `showSubscription` (the same flow used elsewhere in this view).
-    @ViewBuilder
-    private func lockedTabView() -> some View {
-        VStack(spacing: 14) {
-            Spacer().frame(height: 40)
-            Text("This tab is part of paid plans.")
-                .font(.subheadline)
-                .foregroundColor(VP.dim)
-                .multilineTextAlignment(.center)
-            Button {
-                showSubscription = true
-            } label: {
-                Text("View plans")
-                    .font(.system(.subheadline, design: .default, weight: .semibold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 22)
-                    .padding(.vertical, 10)
-                    .frame(minHeight: 44)
-                    .background(VP.accent)
-                    .cornerRadius(10)
-            }
-            .buttonStyle(.plain)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 24)
     }
 
     // MARK: - Overview tab (bio + profile card + my-stuff list)
@@ -1022,11 +992,9 @@ struct ProfileView: View {
                                   description: "Your direct conversations",
                                   destination: AnyView(MessagesView().environmentObject(auth)))
                     }
-                    if canViewBookmarks {
-                        quickLink(label: "Bookmarks",
-                                  description: "Articles you've saved",
-                                  destination: AnyView(BookmarksView().environmentObject(auth)))
-                    }
+                    quickLink(label: "Bookmarks",
+                              description: "Articles you've saved",
+                              destination: AnyView(BookmarksView().environmentObject(auth)))
                     if canViewFamily {
                         quickLink(label: "Kids",
                                   description: "Manage your family plan and kid profiles",
@@ -1164,6 +1132,13 @@ struct ProfileView: View {
                 }
                 .padding(.horizontal, 16)
             } else {
+                if !canViewActivityFullHistory {
+                    Text("Showing last 30 days.")
+                        .font(.caption)
+                        .foregroundColor(VP.dim)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 4)
+                }
                 let filtered = filteredActivityItems()
                 if filtered.isEmpty {
                     emptyState(
@@ -1724,19 +1699,22 @@ struct ProfileView: View {
     private func loadTabData() {
         guard let userId = auth.currentUser?.id else { return }
         switch tab {
-        case .activity where !activityLoaded && canViewActivity:
+        case .activity where !activityLoaded:
             Task { await loadActivity(userId: userId) }
-        case .categories where !categoriesLoaded && canViewCategories:
+        case .categories where !categoriesLoaded:
             Task { await loadCategories(userId: userId) }
         default: break
         }
-        if tab == .milestones && !achievementsLoaded && canViewAchievements {
+        if tab == .milestones && !achievementsLoaded {
             Task { await loadAchievements(userId: userId) }
         }
     }
 
     private func loadActivity(userId: String) async {
         do {
+            let cutoff = canViewActivityFullHistory
+                ? "1970-01-01T00:00:00Z"
+                : ISO8601DateFormatter().string(from: Date().addingTimeInterval(-30 * 24 * 3600))
             // reading_log + quiz_attempts carry kid_profile_id when the
             // row originated in the kids app — filter out so the parent's
             // adult Activity feed never surfaces their kid's reads or
@@ -1746,19 +1724,23 @@ struct ProfileView: View {
                 .select("id, read_at, completed, articles(title, stories(slug))")
                 .eq("user_id", value: userId)
                 .is("kid_profile_id", value: nil)
+                .gte("created_at", value: cutoff)
                 .order("created_at", ascending: false).limit(50).execute().value
             async let q: [QuizAttempt] = client.from("quiz_attempts")
                 .select("id, article_id, attempt_number, is_correct, points_earned, created_at, articles(title, stories(slug))")
                 .eq("user_id", value: userId)
                 .is("kid_profile_id", value: nil)
+                .gte("created_at", value: cutoff)
                 .order("created_at", ascending: false).limit(200).execute().value
             async let c: [VPComment] = client.from("comments")
                 .select("id, body, created_at, articles(title, stories(slug))")
                 .eq("user_id", value: userId)
+                .gte("created_at", value: cutoff)
                 .order("created_at", ascending: false).limit(50).execute().value
             async let b: [BookmarkJoined] = client.from("bookmarks")
                 .select("id, created_at, notes, articles(title, stories(slug))")
                 .eq("user_id", value: userId)
+                .gte("created_at", value: cutoff)
                 .order("created_at", ascending: false).limit(50).execute().value
             let reads = try await r
             let quizzes_ = try await q
