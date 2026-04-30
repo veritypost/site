@@ -69,6 +69,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.veritypost.app
+        DEVELOPMENT_TEAM: FQCAS829U7
         CODE_SIGN_ENTITLEMENTS: VerityPost/VerityPost.entitlements
         SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
         SUPPORTS_MACCATALYST: NO
@@ -83,8 +84,10 @@ targets:
         VP_SITE_URL: "https://veritypost.com"
       configs:
         Debug:
+          CODE_SIGN_IDENTITY: "Apple Development"
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
         Release:
+          CODE_SIGN_IDENTITY: "Apple Distribution"
           SWIFT_COMPILATION_MODE: wholemodule
 
   VerityPostUITests:
