@@ -89,6 +89,7 @@ export default function ArticleSurface(props: ArticleSurfaceProps) {
       <h1 style={TITLE_STYLE}>{reader.title}</h1>
       {reader.subtitle && <p style={SUBTITLE_STYLE}>{reader.subtitle}</p>}
       <div
+        data-article-body
         style={BODY_STYLE}
         // bodyHtml is server-sanitized via renderBodyHtml (sanitize-html);
         // never user-supplied raw HTML at this point.

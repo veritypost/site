@@ -30,15 +30,30 @@ export default function ArticleTracker({ articleId, articleSlug }: Props) {
 
     const sentinels: HTMLElement[] = [];
     const observers: IntersectionObserver[] = [];
+    let resizeObserver: ResizeObserver | null = null;
+
+    function placeSentinels() {
+      const articleEl = document.querySelector<HTMLElement>('[data-article-body]');
+      let articleTop: number;
+      let articleHeight: number;
+      if (articleEl) {
+        articleTop = articleEl.getBoundingClientRect().top + window.scrollY;
+        articleHeight = articleEl.offsetHeight;
+      } else {
+        console.warn('[ArticleTracker] article body element not found; falling back to vh');
+        articleTop = 0;
+        articleHeight = window.innerHeight;
+      }
+      if (articleHeight === 0) return;
+      sentinels.forEach((s, i) => {
+        s.style.top = `${articleTop + (MILESTONES[i] / 100) * articleHeight}px`;
+      });
+    }
 
     for (const pct of MILESTONES) {
       const sentinel = document.createElement('div');
       sentinel.style.cssText = 'position:absolute;left:0;width:1px;height:1px;opacity:0;pointer-events:none';
       sentinel.setAttribute('data-track-pct', String(pct));
-
-      // Place sentinel at `pct`% of viewport height as a proxy for article depth.
-      // The article body is the primary content; this fires relative to document scroll.
-      sentinel.style.top = `${pct}vh`;
       document.body.appendChild(sentinel);
       sentinels.push(sentinel);
 
@@ -67,7 +82,16 @@ export default function ArticleTracker({ articleId, articleSlug }: Props) {
       observers.push(obs);
     }
 
+    placeSentinels();
+
+    const articleEl = document.querySelector<HTMLElement>('[data-article-body]');
+    if (articleEl && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(placeSentinels);
+      resizeObserver.observe(articleEl);
+    }
+
     return () => {
+      resizeObserver?.disconnect();
       observers.forEach((o) => o.disconnect());
       sentinels.forEach((s) => s.remove());
     };
