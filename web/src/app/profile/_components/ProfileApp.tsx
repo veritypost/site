@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 import { createClient } from '@/lib/supabase/client';
-import { hasPermission, refreshIfStale } from '@/lib/permissions';
+import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import { getScoreTiers, nextTier, tierFor, type ScoreTier } from '@/lib/scoreTiers';
 import type { Tables } from '@/types/database-helpers';
 
@@ -144,6 +144,19 @@ export function ProfileApp({ defaultSection }: Props) {
       clearInterval(id);
     };
   }, []);
+
+  // Post-checkout landing: Stripe redirects to /profile/settings?section=plan&success=1
+  // (via /profile/settings/billing which preserves the param). Show a toast and
+  // trigger a perms refresh so newly-granted plan gates reflect immediately rather
+  // than waiting for the 60s poll. Strip the param so back/reload don't re-toast.
+  useEffect(() => {
+    if (!resolved) return;
+    if (searchParams.get('success') !== '1') return;
+    toast.success('Subscription updated.');
+    void refreshAllPermissions().then(() => setPermsTick((t) => t + 1));
+    router.replace('/profile/settings?section=plan');
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- toast is stable singleton
+  }, [resolved, searchParams, router]);
 
   // Permission resolution. The real perms cache is the only source —
   // every gate honors the live `hasPermission` lookup against the user's
@@ -465,9 +478,6 @@ export function ProfileApp({ defaultSection }: Props) {
   ];
 
   const banners = accountStates.filter((s) => s.kind !== 'ok');
-
-  // Touch the searchParams so this is wired to the URL (also lints clean)
-  void searchParams;
 
   return (
     <>
