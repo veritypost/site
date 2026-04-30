@@ -5,6 +5,7 @@ import { useEffect, useState, CSSProperties } from 'react';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import { formatDate } from '@/lib/dates';
 import type { Tables } from '@/types/database-helpers';
+import ErrorState from '@/components/ErrorState';
 
 // D36 / Pass 17 — weekly recap list. Permission swap:
 //   • The server route (api/recap) also gates on recap.list.view and
@@ -97,10 +98,16 @@ export default function RecapListPage() {
   const [recaps, setRecaps] = useState<RecapRow[]>([]);
   // eslint-disable-next-line react-hooks/rules-of-hooks -- launch-hide pattern; remove when feature unhides (FIX_SESSION_1 launch-hides)
   const [canView, setCanView] = useState<boolean>(true);
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- launch-hide pattern; remove when feature unhides (FIX_SESSION_1 launch-hides)
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- launch-hide pattern; remove when feature unhides (FIX_SESSION_1 launch-hides)
+  const [reloadKey, setReloadKey] = useState(0);
 
   // eslint-disable-next-line react-hooks/rules-of-hooks -- launch-hide pattern; remove when feature unhides (FIX_SESSION_1 launch-hides)
   useEffect(() => {
     (async () => {
+      setFetchError(null);
+      setLoading(true);
       await refreshAllPermissions();
       await refreshIfStale();
       const allowed = hasPermission('recap.list.view');
@@ -116,11 +123,13 @@ export default function RecapListPage() {
         // (covers account-state downgrades the client cache hasn't seen).
         if (data.paid === false) setCanView(false);
         setRecaps(data.recaps || []);
+      } catch {
+        setFetchError('Couldn\'t load recap data. Try again.');
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [reloadKey]);
 
   if (loading) return <div style={{ padding: 40, color: C.dim }}>Loading…</div>;
 
@@ -146,7 +155,14 @@ export default function RecapListPage() {
         up.
       </p>
 
-      {recaps.length === 0 ? (
+      {fetchError ? (
+        <ErrorState
+          inline
+          message={fetchError}
+          onRetry={() => { setFetchError(null); setReloadKey((k) => k + 1); }}
+          style={{ marginBottom: 16 }}
+        />
+      ) : recaps.length === 0 ? (
         <div style={{ padding: 40, textAlign: 'center', color: C.dim, fontSize: 13 }}>
           No recaps ready yet. Check back later.
         </div>
