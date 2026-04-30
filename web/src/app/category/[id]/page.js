@@ -392,7 +392,7 @@ export default function CategoryPage() {
             {visible.map((story) => (
               <a
                 key={story.id}
-                href={story.stories?.slug ? `/story/${story.stories.slug}` : '#'}
+                href={story.stories?.slug ? `/${story.stories.slug}` : '#'}
                 style={{
                   background: '#f7f7f7',
                   border: '1px solid #e5e5e5',

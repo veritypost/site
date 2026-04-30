@@ -147,7 +147,7 @@ export default function FollowingPage() {
               <div key={story.id}>
                 {idx > 0 && <hr style={hairline} />}
                 {story.slug ? (
-                  <Link href={`/story/${story.slug}`} style={{ textDecoration: 'none', display: 'block' }}>
+                  <Link href={`/${story.slug}`} style={{ textDecoration: 'none', display: 'block' }}>
                     <StoryCard story={story} />
                   </Link>
                 ) : (

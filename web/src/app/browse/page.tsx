@@ -389,7 +389,7 @@ export default function BrowsePage() {
                               textDecoration: 'none',
                             };
                             return h.slug ? (
-                              <Link key={i} href={`/story/${h.slug}`} style={rowStyle}>
+                              <Link key={i} href={`/${h.slug}`} style={rowStyle}>
                                 {inner}
                               </Link>
                             ) : (
