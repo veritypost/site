@@ -182,7 +182,7 @@ export async function POST(request) {
   const { data: full } = await service
     .from('comments')
     .select(
-      '*, users!user_id(id, username, avatar_color, avatar_url, is_verified_public_figure, is_expert, plans(tier))'
+      '*, users!fk_comments_user_id(id, username, avatar_color, avatar_url, is_verified_public_figure, is_expert, plans(tier))'
     )
     .eq('id', data.id)
     .maybeSingle();
