@@ -191,7 +191,7 @@ export default async function ArticleSlugPage({
   if (article.status !== 'published' && !canEdit) notFound();
 
   if (article.status === 'published') {
-    incrementViewCount(service, article.id).catch(() => {});
+    incrementViewCount(service, article.id).catch((e) => console.error('[article] incrementViewCount failed', e));
   }
 
   const bodyHtml = article.body_html ?? (article.body ? renderBodyHtml(article.body) : '');

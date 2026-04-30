@@ -95,7 +95,7 @@ export default function ArticleSurface(props: ArticleSurfaceProps) {
         // never user-supplied raw HTML at this point.
         dangerouslySetInnerHTML={{ __html: bodyHtml }}
       />
-      <TimelineSection events={timeline} />
+      <TimelineSection events={timeline} storySlug={article.slug} />
       <SourcesSection sources={sources} />
     </article>
   );

@@ -5,6 +5,8 @@ export type TimelineItem = {
   event_date: string;
   event_label: string;
   event_body: string | null;
+  type: 'event' | 'article' | string;
+  linked_article_id: string | null;
 };
 
 const SECTION_STYLE: React.CSSProperties = {
@@ -95,7 +97,13 @@ function formatDate(iso: string): string {
   }
 }
 
-export default function TimelineSection({ events }: { events: TimelineItem[] }) {
+export default function TimelineSection({
+  events,
+  storySlug,
+}: {
+  events: TimelineItem[];
+  storySlug?: string;
+}) {
   if (!events.length) return null;
 
   const sorted = [...events].sort(
@@ -114,7 +122,18 @@ export default function TimelineSection({ events }: { events: TimelineItem[] }) 
               {i < sorted.length - 1 && <div style={LINE_STYLE} />}
             </div>
             <div style={CONTENT_STYLE}>
-              <p style={LABEL_STYLE}>{ev.event_label}</p>
+              {ev.type === 'article' && storySlug && ev.linked_article_id ? (
+                <p style={LABEL_STYLE}>
+                  <a
+                    href={`/${storySlug}?a=${ev.linked_article_id}`}
+                    style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 3 }}
+                  >
+                    {ev.event_label}
+                  </a>
+                </p>
+              ) : (
+                <p style={LABEL_STYLE}>{ev.event_label}</p>
+              )}
               {ev.event_body && <p style={BODY_STYLE}>{ev.event_body}</p>}
             </div>
           </div>
