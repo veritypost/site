@@ -14,6 +14,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Card } from '../_components/Card';
 import { EmptyState } from '../_components/EmptyState';
 import { SkeletonBlock } from '../_components/Skeleton';
+import { useToast } from '../_components/Toast';
 import { C, F, FONT, R, S } from '../_lib/palette';
 
 interface Thread {
@@ -36,6 +37,7 @@ interface Props {
 
 export function MessagesSection({ preview }: Props) {
   const supabase = useMemo(() => createClient(), []);
+  const toast = useToast();
   const [threads, setThreads] = useState<Thread[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -57,6 +59,7 @@ export function MessagesSection({ preview }: Props) {
         setThreads((data.threads ?? data.conversations ?? []) as Thread[]);
       } catch {
         // Soft-fail to empty list; the section still loads.
+        toast.error('Could not load conversations.');
       }
       setLoading(false);
     })();

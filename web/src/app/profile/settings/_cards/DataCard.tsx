@@ -35,6 +35,7 @@ export function DataCard({ user, preview }: Props) {
   const [showDelete, setShowDelete] = useState(false);
   const [confirmText, setConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   const exportData = async () => {
     if (preview) {
@@ -82,6 +83,7 @@ export function DataCard({ user, preview }: Props) {
 
   const cancelDelete = async () => {
     if (preview) return;
+    setCancelling(true);
     try {
       const res = await fetch('/api/account/delete', { method: 'DELETE' });
       const data = await res.json();
@@ -89,6 +91,8 @@ export function DataCard({ user, preview }: Props) {
       toast.success('Deletion cancelled. Your account is staying.');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not cancel.');
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -140,8 +144,17 @@ export function DataCard({ user, preview }: Props) {
                 {new Date(u.deletion_scheduled_for).toLocaleDateString()}.
               </div>
             </div>
-            <button type="button" onClick={cancelDelete} style={buttonSecondaryStyle}>
-              Cancel deletion
+            <button
+              type="button"
+              onClick={cancelDelete}
+              disabled={cancelling}
+              style={{
+                ...buttonSecondaryStyle,
+                opacity: cancelling ? 0.55 : 1,
+                cursor: cancelling ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {cancelling ? 'Cancelling…' : 'Cancel deletion'}
             </button>
           </div>
         ) : showDelete ? (

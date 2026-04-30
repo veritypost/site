@@ -247,7 +247,6 @@ export function ActivitySection({ authUserId, preview, perms }: Props) {
             day: 'numeric',
             year: 'numeric',
           });
-          const target = it.slug ? `/${it.slug}` : '#';
           return (
             <li
               key={`${it.kind}-${it.id}`}
@@ -279,20 +278,35 @@ export function ActivitySection({ authUserId, preview, perms }: Props) {
                 </span>
                 <span style={{ fontSize: F.xs, color: C.inkFaint }}>{when}</span>
               </div>
-              <Link
-                href={target}
-                style={{
-                  fontFamily: FONT.serif,
-                  fontSize: F.md,
-                  fontWeight: 600,
-                  color: C.ink,
-                  textDecoration: 'none',
-                  letterSpacing: '-0.01em',
-                  display: 'block',
-                }}
-              >
-                {it.title}
-              </Link>
+              {it.slug ? (
+                <Link
+                  href={`/${it.slug}`}
+                  style={{
+                    fontFamily: FONT.serif,
+                    fontSize: F.md,
+                    fontWeight: 600,
+                    color: C.ink,
+                    textDecoration: 'none',
+                    letterSpacing: '-0.01em',
+                    display: 'block',
+                  }}
+                >
+                  {it.title}
+                </Link>
+              ) : (
+                <span
+                  style={{
+                    fontFamily: FONT.serif,
+                    fontSize: F.md,
+                    fontWeight: 600,
+                    color: C.inkMuted,
+                    letterSpacing: '-0.01em',
+                    display: 'block',
+                  }}
+                >
+                  {it.title}
+                </span>
+              )}
               {it.kind === 'comment' && it.body ? (
                 <p
                   style={{

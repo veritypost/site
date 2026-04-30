@@ -109,7 +109,6 @@ function visual(state: AccountState): Visual | null {
         body: state.until
           ? `You can read but can't comment, message, or post until ${formatTime(state.until)}.`
           : "You can read but can't comment, message, or post for now. This usually lifts within 24 hours.",
-        cta: { label: 'Read our community guidelines', href: '/community-guidelines' },
       };
     case 'shadow_banned':
       return null;

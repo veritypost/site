@@ -34,6 +34,7 @@ import type { Tables } from '@/types/database-helpers';
 import { Card } from '../_components/Card';
 import { EmptyState } from '../_components/EmptyState';
 import { SkeletonBlock, SkeletonLine } from '../_components/Skeleton';
+import { useToast } from '../_components/Toast';
 import { C, F, FONT, R, S } from '../_lib/palette';
 
 export type AchievementRow = Pick<
@@ -195,7 +196,9 @@ export function MilestonesSectionConnected({
   user,
 }: MilestonesSectionConnectedProps) {
   const supabase = useMemo(() => createClient(), []);
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [achievements, setAchievements] = useState<AchievementRow[]>([]);
   const [earned, setEarned] = useState<Map<string, string>>(new Map());
 
@@ -225,6 +228,11 @@ export function MilestonesSectionConnected({
       ]);
 
       if (cancelled) return;
+      if (catRes.error || mineRes.error) {
+        setError(true);
+        setLoading(false);
+        return;
+      }
       setAchievements((catRes.data ?? []) as AchievementRow[]);
       const map = new Map<string, string>();
       for (const r of (mineRes.data ?? []) as EarnedRow[]) map.set(r.achievement_id, r.earned_at);
@@ -250,6 +258,12 @@ export function MilestonesSectionConnected({
       streak_days: u.streak_current ?? 0,
     };
   }, [user]);
+
+  if (error) return (
+    <div style={{ padding: '24px 0', textAlign: 'center', color: C.inkMuted, fontSize: 14 }}>
+      Could not load milestones — try refreshing.
+    </div>
+  );
 
   return (
     <MilestonesSection

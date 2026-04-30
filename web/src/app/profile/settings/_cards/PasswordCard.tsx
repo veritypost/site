@@ -81,8 +81,13 @@ export function PasswordCard({ preview }: Props) {
         return;
       }
       // Sign out other sessions; current session keeps the user on the page.
-      await supabase.auth.signOut({ scope: 'others' });
-      toast.success('Password updated. Other sessions signed out.');
+      const { error: signOutErr } = await supabase.auth.signOut({ scope: 'others' });
+      if (signOutErr) {
+        toast.success('Password updated.');
+        toast.info('Could not sign out other sessions — do this from Login activity.');
+      } else {
+        toast.success('Password updated. Other devices will be signed out shortly.');
+      }
       setCurrentPw('');
       setNewPw('');
       setConfirmPw('');

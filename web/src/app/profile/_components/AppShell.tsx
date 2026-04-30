@@ -392,7 +392,26 @@ export function AppShell({ user, tier, preview, defaultSection = 'you', sections
               </header>
               {active.locked ? <LockedSection title={active.title} /> : active.render()}
             </article>
-          ) : null}
+          ) : (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minHeight: '60vh',
+                textAlign: 'center',
+              }}
+            >
+              <div>
+                <p style={{ fontFamily: FONT.serif, fontSize: F.xl, color: C.inkMuted, margin: 0, marginBottom: S[2], fontWeight: 600 }}>
+                  No sections available
+                </p>
+                <p style={{ color: C.inkFaint, fontSize: F.sm, margin: 0 }}>
+                  Try refreshing the page.
+                </p>
+              </div>
+            </div>
+          )}
         </main>
       </div>
     </div>

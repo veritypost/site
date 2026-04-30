@@ -14,6 +14,7 @@ import type { Tables } from '@/types/database-helpers';
 
 import { AccountStateBanner } from './AccountStateBanner';
 import { AppShell, type SectionDef } from './AppShell';
+import { useToast } from './Toast';
 import { C, S } from '../_lib/palette';
 import { deriveAccountStates, isHardBlock } from '../_lib/states';
 import { ActivitySection } from '../_sections/ActivitySection';
@@ -47,6 +48,7 @@ export function ProfileApp({ defaultSection }: Props) {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const toast = useToast();
 
   const [user, setUser] = useState<UserRow | null>(null);
   const [authUserId, setAuthUserId] = useState<string | null>(null);
@@ -64,6 +66,7 @@ export function ProfileApp({ defaultSection }: Props) {
   >(null);
   const [expertRejection, setExpertRejection] = useState<string | null>(null);
   const [resolved, setResolved] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [unreadMessages, setUnreadMessages] = useState<number>(0);
 
   useEffect(() => {
@@ -89,6 +92,11 @@ export function ProfileApp({ defaultSection }: Props) {
           .maybeSingle(),
       ]);
       if (cancelled) return;
+      if (userRes.error) {
+        setLoadError(true);
+        setResolved(true);
+        return;
+      }
       if (userRes.data) setUser(userRes.data as UserRow);
       setAuthUserId(authUser.id);
       setTiers(tiersRes);
@@ -169,7 +177,16 @@ export function ProfileApp({ defaultSection }: Props) {
     [user, expertStatus, expertRejection]
   );
 
-  if (!resolved || !user) return null;
+  if (!resolved) return null;
+  if (loadError) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', textAlign: 'center' }}>
+      <div>
+        <p style={{ color: C.ink, fontWeight: 600, marginBottom: 8 }}>Could not load your profile.</p>
+        <p style={{ color: C.inkMuted, fontSize: 14, margin: 0 }}>Try refreshing the page.</p>
+      </div>
+    </div>
+  );
+  if (!user) return null;
 
   const currentTier = tierFor(
     (user as UserRow & { verity_score?: number | null }).verity_score ?? 0,
@@ -476,10 +493,13 @@ export function ProfileApp({ defaultSection }: Props) {
                 onAction={(kind) => {
                   if (kind === 'trial_extended') {
                     fetch('/api/profile/trial-banner-dismiss', { method: 'POST' })
-                      .then(() => {
+                      .then((r) => {
+                        if (!r.ok) throw new Error('dismiss failed');
                         setUser((u) => u ? { ...u, trial_extended_seen_at: new Date().toISOString() } as typeof u : u);
                       })
-                      .catch(() => {});
+                      .catch(() => {
+                        toast.error('Could not dismiss banner.');
+                      });
                   }
                 }}
               />

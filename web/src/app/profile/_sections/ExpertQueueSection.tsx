@@ -190,6 +190,7 @@ export function ExpertQueueSection({ preview }: Props) {
       toast.error('Could not decline.');
       return;
     }
+    toast.success('Item declined.');
     loadItems('pending');
   };
 
@@ -241,6 +242,7 @@ export function ExpertQueueSection({ preview }: Props) {
       toast.error((data as { error?: string }).error ?? 'Post failed.');
       return;
     }
+    toast.success('Message sent.');
     setBackDraft('');
     loadBackChannel(activeCategory);
   };

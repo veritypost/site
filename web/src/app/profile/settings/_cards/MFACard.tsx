@@ -49,8 +49,12 @@ export function MFACard({ preview }: Props) {
     }
     let cancelled = false;
     (async () => {
-      const { data } = await supabase.auth.mfa.listFactors();
+      const { data, error } = await supabase.auth.mfa.listFactors();
       if (cancelled) return;
+      if (error) {
+        toast.error('Could not load 2FA status.');
+        return;
+      }
       const totp = data?.totp?.find((f) => f.status === 'verified');
       if (totp) {
         setPhase('enrolled');

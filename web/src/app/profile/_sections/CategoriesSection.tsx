@@ -32,6 +32,7 @@ import type { Tables } from '@/types/database-helpers';
 
 import { EmptyState } from '../_components/EmptyState';
 import { SkeletonBlock, SkeletonLine } from '../_components/Skeleton';
+import { useToast } from '../_components/Toast';
 import { C, F, FONT, R, S, SH } from '../_lib/palette';
 
 export type CategoryRow = Pick<
@@ -354,7 +355,9 @@ export interface CategoriesSectionConnectedProps {
 
 export function CategoriesSectionConnected({ authUserId }: CategoriesSectionConnectedProps) {
   const supabase = useMemo(() => createClient(), []);
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [scores, setScores] = useState<CategoryScoreRow[]>([]);
 
@@ -389,6 +392,11 @@ export function CategoriesSectionConnected({ authUserId }: CategoriesSectionConn
       ]);
 
       if (cancelled) return;
+      if (catsRes.error || scoresRes.error) {
+        setError(true);
+        setLoading(false);
+        return;
+      }
       setCategories((catsRes.data ?? []) as CategoryRow[]);
       setScores((scoresRes.data ?? []) as CategoryScoreRow[]);
       setLoading(false);
@@ -397,6 +405,12 @@ export function CategoriesSectionConnected({ authUserId }: CategoriesSectionConn
       cancelled = true;
     };
   }, [authUserId, supabase]);
+
+  if (error) return (
+    <div style={{ padding: '24px 0', textAlign: 'center', color: C.inkMuted, fontSize: 14 }}>
+      Could not load categories — try refreshing.
+    </div>
+  );
 
   return <CategoriesSection categories={categories} scores={scores} loading={loading} />;
 }
