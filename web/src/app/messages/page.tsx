@@ -156,6 +156,7 @@ function MessagesPageInner() {
   const [blocking, setBlocking] = useState<boolean>(false);
   const [submittingReport, setSubmittingReport] = useState<boolean>(false);
   const [starting, setStarting] = useState<boolean>(false);
+  const [searchError, setSearchError] = useState<string>('');
   // T113 — viewer-controlled dismiss for the DM paywall (× button +
   // Esc key). Resets on every fresh page mount so the paywall is
   // re-shown for new sessions.
@@ -168,6 +169,7 @@ function MessagesPageInner() {
       setShowSearch(false);
       setSearchQuery('');
       setSearchResults([]);
+      setSearchError('');
       setRoleFilter('all');
     },
   });
@@ -552,12 +554,19 @@ function MessagesPageInner() {
   const searchUsers = async () => {
     if (!searchQuery.trim()) {
       setSearchResults([]);
+      setSearchError('');
       return;
     }
     setSearching(true);
+    setSearchError('');
 
     const params = new URLSearchParams({ q: searchQuery.trim(), role: roleFilter });
     const res = await fetch(`/api/messages/search?${params.toString()}`);
+    if (!res.ok) {
+      setSearchError('Search failed. Try again.');
+      setSearching(false);
+      return;
+    }
     const raw: unknown = await res.json().catch(() => ({}));
     // T162 — runtime guard: only consume `users` when it's actually an
     // array; anything else falls through to an empty result set.
@@ -565,7 +574,7 @@ function MessagesPageInner() {
       raw && typeof raw === 'object' && Array.isArray((raw as { users?: unknown }).users)
         ? (raw as { users: SearchUser[] }).users
         : [];
-    setSearchResults(res.ok ? users : []);
+    setSearchResults(users);
     setSearching(false);
   };
 
@@ -1652,6 +1661,7 @@ function MessagesPageInner() {
             setShowSearch(false);
             setSearchQuery('');
             setSearchResults([]);
+            setSearchError('');
             setRoleFilter('all');
           }}
           style={{
@@ -1775,7 +1785,12 @@ function MessagesPageInner() {
                   Searching...
                 </div>
               )}
-              {!searching && searchQuery && searchResults.length === 0 && (
+              {!searching && searchError && (
+                <div style={{ padding: 20, textAlign: 'center', color: '#c00', fontSize: 13 }}>
+                  {searchError}
+                </div>
+              )}
+              {!searching && !searchError && searchQuery && searchResults.length === 0 && (
                 <div style={{ padding: 20, textAlign: 'center', color: '#999', fontSize: 13 }}>
                   No users found.
                 </div>
