@@ -9,7 +9,7 @@
  *   - adult       → JsonLd NewsArticle + indexable
  *   - kids/tweens → robots noindex,nofollow (COPPA; kids iOS app is canonical)
  */
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { hasPermissionServer } from '@/lib/auth';
@@ -115,10 +115,12 @@ export default async function ArticleSlugPage({
   if (!found) notFound();
 
   const { story, articles } = found;
-  const article =
-    searchParams.a
-      ? (found.articles.find((a) => a.id === searchParams.a) ?? found.article)
-      : found.article;
+  let article = found.article;
+  if (searchParams.a) {
+    const matched = found.articles.find((a) => a.id === searchParams.a);
+    if (!matched) redirect(`/${story.slug}`);
+    article = matched;
+  }
 
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
