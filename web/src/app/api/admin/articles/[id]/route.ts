@@ -77,7 +77,7 @@ const SLUG_SAFE = /^[a-z0-9][a-z0-9-]{0,118}[a-z0-9]$|^[a-z0-9]$/;
 
 const ARTICLE_SELECT = `id, title, story_id, subtitle, body, body_html, excerpt, status,
   moderation_status, moderation_notes, retraction_reason, published_at, unpublished_at,
-  author_id, cluster_id, category_id, is_kids_safe, updated_at`;
+  author_id, cluster_id, category_id, is_kids_safe, browse_only, updated_at`;
 
 // ---------------------------------------------------------------------------
 // Audience resolution — Phase 1 consolidated kid runs into `articles`. The
@@ -255,6 +255,7 @@ const PatchSchema = z
     sources: z.array(SourceSchema).optional(),
     timeline: z.array(TimelineSchema).optional(),
     quizzes: z.array(QuizSchema).optional(),
+    browse_only: z.boolean().optional(),
   })
   .strict();
 
@@ -285,6 +286,7 @@ function requiredPerms(body: PatchBody, currentStatus: string): string[] {
     if (body.status === 'published') perms.add('admin.articles.publish');
     else perms.add('admin.articles.unpublish');
   }
+  if (body.browse_only !== undefined) perms.add('admin.articles.publish');
   return Array.from(perms);
 }
 
@@ -423,6 +425,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (body.subtitle !== undefined) update.subtitle = body.subtitle;
   if (body.excerpt !== undefined) update.excerpt = body.excerpt;
   if (body.moderation_notes !== undefined) update.moderation_notes = body.moderation_notes;
+  if (body.browse_only !== undefined) update.browse_only = body.browse_only;
   if (body.body !== undefined) {
     update.body = body.body;
     // Server-side sanitization — the client never sends HTML.

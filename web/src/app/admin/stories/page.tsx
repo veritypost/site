@@ -20,6 +20,7 @@ import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C, F, S } from '@/lib/adminPalette';
 
 type ArticleRow = Tables<'articles'> & {
+  browse_only: boolean;
   categories: { name: string | null } | null;
   users: { username: string | null } | null;
   stories: { slug: string | null } | null;
@@ -165,6 +166,21 @@ function StoriesAdminInner() {
     });
   };
 
+  const setBrowseOnly = async (story: ArticleRow, next: boolean) => {
+    const res = await fetch(`/api/admin/articles/${story.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ browse_only: next }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      toast.push({ message: `Update failed: ${j.error || 'unknown error'}`, variant: 'danger' });
+      return;
+    }
+    setStories((prev) => prev.map((s) => (s.id === story.id ? { ...s, browse_only: next } : s)));
+    toast.push({ message: next ? 'Moved to browse-only' : 'Restored to front page', variant: 'success' });
+  };
+
   const setStatus = async (story: ArticleRow, next: 'published' | 'draft') => {
     const res = await fetch(`/api/admin/articles/${story.id}`, {
       method: 'PATCH',
@@ -197,6 +213,7 @@ function StoriesAdminInner() {
             </span>
             {row.is_breaking && <Badge variant="danger" size="xs">Breaking</Badge>}
             {row.is_kids_safe && <Badge variant="info" size="xs">Kids</Badge>}
+            {row.browse_only && <Badge variant="warn" size="xs">Browse only</Badge>}
           </div>
           <div style={{ fontSize: F.xs, color: ADMIN_C.dim, display: 'flex', gap: S[2], flexWrap: 'wrap' }}>
             <span>@{row.users?.username || 'unknown'}</span>
@@ -243,6 +260,11 @@ function StoriesAdminInner() {
             <Button size="sm" variant="ghost" onClick={() => setStatus(row, 'draft')}>Unpublish</Button>
           ) : (
             <Button size="sm" variant="primary" onClick={() => setStatus(row, 'published')}>Publish</Button>
+          )}
+          {row.status === 'published' && (
+            row.browse_only
+              ? <Button size="sm" variant="ghost" onClick={() => setBrowseOnly(row, false)}>+ Home</Button>
+              : <Button size="sm" variant="ghost" onClick={() => setBrowseOnly(row, true)}>Browse only</Button>
           )}
           <Button size="sm" variant="ghost" onClick={() => removeArticle(row)} style={{ color: ADMIN_C.danger }}>Delete</Button>
         </div>

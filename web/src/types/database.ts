@@ -1520,6 +1520,7 @@ export type Database = {
           body: string
           body_html: string | null
           bookmark_count: number
+          browse_only: boolean
           category_id: string
           cluster_id: string | null
           comment_count: number
@@ -1590,6 +1591,7 @@ export type Database = {
           body: string
           body_html?: string | null
           bookmark_count?: number
+          browse_only?: boolean
           category_id: string
           cluster_id?: string | null
           comment_count?: number
@@ -1660,6 +1662,7 @@ export type Database = {
           body?: string
           body_html?: string | null
           bookmark_count?: number
+          browse_only?: boolean
           category_id?: string
           cluster_id?: string | null
           comment_count?: number

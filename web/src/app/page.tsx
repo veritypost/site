@@ -226,15 +226,15 @@ export default async function HomePage() {
         .from('articles')
         .select(SELECT_COLS)
         .eq('status', 'published')
-        .gte('published_at', today.startUtc)
+        .eq('browse_only', false)
         .order('published_at', { ascending: false })
-        .limit(12),
+        .limit(50),
       supabase
         .from('articles')
         .select(SELECT_COLS)
         .eq('status', 'published')
         .eq('is_breaking', true)
-        .gte('published_at', today.startUtc)
+        .eq('browse_only', false)
         .order('published_at', { ascending: false })
         .limit(1),
       supabase
@@ -353,7 +353,7 @@ export default async function HomePage() {
             {today.humanDate}
           </div>
           <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
-            Today&rsquo;s edition (Eastern Time)
+            Front page
           </div>
         </div>
 
@@ -394,11 +394,11 @@ export default async function HomePage() {
             }}
           >
             <p style={{ fontSize: 14, color: C.muted, margin: 0 }}>
-              That&rsquo;s today&rsquo;s edition.
+              That&rsquo;s the front page.
             </p>
             <p style={{ fontSize: 14, color: C.muted, margin: '8px 0 0' }}>
               <Link href="/browse" style={{ color: C.muted, textDecoration: 'underline' }}>
-                Browse past editions &rarr;
+                Browse all articles &rarr;
               </Link>
             </p>
           </div>
