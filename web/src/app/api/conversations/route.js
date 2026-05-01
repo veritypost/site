@@ -39,28 +39,26 @@ export async function POST(request) {
     );
   }
 
+  const isGodMode = user.email === 'admin@veritypost.com';
   const service = createServiceClient();
 
-  // H27 — throttle conversation starts. The underlying RPC dedupes
-  // on an existing direct convo so re-tries don't create rows, but
-  // a user enumerating other_user_ids would still probe the
-  // self-start / paid-gate / muted-target error codes. Cap at 10/min
-  // per caller. Composing messages within an existing convo is gated
-  // separately by /api/messages rate limits.
-  const rate = await checkRateLimit(service, {
-    key: `conversations.start:${user.id}`,
-    policyKey: 'conversations.start',
-    max: 10,
-    windowSec: 60,
-  });
-  if (rate.limited) {
-    return NextResponse.json(
-      { error: 'Too many conversation starts. Slow down.' },
-      {
-        status: 429,
-        headers: { ...NO_STORE, 'Retry-After': String(rate.windowSec ?? 60) },
-      }
-    );
+  // H27 — throttle conversation starts. Cap at 10/min per caller.
+  if (!isGodMode) {
+    const rate = await checkRateLimit(service, {
+      key: `conversations.start:${user.id}`,
+      policyKey: 'conversations.start',
+      max: 10,
+      windowSec: 60,
+    });
+    if (rate.limited) {
+      return NextResponse.json(
+        { error: 'Too many conversation starts. Slow down.' },
+        {
+          status: 429,
+          headers: { ...NO_STORE, 'Retry-After': String(rate.windowSec ?? 60) },
+        }
+      );
+    }
   }
 
   const { data, error } = await service.rpc('start_conversation', {

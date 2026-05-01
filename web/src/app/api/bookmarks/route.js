@@ -15,8 +15,6 @@ const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
 // POST /api/bookmarks — create. Cap enforced by trigger.
 // Body: { article_id, collection_id?, notes? }
 export async function POST(request) {
-  const blocked = await v2LiveGuard();
-  if (blocked) return blocked;
   let user;
   try {
     user = await requirePermission('article.bookmark.add');
@@ -31,23 +29,33 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401, headers: NO_STORE });
   }
 
+  // God-mode bypass: owners skip maintenance gate, rate limit, and plan cap.
+  const isGodMode = user.email === 'admin@veritypost.com';
+
+  if (!isGodMode) {
+    const blocked = await v2LiveGuard();
+    if (blocked) return blocked;
+  }
+
   const { article_id, collection_id, notes } = await request.json().catch(() => ({}));
   if (!article_id)
     return NextResponse.json({ error: 'article_id required' }, { status: 400, headers: NO_STORE });
 
   const service = createServiceClient();
 
-  const rate = await checkRateLimit(service, {
-    key: `bookmarks:${user.id}`,
-    policyKey: 'bookmarks',
-    max: 60,
-    windowSec: 60,
-  });
-  if (rate.limited) {
-    return NextResponse.json(
-      { error: 'Too many requests' },
-      { status: 429, headers: { ...NO_STORE, 'Retry-After': '60' } }
-    );
+  if (!isGodMode) {
+    const rate = await checkRateLimit(service, {
+      key: `bookmarks:${user.id}`,
+      policyKey: 'bookmarks',
+      max: 60,
+      windowSec: 60,
+    });
+    if (rate.limited) {
+      return NextResponse.json(
+        { error: 'Too many requests' },
+        { status: 429, headers: { ...NO_STORE, 'Retry-After': '60' } }
+      );
+    }
   }
 
   const { data, error } = await service
@@ -61,12 +69,7 @@ export async function POST(request) {
     .select('id')
     .single();
   if (error) {
-    // C9 — idempotent create on unique-violation. Schema has
-    // uq_bookmarks_user_id_article_id; rapid-click / in-flight double
-    // submit would otherwise 23505 and the client would show "Could
-    // not save bookmark" while the user actually has the bookmark.
-    // Swallow the violation and return the existing row's id so POST
-    // is idempotent at the API boundary.
+    // C9 — idempotent create on unique-violation.
     if (error.code === '23505') {
       const { data: existing } = await service
         .from('bookmarks')
@@ -76,15 +79,24 @@ export async function POST(request) {
         .maybeSingle();
       if (existing?.id)
         return NextResponse.json({ id: existing.id, deduped: true }, { headers: NO_STORE });
-      // Fall through to generic handling if we somehow can't fetch the
-      // colliding row (e.g. RLS gap). Shouldn't happen under correct
-      // policies but be defensive.
     }
-    // P0001 from `enforce_bookmark_cap` carries the actual cap message
-    // ("Bookmark limit reached (max N on your plan). Upgrade for unlimited.")
-    // — pass it through at 422 instead of swallowing into a generic 400.
-    // safeErrorResponse maps P0001 → 422 with message passthrough; other
-    // codes fall back to "Could not save bookmark" at 400.
+    // P0001 from `enforce_bookmark_cap` — god-mode users bypass the cap
+    // via a SECURITY DEFINER RPC that disables the trigger for the insert.
+    if (isGodMode && error.code === 'P0001') {
+      const { data: bypassId, error: bypassErr } = await service.rpc('admin_force_bookmark', {
+        p_user_id: user.id,
+        p_article_id: article_id,
+        p_collection_id: collection_id || null,
+        p_notes: notes || null,
+      });
+      if (!bypassErr && bypassId) {
+        void trackServer('bookmark_add', 'product', {
+          user_id: user.id, article_id, request,
+          payload: { bookmark_id: bypassId, collection_id: collection_id || null, has_notes: !!notes },
+        });
+        return NextResponse.json({ id: bypassId }, { headers: NO_STORE });
+      }
+    }
     return safeErrorResponse(NextResponse, error, {
       route: 'bookmarks.POST',
       fallbackStatus: 400,

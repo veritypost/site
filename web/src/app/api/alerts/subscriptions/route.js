@@ -77,19 +77,22 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401, headers: NO_STORE });
   }
 
+  const isGodMode = user.email === 'admin@veritypost.com';
   const service = createServiceClient();
 
-  const rate = await checkRateLimit(service, {
-    key: `alerts-subs:get:${user.id}`,
-    policyKey: 'alerts_subs_get',
-    max: 60,
-    windowSec: 60,
-  });
-  if (rate.limited) {
-    return NextResponse.json(
-      { error: 'Too many requests' },
-      { status: 429, headers: { ...NO_STORE, 'Retry-After': String(rate.windowSec ?? 60) } }
-    );
+  if (!isGodMode) {
+    const rate = await checkRateLimit(service, {
+      key: `alerts-subs:get:${user.id}`,
+      policyKey: 'alerts_subs_get',
+      max: 60,
+      windowSec: 60,
+    });
+    if (rate.limited) {
+      return NextResponse.json(
+        { error: 'Too many requests' },
+        { status: 429, headers: { ...NO_STORE, 'Retry-After': String(rate.windowSec ?? 60) } }
+      );
+    }
   }
 
   const { data, error } = await service
@@ -129,19 +132,22 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401, headers: NO_STORE });
   }
 
+  const isGodMode = user.email === 'admin@veritypost.com';
   const service = createServiceClient();
 
-  const rate = await checkRateLimit(service, {
-    key: `alerts-subs:write:${user.id}`,
-    policyKey: 'alerts_subs_write',
-    max: 30,
-    windowSec: 60,
-  });
-  if (rate.limited) {
-    return NextResponse.json(
-      { error: 'Too many requests' },
-      { status: 429, headers: { ...NO_STORE, 'Retry-After': String(rate.windowSec ?? 60) } }
-    );
+  if (!isGodMode) {
+    const rate = await checkRateLimit(service, {
+      key: `alerts-subs:write:${user.id}`,
+      policyKey: 'alerts_subs_write',
+      max: 30,
+      windowSec: 60,
+    });
+    if (rate.limited) {
+      return NextResponse.json(
+        { error: 'Too many requests' },
+        { status: 429, headers: { ...NO_STORE, 'Retry-After': String(rate.windowSec ?? 60) } }
+      );
+    }
   }
 
   const { category_id } = await request.json().catch(() => ({}));
@@ -223,19 +229,22 @@ export async function DELETE(request) {
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401, headers: NO_STORE });
   }
 
+  const isGodMode = user.email === 'admin@veritypost.com';
   const service = createServiceClient();
 
-  const rate = await checkRateLimit(service, {
-    key: `alerts-subs:write:${user.id}`,
-    policyKey: 'alerts_subs_write',
-    max: 30,
-    windowSec: 60,
-  });
-  if (rate.limited) {
-    return NextResponse.json(
-      { error: 'Too many requests' },
-      { status: 429, headers: { ...NO_STORE, 'Retry-After': String(rate.windowSec ?? 60) } }
-    );
+  if (!isGodMode) {
+    const rate = await checkRateLimit(service, {
+      key: `alerts-subs:write:${user.id}`,
+      policyKey: 'alerts_subs_write',
+      max: 30,
+      windowSec: 60,
+    });
+    if (rate.limited) {
+      return NextResponse.json(
+        { error: 'Too many requests' },
+        { status: 429, headers: { ...NO_STORE, 'Retry-After': String(rate.windowSec ?? 60) } }
+      );
+    }
   }
 
   const { category_id } = await request.json().catch(() => ({}));

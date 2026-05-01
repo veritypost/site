@@ -1031,6 +1031,26 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
       {!embedded && (
         <Button variant="secondary" size="sm" onClick={() => setShowPicker(true)}>Open article</Button>
       )}
+      {lastPersistedSlugRef.current && (
+        <a
+          href={`/${lastPersistedSlugRef.current}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            fontSize: 12,
+            padding: '4px 10px',
+            border: '1px solid #444',
+            borderRadius: 4,
+            color: '#ccc',
+            textDecoration: 'none',
+            fontFamily: 'inherit',
+            lineHeight: '20px',
+            display: 'inline-block',
+          }}
+        >
+          View
+        </a>
+      )}
       <Button variant="secondary" size="sm" onClick={() => setViewMode('timeline')}>Timeline</Button>
       <Button variant="secondary" size="sm" onClick={() => setViewMode('preview')}>Preview</Button>
       <Button variant="primary" size="sm" loading={saving} onClick={() => saveAll()}>Save</Button>

@@ -26,9 +26,6 @@ const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
 // mentions is an array of { user_id, username }; the RPC strips it
 // for free-tier users (D21).
 export async function POST(request) {
-  const blocked = await v2LiveGuard();
-  if (blocked) return blocked;
-
   // M11 — order: auth → rate-limit → permission → quiz → RPC. Rate-limit
   // fires before the perms RPC so an authenticated attacker probing for
   // a permission flip (or running the quiz pre-check as a recon side
@@ -49,20 +46,31 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401, headers: NO_STORE });
   }
 
+  // God-mode bypass: owners are exempt from maintenance gate, rate limits,
+  // and quiz gate. Email check is zero-overhead (no extra DB call).
+  const isGodMode = user.email === 'admin@veritypost.com';
+
+  if (!isGodMode) {
+    const blocked = await v2LiveGuard();
+    if (blocked) return blocked;
+  }
+
   const service = createServiceClient();
 
-  const rate = await checkRateLimit(service, {
-    key: `comments:${user.id}`,
-    policyKey: 'comments_post',
-    max: 10,
-    windowSec: 60,
-  });
-  if (rate.limited) {
-    const retryAfter = String(rate.windowSec ?? 60);
-    return NextResponse.json(
-      { error: 'Posting too quickly. Wait a moment and try again.' },
-      { status: 429, headers: { ...NO_STORE, 'Retry-After': retryAfter } }
-    );
+  if (!isGodMode) {
+    const rate = await checkRateLimit(service, {
+      key: `comments:${user.id}`,
+      policyKey: 'comments_post',
+      max: 10,
+      windowSec: 60,
+    });
+    if (rate.limited) {
+      const retryAfter = String(rate.windowSec ?? 60);
+      return NextResponse.json(
+        { error: 'Posting too quickly. Wait a moment and try again.' },
+        { status: 429, headers: { ...NO_STORE, 'Retry-After': retryAfter } }
+      );
+    }
   }
 
   const allowed = await hasPermissionServer('comments.post');
@@ -107,8 +115,8 @@ export async function POST(request) {
   }
 
   // H4 — surface the quiz-gate failure as a specific 403 before
-  // hitting the post_comment RPC.
-  {
+  // hitting the post_comment RPC. Skipped for god-mode owners.
+  if (!isGodMode) {
     const { data: passed, error: passErr } = await service.rpc('user_passed_article_quiz', {
       p_user_id: user.id,
       p_article_id: article_id,
