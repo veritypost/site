@@ -70,7 +70,6 @@ interface CommentRowProps {
   authorCategoryScore?: number | null;
   articleId: string;
   viewerIsSupervisor?: boolean;
-  viewerIsModerator?: boolean;
   // Section A — passed by CommentThread; defaults are used if a caller
   // doesn't supply them so existing direct-mount tests still work.
   helpfulThreshold?: number;
@@ -132,7 +131,6 @@ export default function CommentRow({
   authorCategoryScore,
   articleId,
   viewerIsSupervisor = false,
-  viewerIsModerator = false,
   helpfulThreshold = 10,
   tagKinds = DEFAULT_TAG_KINDS,
   onVote,
@@ -695,7 +693,7 @@ export default function CommentRow({
                             Supervisor flag
                           </MenuItem>
                         )}
-                        {(viewerIsModerator || canHideAny) && onHide && (
+                        {canHideAny && onHide && (
                           <MenuItem
                             danger
                             onClick={() => {

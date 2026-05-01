@@ -152,26 +152,43 @@ export async function PATCH(request, { params }) {
   if (lookupErr || !existing) {
     return NextResponse.json({ error: 'not_found' }, { status: 404, headers: NO_STORE });
   }
-  // Self-edit: enforce ownership and the 10-minute window.
-  // Admin edit bypasses both — they can correct any comment at any time.
-  if (!isAdminEdit) {
-    if (existing.user_id !== user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403, headers: NO_STORE });
-    }
-    const createdAt = new Date(existing.created_at).getTime();
-    if (Number.isFinite(createdAt) && Date.now() - createdAt > EDIT_WINDOW_MS) {
-      return NextResponse.json(
-        { error: 'edit_window_expired', message: COPY.comments.editWindowExpired },
-        { status: 403, headers: NO_STORE }
-      );
-    }
+  if (isAdminEdit) {
+    // Service client has full DB access — no need to route through the
+    // ownership-checking RPC. Direct update preserves is_edited + audit trail.
+    const trimmed = body.trim();
+    const { error: updateErr } = await service
+      .from('comments')
+      .update({
+        body: trimmed,
+        is_edited: true,
+        edited_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .neq('status', 'deleted');
+    if (updateErr)
+      return safeErrorResponse(NextResponse, updateErr, {
+        route: 'comments.id.admin-edit',
+        fallbackStatus: 400,
+        headers: NO_STORE,
+      });
+    return NextResponse.json({ ok: true }, { headers: NO_STORE });
   }
 
-  // Pass the comment owner's id so the SECURITY DEFINER RPC's ownership
-  // check passes. For self-edit this is user.id; for admin it's the
-  // comment author's id (admin gate already applied above).
+  // Self-edit: enforce ownership and the 10-minute window.
+  if (existing.user_id !== user.id) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403, headers: NO_STORE });
+  }
+  const createdAt = new Date(existing.created_at).getTime();
+  if (Number.isFinite(createdAt) && Date.now() - createdAt > EDIT_WINDOW_MS) {
+    return NextResponse.json(
+      { error: 'edit_window_expired', message: COPY.comments.editWindowExpired },
+      { status: 403, headers: NO_STORE }
+    );
+  }
+
   const { error } = await service.rpc('edit_comment', {
-    p_user_id: isAdminEdit ? existing.user_id : user.id,
+    p_user_id: user.id,
     p_comment_id: id,
     p_body: body,
   });
@@ -209,9 +226,10 @@ export async function DELETE(_request, { params }) {
   const { id } = params;
   const service = createServiceClient();
 
-  // For admin: look up the comment owner so the RPC's ownership check passes.
-  let rpcUserId = user.id;
   if (isAdminDelete) {
+    // Direct soft-delete via service client — same semantics as the RPC
+    // (body redacted, status=deleted, deleted_at stamped, comment_count
+    // decremented) without routing through the ownership check.
     const { data: row } = await service
       .from('comments')
       .select('user_id')
@@ -220,11 +238,42 @@ export async function DELETE(_request, { params }) {
     if (!row) {
       return NextResponse.json({ error: 'not_found' }, { status: 404, headers: NO_STORE });
     }
-    rpcUserId = row.user_id;
+    const { error: delErr } = await service
+      .from('comments')
+      .update({
+        body: '[deleted]',
+        body_html: null,
+        mentions: [],
+        status: 'deleted',
+        deleted_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id);
+    if (delErr)
+      return safeErrorResponse(NextResponse, delErr, {
+        route: 'comments.id.admin-delete',
+        fallbackStatus: 400,
+        headers: NO_STORE,
+      });
+    // Mirror the RPC's GREATEST(comment_count - 1, 0) decrement. Admin
+    // deletes are rare so the fetch-then-update race window is acceptable.
+    const { data: uRow } = await service
+      .from('users')
+      .select('comment_count')
+      .eq('id', row.user_id)
+      .maybeSingle();
+    if (uRow && typeof uRow.comment_count === 'number') {
+      await service
+        .from('users')
+        .update({ comment_count: Math.max(0, uRow.comment_count - 1) })
+        .eq('id', row.user_id)
+        .catch(() => null);
+    }
+    return NextResponse.json({ ok: true }, { headers: NO_STORE });
   }
 
   const { error } = await service.rpc('soft_delete_comment', {
-    p_user_id: rpcUserId,
+    p_user_id: user.id,
     p_comment_id: id,
   });
   if (error)

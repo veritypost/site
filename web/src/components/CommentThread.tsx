@@ -15,7 +15,6 @@ import CommentComposer from './CommentComposer';
 import CommentRow, { EnrichedComment } from './CommentRow';
 import { useFocusTrap } from '../lib/useFocusTrap';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
-import { MOD_ROLES } from '@/lib/roles';
 import type { Database } from '@/types/database';
 import { Z } from '@/lib/zIndex';
 import Skeleton from './Skeleton';
@@ -127,7 +126,6 @@ export default function CommentThread({
   const [helpfulThreshold, setHelpfulThreshold] = useState<number>(10);
   const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
   const [viewerIsSupervisor, setViewerIsSupervisor] = useState<boolean>(false);
-  const [viewerIsModerator, setViewerIsModerator] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [permsLoaded, setPermsLoaded] = useState<boolean>(false);
@@ -283,17 +281,6 @@ export default function CommentThread({
       });
       setViewerIsSupervisor(!!sup);
     }
-    if (currentUserId) {
-      const { data: roleRows } = await supabase
-        .from('user_roles')
-        .select('roles(name)')
-        .eq('user_id', currentUserId);
-      const names = ((roleRows || []) as Array<{ roles: { name?: string } | null }>)
-        .map((r) => r.roles?.name)
-        .filter((n): n is string => !!n);
-      setViewerIsModerator(names.some((n) => MOD_ROLES.has(n)));
-    }
-
     if (canViewScore && articleCategoryId && userIds.length > 0) {
       const { data: s } = await supabase
         .from('category_scores')
@@ -736,7 +723,7 @@ export default function CommentThread({
         articleId={articleId}
         depth={depth}
         viewerIsSupervisor={viewerIsSupervisor}
-        viewerIsModerator={viewerIsModerator}
+
         helpfulThreshold={helpfulThreshold}
         tagKinds={TAG_KINDS}
         onVote={handleVote}
