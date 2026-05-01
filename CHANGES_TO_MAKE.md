@@ -12,7 +12,7 @@ Running list of UX/admin changes the owner has flagged. Each entry is a self-con
 |---|------|--------|-------|
 | 13 | Unify username pick → single first-login popup (kill iOS full-screen route + dead web redirect) | ✅ shipped (uncommitted) | Owner approval to push pending; two minor stale comments in `AuthViewModel.swift:613, 677-681` rolled into item 10 |
 | 3  | Admin → article: published opens reader, drafts stay in newsroom, separate Edit button | 🟢 ready | Independent — can ship alongside others |
-| 10 | Lock username (self-edit off; admins can rename) | 🟢 ready | Depends on 13 landing first |
+| 10 | Lock username (self-edit off; admins can rename) | ✅ shipped + DB applied (commit `204b31d`, migrations applied 2026-05-01) | Lock is fully live across UI + RPC + trigger |
 | 11 | God-mode (per-user `admin.god_mode` grant; owner auto, others opt-in) | 🟢 ready | **Prerequisite for item 12** — server RPC short-circuit + AuthContext `isGodMode` |
 | 12 | Admin opens / edits / impersonates any user (with kid PIN reset + COPPA notify) | 🟡 1 blocker | Privacy-policy clause must land before write/impersonation endpoints ship; reuses item 11's per-user grant UI |
 
@@ -77,22 +77,61 @@ Suggested ship order within Wave 1: **13 → 10 → 3 → 11 → 12.** (13 unloc
 
 ## 3. Admin → article click should open the public reader, not the build view
 
-**What to change:** when an admin clicks an article from `/admin/stories`, the row currently routes to `/admin/story-manager?article=<id>` (the editor/build view). Owner wants published articles to open the public reader; drafts stay in the admin newsroom.
+**What to change:** when an admin clicks an article row from `/admin/stories`, the row currently routes to `/admin/story-manager?article=<id>` (the editor). Published adult articles should open the public reader; drafts and kids articles stay in the admin newsroom.
 
 **Locked decisions (owner, 2026-04-30):**
-- **Row click on a `published` article → opens public reader at `/[slug]`.** The reader is what a real user would see.
-- **Row click on a `draft` (or any non-published status) → stays in the admin newsroom** — current `/admin/story-manager?article=<id>` behavior. No public preview route, no fallback to a draft slug. Drafts never expose a viewer-facing URL until they're published.
-- **Separate "Edit" button on every row** (regardless of status) routes to `/admin/story-manager?article=<id>`. So an admin reading a published article in the reader still has a one-click path back into the editor via this button (or via the admin shortcut from item 12, whichever lands first).
+- **Row click on a `published` adult article → opens public reader at `/${stories.slug}?a=${articleId}`.**
+- **Row click on a `draft` (or any non-published status) → stays in the admin newsroom** — current `/admin/story-manager?article=<id>` behavior (or `/admin/kids-story-manager` for kid audience). Drafts never expose a viewer-facing URL.
+- **Edit button on every row** routes to `/admin/story-manager?article=<id>` (or `/admin/kids-story-manager` for kid audience). **Note: the Edit button already exists** in the actions column (lines 229-238 of `stories/page.tsx`); it does NOT need to be added — it already does what the locked decision asks. Just verify it stays.
 
-**Source:**
-- `web/src/app/admin/stories/page.tsx:228-240` — row click handler. Branch on `row.status`: published → push `/${row.slug}`; otherwise → push `/admin/story-manager?article=${row.id}` (existing behavior).
-- `web/src/app/admin/stories/page.tsx:240` — "Quiz pool" button stays as-is (always editor-bound; it's an editing affordance, not a reader affordance).
-- `web/src/app/admin/stories/page.tsx:281-283` — second click target. Same branching as above.
-- `web/src/app/admin/stories/page.tsx:270, 337` — "New article" stays at `/admin/story-manager?new=1` (correct; nothing to do).
-- **Add an "Edit" button on each row** next to the existing actions, routing to `/admin/story-manager?article=${row.id}` regardless of status. Keep the button visible for both published and draft rows so the editor is always one click from the list.
-- Confirm `slug` is on the `ArticleRow` type returned by the stories query at `web/src/app/admin/stories/page.tsx:90+`. Add it to the select if missing — required for the published branch.
+**Pre-impl review corrections (4-agent flow, 2026-05-01):** the doc as originally written had four spec errors. All confirmed by the implementer plan below.
 
-**Platforms:**
+### Source — atomic edit on `/Users/veritypost/Desktop/verity-post/web/src/app/admin/stories/page.tsx`
+
+1. **Schema fix — articles has NO `slug` column.** Slug lives on `stories`. The reader at `/[slug]/page.tsx` (lines 68-72) resolves the URL slug against `stories.slug`, then loads articles via `story_id`. Implementer must JOIN stories on the admin SELECT.
+   - **Lines 22-25 (`ArticleRow` type):** add `stories: { slug: string | null } | null;`
+   - **Line 93 (SELECT string):** before `'*, categories!fk_articles_category_id(name), users!author_id(username)'`; after `'*, categories!fk_articles_category_id(name), users!author_id(username), stories!articles_story_id_fkey(slug)'`. **FK name is `articles_story_id_fkey` (`_fkey` suffix), NOT `fk_articles_story_id`** — non-standard for this codebase but confirmed in `web/src/types/database.ts:1747`.
+
+2. **Row click branching at lines 280-284.** Replace the always-editor `onRowClick` with:
+   - **Published adult article AND has slug AND has story_id AND not deleted** → `router.push(\`/\${row.stories.slug}?a=\${row.id}\`)`. The `?a=<articleId>` is required because a story can have multiple articles; without it, the reader defaults to most-recent-published (`/[slug]/page.tsx:80-82, 87`) and the admin lands on a different article than they clicked.
+   - **Otherwise** (draft, archived, kid audience, missing slug, missing story_id, soft-deleted, or non-`'published'` status) → existing editor branching: `r.is_kids_safe ? \`/admin/kids-story-manager?article=\${r.id}\` : \`/admin/story-manager?article=\${r.id}\``.
+   - Use **strict positive equality** `r.status === 'published'` (lowercase string), NOT `r.status !== 'draft'` — `archived`, `unpublished`, etc. are also non-`'published'` and must route to admin.
+   - **Why kids stay in admin:** `/[slug]/page.tsx:104` has a COPPA `notFound()` for kids/tweens articles. Published kids articles via the public reader → 404. Per `kids_scope` memory (kids = iOS only; kids web is redirect-only), there is no web reader for kid articles.
+
+3. **Quiz pool button (line 240) stays editor-bound** (it's an editing affordance).
+
+4. **New article button (lines 270, 337) stays at `/admin/story-manager?new=1`** (correct as-is).
+
+5. **Existing `e.stopPropagation()` wrapper at line 227** already prevents action-button clicks from firing the row click. No change needed.
+
+### Other admin surfaces — scope strictly to `/admin/stories`
+
+- `web/src/app/admin/newsroom/page.tsx:456` already does `router.push('/${json.slug}')` after publish — pattern is consistent with this item.
+- `web/src/app/admin/newsroom/_components/AudienceCard.tsx:402` always opens editor — different surface, leave alone.
+- `/admin/top-stories`, `/admin/comments`, `/admin/reports` — none of these route to `/[slug]` or `/admin/story-manager` from a row click today; no bleed-through to fix.
+
+### Soft concerns flagged for item 11 (not this item)
+
+- **View-count pollution:** `incrementViewCount` fires unconditionally at `/[slug]/page.tsx:228`. Admin views will pollute counts. **Coordinate with item 11 god-mode bypass** — anyone with `admin.god_mode` (or admin role) should skip the increment. Don't ship in item 3.
+- **Analytics pollution:** `ArticleTracker` analytics fires on view at `/[slug]/page.tsx:251`. Same coordination — item 11 should suppress for god-mode users.
+
+### Optional symmetric polish (skip unless owner asks)
+
+- Add an admin-only "Edit in story-manager" pill on `/[slug]` for round-trip ergonomics (matches item 12's `Open in admin →` overlay pattern). ~5 lines. Defer unless owner says yes.
+
+### Verification (Phase 4)
+
+1. **Web build:** `cd /Users/veritypost/Desktop/verity-post/web && npm run build`. Must pass (the new SELECT join + the `stories` field on `ArticleRow` are type-checked).
+2. **Dev-server smoke** (admin role required):
+   - Click a published adult row → lands on `/${storySlug}?a=${articleId}` and renders the reader.
+   - Click a draft row → lands on `/admin/story-manager?article=<id>` (or `/admin/kids-story-manager` for kid audience).
+   - Click a published kid row → stays on `/admin/kids-story-manager` (COPPA notFound prevention).
+   - Click an orphan published row (no `story_id`) → falls back to admin (no `/undefined` URL).
+   - Click Edit on any row → routes to the correct editor (kids vs adult).
+   - Quiz pool / Publish / Delete buttons unchanged.
+
+### Platforms
+
 - Web: yes — the change above.
 - iOS: no admin surface. Not applicable.
 - Kids iOS: no admin surface. Not applicable.

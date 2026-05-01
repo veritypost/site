@@ -22,6 +22,7 @@ import { ADMIN_C, F, S } from '@/lib/adminPalette';
 type ArticleRow = Tables<'articles'> & {
   categories: { name: string | null } | null;
   users: { username: string | null } | null;
+  stories: { slug: string | null } | null;
 };
 
 type StatusFilter = 'all' | 'published' | 'draft';
@@ -90,7 +91,7 @@ function StoriesAdminInner() {
       const [storiesRes, categoriesRes] = await Promise.all([
         supabase
           .from('articles')
-          .select('*, categories!fk_articles_category_id(name), users!author_id(username)')
+          .select('*, categories!fk_articles_category_id(name), users!author_id(username), stories!articles_story_id_fkey(slug)')
           .order('created_at', { ascending: false })
           .limit(500),
         supabase.from('categories').select('name').order('name'),
@@ -277,11 +278,26 @@ function StoriesAdminInner() {
           rowKey={(r: ArticleRow) => r.id}
           columns={columns}
           rows={filtered}
-          onRowClick={(r: ArticleRow) => router.push(
-            r.is_kids_safe
-              ? `/admin/kids-story-manager?article=${r.id}`
-              : `/admin/story-manager?article=${r.id}`,
-          )}
+          onRowClick={(r: ArticleRow) => {
+            // Item 3: published adult articles open the public reader so admins
+            // see what real users see. Drafts, kid audience, orphan articles, and
+            // soft-deleted rows fall back to the editor (kids variant for kid audience).
+            const canReader =
+              r.status === 'published' &&
+              !r.is_kids_safe &&
+              !r.deleted_at &&
+              r.story_id != null &&
+              r.stories?.slug;
+            if (canReader) {
+              router.push(`/${r.stories!.slug}?a=${r.id}`);
+              return;
+            }
+            router.push(
+              r.is_kids_safe
+                ? `/admin/kids-story-manager?article=${r.id}`
+                : `/admin/story-manager?article=${r.id}`,
+            );
+          }}
           toolbar={
             <Toolbar
               left={
