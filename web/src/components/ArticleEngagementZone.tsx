@@ -28,10 +28,17 @@ export default function ArticleEngagementZone({
     setJustPassedThisSession(true);
   }
 
+  const sectionStyle = {
+    marginTop: 40,
+    maxWidth: 680,
+    margin: '40px auto 0',
+    padding: '0 20px',
+  };
+
   // Anon: read-only comment thread only, no quiz
   if (!currentUserId) {
     return (
-      <section id="discussion" style={{ marginTop: 40 }}>
+      <section id="discussion" style={sectionStyle}>
         <CommentThread
           articleId={articleId}
           quizPassed={false}
@@ -43,7 +50,7 @@ export default function ArticleEngagementZone({
 
   // Logged in
   return (
-    <section id="discussion" style={{ marginTop: 40 }}>
+    <section id="discussion" style={sectionStyle}>
       {hasQuiz && (
         <ArticleQuiz
           articleId={articleId}

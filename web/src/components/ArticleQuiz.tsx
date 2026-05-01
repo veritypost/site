@@ -271,8 +271,7 @@ export default function ArticleQuiz({
         style={{
           background: C.card,
           border: `1px solid ${C.border}`,
-          borderLeft: '3px solid var(--accent)',
-          borderRadius: '0 12px 12px 0',
+          borderRadius: 12,
           padding: '18px 20px',
           marginTop: 24,
         }}
@@ -348,11 +347,11 @@ export default function ArticleQuiz({
               key={i}
               style={{
                 flex: 1,
-                height: 5,
+                height: 3,
                 borderRadius: 4,
                 background:
                   i < currentIndex
-                    ? 'rgba(17,17,17,0.35)'
+                    ? 'rgba(17,17,17,0.60)'
                     : i === currentIndex
                       ? C.accent
                       : C.border,
@@ -366,7 +365,7 @@ export default function ArticleQuiz({
           <>
             <div
               style={{
-                fontSize: 16,
+                fontSize: 17,
                 color: C.text,
                 marginBottom: 18,
                 lineHeight: 1.5,
@@ -526,9 +525,8 @@ export default function ArticleQuiz({
           style={{
             background: C.card,
             border: `1px solid ${C.border}`,
-            borderLeft: '3px solid #dc2626',
-            borderRadius: '0 12px 12px 0',
-            padding: '20px 20px 20px 22px',
+            borderRadius: 12,
+            padding: '20px',
             marginTop: 24,
           }}
         >
