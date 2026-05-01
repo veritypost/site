@@ -30,28 +30,66 @@ Items locked but not yet shipped. Created 2026-05-01.
 
 ---
 
-## 3. Item 11a part-2 — RPC short-circuit migration
+## 3. Item 11a part-2 — RPC short-circuit migration — ✅ shipped 2026-05-01
 
-**What:** finish the `2026-05-01_admin_god_mode_rpc_patches.sql` placeholder migration. Currently has a `RAISE EXCEPTION` guard preventing apply.
-
-**Why it matters:** today, owner has god-mode via the email-allowlist (`OWNER_EMAILS` in `web/src/lib/permissions.js` + `web/src/lib/auth.js`) — that works for the owner. But future 11b grantees (other staff who get `admin.god_mode`) don't get the email-allowlist treatment, so they need the SQL-side short-circuit to bypass `my_permission_keys` properly. Also fixes the cosmetic `granted_via='admin_role'` instead of `'god_mode'` in the admin permissions console.
-
-**How to finish:**
-1. Run in Supabase SQL editor:
-   ```sql
-   select pg_get_functiondef(oid) from pg_proc where proname = 'my_permission_keys';
-   select pg_get_functiondef(oid) from pg_proc where proname = 'get_my_capabilities';
-   select pg_get_functiondef(oid) from pg_proc where proname = 'compute_effective_perms';
-   select pg_get_functiondef(oid) from pg_proc where proname = 'has_permission';
-   select pg_get_functiondef(oid) from pg_proc where proname = 'has_permission_for';
-   ```
-2. Paste each result back to the agent. The agent will write the `CREATE OR REPLACE` patches into `2026-05-01_admin_god_mode_rpc_patches.sql`, remove the `RAISE EXCEPTION` guard, then you apply.
-
-**Status:** doable any time owner is ready to paste the RPC bodies.
+**Resolved:** pulled live RPC bodies via MCP, wrote `CREATE OR REPLACE` patches for `my_permission_keys` (god_mode_keys CTE) and `compute_effective_perms` (is_god CTE + CASE arms). Applied both migrations live. Owner grant confirmed: permission → set → role link → owner user all verified 1/1/1/1/1. Committed `ec341c0`.
 
 ---
 
-## 4. Web AvatarEditor silently no-ops on save — ✅ shipped 2026-05-01
+## 4. Item 11b — Per-user god-mode grant UI (web admin)
+
+**What:** extend `/admin/users/[id]/permissions/page.tsx` with a "Sensitive grants" section containing toggles for `admin.god_mode`, `admin.users.edit`, `admin.users.impersonate`.
+
+**Scope:**
+- Toggle writes to `user_permission_sets` via the existing `postToggle` helper
+- API write endpoint must `requirePermission('admin.god_mode')` — not just admin-role membership; any admin could otherwise grant god-mode to anyone
+- Self-revoke blocked (owner can't accidentally lock themselves out)
+- Hide for kid accounts
+- Confirmation modal on grant: "Type @username to confirm"
+- Cache invalidation: call `bump_user_perms_version(target)` + `bump_perms_global_version()` after write
+- Audit log: action strings `god_mode.grant` / `god_mode.revoke` / `users.edit.grant` / `users.impersonate.grant`
+- Plan card refinement: if grantee has an active sub, show "You have admin access. Your subscription remains active for billing purposes." instead of the owner copy
+
+**Blocks:** item 12 (needs the toggle infrastructure).
+
+**Platform:** web admin only.
+
+---
+
+## 5. Item 12 — Admin opens / edits / impersonates any user (web)
+
+**Prereqs:** item 11b shipped + privacy policy clause (OUTSTANDING #1) live.
+
+**Surface 1 — admin strip on `/u/[username]`**
+- Visible only to users with `auth.isAdmin`
+- Row pinned under banner: "Open in admin →" / "View as @username" / "Edit profile" / quick badges (BANNED / SHADOW / ROLE)
+
+**Surface 2 — inline edit on `/u/[username]`**
+- When admin clicks "Edit profile": swap display_name, bio, avatar, banner, username fields to inline editors
+- Writes via new `/api/admin/users/[id]` PATCH endpoint (`requirePermission('admin.users.edit')`)
+- Every write inserts an `admin_audit_log` row with actor, target, action, old_value, new_value
+
+**Surface 3 — extend `/admin/users/[id]` to full editor**
+- Currently read-only. Add inline edit for: identity (username, display_name, bio, email), avatar/banner, plan dropdown, roles, flags (is_banned, is_shadow_banned, is_muted, frozen_at, show_on_leaderboard), kid profiles + PIN reset
+- Email change fires a verification flow
+- PIN reset: confirmation dialog → `/api/admin/kids/[id]/reset-pin` POST → clears PIN → parent notification
+
+**Surface 4 — write-mode impersonation**
+- Owner: forever session (until manual exit or logout)
+- Grantees: 1hr idle / 4hr absolute
+- Persistent banner in chrome while impersonating
+- No impersonating admins / owners / kids
+- No financial endpoints under impersonation
+- Full audit log + sidecar attribution column
+- Mandatory email notification to target user
+
+**Privacy policy:** clause at `web/src/app/privacy/page.tsx` must be live before Surface 4 ships (see OUTSTANDING #1).
+
+**Platform:** web only. iOS admin surface not in scope.
+
+---
+
+## 6. Web AvatarEditor silently no-ops on save — ✅ shipped 2026-05-01
 
 **Discovered:** 2026-05-01 while writing the avatar CHECK constraint.
 **Resolved:** same day — web payload now wraps `avatar` inside `metadata` to match the iOS contract and the RPC's jsonb merge path. Two-line fix at `web/src/app/profile/_components/AvatarEditor.tsx:165`.
