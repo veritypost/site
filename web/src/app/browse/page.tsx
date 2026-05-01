@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import Link from 'next/link';
 import { createClient } from '../../lib/supabase/client';
 import { usePageViewTrack } from '@/lib/useTrack';
 
@@ -27,7 +28,7 @@ type SortKey      = 'recent' | 'coverage' | 'duration';
 type CoverageKey  = 'any' | 'light' | 'medium' | 'heavy';
 type QuizKey      = 'all' | 'quizzed' | 'unquizzed';
 
-interface Article { date: string; headline: string }
+interface Article { date: string; headline: string; slug?: string }
 interface Story {
   id: string;
   lifecycle: Lifecycle;
@@ -35,6 +36,7 @@ interface Story {
   category: string;
   articles: Article[];
   displayGroup: DisplayGroup;
+  slug?: string;
 }
 
 interface FilterState {
@@ -92,7 +94,7 @@ type ClusterRow = {
   categories: { name: string | null } | null;
   feed_cluster_articles: {
     added_at: string | null;
-    articles: { title: string | null; published_at: string | null; status: string | null } | null;
+    articles: { title: string | null; published_at: string | null; status: string | null; stories: { slug: string } | null } | null;
   }[];
 };
 
@@ -103,6 +105,7 @@ function toStory(row: ClusterRow): Story | null {
     .map(fca => ({
       date: fca.articles!.published_at!.slice(0, 10),
       headline: fca.articles!.title!,
+      slug: fca.articles!.stories?.slug ?? undefined,
     }))
     .sort((a, b) => a.date.localeCompare(b.date));
 
@@ -115,6 +118,7 @@ function toStory(row: ClusterRow): Story | null {
     category: row.categories?.name ?? 'General',
     articles,
     displayGroup: getDisplayGroup(row.updated_at ?? new Date().toISOString()),
+    slug: [...articles].reverse().find(a => a.slug)?.slug,
   };
 }
 
@@ -126,7 +130,7 @@ async function loadStories(): Promise<Story[]> {
     .select(`
       id, title, is_breaking, is_active, archived_at, updated_at,
       categories(name),
-      feed_cluster_articles(added_at, articles(title, published_at, status))
+      feed_cluster_articles(added_at, articles(title, published_at, status, stories(slug)))
     `)
     .is('dismissed_at', null)
     .gte('updated_at', cutoff)
@@ -239,7 +243,9 @@ function StoryCard({ story }: {
   const titleWeight = story.lifecycle === 'breaking' ? 800 : story.lifecycle === 'developing' ? 700 : 400;
   const borderLeft  = story.lifecycle === 'breaking' ? `4px solid ${C.breaking}` : story.lifecycle === 'developing' ? `2px solid ${C.developing}` : `1px solid ${C.border}`;
 
-  return (
+  const slug = [...story.articles].reverse().find(a => a.slug)?.slug ?? null;
+
+  const cardContent = (
     <div style={{
       borderLeft,
       background: story.lifecycle === 'breaking' ? C.breakingBg : story.lifecycle === 'developing' ? C.developingBg : 'transparent',
@@ -290,6 +296,15 @@ function StoryCard({ story }: {
       </div>
     </div>
   );
+
+  if (slug) {
+    return (
+      <Link href={`/${slug}`} style={{ textDecoration: 'none', display: 'block', color: 'inherit' }}>
+        {cardContent}
+      </Link>
+    );
+  }
+  return cardContent;
 }
 
 // ── Section header ─────────────────────────────────────────────────────────

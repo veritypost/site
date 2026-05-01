@@ -149,7 +149,18 @@ struct HomeView: View {
                         } else if let err = loadError {
                             errorState(err)
                         } else if stories.isEmpty {
-                            EmptyView()
+                            VStack(spacing: 8) {
+                                Text("No stories today")
+                                    .font(.system(.callout, design: .default, weight: .semibold))
+                                    .foregroundColor(VP.text)
+                                Text("Check back soon for the latest news.")
+                                    .font(.system(.footnote, design: .default, weight: .regular))
+                                    .foregroundColor(VP.dim)
+                                    .multilineTextAlignment(.center)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.horizontal, 40)
+                            .padding(.top, 60)
                         } else {
                             if let hero = stories.first {
                                 heroBlock(hero)

@@ -2471,15 +2471,10 @@ struct StoryDetailView: View {
 
         // D29: Articles have no reactions — reaction loading removed.
 
-        // Bookmark + passed quiz
-        // A82 — these reads back the bookmark + quiz-pass state that drive
-        // persisted UI (the bookmark flag, the post-quiz composer unlock).
-        // A silent failure means the user sees an unbookmarked / unpassed
-        // story even though the server has the row — they bookmark again,
-        // hit the cap, retry the quiz pointlessly. Surface the error to
-        // `loadError` so the retry path catches it. Comment-vote reads
-        // below stay best-effort because their UI degrades gracefully
-        // (counts read as 0 until the second open).
+        // Bookmark and quiz-history fetches are secondary — the article body is already
+        // loaded before these run. Failures degrade gracefully: isBookmarked defaults to
+        // false (safe; worst case the user re-bookmarks), quiz history defaults to empty
+        // (safe; user re-takes the quiz). Neither failure should block article reading.
         if let session = try? await client.auth.session {
             let userId = session.user.id.uuidString
             struct BM: Decodable { let id: String }
@@ -2501,7 +2496,6 @@ struct StoryDetailView: View {
                 let isNotFound = msg.contains("no rows") || msg.contains("pgrst116")
                 if !isNotFound {
                     Log.d("[StoryDetail] bookmark check failed:", error)
-                    loadError = "We couldn\u{2019}t check this story\u{2019}s bookmark. Pull to retry."
                 }
             }
 
@@ -2516,7 +2510,6 @@ struct StoryDetailView: View {
                     .value
             } catch {
                 Log.d("[StoryDetail] quiz attempts read failed:", error)
-                loadError = "We couldn\u{2019}t load your quiz history for this story. Pull to retry."
                 rows = []
             }
             var byAttempt: [Int: (correct: Int, total: Int)] = [:]

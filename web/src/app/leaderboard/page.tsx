@@ -130,6 +130,7 @@ export default function LeaderboardPage() {
   // `canCategories` → leaderboard.category.view.
   const [fullAccess, setFullAccess] = useState<boolean>(false);
   const [canCategories, setCanCategories] = useState<boolean>(false);
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent' | 'rate-limited' | 'error'>('idle');
 
   useEffect(() => {
     (async () => {
@@ -373,6 +374,23 @@ export default function LeaderboardPage() {
   // plans.tier in (verity, verity_pro, verity_family)` derivation for
   // category drill-down. (Pre-T319 also included verity_family_xl,
   // retired 2026-04-27.)
+
+  async function handleResendVerification() {
+    setResendState('sending');
+    try {
+      const res = await fetch('/api/auth/resend-verification', { method: 'POST' });
+      if (res.status === 429) {
+        await res.json().catch(() => {});
+        setResendState('rate-limited');
+      } else if (res.ok) {
+        setResendState('sent');
+      } else {
+        setResendState('error');
+      }
+    } catch {
+      setResendState('error');
+    }
+  }
 
   return (
     // Ext-NN1 — main landmark for screen readers.
@@ -803,22 +821,38 @@ export default function LeaderboardPage() {
                     >
                       Verify your email to see ranks beyond top 3.
                     </p>
-                    <a
-                      href="/verify-email"
-                      style={{
-                        display: 'inline-block',
-                        marginTop: 8,
-                        padding: '10px 28px',
-                        background: 'var(--accent)',
-                        color: '#fff',
-                        borderRadius: 10,
-                        fontSize: 14,
-                        fontWeight: 600,
-                        textDecoration: 'none',
-                      }}
-                    >
-                      Verify email
-                    </a>
+                    {resendState === 'sent' ? (
+                      <p style={{ marginTop: 8, fontSize: 14, color: 'var(--accent)', fontWeight: 600 }}>
+                        Check your inbox for a verification link.
+                      </p>
+                    ) : resendState === 'rate-limited' ? (
+                      <p style={{ marginTop: 8, fontSize: 14, color: 'var(--dim)' }}>
+                        You've already requested a verification email recently. Check your inbox.
+                      </p>
+                    ) : resendState === 'error' ? (
+                      <p style={{ marginTop: 8, fontSize: 14, color: 'var(--dim)' }}>
+                        Something went wrong. Try again in a moment.
+                      </p>
+                    ) : (
+                      <button
+                        onClick={handleResendVerification}
+                        disabled={resendState === 'sending'}
+                        style={{
+                          display: 'inline-block',
+                          marginTop: 8,
+                          padding: '10px 28px',
+                          background: resendState === 'sending' ? 'var(--dim)' : 'var(--accent)',
+                          color: '#fff',
+                          borderRadius: 10,
+                          fontSize: 14,
+                          fontWeight: 600,
+                          border: 'none',
+                          cursor: resendState === 'sending' ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        {resendState === 'sending' ? 'Sending…' : 'Verify email'}
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
