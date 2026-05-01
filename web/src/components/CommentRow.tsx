@@ -437,6 +437,29 @@ export default function CommentRow({
                   </span>
                 </button>
               )}
+              {(canUpvote || canDownvote) && (() => {
+                const up = comment.upvote_count || 0;
+                const down = comment.downvote_count || 0;
+                const net = up - down;
+                const total = up + down;
+                if (total === 0) return null;
+                const color = net > 0 ? '#16a34a' : net < 0 ? '#dc2626' : 'var(--dim, #666)';
+                return (
+                  <span
+                    title={`${up} upvote${up !== 1 ? 's' : ''} · ${down} downvote${down !== 1 ? 's' : ''} · ${total} total`}
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color,
+                      minWidth: 28,
+                      textAlign: 'center',
+                      letterSpacing: '-0.01em',
+                    }}
+                  >
+                    {net > 0 ? '+' : ''}{net}
+                  </span>
+                );
+              })()}
               {canDownvote && (
                 <button
                   onClick={() => doVote(yourVote === 'downvote' ? 'clear' : 'downvote')}

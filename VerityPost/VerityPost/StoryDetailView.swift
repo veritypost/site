@@ -1843,6 +1843,17 @@ struct StoryDetailView: View {
                         ) {
                             Task { await voteOnComment(comment, type: upvotedComments.contains(comment.id) ? "clear" : "upvote") }
                         }
+                        let upCount = commentUpvoteCounts[comment.id] ?? 0
+                        let downCount = commentDownvoteCounts[comment.id] ?? 0
+                        let netScore = upCount - downCount
+                        let totalVotes = upCount + downCount
+                        if totalVotes > 0 {
+                            Text(netScore > 0 ? "+\(netScore)" : "\(netScore)")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(netScore > 0 ? .green : netScore < 0 ? .red : .secondary)
+                                .frame(minWidth: 28, alignment: .center)
+                                .help("\(upCount) upvote\(upCount == 1 ? "" : "s") · \(downCount) downvote\(downCount == 1 ? "" : "s") · \(totalVotes) total")
+                        }
                         voteButton(
                             label: "Down",
                             count: commentDownvoteCounts[comment.id] ?? 0,
