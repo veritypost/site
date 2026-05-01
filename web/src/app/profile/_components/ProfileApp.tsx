@@ -201,10 +201,16 @@ export function ProfileApp({ defaultSection }: Props) {
   );
   if (!user) return null;
 
-  const currentTier = tierFor(
-    (user as UserRow & { verity_score?: number | null }).verity_score ?? 0,
-    tiers
-  );
+  const userWithFrozen = user as UserRow & {
+    verity_score?: number | null;
+    frozen_verity_score?: number | null;
+    frozen_at?: string | null;
+  };
+  const displayScore =
+    userWithFrozen.frozen_at != null
+      ? (userWithFrozen.frozen_verity_score ?? userWithFrozen.verity_score ?? 0)
+      : (userWithFrozen.verity_score ?? 0);
+  const currentTier = tierFor(displayScore, tiers);
   const upcomingTier = nextTier(currentTier, tiers);
 
   const topState = accountStates[0];
@@ -232,9 +238,16 @@ export function ProfileApp({ defaultSection }: Props) {
       id: 'you',
       glyph: '✶',
       title: 'You',
-      reason: 'Your tier, the numbers behind it, and what to do next to keep your streak alive.',
-      keywords: ['home', 'dashboard', 'score', 'tier', 'reads', 'streak', 'stats'],
-      render: () => <YouSection user={user} tier={currentTier} next={upcomingTier} perms={perms} />,
+      reason: 'Your tier, the numbers behind it, and what to do next.',
+      keywords: ['home', 'dashboard', 'score', 'tier', 'stats'],
+      render: () => (
+        <YouSection
+          user={{ ...user, verity_score: displayScore } as typeof user}
+          tier={currentTier}
+          next={upcomingTier}
+          perms={perms}
+        />
+      ),
     },
     {
       id: 'public',
@@ -305,7 +318,7 @@ export function ProfileApp({ defaultSection }: Props) {
       group: 'Library',
       title: 'Milestones',
       reason: 'The badges you’ve earned and what’s next on the ladder.',
-      keywords: ['achievements', 'badges', 'awards', 'streak'],
+      keywords: ['achievements', 'badges', 'awards'],
       render: () => <MilestonesSectionConnected authUserId={authUserId} user={user} />,
     },
 
