@@ -1,7 +1,7 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified comments 2026-04-18
 import { NextResponse } from 'next/server';
-import { requirePermission } from '@/lib/auth';
+import { requirePermission, hasPermissionServer } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { v2LiveGuard } from '@/lib/featureFlags';
 import { safeErrorResponse } from '@/lib/apiErrors';
@@ -91,7 +91,9 @@ export async function POST(request, { params }) {
   // H4 — gate non-clear votes on quiz pass. Clearing an existing vote
   // is always allowed (you can undo your own action regardless of
   // whether you re-pass the quiz). Upvote/downvote require pass.
-  if (type !== 'clear' && commentArticleId) {
+  // admin.god_mode bypasses the quiz gate (mirrors canBypassQuiz in page.tsx).
+  const isGodMode = await hasPermissionServer('admin.god_mode');
+  if (!isGodMode && type !== 'clear' && commentArticleId) {
     const { data: passed, error: passErr } = await service.rpc('user_passed_article_quiz', {
       p_user_id: user.id,
       p_article_id: commentArticleId,
