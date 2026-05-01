@@ -452,6 +452,25 @@ export default function ArticlesTable() {
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div style={{ display: 'flex', gap: S[1], flexWrap: 'wrap', alignItems: 'center' }}>
+                    {row.status === 'published' && row.stories?.slug && (
+                      <Link
+                        href={`/${row.stories.slug}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          fontSize: F.sm,
+                          padding: `${S[1]}px ${S[2]}px`,
+                          border: `1px solid ${C.divider}`,
+                          borderRadius: 4,
+                          color: C.white,
+                          textDecoration: 'none',
+                          fontFamily: 'inherit',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        View
+                      </Link>
+                    )}
                     <Button
                       size="sm"
                       variant="secondary"

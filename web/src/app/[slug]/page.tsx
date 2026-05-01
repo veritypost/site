@@ -136,8 +136,6 @@ export default async function ArticleSlugPage({
         data: await Promise.all([
           hasPermissionServer('articles.edit', supabase),
           hasPermissionServer('admin.articles.edit.any', supabase),
-          hasPermissionServer('articles.publish', supabase),
-          hasPermissionServer('admin.articles.publish', supabase),
           service
             .from('quizzes')
             .select('*', { count: 'exact', head: true })
@@ -193,8 +191,6 @@ export default async function ArticleSlugPage({
   const [
     canEditNew,
     canEditLegacy,
-    canPublishNew,
-    canPublishLegacy,
     quizCountResult,
     passCheckResult,
     sourcesResult,
@@ -209,7 +205,6 @@ export default async function ArticleSlugPage({
   if (nearbyStoriesResult.error) console.error('[article] nearby stories query failed', nearbyStoriesResult.error);
 
   const canEdit = canEditNew || canEditLegacy;
-  const canPublish = canPublishNew || canPublishLegacy;
   const hasQuiz = quizCountResult.error ? false : (quizCountResult.count ?? 0) > 0;
   const initialPassed = passCheckResult.error ? false : !!passCheckResult.data;
   const sources = sourcesResult.data ?? [];
@@ -283,7 +278,7 @@ export default async function ArticleSlugPage({
         }}
         bodyHtml={bodyHtml}
         canEdit={canEdit}
-        canPublish={canPublish}
+        canPublish={false}
         sources={sources}
         timeline={timeline}
       />

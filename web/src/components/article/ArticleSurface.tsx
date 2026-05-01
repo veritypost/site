@@ -1,17 +1,12 @@
 'use client';
 
 /**
- * Client wrapper around the article body. Decides between read-only and
- * edit-mode rendering based on the canEdit flag the server passed in.
- *
- * The editor (full story-manager surface — see ArticleEditor) is loaded
- * via next/dynamic with ssr:false so non-editors never receive its
- * bundle. The read-only path stays a tiny tree of static markup.
+ * Client wrapper around the article body. Always renders the reader view —
+ * what any user sees. Admins get a small "Edit" link at the top that opens
+ * the story-manager without leaving the current reader context.
  */
 
-import dynamic from 'next/dynamic';
-import { useState } from 'react';
-import type { ArticleEditorProps } from './ArticleEditor';
+import Link from 'next/link';
 import SourcesSection, { type SourceItem } from './SourcesSection';
 import TimelineSection, { type TimelineItem } from './TimelineSection';
 
@@ -37,11 +32,6 @@ export type ArticleSurfaceProps = {
   sources?: SourceItem[];
   timeline?: TimelineItem[];
 };
-
-const ArticleEditor = dynamic<ArticleEditorProps>(
-  () => import('./ArticleEditor'),
-  { ssr: false }
-);
 
 const PAGE_STYLE: React.CSSProperties = {
   maxWidth: 720,
@@ -70,24 +60,33 @@ const BODY_STYLE: React.CSSProperties = {
   color: 'var(--text-primary, #111)',
 };
 
-export default function ArticleSurface(props: ArticleSurfaceProps) {
-  const { article, bodyHtml, canEdit, canPublish, sources = [], timeline = [] } = props;
-  const [reader] = useState(article);
-
-  if (canEdit) {
-    return (
-      <ArticleEditor
-        initialArticle={reader}
-        initialBodyHtml={bodyHtml}
-        canPublish={canPublish}
-      />
-    );
-  }
+export default function ArticleSurface({ article, bodyHtml, canEdit, sources = [], timeline = [] }: ArticleSurfaceProps) {
+  const editHref = article.is_kids_safe
+    ? `/admin/kids-story-manager?article=${article.id}`
+    : `/admin/story-manager?article=${article.id}`;
 
   return (
     <article style={PAGE_STYLE}>
-      <h1 style={TITLE_STYLE}>{reader.title}</h1>
-      {reader.subtitle && <p style={SUBTITLE_STYLE}>{reader.subtitle}</p>}
+      {canEdit && (
+        <div style={{ textAlign: 'right', marginBottom: 16 }}>
+          <Link
+            href={editHref}
+            style={{
+              fontSize: 12,
+              padding: '4px 10px',
+              border: '1px solid #ccc',
+              borderRadius: 4,
+              color: 'var(--dim, #555)',
+              textDecoration: 'none',
+              fontFamily: 'inherit',
+            }}
+          >
+            Edit
+          </Link>
+        </div>
+      )}
+      <h1 style={TITLE_STYLE}>{article.title}</h1>
+      {article.subtitle && <p style={SUBTITLE_STYLE}>{article.subtitle}</p>}
       <p style={{ fontSize: 12, color: 'var(--dim, #5a5a5a)', marginBottom: 16, letterSpacing: '0.03em' }}>verity post</p>
       <div
         data-article-body
