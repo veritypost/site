@@ -443,37 +443,94 @@ export default function CommentRow({
                 const up = comment.upvote_count || 0;
                 const down = comment.downvote_count || 0;
                 const net = up - down;
-                const netColor = net > 0 ? '#1a7a4a' : net < 0 ? '#b94040' : 'var(--dim, #666)';
+                const votedUp = yourVote === 'upvote';
+                const votedDown = yourVote === 'downvote';
+                // Pill border shifts to match active vote; neutral otherwise.
+                const pillBorderColor = votedUp ? '#1a7a4a' : votedDown ? '#b94040' : 'var(--border, #e5e5e5)';
                 return (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'stretch',
+                      border: `1px solid ${pillBorderColor}`,
+                      borderRadius: 8,
+                      overflow: 'hidden',
+                      transition: 'border-color 0.15s ease',
+                      boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.04)',
+                    }}
+                  >
+                    {/* Up button */}
                     {canUpvote && (
                       <button
-                        onClick={() => doVote(yourVote === 'upvote' ? 'clear' : 'upvote')}
-                        style={voteBtn(yourVote === 'upvote')}
+                        onClick={() => doVote(votedUp ? 'clear' : 'upvote')}
+                        aria-label={`Upvote (${up})`}
+                        aria-pressed={votedUp}
+                        style={voteClusterBtn(votedUp, false)}
                       >
-                        ▲ {up}
+                        <ChevronUp active={votedUp} />
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: votedUp ? 700 : 500,
+                            color: votedUp ? '#1a7a4a' : 'var(--dim, #666)',
+                            letterSpacing: '-0.01em',
+                            fontVariantNumeric: 'tabular-nums',
+                            transition: 'color 0.15s ease',
+                          }}
+                        >
+                          {up}
+                        </span>
                       </button>
                     )}
-                    <span
+                    {/* Net score — display only, never a button */}
+                    <div
                       title={`${up} up · ${down} down`}
                       style={{
-                        fontSize: 12,
-                        fontWeight: 700,
-                        color: netColor,
-                        minWidth: 24,
-                        textAlign: 'center',
-                        letterSpacing: '-0.01em',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '0 10px',
+                        borderLeft: canUpvote ? '1px solid var(--border, #e5e5e5)' : 'none',
+                        borderRight: canDownvote ? '1px solid var(--border, #e5e5e5)' : 'none',
+                        minWidth: 32,
                         userSelect: 'none',
                       }}
                     >
-                      {net > 0 ? '+' : ''}{net}
-                    </span>
+                      <span
+                        style={{
+                          fontSize: 15,
+                          fontWeight: 700,
+                          color: net > 0 ? '#1a7a4a' : net < 0 ? '#b94040' : 'var(--dim, #999)',
+                          letterSpacing: '-0.02em',
+                          lineHeight: 1,
+                          fontVariantNumeric: 'tabular-nums',
+                          transition: 'color 0.15s ease',
+                        }}
+                      >
+                        {net > 0 ? '+' : ''}{net}
+                      </span>
+                    </div>
+                    {/* Down button */}
                     {canDownvote && (
                       <button
-                        onClick={() => doVote(yourVote === 'downvote' ? 'clear' : 'downvote')}
-                        style={voteBtn(yourVote === 'downvote', true)}
+                        onClick={() => doVote(votedDown ? 'clear' : 'downvote')}
+                        aria-label={`Downvote (${down})`}
+                        aria-pressed={votedDown}
+                        style={voteClusterBtn(votedDown, true)}
                       >
-                        ▼ {down}
+                        <ChevronDown active={votedDown} />
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: votedDown ? 700 : 500,
+                            color: votedDown ? '#b94040' : 'var(--dim, #666)',
+                            letterSpacing: '-0.01em',
+                            fontVariantNumeric: 'tabular-nums',
+                            transition: 'color 0.15s ease',
+                          }}
+                        >
+                          {down}
+                        </span>
                       </button>
                     )}
                   </div>
@@ -709,24 +766,74 @@ export default function CommentRow({
   );
 }
 
-function voteBtn(active: boolean, isDown = false): CSSProperties {
-  const color = active ? (isDown ? '#dc2626' : '#16a34a') : 'var(--dim, #666)';
+// Vote cluster button — left (up) or right (down) cell of the pill.
+// Active state: colored background fill + no border-radius (the outer pill
+// provides rounding). The fill is intentionally light (alpha 0x18) so it
+// reads as "confirmed" without screaming.
+function voteClusterBtn(active: boolean, isDown: boolean): CSSProperties {
+  const hue = isDown ? '#b94040' : '#1a7a4a';
   return {
     display: 'inline-flex',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 4,
-    padding: '4px 6px',
-    borderRadius: 6,
+    // Horizontal padding gives the 44px tap area together with the icon+number.
+    // minWidth ensures the tap target even at count=0.
+    padding: '0 10px',
     minHeight: 44,
     minWidth: 44,
     border: 'none',
-    background: active ? `${color}14` : 'transparent',
-    color,
-    fontSize: 13,
-    fontWeight: 600,
+    borderRadius: 0,
+    background: active ? `${hue}18` : 'transparent',
     cursor: 'pointer',
     touchAction: 'manipulation',
+    transition: 'background 0.15s ease',
+    WebkitTapHighlightColor: 'transparent',
   };
+}
+
+// Chevron icons as inline SVG — no library dependency.
+// Stroke width 1.75 keeps them crisp at small sizes without looking heavy.
+function ChevronUp({ active }: { active: boolean }) {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 12 12"
+      fill="none"
+      aria-hidden="true"
+      style={{ flexShrink: 0, transition: 'stroke 0.15s ease' }}
+    >
+      <polyline
+        points="2,8 6,4 10,8"
+        stroke={active ? '#1a7a4a' : 'var(--dim, #666)'}
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ChevronDown({ active }: { active: boolean }) {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 12 12"
+      fill="none"
+      aria-hidden="true"
+      style={{ flexShrink: 0, transition: 'stroke 0.15s ease' }}
+    >
+      <polyline
+        points="2,4 6,8 10,4"
+        stroke={active ? '#b94040' : 'var(--dim, #666)'}
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 }
 
 interface MenuItemProps {

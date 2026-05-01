@@ -1837,33 +1837,67 @@ struct StoryDetailView: View {
                         }
                     }
                     HStack(spacing: 8) {
-                        // D29: comment voting shows Up + Down with separate counts.
-                        // Same vote twice clears (toggle). Different vote switches.
-                        voteButton(
-                            label: "Up",
-                            count: commentUpvoteCounts[comment.id] ?? 0,
-                            active: upvotedComments.contains(comment.id)
-                        ) {
-                            Task { await voteOnComment(comment, type: upvotedComments.contains(comment.id) ? "clear" : "upvote") }
-                        }
+                        // D29: connected vote pill — up | net | down.
+                        // Same vote twice clears; different vote switches.
+                        let votedUp = upvotedComments.contains(comment.id)
+                        let votedDown = downvotedComments.contains(comment.id)
                         let upCount = commentUpvoteCounts[comment.id] ?? 0
                         let downCount = commentDownvoteCounts[comment.id] ?? 0
-                        let netScore = upCount - downCount
-                        let totalVotes = upCount + downCount
-                        if totalVotes > 0 {
-                            Text(netScore > 0 ? "+\(netScore)" : "\(netScore)")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundColor(netScore > 0 ? .green : netScore < 0 ? .red : .secondary)
-                                .frame(minWidth: 28, alignment: .center)
-                                .help("\(upCount) upvote\(upCount == 1 ? "" : "s") · \(downCount) downvote\(downCount == 1 ? "" : "s") · \(totalVotes) total")
+                        let net = upCount - downCount
+                        let upHue = Color(hex: "#1a7a4a")
+                        let downHue = Color(hex: "#b94040")
+                        let pillBorder = votedUp ? upHue : votedDown ? downHue : VP.border
+                        HStack(spacing: 0) {
+                            Button {
+                                Task { await voteOnComment(comment, type: votedUp ? "clear" : "upvote") }
+                            } label: {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "chevron.up")
+                                        .font(.system(size: 10, weight: .semibold))
+                                    Text("\(upCount)")
+                                        .font(.system(size: 11, weight: votedUp ? .bold : .medium))
+                                        .monospacedDigit()
+                                }
+                                .foregroundColor(votedUp ? upHue : VP.dim)
+                                .padding(.horizontal, 10)
+                                .frame(minHeight: 36)
+                                .background(votedUp ? upHue.opacity(0.09) : Color.clear)
+                            }
+                            .buttonStyle(.plain)
+                            VP.border.frame(width: 1, height: 20)
+                            Text(net > 0 ? "+\(net)" : "\(net)")
+                                .font(.system(size: 15, weight: .bold))
+                                .monospacedDigit()
+                                .foregroundColor(net > 0 ? upHue : net < 0 ? downHue : VP.dim)
+                                .frame(minWidth: 32, alignment: .center)
+                                .padding(.horizontal, 10)
+                                .frame(minHeight: 36)
+                                .help("\(upCount) up · \(downCount) down")
+                            VP.border.frame(width: 1, height: 20)
+                            Button {
+                                Task { await voteOnComment(comment, type: votedDown ? "clear" : "downvote") }
+                            } label: {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "chevron.down")
+                                        .font(.system(size: 10, weight: .semibold))
+                                    Text("\(downCount)")
+                                        .font(.system(size: 11, weight: votedDown ? .bold : .medium))
+                                        .monospacedDigit()
+                                }
+                                .foregroundColor(votedDown ? downHue : VP.dim)
+                                .padding(.horizontal, 10)
+                                .frame(minHeight: 36)
+                                .background(votedDown ? downHue.opacity(0.09) : Color.clear)
+                            }
+                            .buttonStyle(.plain)
                         }
-                        voteButton(
-                            label: "Down",
-                            count: commentDownvoteCounts[comment.id] ?? 0,
-                            active: downvotedComments.contains(comment.id)
-                        ) {
-                            Task { await voteOnComment(comment, type: downvotedComments.contains(comment.id) ? "clear" : "downvote") }
-                        }
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(pillBorder, lineWidth: 1)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .animation(.easeOut(duration: 0.15), value: votedUp)
+                        .animation(.easeOut(duration: 0.15), value: votedDown)
                         // T12 — Reply opens the composer with `parent_id` stamped
                         // to this comment. Server allows nested replies; the iOS
                         // render caps visible depth at `maxThreadDepth` so beyond
@@ -3235,7 +3269,7 @@ struct StoryDetailView: View {
 
     private func voteButton(label: String, count: Int, active: Bool, action: @escaping () -> Void) -> some View {
         let isUp = label == "Up"
-        let activeColor: Color = isUp ? .green : .red
+        let activeColor: Color = isUp ? Color(hex: "#1a7a4a") : Color(hex: "#b94040")
         return Button(action: action) {
             HStack(spacing: 4) {
                 Image(systemName: isUp ? "arrow.up" : "arrow.down")
