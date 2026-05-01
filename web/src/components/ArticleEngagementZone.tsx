@@ -9,6 +9,7 @@ interface ArticleEngagementZoneProps {
   initialPassed: boolean;
   currentUserId?: string | null;
   currentUserTier?: string;
+  canBypassQuiz?: boolean;
 }
 
 export default function ArticleEngagementZone({
@@ -17,8 +18,9 @@ export default function ArticleEngagementZone({
   initialPassed,
   currentUserId,
   currentUserTier,
+  canBypassQuiz = false,
 }: ArticleEngagementZoneProps) {
-  const [hasPassed, setHasPassed] = useState(initialPassed);
+  const [hasPassed, setHasPassed] = useState(initialPassed || canBypassQuiz);
   const [justPassedThisSession, setJustPassedThisSession] = useState(false);
 
   function handlePass(_achievements?: QuizPassAchievement[]) {
@@ -42,7 +44,7 @@ export default function ArticleEngagementZone({
   // Logged in
   return (
     <section id="discussion" style={{ marginTop: 40 }}>
-      {hasQuiz && (
+      {hasQuiz && !canBypassQuiz && (
         <ArticleQuiz
           articleId={articleId}
           initialPassed={initialPassed}

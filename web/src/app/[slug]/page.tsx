@@ -294,6 +294,7 @@ export default async function ArticleSlugPage({
             hasQuiz={hasQuiz}
             initialPassed={initialPassed}
             currentUserId={user?.id ?? null}
+            canBypassQuiz={canEdit || isGodModeViewer}
           />
         </>
       )}
