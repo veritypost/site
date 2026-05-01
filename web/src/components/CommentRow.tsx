@@ -24,10 +24,39 @@ type CommentUser = {
 
 type Mention = { user_id?: string; username: string };
 
+// Section A — kept loosely typed at the row layer to avoid pulling the
+// Thread-level union here; CommentThread owns the canonical TagKind.
+export type TagKind =
+  | 'context'
+  | 'helpful'
+  | 'insightful'
+  | 'sarcastic'
+  | 'cite_needed'
+  | 'off_topic';
+
+// Per-tag chip metadata. Colors mirror the Section A spec; labels match
+// the public copy. Counts come from the row when ≥ 1 (context_tag_count
+// for 'context', helpful_count for 'helpful', otherwise we rely on the
+// per-user state without a public count — Section A only ships a
+// public count for context + helpful).
+const TAG_META: Record<TagKind, { label: string; color: string }> = {
+  helpful:     { label: 'Helpful',      color: '#16a34a' },
+  insightful:  { label: 'Insightful',   color: '#2563eb' },
+  sarcastic:   { label: 'Sarcastic',    color: '#f59e0b' },
+  cite_needed: { label: 'Cite needed',  color: '#ea580c' },
+  off_topic:   { label: 'Off-topic',    color: '#6b7280' },
+  context:     { label: 'Context',      color: 'var(--accent, #111)' },
+};
+
+// Section A — `helpful_count` lives on `comments` after the migration;
+// the regen will surface it natively, but we keep an explicit optional
+// field on the enriched row so the typeline holds during the transition
+// window before `npm run types:gen` runs.
 export type EnrichedComment = CommentRowDb & {
   users?: CommentUser;
   _your_vote?: 'upvote' | 'downvote' | null | undefined;
-  _you_tagged?: boolean;
+  _your_tags?: Set<TagKind>;
+  helpful_count?: number | null;
 };
 
 type VoteType = 'upvote' | 'downvote' | 'clear';
@@ -42,8 +71,12 @@ interface CommentRowProps {
   articleId: string;
   viewerIsSupervisor?: boolean;
   viewerIsModerator?: boolean;
+  // Section A — passed by CommentThread; defaults are used if a caller
+  // doesn't supply them so existing direct-mount tests still work.
+  helpfulThreshold?: number;
+  tagKinds?: TagKind[];
   onVote: (commentId: string, type: VoteType) => void | Promise<void>;
-  onToggleTag: (commentId: string) => void | Promise<void>;
+  onToggleTag: (commentId: string, tagKind: TagKind) => void | Promise<void>;
   onDelete: (commentId: string) => void;
   onEdit: (commentId: string, body: string) => void | Promise<void>;
   onReport: (commentId: string) => void;
@@ -53,6 +86,15 @@ interface CommentRowProps {
   onReplied?: (comment: CommentRowDb | null) => void;
   depth?: number;
 }
+
+const DEFAULT_TAG_KINDS: TagKind[] = [
+  'helpful',
+  'insightful',
+  'sarcastic',
+  'cite_needed',
+  'off_topic',
+  'context',
+];
 
 function renderBody(body: string, mentions: Mention[] = []): ReactNode[] {
   const resolved = new Set((mentions || []).map((m) => m.username));
@@ -91,6 +133,8 @@ export default function CommentRow({
   articleId,
   viewerIsSupervisor = false,
   viewerIsModerator = false,
+  helpfulThreshold = 10,
+  tagKinds = DEFAULT_TAG_KINDS,
   onVote,
   onToggleTag,
   onDelete,
@@ -160,11 +204,11 @@ export default function CommentRow({
       setBusy('');
     }
   }
-  async function doTag() {
+  async function doTag(kind: TagKind) {
     if (busy) return;
-    setBusy('tag');
+    setBusy(`tag:${kind}`);
     try {
-      await onToggleTag(comment.id);
+      await onToggleTag(comment.id, kind);
     } finally {
       setBusy('');
     }
@@ -225,6 +269,26 @@ export default function CommentRow({
               {user.username || 'user'}
             </span>
             <VerifiedBadge user={user} />
+            {/* Section A — inline Helpful badge once the comment crosses
+                the editorial threshold (default 10, settings-tunable via
+                helpful_badge_threshold). Sits between the verified badge
+                and the category score so verified-figure + helpful both
+                read at a glance. */}
+            {(comment.helpful_count ?? 0) >= helpfulThreshold && (
+              <span
+                title={`Marked helpful by ${comment.helpful_count} readers`}
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  padding: '1px 6px',
+                  borderRadius: 4,
+                  background: 'rgba(22,163,74,0.12)',
+                  color: '#16a34a',
+                }}
+              >
+                Helpful
+              </span>
+            )}
             {authorCategoryScore != null && (
               <span
                 title="Verity Score in this category"
@@ -366,26 +430,44 @@ export default function CommentRow({
                 </button>
               )}
 
-              {canContextTag && (
-                <button
-                  onClick={doTag}
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    padding: '10px 12px',
-                    borderRadius: 14,
-                    minHeight: 44,
-                    minWidth: 44,
-                    border: `1px solid ${comment._you_tagged ? 'var(--accent, #111)' : 'var(--border, #e5e5e5)'}`,
-                    background: comment._you_tagged ? 'rgba(17,17,17,0.06)' : 'transparent',
-                    color: comment._you_tagged ? 'var(--accent, #111)' : 'var(--dim, #666)',
-                    cursor: 'pointer',
-                    touchAction: 'manipulation',
-                  }}
-                >
-                  Context \u00b7 {comment.context_tag_count || 0}
-                </button>
-              )}
+              {canContextTag &&
+                tagKinds.map((kind) => {
+                  const meta = TAG_META[kind];
+                  const cast = !!comment._your_tags?.has(kind);
+                  // Section A \u2014 only context + helpful expose a public
+                  // count (server-maintained). Other kinds render as a
+                  // bare label until/unless we choose to surface counts.
+                  let count: number | undefined;
+                  if (kind === 'context') count = comment.context_tag_count ?? 0;
+                  else if (kind === 'helpful') count = comment.helpful_count ?? 0;
+                  const showCount = typeof count === 'number' && count >= 1;
+                  const busyThis = busy === `tag:${kind}`;
+                  return (
+                    <button
+                      key={kind}
+                      onClick={() => doTag(kind)}
+                      disabled={busyThis}
+                      aria-pressed={cast}
+                      aria-label={`Tag ${meta.label}${showCount ? ` (${count})` : ''}`}
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 600,
+                        padding: '8px 10px',
+                        borderRadius: 14,
+                        minHeight: 36,
+                        border: `1px solid ${cast ? meta.color : 'var(--border, #e5e5e5)'}`,
+                        background: cast ? `${meta.color}1f` : 'transparent',
+                        color: cast ? meta.color : 'var(--dim, #666)',
+                        cursor: busyThis ? 'default' : 'pointer',
+                        opacity: busyThis ? 0.6 : 1,
+                        touchAction: 'manipulation',
+                      }}
+                    >
+                      {meta.label}
+                      {showCount ? ` ${count}` : ''}
+                    </button>
+                  );
+                })}
 
               {canReply && commentDepth < commentMaxDepth && (
                 <button

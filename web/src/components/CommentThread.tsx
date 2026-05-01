@@ -82,6 +82,26 @@ type DialogState = {
 
 type VoteType = 'upvote' | 'downvote' | 'clear';
 
+// Section A — multi-kind comment tags. Mirrors the CHECK on
+// comment_context_tags.tag_kind in
+// supabase/migrations/20260501000000_section_a_comment_tag_kinds.sql.
+export type TagKind =
+  | 'context'
+  | 'helpful'
+  | 'insightful'
+  | 'sarcastic'
+  | 'cite_needed'
+  | 'off_topic';
+
+const TAG_KINDS: TagKind[] = [
+  'context',
+  'helpful',
+  'insightful',
+  'sarcastic',
+  'cite_needed',
+  'off_topic',
+];
+
 export default function CommentThread({
   articleId,
   articleCategoryId,
@@ -95,7 +115,16 @@ export default function CommentThread({
   const [comments, setComments] = useState<CommentWithAuthor[]>([]);
   const [authorScores, setAuthorScores] = useState<Record<string, number>>({});
   const [yourVotes, setYourVotes] = useState<Record<string, 'upvote' | 'downvote' | undefined>>({});
-  const [yourTags, setYourTags] = useState<Set<string>>(new Set());
+  // Section A — track per-comment per-kind tag state. The previous
+  // single-Set keyed only by comment_id couldn't represent the new
+  // helpful/insightful/sarcastic/cite_needed/off_topic kinds; the row
+  // component now reads `_your_tags` to drive the cast state of each
+  // chip independently.
+  const [yourTags, setYourTags] = useState<Map<string, Set<TagKind>>>(new Map());
+  // Threshold above which the inline "Helpful" badge is shown next to
+  // the author. Pulled from /api/settings/public; falls back to 10 on
+  // network error or missing key (matches the editorial bar).
+  const [helpfulThreshold, setHelpfulThreshold] = useState<number>(10);
   const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
   const [viewerIsSupervisor, setViewerIsSupervisor] = useState<boolean>(false);
   const [viewerIsModerator, setViewerIsModerator] = useState<boolean>(false);
@@ -114,6 +143,28 @@ export default function CommentThread({
       await refreshIfStale();
       setPermsLoaded(true);
     })();
+  }, []);
+
+  // Section A — pull the editorial threshold from /api/settings/public.
+  // Same endpoint CommentRow already uses for `comment_max_depth`, so no
+  // new server surface required. Falls back to 10 on any failure.
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/settings/public')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        const t = data.helpful_badge_threshold;
+        if (typeof t === 'number' && Number.isFinite(t) && t > 0) {
+          setHelpfulThreshold(t);
+        }
+      })
+      .catch(() => {
+        // Default 10 stands.
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const loadAll = useCallback(async () => {
@@ -190,12 +241,27 @@ export default function CommentThread({
         });
         setYourVotes(votes);
 
+        // `tag_kind` cast: the database.ts type still names the column
+        // `tag_type` until the next regen post-migration; the migration
+        // landing this Section A renames it to `tag_kind`. The cast
+        // keeps the build green during the transition window without
+        // hand-editing the generated types file.
         const { data: t } = await supabase
           .from('comment_context_tags')
-          .select('comment_id')
+          .select('comment_id, tag_kind' as never)
           .eq('user_id', currentUserId)
           .in('comment_id', commentIds);
-        setYourTags(new Set((t || []).map((r) => r.comment_id)));
+        const tagMap = new Map<string, Set<TagKind>>();
+        ((t || []) as unknown as Array<{ comment_id: string; tag_kind: TagKind }>).forEach((r) => {
+          if (!r?.comment_id || !r?.tag_kind) return;
+          let set = tagMap.get(r.comment_id);
+          if (!set) {
+            set = new Set();
+            tagMap.set(r.comment_id, set);
+          }
+          set.add(r.tag_kind);
+        });
+        setYourTags(tagMap);
       }
 
       const { data: b } = await supabase
@@ -361,31 +427,52 @@ export default function CommentThread({
     setYourVotes((prev) => ({ ...prev, [commentId]: data.your_vote || undefined }));
   }
 
-  async function handleToggleTag(commentId: string) {
-    const res = await fetch(`/api/comments/${commentId}/context-tag`, { method: 'POST' });
+  async function handleToggleTag(commentId: string, tagKind: TagKind) {
+    const res = await fetch(`/api/comments/${commentId}/context-tag`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tag_kind: tagKind }),
+    });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       setError(data?.error || 'Tag failed');
       return;
     }
+    // The RPC always returns the canonical { tagged, count, tag_kind,
+    // helpful_count, is_pinned } shape. `count` is context-only and
+    // unchanged for non-context kinds; `helpful_count` is reflected on
+    // every response so a helpful toggle and a context toggle both
+    // converge to truth on the row.
     setComments((prev) =>
       prev.map((c) =>
         c.id === commentId
           ? {
               ...c,
-              context_tag_count: data.count,
-              is_context_pinned: data.is_pinned,
-              context_pinned_at: data.is_pinned
-                ? c.context_pinned_at || new Date().toISOString()
-                : c.context_pinned_at,
+              ...(tagKind === 'context'
+                ? {
+                    context_tag_count: data.count,
+                    is_context_pinned: data.is_pinned,
+                    context_pinned_at: data.is_pinned
+                      ? c.context_pinned_at || new Date().toISOString()
+                      : c.context_pinned_at,
+                  }
+                : {}),
+              // helpful_count column lands with the Section A migration;
+              // cast to `unknown` then merge so older type defs accept it.
+              ...(typeof data.helpful_count === 'number'
+                ? ({ helpful_count: data.helpful_count } as unknown as Partial<CommentDb>)
+                : {}),
             }
           : c
       )
     );
     setYourTags((prev) => {
-      const next = new Set(prev);
-      if (data.tagged) next.add(commentId);
-      else next.delete(commentId);
+      const next = new Map(prev);
+      const set = new Set(next.get(commentId) || []);
+      if (data.tagged) set.add(tagKind);
+      else set.delete(tagKind);
+      if (set.size === 0) next.delete(commentId);
+      else next.set(commentId, set);
       return next;
     });
   }
@@ -626,7 +713,7 @@ export default function CommentThread({
     const enriched: EnrichedComment = {
       ...c,
       _your_vote: yourVotes[c.id],
-      _you_tagged: yourTags.has(c.id),
+      _your_tags: yourTags.get(c.id) ?? new Set<TagKind>(),
     };
     return (
       <CommentRow
@@ -640,6 +727,8 @@ export default function CommentThread({
         depth={depth}
         viewerIsSupervisor={viewerIsSupervisor}
         viewerIsModerator={viewerIsModerator}
+        helpfulThreshold={helpfulThreshold}
+        tagKinds={TAG_KINDS}
         onVote={handleVote}
         onToggleTag={handleToggleTag}
         onEdit={handleEdit}
