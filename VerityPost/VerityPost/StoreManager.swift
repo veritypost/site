@@ -140,7 +140,7 @@ final class StoreManager: ObservableObject {
                 (sortOrder[a.id] ?? 99) < (sortOrder[b.id] ?? 99)
             }
         } catch {
-            errorMessage = "Failed to load products: \(error.localizedDescription)"
+            errorMessage = "Couldn't load subscription options. Check your connection and try again."
             Log.d("StoreManager loadProducts error:", error)
         }
         isLoading = false
@@ -377,7 +377,7 @@ final class StoreManager: ObservableObject {
                 NotificationCenter.default.post(name: .vpSubscriptionDidChange, object: nil)
             }
         } catch {
-            errorMessage = "Restore failed: \(error.localizedDescription)"
+            errorMessage = "Couldn't restore purchases. Check your connection and try again."
         }
     }
 

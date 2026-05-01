@@ -6,6 +6,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
+import { friendlyHttpError } from '@/lib/friendlyError';
+
 import { Card } from '../_components/Card';
 import { ConfirmDialog } from '../_components/ConfirmDialog';
 import { buttonDangerStyle, buttonSecondaryStyle } from '../_components/Field';
@@ -38,7 +40,7 @@ export function SessionsSection({ preview }: Props) {
     setLoading(true);
     try {
       const res = await fetch('/api/account/sessions');
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(friendlyHttpError(res, 'Could not load your sessions.'));
       const data = await res.json();
       setSessions((data.sessions ?? []) as Session[]);
     } catch (err) {
@@ -62,7 +64,7 @@ export function SessionsSection({ preview }: Props) {
       const res = await fetch(`/api/account/sessions/${encodeURIComponent(id)}`, {
         method: 'DELETE',
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(friendlyHttpError(res, 'Could not revoke that session.'));
       toast.success('Session revoked.');
       setSessions((s) => s.filter((x) => x.id !== id));
     } catch (err) {
@@ -85,7 +87,7 @@ export function SessionsSection({ preview }: Props) {
     setBusy('all');
     try {
       const res = await fetch('/api/account/sessions', { method: 'DELETE' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(friendlyHttpError(res, 'Could not sign out other devices.'));
       toast.success('All other sessions signed out.');
       setSessions((s) => s.filter((x) => x.is_current));
     } catch (err) {

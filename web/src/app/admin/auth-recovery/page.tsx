@@ -20,6 +20,7 @@
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { friendlyHttpError } from '@/lib/friendlyError';
 
 import Page, { PageHeader } from '@/components/admin/Page';
 import Toolbar from '@/components/admin/Toolbar';
@@ -105,7 +106,7 @@ export default function AuthRecoveryAdmin() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         toast.push({
-          message: (data as { error?: string })?.error || `HTTP ${res.status}`,
+          message: friendlyHttpError(res, 'Action failed. Try again.'),
           variant: 'danger',
         });
         return;

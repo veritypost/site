@@ -9,6 +9,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { friendlyHttpError } from '@/lib/friendlyError';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Page, { PageHeader } from '@/components/admin/Page';
@@ -81,7 +82,7 @@ export default function KidsDobCorrectionsPage() {
         }
         if (!res.ok) {
           const j = await res.json().catch(() => ({}));
-          setError(j.error || `HTTP ${res.status}`);
+          setError(friendlyHttpError(res, 'Could not load correction requests. Try again.'));
           setRows([]);
         } else {
           const j = await res.json();

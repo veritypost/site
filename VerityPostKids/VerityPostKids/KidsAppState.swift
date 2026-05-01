@@ -110,7 +110,7 @@ final class KidsAppState: ObservableObject {
             // can filter age_band locally as defense-in-depth on top of RLS.
             self.readingBand = row.reading_band ?? "kids"
         } catch {
-            self.loadError = "Couldn't load streak: \(error.localizedDescription)"
+            self.loadError = "Couldn't update your home screen."
         }
     }
 
@@ -153,7 +153,7 @@ final class KidsAppState: ObservableObject {
                 KidCategory(name: "Sports",  slug: "kids-sports",  color: K.coral,  progress: 0),
                 KidCategory(name: "Tech",    slug: "kids-tech",    color: K.sky,    progress: 0)
             ]
-            self.loadError = "Using default categories (DB fetch failed): \(error.localizedDescription)"
+            self.loadError = "Couldn't update your home screen."
         }
     }
 

@@ -30,7 +30,7 @@ export function SignOutSection({ preview }: Props) {
     const { error } = await supabase.auth.signOut({ scope });
     setBusy(null);
     if (error) {
-      toast.error(error.message);
+      toast.error('Sign-out failed. Try again.');
       return;
     }
     window.location.href = '/';

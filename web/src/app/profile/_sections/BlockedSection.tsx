@@ -7,6 +7,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Avatar from '@/components/Avatar';
 import { createClient } from '@/lib/supabase/client';
 
+import { friendlyHttpError } from '@/lib/friendlyError';
+
 import { Card } from '../_components/Card';
 import { buttonSecondaryStyle } from '../_components/Field';
 import { useToast } from '../_components/Toast';
@@ -55,7 +57,7 @@ export function BlockedSection({ preview }: Props) {
       )
       .eq('blocker_id', user.id);
     if (error) {
-      toast.error(error.message ?? 'Could not load blocks.');
+      toast.error('Could not load blocked users. Try again.');
       setLoadError(true);
       setLoading(false);
       return;
@@ -78,11 +80,11 @@ export function BlockedSection({ preview }: Props) {
       const res = await fetch(`/api/users/${encodeURIComponent(blockedId)}/block`, {
         method: 'DELETE',
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(friendlyHttpError(res, 'Could not unblock. Try again.'));
       toast.success('Unblocked.');
       setRows((r) => r.filter((x) => x.blocked_id !== blockedId));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not unblock.');
+      toast.error(err instanceof Error ? err.message : 'Could not unblock. Try again.');
     } finally {
       setBusy(null);
     }

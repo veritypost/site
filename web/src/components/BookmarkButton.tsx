@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
+import { friendlyError } from '@/lib/friendlyError';
 
 interface BookmarkButtonProps {
   articleId: string;
@@ -38,10 +39,10 @@ export default function BookmarkButton({ articleId, currentUserId }: BookmarkBut
         body: JSON.stringify({ article_id: articleId }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || 'Could not save');
+      if (!res.ok) throw new Error(friendlyError(data?.error, 'Could not bookmark. Try again.'));
       setBookmarked(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save');
+      setError(err instanceof Error ? err.message : 'Could not bookmark. Try again.');
     } finally {
       setBusy(false);
     }

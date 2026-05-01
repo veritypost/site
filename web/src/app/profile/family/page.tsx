@@ -3,6 +3,7 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '../../../lib/supabase/client';
+import { friendlyHttpError } from '@/lib/friendlyError';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import { formatDate } from '@/lib/dates';
 
@@ -388,7 +389,7 @@ function FamilySeatsCard() {
           // users), per the kids-redirect block above.
           if (res.status === 401 || res.status === 403) return;
           const j = await res.json().catch(() => ({}));
-          if (!cancelled) setErr(j.error || `HTTP ${res.status}`);
+          if (!cancelled) setErr(friendlyHttpError(res, 'Could not load family seats.'));
           return;
         }
         const j = await res.json();

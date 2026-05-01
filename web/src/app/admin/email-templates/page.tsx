@@ -80,7 +80,7 @@ function EmailTemplatesInner() {
         .from('email_templates')
         .select('*')
         .order('name', { ascending: true });
-      if (tErr) { setLoadError(tErr.message); setTemplates([]); }
+      if (tErr) { setLoadError('Could not load email templates. Try again.'); setTemplates([]); }
       else setTemplates((data || []) as EmailTemplate[]);
       setLoading(false);
     })();

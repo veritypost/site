@@ -45,20 +45,7 @@ export function ActivitySection({ authUserId, preview, perms, isPro }: Props) {
   const [reads, setReads] = useState<ReadingLogJoined[]>([]);
   const [comments, setComments] = useState<CommentJoined[]>([]);
   const [bookmarks, setBookmarks] = useState<BookmarkJoined[]>([]);
-  const [streakCurrent, setStreakCurrent] = useState(0);
-  const [streakBest, setStreakBest] = useState(0);
   const [filter, setFilter] = useState<Filter>('all');
-
-  const readDaySet = useMemo(() => {
-    const cutoff = new Date(Date.now() - 30 * 86400000);
-    const s = new Set<string>();
-    for (const r of reads) {
-      if (r.created_at && new Date(r.created_at) >= cutoff) {
-        s.add(r.created_at.slice(0, 10));
-      }
-    }
-    return s;
-  }, [reads]);
 
   const load = useCallback(async () => {
     if (!authUserId) {
@@ -84,7 +71,7 @@ export function ActivitySection({ authUserId, preview, perms, isPro }: Props) {
       .select('id, created_at, article_id, notes, articles(title, stories(slug))')
       .eq('user_id', authUserId);
 
-    const [r, c, b, streakRes] = await Promise.all([
+    const [r, c, b] = await Promise.all([
       (cutoff30 ? readLogQ.gte('created_at', cutoff30) : readLogQ)
         .order('created_at', { ascending: false })
         .limit(100),
@@ -94,30 +81,15 @@ export function ActivitySection({ authUserId, preview, perms, isPro }: Props) {
       (cutoff30 ? bookmarksQ.gte('created_at', cutoff30) : bookmarksQ)
         .order('created_at', { ascending: false })
         .limit(50),
-      (async () => {
-        try {
-          return await supabase
-            .from('users')
-            .select('streak_current, streak_best')
-            .eq('id', authUserId)
-            .maybeSingle();
-        } catch {
-          return { data: null, error: null };
-        }
-      })(),
     ]);
     if (r.error || c.error || b.error) {
-      setError(r.error?.message || c.error?.message || b.error?.message || 'Load failed.');
+      setError('Could not load your activity. Try again.');
       setLoading(false);
       return;
     }
     setReads((r.data ?? []) as unknown as ReadingLogJoined[]);
     setComments((c.data ?? []) as unknown as CommentJoined[]);
     setBookmarks((b.data ?? []) as unknown as BookmarkJoined[]);
-    if (streakRes.data) {
-      setStreakCurrent((streakRes.data as { streak_current?: number | null }).streak_current ?? 0);
-      setStreakBest((streakRes.data as { streak_best?: number | null }).streak_best ?? 0);
-    }
     setLoading(false);
   }, [authUserId, isPro, preview, supabase]);
 
@@ -230,7 +202,6 @@ export function ActivitySection({ authUserId, preview, perms, isPro }: Props) {
 
   return (
     <div style={{ fontFamily: FONT.sans }}>
-      <ReadingHeatmap readDaySet={readDaySet} streakCurrent={streakCurrent} streakBest={streakBest} />
       {!isPro && (
         <p style={{ margin: `0 0 ${S[3]}px`, fontSize: F.xs, color: C.inkMuted }}>Showing your last 30 days.</p>
       )}
@@ -356,49 +327,6 @@ export function ActivitySection({ authUserId, preview, perms, isPro }: Props) {
           );
         })}
       </ul>
-    </div>
-  );
-}
-
-function ReadingHeatmap({
-  readDaySet,
-  streakCurrent,
-  streakBest,
-}: {
-  readDaySet: Set<string>;
-  streakCurrent: number;
-  streakBest: number;
-}) {
-  const days = useMemo(() => {
-    const result: { date: string; read: boolean }[] = [];
-    for (let i = 29; i >= 0; i--) {
-      const d = new Date(Date.now() - i * 86400000);
-      const key = d.toISOString().slice(0, 10);
-      result.push({ date: key, read: readDaySet.has(key) });
-    }
-    return result;
-  }, [readDaySet]);
-
-  return (
-    <div style={{ marginBottom: S[4] }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(30, 1fr)', gap: 3 }}>
-        {days.map(({ date, read }) => (
-          <div
-            key={date}
-            title={date}
-            style={{
-              aspectRatio: '1',
-              borderRadius: 2,
-              background: read ? C.accent : C.surfaceSunken,
-              border: `1px solid ${C.border}`,
-            }}
-          />
-        ))}
-      </div>
-      <div style={{ display: 'flex', gap: S[4], marginTop: S[2], fontSize: F.xs, color: C.inkMuted }}>
-        <span>Current streak · {streakCurrent} {streakCurrent === 1 ? 'day' : 'days'}</span>
-        <span>Best · {streakBest} {streakBest === 1 ? 'day' : 'days'}</span>
-      </div>
     </div>
   );
 }

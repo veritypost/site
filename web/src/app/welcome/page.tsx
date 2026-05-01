@@ -3,6 +3,7 @@
 'use client';
 import { useState, useEffect, CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
+import { friendlyHttpError } from '@/lib/friendlyError';
 
 // First-login onboarding carousel was retired — `WelcomeModal` (mounted in
 // NavWrapper) handles the post-signin first-login username pick. This page
@@ -74,7 +75,7 @@ function GraduationClaim({ token }: { token: string }) {
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(j.error || `HTTP ${res.status}`);
+        setError(j.error || friendlyHttpError(res, 'Could not complete setup. Try again.'));
         setBusy(false);
         return;
       }

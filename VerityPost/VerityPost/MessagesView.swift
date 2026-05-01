@@ -1147,6 +1147,13 @@ struct DMThreadView: View {
         return "Couldn\u{2019}t send your message. Please try again."
     }
 
+    private func friendlyMessageError(_ code: String) -> String {
+        switch code {
+        case "user_blocked_recipient": return "You can't message this user."
+        default: return "Couldn't send your message. Try again."
+        }
+    }
+
     /// Map a non-200 HTTP status (+ optional server JSON body) to copy.
     /// Keeps server-supplied `error` text when present (validation surfaces).
     private func errorMessage(forStatus status: Int, body: Data) -> String {
@@ -1154,12 +1161,12 @@ struct DMThreadView: View {
         let serverMsg = (try? JSONDecoder().decode(Err.self, from: body))?.error
         switch status {
         case 422, 400:
-            if let m = serverMsg, !m.isEmpty { return "Couldn\u{2019}t send: \(m)" }
+            if let m = serverMsg, !m.isEmpty { return friendlyMessageError(m) }
             return "Couldn\u{2019}t send: that message can\u{2019}t be delivered."
         case 429:
             return "Slow down a moment — try again in a minute."
         case 401, 403:
-            if let m = serverMsg, !m.isEmpty { return "Couldn\u{2019}t send: \(m)" }
+            if let m = serverMsg, !m.isEmpty { return friendlyMessageError(m) }
             return "Couldn\u{2019}t send your message. Please try again."
         default:
             return "Couldn\u{2019}t send your message. Please try again."

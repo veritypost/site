@@ -108,12 +108,12 @@ export function PrivacyCard({ user, preview }: Props) {
       .order('created_at', { ascending: false })
       .limit(200);
     if (error) {
-      toast.error(error.message ?? 'Could not load followers.');
+      toast.error('Could not load followers. Try again.');
       // T351 — keep the failure state in component memory so the empty-list
       // render branch can offer a Retry button. The toast already fired,
       // but a transient error otherwise leaves the user staring at an
       // empty list with no explanation.
-      setFollowersError(error.message ?? 'Could not load followers.');
+      setFollowersError('Could not load followers. Try again.');
       setFollowersLoading(false);
       return;
     }
@@ -134,7 +134,7 @@ export function PrivacyCard({ user, preview }: Props) {
       p_fields: { [field]: value } as Json,
     });
     if (error) {
-      toast.error(error.message ?? 'Save failed.');
+      toast.error('Could not save. Try again.');
       return false;
     }
     return true;
@@ -186,7 +186,7 @@ export function PrivacyCard({ user, preview }: Props) {
       p_user_id: authUser.id,
     });
     if (error) {
-      toast.error('Could not lock down: ' + error.message);
+      toast.error('Could not lock down. Try again.');
       setBusyKey(null);
       return;
     }
@@ -252,7 +252,7 @@ export function PrivacyCard({ user, preview }: Props) {
       .in('follower_id', Array.from(picked));
     setBusyKey(null);
     if (error) {
-      toast.error(error.message ?? 'Could not remove followers.');
+      toast.error('Could not remove followers. Try again.');
       return;
     }
     setFollowers((rows) => rows.filter((r) => !picked.has(r.follower_id)));

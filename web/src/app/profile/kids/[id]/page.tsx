@@ -4,6 +4,7 @@
 import { useState, useEffect, CSSProperties, ReactNode } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '../../../../lib/supabase/client';
+import { friendlyError, friendlyHttpError } from '@/lib/friendlyError';
 import Badge from '@/components/kids/Badge';
 import PairDeviceButton from '@/components/kids/PairDeviceButton';
 import OpenKidsAppButton from '@/components/kids/OpenKidsAppButton';
@@ -812,7 +813,7 @@ function BandPanel({
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
-        onError(j.error || `HTTP ${res.status}`);
+        onError(friendlyError(j.error, friendlyHttpError(res, 'Could not advance reading band. Try again.')));
         setBusy(false);
         return;
       }
@@ -1122,7 +1123,7 @@ function DobCorrectionRequest({
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
-        onError(j.error || `HTTP ${res.status}`);
+        onError(friendlyError(j.error, friendlyHttpError(res, 'Could not submit correction. Try again.')));
         setBusy(false);
         return;
       }

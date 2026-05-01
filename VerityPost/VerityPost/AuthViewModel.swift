@@ -908,7 +908,7 @@ final class AuthViewModel: ObservableObject {
             try await client.auth.signOut()
         } catch {
             Log.d("signOut failed: \(error)")
-            authError = "Signed out locally, but the server session may still be active."
+            authError = "Signed out. Other active sessions may take a moment to sync."
         }
         // Order: server signout → local cache purge → @Published state flip.
         // If caches were cleared first and signOut threw, we'd have wiped

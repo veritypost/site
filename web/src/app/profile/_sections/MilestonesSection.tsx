@@ -8,6 +8,12 @@
 // comment_count, streak_days. Anything else falls through to the
 // description as the hint.
 //
+// Item 7 (2026-05-01): adult product no longer surfaces reading-count or
+// streak-day milestones. Rows with `criteria.reading_count` or
+// `criteria.streak_days` are filtered out of `achievements` in the
+// connected wrapper before render — DB rows stay (launch-hides convention),
+// the type union and gap-hint helpers only know about the surviving keys.
+//
 // No color per achievement. Every "earned" card looks the same regardless
 // of rarity / category / points_reward; differentiation is by name + icon
 // + earned date. (Memory rule: tiers and ranks don't get hue. Same applies
@@ -45,12 +51,11 @@ type EarnedRow = Pick<Tables<'user_achievements'>, 'achievement_id' | 'earned_at
 type UserRow = Tables<'users'>;
 
 // Snapshot of the viewer's counters used to derive the "still-ahead" gap.
-// Keys mirror the achievement criteria JSON keys (migration 050).
+// Keys mirror the achievement criteria JSON keys (migration 050) minus the
+// counters retired in item 7 (`reading_count`, `streak_days`).
 export interface MilestoneUserCounters {
-  reading_count?: number;
   quiz_pass_count?: number;
   comment_count?: number;
-  streak_days?: number;
 }
 
 export interface MilestonesSectionProps {
@@ -233,7 +238,12 @@ export function MilestonesSectionConnected({
         setLoading(false);
         return;
       }
-      setAchievements((catRes.data ?? []) as AchievementRow[]);
+      // Item 7: filter out rows whose criteria reference the retired
+      // `reading_count` / `streak_days` counters. DB rows stay; we just
+      // don't render them on the adult milestones grid.
+      const allRows = (catRes.data ?? []) as AchievementRow[];
+      const filtered = allRows.filter((row) => !criteriaUsesRetiredCounter(row.criteria));
+      setAchievements(filtered);
       const map = new Map<string, string>();
       for (const r of (mineRes.data ?? []) as EarnedRow[]) map.set(r.achievement_id, r.earned_at);
       setEarned(map);
@@ -246,16 +256,12 @@ export function MilestonesSectionConnected({
 
   const counters: MilestoneUserCounters = useMemo(() => {
     const u = user as UserRow & {
-      articles_read_count?: number | null;
       quizzes_completed_count?: number | null;
       comment_count?: number | null;
-      streak_current?: number | null;
     };
     return {
-      reading_count: u.articles_read_count ?? 0,
       quiz_pass_count: u.quizzes_completed_count ?? 0,
       comment_count: u.comment_count ?? 0,
-      streak_days: u.streak_current ?? 0,
     };
   }, [user]);
 
@@ -392,13 +398,22 @@ function readCriterion(
 ): { key: keyof MilestoneUserCounters; threshold: number } | null {
   if (!criteria || typeof criteria !== 'object' || Array.isArray(criteria)) return null;
   const obj = criteria as Record<string, unknown>;
-  for (const k of ['reading_count', 'quiz_pass_count', 'comment_count', 'streak_days'] as const) {
+  for (const k of ['quiz_pass_count', 'comment_count'] as const) {
     const v = obj[k];
     if (typeof v === 'number' && v > 0) {
       return { key: k, threshold: v };
     }
   }
   return null;
+}
+
+// Item 7 client-side filter — true if the achievement's criteria JSON keys
+// on `reading_count` or `streak_days` (the two retired counters). Used by
+// the connected loader to drop these rows before render. Rows stay in DB.
+function criteriaUsesRetiredCounter(criteria: Json | null): boolean {
+  if (!criteria || typeof criteria !== 'object' || Array.isArray(criteria)) return false;
+  const obj = criteria as Record<string, unknown>;
+  return typeof obj.reading_count === 'number' || typeof obj.streak_days === 'number';
 }
 
 function computeGapHint(criteria: Json | null, counters: MilestoneUserCounters): string | null {
@@ -408,14 +423,10 @@ function computeGapHint(criteria: Json | null, counters: MilestoneUserCounters):
   const need = Math.max(0, c.threshold - have);
   if (need === 0) return 'Ready to award on next check.';
   switch (c.key) {
-    case 'reading_count':
-      return `${need.toLocaleString()} ${need === 1 ? 'article' : 'articles'} to go`;
     case 'quiz_pass_count':
       return `${need.toLocaleString()} ${need === 1 ? 'quiz' : 'quizzes'} to go`;
     case 'comment_count':
       return `${need.toLocaleString()} ${need === 1 ? 'comment' : 'comments'} to go`;
-    case 'streak_days':
-      return `${need.toLocaleString()} ${need === 1 ? 'day' : 'days'} to go`;
     default:
       return null;
   }

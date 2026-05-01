@@ -75,7 +75,7 @@ export function MFACard({ preview }: Props) {
     const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp' });
     setBusy(false);
     if (error) {
-      toast.error(error.message);
+      toast.error('Could not start 2FA setup. Try again.');
       return;
     }
     const totp = data as { id: string; totp: { qr_code: string; secret: string } };
@@ -91,7 +91,7 @@ export function MFACard({ preview }: Props) {
     const { data: chal, error: cErr } = await supabase.auth.mfa.challenge({ factorId });
     if (cErr) {
       setBusy(false);
-      toast.error(cErr.message);
+      toast.error('Could not start verification. Try again.');
       return;
     }
     const { error: vErr } = await supabase.auth.mfa.verify({
@@ -101,7 +101,7 @@ export function MFACard({ preview }: Props) {
     });
     setBusy(false);
     if (vErr) {
-      toast.error(vErr.message);
+      toast.error('Code incorrect or expired. Try again.');
       return;
     }
     toast.success('Two-factor authentication enabled.');
@@ -123,7 +123,7 @@ export function MFACard({ preview }: Props) {
     const { error } = await supabase.auth.mfa.unenroll({ factorId });
     setBusy(false);
     if (error) {
-      toast.error(error.message);
+      toast.error('Could not remove 2FA. Try again.');
       return;
     }
     toast.success('Two-factor authentication removed.');

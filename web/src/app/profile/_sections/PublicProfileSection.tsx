@@ -91,7 +91,7 @@ export function PublicProfileSection({ user, tier, preview, onUserUpdated }: Pro
     });
     setSaving(false);
     if (error) {
-      toast.error(error.message ?? 'Could not save.');
+      toast.error('Could not save your profile. Try again.');
       return;
     }
     toast.success('Public profile updated.');

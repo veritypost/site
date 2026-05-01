@@ -280,7 +280,13 @@ struct SubscriptionView: View {
                                     await auth.checkSession()
                                 }
                             } catch {
-                                purchaseError = error.localizedDescription
+                                if let storeErr = error as? StoreKitError, case .userCancelled = storeErr {
+                                    purchaseError = nil
+                                } else if (error as NSError).domain == SKErrorDomain && (error as NSError).code == SKError.paymentCancelled.rawValue {
+                                    purchaseError = nil
+                                } else {
+                                    purchaseError = "Purchase couldn't be completed. Try again."
+                                }
                             }
                         }
                     } label: {
@@ -547,7 +553,7 @@ struct SubscriptionView: View {
                 promoSuccess = false
             }
         } catch {
-            promoMessage = "Failed to redeem: \(error.localizedDescription)"
+            promoMessage = "Couldn't redeem code. Check your connection and try again."
             promoSuccess = false
         }
     }

@@ -11,6 +11,7 @@ import ErrorState from '@/components/ErrorState';
 import type { Tables } from '@/types/database-helpers';
 import type { User } from '@supabase/supabase-js';
 import { Z } from '@/lib/zIndex';
+import { friendlyError } from '@/lib/friendlyError';
 
 // Messages / DM page. Permission swap:
 //   • The former PermissionGate + PERM.PROFILE_MESSAGES / SECTIONS.PROFILE
@@ -616,12 +617,12 @@ function MessagesPageInner() {
       // T162 — guard the conversation/error fields before reading.
       const isObj = json && typeof json === 'object';
       if (!res.ok) {
-        const errMsg =
+        const rawCode =
           isObj && typeof (json as { error?: unknown }).error === 'string'
             ? (json as { error: string }).error
             : undefined;
-        console.error('start conversation failed', errMsg);
-        toast.error(errMsg || 'Could not start conversation. Try again.');
+        console.error('start conversation failed', rawCode);
+        toast.error(friendlyError(rawCode, 'Could not start conversation. Try again.'));
         setShowSearch(false);
         return;
       }

@@ -467,7 +467,7 @@ export default function NotificationsInbox() {
                       textTransform: 'uppercase',
                     }}
                   >
-                    {TYPE_LABELS[n.type as string] ?? n.type}
+                    {TYPE_LABELS[n.type as string] ?? 'Notification'}
                   </span>
                   <span style={{ fontSize: 14, fontWeight: 600 }}>{n.title}</span>
                   <span style={{ marginLeft: 'auto', fontSize: 11, color: C.dim }}>

@@ -3,6 +3,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
+import { friendlyError } from '@/lib/friendlyError';
 
 interface FollowButtonProps {
   targetUserId: string;
@@ -51,11 +52,11 @@ export default function FollowButton({
         body: JSON.stringify({ target_user_id: targetUserId }),
       });
       const data = (await res.json().catch(() => ({}))) as FollowApiResponse;
-      if (!res.ok) throw new Error(data?.error || 'Follow failed');
+      if (!res.ok) throw new Error(friendlyError(data?.error, 'Could not follow. Try again.'));
       setFollowing(!!data.following);
       onChange?.(!!data.following);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Follow failed');
+      setError(err instanceof Error ? err.message : 'Could not follow. Try again.');
     } finally {
       setBusy(false);
     }

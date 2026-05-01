@@ -1583,7 +1583,7 @@ struct EmailSettingsView: View {
             isError = false
             newEmail = ""
         } catch {
-            status = error.localizedDescription
+            status = "Couldn't send verification email. Try again."
             isError = true
         }
     }
@@ -1645,7 +1645,7 @@ struct PasswordSettingsView: View {
             newPassword = ""
             confirmPassword = ""
         } catch {
-            status = error.localizedDescription
+            status = "Couldn't update your password. Try again."
             isError = true
         }
     }
@@ -1861,7 +1861,7 @@ struct MFASettingsView: View {
                 pendingFactorId = "\(p.id)"
             }
         } catch {
-            status = error.localizedDescription
+            status = "Couldn't load 2FA status. Try again."
             isError = true
         }
         loaded = true
@@ -1882,7 +1882,7 @@ struct MFASettingsView: View {
                 totpSecret = totp.secret
             }
         } catch {
-            status = error.localizedDescription
+            status = "Couldn't start 2FA setup. Try again."
             isError = true
         }
     }
@@ -1910,7 +1910,7 @@ struct MFASettingsView: View {
             status = "Two-factor enabled."
             isError = false
         } catch {
-            status = error.localizedDescription
+            status = "Code incorrect or expired. Try again."
             isError = true
         }
     }
@@ -1926,7 +1926,7 @@ struct MFASettingsView: View {
             status = "Two-factor disabled."
             isError = false
         } catch {
-            status = error.localizedDescription
+            status = "Couldn't disable 2FA. Try again."
             isError = true
         }
     }

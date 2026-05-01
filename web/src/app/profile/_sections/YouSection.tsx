@@ -1,9 +1,9 @@
 // "You" — the new home of the profile experience. Replaces the legacy
 // dashboard tabs. Three blocks:
 //   1. Tier progress (the most loaded daily question — "where am I")
-//   2. Numbers grid (the proof — score / reads / quizzes / followers)
-//   3. What's next — three contextual nudges that swap based on streaks,
-//      bookmarks, expert queue, etc.
+//   2. Numbers grid (score / quizzes / comments / followers)
+//   3. What's next — contextual nudges that swap based on bookmarks,
+//      expert queue, etc.
 // Activity / Categories / Milestones aren't tabs anymore — they're sections
 // of their own in the rail, reachable directly.
 
@@ -37,7 +37,6 @@ interface Props {
 export function YouSection({ user, tier, next, perms }: Props) {
   const u = user as UserRow & {
     verity_score?: number | null;
-    articles_read_count?: number | null;
     quizzes_completed_count?: number | null;
     comment_count?: number | null;
     followers_count?: number | null;
@@ -62,7 +61,6 @@ export function YouSection({ user, tier, next, perms }: Props) {
             value={u.verity_score ?? 0}
             hint={tier ? `${tier.display_name ?? tier.name} tier` : 'No tier yet'}
           />
-          <StatTile label="Articles read" value={u.articles_read_count ?? 0} />
           <StatTile label="Quizzes" value={u.quizzes_completed_count ?? 0} />
           <StatTile label="Comments" value={u.comment_count ?? 0} />
           {perms.followersView ? (
@@ -81,9 +79,8 @@ export function YouSection({ user, tier, next, perms }: Props) {
             CTAs. The old set drove users OUT of the profile experience
             mid-edit; the new set keeps them inside the rail-shell so they
             can finish what they came here to do. Outbound nudges (read
-            today's articles etc.) move into a separate empty-state card
-            shown only when articles_read_count === 0 — out of scope for
-            this fix; queued as a follow-up. */}
+            today's articles etc.) move into a separate empty-state card —
+            out of scope for this fix; queued as a follow-up. */}
         <div
           style={{
             display: 'grid',

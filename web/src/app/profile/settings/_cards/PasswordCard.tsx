@@ -76,7 +76,7 @@ export function PasswordCard({ preview }: Props) {
       }
       const { error } = await supabase.auth.updateUser({ password: newPw });
       if (error) {
-        toast.error(error.message);
+        toast.error('Could not update your password. Try again.');
         setSaving(false);
         return;
       }

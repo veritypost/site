@@ -305,11 +305,11 @@ struct ExpertQueueView: View {
             case .backChannel: statusParam = "pending"
             }
             guard let url = URL(string: "/api/expert/queue?status=\(statusParam)", relativeTo: site) else {
-                await MainActor.run { loadError = "Network issue."; loading = false }
+                await MainActor.run { loadError = "Sign in again to view the queue."; loading = false }
                 return
             }
             guard let session = try? await client.auth.session else {
-                await MainActor.run { loadError = "Network issue."; loading = false }
+                await MainActor.run { loadError = "Sign in again to view the queue."; loading = false }
                 return
             }
             var req = URLRequest(url: url)
@@ -318,7 +318,7 @@ struct ExpertQueueView: View {
 
             let (data, response) = try await URLSession.shared.data(for: req)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                await MainActor.run { loadError = "Network issue."; loading = false }
+                await MainActor.run { loadError = "Couldn't load the queue. Try again."; loading = false }
                 return
             }
 
@@ -347,7 +347,7 @@ struct ExpertQueueView: View {
             }
         } catch {
             await MainActor.run {
-                loadError = "Network issue."
+                loadError = "Couldn't load the queue. Check your connection."
                 loading = false
             }
         }

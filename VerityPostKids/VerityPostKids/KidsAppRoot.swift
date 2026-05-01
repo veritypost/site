@@ -348,7 +348,7 @@ struct KidsAppRoot: View {
         .buttonStyle(.plain)
         // The full message goes to VoiceOver so the kid (or parent) hears
         // the underlying cause when they focus the banner.
-        .accessibilityLabel("Couldn't update home screen. \(message). Tap to retry.")
+        .accessibilityLabel("Couldn't update your home screen. Tap to retry.")
     }
 }
 
