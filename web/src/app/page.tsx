@@ -163,8 +163,6 @@ export default async function HomePage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let catsRes: { data: any; error: any } = { data: null, error: null };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let readLogRes: { data: any; error: any } = { data: null, error: null };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let topStoriesRes: { data: any; error: any } = { data: null, error: null };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let userMetaRes: { data: any; error: any } = { data: null, error: null };
@@ -177,32 +175,6 @@ export default async function HomePage() {
       const t = Date.parse(lastVisitRaw);
       if (Number.isFinite(t)) lastVisitMs = t;
     }
-
-    // T109 — read-state for signed-in viewers. We pull the 200 most-recent
-    // reading_log rows for this user from the last 30 days and use that set
-    // to dim cards already read. Anon viewers have no reading_log; the
-    // chained .then() turns auth.getUser() into a single thenable that
-    // either yields the read-set or resolves to an empty payload, so the
-    // whole flow stays parallel with the article + category fetches and
-    // doesn't add a serial round-trip for signed-in viewers vs anon.
-    const thirtyDaysAgoIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    const readLogPromise: Promise<{ data: Array<{ article_id: string }> | null; error: null }> = supabase.auth
-      .getUser()
-      .then(({ data }) => {
-        const u = data.user;
-        if (!u) return { data: null, error: null };
-        return supabase
-          .from('reading_log')
-          .select('article_id')
-          .eq('user_id', u.id)
-          .gte('created_at', thirtyDaysAgoIso)
-          .order('created_at', { ascending: false })
-          .limit(200)
-          .then((r) => ({
-            data: (r.data as Array<{ article_id: string }> | null) ?? null,
-            error: null,
-          }));
-      });
 
     // Fetch signed-in user's feed preferences. Isolated in an IIFE so a
     // failure here never cascades into a full-page fetch error.
@@ -221,7 +193,7 @@ export default async function HomePage() {
       }
     })();
 
-    [storiesRes, breakingRes, catsRes, readLogRes, topStoriesRes, userMetaRes] = await Promise.all([
+    [storiesRes, breakingRes, catsRes, topStoriesRes, userMetaRes] = await Promise.all([
       supabase
         .from('articles')
         .select(SELECT_COLS)
@@ -245,7 +217,6 @@ export default async function HomePage() {
           ascending: true,
           nullsFirst: false,
         }),
-      readLogPromise,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (supabase as any)
         .from('top_stories')
@@ -256,12 +227,6 @@ export default async function HomePage() {
   } catch (e) {
     console.error('[home.fetch]', e);
     fetchThrew = true;
-  }
-
-  const readArticleIds = new Set<string>();
-  const readRows = (readLogRes.data as Array<{ article_id: string | null }> | null) || [];
-  for (const row of readRows) {
-    if (row?.article_id) readArticleIds.add(row.article_id);
   }
 
   // users.metadata.feed.showBreaking — lets signed-in users suppress the
@@ -338,25 +303,6 @@ export default async function HomePage() {
           padding: '32px 20px 64px',
         }}
       >
-        {/* T110 — disclose editorial timezone. The newsroom day is anchored
-            to America/New_York; readers in other zones should know what
-            "today" means here. Subtle masthead line, not a banner. */}
-        <div style={{ marginBottom: 24, lineHeight: 1.3 }}>
-          <div
-            style={{
-              fontFamily: serifStack,
-              fontSize: 13,
-              color: C.dim,
-              fontWeight: 500,
-            }}
-          >
-            {today.humanDate}
-          </div>
-          <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
-            Front page
-          </div>
-        </div>
-
         {fetchFailed && <HomeFetchFailed />}
 
         {!fetchFailed && hero && (
@@ -364,7 +310,6 @@ export default async function HomePage() {
             story={hero}
             category={hero.category_id ? categoryById[hero.category_id] : undefined}
             isNew={isNewStory(hero)}
-            isRead={readArticleIds.has(hero.id)}
           />
         )}
 
@@ -377,7 +322,6 @@ export default async function HomePage() {
                   story={story}
                   category={story.category_id ? categoryById[story.category_id] : undefined}
                   isNew={isNewStory(story)}
-                  isRead={readArticleIds.has(story.id)}
                 />
               </Fragment>
             ))}
@@ -386,23 +330,6 @@ export default async function HomePage() {
 
         {!fetchFailed && hero && <HomeFooter />}
 
-        {!fetchFailed && displayedStories.length > 0 && (
-          <div
-            style={{
-              paddingTop: 48,
-              textAlign: 'center',
-            }}
-          >
-            <p style={{ fontSize: 14, color: C.muted, margin: 0 }}>
-              That&rsquo;s the front page.
-            </p>
-            <p style={{ fontSize: 14, color: C.muted, margin: '8px 0 0' }}>
-              <Link href="/browse" style={{ color: C.muted, textDecoration: 'underline' }}>
-                Browse all articles &rarr;
-              </Link>
-            </p>
-          </div>
-        )}
       </main>
 
       {/* T91 — refresh the last-visit cookie after first paint. Never
@@ -440,33 +367,6 @@ function NewPill() {
       }}
     >
       New
-    </span>
-  );
-}
-
-// T109 — small "Read" tag for cards the signed-in viewer has already
-// opened. Lower contrast than the "New" pill — read-state is reference
-// information, not a call to attention.
-function ReadTag() {
-  return (
-    <span
-      aria-label="Already read"
-      style={{
-        display: 'inline-block',
-        color: C.muted,
-        fontFamily: serifStack,
-        fontSize: 10,
-        fontWeight: 600,
-        letterSpacing: '0.08em',
-        textTransform: 'uppercase',
-        padding: '2px 6px',
-        border: `1px solid ${C.rule}`,
-        borderRadius: 2,
-        lineHeight: 1.2,
-        verticalAlign: 'middle',
-      }}
-    >
-      Read
     </span>
   );
 }
@@ -536,18 +436,13 @@ function Hero({
   story,
   category,
   isNew,
-  isRead,
 }: {
   story: HomeStory;
   category: CategoryRow | undefined;
   isNew: boolean;
-  isRead: boolean;
 }) {
   const bg = heroBg(category);
-  // T109 — soften the hero title when the user has read it. The hero sits
-  // on a dark band, so we drop title opacity rather than swap to grey
-  // (which would clash with the band color).
-  const heroTitleColor = isRead ? 'rgba(255,255,255,0.72)' : '#ffffff';
+  const heroTitleColor = '#ffffff';
   return (
     <article style={{ marginBottom: 32 }}>
       <Link
@@ -571,7 +466,7 @@ function Hero({
         >
           {/* Inner column mirrors the 720px reading column */}
           <div style={{ maxWidth: 720, margin: '0 auto', padding: '0 20px' }}>
-            {(category || isNew || isRead || story.stories?.lifecycle_status) && (
+            {(category || isNew || story.stories?.lifecycle_status) && (
               <div
                 style={{
                   marginBottom: 16,
@@ -616,26 +511,6 @@ function Hero({
                     }}
                   >
                     New
-                  </span>
-                )}
-                {isRead && (
-                  <span
-                    aria-label="Already read"
-                    style={{
-                      display: 'inline-block',
-                      color: 'rgba(255,255,255,0.65)',
-                      fontFamily: serifStack,
-                      fontSize: 10,
-                      fontWeight: 600,
-                      letterSpacing: '0.08em',
-                      textTransform: 'uppercase',
-                      padding: '2px 6px',
-                      border: '1px solid rgba(255,255,255,0.30)',
-                      borderRadius: 2,
-                      lineHeight: 1.2,
-                    }}
-                  >
-                    Read
                   </span>
                 )}
               </div>
@@ -689,19 +564,12 @@ function SupportingCard({
   story,
   category,
   isNew,
-  isRead,
 }: {
   story: HomeStory;
   category: CategoryRow | undefined;
   isNew: boolean;
-  isRead: boolean;
 }) {
-  // T109 — read titles dim to #666 (vs #111 default). #666 measures
-  // 5.74:1 against white, passing WCAG AA for normal text. Excerpt tone
-  // is intentionally left alone — it's already C.soft (#444), and dimming
-  // it further would hurt scannability for sighted users with the article
-  // reopened.
-  const titleColor = isRead ? '#666666' : C.text;
+  const titleColor = C.text;
   return (
     <article style={{ padding: '24px 0' }}>
       <Link
@@ -726,7 +594,6 @@ function SupportingCard({
           )}
           <Eyebrow category={category} />
           {isNew && <NewPill />}
-          {isRead && <ReadTag />}
         </div>
         <h3
           style={{

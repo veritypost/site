@@ -172,7 +172,6 @@ struct HomeView: View {
                                 .padding(.top, 40)
                             }
 
-                            endOfFrontPage
                         }
                     }
                     .navigationDestination(for: Story.self) { story in
@@ -221,14 +220,18 @@ struct HomeView: View {
 
     private var topBar: some View {
         HStack(spacing: 0) {
-            // A52 — canonical brand casing is "Verity Post" (Title Case).
-            Text("Verity Post")
+            Text("verity post")
                 .font(.system(size: 15, weight: .heavy))
                 .tracking(-0.15)
                 .foregroundColor(VP.text)
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
             Spacer()
+            Text(today.humanDate)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(VP.dim)
+                .lineLimit(1)
+                .padding(.trailing, canSearch ? 8 : 0)
             if canSearch {
                 NavigationLink {
                     FindView().environmentObject(auth)
@@ -379,37 +382,6 @@ struct HomeView: View {
         Rectangle()
             .fill(VP.rule)
             .frame(height: 1)
-    }
-
-    // MARK: - End of front page
-
-    private var endOfFrontPage: some View {
-        VStack(spacing: 14) {
-            Rectangle()
-                .fill(VP.rule)
-                .frame(height: 1)
-                .padding(.horizontal, 20)
-                .padding(.top, 56)
-                .padding(.bottom, 24)
-
-            Text("That’s today’s front page.")
-                .font(.system(size: 14, weight: .regular, design: .serif))
-                .italic()
-                .foregroundColor(VP.dim)
-
-            NavigationLink {
-                BrowseLanding()
-            } label: {
-                Text("Browse all categories →")
-                    .font(.system(size: 16, weight: .medium, design: .serif))
-                    .foregroundColor(VP.accent)
-                    .underline(true, color: VP.accent)
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 4)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.bottom, 24)
     }
 
     // MARK: - Empty / loading / error
