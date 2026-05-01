@@ -44,7 +44,7 @@ export default function ArticleEngagementZone({
   // Logged in
   return (
     <section id="discussion" style={{ marginTop: 40 }}>
-      {hasQuiz && !canBypassQuiz && (
+      {hasQuiz && (
         <ArticleQuiz
           articleId={articleId}
           initialPassed={initialPassed}
