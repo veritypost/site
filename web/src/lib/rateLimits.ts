@@ -48,7 +48,7 @@ export const RATE_LIMITS = {
 
   // Pick-username availability check. Per session, 30/minute. Anonymous
   // calls 401 — the cap only applies to authed sessions in the
-  // post-signin pick-username flow. Abusers spinning fresh sessions hit
+  // post-signin first-login modal. Abusers spinning fresh sessions hit
   // the per-IP signup cap first.
   AUTH_USERNAME_CHECK_PER_SESSION: { windowSec: 60, max: 30 },
 

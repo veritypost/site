@@ -7,12 +7,12 @@
 //                              → 409 on UNIQUE race
 //                              → 500 on RPC error
 //
-// Why this endpoint when the web pick-username page already calls
-// the `update_own_profile` RPC directly: iOS needs a stable contract
-// (see Q2-f published in /api/auth/send-magic-link/route.js header).
-// The PATCH shape with a 409 race signal is what
-// AuthViewModel.handleDeepLink expects to surface "taken — try
-// another" without inspecting Postgres error codes.
+// Why this endpoint when WelcomeModal could call the
+// `update_own_profile` RPC directly: iOS needs a stable contract (see
+// Q2-f published in /api/auth/send-magic-link/route.js header). The
+// PATCH shape with a 409 race signal is what AuthViewModel.handleDeepLink
+// expects to surface "taken — try another" without inspecting Postgres
+// error codes. WelcomeModal POSTs here too so web + iOS share one path.
 //
 // Reserved username + format checks happen here too so iOS doesn't
 // have to duplicate the regex.

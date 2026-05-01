@@ -85,8 +85,8 @@ export async function GET(request) {
     // DA-021 / DA-100 / F-029 — validate `next` server-side. Rejects
     // `//evil.com`, backslash tricks, Unicode slash homoglyphs, and
     // anything non-ASCII. Falls back to `/` on any shape mismatch.
-    // WelcomeModal fires on the client for any user still missing a
-    // username — no server redirect to pick-username needed.
+    // No server redirect needed; WelcomeModal will mount client-side if
+    // username is null.
     return NextResponse.redirect(resolveNextForRedirect(siteUrl, rawNext, '/'));
   } catch (err) {
     console.error('[callback]', err);

@@ -539,8 +539,8 @@ final class AuthViewModel: ObservableObject {
         // Swift's `isLetter` matches ANY Unicode letter, which lets Cyrillic
         // `а` (U+0430) and Latin `a` (U+0061) both slip through — a
         // homoglyph-collision / impersonation vector. Restrict to ASCII
-        // letters + digits + underscore, matching the web signup filter
-        // in web/src/app/signup/pick-username/page.tsx handleChange().
+        // letters + digits + underscore, matching the web filter in
+        // web/src/components/welcome/WelcomeModal.tsx (first-login modal).
         // NFC-normalise first so any precomposed Latin variants collapse
         // before the ASCII gate.
         let normalized = username

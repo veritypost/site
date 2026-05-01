@@ -9,8 +9,8 @@
 //
 // Session-scoped (Q2b): anonymous calls 401. The pre-auth signup flow
 // under magic-link has no use for a username check — username is picked
-// in the post-signin /welcome/pick-username step (Q2-e), where the user
-// already has a session. Rate limit is per-session.
+// in the post-signin first-login WelcomeModal, where the user already
+// has a session. Rate limit is per-session.
 //
 // Drops:
 // - `reserved` field — collapsed into `available: false`

@@ -8,9 +8,9 @@ import UIKit
 // S9-Q2-iOS — magic-link rebuild. Email-only form. The username is no
 // longer captured here — the server-side magic-link flow creates the
 // auth.users + public.users rows on link redemption with username NULL,
-// then ContentView routes to PickUsernameView. This collapses the iOS
-// flow to match the web's `/signup` → email-link → `/signup/pick-username`
-// shape.
+// then ContentView presents PickUsernameView as an undismissable sheet
+// over MainTabView. This collapses the iOS flow to match the web's
+// `/signup` → email-link → first-login WelcomeModal shape.
 //
 // OAuth (Apple + Google) buttons are preserved behind `VPOAuthEnabled`
 // (default false). One-line flip re-enables them.

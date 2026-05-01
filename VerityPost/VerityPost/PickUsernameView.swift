@@ -1,13 +1,14 @@
 import SwiftUI
 
-/// S9-Q2-iOS — post-magic-link username picker. Presented after
-/// `setSession()` lands a session whose `users.username IS NULL`.
-/// Mirrors the web `/signup/pick-username` flow:
+/// S9-Q2-iOS — post-magic-link username picker. Presented as an
+/// undismissable sheet from ContentView (item 13) when `setSession()`
+/// lands a session whose `users.username IS NULL`. Mirrors the web
+/// first-login WelcomeModal (`web/src/components/welcome/WelcomeModal.tsx`):
 ///   - 250ms-debounced /api/auth/check-username on every keystroke,
 ///     surfacing "available" / "taken" inline below the field.
 ///   - On submit, PATCH /api/auth/save-username; on 409 (UNIQUE race)
-///     show "Taken — try another"; on 200 reload the user row so
-///     ContentView swaps to MainTabView automatically.
+///     show "Taken — try another"; on 200 reload the user row so the
+///     sheet auto-dismisses and ContentView reveals MainTabView.
 ///
 /// Username constraints mirror the server's regex:
 ///   - 3-20 characters
@@ -47,7 +48,7 @@ struct PickUsernameView: View {
                     .foregroundColor(VP.dim)
                     .padding(.bottom, 28)
 
-                Text("This is how other readers will see you. You can change it once.")
+                Text("This is how other readers will see you. Usernames can't be changed later.")
                     .font(.footnote)
                     .foregroundColor(VP.dim)
                     .multilineTextAlignment(.center)

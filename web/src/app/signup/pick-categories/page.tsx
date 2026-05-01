@@ -242,7 +242,7 @@ export default function PickCategoriesPage() {
   };
 
   if (loading) {
-    // Match pick-username's loading-while-redirecting silence so the page
+    // Match WelcomeModal's loading-while-redirecting silence so the page
     // doesn't flash the picker for users who are about to bounce.
     return null;
   }

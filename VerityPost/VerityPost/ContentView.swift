@@ -137,13 +137,6 @@ struct ContentView: View {
             } else if auth.needsEmailVerification {
                 VerifyEmailView()
                     .environmentObject(auth)
-            } else if auth.needsPickUsername {
-                // S9-Q2-iOS — magic-link signup creates the auth.users row
-                // without a public.users.username; PickUsernameView posts
-                // /api/auth/save-username and reloads the user before
-                // ContentView re-renders into MainTabView.
-                PickUsernameView()
-                    .environmentObject(auth)
             } else if auth.currentUser?.needsOnboarding == true && !auth.bypassOnboardingLocally {
                 // WelcomeView handles the onboarding stamp + user reload
                 // itself. When the reload flips `needsOnboarding` false
@@ -158,6 +151,25 @@ struct ContentView: View {
                 MainTabView()
                     .environmentObject(auth)
             }
+        }
+        // Item 13 — first-login username pick is an undismissable sheet
+        // mounted at the outer ContentView level so it takes precedence
+        // over MainTabView's own .sheet(item: $deepLinkStory). Two sheets
+        // on the same view tree fight; this one must win.
+        //
+        // `auth.needsPickUsername` is a *computed* var (not @Published) —
+        // direct `$auth.needsPickUsername` won't compile. Bind through a
+        // get/no-op-set Binding; the sheet auto-dismisses when
+        // PickUsernameView.save() reloads currentUser and the computed
+        // value flips false.
+        .sheet(isPresented: Binding(
+            get: { auth.needsPickUsername },
+            set: { _ in }
+        )) {
+            PickUsernameView()
+                .environmentObject(auth)
+                .interactiveDismissDisabled(true)
+                .presentationDragIndicator(.hidden)
         }
         .fullScreenCover(isPresented: $auth.isRecoveringPassword) {
             ResetPasswordView()
@@ -299,17 +311,36 @@ struct MainTabView: View {
             // no auto-redirect to .home on logout.
         }
         .onChange(of: articleRouter.pendingSlug) { _, slug in
-            guard let slug = slug else { return }
-            articleRouter.pendingSlug = nil
-            Task {
-                if let story = await fetchStoryBySlug(slug) {
-                    deepLinkStory = story
-                }
-            }
+            consumePendingSlugIfReady(slug: slug)
+        }
+        .onChange(of: auth.currentUser?.username) { _, _ in
+            // Item 13 — when the first-login username sheet finishes,
+            // currentUser.username flips from nil/empty to the picked
+            // value and `needsPickUsername` becomes false. Re-attempt
+            // any deep link that was held above so links arriving during
+            // the sheet aren't dropped.
+            consumePendingSlugIfReady(slug: articleRouter.pendingSlug)
         }
         .sheet(item: $deepLinkStory) { story in
             NavigationStack {
                 StoryDetailView(story: story).environmentObject(auth)
+            }
+        }
+    }
+
+    /// Item 13 — gate the deep-link consumer behind the username sheet.
+    /// While `auth.needsPickUsername` is true the slug is held on
+    /// `articleRouter.pendingSlug`; once the sheet dismisses (username
+    /// saved → currentUser reload → needsPickUsername flips false) the
+    /// onChange watcher on `currentUser?.username` re-invokes this and
+    /// the deep link plays normally.
+    private func consumePendingSlugIfReady(slug: String?) {
+        guard let slug = slug else { return }
+        if auth.needsPickUsername { return }
+        articleRouter.pendingSlug = nil
+        Task {
+            if let story = await fetchStoryBySlug(slug) {
+                deepLinkStory = story
             }
         }
     }
