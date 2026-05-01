@@ -54,7 +54,7 @@ export function PrivacyCard({ user, preview }: Props) {
 
   const u = user as UserRow & {
     allow_messages?: boolean | null;
-    hide_activity_from_others?: boolean | null;
+    show_activity?: boolean | null;
     profile_visibility?: 'public' | 'private' | 'hidden' | string | null;
   };
 
@@ -66,7 +66,8 @@ export function PrivacyCard({ user, preview }: Props) {
         : 'public'
   );
   const [allowMessages, setAllowMessages] = useState<boolean>(u.allow_messages ?? true);
-  const [hideActivity, setHideActivity] = useState<boolean>(u.hide_activity_from_others ?? false);
+  // hideActivity is the UI inversion of show_activity (DB field). show_activity=true means visible.
+  const [hideActivity, setHideActivity] = useState<boolean>(!(u.show_activity ?? true));
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [confirmHidden, setConfirmHidden] = useState(false);
 
@@ -85,8 +86,8 @@ export function PrivacyCard({ user, preview }: Props) {
           : 'public'
     );
     setAllowMessages(u.allow_messages ?? true);
-    setHideActivity(u.hide_activity_from_others ?? false);
-  }, [u.profile_visibility, u.allow_messages, u.hide_activity_from_others]);
+    setHideActivity(!(u.show_activity ?? true));
+  }, [u.profile_visibility, u.allow_messages, u.show_activity]);
 
   const loadFollowers = useCallback(async () => {
     setFollowersLoading(true);
@@ -209,7 +210,8 @@ export function PrivacyCard({ user, preview }: Props) {
     const next = !hideActivity;
     setHideActivity(next);
     setBusyKey('hide');
-    const ok = await persistField('hide_activity_from_others', next);
+    // DB field is show_activity (true = visible). hideActivity is the UI inversion.
+    const ok = await persistField('show_activity', !next);
     setBusyKey(null);
     if (!ok) setHideActivity(!next);
     else toast.success('Activity preference saved.');

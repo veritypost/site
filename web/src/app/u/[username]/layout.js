@@ -3,7 +3,12 @@
 import { createClient } from '../../../lib/supabase/server';
 import { getSiteUrl } from '../../../lib/siteUrl';
 
+const PUBLIC_PROFILE_ENABLED = false;
+
 export async function generateMetadata({ params }) {
+  if (!PUBLIC_PROFILE_ENABLED) {
+    return { title: 'Verity Post', robots: { index: false, follow: false } };
+  }
   const { username } = await params;
   const supabase = createClient();
 

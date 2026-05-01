@@ -224,46 +224,10 @@ function CoverageTimeline({ story }: { story: Story }) {
   );
 }
 
-// ── Following strip ────────────────────────────────────────────────────────
-
-function FollowingStrip({ stories, followed, onToggle }: {
-  stories: Story[]; followed: Set<string>; onToggle: (id: string) => void;
-}) {
-  const active = stories.filter(s => followed.has(s.id));
-  if (active.length === 0) return null;
-  return (
-    <div style={{ marginBottom: 4 }}>
-      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: C.muted, fontFamily: SANS, padding: '14px 20px 8px' }}>
-        Following
-      </div>
-      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '0 20px 16px', scrollbarWidth: 'none', maskImage: 'linear-gradient(to right, transparent, black 12px, black calc(100% - 12px), transparent)', WebkitMaskImage: 'linear-gradient(to right, transparent, black 12px, black calc(100% - 12px), transparent)' }}>
-        {active.map(s => {
-          const color = lcColor(s.lifecycle);
-          return (
-            <div key={s.id} style={{ flexShrink: 0, background: C.surface, border: `1px solid ${C.border}`, borderLeft: `3px solid ${color}`, borderRadius: 10, padding: '10px 14px', maxWidth: 200, cursor: 'pointer' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 5 }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0, boxShadow: s.lifecycle === 'breaking' ? `0 0 6px ${color}` : 'none' }}/>
-                <span style={{ fontSize: 9, fontWeight: 700, color, fontFamily: SANS, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{s.lifecycle}</span>
-              </div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: C.text, fontFamily: SERIF, lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                {s.title}
-              </div>
-              <div style={{ fontSize: 10, color: C.muted, fontFamily: SANS, marginTop: 5 }}>
-                {s.articles.length} articles
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <div style={{ height: 1, background: C.border, margin: '0 0 4px' }}/>
-    </div>
-  );
-}
-
 // ── Story card ─────────────────────────────────────────────────────────────
 
-function StoryCard({ story, followed, onToggleFollow }: {
-  story: Story; followed: boolean; onToggleFollow: (id: string) => void;
+function StoryCard({ story }: {
+  story: Story;
 }) {
   const color      = lcColor(story.lifecycle);
   const dur        = durationDays(story);
@@ -318,21 +282,11 @@ function StoryCard({ story, followed, onToggleFollow }: {
         </div>
       )}
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ display: 'flex', alignItems: 'center' }}>
         <span style={{ fontSize: 11, color: C.muted, fontFamily: SANS }}>
           {story.articles.length} articles
           {dur > 0 && <> · <span style={{ color: isResolved ? C.muted : C.dim }}>{dur}d story</span></>}
         </span>
-        <button
-          onClick={() => onToggleFollow(story.id)}
-          title={followed ? 'Unfollow story' : 'Follow story'}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', color: followed ? color : C.muted, transition: 'color 150ms ease' }}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill={followed ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-            <path d="M13.73 21a2 2 0 01-3.46 0"/>
-          </svg>
-        </button>
       </div>
     </div>
   );
@@ -515,7 +469,6 @@ export default function BrowsePage() {
   const [category,    setCategory]    = useState('All');
   const [filterOpen,  setFilterOpen]  = useState(false);
   const [filters,     setFilters]     = useState<FilterState>(DEFAULT_FILTERS);
-  const [followed,    setFollowed]    = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadStories()
@@ -523,13 +476,6 @@ export default function BrowsePage() {
       .catch(() => { setLoadFailed(true); setLoading(false); });
   }, []);
 
-  const toggleFollow = useCallback((id: string) => {
-    setFollowed(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) { next.delete(id); } else { next.add(id); }
-      return next;
-    });
-  }, []);
 
   const cats = useMemo(() => {
     const seen = new Set<string>();
@@ -662,7 +608,6 @@ export default function BrowsePage() {
 
       {/* Content */}
       <main style={{ maxWidth: 720, margin: '0 auto', paddingTop: activeFilterCount > 0 ? 220 : 188, paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 0px))' }}>
-        <FollowingStrip stories={stories} followed={followed} onToggle={toggleFollow} />
 
         {grouped.length === 0 && (
           <div style={{ textAlign: 'center', padding: '60px 20px' }}>
@@ -685,7 +630,7 @@ export default function BrowsePage() {
           <div key={group}>
             <SectionHeader label={GROUP_LABELS[group]} count={groupStories.length} />
             {groupStories.map(story => (
-              <StoryCard key={story.id} story={story} followed={followed.has(story.id)} onToggleFollow={toggleFollow} />
+              <StoryCard key={story.id} story={story} />
             ))}
           </div>
         ))}

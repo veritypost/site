@@ -41,7 +41,7 @@ export function PublicProfileSection({ user, tier, preview, onUserUpdated }: Pro
     // Treated as read-only here; this card never lets the user pick it
     // and never overwrites it on save (see onSave below).
     profile_visibility?: 'public' | 'private' | 'hidden' | null;
-    hide_activity_from_others?: boolean | null;
+    show_activity?: boolean | null;
     is_expert?: boolean | null;
     expert_title?: string | null;
     expert_organization?: string | null;
@@ -53,7 +53,7 @@ export function PublicProfileSection({ user, tier, preview, onUserUpdated }: Pro
   const [visibility, setVisibility] = useState<'public' | 'private' | 'hidden'>(
     u.profile_visibility ?? 'public'
   );
-  const [hideActivity, setHideActivity] = useState(!!u.hide_activity_from_others);
+  const [hideActivity, setHideActivity] = useState(!(u.show_activity ?? true));
   const [saving, setSaving] = useState(false);
 
   const isLockedDown = visibility === 'hidden';
@@ -63,9 +63,9 @@ export function PublicProfileSection({ user, tier, preview, onUserUpdated }: Pro
     initialRef.current = JSON.stringify({
       bio: u.bio ?? '',
       visibility: u.profile_visibility ?? 'public',
-      hideActivity: !!u.hide_activity_from_others,
+      hideActivity: !(u.show_activity ?? true),
     });
-  }, [u.bio, u.profile_visibility, u.hide_activity_from_others]);
+  }, [u.bio, u.profile_visibility, u.show_activity]);
   const dirty = JSON.stringify({ bio, visibility, hideActivity }) !== initialRef.current;
 
   const onSave = async () => {
@@ -81,7 +81,7 @@ export function PublicProfileSection({ user, tier, preview, onUserUpdated }: Pro
     // toggle still save normally.
     const fields: Record<string, unknown> = {
       bio,
-      hide_activity_from_others: hideActivity,
+      show_activity: !hideActivity,
     };
     if (!isLockedDown) {
       fields.profile_visibility = visibility;
@@ -101,7 +101,7 @@ export function PublicProfileSection({ user, tier, preview, onUserUpdated }: Pro
       // Preserve the existing visibility on lockdown; only emit a change
       // when the user actually edited the public/private toggle.
       profile_visibility: isLockedDown ? (u.profile_visibility ?? 'hidden') : visibility,
-      hide_activity_from_others: hideActivity,
+      show_activity: !hideActivity,
     } as UserRow);
     initialRef.current = JSON.stringify({ bio, visibility, hideActivity });
   };

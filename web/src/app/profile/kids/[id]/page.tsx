@@ -135,7 +135,7 @@ export default function KidDashboardPage() {
 
     const [
       { count: reads7d },
-      { count: quizzesTotal },
+      { data: quizAttemptRows },
       { data: recentAttempts },
       { data: achievements },
       { data: readingTimeline },
@@ -149,7 +149,7 @@ export default function KidDashboardPage() {
         .gte('created_at', since7d),
       supabase
         .from('quiz_attempts')
-        .select('id', { count: 'exact', head: true })
+        .select('article_id, attempt_number')
         .eq('kid_profile_id', id),
       supabase
         .from('quiz_attempts')
@@ -201,9 +201,13 @@ export default function KidDashboardPage() {
     }
     const attemptSummaries = Object.values(byAttempt);
 
+    const quizzesTotal = new Set(
+      (quizAttemptRows || []).map((a) => `${a.article_id}:${a.attempt_number}`)
+    ).size;
+
     setStats({
       reads7d: reads7d || 0,
-      quizzesTotal: quizzesTotal || 0,
+      quizzesTotal,
       recentAttempts: attemptSummaries.slice(0, 8),
       achievements: (achievements as AchievementRow[]) || [],
     });

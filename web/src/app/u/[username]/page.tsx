@@ -53,7 +53,6 @@ type TargetRow = Pick<
   | 'verity_score'
   | 'followers_count'
   | 'following_count'
-  | 'articles_read_count'
   | 'quizzes_completed_count'
   | 'comment_count'
   | 'profile_visibility'
@@ -188,7 +187,7 @@ export default function ProfilePage() {
       const { data: targetRow } = await supabase
         .from('public_profiles_v' as never)
         .select(
-          'id, username, display_name, bio, avatar_url, avatar_color, banner_url, verity_score, followers_count, following_count, articles_read_count, quizzes_completed_count, comment_count, profile_visibility, show_activity, is_expert, expert_title, expert_organization, is_verified_public_figure, created_at'
+          'id, username, display_name, bio, avatar_url, avatar_color, banner_url, verity_score, followers_count, following_count, quizzes_completed_count, comment_count, profile_visibility, show_activity, is_expert, expert_title, expert_organization, is_verified_public_figure, created_at'
         )
         .eq('username' as never, username as never)
         .maybeSingle<TargetRow>();
@@ -302,8 +301,8 @@ export default function ProfilePage() {
           Sign up to see @{username}&apos;s profile
         </h1>
         <p style={{ fontSize: 14, color: C.dim, margin: '0 0 22px', lineHeight: 1.55 }}>
-          Profiles show reading history, Verity Score, streak, comments, and more. Join free to view
-          this profile and build your own.
+          Profiles show reading history, Verity Score, comments, and more. Join free to view this
+          profile and build your own.
         </p>
         <a
           href={`/signup?next=${nextEnc}`}
@@ -484,7 +483,14 @@ export default function ProfilePage() {
                   targetUserId={target.id}
                   initialFollowing={following}
                   viewerUserId={me.id}
-                  onChange={(f: boolean) => setFollowing(f)}
+                  onChange={(f: boolean) => {
+                    setFollowing(f);
+                    setTarget((prev) =>
+                      prev
+                        ? { ...prev, followers_count: (prev.followers_count ?? 0) + (f ? 1 : -1) }
+                        : prev
+                    );
+                  }}
                 />
               )}
               {/* Pass 17 / UJ-609: Send message gated on DM compose permission. */}
@@ -602,10 +608,6 @@ export default function ProfilePage() {
          *  separate optional readout gated on `profile.score.view.other.total`. */}
         {target.show_activity !== false && (
           <div style={{ display: 'flex', gap: 18, marginTop: 14, fontSize: 13, flexWrap: 'wrap' }}>
-            <div>
-              <b>{(target.articles_read_count ?? 0).toLocaleString()}</b>{' '}
-              <span style={{ color: '#666' }}>Articles read</span>
-            </div>
             <div>
               <b>{(target.quizzes_completed_count ?? 0).toLocaleString()}</b>{' '}
               <span style={{ color: '#666' }}>Quizzes passed</span>
