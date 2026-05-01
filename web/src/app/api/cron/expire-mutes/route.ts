@@ -39,4 +39,4 @@ async function run(request: Request) {
   }
 }
 
-export const GET = (req: Request) => withCronLog(CRON_NAME, () => run(req));
+export const GET = withCronLog(CRON_NAME, run);
