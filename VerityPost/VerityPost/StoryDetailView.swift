@@ -100,6 +100,14 @@ struct StoryDetailView: View {
     @State private var commentUpvoteCounts: [String: Int] = [:]
     @State private var commentDownvoteCounts: [String: Int] = [:]
 
+    // Section A — comment-tag chips (helpful, insightful, sarcastic,
+    // cite_needed, off_topic, context). Per-comment per-kind cast set
+    // for the *current* user, plus public helpful_count for the inline
+    // Helpful badge. context_tag_count already lives on VPComment.
+    @State private var commentTagsByUser: [String: Set<String>] = [:]
+    @State private var commentHelpfulCounts: [String: Int] = [:]
+    @State private var commentTagBusyKey: String = ""
+
     // D21: @mention autocomplete — paid tiers only.
     @State private var mentionSuggestions: [VPUser] = []
     @State private var mentionSearchTask: Task<Void, Never>?
@@ -1710,6 +1718,20 @@ struct StoryDetailView: View {
                             .foregroundColor(VP.text)
                     }
                     VerifiedBadgeView(isExpert: u?.isExpert, isVerifiedPublicFigure: u?.isVerifiedPublicFigure)
+                    // Section A — inline "Helpful" badge once the comment's
+                    // helpful_count crosses the editorial threshold (default
+                    // 10, settings-tunable via SettingsService.helpfulBadgeThreshold).
+                    // Public count is read from local cache populated on
+                    // comment fetch + updated on toggle response.
+                    if (commentHelpfulCounts[comment.id] ?? comment.helpfulCount ?? 0)
+                        >= SettingsService.shared.helpfulBadgeThreshold {
+                        Text("Helpful")
+                            .font(.system(.caption2, design: .default, weight: .bold))
+                            .foregroundColor(VP.tagHelpful)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(RoundedRectangle(cornerRadius: 4).fill(VP.tagHelpful.opacity(0.12)))
+                    }
                     if comment.isEdited == true && !comment.isDeleted {
                         Text("(edited)")
                             .font(.caption2)
@@ -1774,6 +1796,17 @@ struct StoryDetailView: View {
                     commentBodyText(comment)
                 }
                 if !comment.isDeleted && !isEditing {
+                    // Section A — Tag chip row (helpful / insightful /
+                    // sarcastic / cite_needed / off_topic / context).
+                    // Renders ABOVE the existing Up/Down/Reply/Edit row so
+                    // the moat affordance reads first; mirrors the web
+                    // CommentRow.tsx ordering. Self-tag is silently skipped
+                    // because the API rejects it 403 anyway and the
+                    // affordance shouldn't tease an action the server bars.
+                    if comment.userId != auth.currentUser?.id {
+                        commentTagChipsRow(for: comment)
+                            .padding(.top, 4)
+                    }
                     HStack(spacing: 8) {
                         // D29: comment voting shows Up + Down with separate counts.
                         // Same vote twice clears (toggle). Different vote switches.
@@ -3163,6 +3196,147 @@ struct StoryDetailView: View {
             )
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - Section A: comment tag chips
+
+    /// Order matches web (CommentRow.tsx → DEFAULT_TAG_KINDS).
+    private static let commentTagOrder: [(kind: String, label: String, color: Color)] = [
+        ("helpful",     "Helpful",     VP.tagHelpful),
+        ("insightful",  "Insightful",  VP.tagInsightful),
+        ("sarcastic",   "Sarcastic",   VP.tagSarcastic),
+        ("cite_needed", "Cite needed", VP.tagCiteNeeded),
+        ("off_topic",   "Off-topic",   VP.tagOffTopic),
+        ("context",     "Context",     VP.accent),
+    ]
+
+    @ViewBuilder
+    private func commentTagChipsRow(for comment: VPComment) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(Self.commentTagOrder, id: \.kind) { entry in
+                    let cast = (commentTagsByUser[comment.id] ?? []).contains(entry.kind)
+                    let count: Int? = {
+                        switch entry.kind {
+                        case "context": return comment.contextTagCount
+                        case "helpful": return commentHelpfulCounts[comment.id] ?? comment.helpfulCount
+                        default: return nil
+                        }
+                    }()
+                    let busy = commentTagBusyKey == "\(comment.id):\(entry.kind)"
+                    Button {
+                        Task { await toggleCommentTag(comment, kind: entry.kind) }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(entry.label).font(.system(.caption, design: .default, weight: .semibold))
+                            if let n = count, n >= 1 {
+                                Text("\(n)").font(.caption)
+                            }
+                        }
+                        .foregroundColor(cast ? entry.color : VP.dim)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(cast ? entry.color.opacity(0.12) : Color.clear)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(cast ? entry.color : VP.border, lineWidth: 1)
+                        )
+                        .opacity(busy ? 0.6 : 1)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(busy)
+                    .accessibilityLabel("\(cast ? "Remove" : "Add") \(entry.label) tag")
+                }
+            }
+        }
+    }
+
+    /// POSTs through /api/comments/[id]/context-tag (single canonical
+    /// route — /vote handles votes only). Server-side rate-limits + self-tag
+    /// guards apply; we optimistically toggle local state and revert on
+    /// any non-2xx. Mirrors `voteOnComment` in shape, intentionally.
+    private func toggleCommentTag(_ comment: VPComment, kind: String) async {
+        let key = "\(comment.id):\(kind)"
+        await MainActor.run { commentTagBusyKey = key }
+        defer { Task { @MainActor in if commentTagBusyKey == key { commentTagBusyKey = "" } } }
+
+        // Optimistic local toggle.
+        let wasCast = (commentTagsByUser[comment.id] ?? []).contains(kind)
+        await MainActor.run {
+            var set = commentTagsByUser[comment.id] ?? []
+            if wasCast { set.remove(kind) } else { set.insert(kind) }
+            if set.isEmpty { commentTagsByUser.removeValue(forKey: comment.id) }
+            else { commentTagsByUser[comment.id] = set }
+            // Pre-emptive helpful_count tweak; server response overrides.
+            if kind == "helpful" {
+                let current = commentHelpfulCounts[comment.id] ?? comment.helpfulCount ?? 0
+                commentHelpfulCounts[comment.id] = max(0, current + (wasCast ? -1 : 1))
+            }
+        }
+
+        let site = SupabaseManager.shared.siteURL
+        guard let url = URL(string: "/api/comments/\(comment.id)/context-tag", relativeTo: site) else { return }
+        guard let session = try? await client.auth.session else {
+            await MainActor.run {
+                revertCommentTagOptimistic(commentId: comment.id, kind: kind, wasCast: wasCast)
+                flashModerationToast("Please sign in again.")
+            }
+            return
+        }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["tag_kind": kind])
+        do {
+            let (data, resp) = try await URLSession.shared.data(for: req)
+            guard let http = resp as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                throw URLError(.badServerResponse)
+            }
+            // Reconcile with server truth where it ships. RPC returns
+            // { tagged, count, tag_kind, helpful_count, is_pinned }.
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                await MainActor.run {
+                    if let h = json["helpful_count"] as? Int {
+                        commentHelpfulCounts[comment.id] = h
+                    }
+                    if let tagged = json["tagged"] as? Bool {
+                        var set = commentTagsByUser[comment.id] ?? []
+                        if tagged { set.insert(kind) } else { set.remove(kind) }
+                        if set.isEmpty { commentTagsByUser.removeValue(forKey: comment.id) }
+                        else { commentTagsByUser[comment.id] = set }
+                    }
+                    // context_tag_count + is_context_pinned only echo for kind='context'.
+                    if kind == "context",
+                       let count = json["count"] as? Int,
+                       let idx = comments.firstIndex(where: { $0.id == comment.id }) {
+                        comments[idx].contextTagCount = count
+                        if let pinned = json["is_pinned"] as? Bool {
+                            comments[idx].isContextPinned = pinned
+                        }
+                    }
+                }
+            }
+        } catch {
+            await MainActor.run {
+                revertCommentTagOptimistic(commentId: comment.id, kind: kind, wasCast: wasCast)
+                flashModerationToast("Couldn\u{2019}t update tag. Try again.")
+            }
+        }
+    }
+
+    private func revertCommentTagOptimistic(commentId: String, kind: String, wasCast: Bool) {
+        var set = commentTagsByUser[commentId] ?? []
+        if wasCast { set.insert(kind) } else { set.remove(kind) }
+        if set.isEmpty { commentTagsByUser.removeValue(forKey: commentId) }
+        else { commentTagsByUser[commentId] = set }
+        if kind == "helpful" {
+            let current = commentHelpfulCounts[commentId] ?? 0
+            commentHelpfulCounts[commentId] = max(0, current + (wasCast ? 1 : -1))
+        }
     }
 
 }

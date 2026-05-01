@@ -110,6 +110,16 @@ enum VP {
     static let verified    = Color(hex: "0b5cff")
     static let expertColor = Color(hex: "7c3aed")
 
+    // Section A — comment-tag chip colors. Mirror the hex literals on
+    // the web side (CommentRow.tsx → TAG_META). 'context' reuses
+    // VP.accent on purpose (no rainbow per the no-color-per-tier rule —
+    // tags are utility, not status).
+    static let tagHelpful    = Color(hex: "16a34a")
+    static let tagInsightful = Color(hex: "2563eb")
+    static let tagSarcastic  = Color(hex: "f59e0b")
+    static let tagCiteNeeded = Color(hex: "ea580c")
+    static let tagOffTopic   = Color(hex: "6b7280")
+
     /// Spacing scale (px). 4-base, 8-grid. Verbose paths (VP.Spacing.s4)
     /// over single-letter top-levels to avoid collision with Swift generic
     /// parameter conventions (e.g. `func foo<S: View>`).

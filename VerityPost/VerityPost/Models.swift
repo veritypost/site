@@ -332,6 +332,19 @@ struct VPComment: Codable, Identifiable {
     /// Cached count of @-mentions in this comment's body. Server-side
     /// trigger maintains it; iOS only reads.
     var contextTagCount: Int?
+    /// Section A — count of `helpful`-kind tag rows on this comment.
+    /// Server-side trigger on `comment_context_tags` increments/decrements
+    /// it; iOS only reads. Drives the inline "Helpful" badge once the row
+    /// crosses the editorial threshold (SettingsService.helpfulBadgeThreshold).
+    var helpfulCount: Int?
+    /// Section A — client-side cache of the kinds the current user has
+    /// cast on this comment ('context', 'helpful', 'insightful',
+    /// 'sarcastic', 'cite_needed', 'off_topic'). Not part of the row's
+    /// JSON shape; populated by StoryDetailView from a separate fetch
+    /// against `comment_context_tags` so each chip renders cast/uncast.
+    /// Defaulted to nil so it stays out of the synthesized Codable path
+    /// (CodingKeys below intentionally omits it).
+    var commentTagKinds: Set<String>? = nil
     /// `mentions` ships from the server as `[{ username, user_id }, ...]`
     /// jsonb — decoded here so the comment renderer can hyperlink the
     /// @-mention runs to a profile route.
@@ -375,6 +388,11 @@ struct VPComment: Codable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey {
+        // Section A — `commentTagKinds` is intentionally absent: it is
+        // a client-side cache (set by the comment-list loader from a
+        // separate `comment_context_tags` fetch), not part of the row's
+        // JSON shape, so excluding it here keeps Swift's synthesized
+        // Decodable from looking for it in the response.
         case id, body, articles, users, status, mentions
         case userId = "user_id"
         case articleId = "article_id"
@@ -388,6 +406,7 @@ struct VPComment: Codable, Identifiable {
         case deletedAt = "deleted_at"
         case isEdited = "is_edited"
         case contextTagCount = "context_tag_count"
+        case helpfulCount = "helpful_count"
     }
 }
 

@@ -13,7 +13,7 @@ Running list of UX/admin changes the owner has flagged. Each entry is a self-con
 | 13 | Unify username pick → single first-login popup (kill iOS full-screen route + dead web redirect) | ✅ shipped (uncommitted) | Owner approval to push pending; two minor stale comments in `AuthViewModel.swift:613, 677-681` rolled into item 10 |
 | 3  | Admin → article: published opens reader, drafts stay in newsroom, separate Edit button | ✅ shipped (commit `08259fe`) | UI-only change; no migrations |
 | 10 | Lock username (self-edit off; admins can rename) | ✅ shipped + DB applied (commit `204b31d`, migrations applied 2026-05-01) | Lock is fully live across UI + RPC + trigger |
-| 11a | God-mode owner-auto + server bypass + client `isGodMode` (no per-user grant UI) | 🟢 ready | **Prerequisite for item 12** — owner auto-grants via existing role permission set; per-user UI moved to 11b |
+| 11a | God-mode owner-auto + server bypass + client `isGodMode` (no per-user grant UI) | ✅ shipped + part-1 migration applied (commit `229bc7d`, applied 2026-05-01); ⚠️ part-2 RPC patches file still placeholder | Owner functions today via existing role grant + 5 API route bypasses + client component bypasses. RPC short-circuits (admin permissions console attribution + future 11b grantees) still need owner to paste live RPC bodies |
 | 11b | Per-user grant UI (god-mode + `admin.users.edit` + `admin.users.impersonate` toggles) | 🔴 blocked on item 11a | Bundled with item 12; build the toggle infrastructure once, use for all three keys |
 | 12 | Admin opens / edits / impersonates any user (with kid PIN reset + COPPA notify) | 🟡 needs 11a + 11b + privacy clause | Reuses 11b's per-user grant UI |
 
