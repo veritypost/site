@@ -33,7 +33,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { requirePermission } from '@/lib/auth';
+import { requirePermission, hasPermissionServer, requireAuth } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { validateConsentPayload, COPPA_CONSENT_VERSION } from '@/lib/coppaConsent';
 import { buildPbkdf2Credential } from '@/lib/kidPin';
@@ -147,21 +147,32 @@ async function finalizeIdempotency(
 export async function POST(request: Request) {
   // Two permission gates — one for kids creation, one for billing mutation.
   // requirePermission throws on denial, returning the corresponding 401/403.
+  // Item 11a Phase 2 — god-mode owner-bypass. Without this, an owner without
+  // the kids/family keys 403s before any seat math runs even though the rest
+  // of the product treats them as having full reach. The bypass keeps the
+  // god-mode caller flowing into the family-sub branch below, which item 11a
+  // also gates explicitly.
   let user;
   try {
     user = await requirePermission('kids.profile.create');
     await requirePermission('family.seats.manage');
   } catch (err) {
-    const status =
-      (err as { status?: number })?.status === 401
-        ? 401
-        : (err as { status?: number })?.status === 403
-          ? 403
-          : 500;
-    return NextResponse.json(
-      { error: status === 401 ? 'Unauthenticated' : 'Forbidden' },
-      { status }
-    );
+    const isGodMode = await hasPermissionServer('admin.god_mode');
+    if (!isGodMode) {
+      const status =
+        (err as { status?: number })?.status === 401
+          ? 401
+          : (err as { status?: number })?.status === 403
+            ? 403
+            : 500;
+      return NextResponse.json(
+        { error: status === 401 ? 'Unauthenticated' : 'Forbidden' },
+        { status }
+      );
+    }
+    // god-mode caller — pull the user via the auth helper so we have a
+    // stable user.id for the rest of the handler.
+    user = await requireAuth();
   }
 
   // Idempotency key is required — without it we can't dedupe and we'd
@@ -303,10 +314,58 @@ export async function POST(request: Request) {
     return NextResponse.json(payload, { status });
   };
 
+  // Item 11a Phase 2 — god-mode owner-bypass for the no-Family-sub branch.
+  // A god-mode caller without a real Family sub should still be able to add
+  // a kid; skip every Stripe step and create the kid_profiles row directly.
+  // Mirrors the /api/kids POST insert shape so we stay consistent with the
+  // simpler kid-create surface.
   if (!sub || sub.plans?.tier !== 'verity_family') {
-    return respond(400, {
-      error: 'No active Verity Family subscription on this account.',
-      code: 'no_family_sub',
+    const isGodMode = await hasPermissionServer('admin.god_mode');
+    if (!isGodMode) {
+      return respond(400, {
+        error: 'No active Verity Family subscription on this account.',
+        code: 'no_family_sub',
+      });
+    }
+
+    const nowIsoGm = now.toISOString();
+    const consentMetadataGm = {
+      coppa_consent: {
+        version: COPPA_CONSENT_VERSION,
+        parent_name: body.consent!.parent_name!.trim(),
+        accepted_at: nowIsoGm,
+        ip: clientIp(request),
+      },
+    };
+    const { data: kidRowGm, error: insertErrGm } = await service
+      .from('kid_profiles')
+      .insert({
+        parent_user_id: user.id,
+        display_name: body.display_name.trim(),
+        avatar_color: body.avatar_color || null,
+        pin_hash: pinCred.pin_hash,
+        pin_salt: pinCred.pin_salt,
+        pin_hash_algo: pinCred.pin_hash_algo,
+        date_of_birth: body.date_of_birth,
+        coppa_consent_given: true,
+        coppa_consent_at: nowIsoGm,
+        metadata: consentMetadataGm,
+      })
+      .select('id')
+      .single();
+    if (insertErrGm || !kidRowGm) {
+      console.error('[family.add_kid_with_seat] god_mode insert', insertErrGm?.message);
+      return respond(400, { error: insertErrGm?.message || 'Could not create kid profile.' });
+    }
+    await service.from('users').update({ has_kids_profiles: true }).eq('id', user.id);
+    return respond(200, {
+      ok: true,
+      kid_id: kidRowGm.id,
+      seats_paid: 0,
+      extra_kid_price_cents: 0,
+      seat_bumped: false,
+      dry_run_stripe: true,
+      god_mode: true,
     });
   }
 

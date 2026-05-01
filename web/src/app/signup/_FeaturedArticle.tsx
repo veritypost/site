@@ -26,6 +26,13 @@ function firstTwoParagraphs(html: string): string {
 
 function tierLabel(tier: string | null): string | null {
   if (!tier || tier === 'free') return null;
+  // Item 11a Phase 6 — defensive arm for god-mode tier strings. The
+  // analytics-side userTier label can be 'godmode' (see NavWrapper.deriveTier);
+  // the author-side `plans.tier` will never be 'godmode' in current DB shape
+  // because no plan row holds that tier, but adding the explicit arm keeps
+  // the badge readable if the value ever flows here through some future
+  // client-derived path. Mirror verity_pro's compact label.
+  if (tier === 'godmode') return 'pro';
   if (tier === 'verity_pro') return 'pro';
   if (tier === 'verity_family') return 'family';
   return tier.replace(/_/g, ' ');

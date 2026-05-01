@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 
 import { createClient } from '@/lib/supabase/client';
+import { useAuth } from '@/app/NavWrapper';
 import type { Tables } from '@/types/database-helpers';
 
 import { Card } from '../../_components/Card';
@@ -46,6 +47,10 @@ interface PlanRow {
 export function BillingCard({ user, preview }: Props) {
   const supabase = useMemo(() => createClient(), []);
   const toast = useToast();
+  // Item 11a Phase 7 — god-mode users see a single "Full access" card
+  // instead of the plan/portal/cancel UI. They have no real subscription
+  // (or a launch-hidden owner row that we deliberately don't surface).
+  const { isGodMode } = useAuth();
 
   const [sub, setSub] = useState<SubscriptionRow | null>(null);
   const [plan, setPlan] = useState<PlanRow | null>(null);
@@ -168,6 +173,18 @@ export function BillingCard({ user, preview }: Props) {
     return (
       <Card title="Billing" description="Loading your subscription…">
         <div style={{ height: 60 }} />
+      </Card>
+    );
+  }
+
+  // Item 11a Phase 7 — god-mode short-circuit. Replaces both the free-tier
+  // upsell branch below and the cancel/portal/change-plan block. Hides every
+  // billing-mutation surface so god-mode users never see a "Cancel" CTA on
+  // a phantom subscription.
+  if (isGodMode) {
+    return (
+      <Card title="Plan" description="Full access (no subscription required).">
+        {null}
       </Card>
     );
   }

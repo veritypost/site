@@ -7,6 +7,7 @@ import { notFound } from 'next/navigation';
 import { useCapabilities } from './PermissionsProvider';
 import LockModal from './LockModal';
 import { DENY_MODE } from '../lib/permissionKeys';
+import { useAuth } from '@/app/NavWrapper';
 
 export interface PermissionCapability {
   permission_key?: string | null;
@@ -36,7 +37,13 @@ export default function PermissionGate({
   renderLocked,
 }: PermissionGateProps) {
   const { get, ready } = useCapabilities(section);
+  const { isGodMode } = useAuth();
   const [modalOpen, setModalOpen] = useState<boolean>(false);
+
+  // Item 11a Phase 5 — god-mode users always see the gated content,
+  // even before the section's capability cache is ready. Belt-and-suspenders
+  // for the first-paint window; server short-circuit covers steady-state.
+  if (isGodMode) return <>{children}</>;
 
   if (!ready) return null;
 
@@ -114,7 +121,10 @@ interface PermissionGateInlineProps {
 
 export function PermissionGateInline({ permission, section, children }: PermissionGateInlineProps) {
   const { get, ready } = useCapabilities(section);
+  const { isGodMode } = useAuth();
   const [modalOpen, setModalOpen] = useState<boolean>(false);
+  // Item 11a Phase 5 — god-mode users always see the inline gated content.
+  if (isGodMode) return <>{children}</>;
   if (!ready) return null;
   const cap = get(permission) as PermissionCapability | null;
   if (!cap) return null;

@@ -224,7 +224,12 @@ export default async function ArticleSlugPage({
 
   if (article.status !== 'published' && !canEdit) notFound();
 
-  if (article.status === 'published') {
+  // Item 11a Phase 3 — suppress view-count writes for god-mode users so
+  // owner reading their own articles doesn't pollute the read counter.
+  // The companion ArticleTracker (analytics events) is gated client-side
+  // in the same item via auth.isGodMode.
+  const isGodModeViewer = await hasPermissionServer('admin.god_mode');
+  if (article.status === 'published' && !isGodModeViewer) {
     incrementViewCount(service, article.id).catch((e) => console.error('[article] incrementViewCount failed', e));
   }
 

@@ -26,19 +26,49 @@ struct SubscriptionView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 24) {
-                    header
-                    billingToggle
-                    planCard(plan: "free")
-                    planCard(plan: "verity")
-                    planCard(plan: "verity_family")
-                    promoSection
-                    restoreSection
-                    manageLink
-                    legalDisclosures
+                if auth.isGodMode {
+                    // Item 11a Phase 8 — god-mode users see a single "Full
+                    // access" card instead of the plan grid + restore/manage
+                    // links. Keeps the SubscriptionView reachable in nav so
+                    // the screen still renders, but hides every billing CTA
+                    // since god-mode has no real subscription to manage.
+                    VStack(spacing: 24) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Full access")
+                                .font(.system(.title2, design: .serif, weight: .bold))
+                                .foregroundColor(VP.text)
+                            Text("No subscription required.")
+                                .font(.system(.subheadline))
+                                .foregroundColor(VP.dim)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(20)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(VP.card)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(VP.border, lineWidth: 1)
+                        )
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 24)
+                } else {
+                    VStack(spacing: 24) {
+                        header
+                        billingToggle
+                        planCard(plan: "free")
+                        planCard(plan: "verity")
+                        planCard(plan: "verity_family")
+                        promoSection
+                        restoreSection
+                        manageLink
+                        legalDisclosures
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 24)
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 24)
             }
             .background(VP.bg)
             .navigationTitle("Subscription")

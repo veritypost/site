@@ -1,0 +1,155 @@
+-- Item 11a Phase 1 (RPC patches half) — DO NOT APPLY UNTIL OWNER PULLS LIVE BODIES.
+--
+-- The four resolver RPCs below need a god-mode short-circuit added at the top.
+-- Their bodies are NOT in the migrations history (they were created via the
+-- Supabase SQL editor / dashboard at various points), so this file only
+-- contains the *shape* of the patch that needs to land. Owner — pull each
+-- function's current source via:
+--
+--   select pg_get_functiondef(p.oid)
+--   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+--   where n.nspname = 'public'
+--     and p.proname in (
+--       'my_permission_keys',
+--       'get_my_capabilities',
+--       'compute_effective_perms',
+--       'has_permission',
+--       'has_permission_for'
+--     );
+--
+-- Then for each function: prepend the relevant short-circuit block below
+-- AFTER the function's existing argument validation but BEFORE its main
+-- resolver logic. Wrap the whole patch in a single BEGIN/COMMIT.
+--
+-- ---------------------------------------------------------------------------
+-- Why these four
+-- ---------------------------------------------------------------------------
+-- - my_permission_keys : returned key set the client caches into the perms
+--   Map. Without short-circuit, god-mode users only see keys their other
+--   grants surface, so first-paint paywall gates flicker on hidden surfaces.
+-- - get_my_capabilities : per-section capability rows the client hydrates
+--   for paywall modal copy. Without short-circuit, god-mode users see locked
+--   modals on sections they have no other grant for.
+-- - compute_effective_perms : SELECTed by the admin permissions console
+--   (web/src/app/admin/users/[id]/permissions/page.tsx:196). Without
+--   short-circuit, god-mode rows show granted_via='none' and look broken to
+--   the admin reviewing the user.
+-- - has_permission / has_permission_for : single-key SECURITY DEFINER probes.
+--   Used by some legacy callers; without short-circuit they return false for
+--   keys the god-mode user has no other grant on.
+--
+-- ---------------------------------------------------------------------------
+-- Short-circuit blocks (paste into each function body at the top, after the
+-- arg-validation / kind-check stanza but before the main resolver work)
+-- ---------------------------------------------------------------------------
+--
+-- For my_permission_keys (returns SETOF text or { permission_key text }):
+--
+--   IF EXISTS (
+--     SELECT 1
+--     FROM public.compute_effective_perms(auth.uid()) cep
+--     WHERE cep.permission_key = 'admin.god_mode' AND cep.granted = true
+--   ) THEN
+--     RETURN QUERY
+--       SELECT p.key AS permission_key
+--       FROM public.permissions p
+--       WHERE p.is_active = true;
+--     RETURN;
+--   END IF;
+--
+-- For get_my_capabilities (returns SETOF { permission_key, granted, ... }
+-- per section):
+--
+--   IF EXISTS (
+--     SELECT 1
+--     FROM public.compute_effective_perms(auth.uid()) cep
+--     WHERE cep.permission_key = 'admin.god_mode' AND cep.granted = true
+--   ) THEN
+--     RETURN QUERY
+--       SELECT
+--         p.key                  AS permission_key,
+--         true                   AS granted,
+--         p.display_name         AS label,
+--         NULL::text             AS lock_message,
+--         'god_mode'::text       AS lock_reason,
+--         NULL::text             AS deny_mode,
+--         p.sort_order           AS sort_order,
+--         p.ui_element           AS ui_element
+--       FROM public.permissions p
+--       WHERE p.is_active = true
+--         AND p.ui_section = p_section;
+--     RETURN;
+--   END IF;
+--
+-- For compute_effective_perms (returns SETOF the long row shape — see
+-- web/src/types/database.ts:11491-11502 for the column list):
+--
+--   -- Detect god-mode without recursion: read the user's own god-mode grant
+--   -- by walking user_permission_sets / role_permission_sets directly.
+--   IF EXISTS (
+--     SELECT 1
+--     FROM public.user_permission_sets ups
+--     JOIN public.permission_set_perms psp ON psp.permission_set_id = ups.permission_set_id
+--     JOIN public.permissions p ON p.id = psp.permission_id
+--     WHERE ups.user_id = p_user_id AND p.key = 'admin.god_mode' AND p.is_active = true
+--     UNION ALL
+--     SELECT 1
+--     FROM public.user_roles ur
+--     JOIN public.role_permission_sets rps ON rps.role_id = ur.role_id
+--     JOIN public.permission_set_perms psp ON psp.permission_set_id = rps.permission_set_id
+--     JOIN public.permissions p ON p.id = psp.permission_id
+--     WHERE ur.user_id = p_user_id AND p.key = 'admin.god_mode' AND p.is_active = true
+--   ) THEN
+--     RETURN QUERY
+--       SELECT
+--         p.id                AS permission_id,
+--         p.key               AS permission_key,
+--         p.display_name      AS permission_display_name,
+--         true                AS granted,
+--         'god_mode'::text    AS granted_via,
+--         '{}'::jsonb         AS source_detail,
+--         NULL::text          AS deny_mode,
+--         NULL::text          AS lock_message,
+--         false               AS requires_verified,
+--         p.ui_section        AS surface
+--       FROM public.permissions p
+--       WHERE p.is_active = true;
+--     RETURN;
+--   END IF;
+--
+-- For has_permission and has_permission_for (return boolean):
+--
+--   IF EXISTS (
+--     SELECT 1
+--     FROM public.compute_effective_perms(auth.uid()) cep
+--     WHERE cep.permission_key = 'admin.god_mode' AND cep.granted = true
+--   ) THEN
+--     RETURN true;
+--   END IF;
+--
+-- ---------------------------------------------------------------------------
+-- Filter-active note
+-- ---------------------------------------------------------------------------
+-- Every "RETURN every key" clause filters on `is_active = true` so a key
+-- soft-deleted via UPDATE permissions SET is_active=false (see
+-- 2026-04-29_combined_unapplied.sql:401-406 for prior precedent) is NOT
+-- claimed by god-mode. Otherwise re-activating a tombstoned key would be a
+-- silent re-grant.
+--
+-- ---------------------------------------------------------------------------
+-- Why pg_get_functiondef
+-- ---------------------------------------------------------------------------
+-- The functions probably also do per-key alias expansion via
+-- permission_key_aliases (see lib/auth.js:357-391 — bridge between old/new
+-- key names). Pulling the live body via pg_get_functiondef is the only way
+-- to preserve every call-site nuance the resolver currently handles.
+
+-- INTENTIONAL FAILURE GUARD — abort if anyone tries to apply this file as-is.
+DO $$
+BEGIN
+  RAISE EXCEPTION
+    '2026-05-01_admin_god_mode_rpc_patches.sql is a placeholder. '
+    'Pull the live RPC bodies via pg_get_functiondef, edit this file in '
+    'place to wrap the patches around them, then remove this guard block '
+    'and apply.';
+END $$;

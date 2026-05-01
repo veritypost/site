@@ -11,12 +11,13 @@ Running list of UX/admin changes the owner has flagged. Each entry is a self-con
 | # | Item | Status | Notes |
 |---|------|--------|-------|
 | 13 | Unify username pick → single first-login popup (kill iOS full-screen route + dead web redirect) | ✅ shipped (uncommitted) | Owner approval to push pending; two minor stale comments in `AuthViewModel.swift:613, 677-681` rolled into item 10 |
-| 3  | Admin → article: published opens reader, drafts stay in newsroom, separate Edit button | 🟢 ready | Independent — can ship alongside others |
+| 3  | Admin → article: published opens reader, drafts stay in newsroom, separate Edit button | ✅ shipped (commit `08259fe`) | UI-only change; no migrations |
 | 10 | Lock username (self-edit off; admins can rename) | ✅ shipped + DB applied (commit `204b31d`, migrations applied 2026-05-01) | Lock is fully live across UI + RPC + trigger |
-| 11 | God-mode (per-user `admin.god_mode` grant; owner auto, others opt-in) | 🟢 ready | **Prerequisite for item 12** — server RPC short-circuit + AuthContext `isGodMode` |
-| 12 | Admin opens / edits / impersonates any user (with kid PIN reset + COPPA notify) | 🟡 1 blocker | Privacy-policy clause must land before write/impersonation endpoints ship; reuses item 11's per-user grant UI |
+| 11a | God-mode owner-auto + server bypass + client `isGodMode` (no per-user grant UI) | 🟢 ready | **Prerequisite for item 12** — owner auto-grants via existing role permission set; per-user UI moved to 11b |
+| 11b | Per-user grant UI (god-mode + `admin.users.edit` + `admin.users.impersonate` toggles) | 🔴 blocked on item 11a | Bundled with item 12; build the toggle infrastructure once, use for all three keys |
+| 12 | Admin opens / edits / impersonates any user (with kid PIN reset + COPPA notify) | 🟡 needs 11a + 11b + privacy clause | Reuses 11b's per-user grant UI |
 
-Suggested ship order within Wave 1: **13 → 10 → 3 → 11 → 12.** (13 unlocks 10's clean server enforcement; 3 is independent; 11 unlocks 12; 12 closes the legal loop after the privacy clause is in place.)
+Suggested ship order within Wave 1: **13 ✅ → 10 ✅ → 3 ✅ → 11a → (11b + 12 bundled).** (13 unlocked 10's clean server enforcement; 3 was independent; 11a gives owner full bypass without the per-user grant UI; 11b's toggle infrastructure builds once and serves both god-mode and item 12's two grant keys.)
 
 **Wave 2 — backlog, schedule after Wave 1 is in flight:**
 
@@ -550,101 +551,172 @@ File: `/Users/veritypost/Desktop/verity-post/VerityPost/VerityPost/AuthViewModel
 
 ---
 
-## 11. God-mode — owner has full bypass; owner can grant it per user
+## 11a. God-mode — owner auto-bypass + server short-circuit + client `isGodMode` (no per-user UI)
 
-**What to change:** owner reports they can't access Ask-an-Expert, can't access other tier-gated features, and see themselves displayed as being "on a plan." Owner shouldn't be on any plan; owner should have unrestricted access to every user-facing feature regardless of tier or permission grants. **Other admins do NOT get god-mode by default** — owner explicitly grants it per-user from a new admin UI. This is two problems sitting on top of each other (server grants + client UI gates), with a third cosmetic problem (the Plan card in profile showing "Free"). All three need to land together.
+**Scope split (owner-locked, 2026-05-01):** the original item 11 was split into 11a (this item — owner-auto-grant + server bypass + client) and 11b (the per-user grant UI, bundled with item 12). 11a ships standalone; 11b builds the toggle infrastructure once for god-mode + item 12's two grant keys.
 
-**Locked decisions (owner, 2026-04-30):**
-- **Owner role: full bypass, automatic, always on.** Every permission key, every plan-tier check, every paywall — owner sails through.
-- **God-mode is per-user grantable, not role-based.** Default: only owner has it. Owner can grant `admin.god_mode` (or whatever the key ends up named) to any individual user — not tied to role membership. Revoke is symmetric and immediate.
-- **Admin role on its own does NOT get god-mode.** An admin without an explicit god-mode grant goes through normal permission checks. This keeps admin-as-test-user workflows clean (admins can hit paywalls / role gates by default; god-mode is opt-in).
-- **Server-side root-cause fix is Option B (RPC short-circuit)** — see Server section below. Cheaper to maintain than auditing every permission set forever.
+**What 11a does:** owner gets full bypass automatically via the existing owner role's permission set. Server RPCs short-circuit when caller has `admin.god_mode`. Client paywall components, Plan card, and iOS paywalls all detect `isGodMode` and bypass. **No per-user grant UI in this item** — until 11b lands, only owner has god-mode, and that's enough for now (owner is the only god-mode user at launch).
 
-### Architecture — per-user grant, not role bypass
+**Locked decisions (owner, 2026-04-30 + 2026-05-01):**
+- Owner role: full bypass, automatic, always on.
+- God-mode is per-user grantable (Option B / RPC short-circuit). 11a ships the owner auto-grant; 11b ships the per-user UI.
+- Admin role on its own does NOT get god-mode.
+- Editor/moderator/expert roles: no auto-bypass. Owner can grant per-user via 11b later.
 
-- Add a permission key, e.g., `admin.god_mode`, in the `permissions` catalog.
-- Owner role auto-grants `admin.god_mode` (one row in whatever table maps role → permission set, set membership includes the new key).
-- Every other user starts without it. Owner uses a new UI section under `/admin/users/[id]` (or extends item 12's inline editor) to toggle the grant.
-- Server-side, `my_permission_keys` short-circuits when the caller has `admin.god_mode` granted, returning every permission key in the catalog. Same for tier checks: server endpoints that gate on plan tier check god-mode first.
-- Client-side, `auth.isGodMode` (renamed from `auth.isAdmin` in the original draft to keep it precise) drives every UI bypass. `auth.isAdmin` stays as a separate signal for "user has the admin role" — still used for routing into `/admin`, banner copy, etc.
+**Pre-impl gates (mandatory before any code touches):**
 
-### Diagnosis
+1. Pull live RPC sources via Supabase MCP — RPCs are not in `supabase/migrations/`:
+   ```sql
+   select pg_get_functiondef(p.oid)
+   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public'
+     and p.proname in ('my_permission_keys','get_my_capabilities','compute_effective_perms','has_permission','has_permission_for');
+   ```
+2. List actual schema for the permission system:
+   ```sql
+   \d permissions
+   \d permission_sets
+   \d permission_set_perms
+   \d role_permission_sets
+   \d user_permission_sets
+   \d permission_scope_overrides
+   select * from roles where name = 'owner';
+   ```
+   **Critical: doc earlier said `permission_set_members` and `user_permissions` — both wrong.** Real tables are `permission_set_perms` (set membership) and `user_permission_sets` (per-user set assignment) + `permission_scope_overrides` (per-key with scope_type='user'). Confirm column names: investigator found permissions catalog uses `key` not `permission_key`. **MCP-verify before writing any SQL.**
 
-- **Roles exist** — `web/src/lib/roles.js:18-23` defines `OWNER_ROLES`, `ADMIN_ROLES`, `EDITOR_ROLES`, `MOD_ROLES`. The owner role is `'owner'`; admin is `'admin'`.
-- **Permission system is set-centric** — `web/src/lib/permissions.js:152, 174` shows the RPCs `get_my_capabilities` and `my_permission_keys`. The cache (`allPermsCache`) is a `Set` of permission keys the user has been granted. UI components check this cache via `hasPermission(key)`.
-- **Owner doesn't get every key automatically** — per memory ("admin account has owner + admin permission sets"), owner has whatever permission sets are attached to the owner role. If a permission key (like `expert.queue.view` or `messages.send`) isn't in any of those sets, the owner won't get it. **This is the most likely root cause for "I don't have access to expert stuff."**
-- **UI gates check the cache, not the role** — `web/src/components/LockedFeatureCTA.tsx`, `LockModal.tsx`, `PermissionGate.tsx` all assume the permission set is the source of truth. They have no concept of "owner bypass."
-- **Tier comes from `plans.tier` join** — `web/src/app/NavWrapper.tsx:79-97` `deriveTier()` returns `'free_verified'` for users with no paid plan. Owner shows up as `free_verified`, which makes `userTier`-based code paths treat them as free.
-- **Plan display reads from `subscriptions` / `plans`** — `web/src/app/profile/settings/_cards/BillingCard.tsx:51, 84` fetches a `PlanRow` and shows it as "Plan." For admins this should display "Admin (full access)" or be hidden.
+If MCP unavailable: stop and request RPC bodies + schema dump from owner inline (same protocol as item 10).
 
-### What to change — server (root-cause fix)
+### Phase 1 — Server migration
 
-**Locked: Option B (RPC short-circuit).** Cheaper to maintain, single DB change vs auditing every permission set forever.
+New migration `supabase/migrations/<YYYYMMDD>_admin_god_mode_owner_auto.sql` — single transaction:
 
-- **1. Add the permission key.** Insert a new row in `permissions` for `admin.god_mode` (description: "Bypass every plan and permission gate"). Verify the catalog table name first via Supabase MCP — likely `permissions` per the existing `my_permission_keys` RPC.
-- **2. Auto-grant to owner role.** Add `admin.god_mode` to whichever permission set is attached to the `owner` role. SQL pattern:
-  ```sql
-  insert into permission_set_members (set_id, permission_id)
-  select ps.id, p.id
-  from permission_sets ps
-  join role_permission_sets rps on rps.set_id = ps.id
-  join roles r on r.id = rps.role_id and r.name = 'owner'
-  cross join permissions p
-  where p.permission_key = 'admin.god_mode';
+1. **Insert `admin.god_mode` into the permissions catalog.** Use the actual column name from the schema dump (likely `key`, not `permission_key`). Description: "Bypass every plan and permission gate."
+2. **Create a singleton system permission set** (e.g., `god_mode`) and link it to `admin.god_mode` via `permission_set_perms`. Mirror an existing system set's row shape.
+3. **Auto-grant to owner role:** insert into `role_permission_sets` linking the `god_mode` set to the `owner` role.
+4. **Backfill the current owner's `user_permission_sets`** so the AuthContext sees god-mode immediately on first login post-migration without waiting for a click. Avoids chicken-and-egg.
+5. **Patch all four resolver RPCs** to short-circuit when caller has `admin.god_mode`:
+   - `my_permission_keys` — returns every permission key.
+   - `get_my_capabilities` — synthesizes `granted=true, granted_via='god_mode', deny_mode=null` for every section row.
+   - `compute_effective_perms` — same short-circuit so the admin permissions console shows correct `granted_via` for god-mode users (otherwise rows say `none` and look broken).
+   - `has_permission` and `has_permission_for` (single-key SECURITY DEFINER RPCs) — return true.
+   Use the `compute_effective_perms` result (or equivalent) to detect god-mode rather than a raw join, so role/set/plan grants of the key all count uniformly.
+6. **Filter on active permissions only** — if the catalog has `is_active=false` rows or soft-deletes, exclude them from the short-circuit return so god-mode doesn't claim tombstoned keys.
+
+### Phase 2 — Direct-tier-read API route bypasses (5 routes)
+
+The RPC short-circuit handles permission-gated endpoints. But several routes read `subscriptions.plans.tier` directly and never go through the permission system. Each needs an explicit god-mode bypass at the top:
+
+- `web/src/app/api/family/seats/route.ts:46-63` — `plans!inner(tier) === 'verity_family'`. Owner with god-mode but no Family sub gets `has_active_family_sub: false` → can't manage seats. Add `await hasPermissionServer('admin.god_mode')` check; if true, treat as if Family sub is active.
+- `web/src/app/api/family/add-kid-with-seat/route.ts:306` — same `verity_family` literal. Same bypass.
+- `web/src/app/api/kids/route.js:108` — same seat enforcement read. Same bypass.
+- `web/src/app/api/cron/send-push/route.js:228` — `plans.tier === 'free'` filter. Cron doesn't run as a user, so god-mode is moot here. Verify and document; no code change.
+- `web/src/app/api/account/onboarding/route.js:26` — reads `plans?.tier` for branching. God-mode-but-no-plan owners may hit a free-tier onboarding path. Add bypass.
+
+Stripe webhooks (`/api/stripe/webhook/route.js`, `/api/ios/appstore/notifications/route.js`) — billing reconciliation, NOT access. Leave alone.
+
+### Phase 3 — View-count + analytics suppression (deferred from item 3)
+
+- `web/src/app/[slug]/page.tsx:228` — `incrementViewCount` fires unconditionally in the route handler. Gate behind a server-side `await hasPermissionServer('admin.god_mode')` check. If true, skip.
+- `web/src/app/[slug]/page.tsx:251` — `ArticleTracker` runs on the client. Read `auth.isGodMode` from `useAuth()` and return early.
+
+### Phase 4 — AuthContext
+
+- `web/src/app/NavWrapper.tsx:53-77` (AuthContext): add `isGodMode: boolean`. Default `false`. **Do NOT add `isAdmin`** — it would collide with the existing path predicate `isAdmin(p: string)` at `:141`. Reuse the existing `canSeeAdmin` flag at `:166` (already computed from `hasPermission('admin.dashboard.view')`) for "user has admin reach" semantics.
+- `:226-233` (inside `loadProfile`): after `await refreshAllPermissions()`, compute `const godMode = hasPermission('admin.god_mode');` and store via a new `setIsGodMode` state slot.
+- `:79-97` `deriveTier()`: change signature to `deriveTier(user, isGodMode)`. Add **early return BEFORE the `'unverified'` check**: `if (isGodMode) return 'godmode';` — must take priority over unverified state so an owner mid-email-change doesn't flip to unverified-tier semantics.
+- `:411-419` provider value: pass `isGodMode` and `userTier: deriveTier(user, isGodMode)`.
+
+### Phase 5 — Component bypasses (3 paywall surfaces)
+
+1. `web/src/components/LockedFeatureCTA.tsx:109+` — at top of body: `const auth = useAuth(); if (auth.isGodMode) return null;`
+2. `web/src/components/LockModal.tsx:78-88` — same pattern, return `null` when god-mode (insert above the `if (!isOpen || !capability) return null` line).
+3. `web/src/components/PermissionGate.tsx:30-47` and `:115` (default + inline variants) — return `<>{children}</>` when god-mode.
+
+These are belt-and-suspenders for the first-paint window before the perms cache loads. Server short-circuit covers steady-state.
+
+### Phase 6 — Sentinel sweep (just one site)
+
+- `web/src/app/signup/_FeaturedArticle.tsx:28-30` — branches on tier strings; `'godmode'` falls through to the default branch which may render the wrong featured article for owner. Add an explicit `if (tier === 'godmode') return ...` arm matching the desired behavior (probably mirror `verity_pro`).
+- **Doc previously cited `bookmarks/page.tsx`, `ArticleQuiz.tsx`, `useTrack.ts` — all already migrated to permission keys or analytics-only.** Nothing to change there.
+- `web/src/lib/useTrack.ts:34` — `userTier` will report as `'godmode'` in analytics. New bucket. Document upstream or filter; non-blocking.
+
+### Phase 7 — Plan card
+
+- `web/src/app/profile/settings/_cards/BillingCard.tsx`: import `useAuth`. At top of `BillingCard` body: `const auth = useAuth();`. Branch immediately after the loading check (~line 173):
+  ```tsx
+  if (auth.isGodMode) {
+    return <Card title="Plan" description="Full access (no subscription required).">{null}</Card>;
+  }
   ```
-  (Confirm the table/column names against the actual schema before running.)
-- **3. Patch `my_permission_keys` and `get_my_capabilities`** to short-circuit when caller has `admin.god_mode`. First branch in the function:
-  ```sql
-  if exists (
-    select 1 from user_permissions up
-    join permissions p on p.id = up.permission_id
-    where up.user_id = auth.uid() and p.permission_key = 'admin.god_mode'
-  ) then
-    return query select permission_key from permissions;
-  end if;
-  ```
-  Same short-circuit added to `get_my_capabilities` so cached section-fetches also pass.
-- **4. Patch tier-gated server endpoints.** Anything that today reads `subscription.plan.tier` to gate access (recap, expert queue, etc.) should also check `has_permission('admin.god_mode', auth.uid())` first and bypass.
-- **5. Per-user grant UI.** Inside `/admin/users/[id]` (extending item 12's editor), add a single toggle: `God-mode access` — on/off. Writes a row in `user_permissions` for that user with `permission_key = 'admin.god_mode'`. Owner-only UI; grant action audited in `admin_audit_log`.
-- **The RPC source isn't in `supabase/migrations/`** (memory: "MCP-verify schema, never trust supabase_migrations log" — pull `pg_get_functiondef(oid)` for both RPCs first to know what you're patching).
+- This replaces both the "free tier" branch (`:175-193`) and the cancel/portal block (`:204-294`) for god-mode users. Hides change-plan link, manage-payment portal, cancel/resume.
+- `BillingCard` is currently server-fetched but rendered client-side (it has `useState`/`useEffect`); `useAuth` should work without a refactor. Verify during implementation; if it's a server component, convert to client.
+- `web/src/app/profile/_sections/PlanSection.tsx` re-exports `BillingCard` — no change needed.
 
-### What to change — client (UI bypass for god-mode users)
+### Phase 8 — iOS mirrors
 
-Even after server grants are correct, several UI surfaces still gate on `userTier` (which is plan-derived, not role-derived). Add a god-mode-aware shortcut so paywall UI never shows for users with the `admin.god_mode` grant.
+- `VerityPost/VerityPost/AuthViewModel.swift`: add `@Published var isGodMode: Bool = false`. After loading permission keys (find via `grep -n "my_permission_keys"`), set `isGodMode = keys.contains("admin.god_mode")`. Refresh on session reload (cold launch is the practical refresh granularity per memory; iOS lacks live cache invalidation today — document).
+- `VerityPost/VerityPost/RecapView.swift:18, 41, 153` — no change needed. `isPaid` is server-driven; once Phase 1's server short-circuit ships, the recap endpoint's permission check passes for god-mode users → server returns `paid: true` automatically.
+- `VerityPost/VerityPost/FamilyViews.swift:54-55` — `maxKids(for tier:)` first line: `if auth.isGodMode { return Int.max }`. Pass `AuthViewModel` in or read from environment.
+- `VerityPost/VerityPost/SubscriptionView.swift` — at top of body, branch on `auth.isGodMode`: render single card "Full access (no subscription required)." and hide upgrade CTA, plan list, restore-purchases.
+- General iOS sweep: `grep -rn "verity_pro\|verity_family" VerityPost/VerityPost`. Confirm no client-side equality checks treat `'godmode'` as not-paid. List matches in PR body.
 
-- **Add `isGodMode` and `isAdmin` to `AuthContext`** at `web/src/app/NavWrapper.tsx:60-77`. `isGodMode` is true when the user's permission cache contains `admin.god_mode` (read from `hasPermission('admin.god_mode')`). `isAdmin` stays as "user has the admin or owner role" (used for routing into `/admin`, banner copy). They're separate signals — admin role doesn't automatically imply god-mode.
-- **Update `deriveTier()`** at `web/src/app/NavWrapper.tsx:79-97` to return a sentinel like `'godmode'` when god-mode is present. This makes every legacy `userTier === 'verity_pro'` / `userTier === 'verity_family'` check pass. Document the sentinel in the function header.
-- **Short-circuit `<LockedFeatureCTA>`** at `web/src/components/LockedFeatureCTA.tsx:109+` — at the top of the component, `if (auth.isGodMode) return null` (no upsell strip).
-- **Short-circuit `<LockModal>`** at `web/src/components/LockModal.tsx` — if god-mode, render `null`.
-- **Short-circuit `<PermissionGate>`** at `web/src/components/PermissionGate.tsx` — if god-mode, render `children` directly without checking the cache. (For most users this is a no-op because the cache already has the key once the server short-circuit lands; the client check is belt-and-suspenders for first-paint before the perms cache loads.)
-- **Search for direct tier checks** — `grep -rn "userTier ===" web/src` and `grep -rn "isPaidTier" web/src`. Each gets the god-mode escape: `if (isGodMode) return <unlocked path>`. Known sites today: `web/src/app/bookmarks/page.tsx:69, 119`, `web/src/components/ArticleQuiz.tsx:56`, `web/src/lib/useTrack.ts:34, 41`.
+### Phase 9 — Verification
 
-### What to change — Plan card display
+1. **Supabase MCP smoke checks** (post-migration; document for owner to run):
+   - Owner JWT → `select * from my_permission_keys();` → returns count = `(select count(*) from permissions where is_active = true)`.
+   - Non-owner non-god-mode JWT → returns subset.
+   - Owner JWT → `select * from get_my_capabilities('quiz');` → all rows `granted=true, granted_via='god_mode'`.
+   - Owner JWT → `select * from compute_effective_perms(auth.uid());` → admin permissions console shows correct attribution.
+   - Non-owner JWT → same query → no `admin.god_mode` row.
+2. **Web build:** `cd /Users/veritypost/Desktop/verity-post/web && rm -rf .next && npm run build`. Must pass.
+3. **iOS build:** `xcodebuild -project /Users/veritypost/Desktop/verity-post/VerityPost/VerityPost.xcodeproj -scheme VerityPost -destination "generic/platform=iOS Simulator" build`.
+4. **Web smoke** (owner login, dev server):
+   - `/profile/settings` → "Full access" card, no change-plan link.
+   - `/expert` (or wherever Ask-an-Expert lives) → no paywall.
+   - `/bookmarks` → no upgrade CTA.
+   - `/admin/users/<other>/permissions` → console shows correct `granted_via` for any user.
+5. **Audit greps** in PR body:
+   - `grep -rn "userTier ===\|isPaidTier" web/src` — comments only (one in `bookmarks/page.tsx`).
+   - `grep -rn "verity_pro\|verity_family" VerityPost/VerityPost` — list matches.
 
-- `web/src/app/profile/settings/_cards/BillingCard.tsx:178-206` (the `PageSection title="Plan"` blocks) — branch on `auth.isGodMode`:
-  - If god-mode: render a single line — `Full access (no subscription required).` Hide the change-plan link, the manage-payment portal, and the cancel/resume controls.
-  - Else: existing UI.
-- `web/src/app/profile/_sections/PlanSection.tsx` is a thin re-export of `BillingCard` — no change needed if BillingCard handles the branching.
-- `web/src/app/profile/_components/ProfileApp.tsx:415` ("Plan" sidebar item) — keep visible (god-mode users might still want to see what plans exist), but make sure clicking it lands on the god-mode-aware Plan view above.
+### Cross-item interactions (carry over to 11b / item 12)
 
-### iOS
+- **vs item 10:** `is_admin_or_above()` is the role-based bypass for username rename. God-mode user without admin role won't pass it. Per spec, this is correct (god-mode ≠ admin role). Document in code comments. If owner ever grants god-mode to a non-admin who needs to rename users, item 10's RPC guard would need a god-mode addition — defer to that case.
+- **vs item 12 (impersonation):** when admin impersonates user X, `auth.uid()` resolves to X. `hasPermission('admin.god_mode')` reads X's grant. If X has god-mode, the impersonator inherits it for the duration. Owner should never grant impersonate authority on a god-mode target without auditing. Document for item 12.
+- **vs item 11b:** the per-user grant UI lands in 11b. Until then, only owner has god-mode (via the auto-grant in Phase 1 step 4). 11b will add the toggle to `/admin/users/[id]/permissions`, gate the API on `requirePermission('admin.god_mode')`, block self-revoke, hide for kid accounts, add confirmation modal, and call `bump_user_perms_version(target)` + `bump_perms_global_version()` after writes.
 
-- `VerityPost/VerityPost/RecapView.swift:18, 41, 153` — `isPaid` boolean fetched from a server endpoint that returns `paid: bool`. Server-side, the recap endpoint should return `paid: true` for god-mode users. Once the `my_permission_keys` short-circuit lands, the endpoint's existing gate becomes permission-driven and god-mode passes through automatically.
-- `VerityPost/VerityPost/FamilyViews.swift:54-55` — `maxKids(for tier)` reads a per-tier cap. God-mode users should bypass; check `auth.hasPermission("admin.god_mode")` and return `Int.max`.
-- `VerityPost/VerityPost/SubscriptionView.swift` (paywall list) — for god-mode users, hide the upgrade CTA and show "Full access (no subscription required)" instead.
-- General iOS pattern: fetch permission keys on session load (mirroring web's `refreshAllPermissions`), surface as `AuthViewModel.isGodMode`, then short-circuit every paywall/locked-feature view.
+### Untouched (do not edit)
 
-### Open questions still pending
-
-1. **Editor/moderator/expert roles.** Locked: no auto-bypass. They go through normal permission set checks. Owner can grant `admin.god_mode` to specific individuals if needed.
-2. **"View as anon" / paywall QA mode.** Not blocking this item — covered by the impersonation flow in item 12 (admin can impersonate a free-tier user to see the paywall as they would). Defer.
-3. **Server-side billing rows.** Owner currently has either a `subscriptions` row pointing at a tier or no row at all. After this lands, the Plan card hides for them — but the underlying row stays untouched (per launch-hides convention). Confirm this is fine and don't write a migration to delete the owner's plan row.
+- `web/src/lib/roles.js` — role Sets unchanged.
+- `web/src/lib/auth.js` `requirePermission` / `hasPermissionServer` — unchanged; god-mode passes through automatically once `my_permission_keys` short-circuits.
+- `is_admin_or_above()` and item 10 surfaces — no overlap.
+- Owner's `subscriptions` row — do not delete/migrate (launch-hides convention); BillingCard branch hides it from the UI without DB writes.
+- `bookmarks/page.tsx`, `ArticleQuiz.tsx`, `useTrack.ts` — already migrated to permission keys or analytics-only.
 
 ### Platforms summary
 
-- Web: add `admin.god_mode` permission + auto-grant to owner role + RPC short-circuit + AuthContext `isGodMode` + bypass in 3 components + grep-and-add bypasses + Plan card branch + per-user grant toggle in `/admin/users/[id]`.
-- iOS adult: server endpoints honor god-mode automatically (via the `my_permission_keys` change) + AuthViewModel `isGodMode` + bypass in `RecapView`, `FamilyViews`, `SubscriptionView`.
+- Web: server migration (catalog + role auto-grant + 4 RPC patches) + 5 API route bypasses + view-count/analytics suppression + AuthContext `isGodMode` + 3 component bypasses + sentinel sweep + Plan card branch.
+- iOS adult: AuthViewModel `isGodMode` + `FamilyViews` cap + `SubscriptionView` branch. Server endpoints auto-pass via Phase 1.
 - Kids iOS: not applicable — kids product is the kid's own account; god-mode doesn't translate.
+
+---
+
+## 11b. Per-user grant UI for god-mode + item 12's two keys (bundled with item 12)
+
+**Status:** blocked on 11a. Bundled with item 12 because item 12 needs the same grant infrastructure for `admin.users.edit` and `admin.users.impersonate`.
+
+**Scope:**
+- Extend `web/src/app/admin/users/[id]/permissions/page.tsx` with a "Sensitive grants" section showing toggles for `admin.god_mode`, `admin.users.edit`, `admin.users.impersonate`. Designed for N keys, not hardcoded.
+- Toggle writes to `user_permission_sets` (or `permission_scope_overrides`) via the existing `postToggle` helper at `:262`.
+- **API gate:** `/api/admin/users/[id]/permissions` write endpoint must `requirePermission('admin.god_mode')` (NOT admin-role membership). Without this, any admin can grant god-mode to anyone. UI gate alone is not security.
+- **Self-revoke block:** the granted user cannot revoke their own god-mode (prevents owner self-lockout requiring DB access to recover).
+- **Hide for kid accounts:** `hasPermissionServer` already returns false for `kind === 'kid'`; toggle row should not render for kid rows.
+- **Confirmation modal on grant:** "Type @username to confirm granting god-mode" — too dangerous to fat-finger.
+- **Cache invalidation:** call `bump_user_perms_version(target_user_id)` AND `bump_perms_global_version()` after write so target's client picks up the change within one 60s poll cycle.
+- **Audit log:** action strings `god_mode.grant` / `god_mode.revoke` / `users.edit.grant` / `users.impersonate.grant` (etc.). Lock format upfront for item 12 compatibility.
+- **Plan card refinement:** branch the BillingCard "Full access" copy on whether the user has an active `subscriptions` row. Owner: original copy. Grantee with active sub: "You have admin access to all features. Your subscription remains active for billing purposes."
+
+**Platforms:** web admin only.
 
 ---
 

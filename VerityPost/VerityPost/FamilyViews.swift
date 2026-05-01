@@ -52,6 +52,10 @@ struct FamilyDashboardView: View {
         "verity_family": 4,
     ]
     private func maxKids(for tier: String?) -> Int {
+        // Item 11a Phase 8 — god-mode owner has no seat cap. Returning Int.max
+        // keeps the at-cap / no-family-plan branches in FamilyDashboardView
+        // false so the "Add kid" button stays usable regardless of plan.
+        if auth.isGodMode { return Int.max }
         guard let t = tier, let n = familyConfigMaxKids[t] else { return 0 }
         return n
     }

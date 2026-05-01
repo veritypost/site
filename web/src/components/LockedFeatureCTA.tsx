@@ -8,6 +8,7 @@ import { CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePermissionsContext } from './PermissionsProvider';
 import { LOCK_REASON } from '../lib/permissionKeys';
+import { useAuth } from '@/app/NavWrapper';
 
 /** gateType maps to the nature of the restriction:
  *  - 'plan'         → user is on a plan that doesn't include this feature (upsell)
@@ -114,6 +115,11 @@ export default function LockedFeatureCTA({
 }: LockedFeatureCTAProps) {
   const router = useRouter();
   const { user } = usePermissionsContext() as { user: unknown };
+  const { isGodMode } = useAuth();
+  // Item 11a Phase 5 — god-mode users never see plan/role/verify nudges.
+  // Belt-and-suspenders for the first-paint window before perms cache loads;
+  // the server short-circuit covers steady-state.
+  if (isGodMode) return null;
   const authed = !!user;
 
   const lockReason = gateTypeToLockReason(gateType, authed);
