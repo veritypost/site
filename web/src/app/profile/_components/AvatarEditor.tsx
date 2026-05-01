@@ -105,7 +105,7 @@ export function AvatarEditor({ user, preview, onUserUpdated }: Props) {
   const [inner, setInner] = useState<string>(u.avatar?.inner ?? DEFAULT_INNER);
   const [text, setText] = useState<string>(u.avatar?.text ?? DEFAULT_TEXT);
   const [initials, setInitials] = useState<string>(
-    (u.avatar?.initials ?? initialsFromUsername).slice(0, 4)
+    (u.avatar?.initials ?? initialsFromUsername).slice(0, 3)
   );
   const [activeChannel, setActiveChannel] = useState<Channel>('outer');
   const [saving, setSaving] = useState(false);
@@ -116,7 +116,7 @@ export function AvatarEditor({ user, preview, onUserUpdated }: Props) {
       outer: u.avatar?.outer ?? u.avatar_color ?? DEFAULT_OUTER,
       inner: u.avatar?.inner ?? DEFAULT_INNER,
       text: u.avatar?.text ?? DEFAULT_TEXT,
-      initials: (u.avatar?.initials ?? initialsFromUsername).slice(0, 4),
+      initials: (u.avatar?.initials ?? initialsFromUsername).slice(0, 3),
     });
   }, [u.avatar, u.avatar_color, initialsFromUsername]);
 
@@ -131,7 +131,7 @@ export function AvatarEditor({ user, preview, onUserUpdated }: Props) {
   const onInitialsChange = (raw: string) => {
     const cleaned = raw
       .replace(/[^A-Za-z0-9]/g, '')
-      .slice(0, 4)
+      .slice(0, 3)
       .toUpperCase();
     setInitials(cleaned);
   };
@@ -181,7 +181,7 @@ export function AvatarEditor({ user, preview, onUserUpdated }: Props) {
   return (
     <Card
       title="Avatar"
-      description="Pick your colors and set up to 4 characters for the monogram."
+      description="Pick your colors and set up to 3 characters for the monogram."
       footer={
         <>
           <button type="button" onClick={onReset} disabled={saving} style={buttonSecondaryStyle}>
@@ -246,7 +246,7 @@ export function AvatarEditor({ user, preview, onUserUpdated }: Props) {
           {/* Initials */}
           <Field
             label="Initials or numbers"
-            hint="Up to 4 characters. Letters or numbers — JD, AK12, 99, 4U all work."
+            hint="Up to 3 characters. Letters or numbers — JD, AK1, 99, 4U all work."
           >
             {(id) => (
               <input
@@ -254,7 +254,7 @@ export function AvatarEditor({ user, preview, onUserUpdated }: Props) {
                 type="text"
                 value={initials}
                 onChange={(e) => onInitialsChange(e.target.value)}
-                maxLength={4}
+                maxLength={3}
                 style={{ ...inputStyle, fontFamily: FONT.mono, letterSpacing: '0.05em' }}
                 autoComplete="off"
                 spellCheck={false}

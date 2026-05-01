@@ -367,8 +367,8 @@ export function ProfileApp({ defaultSection }: Props) {
       glyph: '⛨',
       group: 'Settings',
       title: 'Security',
-      reason: 'Email, password, and two-factor authentication.',
-      keywords: ['email', 'password', '2fa', 'mfa', 'authenticator'],
+      reason: 'Email and two-factor authentication.',
+      keywords: ['email', '2fa', 'mfa', 'authenticator'],
       render: () => <SecuritySection user={user} preview={false} />,
     },
     {

@@ -284,7 +284,7 @@ export function MFACard({ preview }: Props) {
       <ConfirmDialog
         open={confirmRemove}
         title="Disable two-factor authentication?"
-        body="Sign-ins will only require your password. Your account is safer with 2FA on; only disable if you're switching authenticator apps or replacing your device."
+        body="Sign-ins will only require your email code. Your account is safer with 2FA on; only disable if you're switching authenticator apps or replacing your device."
         confirmLabel="Disable 2FA"
         busyLabel="Disabling…"
         busy={busy}

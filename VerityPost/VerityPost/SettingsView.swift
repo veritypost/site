@@ -1176,7 +1176,9 @@ struct SettingsView: View {
         canApplyExpert = await PermissionService.shared.has("expert.application.apply")
         canEditProfile = true
         canEditEmail = true
-        canChangePassword = true
+        // Item 9 — adults are OTP-only per /login + /signup; the Password row is hidden.
+        // PasswordSettingsView struct stays on disk dormant per launch-hides convention.
+        canChangePassword = false
         canViewMFA = true
         canViewLoginActivity = await PermissionService.shared.has("settings.account.login_activity.view")
         canViewBilling = await PermissionService.shared.has("billing.view.plan")

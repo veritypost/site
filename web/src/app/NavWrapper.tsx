@@ -367,9 +367,9 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
   // Most Informed render their own anon empty state with inline Sign-up
   // CTAs; middleware no longer bounces those routes for anon.
   //
-  // Note: `/pricing` deliberately surfaces in the desktop top-bar +
+  // Note: `/pricing` deliberately surfaces in the desktop
   // footer instead of the bottom nav. Bottom nav is the 4 high-frequency
-  // tasks; conversion CTAs route through the top-bar / footer.
+  // tasks; conversion CTAs route through the footer.
   const navItems: NavItem[] = loggedIn
     ? [
         { label: 'Home', href: '/' },
@@ -570,10 +570,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
       </div>
 
       {showTopBar && (
-        // Fixed top bar — Verity Post wordmark on the left, Pricing link
-        // + magnifier on the right. Pricing is the conversion CTA and
-        // belongs in the global chrome; how-it-works is contextual depth
-        // and lives in the footer.
+        // Fixed top bar — Verity Post wordmark only. Pricing moved to the footer; magnifier removed earlier.
         <header style={topBarStyle}>
           <a
             href={topBarHomeHref}
@@ -589,25 +586,6 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
           >
             {BRAND_NAME}
           </a>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            <a
-              href="/pricing"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minHeight: 44,
-                padding: '0 12px',
-                fontSize: 13,
-                fontWeight: 600,
-                color: path === '/pricing' ? C.accent : C.dim,
-                textDecoration: 'none',
-              }}
-              aria-current={path === '/pricing' ? 'page' : undefined}
-            >
-              Pricing
-            </a>
-          </div>
         </header>
       )}
 

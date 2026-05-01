@@ -40,13 +40,13 @@ export default function Avatar({ user, size = 32 }: AvatarProps) {
   // pairs, rendering a broken half-char (e.g. the tofu glyph). Split
   // via Array.from so each entry is one full code point.
   const firstChar = user?.username ? Array.from(user.username)[0] : '?';
-  // Up to 4 characters, alphanumeric (letters or numbers). Letters
+  // Up to 3 characters, alphanumeric (letters or numbers). Letters
   // upper-cased for visual weight; numbers pass through as-is.
   const raw = (user?.avatar?.initials || firstChar || '?').toString();
-  const initials = raw.slice(0, 4).toUpperCase();
+  const initials = raw.slice(0, 3).toUpperCase();
   const fontSize = Math.max(
     8,
-    Math.round(size * (initials.length >= 4 ? 0.26 : initials.length >= 3 ? 0.3 : 0.36))
+    Math.round(size * (initials.length >= 3 ? 0.30 : initials.length >= 2 ? 0.34 : 0.36))
   );
 
   const innerSize = Math.round(size * 0.7);
