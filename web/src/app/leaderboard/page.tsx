@@ -543,40 +543,9 @@ export default function LeaderboardPage() {
           </div>
         )}
 
-        {/* Subcategories — paid only, dynamic based on selected category */}
-        {canCategories && activeSubs.length > 0 && (
-          <div
-            style={{
-              display: 'flex',
-              gap: 6,
-              flexWrap: 'wrap',
-              paddingBottom: 16,
-              marginBottom: 4,
-            }}
-          >
-            {activeSubs.map((sub) => (
-              <button
-                key={sub.id}
-                onClick={() => setActiveSub(activeSub === sub.id ? null : sub.id)}
-                style={{
-                  padding: '4px 10px',
-                  borderRadius: 14,
-                  border:
-                    activeSub === sub.id ? '1px solid var(--accent)' : '1px solid var(--border)',
-                  background: activeSub === sub.id ? 'rgba(0,0,0,0.05)' : 'transparent',
-                  color: activeSub === sub.id ? 'var(--accent)' : 'var(--dim)',
-                  fontSize: 11,
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  fontFamily: 'var(--font-sans)',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {sub.name}
-              </button>
-            ))}
-          </div>
-        )}
+        {/* Subcategory pills removed — activeSub state was never applied to
+            the query (category_scores has no subcategory_id yet). Hiding
+            the false affordance until Section C lands the data backbone. */}
 
         {/* List */}
         <div style={{ borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' }}>
