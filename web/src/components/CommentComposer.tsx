@@ -222,15 +222,15 @@ export default function CommentComposer({
     return (
       <div
         style={{
-          padding: '14px 16px',
+          padding: '16px 18px',
           border: '1px solid var(--border, #e5e5e5)',
           borderRadius: 12,
-          color: 'var(--dim, #888)',
-          fontSize: 13,
-          lineHeight: 1.5,
+          marginBottom: 16,
         }}
       >
-        Pass the quiz to join the discussion.
+        <div style={{ fontSize: 14, color: 'var(--dim, #888)', lineHeight: 1.5 }}>
+          Pass the quiz above to join the discussion.
+        </div>
       </div>
     );
   }
@@ -286,8 +286,8 @@ export default function CommentComposer({
 
 const containerStyle: CSSProperties = {
   border: '1px solid var(--border, #e5e5e5)',
-  borderRadius: 12,
-  padding: '10px 12px',
+  borderRadius: 14,
+  padding: '12px 14px',
   background: 'var(--card, #f7f7f7)',
   marginBottom: 16,
 };
@@ -297,6 +297,8 @@ const textareaStyle: CSSProperties = {
   border: 'none',
   color: 'var(--white, #111)',
   fontSize: 14,
+  lineHeight: 1.6,
+  padding: '4px 0',
   outline: 'none',
   resize: 'vertical',
   fontFamily: 'inherit',
@@ -305,41 +307,43 @@ const footerStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 8,
-  marginTop: 6,
-  fontSize: 11,
+  marginTop: 8,
+  paddingTop: 10,
+  borderTop: '1px solid var(--border, #e5e5e5)',
+  fontSize: 12,
   color: 'var(--dim, #666)',
 };
 const cancelBtnStyle: CSSProperties = {
   background: 'none',
   border: 'none',
-  fontSize: 12,
+  fontSize: 13,
   color: 'var(--dim, #666)',
   cursor: 'pointer',
 };
 const postBtnStyle: CSSProperties = {
-  padding: '6px 14px',
-  borderRadius: 8,
+  padding: '7px 16px',
+  borderRadius: 9,
   border: 'none',
   color: '#fff',
-  fontSize: 12,
+  fontSize: 13,
   fontWeight: 700,
 };
 const mentionHintStyle: CSSProperties = {
-  fontSize: 11,
+  fontSize: 12,
   color: '#b45309',
   background: '#fffbeb',
   border: '1px solid #fde68a',
-  borderRadius: 6,
-  padding: '6px 8px',
+  borderRadius: 8,
+  padding: '8px 10px',
   marginBottom: 8,
   lineHeight: 1.4,
 };
 const muteBannerStyle: CSSProperties = {
   border: '1px solid #fecaca',
   borderRadius: 12,
-  padding: '10px 14px',
+  padding: '12px 16px',
   background: '#fef2f2',
   marginBottom: 16,
-  fontSize: 13,
+  fontSize: 14,
   color: '#991b1b',
 };

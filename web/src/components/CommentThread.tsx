@@ -665,7 +665,7 @@ export default function CommentThread({
     // Three comment-shaped rows: avatar circle + 2-3 text lines each.
     // Shimmer animation defined in globals.css (.vp-skeleton / vpShimmer).
     return (
-      <div style={{ padding: '12px 0', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ padding: '12px 0', display: 'flex', flexDirection: 'column', gap: 18 }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
           <Skeleton width={32} height={32} style={{ borderRadius: '50%', flexShrink: 0 }} />
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -751,28 +751,31 @@ export default function CommentThread({
           contradict the "be the first" empty-state copy below. */}
       {visible.length > 0 && (
         <>
-          <div
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: 'var(--text-primary)',
-              marginBottom: 4,
-            }}
-          >
-            Every reader here passed the quiz.
+          <div style={{ marginBottom: 20 }}>
+            <div
+              style={{
+                fontSize: 22,
+                fontWeight: 700,
+                color: 'var(--text)',
+                lineHeight: 1.2,
+                marginBottom: 4,
+              }}
+            >
+              {displayComments.length} {displayComments.length === 1 ? 'comment' : 'comments'}
+            </div>
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                color: 'var(--dim)',
+              }}
+            >
+              Every reader here passed the quiz.
+            </div>
           </div>
-          <div
-            style={{
-              fontSize: 11,
-              textTransform: 'uppercase',
-              fontWeight: 700,
-              color: 'var(--dim, #666)',
-              letterSpacing: '0.04em',
-              marginBottom: 12,
-            }}
-          >
-            {displayComments.length} {displayComments.length === 1 ? 'comment' : 'comments'}
-          </div>
+          <div style={{ borderTop: '1px solid var(--border)', marginBottom: 20 }} />
         </>
       )}
 
@@ -780,15 +783,15 @@ export default function CommentThread({
         <button
           onClick={() => setExpertFilter((v) => !v)}
           style={{
-            fontSize: 11,
+            fontSize: 12,
             fontWeight: 600,
-            padding: '4px 10px',
-            borderRadius: 20,
+            padding: '6px 12px',
+            borderRadius: 6,
             border: `1px solid ${expertFilter ? '#16a34a' : 'var(--border, #e5e5e5)'}`,
             background: expertFilter ? 'rgba(34,197,94,0.10)' : 'transparent',
             color: expertFilter ? '#16a34a' : 'var(--dim, #666)',
             cursor: 'pointer',
-            marginBottom: 8,
+            marginBottom: 16,
           }}
         >
           {expertFilter ? 'Expert · showing only' : 'Expert'}
@@ -816,12 +819,12 @@ export default function CommentThread({
           style={{
             background: '#fffbeb',
             border: '1px solid #fde68a',
-            borderRadius: 12,
-            padding: '12px 14px',
+            borderRadius: 10,
+            padding: '14px 16px',
             marginBottom: 16,
           }}
         >
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#b45309', marginBottom: 6 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#b45309', marginBottom: 6 }}>
             Ask an Expert &mdash; routes to the category queue
           </div>
           <textarea
@@ -882,12 +885,12 @@ export default function CommentThread({
       {flashMessage && (
         <div
           style={{
-            fontSize: 12,
+            fontSize: 13,
             color: '#166534',
             background: '#ecfdf5',
             border: '1px solid #bbf7d0',
             borderRadius: 8,
-            padding: '8px 10px',
+            padding: '10px 12px',
             marginBottom: 8,
           }}
         >
@@ -907,7 +910,7 @@ export default function CommentThread({
           >
             <div
               id="comment-dialog-title"
-              style={{ fontSize: 15, fontWeight: 700, marginBottom: 10 }}
+              style={{ fontSize: 16, fontWeight: 700, marginBottom: 10 }}
             >
               {dialog.action === 'delete' && 'Delete this comment?'}
               {dialog.action === 'report' && 'Report this comment'}
@@ -1084,15 +1087,15 @@ export default function CommentThread({
               </>
             )}
 
-            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 6 }}>
+            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 14 }}>
               <button
                 onClick={closeDialog}
                 style={{
-                  padding: '7px 14px',
-                  borderRadius: 8,
+                  padding: '8px 16px',
+                  borderRadius: 9,
                   border: '1px solid var(--border, #e5e5e5)',
                   background: 'transparent',
-                  fontSize: 12,
+                  fontSize: 13,
                   cursor: 'pointer',
                   color: 'var(--dim, #666)',
                   fontFamily: 'inherit',
@@ -1112,15 +1115,15 @@ export default function CommentThread({
                     (!dialog.reason || (dialog.reason === 'other' && !dialog.description.trim())))
                 }
                 style={{
-                  padding: '7px 14px',
-                  borderRadius: 8,
+                  padding: '8px 16px',
+                  borderRadius: 9,
                   border: 'none',
                   background:
                     dialog.action === 'delete' || dialog.action === 'block'
                       ? '#dc2626'
                       : 'var(--accent, #111)',
                   color: '#fff',
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: 700,
                   cursor: dialog.submitting ? 'default' : 'pointer',
                   fontFamily: 'inherit',
@@ -1153,13 +1156,13 @@ export default function CommentThread({
         // alone reader has an editorial follow-up rather than a dead end.
         <div
           style={{
-            fontSize: 13,
-            color: 'var(--dim, #666)',
             textAlign: 'center',
-            padding: '30px 0',
+            padding: '48px 0 40px',
           }}
         >
-          <div>No comments yet. You passed the quiz &mdash; start the conversation.</div>
+          <div style={{ fontSize: 15, color: 'var(--dim, #666)', fontStyle: 'italic' }}>
+            No comments yet. You passed the quiz &mdash; start the conversation.
+          </div>
           {emptyStateExtra && (
             <div style={{ marginTop: 24, textAlign: 'left' }}>{emptyStateExtra}</div>
           )}
@@ -1208,9 +1211,9 @@ export default function CommentThread({
 
 const askExpertBtnStyle: CSSProperties = {
   display: 'inline-block',
-  padding: '8px 14px',
+  padding: '9px 16px',
   borderRadius: 8,
-  border: '1px dashed var(--border, #e5e5e5)',
+  border: '1px solid var(--border, #e5e5e5)',
   background: 'transparent',
   color: 'var(--accent, #111)',
   fontSize: 12,
@@ -1230,8 +1233,8 @@ const overlayStyle: CSSProperties = {
 const dialogStyle: CSSProperties = {
   background: 'var(--card, #fff)',
   border: '1px solid var(--border, #e5e5e5)',
-  borderRadius: 12,
-  padding: 18,
+  borderRadius: 14,
+  padding: 22,
   width: '90%',
   maxWidth: 420,
   color: 'var(--white, #111)',

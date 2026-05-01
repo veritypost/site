@@ -231,8 +231,8 @@ export default function CommentRow({
   return (
     <div
       style={{
-        padding: '12px 0',
-        borderBottom: depth === 0 && !comment.is_expert_reply ? '1px solid rgba(0,0,0,0.06)' : 'none',
+        padding: '18px 0',
+        borderBottom: depth === 0 && !comment.is_expert_reply ? '1px solid var(--border, #e5e5e5)' : 'none',
         marginLeft: depth > 0 ? 24 : 0,
         borderLeft: depth > 0 ? '2px solid var(--border, #e5e5e5)' : 'none',
         paddingLeft: depth > 0 ? 12 : 0,
@@ -240,7 +240,7 @@ export default function CommentRow({
           background: 'rgba(34,197,94,0.06)',
           borderRadius: 10,
           border: '1px solid rgba(34,197,94,0.15)',
-          padding: depth > 0 ? '12px 12px' : '12px',
+          padding: depth > 0 ? '14px 14px' : '14px',
           marginTop: 4,
           marginBottom: 4,
         } : {}),
@@ -248,24 +248,26 @@ export default function CommentRow({
     >
       {comment.is_context_pinned && (
         <div
-          style={{ fontSize: 11, color: 'var(--accent, #111)', fontWeight: 700, marginBottom: 6 }}
+          style={{ borderLeft: '2px solid var(--accent, #111)', paddingLeft: 8, marginBottom: 8 }}
         >
-          Pinned as Article Context
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--accent, #111)' }}>
+            Pinned as Article Context
+          </span>
         </div>
       )}
-      <div style={{ display: 'flex', gap: 10 }}>
-        <Avatar user={user} size={28} />
+      <div style={{ display: 'flex', gap: 12 }}>
+        <Avatar user={user} size={32} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 6,
+              gap: 5,
               flexWrap: 'wrap',
-              marginBottom: 3,
+              marginBottom: 5,
             }}
           >
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--white, #111)' }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--white, #111)' }}>
               {user.username || 'user'}
             </span>
             <VerifiedBadge user={user} />
@@ -318,7 +320,7 @@ export default function CommentRow({
                 Expert{user.expert_title ? ` · ${user.expert_title}` : ''}
               </span>
             )}
-            <span style={{ fontSize: 10, color: 'var(--dim, #666)', marginLeft: 'auto' }}>
+            <span style={{ fontSize: 11, color: 'var(--dim, #666)', marginLeft: 'auto' }}>
               {timeAgo(comment.created_at)}
               {comment.is_edited ? ' \u00b7 edited' : ''}
             </span>
@@ -335,7 +337,7 @@ export default function CommentRow({
                   padding: 8,
                   borderRadius: 8,
                   border: '1px solid var(--border, #e5e5e5)',
-                  fontSize: 13,
+                  fontSize: 14,
                   outline: 'none',
                   fontFamily: 'inherit',
                   resize: 'vertical',
@@ -346,7 +348,7 @@ export default function CommentRow({
                   onClick={doSaveEdit}
                   disabled={busy === 'edit' || !editBody.trim()}
                   style={{
-                    fontSize: 12,
+                    fontSize: 13,
                     padding: '4px 12px',
                     borderRadius: 6,
                     border: 'none',
@@ -377,12 +379,23 @@ export default function CommentRow({
                 </button>
               </div>
             </div>
+          ) : isDeleted ? (
+            <div
+              style={{
+                fontSize: 13,
+                lineHeight: 1.65,
+                color: 'var(--dim, #666)',
+                fontStyle: 'italic',
+              }}
+            >
+              [deleted]
+            </div>
           ) : (
             <div
               style={{
-                fontSize: 14,
-                lineHeight: 1.55,
-                color: 'var(--soft, #333)',
+                fontSize: 15,
+                lineHeight: 1.65,
+                color: 'var(--text, #1a1a1a)',
                 filter: blurred ? 'blur(6px)' : 'none',
                 userSelect: blurred ? 'none' : 'auto',
                 pointerEvents: blurred ? 'none' : 'auto',
@@ -405,64 +418,12 @@ export default function CommentRow({
 
           {!isDeleted && !editing && (
             <div style={{ marginTop: 8 }}>
-              {/* Row 1 \u2014 tag chip strip: horizontal scroll, all 6 chips always visible */}
-              {canContextTag && (
-                <div
-                  style={{
-                    display: 'flex',
-                    gap: 6,
-                    overflowX: 'auto',
-                    paddingBottom: 4,
-                    scrollbarWidth: 'none',
-                    msOverflowStyle: 'none',
-                  }}
-                >
-                  {tagKinds.map((kind) => {
-                    const meta = TAG_META[kind];
-                    const cast = !!comment._your_tags?.has(kind);
-                    let count: number | undefined;
-                    if (kind === 'context') count = comment.context_tag_count ?? 0;
-                    else if (kind === 'helpful') count = comment.helpful_count ?? 0;
-                    const showCount = typeof count === 'number' && count >= 1;
-                    const busyThis = busy === `tag:${kind}`;
-                    return (
-                      <button
-                        key={kind}
-                        onClick={() => doTag(kind)}
-                        disabled={busyThis}
-                        aria-pressed={cast}
-                        aria-label={`Tag ${meta.label}${showCount ? ` (${count})` : ''}`}
-                        style={{
-                          flexShrink: 0,
-                          fontSize: 11,
-                          fontWeight: 600,
-                          padding: '6px 10px',
-                          borderRadius: 14,
-                          minHeight: 32,
-                          border: `1px solid ${cast ? meta.color : 'var(--border, #e5e5e5)'}`,
-                          background: cast ? `${meta.color}1f` : 'transparent',
-                          color: cast ? meta.color : 'var(--dim, #666)',
-                          cursor: busyThis ? 'default' : 'pointer',
-                          opacity: busyThis ? 0.6 : 1,
-                          touchAction: 'manipulation',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {meta.label}
-                        {showCount ? ` ${count}` : ''}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Row 2 \u2014 vote / reply / menu */}
+              {/* Row 1 \u2014 vote / reply / menu */}
               <div
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: 8,
-                  marginTop: canContextTag ? 6 : 0,
                 }}
               >
               {canUpvote && (
@@ -470,7 +431,10 @@ export default function CommentRow({
                   onClick={() => doVote(yourVote === 'upvote' ? 'clear' : 'upvote')}
                   style={voteBtn(yourVote === 'upvote')}
                 >
-                  Up {comment.upvote_count || 0}
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <span>&#8593;</span>
+                    <span>{comment.upvote_count || 0}</span>
+                  </span>
                 </button>
               )}
               {canDownvote && (
@@ -478,7 +442,10 @@ export default function CommentRow({
                   onClick={() => doVote(yourVote === 'downvote' ? 'clear' : 'downvote')}
                   style={voteBtn(yourVote === 'downvote', true)}
                 >
-                  Down {comment.downvote_count || 0}
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <span>&#8595;</span>
+                    <span>{comment.downvote_count || 0}</span>
+                  </span>
                 </button>
               )}
 
@@ -486,9 +453,9 @@ export default function CommentRow({
                 <button
                   onClick={() => setReplyOpen((v) => !v)}
                   style={{
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: 600,
-                    padding: '10px 12px',
+                    padding: '8px 12px',
                     borderRadius: 14,
                     minHeight: 44,
                     minWidth: 44,
@@ -514,8 +481,8 @@ export default function CommentRow({
                     border: 'none',
                     color: 'var(--dim, #666)',
                     cursor: 'pointer',
-                    fontSize: 14,
-                    padding: '10px 12px',
+                    fontSize: 16,
+                    padding: '8px 12px',
                     minHeight: 44,
                     minWidth: 44,
                     touchAction: 'manipulation',
@@ -611,6 +578,58 @@ export default function CommentRow({
                 )}
               </div>
               </div>
+
+              {/* Row 2 — tag chip strip: secondary signals, below the action bar */}
+              {canContextTag && (
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: 6,
+                    overflowX: 'auto',
+                    paddingBottom: 4,
+                    scrollbarWidth: 'none',
+                    msOverflowStyle: 'none',
+                    marginTop: 8,
+                  }}
+                >
+                  {tagKinds.map((kind) => {
+                    const meta = TAG_META[kind];
+                    const cast = !!comment._your_tags?.has(kind);
+                    let count: number | undefined;
+                    if (kind === 'context') count = comment.context_tag_count ?? 0;
+                    else if (kind === 'helpful') count = comment.helpful_count ?? 0;
+                    const showCount = typeof count === 'number' && count >= 1;
+                    const busyThis = busy === `tag:${kind}`;
+                    return (
+                      <button
+                        key={kind}
+                        onClick={() => doTag(kind)}
+                        disabled={busyThis}
+                        aria-pressed={cast}
+                        aria-label={`Tag ${meta.label}${showCount ? ` (${count})` : ''}`}
+                        style={{
+                          flexShrink: 0,
+                          fontSize: 10,
+                          fontWeight: 600,
+                          padding: '4px 8px',
+                          borderRadius: 10,
+                          minHeight: 28,
+                          border: `1px solid ${cast ? meta.color : 'var(--border, #e5e5e5)'}`,
+                          background: cast ? `${meta.color}1f` : 'transparent',
+                          color: cast ? meta.color : 'var(--dim, #666)',
+                          cursor: busyThis ? 'default' : 'pointer',
+                          opacity: busyThis ? 0.6 : 1,
+                          touchAction: 'manipulation',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {meta.label}
+                        {showCount ? ` ${count}` : ''}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -643,14 +662,14 @@ function voteBtn(active: boolean, isDown = false): CSSProperties {
     display: 'inline-flex',
     alignItems: 'center',
     gap: 4,
-    padding: '10px 12px',
+    padding: '8px 12px',
     borderRadius: 14,
     minHeight: 44,
     minWidth: 44,
     border: `1px solid ${active ? color : 'var(--border, #e5e5e5)'}`,
     background: active ? `${color}12` : 'transparent',
     color,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: 600,
     cursor: 'pointer',
     touchAction: 'manipulation',
@@ -671,8 +690,8 @@ function MenuItem({ children, onClick, danger }: MenuItemProps) {
         display: 'block',
         width: '100%',
         textAlign: 'left',
-        padding: '6px 10px',
-        fontSize: 12,
+        padding: '8px 12px',
+        fontSize: 13,
         background: 'transparent',
         border: 'none',
         color: danger ? '#dc2626' : 'var(--white, #111)',

@@ -1090,7 +1090,10 @@ struct StoryDetailView: View {
             if !quizQuestions.isEmpty {
                 HStack(spacing: 5) {
                     ForEach(0..<quizQuestions.count, id: \.self) { i in
-                        Circle().fill(dotColor(for: i)).frame(width: 7, height: 7)
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(dotColor(for: i))
+                            .frame(width: 7, height: 5)
+                            .animation(.easeInOut(duration: 0.2), value: quizCurrent)
                     }
                 }
             }
@@ -1098,44 +1101,52 @@ struct StoryDetailView: View {
     }
 
     @ViewBuilder private var quizIdleCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // Voice unified with the Article-tab `passToCommentCTA` per
-            // adversary review — single phrase across both entry points
-            // so readers don't see two flavors of the same mechanic.
-            Text("Pass to comment.")
-                .font(.system(.callout, design: .default, weight: .bold))
-                .foregroundColor(VP.text)
-            Text("5 questions about what you just read. Get 3 right and the conversation opens.")
-                .font(.caption)
-                .foregroundColor(VP.soft)
-                .lineSpacing(2)
-            if let err = quizError {
-                Text(err).font(.caption).foregroundColor(VP.wrong)
-            }
-            if canTakeQuiz {
-                Button {
-                    Task { await startQuiz() }
-                } label: {
-                    Text(quizStage == .loading
-                         ? "Starting quiz…"
-                         : (quizError != nil ? "Try again" : "Take the quiz"))
-                        .font(.system(.subheadline, design: .default, weight: .bold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 10)
-                        .background(VP.accent)
-                        .cornerRadius(9)
+        HStack(alignment: .top, spacing: 0) {
+            // Leading accent bar
+            Rectangle()
+                .fill(VP.accent)
+                .frame(width: 3)
+                .cornerRadius(2)
+            VStack(alignment: .leading, spacing: 10) {
+                // Voice unified with the Article-tab `passToCommentCTA` per
+                // adversary review — single phrase across both entry points
+                // so readers don't see two flavors of the same mechanic.
+                Text("Pass to comment.")
+                    .font(.headline)
+                    .foregroundColor(VP.text)
+                Text("5 questions about what you just read. Get 3 right and the conversation opens.")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .lineSpacing(2)
+                if let err = quizError {
+                    Text(err).font(.caption).foregroundColor(VP.wrong)
                 }
-                .disabled(quizStage == .loading)
-                .buttonStyle(.plain)
-                .padding(.top, 4)
+                if canTakeQuiz {
+                    Button {
+                        Task { await startQuiz() }
+                    } label: {
+                        Text(quizStage == .loading
+                             ? "Starting quiz…"
+                             : (quizError != nil ? "Try again" : "Take the quiz"))
+                            .font(.system(.subheadline, design: .default, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(VP.accent)
+                            .cornerRadius(10)
+                    }
+                    .disabled(quizStage == .loading)
+                    .buttonStyle(.plain)
+                    .padding(.top, 4)
+                }
             }
+            .padding(16)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
         .background(VP.card)
         .cornerRadius(14)
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(VP.border, lineWidth: 1))
+        .clipped()
     }
 
     @ViewBuilder private var quizAnsweringCard: some View {
@@ -1183,46 +1194,53 @@ struct StoryDetailView: View {
 
     @ViewBuilder private var quizResultCard: some View {
         if let r = quizResult {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 12) {
                 Text(r.passed
                      ? "Passed — \(r.correct) of \(r.total). Discussion unlocked."
                      : "Scored \(r.correct) of \(r.total). Needed \(passThreshold) to pass.")
-                    .font(.system(.headline, design: .default, weight: .bold))
-                    .foregroundColor(r.passed ? VP.right : VP.wrong)
+                    .font(.headline)
+                    .foregroundColor(r.passed ? VP.right : VP.text)
                 if let pct = r.percentile {
                     Text("Better than \(pct)% of readers on this article.")
-                        .font(.caption)
-                        .foregroundColor(VP.soft)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
                 }
                 if !hasUnlimitedQuizAttempts, let remaining = r.attempts_remaining, !r.passed {
                     Text("You have \(remaining) attempt\(remaining == 1 ? "" : "s") left.")
-                        .font(.caption)
-                        .foregroundColor(VP.soft)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
                 }
 
                 // D41: per-question breakdown with explanations, every attempt.
-                ForEach(r.results) { row in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(row.question_text)
-                            .font(.system(.footnote, design: .default, weight: .semibold))
-                            .foregroundColor(VP.text)
-                        if row.is_correct {
-                            Text("Correct")
-                                .font(.system(.caption, design: .default, weight: .semibold))
-                                .foregroundColor(VP.right)
-                        } else {
-                            let correctText = row.options.indices.contains(row.correct_answer)
-                                ? row.options[row.correct_answer].text : ""
-                            Text("Incorrect — correct answer: \(correctText)")
-                                .font(.system(.caption, design: .default, weight: .semibold))
-                                .foregroundColor(VP.wrong)
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(r.results) { row in
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(row.question_text)
+                                .font(.system(.footnote, design: .default, weight: .semibold))
+                                .foregroundColor(VP.text)
+                            if row.is_correct {
+                                Label("Correct", systemImage: "checkmark.circle.fill")
+                                    .font(.system(.caption, design: .default, weight: .semibold))
+                                    .foregroundColor(VP.right)
+                            } else {
+                                let correctText = row.options.indices.contains(row.correct_answer)
+                                    ? row.options[row.correct_answer].text : ""
+                                Label("Correct: \(correctText)", systemImage: "xmark.circle.fill")
+                                    .font(.system(.caption, design: .default, weight: .semibold))
+                                    .foregroundColor(VP.wrong)
+                            }
+                            if let ex = row.explanation, !ex.isEmpty {
+                                Text(ex)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .lineSpacing(2)
+                            }
                         }
-                        if let ex = row.explanation, !ex.isEmpty {
-                            Text(ex).font(.caption).foregroundColor(VP.dim)
-                        }
+                        .padding(10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color(.secondarySystemBackground))
+                        .cornerRadius(10)
                     }
-                    .padding(.vertical, 6)
-                    Divider().background(VP.border)
                 }
 
                 if !r.passed {
@@ -1235,10 +1253,10 @@ struct StoryDetailView: View {
                             Text("View plans")
                                 .font(.system(.subheadline, design: .default, weight: .bold))
                                 .foregroundColor(.white)
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 10)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
                                 .background(VP.accent)
-                                .cornerRadius(9)
+                                .cornerRadius(10)
                         }
                         .buttonStyle(.plain)
                     } else if canRetakeQuiz {
@@ -1248,20 +1266,23 @@ struct StoryDetailView: View {
                             Text("Retake with fresh questions")
                                 .font(.system(.subheadline, design: .default, weight: .bold))
                                 .foregroundColor(.white)
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 10)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
                                 .background(VP.accent)
-                                .cornerRadius(9)
+                                .cornerRadius(10)
                         }
                         .buttonStyle(.plain)
                     }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(16)
-            .background(r.passed ? Color(red: 0.93, green: 0.99, blue: 0.95) : Color(red: 1.0, green: 0.96, blue: 0.96))
+            .padding(18)
+            .background(Color(.systemBackground))
             .cornerRadius(14)
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(r.passed ? VP.right : VP.wrong, lineWidth: 1))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(r.passed ? VP.right.opacity(0.4) : Color(.systemRed).opacity(0.3), lineWidth: 1)
+            )
         }
     }
 
@@ -1269,19 +1290,18 @@ struct StoryDetailView: View {
         if quizStage == .result, let rows = quizResult?.results, i < rows.count {
             return rows[i].is_correct ? VP.right : VP.wrong
         }
-        if i < quizQuestions.count, quizAnswers[quizQuestions[i].id] != nil {
-            return VP.accent.opacity(0.7)
-        }
         if i == quizCurrent && (quizStage == .answering || quizStage == .submitting) {
             return VP.accent
         }
-        return VP.tlDot
+        if i < quizQuestions.count, quizAnswers[quizQuestions[i].id] != nil {
+            return VP.accent.opacity(0.4)
+        }
+        return Color(.systemGray5)
     }
 
     private func quizOption(quizId: String, oi: Int, text: String) -> some View {
         let answered = quizAnswers[quizId] != nil
         let selected = quizAnswers[quizId] == text
-        let border = selected ? VP.accent : VP.border
         return Button {
             guard !answered, quizStage == .answering else { return }
             // Subtle selection haptic on every answer tap. Apple recommends
@@ -1305,10 +1325,14 @@ struct StoryDetailView: View {
                 }
             }
         } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: 10) {
+                // Letter badge
                 Text(["A", "B", "C", "D"][min(oi, 3)])
-                    .foregroundColor(VP.dim)
-                    .font(.system(.footnote, design: .default, weight: .medium))
+                    .font(.system(.caption, design: .default, weight: .semibold))
+                    .foregroundColor(selected ? VP.accent : .secondary)
+                    .frame(width: 24, height: 24)
+                    .background(selected ? Color.white : Color.primary.opacity(0.08))
+                    .cornerRadius(6)
                 Text(text)
                     .foregroundColor(selected ? .white : VP.text)
                     .font(.system(.subheadline, design: .default, weight: selected ? .semibold : .regular))
@@ -1316,10 +1340,12 @@ struct StoryDetailView: View {
                 Spacer()
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(selected ? VP.accent : VP.card)
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(border, lineWidth: 1))
+            .padding(.vertical, 11)
+            .background(selected ? VP.accent : Color(.secondarySystemBackground))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(selected ? VP.accent : VP.border, lineWidth: 1))
             .cornerRadius(10)
+            .opacity(answered && !selected ? 0.35 : 1.0)
+            .animation(.easeInOut(duration: 0.15), value: selected)
         }
         .buttonStyle(.plain)
         .disabled(answered || quizStage != .answering)
@@ -1550,11 +1576,11 @@ struct StoryDetailView: View {
                 .padding(.bottom, 8)
             }
 
-            HStack(alignment: .top, spacing: 8) {
-                AvatarView(user: auth.currentUser, size: 28)
-                VStack(alignment: .leading, spacing: 6) {
-                    TextField("Join the discussion...", text: $commentText, axis: .vertical)
-                        .font(.footnote)
+            HStack(alignment: .top, spacing: 10) {
+                AvatarView(user: auth.currentUser, size: 32)
+                VStack(alignment: .leading, spacing: 8) {
+                    TextField("Join the discussion…", text: $commentText, axis: .vertical)
+                        .font(.subheadline)
                         .foregroundColor(VP.text)
                         .lineLimit(1...4)
                         .focused($composerFocused)
@@ -1576,18 +1602,21 @@ struct StoryDetailView: View {
                         .onChange(of: commentText) { _, new in
                             handleMentionChange(new)
                         }
+                        .padding(10)
+                        .background(Color(.secondarySystemBackground))
+                        .cornerRadius(12)
                     HStack {
                         Spacer()
                         Button {
                             Task { await postComment() }
                         } label: {
-                            Text(commentSubmitting ? "..." : (commentRateRemainingSec > 0 ? "Wait \(commentRateRemainingSec)s" : "Post"))
-                                .font(.system(.caption, design: .default, weight: .semibold))
+                            Text(commentSubmitting ? "Posting…" : (commentRateRemainingSec > 0 ? "Wait \(commentRateRemainingSec)s" : "Post"))
+                                .font(.system(.subheadline, design: .default, weight: .semibold))
                                 .foregroundColor(.white)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 6)
+                                .padding(.horizontal, 18)
+                                .padding(.vertical, 8)
                                 .background(
-                                    RoundedRectangle(cornerRadius: 8).fill(
+                                    Capsule().fill(
                                         commentText.trimmingCharacters(in: .whitespaces).isEmpty || commentRateRemainingSec > 0
                                         ? VP.muted : VP.accent
                                     )
@@ -1598,7 +1627,7 @@ struct StoryDetailView: View {
                     }
                 }
             }
-            .padding(12)
+            .padding(14)
             .background(VP.card)
             .overlay(RoundedRectangle(cornerRadius: 14).stroke(VP.border))
             .cornerRadius(14)
@@ -1676,12 +1705,12 @@ struct StoryDetailView: View {
         let indent = CGFloat(depth) * 16
         let isOwnComment = comment.userId != nil && comment.userId == auth.currentUser?.id
         let isEditing = editingCommentId == comment.id
-        return HStack(alignment: .top, spacing: 8) {
+        return HStack(alignment: .top, spacing: 10) {
             AvatarView(
                 outerHex: u?.avatar?.outer ?? u?.avatarColor,
                 innerHex: u?.avatar?.inner,
                 initials: initials,
-                size: 28
+                size: 32
             )
             VStack(alignment: .leading, spacing: 4) {
                 if comment.isPinned == true {
@@ -1705,13 +1734,13 @@ struct StoryDetailView: View {
                                 .environmentObject(auth)
                         } label: {
                             Text(uname)
-                                .font(.system(.footnote, design: .default, weight: .semibold))
+                                .font(.subheadline.weight(.semibold))
                                 .foregroundColor(VP.text)
                         }
                         .buttonStyle(.plain)
                     } else {
                         Text("user")
-                            .font(.system(.footnote, design: .default, weight: .semibold))
+                            .font(.subheadline.weight(.semibold))
                             .foregroundColor(VP.text)
                     }
                     VerifiedBadgeView(isExpert: u?.isExpert, isVerifiedPublicFigure: u?.isVerifiedPublicFigure)
@@ -1737,8 +1766,8 @@ struct StoryDetailView: View {
                     Spacer()
                     if let d = comment.createdAt {
                         Text(timeAgo(d))
-                            .font(.caption2)
-                            .foregroundColor(VP.dim)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
                 }
                 if comment.isDeleted {
@@ -2918,6 +2947,13 @@ struct StoryDetailView: View {
                 quizStage = .result
                 if decoded.passed {
                     userPassedQuiz = true
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+                        showPassBurst = true
+                    }
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                        withAnimation { showPassBurst = false }
+                    }
                     if push.status == .notDetermined,
                        !push.prePromptRecentlyDeclined,
                        !push.hasBeenPrompted {
@@ -3168,17 +3204,22 @@ struct StoryDetailView: View {
     }
 
     private func voteButton(label: String, count: Int, active: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+        let isUp = label == "Up"
+        let activeColor: Color = isUp ? .green : .red
+        return Button(action: action) {
             HStack(spacing: 4) {
-                Text(label).font(.system(.caption, design: .default, weight: .semibold))
-                Text("\(count)").font(.caption)
+                Image(systemName: isUp ? "arrow.up" : "arrow.down")
+                    .font(.system(size: 11, weight: .semibold))
+                if count > 0 {
+                    Text("\(count)").font(.system(.caption, design: .default, weight: .medium))
+                }
             }
-            .foregroundColor(active ? VP.accent : VP.dim)
+            .foregroundColor(active ? activeColor : .secondary)
             .padding(.horizontal, 10)
-            .padding(.vertical, 3)
+            .padding(.vertical, 5)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(active ? VP.accent : VP.border, lineWidth: 1)
+                    .stroke(active ? activeColor.opacity(0.5) : VP.border, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
@@ -3213,22 +3254,22 @@ struct StoryDetailView: View {
                     Button {
                         Task { await toggleCommentTag(comment, kind: entry.kind) }
                     } label: {
-                        HStack(spacing: 4) {
-                            Text(entry.label).font(.system(.caption, design: .default, weight: .semibold))
+                        HStack(spacing: 3) {
+                            Text(entry.label).font(.caption.weight(.semibold))
                             if let n = count, n >= 1 {
                                 Text("\(n)").font(.caption)
                             }
                         }
                         .foregroundColor(cast ? entry.color : VP.dim)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
                         .background(
                             RoundedRectangle(cornerRadius: 14)
-                                .fill(cast ? entry.color.opacity(0.12) : Color.clear)
+                                .fill(cast ? entry.color.opacity(0.15) : Color.clear)
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 14)
-                                .stroke(cast ? entry.color : VP.border, lineWidth: 1)
+                                .stroke(cast ? entry.color.opacity(0.6) : VP.border, lineWidth: 1)
                         )
                         .opacity(busy ? 0.6 : 1)
                     }

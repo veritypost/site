@@ -71,6 +71,8 @@ const C = {
   warn: '#b45309',
 };
 
+const OPTION_LETTERS = ['A', 'B', 'C', 'D'];
+
 export default function ArticleQuiz({
   articleId,
   initialPassed = false,
@@ -234,9 +236,9 @@ export default function ArticleQuiz({
           <div style={{ fontSize: 13, color: C.text, marginTop: 4 }}>
             {isKid
               ? 'Great reading! You got it.'
-              : 'You\u2019ve passed the quiz on this article. The discussion is below.'}
+              : 'You’ve passed the quiz on this article. The discussion is below.'}
           </div>
-          {/* T141 \u2014 give passed-state a forward path. One line, two
+          {/* T141 — give passed-state a forward path. One line, two
               targets: jump to the unlocked thread, or go pick the next
               read. Same-category recirc is owned by T11; this is just
               the "what now?" beat. */}
@@ -248,7 +250,7 @@ export default function ArticleQuiz({
               >
                 Jump to discussion
               </a>
-              {' \u00b7 '}
+              {' · '}
               <a
                 href="/browse"
                 style={{ color: C.accent, textDecoration: 'underline', fontWeight: 600 }}
@@ -269,15 +271,16 @@ export default function ArticleQuiz({
         style={{
           background: C.card,
           border: `1px solid ${C.border}`,
-          borderRadius: 14,
+          borderLeft: '3px solid var(--accent)',
+          borderRadius: '0 12px 12px 0',
           padding: '18px 20px',
           marginTop: 24,
         }}
       >
-        <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 6 }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 6 }}>
           Unlock the discussion
         </div>
-        <div style={{ fontSize: 13, color: C.dim, marginBottom: 14, lineHeight: 1.5 }}>
+        <div style={{ fontSize: 14, color: C.dim, marginBottom: 14, lineHeight: 1.5 }}>
           Answer 5 questions about this article. 3 correct unlocks the comment section.
         </div>
         {error && <div style={{ fontSize: 12, color: C.danger, marginBottom: 10 }}>{error}</div>}
@@ -285,17 +288,21 @@ export default function ArticleQuiz({
           onClick={startAttempt}
           disabled={stage === 'loading-start'}
           style={{
-            padding: '10px 20px',
-            borderRadius: 9,
+            display: 'block',
+            width: '100%',
+            padding: '13px 20px',
+            borderRadius: 10,
             border: 'none',
             background: C.accent,
             color: '#fff',
-            fontSize: 14,
+            fontSize: 15,
             fontWeight: 700,
             cursor: stage === 'loading-start' ? 'default' : 'pointer',
+            opacity: stage === 'loading-start' ? 0.6 : 1,
+            fontFamily: 'inherit',
           }}
         >
-          {stage === 'loading-start' ? 'Loading\u2026' : 'Take the quiz'}
+          {stage === 'loading-start' ? 'Loading…' : 'Take the quiz'}
         </button>
       </div>
     );
@@ -322,20 +329,34 @@ export default function ArticleQuiz({
             marginBottom: 10,
           }}
         >
-          <div style={{ fontSize: 13, fontWeight: 700, color: C.dim }}>
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: C.dim,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+            }}
+          >
             Question {currentIndex + 1} of {questions.length}
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 3, marginBottom: 16 }}>
           {questions.map((_, i) => (
             <div
               key={i}
               style={{
                 flex: 1,
-                height: 3,
-                borderRadius: 2,
-                background: i <= currentIndex ? C.accent : C.border,
+                height: 5,
+                borderRadius: 4,
+                background:
+                  i < currentIndex
+                    ? 'rgba(17,17,17,0.35)'
+                    : i === currentIndex
+                      ? C.accent
+                      : C.border,
+                transition: 'background 250ms ease',
               }}
             />
           ))}
@@ -345,10 +366,10 @@ export default function ArticleQuiz({
           <>
             <div
               style={{
-                fontSize: 15,
+                fontSize: 16,
                 color: C.text,
-                marginBottom: 14,
-                lineHeight: 1.45,
+                marginBottom: 18,
+                lineHeight: 1.5,
                 fontWeight: 600,
               }}
             >
@@ -357,28 +378,50 @@ export default function ArticleQuiz({
             {q.options?.map((opt, oi) => {
               const selected = answers[q.id] === opt.text;
               const anySelected = answers[q.id] != null;
+              const letter = OPTION_LETTERS[oi] ?? String(oi + 1);
               return (
                 <button
                   key={oi}
                   onClick={() => !grading && !anySelected && selectOption(q, oi)}
                   disabled={grading || anySelected}
                   style={{
-                    display: 'block',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
                     width: '100%',
                     textAlign: 'left',
                     padding: '12px 14px',
                     borderRadius: 10,
                     border: `2px solid ${selected ? C.accent : C.border}`,
-                    background: selected ? C.accent : '#fff',
+                    background: selected ? C.accent : C.card,
                     color: selected ? '#fff' : C.text,
                     marginBottom: 8,
                     cursor: grading || anySelected ? 'default' : 'pointer',
                     fontSize: 14,
                     fontWeight: selected ? 700 : 400,
                     fontFamily: 'inherit',
-                    transition: 'background 120ms, color 120ms, border-color 120ms',
+                    opacity: anySelected && !selected ? 0.38 : 1,
+                    transition: 'all 150ms ease',
                   }}
                 >
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: 22,
+                      height: 22,
+                      borderRadius: 6,
+                      flexShrink: 0,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      background: selected ? '#fff' : 'var(--border)',
+                      color: selected ? 'var(--accent)' : 'var(--dim)',
+                      transition: 'background 150ms ease, color 150ms ease',
+                    }}
+                  >
+                    {letter}
+                  </span>
                   {opt.text}
                 </button>
               );
@@ -387,7 +430,17 @@ export default function ArticleQuiz({
         )}
 
         {grading && (
-          <div style={{ fontSize: 12, color: C.dim, marginTop: 10 }}>{'Grading\u2026'}</div>
+          <div
+            style={{
+              fontSize: 13,
+              color: C.dim,
+              marginTop: 14,
+              textAlign: 'center',
+              letterSpacing: '0.04em',
+            }}
+          >
+            {'Grading…'}
+          </div>
         )}
         {error && <div style={{ fontSize: 12, color: C.danger, marginTop: 10 }}>{error}</div>}
       </div>
@@ -414,7 +467,7 @@ export default function ArticleQuiz({
               background: 'var(--card, #f7f7f7)',
               border: `1px solid ${C.border}`,
               borderRadius: 14,
-              padding: '24px 24px 22px',
+              padding: '28px 28px 26px',
               marginTop: 24,
               textAlign: 'left',
               opacity: passRevealed ? 1 : 0,
@@ -454,7 +507,7 @@ export default function ArticleQuiz({
                   fontWeight: 500,
                   color: C.dim,
                   background: 'rgba(0,0,0,0.04)',
-                  padding: '4px 10px',
+                  padding: '5px 12px',
                   borderRadius: 99,
                 }}
               >
@@ -471,39 +524,66 @@ export default function ArticleQuiz({
         {interstitialNode}
         <div
           style={{
-            background: '#fef2f2',
-            border: `1px solid ${C.danger}`,
-            borderRadius: 14,
-            padding: '18px 20px',
+            background: C.card,
+            border: `1px solid ${C.border}`,
+            borderLeft: '3px solid #dc2626',
+            borderRadius: '0 12px 12px 0',
+            padding: '20px 20px 20px 22px',
             marginTop: 24,
           }}
         >
           <div
             style={{
-              fontSize: 16,
-              fontWeight: 800,
-              color: C.danger,
-              marginBottom: 4,
+              fontSize: 18,
+              fontWeight: 700,
+              color: C.text,
             }}
           >
-            {correct} of {total}. The bar is 3 to unlock the discussion.
+            {correct} of {total}.
           </div>
-          <div style={{ fontSize: 13, color: C.text, marginBottom: 14 }}>
-            Better than {percentile}% of readers on this article.
+          <div style={{ fontSize: 14, color: C.dim, marginTop: 4, marginBottom: 14 }}>
+            The bar is 3 to unlock the discussion.
           </div>
+
+          {percentile != null && (
+            <div
+              style={{
+                display: 'inline-block',
+                fontSize: 12,
+                fontWeight: 500,
+                color: C.dim,
+                background: 'rgba(0,0,0,0.04)',
+                padding: '5px 12px',
+                borderRadius: 99,
+                marginTop: 12,
+                marginBottom: 14,
+              }}
+            >
+              Better than {percentile}% of readers on this article
+            </div>
+          )}
 
           {results?.map((r, i) => (
             <div
               key={r.quiz_id}
               style={{
-                background: '#fff',
+                background: C.card,
                 border: `1px solid ${C.border}`,
                 borderRadius: 10,
                 padding: '12px 14px',
                 marginBottom: 10,
               }}
             >
-              <div style={{ fontSize: 12, fontWeight: 700, color: C.dim, marginBottom: 4 }}>
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  color: C.dim,
+                  marginBottom: 4,
+                }}
+              >
                 Question {i + 1}
               </div>
               <div style={{ fontSize: 14, color: C.text, marginBottom: 8 }}>{r.question_text}</div>
@@ -516,11 +596,11 @@ export default function ArticleQuiz({
               >
                 {r.is_correct
                   ? 'Correct'
-                  : `Incorrect \u2014 you picked "${r.selected_answer ?? '\u2014'}"`}
+                  : `Incorrect — you picked "${r.selected_answer ?? '—'}"`}
               </div>
               {!r.is_correct && (
                 <div style={{ fontSize: 13, color: C.text, marginTop: 2 }}>
-                  Correct answer: <b>{r.options?.[r.correct_answer]?.text ?? '\u2014'}</b>
+                  Correct answer: <b>{r.options?.[r.correct_answer]?.text ?? '—'}</b>
                 </div>
               )}
               {r.explanation && (
@@ -535,15 +615,18 @@ export default function ArticleQuiz({
             <button
               onClick={startAttempt}
               style={{
-                padding: '10px 20px',
-                borderRadius: 9,
+                display: 'block',
+                width: '100%',
+                padding: '13px 20px',
+                borderRadius: 10,
                 border: 'none',
                 background: C.accent,
                 color: '#fff',
-                fontSize: 14,
+                fontSize: 15,
                 fontWeight: 700,
                 cursor: 'pointer',
                 marginTop: 4,
+                fontFamily: 'inherit',
               }}
             >
               Take another look and try again
