@@ -341,39 +341,48 @@ export default function CommentRow({
           </div>
 
           {editing ? (
-            <div>
+            <div style={{
+              borderLeft: '3px solid var(--accent, #111)',
+              borderRadius: '0 10px 10px 0',
+              border: '1px solid var(--border, #e5e5e5)',
+              padding: '10px 12px',
+              background: 'var(--card, #f7f7f7)',
+              marginBottom: 2,
+            }}>
               <textarea
                 value={editBody}
+                autoFocus
                 onChange={(e) => setEditBody(e.target.value)}
-                rows={2}
+                rows={3}
                 style={{
                   width: '100%',
-                  padding: 8,
-                  borderRadius: 8,
-                  border: '1px solid var(--border, #e5e5e5)',
+                  background: 'transparent',
+                  border: 'none',
                   fontSize: 14,
+                  lineHeight: 1.6,
+                  color: 'var(--text, #1a1a1a)',
                   outline: 'none',
                   fontFamily: 'inherit',
                   resize: 'vertical',
+                  padding: '2px 0',
                 }}
               />
-              <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+              <div style={{ display: 'flex', gap: 6, marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border, #e5e5e5)' }}>
                 <button
                   onClick={doSaveEdit}
                   disabled={busy === 'edit' || !editBody.trim()}
                   style={{
                     fontSize: 13,
-                    padding: '4px 12px',
-                    borderRadius: 6,
+                    padding: '7px 16px',
+                    borderRadius: 9,
                     border: 'none',
-                    background: 'var(--accent, #111)',
+                    background: editBody.trim() && busy !== 'edit' ? 'var(--accent, #111)' : '#ccc',
                     color: '#fff',
-                    fontWeight: 600,
-                    cursor: busy === 'edit' ? 'not-allowed' : 'pointer',
-                    opacity: busy === 'edit' ? 0.6 : 1,
+                    fontWeight: 700,
+                    cursor: busy === 'edit' || !editBody.trim() ? 'default' : 'pointer',
                   }}
                 >
-                  Save
+                  {busy === 'edit' ? 'Saving…' : 'Save'}
                 </button>
                 <button
                   onClick={() => {
@@ -381,11 +390,12 @@ export default function CommentRow({
                     setEditBody(comment.body || '');
                   }}
                   style={{
-                    fontSize: 12,
-                    padding: '4px 12px',
-                    borderRadius: 6,
-                    border: '1px solid var(--border, #e5e5e5)',
+                    fontSize: 13,
+                    padding: '7px 14px',
+                    borderRadius: 9,
+                    border: 'none',
                     background: 'transparent',
+                    color: 'var(--dim, #666)',
                     cursor: 'pointer',
                   }}
                 >

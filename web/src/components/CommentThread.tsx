@@ -747,43 +747,42 @@ export default function CommentThread({
           Suppressed on empty threads where "Every reader here" would
           contradict the "be the first" empty-state copy below. */}
       {visible.length > 0 && (
-        <>
-          <div style={{
-            display: 'flex',
-            alignItems: 'baseline',
-            gap: 12,
-            marginBottom: 20,
-            paddingBottom: 12,
-            borderBottom: '1px solid #e5e5e5',
-          }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 20,
+          paddingBottom: 12,
+          borderBottom: '1px solid #e5e5e5',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
             <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text, #1a1a1a)' }}>
               {comments.length} {comments.length === 1 ? 'comment' : 'comments'}
             </span>
-            <div style={{ display: 'flex', gap: 12, marginLeft: 8 }}>
-              {(['top', 'newest'] as const).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setSort(s)}
-                  style={{
-                    fontSize: 13,
-                    fontWeight: sort === s ? 600 : 400,
-                    color: sort === s ? 'var(--text, #1a1a1a)' : 'var(--dim, #666)',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: 0,
-                    textTransform: 'capitalize',
-                  }}
-                >
-                  {s === 'top' ? 'Top' : 'Newest'}
-                </button>
-              ))}
-            </div>
+            <span style={{ fontSize: 11, color: '#bbb', fontWeight: 400 }}>· quiz-verified</span>
           </div>
-          <div style={{ fontSize: 13, color: '#999', fontWeight: 400, marginBottom: 16 }}>
-            Every reader here passed the quiz.
+          <div style={{ display: 'flex', gap: 2 }}>
+            {(['top', 'newest'] as const).map((s) => (
+              <button
+                key={s}
+                onClick={() => setSort(s)}
+                style={{
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: sort === s ? 'var(--text, #1a1a1a)' : 'var(--dim, #999)',
+                  background: sort === s ? 'rgba(17,17,17,0.07)' : 'transparent',
+                  border: 'none',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  padding: '4px 10px',
+                  minHeight: 30,
+                }}
+              >
+                {s === 'top' ? 'Top' : 'Newest'}
+              </button>
+            ))}
           </div>
-        </>
+        </div>
       )}
 
       {visible.some((c) => c.is_expert_reply || c.is_expert_question) && (

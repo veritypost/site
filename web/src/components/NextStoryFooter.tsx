@@ -15,14 +15,14 @@ export default function NextStoryFooter({ category, nearbyStories }: NextStoryFo
       }}
     >
       {nearbyStories.length > 0 && category && (
-        <section style={{ marginBottom: 24 }}>
+        <section style={{ marginBottom: 28 }}>
           <p
             style={{
               fontSize: 11,
-              fontWeight: 600,
+              fontWeight: 700,
               letterSpacing: '0.08em',
               textTransform: 'uppercase',
-              color: 'var(--dim, #5a5a5a)',
+              color: 'var(--dim, #999)',
               margin: '0 0 12px',
             }}
           >
@@ -34,14 +34,15 @@ export default function NextStoryFooter({ category, nearbyStories }: NextStoryFo
               {category.name}
             </Link>
           </p>
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
             {nearbyStories.map((s) => (
               <li key={s.slug}>
                 <Link
                   href={`/${s.slug}`}
                   style={{
                     fontSize: 15,
-                    color: 'var(--text-primary, #111)',
+                    fontWeight: 500,
+                    color: 'var(--text, #1a1a1a)',
                     textDecoration: 'none',
                     lineHeight: 1.4,
                   }}
@@ -53,19 +54,27 @@ export default function NextStoryFooter({ category, nearbyStories }: NextStoryFo
           </ul>
         </section>
       )}
-      <p style={{ margin: 0 }}>
-        <Link
-          href="/"
-          style={{
-            fontSize: 13,
-            color: 'var(--dim, #5a5a5a)',
-            textDecoration: 'none',
-            letterSpacing: '0.01em',
-          }}
-        >
-          &larr; Back to edition
-        </Link>
-      </p>
+      <Link
+        href="/"
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          fontSize: 13,
+          fontWeight: 500,
+          color: 'var(--dim, #666)',
+          textDecoration: 'none',
+          padding: '8px 14px',
+          borderRadius: 8,
+          border: '1px solid var(--border, #e5e5e5)',
+          WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+          <path d="M9 11L5 7l4-4" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        Back to edition
+      </Link>
     </footer>
   );
 }

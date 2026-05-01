@@ -333,13 +333,11 @@ export default function CommentComposer({
     );
   }
 
+  const isReply = !!parentId;
+
   return (
-    <div style={containerStyle}>
+    <div style={isReply ? replyContainerStyle : containerStyle}>
       {showMentionHint && (
-        // Live tooltip above the textarea \u2014 informational, not blocking.
-        // Disappears the moment the user upgrades (canMention flips true)
-        // or removes the @-handle. The post-submit toast at submit() is
-        // kept as a redundant safety net; the user dismisses it themselves.
         <div role="note" style={mentionHintStyle}>
           {COPY.comments.mentionPaid}
         </div>
@@ -351,9 +349,9 @@ export default function CommentComposer({
         onChange={handleBodyChange}
         onKeyDown={handleKeyDown}
         onBlur={() => setTimeout(() => setMentionSuggest(null), 150)}
-        placeholder="Add to the discussion."
-        aria-label={parentId ? 'Reply text' : 'Comment text'}
-        rows={parentId ? 2 : 3}
+        placeholder={isReply ? 'Write a reply\u2026' : 'Add to the discussion.'}
+        aria-label={isReply ? 'Reply text' : 'Comment text'}
+        rows={isReply ? 2 : 3}
         style={textareaStyle}
       />
       {mentionSuggest && mentionSuggest.results.length > 0 && (
@@ -412,14 +410,16 @@ export default function CommentComposer({
           ))}
         </div>
       )}
-      <div style={{ fontSize: 12, color: 'var(--dim, #666)', marginBottom: 10, lineHeight: 1.5 }}>
-        Others passed a quiz to read this. Make it worth their time.
-      </div>
+      {!isReply && (
+        <div style={{ fontSize: 12, color: 'var(--dim, #666)', marginBottom: 10, lineHeight: 1.5 }}>
+          Others passed a quiz to read this. Make it worth their time.
+        </div>
+      )}
       <div style={footerStyle}>
         <span>
           {canMention
-            ? 'Tip: type @username to mention.'
-            : '@mentions are available on paid plans.'}
+            ? isReply ? '' : 'Tip: type @username to mention.'
+            : isReply ? '' : '@mentions are available on paid plans.'}
         </span>
         <span style={{ flex: 1 }} />
         {onCancel && (
@@ -451,6 +451,15 @@ const containerStyle: CSSProperties = {
   padding: '12px 14px',
   background: 'var(--card, #f7f7f7)',
   marginBottom: 16,
+};
+
+const replyContainerStyle: CSSProperties = {
+  border: '1px solid var(--border, #e5e5e5)',
+  borderRadius: 10,
+  padding: '10px 12px',
+  background: 'transparent',
+  marginBottom: 12,
+  marginTop: 6,
 };
 const textareaStyle: CSSProperties = {
   width: '100%',

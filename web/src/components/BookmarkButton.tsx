@@ -48,25 +48,40 @@ export default function BookmarkButton({ articleId, currentUserId }: BookmarkBut
   }
 
   return (
-    <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
+    <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
       <button
         onClick={handleBookmark}
         disabled={busy || bookmarked}
         style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
           fontSize: 13,
           fontWeight: 500,
-          color: bookmarked ? 'var(--dim, #5a5a5a)' : 'var(--text-primary, #111)',
-          background: 'none',
-          border: '1px solid var(--border, #e5e5e5)',
-          borderRadius: 4,
-          padding: '5px 12px',
+          color: bookmarked ? '#fff' : 'var(--text, #1a1a1a)',
+          background: bookmarked ? 'var(--accent, #111)' : 'transparent',
+          border: `1px solid ${bookmarked ? 'var(--accent, #111)' : 'var(--border, #e5e5e5)'}`,
+          borderRadius: 8,
+          padding: '0 14px',
+          minHeight: 36,
           cursor: busy || bookmarked ? 'default' : 'pointer',
-          letterSpacing: '0.01em',
+          transition: 'background 0.15s ease, border-color 0.15s ease, color 0.15s ease',
+          WebkitTapHighlightColor: 'transparent',
+          opacity: busy ? 0.6 : 1,
         }}
       >
-        {busy ? '…' : bookmarked ? 'Bookmarked' : 'Bookmark'}
+        {bookmarked ? (
+          <svg width="12" height="13" viewBox="0 0 12 13" fill="currentColor" aria-hidden="true">
+            <path d="M2 1h8a1 1 0 011 1v10l-5-3-5 3V2a1 1 0 011-1z" />
+          </svg>
+        ) : (
+          <svg width="12" height="13" viewBox="0 0 12 13" fill="none" aria-hidden="true">
+            <path d="M2 1h8a1 1 0 011 1v10l-5-3-5 3V2a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+          </svg>
+        )}
+        {busy ? '…' : bookmarked ? 'Saved' : 'Bookmark'}
       </button>
-      {error && <span style={{ fontSize: 11, color: '#dc2626' }}>{error}</span>}
+      {error && <span style={{ fontSize: 11, color: '#b94040' }}>{error}</span>}
     </span>
   );
 }
