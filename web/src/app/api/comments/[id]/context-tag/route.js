@@ -6,19 +6,17 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { v2LiveGuard } from '@/lib/featureFlags';
 import { safeErrorResponse } from '@/lib/apiErrors';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { scoreReceiveHelpfulTag } from '@/lib/scoring';
 
 // POST /api/comments/[id]/context-tag
-// D15/D16: toggle a per-user tag on a comment. Any user who passed the
-// article's quiz can tag (D16). The RPC autopins the comment once the
-// `context` threshold is reached and maintains `helpful_count` for the
-// `helpful` kind. Body: { tag_kind?: 'context' | 'helpful' | 'insightful'
-// | 'sarcastic' | 'cite_needed' | 'off_topic' } — defaults to 'context'
-// for backward compatibility with callers who POST no body.
+// Toggle a per-user tag on a comment. Four kinds: helpful, context,
+// cite_needed, off_topic. Defaults to 'context' for backward compat.
+// quality_score (helpful + context - cite_needed - off_topic) maintained
+// by DB trigger + RPC; not returned here — clients sort by recency/quality
+// and read the derived indicator, never raw counts.
 const ALLOWED_TAG_KINDS = new Set([
   'context',
   'helpful',
-  'insightful',
-  'sarcastic',
   'cite_needed',
   'off_topic',
 ]);
@@ -98,5 +96,22 @@ export async function POST(request, { params }) {
       route: 'comments.id.context_tag',
       fallbackStatus: 400,
     });
+
+  // Award scoring points when a helpful tag is freshly applied.
+  if (data?.tagged && data?.tag_kind === 'helpful') {
+    const { data: comment } = await service
+      .from('comments')
+      .select('user_id')
+      .eq('id', params.id)
+      .maybeSingle();
+    if (comment?.user_id) {
+      scoreReceiveHelpfulTag(service, {
+        actorId: user.id,
+        authorId: comment.user_id,
+        commentId: params.id,
+      }).catch((e) => console.error('[comments.id.context-tag] scoreReceiveHelpfulTag', e));
+    }
+  }
+
   return NextResponse.json(data);
 }

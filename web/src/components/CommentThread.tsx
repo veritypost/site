@@ -79,27 +79,9 @@ type DialogState = {
   targetUserId?: string;
 } | null;
 
-type VoteType = 'upvote' | 'downvote' | 'clear';
+export type TagKind = 'context' | 'helpful' | 'cite_needed' | 'off_topic';
 
-// Section A — multi-kind comment tags. Mirrors the CHECK on
-// comment_context_tags.tag_kind in
-// supabase/migrations/20260501000000_section_a_comment_tag_kinds.sql.
-export type TagKind =
-  | 'context'
-  | 'helpful'
-  | 'insightful'
-  | 'sarcastic'
-  | 'cite_needed'
-  | 'off_topic';
-
-const TAG_KINDS: TagKind[] = [
-  'context',
-  'helpful',
-  'insightful',
-  'sarcastic',
-  'cite_needed',
-  'off_topic',
-];
+const TAG_KINDS: TagKind[] = ['helpful', 'context', 'cite_needed', 'off_topic'];
 
 export default function CommentThread({
   articleId,
@@ -113,12 +95,7 @@ export default function CommentThread({
   const supabase = createClient();
   const [comments, setComments] = useState<CommentWithAuthor[]>([]);
   const [authorScores, setAuthorScores] = useState<Record<string, number>>({});
-  const [yourVotes, setYourVotes] = useState<Record<string, 'upvote' | 'downvote' | undefined>>({});
-  // Section A — track per-comment per-kind tag state. The previous
-  // single-Set keyed only by comment_id couldn't represent the new
-  // helpful/insightful/sarcastic/cite_needed/off_topic kinds; the row
-  // component now reads `_your_tags` to drive the cast state of each
-  // chip independently.
+  const [yourReactions, setYourReactions] = useState<Record<string, 'agree' | 'disagree'>>({});
   const [yourTags, setYourTags] = useState<Map<string, Set<TagKind>>>(new Map());
   // Threshold above which the inline "Helpful" badge is shown next to
   // the author. Pulled from /api/settings/public; falls back to 10 on
@@ -228,16 +205,15 @@ export default function CommentThread({
 
     if (currentUserId) {
       if (commentIds.length > 0) {
-        const { data: v } = await supabase
-          .from('comment_votes')
-          .select('comment_id, vote_type')
-          .eq('user_id', currentUserId)
-          .in('comment_id', commentIds);
-        const votes: Record<string, 'upvote' | 'downvote' | undefined> = {};
-        (v || []).forEach((row) => {
-          votes[row.comment_id] = row.vote_type as 'upvote' | 'downvote';
-        });
-        setYourVotes(votes);
+        const { data: ar } = await supabase
+          .from('comment_agree_disagree' as never)
+          .select('comment_id, reaction')
+          .eq('user_id' as never, currentUserId as never)
+          .in('comment_id' as never, commentIds as never);
+        const reactions: Record<string, 'agree' | 'disagree'> = {};
+        ((ar || []) as unknown as Array<{ comment_id: string; reaction: 'agree' | 'disagree' }>)
+          .forEach((row) => { reactions[row.comment_id] = row.reaction; });
+        setYourReactions(reactions);
 
         // `tag_kind` cast: the database.ts type still names the column
         // `tag_type` until the next regen post-migration; the migration
@@ -394,25 +370,6 @@ export default function CommentThread({
       supabase.removeChannel(channel);
     };
   }, [articleId, canSubscribe, supabase]);
-
-  async function handleVote(commentId: string, type: VoteType) {
-    const res = await fetch(`/api/comments/${commentId}/vote`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      setError(data?.error || 'Vote failed');
-      return;
-    }
-    setComments((prev) =>
-      prev.map((c) =>
-        c.id === commentId ? { ...c, upvote_count: data.up, downvote_count: data.down } : c
-      )
-    );
-    setYourVotes((prev) => ({ ...prev, [commentId]: data.your_vote || undefined }));
-  }
 
   async function handleToggleTag(commentId: string, tagKind: TagKind) {
     const res = await fetch(`/api/comments/${commentId}/context-tag`, {
@@ -616,7 +573,7 @@ export default function CommentThread({
     );
   }
 
-  const [sort, setSort] = useState<'top' | 'newest'>('top');
+  const [sort, setSort] = useState<'top' | 'newest'>('newest');
   const [expertFilter, setExpertFilter] = useState<boolean>(false);
   const [expertDialogOpen, setExpertDialogOpen] = useState<boolean>(false);
   const [expertQuestion, setExpertQuestion] = useState<string>('');
@@ -692,10 +649,10 @@ export default function CommentThread({
     if (sort === 'newest') {
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     }
-    // 'top': sort by net score descending
-    const netA = (a.upvote_count || 0) - (a.downvote_count || 0);
-    const netB = (b.upvote_count || 0) - (b.downvote_count || 0);
-    return netB - netA;
+    // 'top': sort by quality_score (helpful + context - cite_needed - off_topic) descending
+    const qA = (a as unknown as { quality_score?: number | null }).quality_score ?? 0;
+    const qB = (b as unknown as { quality_score?: number | null }).quality_score ?? 0;
+    return qB - qA;
   });
   const childrenByParent: Record<string, CommentWithAuthor[]> = {};
   displayComments
@@ -709,7 +666,7 @@ export default function CommentThread({
     const kids = (childrenByParent[c.id] || []).map((child) => renderWithReplies(child, depth + 1));
     const enriched: EnrichedComment = {
       ...c,
-      _your_vote: yourVotes[c.id],
+      _your_reaction: yourReactions[c.id] ?? null,
       _your_tags: yourTags.get(c.id) ?? new Set<TagKind>(),
     };
     return (
@@ -723,10 +680,8 @@ export default function CommentThread({
         articleId={articleId}
         depth={depth}
         viewerIsSupervisor={viewerIsSupervisor}
-
         helpfulThreshold={helpfulThreshold}
         tagKinds={TAG_KINDS}
-        onVote={handleVote}
         onToggleTag={handleToggleTag}
         onEdit={handleEdit}
         onDelete={handleDelete}

@@ -1,7 +1,7 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified comments 2026-04-18
 'use client';
-import { useState, useEffect, useRef, CSSProperties, ReactNode } from 'react';
+import { useState, useEffect, useRef, ReactNode } from 'react';
 import Avatar from './Avatar';
 import VerifiedBadge from './VerifiedBadge';
 import CommentComposer from './CommentComposer';
@@ -24,42 +24,26 @@ type CommentUser = {
 
 type Mention = { user_id?: string; username: string };
 
-// Section A — kept loosely typed at the row layer to avoid pulling the
-// Thread-level union here; CommentThread owns the canonical TagKind.
-export type TagKind =
-  | 'context'
-  | 'helpful'
-  | 'insightful'
-  | 'sarcastic'
-  | 'cite_needed'
-  | 'off_topic';
+export type TagKind = 'context' | 'helpful' | 'cite_needed' | 'off_topic';
 
-// Per-tag chip metadata. Colors mirror the Section A spec; labels match
-// the public copy. Counts come from the row when ≥ 1 (context_tag_count
-// for 'context', helpful_count for 'helpful', otherwise we rely on the
-// per-user state without a public count — Section A only ships a
-// public count for context + helpful).
-const TAG_META: Record<TagKind, { label: string; color: string }> = {
-  helpful:     { label: 'Helpful',      color: '#16a34a' },
-  insightful:  { label: 'Insightful',   color: '#2563eb' },
-  sarcastic:   { label: 'Sarcastic',    color: '#f59e0b' },
-  cite_needed: { label: 'Cite needed',  color: '#ea580c' },
-  off_topic:   { label: 'Off-topic',    color: '#6b7280' },
-  context:     { label: 'Context',      color: 'var(--accent, #111)' },
+// Four tags: two additive (helpful, context), two challenge (cite_needed, off_topic).
+// No counts shown in UI — quality_score is the only derived number surfaced.
+const TAG_META: Record<TagKind, { label: string; color: string; challenge: boolean }> = {
+  helpful:     { label: 'Helpful',     color: '#1a7a4a', challenge: false },
+  context:     { label: 'Context',     color: 'var(--accent, #111)', challenge: false },
+  cite_needed: { label: 'Cite needed', color: '#ea580c', challenge: true },
+  off_topic:   { label: 'Off-topic',   color: '#6b7280', challenge: true },
 };
 
-// Section A — `helpful_count` lives on `comments` after the migration;
-// the regen will surface it natively, but we keep an explicit optional
-// field on the enriched row so the typeline holds during the transition
-// window before `npm run types:gen` runs.
 export type EnrichedComment = CommentRowDb & {
   users?: CommentUser;
-  _your_vote?: 'upvote' | 'downvote' | null | undefined;
   _your_tags?: Set<TagKind>;
+  _your_reaction?: 'agree' | 'disagree' | null;
   helpful_count?: number | null;
+  cite_needed_count?: number | null;
+  off_topic_count?: number | null;
+  quality_score?: number | null;
 };
-
-type VoteType = 'upvote' | 'downvote' | 'clear';
 
 interface CommentRowProps {
   comment: EnrichedComment;
@@ -70,11 +54,8 @@ interface CommentRowProps {
   authorCategoryScore?: number | null;
   articleId: string;
   viewerIsSupervisor?: boolean;
-  // Section A — passed by CommentThread; defaults are used if a caller
-  // doesn't supply them so existing direct-mount tests still work.
   helpfulThreshold?: number;
   tagKinds?: TagKind[];
-  onVote: (commentId: string, type: VoteType) => void | Promise<void>;
   onToggleTag: (commentId: string, tagKind: TagKind) => void | Promise<void>;
   onDelete: (commentId: string) => void;
   onEdit: (commentId: string, body: string) => void | Promise<void>;
@@ -86,14 +67,7 @@ interface CommentRowProps {
   depth?: number;
 }
 
-const DEFAULT_TAG_KINDS: TagKind[] = [
-  'helpful',
-  'insightful',
-  'sarcastic',
-  'cite_needed',
-  'off_topic',
-  'context',
-];
+const DEFAULT_TAG_KINDS: TagKind[] = ['helpful', 'context', 'cite_needed', 'off_topic'];
 
 function renderBody(body: string, mentions: Mention[] = []): ReactNode[] {
   const resolved = new Set((mentions || []).map((m) => m.username));
@@ -133,7 +107,6 @@ export default function CommentRow({
   viewerIsSupervisor = false,
   helpfulThreshold = 10,
   tagKinds = DEFAULT_TAG_KINDS,
-  onVote,
   onToggleTag,
   onDelete,
   onEdit,
@@ -151,10 +124,14 @@ export default function CommentRow({
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [busy, setBusy] = useState<string>('');
   const [commentMaxDepth, setCommentMaxDepth] = useState<number>(2);
+  const [yourReaction, setYourReaction] = useState<'agree' | 'disagree' | null>(
+    comment._your_reaction ?? null
+  );
+  const [tagPickerOpen, setTagPickerOpen] = useState(false);
   const canReply = hasPermission('comments.reply');
-  const canUpvote = hasPermission('comments.upvote');
-  const canDownvote = hasPermission('comments.downvote');
   const canReport = hasPermission('comments.report');
+  const canContextTag = hasPermission('comments.context_tag');
+  const canReact = hasPermission('comments.react');
   const canEditOwn = hasPermission('comments.edit.own');
   const canDeleteOwn = hasPermission('comments.delete.own');
   const canEditAny = hasPermission('admin.comments.edit.any');
@@ -198,15 +175,6 @@ export default function CommentRow({
     ? (canEditOwn || canDeleteOwn)
     : (canEditAny || canDeleteAny || canReport || canBlockUser || (viewerIsSupervisor && !!onFlag) || (canHideAny && !!onHide));
 
-  async function doVote(type: VoteType) {
-    if (busy) return;
-    setBusy('vote');
-    try {
-      await onVote(comment.id, type);
-    } finally {
-      setBusy('');
-    }
-  }
   async function doTag(kind: TagKind) {
     if (busy) return;
     setBusy(`tag:${kind}`);
@@ -226,8 +194,24 @@ export default function CommentRow({
       setBusy('');
     }
   }
+  async function doAgree(reaction: 'agree' | 'disagree') {
+    if (busy || isOwner) return;
+    setBusy(`react:${reaction}`);
+    try {
+      const res = await fetch(`/api/comments/${comment.id}/agree`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reaction }),
+      });
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setYourReaction(data.reaction ?? null);
+      }
+    } finally {
+      setBusy('');
+    }
+  }
 
-  const yourVote = comment._your_vote;
   const mentions = (Array.isArray(comment.mentions) ? comment.mentions : []) as Mention[];
   const commentDepth = comment.thread_depth ?? depth;
 
@@ -294,11 +278,6 @@ export default function CommentRow({
               {user.username || 'user'}
             </span>
             <VerifiedBadge user={user} />
-            {/* Section A — inline Helpful badge once the comment crosses
-                the editorial threshold (default 10, settings-tunable via
-                helpful_badge_threshold). Sits between the verified badge
-                and the category score so verified-figure + helpful both
-                read at a glance. */}
             {(comment.helpful_count ?? 0) >= helpfulThreshold && (
               <span
                 title={`Marked helpful by ${comment.helpful_count} readers`}
@@ -329,13 +308,29 @@ export default function CommentRow({
                 VS {authorCategoryScore}
               </span>
             )}
-            <span style={{ fontSize: 12, color: '#ccc', margin: '0 4px' }}>·</span>
+            <span style={{ fontSize: 12, color: '#ccc', margin: '0 4px' }}>&middot;</span>
               <span style={{ fontSize: 12, color: '#999', fontWeight: 400 }}>
                 {timeAgo(comment.created_at)}
-                {comment.is_edited ? ' \u00b7 edited' : ''}
+                {comment.is_edited ? ' · edited' : ''}
               </span>
+              {(comment.quality_score ?? 0) !== 0 && (
+                <>
+                  <span style={{ fontSize: 12, color: '#ccc', margin: '0 2px' }}>&middot;</span>
+                  <span
+                    title="Community quality signal"
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: (comment.quality_score ?? 0) > 0 ? '#1a7a4a' : '#b94040',
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
+                  >
+                    {(comment.quality_score ?? 0) > 0 ? '+' : ''}{comment.quality_score}
+                  </span>
+                </>
+              )}
             </div>
-            {/* context menu \u2014 header row */}
+            {/* context menu — header row */}
             {!isDeleted && !editing && hasMenuItems && (
               <div ref={menuRef} style={{ position: 'relative', flexShrink: 0 }}>
                 <button
@@ -516,7 +511,7 @@ export default function CommentRow({
           )}
           {blurred && (
             <div style={{ fontSize: 12, marginTop: 6, color: 'var(--dim, #666)' }}>
-              Expert response \u2014{' '}
+              Expert response &mdash;{' '}
               <a
                 href="/profile/settings#billing"
                 style={{ color: 'var(--accent, #111)', fontWeight: 600 }}
@@ -526,114 +521,90 @@ export default function CommentRow({
             </div>
           )}
 
-          {!isDeleted && !editing && (
-            <div style={{ marginTop: 8 }}>
-              {/* Row 1 \u2014 vote / reply / menu */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                }}
-              >
-              {(canUpvote || canDownvote) && (() => {
-                const up = comment.upvote_count || 0;
-                const down = comment.downvote_count || 0;
-                const net = up - down;
-                const votedUp = yourVote === 'upvote';
-                const votedDown = yourVote === 'downvote';
-                // Pill border shifts to match active vote; neutral otherwise.
-                const pillBorderColor = votedUp ? '#1a7a4a' : votedDown ? '#b94040' : 'var(--border, #e5e5e5)';
-                return (
-                  <div
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'stretch',
-                      border: `1px solid ${pillBorderColor}`,
-                      borderRadius: 8,
-                      overflow: 'hidden',
-                      transition: 'border-color 0.15s ease',
-                      boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.04)',
-                    }}
-                  >
-                    {/* Up button */}
-                    {canUpvote && (
-                      <button
-                        onClick={() => doVote(votedUp ? 'clear' : 'upvote')}
-                        aria-label={`Upvote (${up})`}
-                        aria-pressed={votedUp}
-                        style={voteClusterBtn(votedUp, false)}
-                      >
-                        <ChevronUp active={votedUp} />
-                        <span
-                          style={{
-                            fontSize: 11,
-                            fontWeight: votedUp ? 700 : 500,
-                            color: votedUp ? '#1a7a4a' : 'var(--dim, #666)',
-                            letterSpacing: '-0.01em',
-                            fontVariantNumeric: 'tabular-nums',
-                            transition: 'color 0.15s ease',
-                          }}
-                        >
-                          {up}
-                        </span>
-                      </button>
-                    )}
-                    {/* Net score — display only, never a button */}
-                    <div
-                      title={`${up} up · ${down} down`}
+          {/* Tag chips — visible when any tag is active (you or community) */}
+          {!isDeleted && !editing && !isOwner && canContextTag && (() => {
+            const tc = (k: TagKind): number =>
+              k === 'helpful' ? (comment.helpful_count ?? 0)
+              : k === 'context' ? ((comment as CommentRowDb & { context_tag_count?: number | null }).context_tag_count ?? 0)
+              : k === 'cite_needed' ? (comment.cite_needed_count ?? 0)
+              : (comment.off_topic_count ?? 0);
+            const yours = comment._your_tags ?? new Set<TagKind>();
+            const activeTags = tagKinds.filter(k => yours.has(k) || tc(k) > 0);
+            const inactiveTags = tagKinds.filter(k => !yours.has(k) && tc(k) === 0);
+            if (activeTags.length === 0 && !tagPickerOpen) return (
+              <div style={{ marginTop: 8 }}>
+                <button
+                  onClick={() => setTagPickerOpen(true)}
+                  style={{ fontSize: 11, padding: '2px 8px', borderRadius: 5, border: '1px dashed var(--border, #e0e0e0)', background: 'transparent', color: 'var(--dim, #aaa)', cursor: 'pointer', lineHeight: 1.6 }}
+                >
+                  + Tag
+                </button>
+              </div>
+            );
+            return (
+              <div style={{ marginTop: 8, display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+                {activeTags.map(k => {
+                  const meta = TAG_META[k];
+                  const active = yours.has(k);
+                  return (
+                    <button
+                      key={k}
+                      onClick={() => doTag(k)}
+                      disabled={!!busy}
                       style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: '0 10px',
-                        borderLeft: canUpvote ? '1px solid var(--border, #e5e5e5)' : 'none',
-                        borderRight: canDownvote ? '1px solid var(--border, #e5e5e5)' : 'none',
-                        minWidth: 32,
-                        userSelect: 'none',
+                        fontSize: 11,
+                        fontWeight: active ? 700 : 500,
+                        padding: '2px 8px',
+                        borderRadius: 5,
+                        border: `1px solid ${active ? meta.color : 'var(--border, #e5e5e5)'}`,
+                        background: active ? `${meta.color}18` : 'transparent',
+                        color: active ? meta.color : 'var(--dim, #888)',
+                        cursor: 'pointer',
+                        lineHeight: 1.6,
                       }}
                     >
-                      <span
-                        style={{
-                          fontSize: 15,
-                          fontWeight: 700,
-                          color: net > 0 ? '#1a7a4a' : net < 0 ? '#b94040' : 'var(--dim, #999)',
-                          letterSpacing: '-0.02em',
-                          lineHeight: 1,
-                          fontVariantNumeric: 'tabular-nums',
-                          transition: 'color 0.15s ease',
-                        }}
-                      >
-                        {net > 0 ? '+' : ''}{net}
-                      </span>
-                    </div>
-                    {/* Down button */}
-                    {canDownvote && (
-                      <button
-                        onClick={() => doVote(votedDown ? 'clear' : 'downvote')}
-                        aria-label={`Downvote (${down})`}
-                        aria-pressed={votedDown}
-                        style={voteClusterBtn(votedDown, true)}
-                      >
-                        <ChevronDown active={votedDown} />
-                        <span
-                          style={{
-                            fontSize: 11,
-                            fontWeight: votedDown ? 700 : 500,
-                            color: votedDown ? '#b94040' : 'var(--dim, #666)',
-                            letterSpacing: '-0.01em',
-                            fontVariantNumeric: 'tabular-nums',
-                            transition: 'color 0.15s ease',
-                          }}
-                        >
-                          {down}
-                        </span>
-                      </button>
-                    )}
-                  </div>
-                );
-              })()}
+                      {meta.label}
+                    </button>
+                  );
+                })}
+                {inactiveTags.length > 0 && (
+                  <button
+                    onClick={() => setTagPickerOpen(v => !v)}
+                    style={{ fontSize: 11, padding: '2px 8px', borderRadius: 5, border: '1px dashed var(--border, #e0e0e0)', background: 'transparent', color: 'var(--dim, #aaa)', cursor: 'pointer', lineHeight: 1.6 }}
+                  >
+                    {tagPickerOpen ? '−' : '+'}
+                  </button>
+                )}
+                {tagPickerOpen && inactiveTags.map(k => {
+                  const meta = TAG_META[k];
+                  return (
+                    <button
+                      key={k}
+                      onClick={() => { doTag(k); setTagPickerOpen(false); }}
+                      disabled={!!busy}
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 500,
+                        padding: '2px 8px',
+                        borderRadius: 5,
+                        border: '1px dashed var(--border, #e0e0e0)',
+                        background: 'transparent',
+                        color: 'var(--dim, #888)',
+                        cursor: 'pointer',
+                        lineHeight: 1.6,
+                      }}
+                    >
+                      {meta.label}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
 
+          {/* Action row: Reply · Agree · Disagree */}
+          {!isDeleted && !editing && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginTop: 6 }}>
               {canReply && commentDepth < commentMaxDepth && (
                 <button
                   onClick={() => setReplyOpen((v) => !v)}
@@ -653,8 +624,35 @@ export default function CommentRow({
                   Reply
                 </button>
               )}
-
-              </div>
+              {canReact && !isOwner && (
+                <>
+                  <span style={{ fontSize: 12, color: 'var(--border, #e0e0e0)', margin: '0 2px', userSelect: 'none' }}>&middot;</span>
+                  {(['agree', 'disagree'] as const).map(r => (
+                    <button
+                      key={r}
+                      onClick={() => doAgree(r)}
+                      disabled={!!busy}
+                      aria-pressed={yourReaction === r}
+                      style={{
+                        fontSize: 12,
+                        fontWeight: yourReaction === r ? 700 : 500,
+                        padding: '4px 10px',
+                        borderRadius: 6,
+                        minHeight: 30,
+                        border: 'none',
+                        background: 'transparent',
+                        color: yourReaction === r
+                          ? (r === 'agree' ? '#1a7a4a' : '#b94040')
+                          : 'var(--dim, #888)',
+                        cursor: busy ? 'default' : 'pointer',
+                        touchAction: 'manipulation',
+                      }}
+                    >
+                      {r === 'agree' ? 'Agree' : 'Disagree'}
+                    </button>
+                  ))}
+                </>
+              )}
             </div>
           )}
 
@@ -678,76 +676,6 @@ export default function CommentRow({
         </div>
       </div>
     </div>
-  );
-}
-
-// Vote cluster button — left (up) or right (down) cell of the pill.
-// Active state: colored background fill + no border-radius (the outer pill
-// provides rounding). The fill is intentionally light (alpha 0x18) so it
-// reads as "confirmed" without screaming.
-function voteClusterBtn(active: boolean, isDown: boolean): CSSProperties {
-  const hue = isDown ? '#b94040' : '#1a7a4a';
-  return {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    // Horizontal padding gives the 44px tap area together with the icon+number.
-    // minWidth ensures the tap target even at count=0.
-    padding: '0 8px',
-    minHeight: 30,
-    minWidth: 36,
-    border: 'none',
-    borderRadius: 0,
-    background: active ? `${hue}18` : 'transparent',
-    cursor: 'pointer',
-    touchAction: 'manipulation',
-    transition: 'background 0.15s ease',
-    WebkitTapHighlightColor: 'transparent',
-  };
-}
-
-// Chevron icons as inline SVG — no library dependency.
-// Stroke width 1.75 keeps them crisp at small sizes without looking heavy.
-function ChevronUp({ active }: { active: boolean }) {
-  return (
-    <svg
-      width="12"
-      height="12"
-      viewBox="0 0 12 12"
-      fill="none"
-      aria-hidden="true"
-      style={{ flexShrink: 0, transition: 'stroke 0.15s ease' }}
-    >
-      <polyline
-        points="2,8 6,4 10,8"
-        stroke={active ? '#1a7a4a' : 'var(--dim, #666)'}
-        strokeWidth="1.75"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function ChevronDown({ active }: { active: boolean }) {
-  return (
-    <svg
-      width="12"
-      height="12"
-      viewBox="0 0 12 12"
-      fill="none"
-      aria-hidden="true"
-      style={{ flexShrink: 0, transition: 'stroke 0.15s ease' }}
-    >
-      <polyline
-        points="2,4 6,8 10,4"
-        stroke={active ? '#b94040' : 'var(--dim, #666)'}
-        strokeWidth="1.75"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
   );
 }
 

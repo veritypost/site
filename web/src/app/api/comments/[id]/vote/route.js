@@ -5,7 +5,6 @@ import { requirePermission, hasPermissionServer } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { v2LiveGuard } from '@/lib/featureFlags';
 import { safeErrorResponse } from '@/lib/apiErrors';
-import { scoreReceiveUpvote } from '@/lib/scoring';
 import { checkRateLimit } from '@/lib/rateLimit';
 
 // POST /api/comments/[id]/vote
@@ -119,25 +118,6 @@ export async function POST(request, { params }) {
       route: 'comments.id.vote',
       fallbackStatus: 400,
     });
-
-  // Award only when the new vote is an upvote AND the prior state was
-  // not already an upvote (no double-award for re-affirm). The helper
-  // also enforces (actor, comment) idempotency via synthetic_key dedupe,
-  // so up→down→up still awards only once. Skip self-votes silently.
-  if (data?.your_vote === 'upvote' && priorVoteType !== 'upvote' && commentAuthorId) {
-    try {
-      const result = await scoreReceiveUpvote(service, {
-        actorId: user.id,
-        authorId: commentAuthorId,
-        commentId: id,
-      });
-      if (result?.error) {
-        console.error('[comments.id.vote] scoreReceiveUpvote', result.error);
-      }
-    } catch (e) {
-      console.error('[comments.id.vote] scoreReceiveUpvote threw', e);
-    }
-  }
 
   return NextResponse.json(data);
 }

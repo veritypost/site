@@ -119,44 +119,33 @@ export async function scoreDailyLogin(service, { userId }) {
   return { ...pointsData, streak: streakData };
 }
 
-// scoreReceiveUpvote — award the `receive_upvote` rule to the comment
-// author when the actor's vote flips into upvote territory. Caller is
-// responsible for the no-self-vote guard and for confirming the prior
-// state was not already an upvote (we should only award on a fresh
-// up-flip, not on a re-affirm or a downvote).
-//
-// Idempotency: even if the actor up→down→up the same comment, we only
-// want to award once per (actor, comment). Pre-checks score_events for
-// an existing row before awarding.
-export async function scoreReceiveUpvote(service, { actorId, authorId, commentId }) {
+// scoreReceiveHelpfulTag — award the `receive_helpful_tag` rule to the
+// comment author when an actor marks it helpful for the first time.
+// Idempotent per (actor, comment) so repeat toggles don't double-award.
+export async function scoreReceiveHelpfulTag(service, { actorId, authorId, commentId }) {
   if (!actorId || !authorId || !commentId) {
     return { awarded: false, error: 'actorId, authorId, commentId required' };
   }
-  if (actorId === authorId) return { awarded: false, reason: 'self_vote' };
+  if (actorId === authorId) return { awarded: false, reason: 'self_tag' };
 
-  // Dedupe: source_type='comment_vote', source_id=commentId, but indexed
-  // by (recipient user_id, action, source_type, source_id). A second actor
-  // upvoting the same comment must still award the author. Use the
-  // synthetic-key path keyed by actor:comment so each (actor, comment)
-  // pair awards at most once for the author.
-  const syntheticKey = `receive_upvote:${actorId}:${commentId}`;
+  const syntheticKey = `receive_helpful_tag:${actorId}:${commentId}`;
   const { data: existing } = await service
     .from('score_events')
     .select('id')
     .eq('user_id', authorId)
-    .eq('action', 'receive_upvote')
+    .eq('action', 'receive_helpful_tag')
     .filter('metadata->>key', 'eq', syntheticKey)
     .limit(1)
     .maybeSingle();
   if (existing) return { awarded: false, reason: 'already_awarded' };
 
   const { data, error } = await service.rpc('award_points', {
-    p_action: 'receive_upvote',
+    p_action: 'receive_helpful_tag',
     p_user_id: authorId,
     p_kid_profile_id: null,
     p_article_id: null,
     p_category_id: null,
-    p_source_type: 'comment_vote',
+    p_source_type: 'comment_tag',
     p_source_id: null,
     p_synthetic_key: syntheticKey,
   });

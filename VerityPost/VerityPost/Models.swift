@@ -329,9 +329,14 @@ struct VPComment: Codable, Identifiable {
     /// it; iOS only reads. Drives the inline "Helpful" badge once the row
     /// crosses the editorial threshold (SettingsService.helpfulBadgeThreshold).
     var helpfulCount: Int?
+    var citeNeededCount: Int?
+    var offTopicCount: Int?
+    var qualityScore: Int?
+    var agreeCount: Int?
+    var disagreeCount: Int?
     /// Section A — client-side cache of the kinds the current user has
-    /// cast on this comment ('context', 'helpful', 'insightful',
-    /// 'sarcastic', 'cite_needed', 'off_topic'). Not part of the row's
+    /// cast on this comment ('context', 'helpful', 'cite_needed', 'off_topic').
+    /// Not part of the row's
     /// JSON shape; populated by StoryDetailView from a separate fetch
     /// against `comment_context_tags` so each chip renders cast/uncast.
     /// Defaulted to nil so it stays out of the synthesized Codable path
@@ -399,6 +404,11 @@ struct VPComment: Codable, Identifiable {
         case isEdited = "is_edited"
         case contextTagCount = "context_tag_count"
         case helpfulCount = "helpful_count"
+        case citeNeededCount = "cite_needed_count"
+        case offTopicCount = "off_topic_count"
+        case qualityScore = "quality_score"
+        case agreeCount = "agree_count"
+        case disagreeCount = "disagree_count"
     }
 }
 
