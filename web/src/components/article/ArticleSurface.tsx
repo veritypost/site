@@ -34,7 +34,7 @@ export type ArticleSurfaceProps = {
 };
 
 const PAGE_STYLE: React.CSSProperties = {
-  maxWidth: 720,
+  maxWidth: 680,
   margin: '0 auto',
   padding: '32px 20px 96px',
 };

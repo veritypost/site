@@ -1,7 +1,7 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified quiz 2026-04-18
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Interstitial from './Interstitial';
 import { bumpQuizCount } from '../lib/session';
 import { hasPermission } from '@/lib/permissions';
@@ -86,7 +86,16 @@ export default function ArticleQuiz({
   const [result, setResult] = useState<QuizResult | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [showInterstitial, setShowInterstitial] = useState<boolean>(false);
+  const [passRevealed, setPassRevealed] = useState<boolean>(false);
   const trackEvent = useTrack();
+
+  useEffect(() => {
+    if (stage === 'result' && result?.passed) {
+      const t = setTimeout(() => setPassRevealed(true), 40);
+      return () => clearTimeout(t);
+    }
+    setPassRevealed(false);
+  }, [stage, result?.passed]);
 
   const canStart = hasPermission('quiz.attempt.start');
   const canRetake = hasPermission('quiz.retake');
@@ -408,6 +417,9 @@ export default function ArticleQuiz({
               padding: '24px 24px 22px',
               marginTop: 24,
               textAlign: 'left',
+              opacity: passRevealed ? 1 : 0,
+              transform: passRevealed ? 'scale(1) translateY(0)' : 'scale(0.97) translateY(6px)',
+              transition: 'opacity 0.5s ease, transform 0.5s ease',
             }}
           >
             <div

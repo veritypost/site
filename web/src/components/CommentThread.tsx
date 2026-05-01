@@ -743,7 +743,7 @@ export default function CommentThread({
   };
 
   return (
-    <div style={{ maxWidth: 640, margin: '0 auto' }}>
+    <div style={{ maxWidth: 680, margin: '0 auto' }}>
       {/* Quiz Gate Brand — make the moat visible. Header is the trust
           signal: every commenter passed the comprehension quiz, by
           construction (schema/013 post_comment RPC; no role bypass).

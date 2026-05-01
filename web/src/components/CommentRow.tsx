@@ -404,15 +404,68 @@ export default function CommentRow({
           )}
 
           {!isDeleted && !editing && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                marginTop: 8,
-                flexWrap: 'wrap',
-              }}
-            >
+            <div style={{ marginTop: 8 }}>
+              {/* Row 1 \u2014 tag chip strip: horizontal scroll, all 6 chips always visible */}
+              {canContextTag && (
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: 6,
+                    overflowX: 'auto',
+                    paddingBottom: 4,
+                    scrollbarWidth: 'none',
+                    // @ts-ignore \u2014 non-standard but widely supported
+                    msOverflowStyle: 'none',
+                  }}
+                >
+                  {tagKinds.map((kind) => {
+                    const meta = TAG_META[kind];
+                    const cast = !!comment._your_tags?.has(kind);
+                    let count: number | undefined;
+                    if (kind === 'context') count = comment.context_tag_count ?? 0;
+                    else if (kind === 'helpful') count = comment.helpful_count ?? 0;
+                    const showCount = typeof count === 'number' && count >= 1;
+                    const busyThis = busy === `tag:${kind}`;
+                    return (
+                      <button
+                        key={kind}
+                        onClick={() => doTag(kind)}
+                        disabled={busyThis}
+                        aria-pressed={cast}
+                        aria-label={`Tag ${meta.label}${showCount ? ` (${count})` : ''}`}
+                        style={{
+                          flexShrink: 0,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          padding: '6px 10px',
+                          borderRadius: 14,
+                          minHeight: 32,
+                          border: `1px solid ${cast ? meta.color : 'var(--border, #e5e5e5)'}`,
+                          background: cast ? `${meta.color}1f` : 'transparent',
+                          color: cast ? meta.color : 'var(--dim, #666)',
+                          cursor: busyThis ? 'default' : 'pointer',
+                          opacity: busyThis ? 0.6 : 1,
+                          touchAction: 'manipulation',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {meta.label}
+                        {showCount ? ` ${count}` : ''}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Row 2 \u2014 vote / reply / menu */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  marginTop: canContextTag ? 6 : 0,
+                }}
+              >
               {canUpvote && (
                 <button
                   onClick={() => doVote(yourVote === 'upvote' ? 'clear' : 'upvote')}
@@ -429,45 +482,6 @@ export default function CommentRow({
                   Down {comment.downvote_count || 0}
                 </button>
               )}
-
-              {canContextTag &&
-                tagKinds.map((kind) => {
-                  const meta = TAG_META[kind];
-                  const cast = !!comment._your_tags?.has(kind);
-                  // Section A \u2014 only context + helpful expose a public
-                  // count (server-maintained). Other kinds render as a
-                  // bare label until/unless we choose to surface counts.
-                  let count: number | undefined;
-                  if (kind === 'context') count = comment.context_tag_count ?? 0;
-                  else if (kind === 'helpful') count = comment.helpful_count ?? 0;
-                  const showCount = typeof count === 'number' && count >= 1;
-                  const busyThis = busy === `tag:${kind}`;
-                  return (
-                    <button
-                      key={kind}
-                      onClick={() => doTag(kind)}
-                      disabled={busyThis}
-                      aria-pressed={cast}
-                      aria-label={`Tag ${meta.label}${showCount ? ` (${count})` : ''}`}
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 600,
-                        padding: '8px 10px',
-                        borderRadius: 14,
-                        minHeight: 36,
-                        border: `1px solid ${cast ? meta.color : 'var(--border, #e5e5e5)'}`,
-                        background: cast ? `${meta.color}1f` : 'transparent',
-                        color: cast ? meta.color : 'var(--dim, #666)',
-                        cursor: busyThis ? 'default' : 'pointer',
-                        opacity: busyThis ? 0.6 : 1,
-                        touchAction: 'manipulation',
-                      }}
-                    >
-                      {meta.label}
-                      {showCount ? ` ${count}` : ''}
-                    </button>
-                  );
-                })}
 
               {canReply && commentDepth < commentMaxDepth && (
                 <button
@@ -596,6 +610,7 @@ export default function CommentRow({
                     )}
                   </div>
                 )}
+              </div>
               </div>
             </div>
           )}
