@@ -29,9 +29,9 @@ export async function isFlagEnabled(client, key, defaultValue = false) {
   // default is for the "row not present yet" case only.
   if (error) {
     console.error(`[featureFlags] lookup failed for ${key}:`, error);
-    const safe = false;
-    CACHE.set(key, { value: safe, ts: Date.now() });
-    return safe;
+    // Don't cache errors — let the next request retry immediately so recovery
+    // isn't delayed by the TTL window.
+    return false;
   }
 
   const value = data ? !!data.is_enabled : defaultValue;
@@ -44,10 +44,12 @@ export function clearFlagCache() {
 }
 
 // Convenience wrapper for the master cutover switch.
-// Fail-closed: if the flag row is missing or the DB read fails, treat
-// v2 as NOT live so the guard returns 503 rather than silently opening.
+// Default true: v2 is live in production. A missing row or DB error should
+// fail open (pass traffic through) rather than taking down production routes.
+// The fail-closed default was correct during the pre-launch migration window;
+// now that v2 is live, a feature_flags DB hiccup must not block all routes.
 export async function isV2Live(client) {
-  return isFlagEnabled(client, 'v2_live', false);
+  return isFlagEnabled(client, 'v2_live', true);
 }
 
 // Route guard for the master cutover switch. Returns a 503 NextResponse
