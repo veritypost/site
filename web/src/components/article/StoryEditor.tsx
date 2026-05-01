@@ -50,7 +50,16 @@ function todayInEditorialTz(): string {
   }).format(new Date());
 }
 
-type StorySource = { id: string; outlet: string; url: string; headline: string };
+type StorySource = {
+  id: string;
+  outlet: string;
+  url: string;
+  headline: string;
+  author_name?: string | null;
+  published_date?: string | null;
+  source_type?: string | null;
+  quote?: string | null;
+};
 
 type StoryForm = {
   title: string;
@@ -396,6 +405,10 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
           outlet: s.publisher || '',
           url: s.url || '',
           headline: s.title || '',
+          author_name: (s as unknown as { author_name?: string | null }).author_name ?? null,
+          published_date: (s as unknown as { published_date?: string | null }).published_date ?? null,
+          source_type: (s as unknown as { source_type?: string | null }).source_type ?? null,
+          quote: (s as unknown as { quote?: string | null }).quote ?? null,
         })),
       });
       setStoryId(id);
@@ -757,6 +770,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
           timeline_entries: entries.map((entry) => ({
             id: entry.id,
             _isNew: entry._isNew,
+            type: entry.type,
             event_date: entry.type === 'story' ? (entry.timeline_date || entry.event_date) : entry.event_date,
             event_label: entry.type === 'story' ? (entry.timeline_headline || entry.title) : entry.title,
             event_body: entry.summary || null,
@@ -767,6 +781,10 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
             url: s.url || '',
             title: s.headline || '',
             sort_order: i,
+            author_name: s.author_name ?? null,
+            published_date: s.published_date ?? null,
+            source_type: s.source_type ?? null,
+            quote: s.quote ?? null,
           })),
           quizzes: quizzes.filter((q) => !q._deleted && q.question_text.trim().length > 0).map((q, i) => ({
             title: q.question_text.slice(0, 200),

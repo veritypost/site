@@ -29,6 +29,7 @@ export type ArticleSurfaceProps = {
   bodyHtml: string;
   canEdit: boolean;
   canPublish: boolean;
+  canViewBody?: boolean;
   sources?: SourceItem[];
   timeline?: TimelineItem[];
 };
@@ -60,7 +61,7 @@ const BODY_STYLE: React.CSSProperties = {
   color: 'var(--text-primary, #111)',
 };
 
-export default function ArticleSurface({ article, bodyHtml, canEdit, sources = [], timeline = [] }: ArticleSurfaceProps) {
+export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody = true, sources = [], timeline = [] }: ArticleSurfaceProps) {
   const editHref = article.is_kids_safe
     ? `/admin/kids-story-manager?article=${article.id}`
     : `/admin/story-manager?article=${article.id}`;
@@ -88,13 +89,41 @@ export default function ArticleSurface({ article, bodyHtml, canEdit, sources = [
       <h1 style={TITLE_STYLE}>{article.title}</h1>
       {article.subtitle && <p style={SUBTITLE_STYLE}>{article.subtitle}</p>}
       <p style={{ fontSize: 12, color: 'var(--dim, #5a5a5a)', marginBottom: 16, letterSpacing: '0.03em' }}>verity post</p>
-      <div
-        data-article-body
-        style={BODY_STYLE}
-        // bodyHtml is server-sanitized via renderBodyHtml (sanitize-html);
-        // never user-supplied raw HTML at this point.
-        dangerouslySetInnerHTML={{ __html: bodyHtml }}
-      />
+      {canViewBody ? (
+        <div
+          data-article-body
+          style={BODY_STYLE}
+          // bodyHtml is server-sanitized via renderBodyHtml (sanitize-html);
+          // never user-supplied raw HTML at this point.
+          dangerouslySetInnerHTML={{ __html: bodyHtml }}
+        />
+      ) : (
+        <div
+          style={{
+            padding: '32px 0',
+            textAlign: 'center',
+            color: 'var(--dim, #555)',
+            fontSize: 14,
+          }}
+        >
+          <p style={{ margin: '0 0 12px' }}>Sign in to read this article.</p>
+          <a
+            href="/login"
+            style={{
+              display: 'inline-block',
+              padding: '8px 20px',
+              borderRadius: 8,
+              background: 'var(--accent, #0070f3)',
+              color: '#fff',
+              fontWeight: 600,
+              textDecoration: 'none',
+              fontSize: 13,
+            }}
+          >
+            Sign in
+          </a>
+        </div>
+      )}
       <TimelineSection events={timeline} storySlug={article.slug} />
       <SourcesSection sources={sources} />
     </article>

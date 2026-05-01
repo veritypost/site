@@ -211,7 +211,6 @@ export async function POST(request: Request) {
       event_label: entry.event_label,
       event_body: entry.event_body ?? null,
       sort_order: entry.sort_order ?? 0,
-      ...(entry.content !== undefined ? { content: entry.content } : {}),
     };
     if (entry._isNew || !entry.id) {
       const { data: newEvent } = await service
@@ -224,7 +223,6 @@ export async function POST(request: Request) {
     } else {
       await service
         .from('timelines')
-        // @ts-expect-error — partial shape.
         .update(eventPayload)
         .eq('id', entry.id);
     }
