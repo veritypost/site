@@ -414,7 +414,6 @@ export default function CommentRow({
                     overflowX: 'auto',
                     paddingBottom: 4,
                     scrollbarWidth: 'none',
-                    // @ts-ignore \u2014 non-standard but widely supported
                     msOverflowStyle: 'none',
                   }}
                 >
