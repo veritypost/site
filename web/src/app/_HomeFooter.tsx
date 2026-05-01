@@ -18,6 +18,8 @@ import { HOME_COLORS as C, HOME_SERIF_STACK as serifStack } from './_homeShared'
 export default function HomeFooter() {
   const { loggedIn } = useAuth() as { loggedIn: boolean };
 
+  if (loggedIn) return null;
+
   return (
     <footer
       style={{
@@ -30,60 +32,29 @@ export default function HomeFooter() {
       <p
         style={{
           fontFamily: serifStack,
-          fontStyle: 'italic',
-          fontSize: 14,
-          color: C.dim,
+          fontSize: 15,
+          color: C.soft,
           margin: 0,
+          lineHeight: 1.5,
         }}
       >
-        That&rsquo;s today&rsquo;s front page.
+        Create a free account to take the quiz and join the discussion.
       </p>
-      {loggedIn ? (
-        <p style={{ margin: '12px 0 0' }}>
-          <Link
-            href="/browse"
-            style={{
-              fontFamily: serifStack,
-              fontSize: 16,
-              color: C.accent,
-              textDecoration: 'underline',
-              textUnderlineOffset: 4,
-              fontWeight: 500,
-            }}
-          >
-            Browse all categories &rarr;
-          </Link>
-        </p>
-      ) : (
-        <>
-          <p
-            style={{
-              fontFamily: serifStack,
-              fontSize: 15,
-              color: C.soft,
-              margin: '16px 0 0',
-              lineHeight: 1.5,
-            }}
-          >
-            Create a free account to take the quiz and join the discussion.
-          </p>
-          <p style={{ margin: '12px 0 0' }}>
-            <Link
-              href="/signup"
-              style={{
-                fontFamily: serifStack,
-                fontSize: 16,
-                color: C.accent,
-                textDecoration: 'underline',
-                textUnderlineOffset: 4,
-                fontWeight: 500,
-              }}
-            >
-              Create free account &rarr;
-            </Link>
-          </p>
-        </>
-      )}
+      <p style={{ margin: '12px 0 0' }}>
+        <Link
+          href="/signup"
+          style={{
+            fontFamily: serifStack,
+            fontSize: 16,
+            color: C.accent,
+            textDecoration: 'underline',
+            textUnderlineOffset: 4,
+            fontWeight: 500,
+          }}
+        >
+          Create free account &rarr;
+        </Link>
+      </p>
     </footer>
   );
 }
