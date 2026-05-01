@@ -171,17 +171,24 @@ export async function getCapabilities(section) {
 // Full-perms cache path (my_permission_keys). Returns false when cache
 // has not loaded yet (allPermsCache null) — fail-closed by design. Callers
 // must await refreshAllPermissions() before reading this function.
+//
+// Item 11a: god-mode short-circuit. Anyone holding `admin.god_mode` in
+// their cache passes every key check until the SQL-side short-circuit
+// in my_permission_keys / get_my_capabilities lands (part-2 placeholder
+// migration). Without this, raw hasPermission() callers (expert pages,
+// settings/expert, /u/[username] expert badge, etc.) deny owner because
+// their granted-by-role keys don't include the per-feature keys.
 export function hasPermission(key) {
-  if (allPermsCache) {
-    return allPermsCache.has(key);
-  }
-  return false;
+  if (!allPermsCache) return false;
+  if (allPermsCache.has('admin.god_mode')) return true;
+  return allPermsCache.has(key);
 }
 
 // Key presence check. Returns null when cache not loaded; a minimal
 // synthetic object when the key is granted; null when absent.
 export function getPermission(key) {
   if (!allPermsCache) return null;
+  if (allPermsCache.has('admin.god_mode')) return { permission_key: key, granted: true };
   if (!allPermsCache.has(key)) return null;
   return { permission_key: key, granted: true };
 }
@@ -197,8 +204,10 @@ export function getCapability(key) {
 }
 
 // Single-permission server-side check (for RLS-mirroring UI logic
-// where you don't have the section cached).
+// where you don't have the section cached). Item 11a: god-mode
+// short-circuits before the RPC round-trip.
 export async function hasPermissionViaRpc(key) {
+  if (allPermsCache?.has('admin.god_mode')) return true;
   const supabase = createClient();
   const args = { p_key: key };
   const { data, error } = await supabase.rpc('has_permission', args);
@@ -207,7 +216,9 @@ export async function hasPermissionViaRpc(key) {
 }
 
 // Content-scoped check: e.g. "can this user view THIS article?"
+// Item 11a: god-mode short-circuits before the RPC round-trip.
 export async function hasPermissionFor(key, scopeType, scopeId) {
+  if (allPermsCache?.has('admin.god_mode')) return true;
   const supabase = createClient();
   const args = { p_key: key, p_scope_type: scopeType, p_scope_id: scopeId };
   const { data, error } = await supabase.rpc('has_permission_for', args);

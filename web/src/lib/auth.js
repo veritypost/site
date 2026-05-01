@@ -449,6 +449,15 @@ export async function hasPermissionServer(permissionKey, client) {
     if (user.kind === 'kid') return false;
     const { rows, error } = await loadEffectivePerms(supabase, user.id);
     if (error || rows == null) return false;
+    // Item 11a: god-mode short-circuit. Closes the gap until the SQL-side
+    // short-circuit in my_permission_keys lands (part-2 RPC patches file).
+    // Without this, server endpoints calling requirePermission(key) deny
+    // god-mode users for keys not in their role grants (expert features,
+    // anything not on the standard owner-set roster).
+    const hasGodMode = rows.some(
+      (r) => r && r.permission_key === 'admin.god_mode' && r.granted === true,
+    );
+    if (hasGodMode) return true;
     const row = rows.find((r) => r && r.permission_key === permissionKey);
     return !!(row && row.granted === true);
   } catch {
