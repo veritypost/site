@@ -107,6 +107,7 @@ struct StoryDetailView: View {
     @State private var commentTagsByUser: [String: Set<String>] = [:]
     @State private var commentHelpfulCounts: [String: Int] = [:]
     @State private var commentTagBusyKey: String = ""
+    @State private var tagOpenCommentId: String? = nil
 
     // D21: @mention autocomplete — paid tiers only.
     @State private var mentionSuggestions: [VPUser] = []
@@ -1830,8 +1831,10 @@ struct StoryDetailView: View {
                     // because the API rejects it 403 anyway and the
                     // affordance shouldn't tease an action the server bars.
                     if comment.userId != auth.currentUser?.id {
-                        commentTagChipsRow(for: comment)
-                            .padding(.top, 4)
+                        if tagOpenCommentId == comment.id {
+                            commentTagChipsRow(for: comment)
+                                .padding(.top, 4)
+                        }
                     }
                     HStack(spacing: 8) {
                         // D29: comment voting shows Up + Down with separate counts.
@@ -1893,6 +1896,22 @@ struct StoryDetailView: View {
                             .buttonStyle(.plain)
                         }
                         Spacer()
+                        if comment.userId != auth.currentUser?.id {
+                            let hasTag = tagOpenCommentId == comment.id
+                            Button {
+                                withAnimation(.easeOut(duration: 0.15)) {
+                                    tagOpenCommentId = (tagOpenCommentId == comment.id ? nil : comment.id)
+                                }
+                            } label: {
+                                Text("#")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(hasTag ? VP.accent : .secondary)
+                                    .frame(width: 32, height: 44)
+                                    .background(hasTag ? VP.accent.opacity(0.08) : Color.clear)
+                                    .cornerRadius(6)
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
                     .padding(.top, 4)
                 }

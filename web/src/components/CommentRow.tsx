@@ -153,6 +153,7 @@ export default function CommentRow({
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [busy, setBusy] = useState<string>('');
   const [commentMaxDepth, setCommentMaxDepth] = useState<number>(2);
+  const [tagsOpen, setTagsOpen] = useState<boolean>(false);
 
   const canReply = hasPermission('comments.reply');
   const canUpvote = hasPermission('comments.upvote');
@@ -227,6 +228,12 @@ export default function CommentRow({
   const yourVote = comment._your_vote;
   const mentions = (Array.isArray(comment.mentions) ? comment.mentions : []) as Mention[];
   const commentDepth = comment.thread_depth ?? depth;
+  const hasAnyTag = canContextTag && tagKinds.some((kind) => {
+    if (comment._your_tags?.has(kind)) return true;
+    if (kind === 'context' && (comment.context_tag_count ?? 0) >= 1) return true;
+    if (kind === 'helpful' && (comment.helpful_count ?? 0) >= 1) return true;
+    return false;
+  });
 
   return (
     <div
@@ -431,10 +438,7 @@ export default function CommentRow({
                   onClick={() => doVote(yourVote === 'upvote' ? 'clear' : 'upvote')}
                   style={voteBtn(yourVote === 'upvote')}
                 >
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    <span>&#8593;</span>
-                    <span>{comment.upvote_count || 0}</span>
-                  </span>
+                  ▲
                 </button>
               )}
               {(canUpvote || canDownvote) && (() => {
@@ -465,10 +469,7 @@ export default function CommentRow({
                   onClick={() => doVote(yourVote === 'downvote' ? 'clear' : 'downvote')}
                   style={voteBtn(yourVote === 'downvote', true)}
                 >
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    <span>&#8595;</span>
-                    <span>{comment.downvote_count || 0}</span>
-                  </span>
+                  ▼
                 </button>
               )}
 
@@ -490,6 +491,28 @@ export default function CommentRow({
                   }}
                 >
                   Reply
+                </button>
+              )}
+
+              {canContextTag && (
+                <button
+                  onClick={() => setTagsOpen((v) => !v)}
+                  title="Tag this comment"
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    padding: '6px 8px',
+                    borderRadius: 6,
+                    minHeight: 44,
+                    minWidth: 44,
+                    border: 'none',
+                    background: tagsOpen || hasAnyTag ? 'rgba(17,17,17,0.07)' : 'transparent',
+                    color: tagsOpen ? 'var(--accent, #111)' : hasAnyTag ? 'var(--accent, #111)' : 'var(--dim, #666)',
+                    cursor: 'pointer',
+                    touchAction: 'manipulation',
+                  }}
+                >
+                  #
                 </button>
               )}
 
@@ -602,8 +625,8 @@ export default function CommentRow({
               </div>
               </div>
 
-              {/* Row 2 — tag chip strip: secondary signals, below the action bar */}
-              {canContextTag && (
+              {/* Tag chip strip — revealed by # toggle */}
+              {canContextTag && tagsOpen && (
                 <div
                   style={{
                     display: 'flex',
