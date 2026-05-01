@@ -1,7 +1,7 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified comments 2026-04-18
 'use client';
-import { useState, useEffect, CSSProperties } from 'react';
+import { useState, useEffect, useRef, CSSProperties } from 'react';
 import { createClient } from '../lib/supabase/client';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import { MENTION_RE } from '@/lib/mentions';
@@ -30,6 +30,21 @@ type MuteState = {
   mute_level: number | null;
 } | null;
 
+type SuggestUser = {
+  id: string;
+  username: string;
+  display_name?: string | null;
+  avatar_url?: string | null;
+  avatar_color?: string | null;
+  is_verified_public_figure?: boolean;
+  is_expert?: boolean;
+};
+
+type MentionSuggest = {
+  results: SuggestUser[];
+  activeIndex: number;
+} | null;
+
 export default function CommentComposer({
   articleId,
   parentId = null,
@@ -45,6 +60,16 @@ export default function CommentComposer({
   const [canPost, setCanPost] = useState<boolean>(false);
   const [canMention, setCanMention] = useState<boolean>(false);
   const [permsLoaded, setPermsLoaded] = useState<boolean>(false);
+  const [mentionSuggest, setMentionSuggest] = useState<MentionSuggest>(null);
+
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const mentionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (mentionTimerRef.current) clearTimeout(mentionTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -77,6 +102,79 @@ export default function CommentComposer({
       }
     })();
   }, [parentId]);
+
+  function getMentionQueryAtCursor(text: string, cursor: number): string | null {
+    const before = text.slice(0, cursor);
+    const match = before.match(/@(\w{1,30})$/);
+    return match ? match[1] : null;
+  }
+
+  function handleBodyChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    const val = e.target.value;
+    setBody(val);
+
+    if (!canMention) return;
+
+    const cursor = e.target.selectionStart ?? val.length;
+    const q = getMentionQueryAtCursor(val, cursor);
+
+    if (mentionTimerRef.current) clearTimeout(mentionTimerRef.current);
+
+    if (!q) {
+      setMentionSuggest(null);
+      return;
+    }
+
+    mentionTimerRef.current = setTimeout(async () => {
+      const res = await fetch(`/api/comments/mention-search?q=${encodeURIComponent(q)}`).catch(() => null);
+      if (!res?.ok) return;
+      const data = await res.json().catch(() => ({}));
+      const users: SuggestUser[] = Array.isArray(data.users) ? data.users : [];
+      if (users.length > 0) {
+        setMentionSuggest({ results: users, activeIndex: 0 });
+      } else {
+        setMentionSuggest(null);
+      }
+    }, 180);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (!mentionSuggest) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setMentionSuggest((s) => s ? { ...s, activeIndex: Math.min(s.activeIndex + 1, s.results.length - 1) } : s);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setMentionSuggest((s) => s ? { ...s, activeIndex: Math.max(s.activeIndex - 1, 0) } : s);
+    } else if (e.key === 'Enter' || e.key === 'Tab') {
+      if (mentionSuggest.results.length > 0) {
+        e.preventDefault();
+        insertMention(mentionSuggest.results[mentionSuggest.activeIndex].username);
+      }
+    } else if (e.key === 'Escape') {
+      setMentionSuggest(null);
+    }
+  }
+
+  function insertMention(username: string) {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const cursor = ta.selectionStart ?? body.length;
+    const before = body.slice(0, cursor);
+    const after = body.slice(cursor);
+    const match = before.match(/@\w{0,30}$/);
+    if (!match || match.index === undefined) return;
+    const newBefore = before.slice(0, match.index) + '@' + username + ' ';
+    const newBody = newBefore + after;
+    setBody(newBody);
+    setMentionSuggest(null);
+    setTimeout(() => {
+      if (ta) {
+        ta.selectionStart = ta.selectionEnd = newBefore.length;
+        ta.focus();
+      }
+    }, 0);
+  }
 
   async function resolveMentions(text: string): Promise<Mention[]> {
     if (!canMention) return [];
@@ -247,14 +345,73 @@ export default function CommentComposer({
         </div>
       )}
       <textarea
+        ref={textareaRef}
         autoFocus={autoFocus}
         value={body}
-        onChange={(e) => setBody(e.target.value)}
+        onChange={handleBodyChange}
+        onKeyDown={handleKeyDown}
+        onBlur={() => setTimeout(() => setMentionSuggest(null), 150)}
         placeholder="Add to the discussion."
         aria-label={parentId ? 'Reply text' : 'Comment text'}
         rows={parentId ? 2 : 3}
         style={textareaStyle}
       />
+      {mentionSuggest && mentionSuggest.results.length > 0 && (
+        <div style={mentionDropdownStyle}>
+          {mentionSuggest.results.map((u, i) => (
+            <button
+              key={u.id}
+              onMouseDown={(e) => { e.preventDefault(); insertMention(u.username); }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                width: '100%',
+                padding: '6px 10px',
+                border: 'none',
+                background: i === mentionSuggest.activeIndex ? 'rgba(17,17,17,0.06)' : 'transparent',
+                cursor: 'pointer',
+                borderRadius: 6,
+                textAlign: 'left',
+              }}
+            >
+              <span
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: '50%',
+                  background: u.avatar_color || '#ccc',
+                  backgroundImage: u.avatar_url ? `url(${u.avatar_url})` : undefined,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: '#fff',
+                }}
+              >
+                {!u.avatar_url && u.username ? u.username[0].toUpperCase() : ''}
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text, #1a1a1a)' }}>
+                @{u.username}
+              </span>
+              {u.display_name && u.display_name !== u.username && (
+                <span style={{ fontSize: 12, color: 'var(--dim, #666)', marginLeft: 2 }}>
+                  {u.display_name}
+                </span>
+              )}
+              {u.is_expert && (
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#2d9e6b', marginLeft: 'auto' }}>
+                  Expert
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
       <div style={{ fontSize: 12, color: 'var(--dim, #666)', marginBottom: 10, lineHeight: 1.5 }}>
         Others passed a quiz to read this. Make it worth their time.
       </div>
@@ -332,6 +489,17 @@ const postBtnStyle: CSSProperties = {
   fontSize: 13,
   fontWeight: 700,
 };
+const mentionDropdownStyle: CSSProperties = {
+  background: '#fff',
+  border: '1px solid var(--border, #e5e5e5)',
+  borderRadius: 10,
+  boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+  padding: '4px',
+  marginBottom: 8,
+  maxHeight: 240,
+  overflowY: 'auto',
+};
+
 const mentionHintStyle: CSSProperties = {
   fontSize: 12,
   color: '#b45309',

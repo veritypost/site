@@ -82,20 +82,28 @@ const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
 //   at that comment and renders depth 0..3 of the subtree, recursive.
 // =====================================================================
 
-// PATCH /api/comments/[id] — owner edit.
+// PATCH /api/comments/[id] — owner edit, or admin edit-any.
 export async function PATCH(request, { params }) {
+  // admin.comments.edit.any bypasses ownership + time-window; fall back to
+  // the self-edit permission for regular users.
   let user;
+  let isAdminEdit = false;
   try {
-    user = await requirePermission('comments.edit.own');
-  } catch (err) {
-    if (err.status) {
-      console.error('[comments.[id].permission]', err?.message || err);
-      return NextResponse.json(
-        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
-        { status: err.status, headers: NO_STORE }
-      );
+    user = await requirePermission('admin.comments.edit.any');
+    isAdminEdit = true;
+  } catch (_) {
+    try {
+      user = await requirePermission('comments.edit.own');
+    } catch (err) {
+      if (err.status) {
+        console.error('[comments.[id].permission]', err?.message || err);
+        return NextResponse.json(
+          { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+          { status: err.status, headers: NO_STORE }
+        );
+      }
+      return NextResponse.json({ error: 'Unauthenticated' }, { status: 401, headers: NO_STORE });
     }
-    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401, headers: NO_STORE });
   }
 
   const { id } = params;
@@ -144,13 +152,14 @@ export async function PATCH(request, { params }) {
   if (lookupErr || !existing) {
     return NextResponse.json({ error: 'not_found' }, { status: 404, headers: NO_STORE });
   }
-  if (existing.user_id === user.id) {
+  // Self-edit: enforce ownership and the 10-minute window.
+  // Admin edit bypasses both — they can correct any comment at any time.
+  if (!isAdminEdit) {
+    if (existing.user_id !== user.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403, headers: NO_STORE });
+    }
     const createdAt = new Date(existing.created_at).getTime();
     if (Number.isFinite(createdAt) && Date.now() - createdAt > EDIT_WINDOW_MS) {
-      // `error` stays a stable machine code so existing clients keep working;
-      // `message` is the user-facing copy sourced from the i18n seed so any
-      // client that wants to surface the text inline reads it from a single
-      // place.
       return NextResponse.json(
         { error: 'edit_window_expired', message: COPY.comments.editWindowExpired },
         { status: 403, headers: NO_STORE }
@@ -158,8 +167,11 @@ export async function PATCH(request, { params }) {
     }
   }
 
+  // Pass the comment owner's id so the SECURITY DEFINER RPC's ownership
+  // check passes. For self-edit this is user.id; for admin it's the
+  // comment author's id (admin gate already applied above).
   const { error } = await service.rpc('edit_comment', {
-    p_user_id: user.id,
+    p_user_id: isAdminEdit ? existing.user_id : user.id,
     p_comment_id: id,
     p_body: body,
   });
@@ -172,26 +184,47 @@ export async function PATCH(request, { params }) {
   return NextResponse.json({ ok: true }, { headers: NO_STORE });
 }
 
-// DELETE /api/comments/[id] — owner soft-delete.
+// DELETE /api/comments/[id] — owner soft-delete, or admin delete-any.
 export async function DELETE(_request, { params }) {
   let user;
+  let isAdminDelete = false;
   try {
-    user = await requirePermission('comments.delete.own');
-  } catch (err) {
-    if (err.status) {
-      console.error('[comments.[id].permission]', err?.message || err);
-      return NextResponse.json(
-        { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
-        { status: err.status, headers: NO_STORE }
-      );
+    user = await requirePermission('admin.comments.delete.any');
+    isAdminDelete = true;
+  } catch (_) {
+    try {
+      user = await requirePermission('comments.delete.own');
+    } catch (err) {
+      if (err.status) {
+        console.error('[comments.[id].permission]', err?.message || err);
+        return NextResponse.json(
+          { error: err.status === 401 ? 'Unauthenticated' : 'Forbidden' },
+          { status: err.status, headers: NO_STORE }
+        );
+      }
+      return NextResponse.json({ error: 'Unauthenticated' }, { status: 401, headers: NO_STORE });
     }
-    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401, headers: NO_STORE });
   }
 
   const { id } = params;
   const service = createServiceClient();
+
+  // For admin: look up the comment owner so the RPC's ownership check passes.
+  let rpcUserId = user.id;
+  if (isAdminDelete) {
+    const { data: row } = await service
+      .from('comments')
+      .select('user_id')
+      .eq('id', id)
+      .maybeSingle();
+    if (!row) {
+      return NextResponse.json({ error: 'not_found' }, { status: 404, headers: NO_STORE });
+    }
+    rpcUserId = row.user_id;
+  }
+
   const { error } = await service.rpc('soft_delete_comment', {
-    p_user_id: user.id,
+    p_user_id: rpcUserId,
     p_comment_id: id,
   });
   if (error)

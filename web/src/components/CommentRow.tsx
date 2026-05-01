@@ -162,6 +162,9 @@ export default function CommentRow({
   const canReport = hasPermission('comments.report');
   const canEditOwn = hasPermission('comments.edit.own');
   const canDeleteOwn = hasPermission('comments.delete.own');
+  const canEditAny = hasPermission('admin.comments.edit.any');
+  const canDeleteAny = hasPermission('admin.comments.delete.any');
+  const canHideAny = hasPermission('admin.comments.hide');
   const canBlockUser = hasPermission('comments.block.add');
   const canReadExpert = hasPermission('article.expert_responses.read');
 
@@ -641,6 +644,27 @@ export default function CommentRow({
                       </>
                     ) : (
                       <>
+                        {canEditAny && (
+                          <MenuItem
+                            onClick={() => {
+                              setMenuOpen(false);
+                              setEditing(true);
+                            }}
+                          >
+                            Edit
+                          </MenuItem>
+                        )}
+                        {canDeleteAny && (
+                          <MenuItem
+                            danger
+                            onClick={() => {
+                              setMenuOpen(false);
+                              onDelete(comment.id);
+                            }}
+                          >
+                            Delete
+                          </MenuItem>
+                        )}
                         {canReport && currentUserVerified && (
                           <MenuItem
                             onClick={() => {
@@ -671,7 +695,7 @@ export default function CommentRow({
                             Supervisor flag
                           </MenuItem>
                         )}
-                        {viewerIsModerator && onHide && (
+                        {(viewerIsModerator || canHideAny) && onHide && (
                           <MenuItem
                             danger
                             onClick={() => {
