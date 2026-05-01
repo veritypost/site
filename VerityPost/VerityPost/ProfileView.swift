@@ -852,18 +852,18 @@ struct ProfileView: View {
                         .foregroundColor(VP.dim)
                     profileCardPreview(user: user, tierColor: tierColorFor(score: user.verityScore ?? 0))
                     HStack(spacing: 8) {
-                        NavigationLink {
-                            PublicProfileView(username: uname).environmentObject(auth)
-                        } label: {
-                            Text("View public card")
-                                .font(.system(.footnote, design: .default, weight: .semibold))
-                                .foregroundColor(VP.text)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 8)
-                                .frame(minHeight: 36)
-                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(VP.border))
+                        if let cardURL = profileCardURL(for: uname) {
+                            Link(destination: cardURL) {
+                                Text("View public card")
+                                    .font(.system(.footnote, design: .default, weight: .semibold))
+                                    .foregroundColor(VP.text)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 8)
+                                    .frame(minHeight: 36)
+                                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(VP.border))
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
 
                         if canShareProfileCard, let url = profileCardURL(for: uname) {
                             ShareLink(item: url) {
