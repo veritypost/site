@@ -1,6 +1,13 @@
-// Identity — display name, username, bio. Hits the `update_own_profile` RPC
-// which the legacy code already uses; same backend, new UI. Dirty-state
-// tracked via JSON ref so the Save button only enables on real change.
+// Identity — display name, username (read-only), bio. Hits the
+// `update_own_profile` RPC; same backend, new UI. Dirty-state tracked
+// via JSON ref so the Save button only enables on real change.
+//
+// Username is set once at signup (item 13's WelcomeModal) and locked
+// thereafter for self-edit (item 10). The DB-side guards live in
+// supabase/migrations/2026-05-01_lock_username_in_update_own_profile.sql
+// and 2026-05-01_protect_users_username.sql; this card simply renders the
+// existing value as a read-only row and never sends `username` in the
+// RPC payload. Admin renames go through /admin/users/[id] (item 12).
 
 'use client';
 
@@ -12,7 +19,7 @@ import type { Tables } from '@/types/database-helpers';
 import { Card } from '../../_components/Card';
 import { Field, buttonPrimaryStyle, inputStyle, textareaStyle } from '../../_components/Field';
 import { useToast } from '../../_components/Toast';
-import { C, F, S } from '../../_lib/palette';
+import { C, S } from '../../_lib/palette';
 
 type UserRow = Tables<'users'>;
 
@@ -27,21 +34,18 @@ export function IdentityCard({ user, preview, onUserUpdated }: Props) {
   const toast = useToast();
 
   const [displayName, setDisplayName] = useState(user.display_name ?? '');
-  const [username, setUsername] = useState(user.username ?? '');
   const [bio, setBio] = useState((user as UserRow & { bio?: string | null }).bio ?? '');
   const [saving, setSaving] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string | null>>({});
 
-  const initialRef = useRef(JSON.stringify({ displayName, username, bio }));
+  const initialRef = useRef(JSON.stringify({ displayName, bio }));
   useEffect(() => {
     initialRef.current = JSON.stringify({
       displayName: user.display_name ?? '',
-      username: user.username ?? '',
       bio: (user as UserRow & { bio?: string | null }).bio ?? '',
     });
   }, [user]);
 
-  const dirty = JSON.stringify({ displayName, username, bio }) !== initialRef.current;
+  const dirty = JSON.stringify({ displayName, bio }) !== initialRef.current;
 
   const onSave = async () => {
     if (preview) {
@@ -49,24 +53,22 @@ export function IdentityCard({ user, preview, onUserUpdated }: Props) {
       return;
     }
     setSaving(true);
-    setErrors({});
     const { data, error } = await supabase.rpc('update_own_profile', {
-      p_fields: { display_name: displayName, username, bio },
+      p_fields: { display_name: displayName, bio },
     });
     setSaving(false);
     if (error) {
       // Surface the server's actual message — fixes the legacy "Could not
       // update profile" generic that hid the real reason.
       const msg = error.message ?? 'Save failed.';
-      if (/username/i.test(msg)) setErrors({ username: msg });
-      else toast.error(msg);
+      toast.error(msg);
       return;
     }
     toast.success('Profile updated.');
     if (data && onUserUpdated) {
-      onUserUpdated({ ...user, display_name: displayName, username, bio } as UserRow);
+      onUserUpdated({ ...user, display_name: displayName, bio } as UserRow);
     }
-    initialRef.current = JSON.stringify({ displayName, username, bio });
+    initialRef.current = JSON.stringify({ displayName, bio });
   };
 
   return (
@@ -102,24 +104,10 @@ export function IdentityCard({ user, preview, onUserUpdated }: Props) {
             />
           )}
         </Field>
-        <Field
-          label="Username"
-          hint="Lowercase letters, numbers, and underscores. This is your @handle."
-          error={errors.username}
-        >
+        <Field label="Username" hint="Usernames are set at signup and can't be changed.">
           {(id) => (
-            <div style={{ display: 'flex', alignItems: 'center', gap: S[2] }}>
-              <span style={{ fontSize: F.base, color: C.inkMuted }}>@</span>
-              <input
-                id={id}
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value.toLowerCase())}
-                pattern="[a-z0-9_]+"
-                maxLength={30}
-                style={inputStyle}
-                autoComplete="username"
-              />
+            <div id={id} style={{ ...inputStyle, background: C.surfaceSunken, color: C.ink }}>
+              <span style={{ color: C.inkMuted }}>@</span>{user.username ?? '—'}
             </div>
           )}
         </Field>

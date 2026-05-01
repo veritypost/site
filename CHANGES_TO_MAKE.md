@@ -313,42 +313,201 @@ Suggested ship order within Wave 1: **13 → 10 → 3 → 11 → 12.** (13 unloc
 
 ## 10. Lock the username — pickable at signup, not editable after
 
-**What to change:** users can currently change their @handle from settings. Owner wants the username to be set once at signup and never editable afterward. The pick-at-signup flow stays; the post-signup editor goes (or becomes read-only display).
+**What to change:** users can currently change their @handle from settings. Owner wants the username to be set once at signup and never editable afterward. The pick-at-signup flow stays (item 13's WelcomeModal/PickUsernameView sheet); the post-signup editor becomes a read-only display.
 
 **Locked decisions (owner, 2026-04-30):**
-- **Self-edit:** disabled. Pick at signup is the only user-facing way to set a username.
-- **Admin override:** YES. Admins can rename any user's handle from `/admin/users/[id]` (and from the inline-edit profile mode in item 12 once that lands).
-- **Implementation option A (read-only display row + drop `username` from RPC payload)** is the chosen path.
+- **Self-edit:** disabled.
+- **Admin override:** YES. Admins can rename via `/admin/users/[id]` (UI lands in item 12; backend bypass lands here).
+- **Implementation Option A** (read-only display row + drop `username` from RPC payload).
+- **Three-layer server enforcement:** RPC guard + `/api/auth/save-username` route mirror + `users_protect_columns` trigger addition. All three must land in one commit — partial deploys leave bypass surfaces.
 
-**Source — web:**
-- `web/src/app/profile/settings/_cards/IdentityCard.tsx:30, 35, 39, 44, 54, 67, 69, 105-125` — the `username` state, dirty tracking, RPC payload, and the `<Field label="Username">` block with the `<input>` (lines 105-125). Two implementation options:
-  - **A (preferred):** Render the username as a read-only display row (e.g., `@{user.username}` with no input, plus a small "Username can't be changed" subtext). Drop `username` from the dirty calculation and the RPC payload so the form save call only sends `display_name` + `bio`.
-  - **B (cheaper):** keep the input but set `disabled` and add the helper copy. A's cleaner because B leaves stale code paths (validation, error mapping) that never fire.
-- `web/src/app/profile/settings/_cards/IdentityCard.tsx:54, 61` — `p_fields: { display_name, username, bio }` and the `if (/username/i.test(msg)) setErrors({ username: msg })` branch. Drop `username` from the payload (option A) so the RPC only ever updates display_name + bio for non-admins.
-- Signup (`web/src/app/signup/pick-username/page.tsx` — confirmed at `AuthViewModel.swift:543` reference) stays untouched. First pick is fine.
+**Pre-impl gates (both required before implementer touches code):**
+1. Pull live `update_own_profile` source via Supabase MCP: `select pg_get_functiondef(oid) from pg_proc where proname = 'update_own_profile';` — RPC is not in `supabase/migrations/`. **Do not write a CREATE OR REPLACE without the current source in hand.**
+2. Confirm `is_admin_or_above()` predicate exists: `select pg_get_functiondef(oid) from pg_proc where proname = 'is_admin_or_above';` — already used by `users_protect_columns:369` in `supabase/migrations/2026-04-29_combined_unapplied.sql`. Reuse it. Do NOT invent `is_admin()`.
 
-**Source — iOS adult:**
-- `VerityPost/VerityPost/SettingsView.swift:1372-1377` — `SettingsTextField(label: "Username", text: $username)` inside the Identity card. Replace with a non-editable label, e.g., `Text("@\(originalUsername)")` plus a `.foregroundColor(VP.dim)` caption "Username can't be changed".
-- `VerityPost/VerityPost/SettingsView.swift:1452, 1458, 1466` — `usernameChanged` flag, the `guard … || bioChanged || avatarChanged` gate, and the patch builder. Strip `username` from both. The save flow then only patches bio + avatar.
-- `VerityPost/VerityPost/PickUsernameView.swift` — first-time pick flow; leave as-is.
-- `VerityPost/VerityPost/AuthViewModel.swift:599` references `update_own_profile` RPC for setting the username at signup. That call is fine; only post-signup edits go away.
+### Phase 1 — Server RPC
 
-**Source — server (defense in depth):**
-- The `update_own_profile` Postgres RPC (referenced as `p_fields: { display_name, username, bio }`) currently accepts `username`. After the UI removes it, the RPC still accepts it — meaning a power user with curl could bypass. To enforce server-side, either:
-  - Add a check in the RPC body: `if (p_fields ? 'username') and (current users.username is not null) then raise exception 'username locked'`. Owners/admins should still be able to change usernames via a separate admin RPC or direct UPDATE.
-  - Or split the RPC into `update_own_identity_v2` (no username param) and migrate callers.
-- The RPC source isn't in the `supabase/migrations/` directory I checked (`grep -rln update_own_profile supabase` returned nothing). Pull the live definition via Supabase MCP `execute_sql` (`select pg_get_functiondef(oid) from pg_proc where proname = 'update_own_profile'`) before patching it.
+**Discovery (2026-05-01, post-pre-impl):** the live `update_own_profile` RPC already has a *silent partial lock* in the form of a CASE clause inside the UPDATE:
+```sql
+username = CASE
+             WHEN p_fields ? 'username' AND u.username IS NULL
+               THEN NULLIF(p_fields->>'username', '')::varchar
+             ELSE u.username
+           END,
+```
+This means today: a logged-in user's rename request returns `{ok: true, updated_at: ...}` but the column is preserved. UI shows success; nothing changed. There is **no admin bypass** in this clause — even owners can't rename via the RPC. The empty-string trap is also live: `u.username = ''` is `NOT NULL`, so even first-pick fails for any user whose row has empty-string.
 
-**Edge cases (one still open):**
-1. **Users with no username yet** (signed up but didn't complete pick). Lock applies *after* a username is set; pick-username flow must still work. The RPC server-side check should be `if (p_fields ? 'username') and (current users.username is not null and caller_role not in ('owner','admin')) then raise exception 'username locked'` — admin/owner gets the override per the locked decision above.
-2. **Admin override** — locked YES (see top of item).
-3. **Account-takeover / abuse rename — owner to confirm:** if a user's account is compromised, today they could rename to escape mentions/notifications; with the lock they can't (which is actually a feature for mention integrity). Confirm this is the intended behavior.
+**New migration `supabase/migrations/<YYYYMMDD>_lock_username_in_update_own_profile.sql`:** `CREATE OR REPLACE` the entire RPC. The full source is in this conversation log under "owner-pasted RPC body 2026-05-01" — pull it from there, then make these two changes:
 
-**Platforms:**
-- Web: lock the field in `IdentityCard.tsx`.
-- iOS adult: lock the field in `SettingsView.swift`.
-- Kids iOS: kids handle scheme differs; owner directive is for adults — mark not applicable unless owner extends.
-- Server: enforce in `update_own_profile` RPC as well.
+1. **Add an explicit guard near the top** (after `auth.uid()` resolution, before the UPDATE statement):
+   ```sql
+   IF (p_fields ? 'username') THEN
+     DECLARE
+       v_current text;
+     BEGIN
+       SELECT username INTO v_current FROM public.users WHERE id = v_uid;
+       IF coalesce(nullif(v_current, ''), null) IS NOT NULL
+          AND NOT public.is_admin_or_above() THEN
+         RAISE EXCEPTION 'username locked' USING ERRCODE = '42501';
+       END IF;
+     END;
+   END IF;
+   ```
+   - **Critical wording: `coalesce(nullif(v_current, ''), null) IS NOT NULL`, NOT `IS NOT NULL`.** Empty-string trap fix.
+   - The guard converts the silent no-op into an explicit 42501 error so UI knows the rename failed.
+   - Admins and owners pass through (`is_admin_or_above()` returns true).
+
+2. **Simplify the username CASE clause in the UPDATE** since the guard now enforces who can write:
+   ```sql
+   username = CASE
+                WHEN p_fields ? 'username'
+                  THEN NULLIF(p_fields->>'username', '')::varchar
+                ELSE u.username
+              END,
+   ```
+   (Removed the `AND u.username IS NULL` condition — guard handles it.)
+
+3. **Preserve everything else verbatim.** Don't touch the kid-delegated check, the not-authenticated check, the jsonb-typeof check, the other CASE columns, the `RETURNING`, or the `RETURN` block. The `SECURITY DEFINER`, `SET search_path`, language declarations all stay.
+
+`42501` matches the existing `users_protect_columns` trigger convention.
+
+### Phase 2 — `/api/auth/save-username` route mirror
+
+- File: `web/src/app/api/auth/save-username/route.ts`. After the auth check (~line 51) and before the RPC call (~line 89), add:
+  ```ts
+  // Defense-in-depth: short-circuit before hitting the RPC so iOS doesn't
+  // see 42501 mapped through the P0002 retry loop in AuthViewModel.swift:639.
+  const { data: existing } = await service
+    .from('users')
+    .select('username')
+    .eq('id', user.id)
+    .maybeSingle();
+  if (existing?.username && existing.username !== '') {
+    const { data: isAdmin } = await service.rpc('is_admin_or_above');
+    if (!isAdmin) {
+      return new Response(
+        JSON.stringify({ error: 'Username already set on this account.' }),
+        { status: 403, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+  }
+  ```
+- **Critical: explicit 403 (not generic 500).** Cross-device first-pick race (web saves first, iOS hits the route second) currently returns 500 from the route's catch-all. iOS user sees "Couldn't save" with no recovery hint. The 403 with explicit copy lets iOS show "your username is already set on another device" and call `auth.loadUser()` to dismiss the sheet.
+- Update header comment (lines 1-18) to document the lock behavior alongside the existing 409 race contract.
+
+### Phase 3 — `users_protect_columns` trigger
+
+- New migration `supabase/migrations/<YYYYMMDD>_protect_users_username.sql` that `CREATE OR REPLACE`s `public.users_protect_columns` (current at `supabase/migrations/2026-04-29_combined_unapplied.sql:792-879+` and `2026-04-29_auth_redesign_consolidated.sql:354-415`). Add a username block before `RETURN NEW`:
+  ```sql
+  IF OLD.username IS NOT NULL AND OLD.username <> ''
+     AND NEW.username IS DISTINCT FROM OLD.username THEN
+    RAISE EXCEPTION 'users.username is read-only for self-update' USING ERRCODE = '42501';
+  END IF;
+  ```
+- Existing admin/service-role/auth_sync bypasses at the function top (lines 803-810 / 366-373) already short-circuit before reaching this block. Item 12's admin endpoint uses service-role, so it sails through. The only path that hits the lock is end-user PostgREST/RPC writes — which is exactly the intended scope.
+- Defense-in-depth for any future writer that bypasses `update_own_profile`. The trigger only catches non-RPC writers since the RPC uses SECURITY DEFINER and bypasses triggers.
+
+### Phase 4 — `IdentityCard.tsx` (web)
+
+File: `/Users/veritypost/Desktop/verity-post/web/src/app/profile/settings/_cards/IdentityCard.tsx`. **Atomic edit — do all of these in one pass:**
+
+1. Line 30 — drop `const [username, setUsername] = useState(user.username ?? '');`.
+2. Lines 35, 39, 44 — drop `username` from `JSON.stringify({ displayName, username, bio })` in initialRef seed, useEffect re-seed, and dirty calc. Dirty becomes `{ displayName, bio }` only.
+3. Lines 53-55 — drop `username` from `p_fields`. Payload becomes `{ display_name: displayName, bio }`.
+4. Lines 60-63 — drop the `if (/username/i.test(msg)) setErrors({ username: msg })` branch.
+5. Line 67 — drop `username` from the optimistic `onUserUpdated` merge.
+6. Line 69 — drop from post-save `initialRef.current` reset.
+7. Lines 105-125 — replace the `<Field label="Username" hint=... error=...>` block with a static read-only row:
+   ```tsx
+   <Field label="Username" hint="Usernames are set at signup and can't be changed.">
+     {(id) => (
+       <div id={id} style={{ ...inputStyle, background: C.surfaceMuted, color: C.text }}>
+         <span style={{ color: C.inkMuted }}>@</span>{user.username ?? '—'}
+       </div>
+     )}
+   </Field>
+   ```
+
+### Phase 5 — `SettingsView.swift` (iOS)
+
+File: `/Users/veritypost/Desktop/verity-post/VerityPost/VerityPost/SettingsView.swift`. **Atomic edit — partial removal causes regression:**
+
+1. Lines 1372-1376 — replace `SettingsTextField(label: "Username", ..., text: $username, ...)` with a read-only row:
+   ```swift
+   HStack {
+     Text("Username").font(.caption).foregroundColor(VP.dim)
+     Spacer()
+     Text("@\(originalUsername)").foregroundColor(VP.text)
+   }
+   Text("Usernames are set at signup and can't be changed.")
+     .font(.caption2).foregroundColor(VP.dim)
+   ```
+2. **Keep `@State var username` declaration and `onAppear` seeding** (line 1414, 1419) — `originalUsername` is derived from it and the avatar-initials fallback at line 1449 still reads it. Just stop binding it to any input.
+3. Line 1402 — change `isDisabled: username.trimmingCharacters(in: .whitespaces).isEmpty` to a hoisted dirty check. Add a computed property:
+   ```swift
+   private var dirty: Bool {
+     bio != originalBio
+     || avatarOuter != originalAvatarOuter
+     || avatarInner != originalAvatarInner
+     || avatarInitials != originalAvatarInitials
+   }
+   ```
+   Then `isDisabled: !dirty || saving`. **Without this, Save button is permanently disabled OR always enabled depending on which half the implementer changes.**
+4. Line 1452 — drop `let usernameChanged = username != originalUsername`.
+5. Line 1458 — change save guard to `guard bioChanged || avatarChanged else { ... }`.
+6. Lines 1441, 1466 — drop `var username: String? = nil` from `ProfilePatch` struct AND `if usernameChanged { patch.username = username }`. **Both must go.** Half-removal causes the "5xx loop on stale baseline" — patch sends stale username, RPC rejects, user sees "Couldn't save" toast on every legitimate bio edit.
+
+### Phase 6 — `AuthViewModel.swift` comment cleanup (rolled in from item 13)
+
+File: `/Users/veritypost/Desktop/verity-post/VerityPost/VerityPost/AuthViewModel.swift`.
+
+1. Line 613 — replace "mirrors web pick-username page" with "mirrors web WelcomeModal first-pick flow."
+2. Lines 677-681 — `needsPickUsername` doc-comment. Current text: "ContentView gates on this to push PickUsernameView before MainTabView so a fresh magic-link signup always lands on the picker first." Update to: "ContentView gates on this to present PickUsernameView as an undismissable sheet over MainTabView when this is true, so a fresh magic-link signup is forced through the picker before interacting with the app."
+
+### Phase 7 — Verification
+
+1. **Supabase MCP smoke checks** (`execute_sql` with role + JWT impersonation per case):
+   - Non-admin user with existing username → `update_own_profile('{"username":"newname"}'::jsonb)` → expect `42501 username locked`.
+   - Same user → `update_own_profile('{"bio":"hello"}'::jsonb)` → expect success.
+   - Admin user → `update_own_profile('{"username":"adminrename"}'::jsonb)` → expect success.
+   - Fresh user with `username IS NULL` → `update_own_profile('{"username":"firstpick"}'::jsonb)` → expect success.
+   - User with `username = ''` (legacy edge case) → `update_own_profile('{"username":"firstpick"}'::jsonb)` → expect success (proves the `nullif` guard works).
+   - Direct UPDATE as `authenticated`: `update users set username = 'x' where id = '<non-admin uuid>'` → expect trigger `42501`.
+2. **Route-level smoke**: `curl -X PATCH /api/auth/save-username` with a session whose user already has a username → expect explicit 403 with copy "Username already set on this account." (NOT 500, NOT 409).
+3. **Build gates:**
+   - `cd /Users/veritypost/Desktop/verity-post/web && npm run build`
+   - `xcodebuild -project /Users/veritypost/Desktop/verity-post/VerityPost/VerityPost.xcodeproj -scheme VerityPost -destination "generic/platform=iOS Simulator" build`
+4. **Audit grep:** `grep -rn "patch.username\|p_fields.*username" /Users/veritypost/Desktop/verity-post/web/src/app/profile/settings /Users/veritypost/Desktop/verity-post/VerityPost/VerityPost/SettingsView.swift` — expect zero matches in self-edit surfaces.
+
+### Untouched (do not edit)
+
+- `WelcomeModal.tsx`, `WelcomeModalMount.tsx` — item 13 surface; first-pick still allowed by the RPC because `username IS NULL/''`.
+- `PickUsernameView.swift` — item 13 surface.
+- `pick-categories/page.tsx` — does not write username (verified).
+- `AvatarEditor.tsx`, `PublicProfileSection.tsx`, `PrivacyCard.tsx` — `update_own_profile` callers but none send `username` in payload (verified).
+- `/api/admin/users/[id]/route.ts` — admin rename UI lands in item 12; the trigger and RPC already admin-bypass via `is_admin_or_above()` and service-role bypass.
+- `AuthViewModel.swift:599-653` signup path — first-pick RPC call still allowed by guard.
+
+### Edge cases (locked or noted)
+
+1. **Empty-string username trap** — addressed by `coalesce(nullif(..., ''), null)` in the guard. Critical.
+2. **Cross-device first-pick race** — web saves first, iOS hits second. Route mirror returns explicit 403 instead of generic 500; iOS shows "Username already set on this account" and calls `auth.loadUser()` to dismiss the sheet.
+3. **Service-role direct writes to `users.username`** — none exist outside `/api/admin/users/[id]/route.ts`. **Rule for future maintainers:** no service-role `users.username` write outside that admin endpoint.
+4. **Admin under impersonation (item 12):** `auth.uid()` resolves to the impersonated user, so RPC guard blocks rename. **Admins must use `/admin/users/[id]` PATCH (service-role) for renames, never the impersonation flow.** Item 12 inline-edit username surface must hard-error when impersonating.
+5. **Account-takeover / abuse rename** — owner-noted as intended behavior (mention integrity is the win). Not a bug.
+6. **iOS retry loop:** `AuthViewModel.swift:639-645` retries on `P0002`-substring; `42501` doesn't match. Safe by accident — document so a future maintainer doesn't "fix" the retry to be more permissive.
+
+### Benefits surfaced (not just side effects)
+
+- **Mention integrity:** `comments.mentions` JSONB stores `{user_id, username}` snapshots. Lock guarantees the snapshot stays valid forever (at least for non-admin renames).
+- **Referral link stability:** `/r/<username>` (`web/src/app/api/referrals/me/route.ts:117`) — locked handles mean shared referral links never break.
+- **Profile/card URL stability:** `/u/[username]`, `/card/[username]` — no need to build a `previous_usernames` redirect table.
+
+### Platforms summary
+
+- Web: `IdentityCard.tsx` + `/api/auth/save-username/route.ts` + new RPC migration + new trigger migration.
+- iOS adult: `SettingsView.swift` (read-only display + save-button gate + patch builder) + `AuthViewModel.swift` (comment refreshes from item 13).
+- Kids iOS: not applicable — kids has a different handle scheme; no self-edit surface.
 
 ---
 

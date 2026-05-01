@@ -610,7 +610,7 @@ final class AuthViewModel: ObservableObject {
             // which was redundant and tripped RLS in edge cases.
             //
             // update_own_profile is the established write contract for
-            // user-owned profile fields (mirrors web pick-username page).
+            // user-owned profile fields (mirrors web WelcomeModal first-pick flow).
             // It does a targeted UPDATE, not an INSERT, so it is immune to the
             // trigger race and only touches the column we actually own.
             //
@@ -675,9 +675,10 @@ final class AuthViewModel: ObservableObject {
     }
 
     /// S9-Q2-iOS — true when we have a session but the cached user row's
-    /// `username` is nil/empty. ContentView gates on this to push
-    /// PickUsernameView before MainTabView so a fresh magic-link signup
-    /// always lands on the picker first.
+    /// `username` is nil/empty. ContentView gates on this to present
+    /// PickUsernameView as an undismissable sheet over MainTabView when
+    /// this is true, so a fresh magic-link signup is forced through the
+    /// picker before interacting with the app.
     var needsPickUsername: Bool {
         guard isLoggedIn, let user = currentUser else { return false }
         let uname = user.username?.trimmingCharacters(in: .whitespaces) ?? ""

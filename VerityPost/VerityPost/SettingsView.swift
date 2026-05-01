@@ -1296,6 +1296,18 @@ struct AccountSettingsView: View {
         return "?"
     }
 
+    // Item 10: username is locked at signup, so it is no longer part of the
+    // dirty calc. The save button gates on real bio/avatar diffs only —
+    // without this, dropping the old `username.isEmpty` gate would leave the
+    // button permanently disabled (or always enabled) depending on which
+    // half of the rewrite landed.
+    private var dirty: Bool {
+        bio != originalBio
+        || avatarOuter != originalAvatarOuter
+        || avatarInner != originalAvatarInner
+        || avatarInitials != originalAvatarInitials
+    }
+
     var body: some View {
         SettingsPageShell(title: "Profile") {
             // Avatar card — preview + initials + ring + inner fill pickers.
@@ -1365,15 +1377,21 @@ struct AccountSettingsView: View {
                 .padding(16)
             }
 
-            // Identity card
+            // Identity card — username is set at signup and locked thereafter
+            // (item 10). Server enforcement: update_own_profile RPC + the
+            // users_protect_columns trigger both raise 42501 'username locked'
+            // for self-update. Admins rename via /admin/users/[id] (item 12).
+            // Read-only display only — no input binding.
             SettingsSectionHeader(title: "Identity", tone: .normal)
             SettingsCard {
-                VStack(spacing: 14) {
-                    SettingsTextField(label: "Username",
-                                      placeholder: "username",
-                                      text: $username,
-                                      autocap: .never,
-                                      autocorrect: false)
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Username").font(.caption).foregroundColor(VP.dim)
+                        Spacer()
+                        Text("@\(originalUsername)").foregroundColor(VP.text)
+                    }
+                    Text("Usernames are set at signup and can't be changed.")
+                        .font(.caption2).foregroundColor(VP.dim)
                 }
                 .padding(16)
             }
@@ -1399,7 +1417,7 @@ struct AccountSettingsView: View {
             VStack(spacing: 8) {
                 SettingsPrimaryButton(title: saving ? "Saving..." : "Save changes",
                                       isLoading: saving,
-                                      isDisabled: username.trimmingCharacters(in: .whitespaces).isEmpty) {
+                                      isDisabled: !dirty || saving) {
                     Task { await save() }
                 }
                 if let banner = savedBanner {
@@ -1435,10 +1453,15 @@ struct AccountSettingsView: View {
         // baseline (e.g. a web-set bio) from silently overwriting it.
         // Swift's synthesized Encodable uses encodeIfPresent for
         // optionals, so nil fields drop out of the JSON entirely.
+        // Item 10: username is locked after signup. ProfilePatch no longer
+        // carries a `username` field (and the save() body never builds one),
+        // so the RPC payload from this surface is bio + avatar only. Both
+        // the RPC guard and users_protect_columns trigger reject self-renames
+        // anyway; keeping the field on the struct would let a stale baseline
+        // resurface the "5xx loop on every legitimate bio edit" regression.
         struct AvatarJSON: Encodable { let outer: String; let inner: String?; let initials: String }
         struct MetadataPatch: Encodable { let avatar: AvatarJSON }
         struct ProfilePatch: Encodable {
-            var username: String? = nil
             var bio: String? = nil
             var avatar_color: String? = nil
             var metadata: MetadataPatch? = nil
@@ -1449,13 +1472,12 @@ struct AccountSettingsView: View {
             ? String((username.first.map { String($0) } ?? "?")).uppercased()
             : avatarInitials
 
-        let usernameChanged = username != originalUsername
         let bioChanged      = bio != originalBio
         let avatarChanged   = avatarOuter != originalAvatarOuter
                            || avatarInner != originalAvatarInner
                            || avatarInitials != originalAvatarInitials
 
-        guard usernameChanged || bioChanged || avatarChanged else {
+        guard bioChanged || avatarChanged else {
             savedBanner = "No changes to save."
             try? await Task.sleep(nanoseconds: 900_000_000)
             dismiss()
@@ -1463,7 +1485,6 @@ struct AccountSettingsView: View {
         }
 
         var patch = ProfilePatch()
-        if usernameChanged { patch.username = username }
         if bioChanged      { patch.bio = bio }
         if avatarChanged {
             patch.avatar_color = avatarOuter
