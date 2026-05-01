@@ -1,11 +1,17 @@
--- users.avatar.initials format guard.
+-- users metadata.avatar.initials format guard.
 --
 -- Mirrors the client-side cap shipped in commit f0748ce (Wave 2 batch,
--- item 5): up to 3 characters, alphanumeric only. The client-side
--- enforcement clamps display via Avatar.tsx slice + AvatarEditor input
--- maxLength + filter, but a curl-savvy caller could still write a
--- noncompliant value via update_own_profile, leaving DB rot for any
--- future renderer that doesn't slice.
+-- item 5): up to 3 characters, alphanumeric only.
+--
+-- Schema reality (corrected 2026-05-01): there is NO users.avatar column.
+-- Avatar persists inside the users.metadata JSONB column at the path
+-- metadata->'avatar'->>'initials'. The iOS write path
+-- (SettingsView.swift, ProfileView.swift) already uses this shape via the
+-- metadata key in update_own_profile's p_fields. The web AvatarEditor
+-- (web/src/app/profile/_components/AvatarEditor.tsx:165) currently sends
+-- p_fields: { avatar: ..., avatar_color: ... } which DOES NOT match any
+-- column the RPC handles for the avatar key, so web avatar saves are
+-- silently dropped today — separate bug, see follow-up.
 --
 -- Constraint is added NOT VALID so existing rows with longer/legacy
 -- initials don't fail the migration. New writes are constrained
@@ -15,24 +21,31 @@
 --
 -- Pre-cleanup audit query:
 --
---     SELECT id, email, avatar->>'initials' AS initials
+--     SELECT id, email, metadata->'avatar'->>'initials' AS initials
 --     FROM public.users
---     WHERE avatar IS NOT NULL
---       AND jsonb_typeof(avatar) = 'object'
---       AND avatar ? 'initials'
+--     WHERE metadata IS NOT NULL
+--       AND jsonb_typeof(metadata) = 'object'
+--       AND metadata ? 'avatar'
+--       AND jsonb_typeof(metadata->'avatar') = 'object'
+--       AND metadata->'avatar' ? 'initials'
 --       AND (
---         char_length(avatar->>'initials') > 3
---         OR avatar->>'initials' !~ '^[A-Za-z0-9]*$'
+--         char_length(metadata->'avatar'->>'initials') > 3
+--         OR metadata->'avatar'->>'initials' !~ '^[A-Za-z0-9]*$'
 --       );
+
+ALTER TABLE public.users
+  DROP CONSTRAINT IF EXISTS users_avatar_initials_format;
 
 ALTER TABLE public.users
   ADD CONSTRAINT users_avatar_initials_format
   CHECK (
-    avatar IS NULL
-    OR jsonb_typeof(avatar) <> 'object'
-    OR NOT (avatar ? 'initials')
+    metadata IS NULL
+    OR jsonb_typeof(metadata) <> 'object'
+    OR NOT (metadata ? 'avatar')
+    OR jsonb_typeof(metadata->'avatar') <> 'object'
+    OR NOT (metadata->'avatar' ? 'initials')
     OR (
-      char_length(avatar->>'initials') <= 3
-      AND avatar->>'initials' ~ '^[A-Za-z0-9]*$'
+      char_length(metadata->'avatar'->>'initials') <= 3
+      AND metadata->'avatar'->>'initials' ~ '^[A-Za-z0-9]*$'
     )
   ) NOT VALID;

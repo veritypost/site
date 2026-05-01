@@ -48,3 +48,27 @@ Items locked but not yet shipped. Created 2026-05-01.
 2. Paste each result back to the agent. The agent will write the `CREATE OR REPLACE` patches into `2026-05-01_admin_god_mode_rpc_patches.sql`, remove the `RAISE EXCEPTION` guard, then you apply.
 
 **Status:** doable any time owner is ready to paste the RPC bodies.
+
+---
+
+## 4. Web AvatarEditor silently no-ops on save
+
+**Discovered:** 2026-05-01 while writing the avatar CHECK constraint.
+
+**What:** `web/src/app/profile/_components/AvatarEditor.tsx:165` calls:
+```ts
+supabase.rpc('update_own_profile', {
+  p_fields: { avatar: next, avatar_color: outer },
+});
+```
+The RPC's UPDATE statement has `avatar_url` and `avatar_color` columns plus a `metadata` JSONB merge — but does NOT handle a top-level `avatar` key. So the web avatar payload is silently dropped server-side. The save toast says success but nothing changes. Users would see this if they ever closed and reopened the avatar editor (the optimistic UI hides it during the same session).
+
+iOS does the right thing — `SettingsView.swift:1465` and `ProfileView.swift:2122` write inside `metadata.avatar`, which goes through the RPC's `metadata` jsonb merge.
+
+**Fix options:**
+1. **Change web payload to match iOS:** `p_fields: { metadata: { avatar: next }, avatar_color: outer }`. Two-line change in AvatarEditor.tsx. Reads remain compatible (web already reads `u.avatar?.outer ?? u.avatar_color`).
+2. **Patch the RPC** to handle a top-level `avatar` key by writing into `metadata.avatar`. Backwards-compatible if any other client also sends top-level `avatar`. More change.
+
+Recommend option 1 — surgical, matches iOS contract, no migration needed.
+
+**Status:** small fix; queue alongside item 7 or item 8.
