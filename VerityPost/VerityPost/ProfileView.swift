@@ -1697,6 +1697,7 @@ struct ProfileView: View {
             }
             let ups: [UpRow] = (try? await client.from("comment_votes")
                 .select("comments!inner(user_id, articles(category_id, subcategory_id))")
+                .eq("vote_type", value: "upvote")
                 .eq("comments.user_id", value: userId)
                 .execute().value) ?? []
             var catU: [String: Int] = [:]

@@ -41,6 +41,10 @@ export type CategoryRow = Pick<
 >;
 export type CategoryScoreRow = {
   category_id: string;
+  // leaf_id resolves to subcategory_id when present (sub-pill drill-in),
+  // otherwise falls through to category_id (parent-level row). scoreById
+  // is keyed by this so sub-pill scope-card lookups land on the right row.
+  leaf_id: string;
   score: number;
   reads: number;
   quizzes_passed: number;
@@ -94,7 +98,7 @@ export function CategoriesSection({ categories, scores, loading }: CategoriesSec
   );
   const scoreById = useMemo(() => {
     const m = new Map<string, CategoryScoreRow>();
-    for (const s of scores) m.set(s.category_id, s);
+    for (const s of scores) m.set(s.leaf_id, s);
     return m;
   }, [scores]);
 
@@ -418,6 +422,7 @@ export function CategoriesSectionConnected({ authUserId }: CategoriesSectionConn
       };
       const scoreRows: CategoryScoreRow[] = ((metricsRes.data ?? []) as MetricsRow[]).map((r) => ({
         category_id: r.category_id,
+        leaf_id: r.subcategory_id ?? r.category_id,
         score: r.score,
         reads: r.reads,
         quizzes_passed: r.quizzes_passed,

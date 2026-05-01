@@ -188,17 +188,9 @@ export function PublicProfileSection({ user, tier, preview, onUserUpdated }: Pro
                 ) : null}
               </div>
             ) : null}
-            {user.username ? (
-              <div style={{ marginTop: S[4], fontSize: F.xs, color: C.inkFaint }}>
-                Public URL:{' '}
-                <Link
-                  href={`/u/${user.username}`}
-                  style={{ color: C.accent, textDecoration: 'none', fontWeight: 600 }}
-                >
-                  veritypost.com/u/{user.username}
-                </Link>
-              </div>
-            ) : null}
+            {/* Public URL link intentionally omitted — /u/[username] is
+                kill-switched pending public profile launch. Re-enable
+                when PUBLIC_PROFILE_ENABLED flips to true. */}
           </div>
         </div>
       </section>
