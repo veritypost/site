@@ -23,6 +23,8 @@ import Button from '@/components/admin/Button';
 import Spinner from '@/components/admin/Spinner';
 import TextInput from '@/components/admin/TextInput';
 import EmptyState from '@/components/admin/EmptyState';
+import DestructiveActionConfirm from '@/components/admin/DestructiveActionConfirm';
+import { createClient } from '@/lib/supabase/client';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 
 type AudienceBand = 'adult' | 'tweens' | 'kids';
@@ -31,13 +33,22 @@ type ArticleStatus = 'draft' | 'published' | 'archived' | 'failed';
 type ArticleRow = {
   id: string;
   title: string | null;
-  stories: { slug: string } | null;
+  stories: { slug: string | null } | null;
   status: ArticleStatus;
   age_band: AudienceBand;
   category_id: string | null;
   author_id: string | null;
   published_at: string | null;
   updated_at: string | null;
+  is_ai_generated: boolean | null;
+  browse_only: boolean;
+  view_count: number | null;
+  is_breaking: boolean;
+  is_kids_safe: boolean;
+  deleted_at: string | null;
+  story_id: string | null;
+  categories: { name: string | null } | null;
+  users: { username: string | null } | null;
 };
 
 const ALL_BANDS: AudienceBand[] = ['adult', 'tweens', 'kids'];
@@ -71,6 +82,7 @@ function formatStatus(status: ArticleStatus): { label: string; variant: 'success
 export default function ArticlesTable() {
   const router = useRouter();
   const sp = useSearchParams();
+  const supabase = createClient();
 
   // Selected filters resolve from the querystring on every render —
   // single source of truth.
@@ -86,6 +98,17 @@ export default function ArticlesTable() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Action state
+  const [publishingId, setPublishingId] = useState<string | null>(null);
+  const [browseOnlyId, setBrowseOnlyId] = useState<string | null>(null);
+  const [loadingDeleteId, setLoadingDeleteId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    title: string;
+    readCount: number;
+    commentCount: number;
+  } | null>(null);
 
   const writeUrl = useCallback(
     (next: { audience?: AudienceBand[]; status?: ArticleStatus[]; q?: string }) => {
@@ -204,6 +227,107 @@ export default function ArticlesTable() {
     }
   };
 
+  // -------------------------------------------------------------------------
+  // Action handlers — all mutations go through the PATCH/DELETE API routes
+  // so permission checks, rate limiting, and audit logging are enforced.
+  // Optimistic local state updates avoid re-fetching (which would lose cursor
+  // position and discard pages already loaded via "Load more").
+  // -------------------------------------------------------------------------
+
+  // Allowed transitions mirror the PATCH route's ALLOWED_TRANSITIONS:
+  //   draft → published | archived
+  //   published → archived  (unpublish = archive, not draft)
+  //   archived → draft      (restore to draft, then re-publish)
+  const handleStatusChange = async (row: ArticleRow, nextStatus: 'published' | 'archived' | 'draft') => {
+    setPublishingId(row.id);
+    try {
+      const res = await fetch(`/api/admin/articles/${row.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      const json = await res.json().catch(() => ({})) as { article?: ArticleRow; error?: string };
+      if (!res.ok) {
+        setError(json.error ?? 'Status change failed');
+        return;
+      }
+      setRows((prev) =>
+        prev.map((r) =>
+          r.id === row.id
+            ? { ...r, status: nextStatus as ArticleStatus, published_at: json.article?.published_at ?? r.published_at }
+            : r
+        )
+      );
+    } catch {
+      setError('Status change failed');
+    } finally {
+      setPublishingId(null);
+    }
+  };
+
+  const handleBrowseOnlyToggle = async (row: ArticleRow) => {
+    setBrowseOnlyId(row.id);
+    const next = !row.browse_only;
+    try {
+      const res = await fetch(`/api/admin/articles/${row.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ browse_only: next }),
+      });
+      const json = await res.json().catch(() => ({})) as { error?: string };
+      if (!res.ok) {
+        setError(json.error ?? 'Update failed');
+        return;
+      }
+      setRows((prev) =>
+        prev.map((r) => (r.id === row.id ? { ...r, browse_only: next } : r))
+      );
+    } catch {
+      setError('Update failed');
+    } finally {
+      setBrowseOnlyId(null);
+    }
+  };
+
+  const handleDeleteClick = async (row: ArticleRow) => {
+    setLoadingDeleteId(row.id);
+    try {
+      const [readsRes, commentsRes] = await Promise.all([
+        supabase
+          .from('reading_log')
+          .select('id', { count: 'exact', head: true })
+          .eq('article_id', row.id),
+        supabase
+          .from('comments')
+          .select('id', { count: 'exact', head: true })
+          .eq('article_id', row.id),
+      ]);
+      setDeleteTarget({
+        id: row.id,
+        title: row.title ?? 'Untitled',
+        readCount: readsRes.count ?? 0,
+        commentCount: commentsRes.count ?? 0,
+      });
+    } catch {
+      setDeleteTarget({ id: row.id, title: row.title ?? 'Untitled', readCount: 0, commentCount: 0 });
+    } finally {
+      setLoadingDeleteId(null);
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    const id = deleteTarget.id;
+    setDeleteTarget(null);
+    const res = await fetch(`/api/admin/articles/${id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({})) as { error?: string };
+      setError(json.error ?? 'Delete failed');
+      return;
+    }
+    setRows((prev) => prev.filter((r) => r.id !== id));
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: S[3] }}>
       <div
@@ -271,7 +395,8 @@ export default function ArticlesTable() {
               <th style={{ padding: `${S[2]}px ${S[3]}px`, fontWeight: 600 }}>Title</th>
               <th style={{ padding: `${S[2]}px ${S[3]}px`, fontWeight: 600 }}>Audience</th>
               <th style={{ padding: `${S[2]}px ${S[3]}px`, fontWeight: 600 }}>Status</th>
-              <th style={{ padding: `${S[2]}px ${S[3]}px`, fontWeight: 600 }}>Updated</th>
+              <th style={{ padding: `${S[2]}px ${S[3]}px`, fontWeight: 600, textAlign: 'right', width: 70 }}>Views</th>
+              <th style={{ padding: `${S[2]}px ${S[3]}px`, fontWeight: 600, width: 300 }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -280,31 +405,108 @@ export default function ArticlesTable() {
                 key={row.id}
                 style={{ borderBottom: `1px solid ${C.divider}`, background: C.bg }}
               >
+                {/* Title cell — title + badges + author/category metadata */}
                 <td style={{ padding: `${S[2]}px ${S[3]}px` }}>
-                  <Link
-                    href={row.stories?.slug ? `/${row.stories.slug}` : '#'}
-                    style={{
-                      color: C.white,
-                      textDecoration: 'none',
-                      fontWeight: 500,
-                      display: 'inline-flex',
-                      gap: S[2],
-                      alignItems: 'baseline',
-                    }}
-                  >
-                    {row.title || row.stories?.slug || '—'}
-                  </Link>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: S[1], flexWrap: 'wrap' }}>
+                    <Link
+                      href={row.stories?.slug ? `/${row.stories.slug}` : '#'}
+                      style={{
+                        color: C.white,
+                        textDecoration: 'none',
+                        fontWeight: 500,
+                      }}
+                      onClick={(e) => { if (!row.stories?.slug) e.preventDefault(); }}
+                    >
+                      {row.title || '—'}
+                    </Link>
+                    {row.is_breaking && <Badge variant="danger" size="xs">Breaking</Badge>}
+                    {row.is_kids_safe && <Badge variant="info" size="xs">Kids</Badge>}
+                    {row.browse_only && <Badge variant="warn" size="xs">Browse only</Badge>}
+                  </div>
+                  <div style={{ fontSize: F.xs, color: C.dim, marginTop: 2 }}>
+                    {row.users?.username ? `@${row.users.username}` : '—'}
+                    {row.categories?.name ? ` · ${row.categories.name}` : ''}
+                  </div>
                 </td>
+
+                {/* Audience */}
                 <td style={{ padding: `${S[2]}px ${S[3]}px`, color: C.dim }}>
                   {row.age_band === 'adult' ? 'Adult' : row.age_band === 'tweens' ? 'Tweens' : 'Kids'}
                 </td>
+
+                {/* Status */}
                 <td style={{ padding: `${S[2]}px ${S[3]}px` }}>
                   <Badge variant={formatStatus(row.status).variant} size="xs">
                     {formatStatus(row.status).label}
                   </Badge>
                 </td>
-                <td style={{ padding: `${S[2]}px ${S[3]}px`, color: C.dim }}>
-                  {row.updated_at ? new Date(row.updated_at).toLocaleString() : '—'}
+
+                {/* Views */}
+                <td style={{ padding: `${S[2]}px ${S[3]}px`, color: C.dim, textAlign: 'right' }}>
+                  {(row.view_count ?? 0).toLocaleString()}
+                </td>
+
+                {/* Actions */}
+                <td
+                  style={{ padding: `${S[2]}px ${S[3]}px` }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div style={{ display: 'flex', gap: S[1], flexWrap: 'wrap', alignItems: 'center' }}>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() =>
+                        router.push(
+                          row.is_kids_safe
+                            ? `/admin/kids-story-manager?article=${row.id}`
+                            : `/admin/story-manager?article=${row.id}`
+                        )
+                      }
+                    >
+                      Edit
+                    </Button>
+
+                    {row.status === 'draft' && (
+                      <Button size="sm" variant="primary" disabled={publishingId === row.id} onClick={() => handleStatusChange(row, 'published')}>
+                        {publishingId === row.id ? '…' : 'Publish'}
+                      </Button>
+                    )}
+                    {row.status === 'published' && (
+                      <Button size="sm" variant="ghost" disabled={publishingId === row.id} onClick={() => handleStatusChange(row, 'archived')}>
+                        {publishingId === row.id ? '…' : 'Unpublish'}
+                      </Button>
+                    )}
+                    {row.status === 'archived' && (
+                      <Button size="sm" variant="ghost" disabled={publishingId === row.id} onClick={() => handleStatusChange(row, 'draft')}>
+                        {publishingId === row.id ? '…' : 'Restore'}
+                      </Button>
+                    )}
+
+                    {row.status === 'published' && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={browseOnlyId === row.id}
+                        onClick={() => handleBrowseOnlyToggle(row)}
+                      >
+                        {browseOnlyId === row.id
+                          ? '…'
+                          : row.browse_only
+                          ? '+ Home'
+                          : 'Browse only'}
+                      </Button>
+                    )}
+
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={loadingDeleteId === row.id}
+                      onClick={() => handleDeleteClick(row)}
+                      style={{ color: C.danger }}
+                    >
+                      {loadingDeleteId === row.id ? '…' : 'Delete'}
+                    </Button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -319,6 +521,26 @@ export default function ArticlesTable() {
           </Button>
         </div>
       )}
+
+      <DestructiveActionConfirm
+        open={!!deleteTarget}
+        title={`Delete "${deleteTarget?.title}"?`}
+        message={
+          deleteTarget
+            ? `${deleteTarget.readCount} recorded read${deleteTarget.readCount !== 1 ? 's' : ''} · ${deleteTarget.commentCount} comment${deleteTarget.commentCount !== 1 ? 's' : ''}. Cannot be undone.`
+            : ''
+        }
+        confirmText="delete"
+        confirmLabel="Delete article"
+        reasonRequired={false}
+        action="article.delete"
+        targetTable="articles"
+        targetId={deleteTarget?.id ?? null}
+        oldValue={deleteTarget?.title ?? null}
+        newValue={null}
+        onConfirm={handleDeleteConfirm}
+        onClose={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

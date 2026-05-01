@@ -96,7 +96,7 @@ export async function GET(req: Request) {
   let query = service
     .from('articles')
     .select(
-      'id, title, status, age_band, category_id, author_id, published_at, updated_at, is_ai_generated, stories(slug)'
+      'id, title, status, age_band, category_id, author_id, published_at, updated_at, is_ai_generated, browse_only, view_count, is_breaking, is_kids_safe, deleted_at, story_id, stories!articles_story_id_fkey(slug), categories!fk_articles_category_id(name), users!fk_articles_author_id(username)'
     )
     .is('deleted_at', null)
     .in('status', status)
