@@ -250,11 +250,14 @@ export default function CommentComposer({
         autoFocus={autoFocus}
         value={body}
         onChange={(e) => setBody(e.target.value)}
-        placeholder={parentId ? 'Write a reply\u2026' : 'Join the discussion\u2026'}
+        placeholder="Add to the discussion."
         aria-label={parentId ? 'Reply text' : 'Comment text'}
         rows={parentId ? 2 : 3}
         style={textareaStyle}
       />
+      <div style={{ fontSize: 12, color: 'var(--dim, #666)', marginBottom: 10, lineHeight: 1.5 }}>
+        Others passed a quiz to read this. Make it worth their time.
+      </div>
       <div style={footerStyle}>
         <span>
           {canMention
@@ -286,7 +289,8 @@ export default function CommentComposer({
 
 const containerStyle: CSSProperties = {
   border: '1px solid var(--border, #e5e5e5)',
-  borderRadius: 14,
+  borderLeft: '3px solid var(--accent, #111)',
+  borderRadius: '0 10px 10px 0',
   padding: '12px 14px',
   background: 'var(--card, #f7f7f7)',
   marginBottom: 16,

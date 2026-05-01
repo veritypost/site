@@ -629,6 +629,7 @@ export default function CommentThread({
     );
   }
 
+  const [sort, setSort] = useState<'top' | 'newest'>('top');
   const [expertFilter, setExpertFilter] = useState<boolean>(false);
   const [expertDialogOpen, setExpertDialogOpen] = useState<boolean>(false);
   const [expertQuestion, setExpertQuestion] = useState<string>('');
@@ -699,7 +700,16 @@ export default function CommentThread({
   const displayComments = expertFilter
     ? visible.filter((c) => c.is_expert_question || c.is_expert_reply)
     : visible;
-  const tops = displayComments.filter((c) => !c.parent_id);
+  const topsUnsorted = displayComments.filter((c) => !c.parent_id);
+  const tops = [...topsUnsorted].sort((a, b) => {
+    if (sort === 'newest') {
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    }
+    // 'top': sort by net score descending
+    const netA = (a.upvote_count || 0) - (a.downvote_count || 0);
+    const netB = (b.upvote_count || 0) - (b.downvote_count || 0);
+    return netB - netA;
+  });
   const childrenByParent: Record<string, CommentWithAuthor[]> = {};
   displayComments
     .filter((c) => c.parent_id)
@@ -751,31 +761,41 @@ export default function CommentThread({
           contradict the "be the first" empty-state copy below. */}
       {visible.length > 0 && (
         <>
-          <div style={{ marginBottom: 20 }}>
-            <div
-              style={{
-                fontSize: 22,
-                fontWeight: 700,
-                color: 'var(--text)',
-                lineHeight: 1.2,
-                marginBottom: 4,
-              }}
-            >
-              {displayComments.length} {displayComments.length === 1 ? 'comment' : 'comments'}
-            </div>
-            <div
-              style={{
-                fontSize: 12,
-                fontWeight: 700,
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase',
-                color: 'var(--dim)',
-              }}
-            >
-              Every reader here passed the quiz.
+          <div style={{
+            display: 'flex',
+            alignItems: 'baseline',
+            gap: 12,
+            marginBottom: 20,
+            paddingBottom: 12,
+            borderBottom: '1px solid #e5e5e5',
+          }}>
+            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text, #1a1a1a)' }}>
+              {comments.length} {comments.length === 1 ? 'comment' : 'comments'}
+            </span>
+            <div style={{ display: 'flex', gap: 12, marginLeft: 8 }}>
+              {(['top', 'newest'] as const).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setSort(s)}
+                  style={{
+                    fontSize: 13,
+                    fontWeight: sort === s ? 600 : 400,
+                    color: sort === s ? 'var(--text, #1a1a1a)' : 'var(--dim, #666)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: 0,
+                    textTransform: 'capitalize',
+                  }}
+                >
+                  {s === 'top' ? 'Top' : 'Newest'}
+                </button>
+              ))}
             </div>
           </div>
-          <div style={{ borderTop: '1px solid var(--border)', marginBottom: 20 }} />
+          <div style={{ fontSize: 13, color: '#999', fontWeight: 400, marginBottom: 16 }}>
+            Every reader here passed the quiz.
+          </div>
         </>
       )}
 
@@ -1156,12 +1176,11 @@ export default function CommentThread({
         // alone reader has an editorial follow-up rather than a dead end.
         <div
           style={{
-            textAlign: 'center',
-            padding: '48px 0 40px',
+            padding: '24px 0',
           }}
         >
-          <div style={{ fontSize: 15, color: 'var(--dim, #666)', fontStyle: 'italic' }}>
-            No comments yet. You passed the quiz &mdash; start the conversation.
+          <div style={{ fontSize: 14, color: 'var(--dim, #666)' }}>
+            No one has joined this discussion yet.
           </div>
           {emptyStateExtra && (
             <div style={{ marginTop: 24, textAlign: 'left' }}>{emptyStateExtra}</div>

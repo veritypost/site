@@ -238,16 +238,13 @@ export default function CommentRow({
   return (
     <div
       style={{
-        padding: '18px 0',
-        borderBottom: depth === 0 && !comment.is_expert_reply ? '1px solid var(--border, #e5e5e5)' : 'none',
-        marginLeft: depth > 0 ? 24 : 0,
-        borderLeft: depth > 0 ? '2px solid var(--border, #e5e5e5)' : 'none',
-        paddingLeft: depth > 0 ? 12 : 0,
+        padding: depth === 0 ? '20px 0' : '16px 0',
+        borderBottom: depth === 0 && !comment.is_expert_reply ? '1px solid #e5e5e5' : 'none',
         ...(comment.is_expert_reply ? {
-          background: 'rgba(34,197,94,0.06)',
-          borderRadius: 10,
-          border: '1px solid rgba(34,197,94,0.15)',
-          padding: depth > 0 ? '14px 14px' : '14px',
+          background: '#f0faf4',
+          borderLeft: '3px solid #2d9e6b',
+          borderRadius: '0 8px 8px 0',
+          padding: depth > 0 ? '14px 16px' : '14px 16px',
           marginTop: 4,
           marginBottom: 4,
         } : {}),
@@ -264,7 +261,29 @@ export default function CommentRow({
       )}
       <div style={{ display: 'flex', gap: 12 }}>
         <Avatar user={user} size={32} />
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            flex: 1,
+            minWidth: 0,
+            ...(depth > 0 ? {
+              paddingLeft: 16,
+              borderLeft: '2px solid #e0e0e0',
+              marginLeft: 12,
+            } : {}),
+          }}
+        >
+          {comment.is_expert_reply && (
+            <div style={{
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: '0.07em',
+              textTransform: 'uppercase',
+              color: '#2d9e6b',
+              marginBottom: 4,
+            }}>
+              Expert Reply{user.expert_title ? ` · ${user.expert_title}` : ''}
+            </div>
+          )}
           <div
             style={{
               display: 'flex',
@@ -274,7 +293,7 @@ export default function CommentRow({
               marginBottom: 5,
             }}
           >
-            <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--white, #111)' }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--white, #111)' }}>
               {user.username || 'user'}
             </span>
             <VerifiedBadge user={user} />
@@ -313,21 +332,8 @@ export default function CommentRow({
                 VS {authorCategoryScore}
               </span>
             )}
-            {comment.is_expert_reply && (
-              <span
-                style={{
-                  fontSize: 10,
-                  padding: '1px 6px',
-                  borderRadius: 4,
-                  background: 'rgba(34,197,94,0.12)',
-                  color: '#16a34a',
-                  fontWeight: 600,
-                }}
-              >
-                Expert{user.expert_title ? ` · ${user.expert_title}` : ''}
-              </span>
-            )}
-            <span style={{ fontSize: 11, color: 'var(--dim, #666)', marginLeft: 'auto' }}>
+            <span style={{ fontSize: 12, color: '#ccc', margin: '0 4px' }}>·</span>
+            <span style={{ fontSize: 12, color: '#999', fontWeight: 400 }}>
               {timeAgo(comment.created_at)}
               {comment.is_edited ? ' \u00b7 edited' : ''}
             </span>
@@ -447,7 +453,7 @@ export default function CommentRow({
                 const net = up - down;
                 const total = up + down;
                 if (total === 0) return null;
-                const color = net > 0 ? '#16a34a' : net < 0 ? '#dc2626' : 'var(--dim, #666)';
+                const color = net > 0 ? '#1a7a4a' : net < 0 ? '#b94040' : 'var(--dim, #666)';
                 return (
                   <span
                     title={`${up} upvote${up !== 1 ? 's' : ''} · ${down} downvote${down !== 1 ? 's' : ''} · ${total} total`}
@@ -708,14 +714,14 @@ function voteBtn(active: boolean, isDown = false): CSSProperties {
     display: 'inline-flex',
     alignItems: 'center',
     gap: 4,
-    padding: '6px 8px',
+    padding: '4px 6px',
     borderRadius: 6,
     minHeight: 44,
     minWidth: 44,
     border: 'none',
     background: active ? `${color}14` : 'transparent',
     color,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: 600,
     cursor: 'pointer',
     touchAction: 'manipulation',
