@@ -113,7 +113,7 @@ export default async function HelpPage() {
         <span>
           Reading is free. Verity ({verityMonthly}/mo) adds reduced ads, unlimited bookmarks, quiz
           retakes, text-to-speech, DMs, and follows. Pro ({proMonthly}/mo) is ad-free and adds
-          Ask-an-Expert and streak freezes. Family ({familyMonthly}/mo) covers two adults and up to
+          Ask-an-Expert. Family ({familyMonthly}/mo) covers two adults and up to
           two kid profiles with age-tiered content and a family leaderboard.
           {pricesAreFallback && (
             <>

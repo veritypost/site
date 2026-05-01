@@ -147,7 +147,7 @@ struct PublicProfileView: View {
                 .font(.system(.title3, design: .default, weight: .bold))
                 .foregroundColor(VP.text)
                 .multilineTextAlignment(.center)
-            Text("Profiles show reading history, Verity Score, streak, comments, and more. Join free to view this profile and build your own.")
+            Text("Profiles show reading history, Verity Score, comments, and more. Join free to view this profile and build your own.")
                 .font(.footnote)
                 .foregroundColor(VP.dim)
                 .multilineTextAlignment(.center)
@@ -276,7 +276,6 @@ struct PublicProfileView: View {
             // target has flipped `show_activity` off.
             if u.showActivity != false {
                 HStack(spacing: 16) {
-                    stat(label: "Articles read", value: u.articlesReadCount ?? 0)
                     stat(label: "Quizzes passed", value: u.quizzesCompletedCount ?? 0)
                     stat(label: "Comments", value: u.commentCount ?? 0)
                     stat(label: "Followers", value: u.followersCount ?? 0)
@@ -367,7 +366,7 @@ struct PublicProfileView: View {
             // Dropped `is_banned` from the column list — the view
             // already excludes banned users so the column isn't needed.
             let row: VPUser? = try await client.from("public_profiles_v")
-                .select("id, username, display_name, bio, avatar_url, avatar_color, banner_url, verity_score, streak_current, is_expert, expert_title, expert_organization, is_verified_public_figure, articles_read_count, quizzes_completed_count, comment_count, followers_count, following_count, show_activity, profile_visibility, email_verified, show_on_leaderboard, created_at")
+                .select("id, username, display_name, bio, avatar_url, avatar_color, banner_url, verity_score, is_expert, expert_title, expert_organization, is_verified_public_figure, quizzes_completed_count, comment_count, followers_count, following_count, show_activity, profile_visibility, email_verified, show_on_leaderboard, created_at")
                 .eq("username", value: username)
                 .limit(1)
                 .single()

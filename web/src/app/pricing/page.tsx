@@ -154,7 +154,6 @@ export default function PricingPage() {
             'Listen to articles (TTS)',
             'Ad-free',
             'Ask an Expert',
-            'Streak freezes (2 per week)',
             'Weekly recap quizzes',
           ]}
           cta="Start Verity"

@@ -441,7 +441,6 @@ struct SubscriptionView: View {
                 "Listen to articles (TTS)",
                 "Ad-free",
                 "Ask an Expert",
-                "Streak freezes (2 per week)",
                 "Weekly recap quizzes",
                 "Shareable profile card"
             ]

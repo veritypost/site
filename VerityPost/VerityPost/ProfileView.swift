@@ -9,9 +9,8 @@ import Supabase
 // full lists. Layout:
 //
 //   topBar (flat, shared with HomeView/SettingsView)
-//   [ hero card: tier ring + score + tier pill + progress bar + delta-to-next ]
-//   [ 30-day streak grid + streak summary row ]
-//   [ stat row: Articles read / Quizzes passed / Comments ]
+//   [ hero card: score + tier pill ]
+//   [ stat row: Quizzes passed / Comments ]
 //   [ social row: Followers / Following — gated by profile.followers.view.own ]
 //   [ quick action row: Bookmarks / Messages / Share / Kids ]
 //   [ recent activity preview — 3 rows + "See all" ]
@@ -23,16 +22,14 @@ import Supabase
 //   - pull-to-refresh on the outer ScrollView drives every loader
 //   - 44pt tap targets on header/action buttons
 //   - light haptic on tab switch + quick-action tap
-//   - spring reveal on tier ring / streak grid on first appear
 //   - Dynamic Type compatible (relative font styles used everywhere that
 //     isn't fixed-size by design like the avatar glyph)
 //
 // Data sources (real, not mocked):
-//   - users.verity_score / streak_current / streak_best / articles_read_count
-//     / quizzes_completed_count / comment_count / followers_count /
-//     following_count / display_name / bio — loaded by AuthViewModel.loadUser
+//   - users.verity_score / quizzes_completed_count / comment_count /
+//     followers_count / following_count / display_name / bio
+//     — loaded by AuthViewModel.loadUser
 //   - score_tiers — live query, cached per screen
-//   - reading_log (30-day window) — built into a day-set to drive the grid
 //   - reading_log / quiz_attempts / comments / bookmarks — activity feed
 //   - user_achievements + achievements — badge showcase
 //   - comment_votes — per-category upvote tally (milestones tab)
@@ -61,7 +58,7 @@ struct ProfileView: View {
     @State private var refreshTask: Task<Void, Never>? = nil
 
     // Tabs — 4-item set. Overview is the "profile card + my stuff" deeper
-    // view; the hero/stats/streak/quick-actions all sit above the tab bar
+    // view; the hero/stats/quick-actions all sit above the tab bar
     // and stay visible regardless of tab.
     enum ProfileTab: String, CaseIterable, Identifiable {
         case overview   = "Overview"
@@ -105,13 +102,6 @@ struct ProfileView: View {
     @State private var scoreTiers: [ScoreTierRow] = []
     @State private var scoreTiersLoaded = false
 
-    // 30-day streak heatmap — midnight-aligned dates with a reading_log row.
-    @State private var streakDays: Set<Date> = []
-    @State private var streakLoaded = false
-
-    // Reveal animation flags (first-load spring on hero + streak)
-    @State private var streakGridReveal: Bool = false
-
     // Expansion state (milestones / categories drilldown)
     @State private var expandedCat: String? = nil
     @State private var expandedSub: String? = nil
@@ -145,7 +135,7 @@ struct ProfileView: View {
 
                 if let user = auth.currentUser {
                     if user.emailVerified == false {
-                        // Web parity: the full hero/stats/streak/activity grid
+                        // Web parity: the full hero/stats/activity grid
                         // is hidden until the email is verified. Same copy
                         // and CTA as `web/src/app/profile/page.tsx` around
                         // the `!perms.viewOwn && !user.email_verified` branch.
@@ -156,7 +146,6 @@ struct ProfileView: View {
                             frozenAccountBanner
                         }
                         heroCard(user)
-                        streakStrip(user)
                         statRow(user)
                         socialRow(user)
                         quickActionsRow(user)
@@ -184,12 +173,8 @@ struct ProfileView: View {
         .task {
             if let uid = auth.currentUser?.id {
                 async let a: Void = loadActivity(userId: uid)
-                async let s: Void = loadStreak(userId: uid)
                 async let ach: Void = loadAchievements(userId: uid)
-                _ = await (a, s, ach)
-            }
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
-                streakGridReveal = true
+                _ = await (a, ach)
             }
         }
         .task(id: tab) { loadTabData() }
@@ -286,7 +271,7 @@ struct ProfileView: View {
             Text("Guest reader")
                 .font(.system(.title3, design: .default, weight: .bold))
                 .foregroundColor(VP.text)
-            Text("Sign in to track reading, quizzes, streaks, bookmarks, and achievements.")
+            Text("Sign in to track reading, quizzes, bookmarks, and achievements.")
                 .font(.footnote)
                 .foregroundColor(VP.dim)
                 .multilineTextAlignment(.center)
@@ -458,88 +443,10 @@ struct ProfileView: View {
         .padding(.bottom, 8)
     }
 
-    // MARK: - Streak strip (30-day heatmap grid)
-    @ViewBuilder
-    private func streakStrip(_ user: VPUser) -> some View {
-        let current = user.streakCurrent ?? 0
-        let best = user.streakBest ?? 0
-        let readDaysIn30 = readDaysInLast30()
-
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Last 30 days")
-                    .font(.system(.subheadline, design: .default, weight: .semibold))
-                    .foregroundColor(VP.text)
-                Spacer()
-                Text("\(readDaysIn30) read · \(current)-day streak")
-                    .font(.caption)
-                    .foregroundColor(VP.dim)
-            }
-
-            // 30-day grid — 10 cols × 3 rows, oldest → newest.
-            LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 10),
-                spacing: 6
-            ) {
-                ForEach(lastNDays(30), id: \.self) { day in
-                    let isRead = streakDays.contains(day)
-                    let isFuture = day > todayMidnight()
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(
-                            isFuture ? VP.streakTrack
-                            : isRead ? VP.streakActive
-                            : VP.streakMissed
-                        )
-                        .frame(height: 18)
-                        .opacity(streakGridReveal ? 1 : 0)
-                        .scaleEffect(streakGridReveal ? 1 : 0.6)
-                        .animation(
-                            .spring(response: 0.45, dampingFraction: 0.75)
-                                .delay(Double(dayIndex(day)) * 0.012),
-                            value: streakGridReveal
-                        )
-                        .accessibilityLabel(dayAccessibilityLabel(day: day, isRead: isRead))
-                }
-            }
-
-            HStack(spacing: 12) {
-                legendDot(color: VP.streakActive, label: "Read")
-                legendDot(color: VP.streakMissed, label: "Missed")
-                Spacer()
-                Text("Best: \(best)d")
-                    .font(.system(.caption2, design: .default, weight: .semibold))
-                    .foregroundColor(VP.dim)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(VP.card)
-                    .overlay(RoundedRectangle(cornerRadius: 99).stroke(VP.border))
-                    .cornerRadius(99)
-            }
-        }
-        .padding(14)
-        .background(VP.bg)
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(VP.border))
-        .cornerRadius(12)
-        .padding(.horizontal, 16)
-        .padding(.bottom, 12)
-    }
-
-    private func legendDot(color: Color, label: String) -> some View {
-        HStack(spacing: 4) {
-            RoundedRectangle(cornerRadius: 2).fill(color).frame(width: 8, height: 8)
-            Text(label).font(.caption2).foregroundColor(VP.dim)
-        }
-    }
-
     // MARK: - Stat row (3 tiles)
     @ViewBuilder
     private func statRow(_ user: VPUser) -> some View {
         HStack(spacing: 8) {
-            statTile(
-                label: "Articles read",
-                value: "\((user.articlesReadCount ?? 0).formatted())",
-                icon: "book.fill"
-            )
             statTile(
                 label: "Quizzes passed",
                 value: "\((user.quizzesCompletedCount ?? 0).formatted())",
@@ -766,12 +673,12 @@ struct ProfileView: View {
 
     private func compactSkeletonRow() -> some View {
         HStack(spacing: 10) {
-            RoundedRectangle(cornerRadius: 4).fill(VP.streakTrack)
+            RoundedRectangle(cornerRadius: 4).fill(VP.surfaceSunken)
                 .frame(width: 40, height: 14)
-            RoundedRectangle(cornerRadius: 4).fill(VP.streakTrack)
+            RoundedRectangle(cornerRadius: 4).fill(VP.surfaceSunken)
                 .frame(height: 14)
             Spacer()
-            RoundedRectangle(cornerRadius: 4).fill(VP.streakTrack)
+            RoundedRectangle(cornerRadius: 4).fill(VP.surfaceSunken)
                 .frame(width: 36, height: 10)
         }
         .padding(.horizontal, 12)
@@ -810,12 +717,12 @@ struct ProfileView: View {
             if !achievementsLoaded {
                 HStack(spacing: 10) {
                     ForEach(0..<3, id: \.self) { _ in
-                        RoundedRectangle(cornerRadius: 12).fill(VP.streakTrack)
+                        RoundedRectangle(cornerRadius: 12).fill(VP.surfaceSunken)
                             .frame(height: 68)
                     }
                 }
             } else if userAchievements.isEmpty {
-                Text("Complete a quiz or hit your first streak to earn badges.")
+                Text("Complete a quiz to earn your first badge.")
                     .font(.caption)
                     .foregroundColor(VP.dim)
                     .padding(.vertical, 8)
@@ -1062,8 +969,8 @@ struct ProfileView: View {
                 }
                 HStack(spacing: 10) {
                     inlineStat(value: "\((user.verityScore ?? 0).formatted())", label: "score")
-                    inlineStat(value: "\(user.streakCurrent ?? 0)d", label: "streak")
-                    inlineStat(value: "\((user.articlesReadCount ?? 0).formatted())", label: "read")
+                    inlineStat(value: "\((user.quizzesCompletedCount ?? 0).formatted())", label: "quizzes")
+                    inlineStat(value: "\((user.commentCount ?? 0).formatted())", label: "comments")
                 }
                 .padding(.top, 2)
             }
@@ -1236,7 +1143,7 @@ struct ProfileView: View {
                 VStack(spacing: 8) {
                     ForEach(0..<4, id: \.self) { _ in
                         RoundedRectangle(cornerRadius: 10)
-                            .fill(VP.streakTrack)
+                            .fill(VP.surfaceSunken)
                             .frame(height: 48)
                             .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border))
                     }
@@ -1448,7 +1355,7 @@ struct ProfileView: View {
                 } else if allAchievements.isEmpty {
                     emptyState(
                         title: "No achievements yet",
-                        description: "Complete a quiz or hit your first streak to start collecting badges."
+                        description: "Complete a quiz to start collecting badges."
                     )
                 } else {
                     // Render earned first, then locked — same ordering
@@ -1532,13 +1439,6 @@ struct ProfileView: View {
     private static let achFormatter: DateFormatter = {
         let f = DateFormatter(); f.dateFormat = "MMM d, yyyy"; return f
     }()
-    private static let dayLabelFmt: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "MMM d"
-        return f
-    }()
-    private static let streakISO = ISO8601DateFormatter()
-
     // MARK: - Empty state helper
     private func emptyState(title: String, description: String) -> some View {
         VStack(spacing: 6) {
@@ -1625,74 +1525,18 @@ struct ProfileView: View {
         scoreTiersLoaded = true
     }
 
-    // MARK: - Streak grid helpers
-    private func todayMidnight() -> Date {
-        Calendar.current.startOfDay(for: Date())
-    }
-
-    private func lastNDays(_ n: Int) -> [Date] {
-        let cal = Calendar.current
-        let today = cal.startOfDay(for: Date())
-        return (0..<n).compactMap { cal.date(byAdding: .day, value: -((n - 1) - $0), to: today) }
-    }
-
-    private func dayIndex(_ day: Date) -> Int {
-        let cal = Calendar.current
-        let today = cal.startOfDay(for: Date())
-        let comps = cal.dateComponents([.day], from: day, to: today)
-        return 29 - max(0, min(29, comps.day ?? 0))
-    }
-
-    private func readDaysInLast30() -> Int {
-        let window = lastNDays(30)
-        return window.filter { streakDays.contains($0) }.count
-    }
-
-    private func dayAccessibilityLabel(day: Date, isRead: Bool) -> String {
-        return "\(ProfileView.dayLabelFmt.string(from: day)): \(isRead ? "read" : "no read")"
-    }
-
-    private func loadStreak(userId: String) async {
-        struct Row: Decodable { let created_at: Date? }
-        do {
-            let cal = Calendar.current
-            guard let since = cal.date(byAdding: .day, value: -30, to: cal.startOfDay(for: Date())) else { return }
-            let iso = ProfileView.streakISO.string(from: since)
-            // `.is("kid_profile_id", value: nil)` — every kids-app
-            // reading_log row carries the kid_profile_id, so without
-            // this filter the parent's own streak grid would also count
-            // their kid's reads. Same guard added on every query that
-            // joins user_id + a kids-eligible table.
-            let rows: [Row] = try await client.from("reading_log")
-                .select("created_at")
-                .eq("user_id", value: userId)
-                .is("kid_profile_id", value: nil)
-                .gte("created_at", value: iso)
-                .execute().value
-            var days: Set<Date> = []
-            for r in rows {
-                if let d = r.created_at {
-                    days.insert(cal.startOfDay(for: d))
-                }
-            }
-            streakDays = days
-        } catch { Log.d("Load streak error: \(error)") }
-        streakLoaded = true
-    }
-
     // MARK: - Refresh (pull-to-refresh)
     private func refreshAll() async {
         guard let uid = auth.currentUser?.id else { return }
         // Pull every data source the hero + tabs depend on. loadUser
-        // re-fetches the users row so follower/score/streak counts update
+        // re-fetches the users row so follower/score counts update
         // inline without waiting for the next auth tick.
         async let a: Void = loadActivity(userId: uid)
         async let c: Void = loadCategories(userId: uid)
         async let ach: Void = loadAchievements(userId: uid)
         async let t: Void = loadScoreTiers()
-        async let s: Void = loadStreak(userId: uid)
         async let u: Void = auth.loadUser(id: uid)
-        _ = await (a, c, ach, t, s, u)
+        _ = await (a, c, ach, t, u)
     }
 
     // MARK: - Tab-triggered data loading

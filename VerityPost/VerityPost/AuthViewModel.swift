@@ -1257,7 +1257,7 @@ final class AuthViewModel: ObservableObject {
         do {
             let response: VPUser = try await client.from("users")
                 .select(
-                    "id, email, email_verified, username, display_name, bio, avatar_color, metadata, is_expert, expert_title, is_verified_public_figure, frozen_at, verity_score, articles_read_count, quizzes_completed_count, streak_current, streak_best, comment_count, followers_count, following_count, show_activity, created_at, onboarding_completed_at, plans(tier)"
+                    "id, email, email_verified, username, display_name, bio, avatar_color, metadata, is_expert, expert_title, is_verified_public_figure, frozen_at, verity_score, quizzes_completed_count, comment_count, followers_count, following_count, show_activity, created_at, onboarding_completed_at, plans(tier)"
                 )
                 .eq("id", value: id)
                 .single()

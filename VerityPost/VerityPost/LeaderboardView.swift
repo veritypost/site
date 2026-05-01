@@ -27,9 +27,8 @@ import PostgREST
 //     parallel path.
 //   - Column selections stay inside the anon GRANT list (092b): id,
 //     username, verity_score, avatar_color, avatar_url,
-//     is_verified_public_figure, articles_read_count,
-//     quizzes_completed_count, comment_count, streak_current, created_at.
-//     Any future GRANT tightening must re-audit this file.
+//     is_verified_public_figure, quizzes_completed_count, comment_count,
+//     created_at. Any future GRANT tightening must re-audit this file.
 //
 // Subcategory pills: the web page renders the pills and then silently drops
 // `activeSub` before issuing the query (drift, not intentional) because the
@@ -426,10 +425,8 @@ struct LeaderboardView: View {
             if isExpanded {
                 VStack(alignment: .leading, spacing: 0) {
                     StatRowView(label: "Score", value: displayScore, total: max(topScore, 1))
-                    StatRowView(label: "Articles Read", value: user.articlesReadCount ?? 0, total: max(topUser?.articlesReadCount ?? 0, 1))
                     StatRowView(label: "Quizzes Passed", value: user.quizzesCompletedCount ?? 0, total: max(topUser?.quizzesCompletedCount ?? 0, 1))
                     StatRowView(label: "Comments", value: user.commentCount ?? 0, total: max(topUser?.commentCount ?? 0, 1))
-                    StatRowView(label: "Streak", value: user.streak ?? 0, total: max(topUser?.streak ?? 0, 1))
                 }
                 .padding(.leading, 80)
                 .padding(.trailing, 20)
@@ -483,7 +480,6 @@ struct LeaderboardView: View {
                 } else {
                     await loadPeriodLeaderboard(period: activePeriod, limit: limit)
                 }
-            case .topReaders:   await loadTopReaders(limit: limit)
             case .risingStars:  await loadRisingStars(limit: limit)
             case .weekly:       await loadPeriodLeaderboard(period: .thisWeek, limit: limit)
             }
@@ -539,19 +535,6 @@ struct LeaderboardView: View {
             displayScores = Dictionary(uniqueKeysWithValues: data.map { ($0.id, $0.verityScore ?? 0) })
         } catch {
             Log.d("Top verifiers error:", error)
-        }
-    }
-
-    private func loadTopReaders(limit: Int) async {
-        do {
-            let data: [VPUser] = try await usersQueryBase()
-                .order("articles_read_count", ascending: false)
-                .limit(limit)
-                .execute().value
-            users = data
-            displayScores = Dictionary(uniqueKeysWithValues: data.map { ($0.id, $0.articlesReadCount ?? 0) })
-        } catch {
-            Log.d("Top readers error:", error)
         }
     }
 
@@ -612,14 +595,12 @@ struct LeaderboardView: View {
 
 private enum TabKey: String, CaseIterable, Hashable {
     case topVerifiers = "top_verifiers"
-    case topReaders = "top_readers"
     case risingStars = "rising_stars"
     case weekly = "weekly"
 
     var label: String {
         switch self {
         case .topVerifiers: return "Top Verifiers"
-        case .topReaders:   return "Top Readers"
         case .risingStars:  return "Rising Stars"
         case .weekly:       return "Weekly"
         }
@@ -639,4 +620,4 @@ extension LeaderboardPeriod {
 /// Columns pulled from `public.users` on every leaderboard query. Stays
 /// inside the anon GRANT list the 092b RLS lockdown enforces; adding a
 /// column here without a matching GRANT update will 403 the fetch.
-private let USER_COLUMNS = "id, username, verity_score, avatar_color, avatar_url, is_verified_public_figure, articles_read_count, quizzes_completed_count, comment_count, streak_current, created_at"
+private let USER_COLUMNS = "id, username, verity_score, avatar_color, avatar_url, is_verified_public_figure, quizzes_completed_count, comment_count, created_at"

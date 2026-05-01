@@ -487,7 +487,6 @@ struct KidDashboardView: View {
 
     @State private var readCount = 0
     @State private var quizCount = 0
-    @State private var streak = 0
 
     var body: some View {
         ScrollView {
@@ -514,7 +513,6 @@ struct KidDashboardView: View {
                 HStack(spacing: 16) {
                     statBlock("Articles", value: readCount)
                     statBlock("Quizzes", value: quizCount)
-                    statBlock("Streak", value: streak)
                 }
             }
             .padding(20)

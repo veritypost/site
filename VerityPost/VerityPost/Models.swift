@@ -20,10 +20,7 @@ struct VPUser: Codable, Identifiable {
     /// banner with a Resubscribe CTA, mirroring the web inline notice.
     var frozenAt: Date?
     var verityScore: Int?
-    var articlesReadCount: Int?
     var quizzesCompletedCount: Int?
-    var streakCurrent: Int?
-    var streakBest: Int?
     var commentCount: Int?
     var followersCount: Int?
     var followingCount: Int?
@@ -49,8 +46,6 @@ struct VPUser: Codable, Identifiable {
     var avatar: AvatarRef? { metadata?.avatar }
     var createdAt: Date?
     var onboardingCompletedAt: Date?
-
-    var streak: Int? { streakCurrent }
 
     struct AvatarRef: Codable {
         var outer: String?
@@ -80,10 +75,7 @@ struct VPUser: Codable, Identifiable {
         case emailVerified = "email_verified"
         case frozenAt = "frozen_at"
         case verityScore = "verity_score"
-        case articlesReadCount = "articles_read_count"
         case quizzesCompletedCount = "quizzes_completed_count"
-        case streakCurrent = "streak_current"
-        case streakBest = "streak_best"
         case commentCount = "comment_count"
         case followersCount = "followers_count"
         case followingCount = "following_count"

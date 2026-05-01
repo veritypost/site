@@ -136,8 +136,6 @@ struct StoryDetailView: View {
     // Toasts
     @State private var showAchievementToast = false
     @State private var achievementToastText = ""
-    @State private var showStreakCelebration = false
-    @State private var streakCount = 0
 
     // Apple Guideline 1.2 — Report Content + Block User on comments.
     @ObservedObject private var blocks = BlockService.shared
@@ -498,7 +496,6 @@ struct StoryDetailView: View {
         .onDisappear { tts.stop() }
         .overlay(alignment: .top) { toastOverlay }
         .animation(.easeInOut(duration: 0.3), value: showAchievementToast)
-        .animation(.easeInOut(duration: 0.3), value: showStreakCelebration)
     }
 
     // OwnersAudit Story Task 18: Discussion tab is now always visible
@@ -2083,17 +2080,6 @@ struct StoryDetailView: View {
                 .padding(.vertical, 10)
                 .background(RoundedRectangle(cornerRadius: 10).fill(VP.accent))
                 .shadow(radius: 4)
-                .padding(.top, 8)
-                .transition(.move(edge: .top).combined(with: .opacity))
-        }
-        if showStreakCelebration {
-            Text("Streak: \(streakCount) days!")
-                .font(.system(.subheadline, design: .default, weight: .bold))
-                .foregroundColor(VP.accent)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 10)
-                .background(RoundedRectangle(cornerRadius: 10).fill(VP.accent.opacity(0.12)))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.accent, lineWidth: 1.5))
                 .padding(.top, 8)
                 .transition(.move(edge: .top).combined(with: .opacity))
         }

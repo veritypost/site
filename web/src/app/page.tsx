@@ -318,10 +318,6 @@ export default async function HomePage() {
     return Number.isFinite(t) && t > lastVisitMs;
   };
 
-  // T109 — edition progress counter reflects whichever set is displayed.
-  const readTodayCount = displayedStories.filter((s) => readArticleIds.has(s.id)).length;
-  const totalToday = displayedStories.length;
-
   return (
     <div style={{ background: C.bg, color: C.text, minHeight: '100vh' }}>
       {/* First-login attribution moment — position:fixed overlay, fades in/out
@@ -345,27 +341,20 @@ export default async function HomePage() {
         {/* T110 — disclose editorial timezone. The newsroom day is anchored
             to America/New_York; readers in other zones should know what
             "today" means here. Subtle masthead line, not a banner. */}
-        <div style={{ marginBottom: 24, lineHeight: 1.3, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-          <div>
-            <div
-              style={{
-                fontFamily: serifStack,
-                fontSize: 13,
-                color: C.dim,
-                fontWeight: 500,
-              }}
-            >
-              {today.humanDate}
-            </div>
-            <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
-              Today&rsquo;s edition (Eastern Time)
-            </div>
+        <div style={{ marginBottom: 24, lineHeight: 1.3 }}>
+          <div
+            style={{
+              fontFamily: serifStack,
+              fontSize: 13,
+              color: C.dim,
+              fontWeight: 500,
+            }}
+          >
+            {today.humanDate}
           </div>
-          {totalToday > 0 && (
-            <div style={{ fontSize: 12, color: C.muted, fontWeight: 500, textAlign: 'right', flexShrink: 0, paddingLeft: 16 }}>
-              {readTodayCount} of {totalToday} read today
-            </div>
-          )}
+          <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
+            Today&rsquo;s edition (Eastern Time)
+          </div>
         </div>
 
         {fetchFailed && <HomeFetchFailed />}

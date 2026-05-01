@@ -32,7 +32,7 @@ function rankAccentColor(rank: number): string {
 //     paid gate — the top-3 + full-list split is about verification, not
 //     plan.
 
-const TABS = ['Top Verifiers', 'Top Readers', 'Rising Stars'] as const;
+const TABS = ['Top Verifiers', 'Rising Stars'] as const;
 type TabKey = (typeof TABS)[number];
 
 // Period model lives in `@/lib/leaderboardPeriod` so web + iOS share
@@ -75,9 +75,7 @@ type LeaderUser = Pick<
   | 'is_verified_public_figure'
   | 'is_expert'
   | 'verity_score'
-  | 'streak_current'
   | 'quizzes_completed_count'
-  | 'articles_read_count'
   | 'comment_count'
 > & { displayScore?: number };
 
@@ -96,9 +94,7 @@ interface CategoryScoreRow {
     | 'is_verified_public_figure'
     | 'is_expert'
     | 'verity_score'
-    | 'streak_current'
     | 'quizzes_completed_count'
-    | 'articles_read_count'
     | 'comment_count'
     | 'email_verified'
     | 'is_banned'
@@ -167,7 +163,7 @@ export default function LeaderboardPage() {
         const { data: meRow } = await supabase
           .from('users')
           .select(
-            'id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert, verity_score, streak_current, quizzes_completed_count, articles_read_count, comment_count, email_verified, plan_status'
+            'id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert, verity_score, quizzes_completed_count, comment_count, email_verified, plan_status'
           )
           .eq('id', authRes.data.user.id)
           .single<MeRow>();
@@ -201,7 +197,7 @@ export default function LeaderboardPage() {
         const { data: csRows, error: csErr } = await supabase
           .from('category_scores')
           .select(
-            'user_id, score, users!inner ( id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert, verity_score, streak_current, quizzes_completed_count, articles_read_count, comment_count, email_verified, is_banned, show_on_leaderboard, frozen_at )'
+            'user_id, score, users!inner ( id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert, verity_score, quizzes_completed_count, comment_count, email_verified, is_banned, show_on_leaderboard, frozen_at )'
           )
           .eq('category_id', activeCat)
           .eq('users.email_verified', true)
@@ -245,7 +241,7 @@ export default function LeaderboardPage() {
         const { data, error: rsErr } = await supabase
           .from('public_profiles_v' as never)
           .select(
-            'id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert, verity_score, streak_current, quizzes_completed_count, articles_read_count, comment_count'
+            'id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert, verity_score, quizzes_completed_count, comment_count'
           )
           .eq('email_verified' as never, true as never)
           .eq('show_on_leaderboard' as never, true as never)
@@ -313,7 +309,7 @@ export default function LeaderboardPage() {
         const { data } = await supabase
           .from('public_profiles_v' as never)
           .select(
-            'id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert, verity_score, streak_current, quizzes_completed_count, articles_read_count, comment_count'
+            'id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert, verity_score, quizzes_completed_count, comment_count'
           )
           .in('id' as never, ids as never);
         const rows = (data as LeaderUser[] | null) || [];
@@ -323,10 +319,7 @@ export default function LeaderboardPage() {
         return;
       }
 
-      // Default: rank by verity_score (or stories_read for Top Readers).
-      // Anonymous viewers see only top 3 per D31.
-      const orderBy: 'articles_read_count' | 'verity_score' =
-        activeTab === 'Top Readers' ? 'articles_read_count' : 'verity_score';
+      // Default: rank by verity_score. Anonymous viewers see only top 3 per D31.
       const pageLimit = me ? 50 : 3;
       // T300 — read via public_profiles_v. is_banned + deletion already
       // pre-filtered by the view; `is_frozen` derived boolean filters
@@ -335,12 +328,12 @@ export default function LeaderboardPage() {
       const { data, error: defErr } = await supabase
         .from('public_profiles_v' as never)
         .select(
-          'id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert, verity_score, streak_current, quizzes_completed_count, articles_read_count, comment_count'
+          'id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert, verity_score, quizzes_completed_count, comment_count'
         )
         .eq('email_verified' as never, true as never)
         .eq('show_on_leaderboard' as never, true as never)
         .eq('is_frozen' as never, false as never)
-        .order(orderBy as never, { ascending: false })
+        .order('verity_score' as never, { ascending: false })
         .limit(pageLimit);
       if (defErr) {
         console.error('[leaderboard] default load failed', defErr);
@@ -350,7 +343,7 @@ export default function LeaderboardPage() {
         return;
       }
       const rows = (data as LeaderUser[] | null) || [];
-      setUsers(rows.map((u) => ({ ...u, displayScore: (u[orderBy] as number | null) || 0 })));
+      setUsers(rows.map((u) => ({ ...u, displayScore: u.verity_score || 0 })));
       setLoading(false);
     }
     load();
@@ -640,7 +633,6 @@ export default function LeaderboardPage() {
                   rank={i + 1}
                   rankColor={rankAccentColor(i + 1)}
                   isPodium
-                  streak={u.streak_current || 0}
                   isLast={i === Math.min(2, visibleUsers.length - 1) && visibleUsers.length <= 3}
                 />
               ))}
@@ -751,7 +743,6 @@ export default function LeaderboardPage() {
                   rank={i + 1}
                   rankColor={rankAccentColor(i + 1)}
                   isPodium
-                  streak={u.streak_current || 0}
                 />
               ))}
 
@@ -765,7 +756,6 @@ export default function LeaderboardPage() {
                     user={u}
                     rank={i + 4}
                     rankColor="var(--dim)"
-                    streak={u.streak_current || 0}
                     isLast={i === visibleUsers.length - 4 - 1}
                     showVerityScore
                   />
@@ -921,7 +911,6 @@ interface LeaderRowProps {
   user: LeaderUser;
   rank: number;
   rankColor: string;
-  streak: number;
   isLast?: boolean;
   showVerityScore?: boolean;
   isPodium?: boolean;
@@ -931,7 +920,6 @@ function LeaderRow({
   user: u,
   rank,
   rankColor,
-  streak,
   isLast = false,
   showVerityScore = false,
   isPodium = false,
@@ -991,7 +979,6 @@ function LeaderRow({
             {(u.verity_score || 0).toLocaleString()} verity
           </div>
         )}
-        {streak > 0 && <div style={{ fontSize: 11, color: 'var(--dim)' }}>{streak} day streak</div>}
       </div>
       <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent)' }}>
         {(u.displayScore || 0).toLocaleString()}
