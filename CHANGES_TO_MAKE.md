@@ -27,7 +27,7 @@ Suggested ship order within Wave 1: **13 ✅ → 10 ✅ → 3 ✅ → 11a → (1
 | 5  | Avatar initials → 3 alphanumeric chars on web (iOS already correct) | ✅ shipped (commit `f0748ce`); server-side `users.avatar` CHECK constraint shipped 2026-05-01 |
 | 9  | Hide password UI for adults (no passwords; OTP-only) | ✅ shipped web + iOS adult (commit `f0748ce`) |
 | 7  | Drop streaks + read counts across adult product (kids keeps streaks — kids = funner) | 🟢 ready (locked: strip parent's kid-streak block in FamilyViews; drop the 30-day grid entirely on web; kids iOS untouched) |
-| 8  | Profile stat-tile typography redesign — Direction A (sans, bold, tight) | 🟢 ready (locked) |
+| 8  | Profile stat-tile typography redesign — Direction A (sans, bold, tight) | ✅ shipped |
 | 4  | Mount AI provider/model picker in admin | 📋 backlogged in OUTSTANDING.md (locked: both global + per-run) |
 
 **Superseded — kept for reference:**

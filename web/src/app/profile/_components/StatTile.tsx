@@ -2,6 +2,10 @@
 // sub-line for context. Always neutral — no per-stat accent color
 // (per owner directive 2026-04-27, system-assigned color is forbidden;
 // only the avatar carries user-controlled color).
+//
+// Item 8 redesign 2026-05-01 — Direction A: sans-serif, bold weight,
+// no letter-spacing on the number; sentence-case label (no uppercase).
+// Owner spec: "data dashboard you're winning, not editorial column."
 
 'use client';
 
@@ -34,23 +38,22 @@ export function StatTile({ label, value, hint, href }: Props) {
     >
       <div
         style={{
-          fontSize: F.sm,
+          fontSize: F.xs,
           color: C.inkMuted,
           fontWeight: 600,
-          letterSpacing: '0.02em',
-          textTransform: 'uppercase',
+          letterSpacing: 0,
         }}
       >
         {label}
       </div>
       <div
         style={{
-          fontFamily: FONT.serif,
+          fontFamily: FONT.sans,
           fontSize: F.display,
-          fontWeight: 600,
+          fontWeight: 800,
           color: C.ink,
-          letterSpacing: '-0.02em',
-          lineHeight: 1.05,
+          letterSpacing: 0,
+          lineHeight: 1,
         }}
       >
         {typeof value === 'number' ? value.toLocaleString() : value}
