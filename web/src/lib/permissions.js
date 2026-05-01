@@ -98,6 +98,14 @@ export async function refreshIfStale() {
   }
 }
 
+// Item 11a — owner email allowlist. Force-injects `admin.god_mode`
+// into the perm cache for these emails regardless of DB grants. Belt-
+// and-suspenders backup so god-mode works even if the DB-side grant
+// path (role → permission_set → permission_set_perms → permissions)
+// or the RPC short-circuit isn't fully wired. Edit this set to add
+// trusted accounts; the proper per-user grant lands in 11b.
+const OWNER_EMAILS = new Set(['admin@veritypost.com']);
+
 // --------- New path: my_permission_keys ---------
 export async function refreshAllPermissions() {
   if (allPermsInflight) return allPermsInflight;
@@ -107,6 +115,7 @@ export async function refreshAllPermissions() {
     try {
       const { data: auth } = await supabase.auth.getUser();
       const userId = auth?.user?.id;
+      const userEmail = auth?.user?.email?.toLowerCase() ?? null;
       if (!userId) {
         allPermsCache = new Set();
         _allPermsFetchedAt = Date.now();
@@ -122,6 +131,13 @@ export async function refreshAllPermissions() {
         // (no prior cache) the same null-deny semantics apply. Previously
         // this branch returned the prior cache, which re-exposed any stale
         // grant that the revoke-driven version bump was trying to clear.
+        // EXCEPTION: owner-email accounts always get god-mode injected so
+        // they can never be locked out by a perms RPC failure.
+        if (userEmail && OWNER_EMAILS.has(userEmail)) {
+          allPermsCache = new Set(['admin.god_mode']);
+          _allPermsFetchedAt = Date.now();
+          return allPermsCache;
+        }
         return allPermsCache;
       }
       const next = new Set();
@@ -129,6 +145,11 @@ export async function refreshAllPermissions() {
         if (row && typeof row.permission_key === 'string') {
           next.add(row.permission_key);
         }
+      }
+      // Owner-email override: ensure god-mode is in the cache for trusted
+      // accounts even if the DB grant path didn't surface it.
+      if (userEmail && OWNER_EMAILS.has(userEmail)) {
+        next.add('admin.god_mode');
       }
       allPermsCache = next;
       _allPermsFetchedAt = Date.now();
