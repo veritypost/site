@@ -51,8 +51,8 @@ ON CONFLICT (key) DO NOTHING;
 -- set columns we know exist in every shape this repo has shipped: key + name.
 -- description is optional in some shapes; include via NULLS-tolerant insert.
 -- ---------------------------------------------------------------------------
-INSERT INTO public.permission_sets (key, name)
-VALUES ('god_mode', 'God Mode (full bypass)')
+INSERT INTO public.permission_sets (key, display_name, is_system, is_active, is_kids_set)
+VALUES ('god_mode', 'God Mode (full bypass)', true, true, false)
 ON CONFLICT (key) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
@@ -78,23 +78,10 @@ CROSS JOIN public.permission_sets ps
 WHERE r.name = 'owner' AND ps.key = 'god_mode'
 ON CONFLICT DO NOTHING;
 
--- ---------------------------------------------------------------------------
--- 5. Backfill user_permission_sets for every user currently holding the
--- owner role so AuthContext sees god-mode on the very next session refresh.
--- The role grant alone is enough for resolvers that walk roles → sets →
--- perms, but seeding user_permission_sets directly insulates owner from any
--- resolver that only consults user_permission_sets (which the per-user UI in
--- 11b will write to anyway).
--- user_roles(user_id, role_id) is the existing membership table; if it's
--- absent in this schema, the SELECT returns 0 rows and the INSERT is a
--- no-op rather than failing.
--- ---------------------------------------------------------------------------
-INSERT INTO public.user_permission_sets (user_id, permission_set_id)
-SELECT ur.user_id, ps.id
-FROM public.user_roles ur
-JOIN public.roles r ON r.id = ur.role_id
-CROSS JOIN public.permission_sets ps
-WHERE r.name = 'owner' AND ps.key = 'god_mode'
-ON CONFLICT DO NOTHING;
+-- Step 5 (user_permission_sets backfill) skipped: the audit_perm_change trigger
+-- calls bump_user_perms_version which collides with users_protect_columns in
+-- migration context. The role grant in step 4 is sufficient — my_permission_keys
+-- and compute_effective_perms both walk the user_roles → role_permission_sets
+-- path to detect god_mode.
 
 COMMIT;
