@@ -23,12 +23,12 @@ Suggested ship order within Wave 1: **13 ✅ → 10 ✅ → 3 ✅ → 11a → (1
 
 | # | Item | Status |
 |---|------|--------|
-| 2  | Remove "Pricing" link from top bar | 🟢 ready |
-| 5  | Avatar initials → 3 alphanumeric chars on web (iOS already correct) | 🟢 ready |
-| 9  | Hide password UI for adults (no passwords; OTP-only) | 🟢 ready |
-| 7  | Drop streaks + read counts across web + iOS adult | 🟡 needs decisions on kid-streak scope |
-| 8  | Profile stat-tile typography redesign | 🟡 needs design direction (A vs B) |
-| 4  | Mount AI provider/model picker in admin | 🟡 needs decision on mount location |
+| 2  | Remove "Pricing" link from top bar | ✅ shipped (commit `f0748ce`) |
+| 5  | Avatar initials → 3 alphanumeric chars on web (iOS already correct) | ✅ shipped (commit `f0748ce`); server-side `users.avatar` CHECK constraint shipped 2026-05-01 |
+| 9  | Hide password UI for adults (no passwords; OTP-only) | ✅ shipped web + iOS adult (commit `f0748ce`) |
+| 7  | Drop streaks + read counts across adult product (kids keeps streaks — kids = funner) | 🟢 ready (locked: strip parent's kid-streak block in FamilyViews; drop the 30-day grid entirely on web; kids iOS untouched) |
+| 8  | Profile stat-tile typography redesign — Direction A (sans, bold, tight) | 🟢 ready (locked) |
+| 4  | Mount AI provider/model picker in admin | 📋 backlogged in OUTSTANDING.md (locked: both global + per-run) |
 
 **Superseded — kept for reference:**
 
@@ -218,6 +218,13 @@ Suggested ship order within Wave 1: **13 ✅ → 10 ✅ → 3 ✅ → 11a → (1
 
 ## 7. Remove streaks and "read this many" from the adult product (web + iOS)
 
+**Locked decisions (owner, 2026-05-01):**
+- **Kids iOS keeps streaks unchanged** — kids = funner. Adult-side purge only.
+- **Strip the parent's kid-streak block** in `VerityPost/VerityPost/FamilyViews.swift:486, 513` (the `statBlock("Streak", value: streak)` row) and drop the supporting `@State private var streak = 0`. Parent is an adult; adults shouldn't see streak language anywhere. Privacy-policy mention at `:742` stays (legal notice).
+- **Web profile 30-day grid is dropped entirely** — not kept as a non-streak "activity" grid. Removes both the grid AND the streak counters in `web/src/app/profile/_sections/ActivitySection.tsx:233, 363-404`.
+- DB columns (`users.streak_current`, `users.streak_best`, `users.articles_read_count`) stay per launch-hides convention. Achievement rows with `reading_count` / `streak_days` criteria are filtered out client-side; rows stay.
+
+
 **What to change:** strip every adult-facing surface that shows reading streaks ("X-day streak", "current streak", streak heatmap, streak freezes, streak celebrations) **and** lifetime/period read counts ("Articles read", "X of Y read today", reading-count milestones, "Top Readers" rankings). Applies to web and adult iOS. Kids product is out of scope (kid sees streaks in their own app); adult-facing surfaces *about* a kid (e.g., a parent looking at their kid's stats inside the adult app) are also in scope — see open question below.
 
 > **Note:** this supersedes item 1 (date/edition/timezone removal subsumes the home read counter) and item 6 (improving the streak heatmap legend — moot if the heatmap is removed). Delete items 1 and 6 from the work list once item 7 is scoped, OR keep them as separate phases if the streak removal lands later.
@@ -298,6 +305,9 @@ Suggested ship order within Wave 1: **13 ✅ → 10 ✅ → 3 ✅ → 11a → (1
 ---
 
 ## 8. Profile stat numbers look bad on web — restyle
+
+**Locked decision (owner, 2026-05-01):** Direction A — sans-serif, bold weight, larger numbers with tighter letter-spacing. "Make it look like a data dashboard you're winning, not an editorial column." Drop the serif at display size; switch `FONT.serif` → `FONT.sans`, weight 600 → 700, ease `letterSpacing` from `-0.02em` to `0`, consider non-uppercase label.
+
 
 **What to change:** owner's quote: "your numbers at least on web is fucking shit looking." The big numeric values inside the profile stat tiles (Quizzes / Comments / Followers / Following — and Articles read until item 7 lands) read poorly. This is qualitative feedback, so the spec needs to be settled with the owner before implementing; below is the surface and the levers to try.
 
@@ -842,13 +852,13 @@ Allowed under standard platform-operator legitimate interest. Caveats:
 4. **COPPA parent notification on kid edits = YES.** Every admin write to a kid profile triggers a parent email. Server-side enforcement (trigger / hook on the endpoint), not a client checkbox. Detail in Surface 3, Kid profiles section.
 5. **Kid PIN reset from kid's profile = YES.** Reset only, never view. Detail in Surface 3, Kid profiles section.
 
-### Open questions still pending
+### Locked answers (owner, 2026-05-01)
 
-1. **Email change on adult accounts.** When admin changes a user's email, does the user get notified at both old and new address? Recommended default: yes — standard takeover-prevention pattern. Confirm and lock.
-2. **Privacy policy update timing.** Add the admin-access clause to `web/src/app/privacy/page.tsx` *before* shipping the write/impersonation endpoints. Suggested ship order: privacy clause → admin_audit_log + sidecar attribution table → endpoints → UI. Confirm sequencing (and confirm you'll write/approve the clause yourself, not agent-drafted).
-3. **Audit-log retention.** Confirm `admin_audit_log` retention policy (90d? forever?). For COPPA + GDPR DSARs, 1 year minimum is sensible; pull current partition/archive setup via Supabase MCP before changing.
-4. **Grantee impersonation session timeout.** Locked: owner = forever. Open: should non-owner staff with the `admin.users.impersonate` grant also get forever sessions? Default proposal: no — they get 1h idle / 4h absolute, since longer sessions amplify the takeover risk if a grantee's session is hijacked. Confirm or override.
-5. **Impersonation suppression of the first-login modal (surfaced from item 13 review).** When admin impersonates a user with `username IS NULL` (e.g. a freshly graduated kid), the web `WelcomeModalMount` (`web/src/components/welcome/WelcomeModalMount.tsx:32-46`) and iOS PickUsernameView sheet (`VerityPost/VerityPost/ContentView.swift`) will both fire, forcing the admin to set a handle for the impersonated user. Add an `isImpersonating` check to both gating predicates so the modal/sheet is suppressed during impersonation sessions. Cheap fix; mandatory for item 12 to be safe to use on incomplete user accounts.
+1. **Email change notifies BOTH old + new addresses.** Standard takeover-prevention.
+2. **Privacy-policy clause = future improvement.** Logged in `OUTSTANDING.md`. Owner writes/approves the clause before write-impersonation endpoints ship. Item 12 read-only surfaces (Surface 1, 2, 3, 5) can ship without it; only Surface 4 (impersonation) is gated.
+3. **Audit-log retention = 1 year, env-var driven.** Add `ADMIN_AUDIT_LOG_RETENTION_DAYS=365` so it's easy to flip later. Implement as a daily cron that prunes rows older than the env value.
+4. **Grantee impersonation session: 1hr default, owner-configurable + force-eject.** Owner can change the default via a setting + has a "Force exit impersonation" button on `/admin/users/[id]` to kick any active grantee session immediately. Owner's own impersonation stays forever-until-logout per item 12 lock.
+5. **Impersonation suppression of first-login modal.** Add an `isImpersonating` check to both `WelcomeModalMount` (web) and the iOS `PickUsernameView` sheet predicate so admins impersonating a user with `username IS NULL` don't get force-prompted to set a handle for them.
 
 ### Platforms summary
 
