@@ -51,9 +51,10 @@ Items locked but not yet shipped. Created 2026-05-01.
 
 ---
 
-## 4. Web AvatarEditor silently no-ops on save
+## 4. Web AvatarEditor silently no-ops on save — ✅ shipped 2026-05-01
 
 **Discovered:** 2026-05-01 while writing the avatar CHECK constraint.
+**Resolved:** same day — web payload now wraps `avatar` inside `metadata` to match the iOS contract and the RPC's jsonb merge path. Two-line fix at `web/src/app/profile/_components/AvatarEditor.tsx:165`.
 
 **What:** `web/src/app/profile/_components/AvatarEditor.tsx:165` calls:
 ```ts

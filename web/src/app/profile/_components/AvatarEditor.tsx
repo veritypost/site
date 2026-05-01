@@ -161,8 +161,14 @@ export function AvatarEditor({ user, preview, onUserUpdated }: Props) {
     }
     setSaving(true);
     const next: AvatarShape = { outer, inner, text, initials };
+    // OUTSTANDING #4 fix: avatar persists inside users.metadata->'avatar',
+    // not as a top-level column. iOS already writes via the metadata path
+    // (SettingsView.swift, ProfileView.swift); web previously sent
+    // p_fields: { avatar: next } which the RPC silently dropped because no
+    // CASE branch handles a top-level `avatar` key, so web saves no-op'd.
+    // Wrap in metadata so the RPC's jsonb merge persists the shape.
     const { error } = await supabase.rpc('update_own_profile', {
-      p_fields: { avatar: next, avatar_color: outer } as unknown as Json,
+      p_fields: { metadata: { avatar: next }, avatar_color: outer } as unknown as Json,
     });
     setSaving(false);
     if (error) {
