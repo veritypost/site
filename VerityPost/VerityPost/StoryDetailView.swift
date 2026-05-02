@@ -127,6 +127,8 @@ struct StoryDetailView: View {
     @State private var showSubscription = false
     // OwnersAudit Story Task 18 — anon Discussion tab → LoginView sheet
     @State private var showLogin = false
+    // Registration wall sheet — triggered by anon bookmark or quiz CTA taps
+    @State private var showRegistrationSheet = false
 
     // Expert filter
     @State private var expertFilterActive: Bool = false
@@ -388,6 +390,9 @@ struct StoryDetailView: View {
             Text("You\u{2019}ve hit the bookmark limit for free accounts. Upgrade to save unlimited bookmarks.")
         }
         .sheet(isPresented: $showSubscription) { SubscriptionView().environmentObject(auth) }
+        .sheet(isPresented: $showRegistrationSheet) {
+            RegistrationSheetView()
+        }
         .sheet(isPresented: $showPushPrompt) {
             PushPromptSheet(
                 title: "Stay informed",
@@ -748,8 +753,8 @@ struct StoryDetailView: View {
                     }
                     .buttonStyle(.plain)
                 } else {
-                    NavigationLink {
-                        SignupView().environmentObject(auth)
+                    Button {
+                        showRegistrationSheet = true
                     } label: {
                         Text("Create free account")
                             .font(.system(.subheadline, design: .default, weight: .bold))
@@ -2769,7 +2774,10 @@ struct StoryDetailView: View {
     /// into the upgrade affordance, mirroring what the web client does.
     /// The pre-check is gone end-to-end.
     private func attemptBookmark() async {
-        guard (try? await client.auth.session) != nil else { return }
+        guard (try? await client.auth.session) != nil else {
+            await MainActor.run { showRegistrationSheet = true }
+            return
+        }
         await toggleBookmark()
     }
 
@@ -3391,5 +3399,35 @@ private func friendlyApiError(_ raw: String?, fallback: String) -> String {
             return fallback
         }
         return raw
+    }
+}
+
+// MARK: - Registration wall sheet (Slice 6)
+// Shown to anonymous users who tap Bookmark or the quiz/discussion CTA.
+// Presents a half-sheet with a Sign up link; does not require auth context.
+private struct RegistrationSheetView: View {
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("Read more on Verity Post")
+                .font(.title2.bold())
+                .multilineTextAlignment(.center)
+            Text("Join free to unlock more.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            VStack(alignment: .leading, spacing: 12) {
+                Label("Bookmark articles to read later", systemImage: "bookmark")
+                Label("Join discussions after passing the quiz", systemImage: "bubble.left.and.bubble.right")
+                Label("Follow topics you care about", systemImage: "star")
+            }
+            .font(.subheadline)
+            Link("Sign up — free", destination: URL(string: "\(Bundle.main.infoDictionary?["APP_BASE_URL"] as? String ?? "https://veritypost.com")/login")!)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .tint(.primary)
+        }
+        .padding(28)
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
     }
 }

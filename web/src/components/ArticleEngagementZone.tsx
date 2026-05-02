@@ -56,6 +56,7 @@ export default function ArticleEngagementZone({
         <ArticleQuiz
           articleId={articleId}
           initialPassed={initialPassed}
+          currentUserId={currentUserId ?? null}
           onPass={handlePass}
         />
       )}

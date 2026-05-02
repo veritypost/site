@@ -4,6 +4,7 @@ import Interstitial from './Interstitial';
 import { bumpQuizCount } from '../lib/session';
 import { hasPermission } from '@/lib/permissions';
 import { useTrack } from '@/lib/useTrack';
+import { useRegistrationWall } from '@/components/RegistrationWall';
 
 interface QuizOption {
   text: string;
@@ -53,6 +54,7 @@ interface ArticleQuizProps {
   initialPassed?: boolean;
   userTier?: string;
   kidProfileId?: string | null;
+  currentUserId?: string | null;
   onPass?: (newAchievements?: QuizPassAchievement[]) => void;
 }
 
@@ -75,8 +77,10 @@ export default function ArticleQuiz({
   articleId,
   initialPassed = false,
   kidProfileId = null,
+  currentUserId = null,
   onPass,
 }: ArticleQuizProps) {
+  const { openWall } = useRegistrationWall();
   const [stage, setStage] = useState<Stage>(initialPassed ? 'passed' : 'idle');
   const [error, setError] = useState<string>('');
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
@@ -102,6 +106,10 @@ export default function ArticleQuiz({
   const seeInterstitialAd = !hasPermission('article.view.ad_free');
 
   async function startAttempt() {
+    if (!currentUserId) {
+      openWall();
+      return;
+    }
     setStage('loading-start');
     setError('');
     try {

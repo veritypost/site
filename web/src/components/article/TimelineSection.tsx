@@ -1,6 +1,7 @@
 'use client';
 
 import { formatTimelineDate } from '@/lib/dates';
+import { useRegistrationWall } from '@/components/RegistrationWall';
 
 export type TimelineItem = {
   id: string;
@@ -81,14 +82,40 @@ const LABEL_STYLE: React.CSSProperties = {
   margin: '0 0 4px',
 };
 
-export default function TimelineSection({
-  events,
-  storySlug,
-}: {
+interface TimelineSectionProps {
   events: TimelineItem[];
   storySlug?: string;
-}) {
-  if (!events.length) return null;
+  showTease?: boolean;
+  articleCountReached?: boolean;
+}
+
+export default function TimelineSection({ events, storySlug, showTease = false, articleCountReached = false }: TimelineSectionProps) {
+  const { openWall } = useRegistrationWall();
+
+  if (!events.length && !showTease) return null;
+
+  if (showTease) {
+    return (
+      <section style={SECTION_STYLE}>
+        <h2 style={{ ...HEADING_STYLE, margin: '0 0 6px' }}>Timeline</h2>
+        <p style={{ fontSize: 14, color: 'var(--dim, #777)', margin: '0 0 8px', lineHeight: 1.5 }}>
+          The story timeline is a Verity Plus perk.{' '}
+          {articleCountReached ? (
+            <button
+              onClick={openWall}
+              style={{ background: 'none', border: 0, padding: 0, color: 'var(--text-primary, #111)', fontWeight: 500, cursor: 'pointer', fontSize: 'inherit', textDecoration: 'underline' }}
+            >
+              Sign up free →
+            </button>
+          ) : (
+            <a href="/pricing" style={{ color: 'var(--text-primary, #111)', fontWeight: 500 }}>
+              See plans
+            </a>
+          )}
+        </p>
+      </section>
+    );
+  }
 
   const sorted = [...events].sort(
     (a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime()
@@ -96,7 +123,7 @@ export default function TimelineSection({
 
   return (
     <section style={SECTION_STYLE}>
-      <p style={HEADING_STYLE}>Timeline</p>
+      <h2 style={HEADING_STYLE}>Timeline</h2>
       <div style={SPINE_STYLE}>
         {sorted.map((ev, i) => (
           <div key={ev.id} style={EVENT_STYLE}>

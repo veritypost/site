@@ -1,5 +1,7 @@
 'use client';
 
+import { useRegistrationWall } from '@/components/RegistrationWall';
+
 export type SourceItem = {
   title: string | null;
   url: string | null;
@@ -47,14 +49,45 @@ const PUB_STYLE: React.CSSProperties = {
   marginLeft: 6,
 };
 
-export default function SourcesSection({ sources }: { sources: SourceItem[] }) {
-  if (!sources.length) return null;
+interface SourcesSectionProps {
+  sources: SourceItem[];
+  showTease?: boolean;
+  articleCountReached?: boolean;
+}
+
+export default function SourcesSection({ sources, showTease = false, articleCountReached = false }: SourcesSectionProps) {
+  const { openWall } = useRegistrationWall();
+
+  if (!sources.length && !showTease) return null;
+
+  if (showTease) {
+    return (
+      <section style={SECTION_STYLE}>
+        <h2 style={{ ...HEADING_STYLE, margin: '0 0 6px' }}>Sources</h2>
+        <p style={{ fontSize: 14, color: 'var(--dim, #777)', margin: '0 0 8px', lineHeight: 1.5 }}>
+          Sources are a Verity Plus perk.{' '}
+          {articleCountReached ? (
+            <button
+              onClick={openWall}
+              style={{ background: 'none', border: 0, padding: 0, color: 'var(--text-primary, #111)', fontWeight: 500, cursor: 'pointer', fontSize: 'inherit', textDecoration: 'underline' }}
+            >
+              Sign up free →
+            </button>
+          ) : (
+            <a href="/pricing" style={{ color: 'var(--text-primary, #111)', fontWeight: 500 }}>
+              See plans
+            </a>
+          )}
+        </p>
+      </section>
+    );
+  }
 
   const sorted = [...sources].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
   return (
     <section style={SECTION_STYLE}>
-      <p style={HEADING_STYLE}>Sources</p>
+      <h2 style={HEADING_STYLE}>Sources</h2>
       <ul style={LIST_STYLE}>
         {sorted.map((s, i) => (
           <li key={i} style={ITEM_STYLE}>

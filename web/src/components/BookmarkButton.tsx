@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { hasPermission, refreshIfStale } from '@/lib/permissions';
 import { friendlyError } from '@/lib/friendlyError';
+import { useRegistrationWall } from '@/components/RegistrationWall';
 
 interface BookmarkButtonProps {
   articleId: string;
@@ -10,6 +11,7 @@ interface BookmarkButtonProps {
 }
 
 export default function BookmarkButton({ articleId, currentUserId }: BookmarkButtonProps) {
+  const { openWall } = useRegistrationWall();
   const [bookmarked, setBookmarked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -40,7 +42,35 @@ export default function BookmarkButton({ articleId, currentUserId }: BookmarkBut
     return () => { cancelled = true; };
   }, [articleId, currentUserId, permsReady, canBookmark]);
 
-  if (!currentUserId || !permsReady || !canBookmark) return null;
+  if (!currentUserId) {
+    // Anon: show a button that opens the registration wall
+    return (
+      <button
+        onClick={openWall}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          fontSize: 13,
+          fontWeight: 500,
+          color: 'var(--text, #1a1a1a)',
+          background: 'transparent',
+          border: '1px solid var(--border, #e5e5e5)',
+          borderRadius: 8,
+          padding: '0 14px',
+          minHeight: 36,
+          cursor: 'pointer',
+          WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        <svg width="12" height="13" viewBox="0 0 12 13" fill="none" aria-hidden="true">
+          <path d="M2 1h8a1 1 0 011 1v10l-5-3-5 3V2a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+        </svg>
+        Bookmark
+      </button>
+    );
+  }
+  if (!permsReady || !canBookmark) return null;
 
   async function handleBookmark() {
     if (busy || bookmarked) return;

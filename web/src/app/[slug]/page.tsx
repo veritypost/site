@@ -11,12 +11,15 @@
  */
 import { notFound, redirect } from 'next/navigation';
 import type { Metadata } from 'next';
+import { cookies } from 'next/headers';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { hasPermissionServer } from '@/lib/auth';
 import { renderBodyHtml } from '@/lib/pipeline/render-body';
 import { JsonLd, newsArticle } from '@/components/JsonLd';
 import { getSiteUrlOrNull } from '@/lib/siteUrl';
 import { incrementViewCount } from '@/lib/counters';
+import { getAnonReadCount } from '@/lib/anonReadCounter';
+import { RegistrationWallProvider } from '@/components/RegistrationWall';
 import ArticleSurface from '@/components/article/ArticleSurface';
 import ArticleReaderTabs from '@/components/article/ArticleReaderTabs';
 import TimelineSection from '@/components/article/TimelineSection';
@@ -25,6 +28,7 @@ import ArticleEngagementZone from '@/components/ArticleEngagementZone';
 import ArticleActions from '@/components/ArticleActions';
 import ArticleTracker from '@/components/article/ArticleTracker';
 import StoryArticlePicker from '@/components/article/StoryArticlePicker';
+import AnonArticleCtaBanner from '@/components/article/AnonArticleCtaBanner';
 import ArticleFetchFailed from './_ArticleFetchFailed';
 import NextStoryFooter from '@/components/NextStoryFooter';
 
@@ -134,6 +138,14 @@ export default async function ArticleSlugPage({
 
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
+
+  const isAnon = !user;
+  const cookieStore = cookies();
+  const anonReadCount = isAnon
+    ? getAnonReadCount(cookieStore.get('vp_anon_reads')?.value)
+    : 0;
+  const wallSuppressed = cookieStore.get('vp_wall_supp')?.value === '1';
+  const WALL_THRESHOLD = 2;
 
   const service = createServiceClient();
   const fetchResult = await (async () => {
@@ -257,7 +269,11 @@ export default async function ArticleSlugPage({
     .map((a) => ({ id: a.id, title: a.title, published_at: a.published_at, status: a.status }));
 
   return (
-    <>
+    <RegistrationWallProvider
+      isAnon={isAnon}
+      initialSuppressed={wallSuppressed}
+    >
+      <>
       {jsonLd && <JsonLd data={jsonLd} />}
       {!isCoppa && article.status === 'published' && (
         <ArticleTracker articleId={article.id} articleSlug={story.slug} />
@@ -296,12 +312,13 @@ export default async function ArticleSlugPage({
                 currentUserId={user?.id ?? null}
               />
             )}
+            {isAnon && <AnonArticleCtaBanner />}
           </>
         }
         timelineSlot={
           <>
-            <TimelineSection events={timeline} storySlug={story.slug} />
-            <SourcesSection sources={sources} />
+            <TimelineSection events={!isAnon ? timeline : []} storySlug={story.slug} showTease={isAnon && timeline.length > 0} articleCountReached={anonReadCount >= WALL_THRESHOLD} />
+            <SourcesSection sources={!isAnon ? sources : []} showTease={isAnon && sources.length > 0} articleCountReached={anonReadCount >= WALL_THRESHOLD} />
           </>
         }
         engagementSlot={
@@ -351,6 +368,7 @@ export default async function ArticleSlugPage({
         }
       />
       <NextStoryFooter category={category} nearbyStories={nearbyStories} />
-    </>
+      </>
+    </RegistrationWallProvider>
   );
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { isAllowedOrigin, CORS_ALLOW_METHODS, CORS_ALLOW_HEADERS } from '@/lib/cors';
+import { incrementAnonRead } from '@/lib/anonReadCounter';
 
 // Logged-in-only route trees. Anonymous visitors get 302'd to
 // /login?next=<path> so they can sign in and be bounced back. Middleware
@@ -476,6 +477,52 @@ export async function middleware(request) {
       setCspHeader(rewritten, csp);
       return rewritten;
     }
+  }
+
+  // Anon read counter — increment for article pages only
+  const KNOWN_NON_ARTICLE_PATHS = new Set([
+    '/', '/browse', '/search', '/leaderboard', '/notifications', '/login',
+    '/signup', '/logout', '/welcome', '/beta-locked', '/request-access',
+    '/about', '/pricing', '/how-it-works', '/contact', '/help', '/accessibility',
+    '/privacy', '/terms', '/cookies', '/dmca', '/corrections',
+    '/editorial-standards', '/methodology', '/kids-app', '/preview',
+    '/following', '/appeal', '/expert-queue', '/recap', '/billing',
+    '/messages', '/bookmarks',
+  ]);
+  const pathParts = pathname.split('/').filter(Boolean);
+  const isLikelyArticlePath =
+    pathParts.length === 1 &&
+    !KNOWN_NON_ARTICLE_PATHS.has('/' + pathParts[0]) &&
+    !pathParts[0].startsWith('_') &&
+    !pathname.startsWith('/admin') &&
+    !pathname.startsWith('/api') &&
+    !pathname.startsWith('/u/') &&
+    !pathname.startsWith('/profile') &&
+    !pathname.startsWith('/category') &&
+    !pathname.startsWith('/card') &&
+    !pathname.startsWith('/ideas');
+
+  // Use auth-cookie presence (not `user`, which is null for all public routes)
+  // to distinguish true anon visitors from logged-in readers.
+  const _ctrRef = (() => {
+    try { return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || '').hostname.split('.')[0]; }
+    catch { return ''; }
+  })();
+  const _ctrBase = _ctrRef ? `sb-${_ctrRef}-auth-token` : '';
+  const _ctrHasAuth = _ctrBase && (
+    request.cookies.get(_ctrBase) ||
+    request.cookies.get(`${_ctrBase}.0`)
+  );
+
+  if (!_ctrHasAuth && isLikelyArticlePath) {
+    const currentReads = request.cookies.get('vp_anon_reads')?.value ?? null;
+    const newReadsValue = incrementAnonRead(currentReads);
+    response.cookies.set('vp_anon_reads', newReadsValue, {
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60,
+      httpOnly: true,
+      sameSite: 'lax',
+    });
   }
 
   return response;
