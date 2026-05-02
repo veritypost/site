@@ -199,6 +199,7 @@ struct FollowingView: View {
                 .from("articles")
                 .select("id, title, story_id, published_at, excerpt, cover_image_url, category_id, is_breaking, is_developing, stories(slug)")
                 .in("story_id", values: Array(storyIds))
+                .eq("browse_only", value: false)
                 .order("published_at", ascending: false)
                 .execute()
                 .value

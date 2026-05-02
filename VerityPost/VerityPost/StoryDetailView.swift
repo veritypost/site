@@ -2360,6 +2360,7 @@ struct StoryDetailView: View {
                 .select("id, title, story_id, stories(slug), excerpt, body, cover_image_url, category_id, status, is_breaking, is_developing, published_at, created_at")
                 .eq("category_id", value: catId)
                 .eq("status", value: "published")
+                .eq("browse_only", value: false)
                 .neq("id", value: story.id)
                 .order("published_at", ascending: false)
                 .limit(3)
