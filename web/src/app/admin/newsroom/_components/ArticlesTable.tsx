@@ -409,13 +409,16 @@ export default function ArticlesTable() {
                 <td style={{ padding: `${S[2]}px ${S[3]}px` }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: S[1], flexWrap: 'wrap' }}>
                     <Link
-                      href={row.stories?.slug ? `/${row.stories.slug}` : '#'}
+                      href={
+                        row.is_kids_safe
+                          ? `/admin/kids-story-manager?article=${row.id}`
+                          : `/admin/story-manager?article=${row.id}`
+                      }
                       style={{
                         color: C.ink,
                         textDecoration: 'none',
                         fontWeight: 500,
                       }}
-                      onClick={(e) => { if (!row.stories?.slug) e.preventDefault(); }}
                     >
                       {row.title || '—'}
                     </Link>

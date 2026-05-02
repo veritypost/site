@@ -518,14 +518,114 @@ Symptom: Card doesn't show a clear status (idle / generating / generated /
 published / failed). Wanted: persistent status badge per audience.
 
 ### 12. /admin/articles — clicking article opens view, not edit
-Status: IN_PROGRESS
+Status: RESOLVED
 Symptom: Default click on a row in /admin/articles navigates to the public
 view of the article. Wanted: navigate to the editor.
 
+```
+RESOLUTION (concern 12) — 2026-05-02
+Investigate: The Articles tab is /admin/newsroom?tab=articles, not a
+             standalone /admin/articles route. ArticlesTable.tsx:411-421
+             rendered the row title as a Next.js <Link> with
+             href={row.stories?.slug ? `/${row.stories.slug}` : '#'} +
+             an onClick that preventDefault'd when no slug — the
+             "default click" went to the public story page. The
+             existing Edit Button at lines 474-486 already encoded the
+             correct editor routing
+             (row.is_kids_safe ? /admin/kids-story-manager : /admin/story-manager)
+             with `?article=${row.id}`. Both editor wrapper pages
+             (story-manager + kids-story-manager) accept ?article=ID
+             without requiring a slug.
+Review:      A (confirmer) CONFIRMED Stage 1 end-to-end: title <Link> at
+             411-421, Edit at 474-486, View at 455-473, no row-level
+             onClick, no Drawer/Sidebar/Modal imports, both editor
+             wrappers accept ?article=ID. B (adversary) flagged a real
+             middle-click regression risk if the title were swapped to
+             a Button + router.push — Stage 1's plan kept it as a
+             <Link>, so middle-click/cmd-click semantics are preserved
+             (now opens the editor in a new tab instead of the public
+             page). B also confirmed the editor loads cleanly for all
+             statuses (loadStory selects by id with no status filter).
+             A and B converged on the #12 fix; their disagreement was
+             on #13's scope (resolved by tie-breaker — see #13).
+Fix:         web/src/app/admin/newsroom/_components/ArticlesTable.tsx —
+             title <Link> href changed from the public-slug expression
+             to the editor URL using row.is_kids_safe as the
+             discriminator (mirrors Edit button at lines 474-486).
+             Removed the no-slug onClick preventDefault since the
+             editor route doesn't depend on slug. Kept <Link> (not
+             swapped to Button+router.push) so middle-click /
+             cmd-click still opens the destination in a new tab.
+             "View" button (455-473) untouched — it remains the
+             explicit public-page affordance for published rows.
+             "Edit" button (474-486) untouched — duplicates the
+             title-link destination now, intentional explicit affordance.
+TypeScript:  pass (npx tsc --noEmit, exit 0)
+iOS build:   n/a — newsroom is web-admin only; no equivalent admin
+             article-list surface in VerityPost/ or VerityPostKids/
+Verifier:    pass — 6/6 checks. Title href correctly routes by
+             is_kids_safe, slug-fallback + preventDefault removed,
+             View + Edit buttons untouched, no unused imports, no
+             other call sites depend on the title link going to the
+             public slug, middle-click semantics preserved.
+Status:      RESOLVED
+```
+
 ### 13. /admin/articles — "Open article" opens a sidebar
-Status: IN_PROGRESS
+Status: DEFERRED
 Symptom: The "Open article" affordance opens a sidebar drawer instead of
 navigating directly to the article.
+
+```
+RESOLUTION (concern 13) — 2026-05-02
+Investigate: ArticlesTable.tsx has NO drawer / sidebar / modal — no
+             Drawer/Sheet/Dialog imports, no row-level onClick. The
+             "Open article" button + Drawer that the owner described
+             live in StoryEditor.tsx (button at line 1160, Drawer at
+             ~1747-1784) and KidsStoryEditor.tsx (button at line 769
+             + equivalent Drawer block). The structured concern's
+             "/admin/articles" label is a mis-tag of the symptom
+             location; the raw owner words ("open article view
+             timeline preview save and publish draft and unsave …
+             also i click en open aritcle it oopens sidebar") are
+             unmistakably about the StoryEditor's button bar.
+Review:      A (confirmer) CONFIRMED defer to the editor bundle
+             session (which is already touching StoryEditor for
+             concern #20). B (adversary) DISAGREED — argued #13
+             should be fixed in this session by deleting the
+             button + Drawer in both editor files now, on
+             genuine-fixes / no-parallel-paths grounds. Tie-breaker
+             ruled DEFER: this session's hard scope guard is "Touch
+             ONLY ArticlesTable.tsx"; StoryEditor.tsx +
+             KidsStoryEditor.tsx are open in the parallel editor
+             bundle session right now and concurrent edits would
+             clobber each other. Concern #20's verbatim text already
+             names "Open article" as one of the buttons being
+             condensed, so the editor bundle session is the natural
+             owner.
+Fix:         No code changes in this session. See HANDOFF below.
+TypeScript:  n/a (no code changes)
+iOS build:   n/a — symptom is web-admin only
+Verifier:    n/a (no code changes)
+Status:      DEFERRED — symptom belongs to StoryEditor.tsx +
+             KidsStoryEditor.tsx; out of scope for this session per
+             the explicit "Touch ONLY ArticlesTable.tsx" guard.
+
+HANDOFF TO EDITOR BUNDLE SESSION (concerns #14-20, #28, #30):
+- Drawer + "Open article" button to remove:
+  - StoryEditor.tsx: button at line 1160 (`<Button … onClick={() => setShowPicker(true)}>Open article</Button>`),
+    Drawer block at ~1747-1784 (title="Open article"), plus the
+    showPicker / setShowPicker state and the storyList fetch that
+    feeds the drawer.
+  - KidsStoryEditor.tsx: button at line 769 (same shape), plus the
+    matching Drawer + showPicker state.
+- Why drop entirely: concern #12's fix (just landed) makes the
+  Articles tab title-link the canonical article picker — the
+  editor's in-app drawer is a redundant parallel path, which the
+  owner's "genuine fixes / no parallel paths" rule prohibits.
+- When dropping, also flip concern #13 from DEFERRED → RESOLVED in
+  this file with a brief note pointing back to the bundled commit.
+```
 
 ### 14. Generated article — body not visible
 Status: IN_PROGRESS
