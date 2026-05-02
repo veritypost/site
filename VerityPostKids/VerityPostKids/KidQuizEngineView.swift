@@ -455,7 +455,7 @@ struct KidQuizEngineView: View {
                 .lineSpacing(4)
 
             VStack(spacing: 10) {
-                ForEach(q.options) { opt in
+                ForEach(Array(q.options.enumerated()), id: \.offset) { _, opt in
                     optionButton(q: q, opt: opt)
                 }
             }
@@ -487,6 +487,8 @@ struct KidQuizEngineView: View {
         }
         .padding(.horizontal, 24)
         .padding(.bottom, 30)
+        .frame(maxWidth: 600)
+        .frame(maxWidth: .infinity)
     }
 
     private func optionButton(q: QuizQuestion, opt: QuizOption) -> some View {
@@ -542,7 +544,12 @@ struct KidQuizEngineView: View {
 
     private func revealAnswer(q: QuizQuestion, chosen: QuizOption) {
         withAnimation(K.springSnap) { revealed = true }
-        if chosen.isCorrect { correctCount += 1 }
+        if chosen.isCorrect {
+            correctCount += 1
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        } else {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        }
         guard let kidId = auth.kid?.id else { return }
         // T251 — build the disk-persistable payload first, save it,
         // THEN dispatch. The disk entry is what survives a background-
@@ -708,7 +715,7 @@ struct KidQuizEngineView: View {
         // Only fetch the server verdict if every write actually landed.
         // Otherwise the RPC would count an incomplete attempt set and
         // the kid would see a wrong score on the result screen.
-        if allSucceeded && writeFailures == 0 {
+        if allSucceeded && !drainHadFailures {
             await fetchServerVerdict()
         }
     }
@@ -879,6 +886,8 @@ struct KidQuizEngineView: View {
         }
         .padding(.horizontal, 24)
         .padding(.bottom, 40)
+        .frame(maxWidth: 600)
+        .frame(maxWidth: .infinity)
     }
 
     /// Pass/fail success body. Threshold copy comes from the server-
@@ -900,7 +909,7 @@ struct KidQuizEngineView: View {
                 .foregroundStyle(r.passed ? K.tealDark : K.coral)
         }
 
-        Text(r.passed ? "Great job!" : "Give it another go?")
+        Text(r.passed ? "Great job!" : "Give it another go!")
             .font(.scaledSystem(size: 28, weight: .black, design: .rounded))
             .foregroundStyle(K.text)
 
@@ -918,7 +927,7 @@ struct KidQuizEngineView: View {
         // concrete so the quiz reads as participation context, not
         // a school test.
         Text(r.passed
-             ? "Your streak just got longer."
+             ? "Keep that streak going!"
              : "Read it again and try when you're ready.")
             .font(.scaledSystem(size: 13, weight: .semibold, design: .rounded))
             .foregroundStyle(K.dim)
@@ -999,7 +1008,7 @@ struct KidQuizEngineView: View {
             .foregroundStyle(K.text)
             .multilineTextAlignment(.center)
 
-        Text("We'll keep trying in the background. Try again now to see your score.")
+        Text("Your answers are saved. Try again to see your score.")
             .font(.scaledSystem(size: 14, weight: .semibold, design: .rounded))
             .foregroundStyle(K.dim)
             .multilineTextAlignment(.center)

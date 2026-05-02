@@ -37,9 +37,15 @@ struct KidReaderView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
+                    HStack {
+                        dismissButton
+                        Spacer()
+                    }
                     header
                     if loading {
                         ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
+                    } else if loadError != nil {
+                        networkErrorState
                     } else if body_.isEmpty {
                         // OwnersAudit Kids A7 — empty kids_summary means the
                         // editor hasn't authored a kid-band rewrite. Pre-A7
@@ -71,18 +77,10 @@ struct KidReaderView: View {
 
                         takeQuizButton
                     }
-                    if let loadError {
-                        Text(loadError)
-                            .font(.system(.caption, design: .rounded))
-                            .foregroundStyle(K.coralDark)
-                    }
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 20)
                 .padding(.bottom, 100)
-            }
-            .overlay(alignment: .topLeading) {
-                dismissButton
             }
             .fullScreenCover(isPresented: $showQuiz) {
                 KidQuizEngineView(
@@ -120,19 +118,25 @@ struct KidReaderView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(LinearGradient(
-                    colors: [categoryColor.opacity(0.3), categoryColor.opacity(0.1)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ))
-                .frame(height: 140)
-                .overlay(
-                    Image(systemName: "newspaper.fill")
-                        .font(.system(.largeTitle, weight: .bold))
-                        .foregroundStyle(categoryColor)
-                        .accessibilityHidden(true)
-                )
+            Group {
+                if let urlString = article.coverImageUrl, let url = URL(string: urlString) {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        default:
+                            gradientPlaceholder
+                        }
+                    }
+                } else {
+                    gradientPlaceholder
+                }
+            }
+            .frame(height: 140)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipped()
 
             Text(article.title ?? "Untitled")
                 .font(.system(.title2, design: .rounded, weight: .black))
@@ -150,6 +154,21 @@ struct KidReaderView: View {
                 .foregroundStyle(K.dim)
             }
         }
+    }
+
+    private var gradientPlaceholder: some View {
+        RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .fill(LinearGradient(
+                colors: [categoryColor.opacity(0.3), categoryColor.opacity(0.1)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ))
+            .overlay(
+                Image(systemName: "newspaper.fill")
+                    .font(.system(.largeTitle, weight: .bold))
+                    .foregroundStyle(categoryColor)
+                    .accessibilityHidden(true)
+            )
     }
 
     private var takeQuizButton: some View {
@@ -209,8 +228,6 @@ struct KidReaderView: View {
         }
         .accessibilityLabel("Close article")
         .buttonStyle(.plain)
-        .padding(.leading, 20)
-        .padding(.top, 60)
     }
 
     /// A7 — shown when an article has no kids_summary. Friendly placeholder
@@ -222,12 +239,39 @@ struct KidReaderView: View {
                 .font(.system(.largeTitle, weight: .bold))
                 .foregroundStyle(K.dim)
                 .accessibilityHidden(true)
-            Text("Story not ready yet — try another.")
+            Text("This story isn't ready yet. Try a different one!")
                 .font(.system(.subheadline, design: .rounded, weight: .semibold))
                 .foregroundStyle(K.dim)
                 .multilineTextAlignment(.center)
             Button { dismiss() } label: {
                 Text("Back")
+                    .font(.system(.subheadline, design: .rounded, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: 180, minHeight: 44)
+                    .background(K.tealDark)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .buttonStyle(.plain)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
+    }
+
+    private var networkErrorState: some View {
+        VStack(alignment: .center, spacing: 14) {
+            Image(systemName: "wifi.slash")
+                .font(.system(.largeTitle, weight: .bold))
+                .foregroundStyle(K.dim)
+                .accessibilityHidden(true)
+            Text("Couldn't load this story.")
+                .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                .foregroundStyle(K.dim)
+                .multilineTextAlignment(.center)
+            Button {
+                loadError = nil
+                Task { await loadArticle() }
+            } label: {
+                Text("Try again")
                     .font(.system(.subheadline, design: .rounded, weight: .bold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: 180, minHeight: 44)
@@ -278,7 +322,9 @@ struct KidReaderView: View {
     }
 
     private func logReading() async throws {
-        guard let kidId = auth.kid?.id else { return }
+        guard let kidId = auth.kid?.id else {
+            throw URLError(.userAuthenticationRequired)
+        }
         let elapsed = Int(Date().timeIntervalSince(startTime))
         let row = ReadingLogInsert(
             user_id: nil,
@@ -312,4 +358,3 @@ struct KidReaderView: View {
         }
     }
 }
-
