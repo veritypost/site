@@ -480,65 +480,41 @@ function DiscoveryTab({
           value={dqInput}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDqInput(e.target.value)}
           placeholder="Search stories…"
-          style={{ flex: '1 1 200px', minWidth: 160 } as React.CSSProperties}
+          style={{ flex: '1 1 200px', minWidth: 160, minHeight: 44, padding: '0 10px' } as React.CSSProperties}
         />
-        <select
+        <Select
           value={cat}
-          onChange={(e) => handleCatChange(e.target.value)}
-          style={{
-            fontSize: F.sm,
-            border: `1px solid ${C.border}`,
-            borderRadius: 6,
-            padding: `${S[1]}px ${S[2]}px`,
-            color: C.ink,
-            background: C.bg,
-            cursor: 'pointer',
-            minWidth: 140,
-          }}
+          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleCatChange(e.target.value)}
+          block={false}
+          style={{ minWidth: 140, minHeight: 44 }}
         >
           <option value="">All categories</option>
           {categories.map((c) => (
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
-        </select>
-        <select
+        </Select>
+        <Select
           value={so}
-          onChange={(e) => handleSoChange(e.target.value)}
-          style={{
-            fontSize: F.sm,
-            border: `1px solid ${C.border}`,
-            borderRadius: 6,
-            padding: `${S[1]}px ${S[2]}px`,
-            color: C.ink,
-            background: C.bg,
-            cursor: 'pointer',
-            minWidth: 140,
-          }}
+          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleSoChange(e.target.value)}
+          block={false}
+          style={{ minWidth: 140, minHeight: 44 }}
         >
           <option value="">Newest</option>
           <option value="oldest">Oldest</option>
           <option value="most_sources">Most sources</option>
           <option value="breaking_first">Breaking first</option>
-        </select>
-        <select
+        </Select>
+        <Select
           aria-label="Generation model"
           value={String(selectedModelIdx)}
-          onChange={(e) => setSelectedModelIdx(Number(e.target.value))}
-          style={{
-            fontSize: F.sm,
-            border: `1px solid ${C.border}`,
-            borderRadius: 6,
-            padding: `${S[1]}px ${S[2]}px`,
-            color: C.ink,
-            background: C.bg,
-            cursor: 'pointer',
-            minWidth: 180,
-          }}
+          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedModelIdx(Number(e.target.value))}
+          block={false}
+          style={{ minWidth: 180, minHeight: 44 }}
         >
           {MODEL_OPTIONS.map((opt, i) => (
             <option key={opt.model} value={i}>{opt.label}</option>
           ))}
-        </select>
+        </Select>
       </div>
 
       {/* Merge confirmation bar */}
@@ -645,14 +621,28 @@ function DiscoveryTab({
 
 function ViewToggle({ view, onView }: { view: ViewId; onView: (v: ViewId) => void }) {
   return (
-    <div style={{ display: 'inline-flex', gap: 0, border: `1px solid ${C.divider}`, borderRadius: 6 }}>
+    <div
+      style={{
+        display: 'inline-flex',
+        alignItems: 'stretch',
+        gap: 0,
+        border: `1px solid ${C.divider}`,
+        borderRadius: 6,
+        minHeight: 44,
+        overflow: 'hidden',
+      }}
+    >
       {(['active', 'completed'] as const).map((v) => (
         <button
           key={v}
           type="button"
           onClick={() => onView(v)}
           style={{
-            padding: `${S[1]}px ${S[3]}px`,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: 44,
+            padding: `0 ${S[3]}px`,
             background: view === v ? C.accent : 'transparent',
             color: view === v ? C.bg : C.ink,
             border: 'none',

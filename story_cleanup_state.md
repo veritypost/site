@@ -306,10 +306,23 @@ Status:      RESOLVED
 ```
 
 ### 5. Newsroom — DB wipe to start fresh
-Status: IN_PROGRESS
+Status: RESOLVED
 Symptom: Owner wants every article + news row cleared so testing starts
 clean. Wipe SQL handed over and verified against information_schema. Owner
 runs it in the Supabase SQL editor. Awaiting confirmation it ran.
+
+```
+RESOLUTION (concern 5) — 2026-05-02
+Investigate: n/a — destructive SQL is owner-run by policy.
+Review:      n/a
+Fix:         Owner ran the wipe SQL in the Supabase SQL editor (confirmed
+             2026-05-02). DB now clean for fresh testing of downstream
+             concerns (#10, #11, #14-19, #21-25, #28, #30).
+TypeScript:  n/a
+iOS build:   n/a
+Verifier:    n/a — owner self-confirmed
+Status:      RESOLVED
+```
 
 ### 6. Newsroom — manual create flow (no AI)
 Status: DEFERRED
@@ -320,9 +333,64 @@ Reason: Big-feature peel-off — owner locked this for its own session
 (2026-05-02).
 
 ### 7. Newsroom — top-row buttons different sizes
-Status: PENDING
+Status: RESOLVED
 Symptom: The top row of the newsroom page mixes button sizes / variants —
 visually inconsistent.
+
+```
+RESOLUTION (concern 7) — 2026-05-02
+Investigate: Button.jsx (web/src/components/admin/Button.jsx) defines a
+             44px minHeight floor for both `sm` and `md` sizes. All six
+             top-toolbar Buttons already use size="sm" → 44px. The
+             outliers in the top region were:
+             (a) ViewToggle (page.tsx:646-668) — custom inline component
+                 with no minHeight, rendering at ~24px next to 44px
+                 toolbar buttons.
+             (b) Filter-row TextInput (page.tsx:479) — md size renders
+                 ~36px, no minHeight.
+             (c) Three raw <select> elements (categories, sort, model
+                 picker, page.tsx:485-541) — padY=4, no minHeight,
+                 ~28px each. Page already imports the polished
+                 Select.jsx (line 32) but the filter row reinvented
+                 raw selects.
+Review:      A (confirmer) re-derived independently — confirmed Stage
+             1's ViewToggle target, recommended EXTEND scope to filter
+             row since owner words ("buttons at the top") describe the
+             visible top region not just one row, and filter-row
+             cosmetic alignment doesn't conflict with #8's deferred
+             search-redesign. B (adversary) flagged: ViewToggle inner
+             button needs explicit minHeight (defensive), raw-<select>
+             at minHeight has cross-browser rendering risk where the
+             existing Select.jsx component already solves it
+             (appearance:none + custom chevron), TabBar above toolbar
+             could also be considered. Resolved without tie-breaker:
+             A and B converge on direction (extend scope to filter
+             row); their disagreements are tactical not strategic.
+             Adopted B's defensive ViewToggle inner-minHeight, B's
+             swap to Select.jsx component. Skipped TabBar — owner said
+             "buttons" and tabs aren't buttons; if owner pushes back
+             it's a small follow-up. "What's mute outlet?" is already
+             tracked by concern #31 (mute outlet rip-out).
+Fix:         web/src/app/admin/newsroom/page.tsx —
+             - ViewToggle outer div: added minHeight: 44,
+               alignItems: 'stretch', overflow: 'hidden'
+             - ViewToggle inner buttons: added display: 'inline-flex',
+               alignItems: 'center', justifyContent: 'center',
+               minHeight: 44, padding: '0 ${S[3]}px' (dropped vertical
+               padding since minHeight controls height now)
+             - dq-search TextInput: added minHeight: 44, padding: '0 10px'
+               to inline style
+             - Replaced 3 raw <select> blocks with <Select> component
+               (categories, sort, model picker), each block={false},
+               minHeight: 44 via style. Preserved aria-label on model
+               picker, all values/options/handlers untouched.
+TypeScript:  pass (npx tsc --noEmit, exit 0)
+iOS build:   n/a — newsroom is web-admin only
+Verifier:    pass — all spec items satisfied, zero raw <select>
+             remaining, ViewToggle structure correct, toolbar Buttons
+             untouched, no behavior changes, file compiles clean
+Status:      RESOLVED
+```
 
 ### 8. Newsroom — feed run becomes search
 Status: DEFERRED
