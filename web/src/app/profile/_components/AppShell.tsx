@@ -669,7 +669,7 @@ const shellCss = `
   margin-bottom: ${S[1]}px;
 }
 .redesign-section-reason {
-  font-size: ${F.sm}px;
+  font-size: ${F.sm};
 }
 @media (min-width: 860px) {
   .redesign-shell-mobilebar { display: none; }
@@ -693,11 +693,11 @@ const shellCss = `
     margin-bottom: ${S[6]}px;
   }
   .redesign-section-h1 {
-    font-size: ${F.display}px;
+    font-size: ${F.display};
     margin-bottom: ${S[2]}px;
   }
   .redesign-section-reason {
-    font-size: ${F.lg}px;
+    font-size: ${F.lg};
   }
 }
 `;

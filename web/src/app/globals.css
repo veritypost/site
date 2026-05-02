@@ -74,6 +74,88 @@
   --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
+/* Profile redesign tokens — mirrors palette.ts C.* constants.
+   Variable names use --p-* prefix to isolate from the admin palette. */
+:root {
+  /* Surfaces */
+  --p-bg: #ffffff;
+  --p-surface: #fafafa;
+  --p-surface-raised: #ffffff;
+  --p-surface-sunken: #f4f4f5;
+  /* Lines */
+  --p-border: #e4e4e7;
+  --p-border-strong: #d4d4d8;
+  --p-divider: #f1f1f3;
+  /* Ink */
+  --p-ink: #0a0a0a;
+  --p-ink-soft: #27272a;
+  --p-ink-muted: #52525b;
+  --p-ink-dim: #71717a;
+  --p-ink-faint: #a1a1aa;
+  /* Brand accent */
+  --p-accent: #0b5cff;
+  --p-accent-soft: #e6efff;
+  --p-accent-ink: #ffffff;
+  /* Semantic states */
+  --p-success: #15803d;
+  --p-success-soft: #dcfce7;
+  --p-warn: #b45309;
+  --p-warn-soft: #fef3c7;
+  --p-danger: #b91c1c;
+  --p-danger-soft: #fee2e2;
+  --p-info: #1d4ed8;
+  --p-info-soft: #dbeafe;
+  /* Expert / verified badges */
+  --p-verified: #0a66c2;
+  --p-verified-soft: #e3f0ff;
+  --p-expert: #7c3aed;
+  --p-expert-soft: #ede9fe;
+  /* Focus ring */
+  --p-ring: rgba(11, 92, 255, 0.30);
+  --p-ring-strong: rgba(11, 92, 255, 0.60);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Surfaces */
+    --p-bg: #0a0a0a;
+    --p-surface: #111113;
+    --p-surface-raised: #18181b;
+    --p-surface-sunken: #09090b;
+    /* Lines */
+    --p-border: #27272a;
+    --p-border-strong: #3f3f46;
+    --p-divider: #1c1c1f;
+    /* Ink */
+    --p-ink: #fafafa;
+    --p-ink-soft: #e4e4e7;
+    --p-ink-muted: #a1a1aa;
+    --p-ink-dim: #71717a;
+    --p-ink-faint: #52525b;
+    /* Brand accent — slightly lighter for contrast on dark */
+    --p-accent: #4d8fff;
+    --p-accent-soft: #0d1f4d;
+    --p-accent-ink: #ffffff;
+    /* Semantic states */
+    --p-success: #22c55e;
+    --p-success-soft: #052e16;
+    --p-warn: #fbbf24;
+    --p-warn-soft: #2d1d02;
+    --p-danger: #f87171;
+    --p-danger-soft: #2d0a0a;
+    --p-info: #60a5fa;
+    --p-info-soft: #0c1a3d;
+    /* Expert / verified badges */
+    --p-verified: #60a5fa;
+    --p-verified-soft: #0a1a30;
+    --p-expert: #a78bfa;
+    --p-expert-soft: #1e0a3c;
+    /* Focus ring */
+    --p-ring: rgba(77, 143, 255, 0.35);
+    --p-ring-strong: rgba(77, 143, 255, 0.65);
+  }
+}
+
 /* Opt-in scope for the pages that adopt the vp-views layout so existing pages
    with their own inline palettes stay untouched. */
 .vp-dark {
