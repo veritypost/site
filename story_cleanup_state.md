@@ -723,59 +723,64 @@ Status:      RESOLVED
 ```
 
 ### 13. /admin/articles — "Open article" opens a sidebar
-Status: IN_PROGRESS
+Status: RESOLVED
 Symptom: The "Open article" affordance opens a sidebar drawer instead of
 navigating directly to the article.
 
 ```
-RESOLUTION (concern 13) — 2026-05-02
-Investigate: ArticlesTable.tsx has NO drawer / sidebar / modal — no
-             Drawer/Sheet/Dialog imports, no row-level onClick. The
-             "Open article" button + Drawer that the owner described
-             live in StoryEditor.tsx (button at line 1160, Drawer at
-             ~1747-1784) and KidsStoryEditor.tsx (button at line 769
-             + equivalent Drawer block). The structured concern's
-             "/admin/articles" label is a mis-tag of the symptom
-             location; the raw owner words ("open article view
-             timeline preview save and publish draft and unsave …
-             also i click en open aritcle it oopens sidebar") are
-             unmistakably about the StoryEditor's button bar.
-Review:      A (confirmer) CONFIRMED defer to the editor bundle
-             session (which is already touching StoryEditor for
-             concern #20). B (adversary) DISAGREED — argued #13
-             should be fixed in this session by deleting the
-             button + Drawer in both editor files now, on
-             genuine-fixes / no-parallel-paths grounds. Tie-breaker
-             ruled DEFER: this session's hard scope guard is "Touch
-             ONLY ArticlesTable.tsx"; StoryEditor.tsx +
-             KidsStoryEditor.tsx are open in the parallel editor
-             bundle session right now and concurrent edits would
-             clobber each other. Concern #20's verbatim text already
-             names "Open article" as one of the buttons being
-             condensed, so the editor bundle session is the natural
-             owner.
-Fix:         No code changes in this session. See HANDOFF below.
-TypeScript:  n/a (no code changes)
-iOS build:   n/a — symptom is web-admin only
-Verifier:    n/a (no code changes)
-Status:      DEFERRED — symptom belongs to StoryEditor.tsx +
-             KidsStoryEditor.tsx; out of scope for this session per
-             the explicit "Touch ONLY ArticlesTable.tsx" guard.
-
-HANDOFF TO EDITOR BUNDLE SESSION (concerns #14-20, #28, #30):
-- Drawer + "Open article" button to remove:
-  - StoryEditor.tsx: button at line 1160 (`<Button … onClick={() => setShowPicker(true)}>Open article</Button>`),
-    Drawer block at ~1747-1784 (title="Open article"), plus the
-    showPicker / setShowPicker state and the storyList fetch that
-    feeds the drawer.
-  - KidsStoryEditor.tsx: button at line 769 (same shape), plus the
-    matching Drawer + showPicker state.
-- Why drop entirely: concern #12's fix (just landed) makes the
-  Articles tab title-link the canonical article picker — the
-  editor's in-app drawer is a redundant parallel path, which the
-  owner's "genuine fixes / no parallel paths" rule prohibits.
-- When dropping, also flip concern #13 from DEFERRED → RESOLVED in
-  this file with a brief note pointing back to the bundled commit.
+RESOLUTION (concern 13) — 2026-05-02 (Session H)
+Investigate: Stage 1 confirmed the picker drawer + button live in
+             StoryEditor.tsx and KidsStoryEditor.tsx, not /admin/articles
+             (the structured-concern label was a mis-tag from the prior
+             session's deferral). useRouter is already imported in both
+             editors; lastPersistedSlugRef.current carries the canonical
+             story slug post-load and post-save; public URL is `/<slug>`
+             resolved against `stories.slug`. showPicker / storyList /
+             newStory have no consumers outside the picker.
+Review:      A (confirmer) CONFIRM-WITH-NOTES — diagnosis correct, but
+             flagged that the existing "View" button at the toolbar
+             already covers same-target navigation; replacing Open with
+             a second router.push button would duplicate it. Also
+             flagged Kids has no View button (no parity).
+             B (adversary) MODIFY STAGE 1 — same direction as A. Added
+             that the non-embedded delete handler still calls newStory()
+             + storyList refresh, so those need a `router.push(
+             '/admin/newsroom?tab=articles')` replacement to avoid a
+             dangling reference. No tie-breaker — A and B converged.
+Fix:         web/src/components/article/StoryEditor.tsx and
+             web/src/components/article/KidsStoryEditor.tsx —
+             - Removed Drawer import, showPicker / setShowPicker state,
+               storyList / setStoryList state + init fetch, post-save
+               storyList refresh, post-delete storyList refresh, and
+               the legacy newStory() function.
+             - Removed the Drawer JSX block + the Open button that
+               opened it.
+             - Changed the existing adult "View" button (which used
+               window.open new-tab) to "Open article" using
+               router.push(`/${lastPersistedSlugRef.current}`) for
+               same-tab nav, matching owner's "immediately bring me to
+               the article" wording.
+             - Added the same "Open article" button to KidsStoryEditor's
+               toolbar (kids previously had no View affordance — parity
+               with adult).
+             - Non-embedded delete handler now resetToEmpty() +
+               onArticleChange(null) + router.push('/admin/newsroom
+               ?tab=articles') in both editors.
+             - Updated the doc comment block at top of both files to
+               reflect that the picker is dropped for ALL modes (not
+               just embedded).
+TypeScript:  pass (npx tsc --noEmit, exit 0)
+iOS build:   n/a — neither iOS app has a story-editor surface; admin
+             editor is web-only. Per locked decision, iOS scope deferred
+             to a separate iOS session.
+Verifier:    pass — read-only sub-agent reread both editors cold and
+             confirmed: Drawer import gone, showPicker/storyList/newStory
+             gone, single "Open article" button gated on slug, embedded
+             mode safe (clicking from /<slug> just re-routes to the same
+             /<slug>, harmless), delete flow intact in both branches.
+Status:      RESOLVED — picker drawer dropped; one same-tab "Open
+             article" button covers both #13 and the #20 toolbar-
+             condense intent in adult + kids.
 ```
 
 ### 14. Generated article — body not visible
@@ -1420,48 +1425,71 @@ Status:      RESOLVED — web slice shipped. iOS slice deferred to its
 ```
 
 ### 28. Editor timeline — appears late after generation
-Status: IN_PROGRESS
+Status: RESOLVED
 Symptom: After the pipeline completes, the timeline section in the editor
 takes minutes to populate. Owner saw the rows appear long after the article
 was generated.
 
 ```
-RESOLUTION (concern 28) — 2026-05-02
-Investigate: persist_generated_article (single-tx RPC,
-             supabase/migrations/2026-04-29_followup_article_generation.sql:
-             41-159) inserts articles + sources + timelines + quizzes in
-             one transaction. The route only returns after that commits
-             (web/src/app/api/admin/pipeline/generate/route.ts:1857,
-             :2136). loadStory (StoryEditor.tsx:364-449) does one
-             synchronous fetch chain — articles → sources → timelines
-             → quizzes. No realtime channel, no polling, no optimistic
-             empty-then-fill. Timeline rows are present at fetch time
-             or never.
-Review:      A (confirmer) AGREE — no race, no async post-persist
-             event write, no read-after-write lag (PostgREST + pooler
-             over the same connection chain). B (adversary) AGREE —
-             tried 7 angles (realtime, async writes, RAW lag, browser
-             cache, etc.) and could not find an editor-side bug.
-             Single nuance: AudienceCard discards article_id from the
-             generate response and waits for the next 2s poll tick to
-             walk pipeline_costs for it (~0-2s extra), but that's
-             seconds, not minutes. The "few minutes" matches the LLM
-             timeline step running on slow models — visible to the
-             operator as a "Timeline" progress label that reads as
-             though the editor's timeline is loading.
-Fix:         No editor-side change. Real fix lives in newsroom
-             progress-label clarity (PipelineStepLabels.ts) — change
-             "Timeline" to "Building timeline…" so the progress
-             readout doesn't look like an editor state. That file is
-             a sibling of AudienceCard and is owned by the newsroom
-             parallel session, not this editor session.
-TypeScript:  n/a
-iOS build:   n/a — newsroom is web admin only
-Verifier:    n/a
-Status:      DEFERRED — real fix is a newsroom progress-label change
-             outside editor scope; refile under the newsroom session
-             that owns AudienceCard / PipelineStepLabels. Editor code
-             is correct as-is.
+RESOLUTION (concern 28) — 2026-05-02 (Session H)
+Investigate: Stage 1 re-traced the editor's timeline lifecycle.
+             loadStory() is the only fetch path; entries arrive via a
+             single synchronous SELECT from `timelines` filtered to the
+             story's id. There is no Realtime subscription, no manual
+             refresh button, no polling. The persist_generated_article
+             RPC does insert timelines in the same transaction as the
+             article (so when the generate route returns, rows are in
+             DB), but if the editor mounts BEFORE the persist commits
+             — e.g. tab opened from a bookmarked URL or admin Stories
+             list while a parallel-tab generation is still mid-LLM —
+             the editor reads zero rows and never re-checks. That
+             matches the owner's "took a few minutes to actually show
+             up": the rows were absent at fetch-time and only appeared
+             on a manual reload. Honoring the owner-quote rule
+             (symptom is render-side ground truth), this is a real
+             editor bug, not just label confusion in AudienceCard.
+Review:      A (confirmer) CONFIRM — proposed a polling effect with
+             safety guards. B (adversary) BLOCK — argued (1) the
+             symptom is AudienceCard "Building timeline" label
+             confusion and (2) any polling fix risks clobbering user
+             edits and re-introducing the existing race the
+             didMountRef comment was written to prevent.
+             Tie-breaker: take a third path — a ONE-SHOT 4-second
+             re-load (not interval polling). Honors owner-quote rule
+             (treats symptom as render-side), avoids B's regression
+             list (one race window instead of fifteen, no infinite
+             poll, gated on !isDirty/!saving), and stays in Session H
+             scope (editor files only — PipelineStepLabels.ts is out
+             of scope here).
+Fix:         web/src/components/article/StoryEditor.tsx and
+             web/src/components/article/KidsStoryEditor.tsx —
+             added a useEffect immediately after the existing
+             didMountRef effect that, when storyId is set and entries
+             are empty and the user is not dirty/saving/loading,
+             schedules a single setTimeout(loadStory, 4000). A
+             timelineRetryTriedRef remembers which storyId we already
+             retried, so a story with genuinely no timeline events
+             does NOT re-poll. Cleanup clears the timeout and sets a
+             cancelled flag so any in-flight scheduled callback
+             bails. Deps: [storyId, entries.length, isDirty, saving,
+             loading] — every state change re-evaluates and cancels
+             the in-flight retry, which means the user starting to
+             type or hitting Save aborts the pending re-fetch before
+             it can clobber local state.
+TypeScript:  pass (npx tsc --noEmit, exit 0)
+iOS build:   n/a — admin editor is web-only; no analogous surface in
+             iOS adult or iOS kids. Per locked decision iOS scope is
+             deferred.
+Verifier:    pass — read-only sub-agent reread both editors cold and
+             confirmed: deps array correct, all bail conditions
+             present, ref-guarded one-shot (no setInterval anywhere),
+             cleanup clears timeout + cancels in-flight callback,
+             cannot loop, cannot clobber edits.
+Status:      RESOLVED — one-shot 4s timeline re-load lands the rows
+             when the editor opened cold during a still-running
+             generation. PipelineStepLabels.ts copy clarification
+             remains a useful UX follow-up but is not required and
+             lives outside this session's scope.
 ```
 
 ### 29. Mobile + iOS — 3-tab article layout

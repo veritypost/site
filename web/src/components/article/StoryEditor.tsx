@@ -1,22 +1,11 @@
 'use client';
 
 /**
- * Reusable adult story editor — the full legacy /admin/story-manager
- * surface, refactored as a component so /<slug> (in editor mode) and
- * /admin/story-manager can both mount it.
- *
- * Source: web/src/app/admin/story-manager/page.tsx (StoryEditorInner).
- * Behavior is preserved 1:1 except where `embedded` is true:
- *   - Page / PageHeader / PageSection chrome is dropped (the host page
- *     supplies its own layout).
- *   - The "Open article" picker (Drawer + storyList) is dropped — the
- *     host scopes the editor to a single article.
- *   - The "+ New article" / `newStory()` flow is dropped for the same
- *     reason; nav to a new article is the host's responsibility.
- *   - router.replace() calls are skipped; the host owns URL changes via
- *     `onArticleChange(id, slug?)`.
- *
- * The save endpoint stays /api/admin/articles/save unchanged.
+ * Reusable adult story editor. Mounts under /<slug> (embedded) and the
+ * legacy /admin/story-manager wrapper. Article picking is owned by
+ * /admin/newsroom (Articles tab); this editor never lists or switches
+ * articles itself. In embedded mode the host suppresses chrome and owns
+ * URL changes via `onArticleChange(id, slug?)`.
  */
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -33,7 +22,6 @@ import Textarea from '@/components/admin/Textarea';
 import Select from '@/components/admin/Select';
 import DatePicker from '@/components/admin/DatePicker';
 import Badge from '@/components/admin/Badge';
-import Drawer from '@/components/admin/Drawer';
 import Spinner from '@/components/admin/Spinner';
 import { confirm, ConfirmDialogHost } from '@/components/admin/ConfirmDialog';
 import { useToast } from '@/components/admin/Toast';
@@ -234,8 +222,6 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
   const [viewMode, setViewMode] = useState<'edit' | 'preview' | 'timeline'>('edit');
   const [isDirty, setIsDirty] = useState(false);
 
-  const [storyList, setStoryList] = useState<ArticleRow[]>([]);
-  const [showPicker, setShowPicker] = useState(false);
   const [destructive, setDestructive] = useState<DestructiveState>(null);
   const [saving, setSaving] = useState(false);
   const [regenQuizLoading, setRegenQuizLoading] = useState(false);
@@ -278,10 +264,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
         }
       }
 
-      // Picker list is only used by the legacy admin wrapper. Skip the
-      // 200-row articles fetch in embedded mode; saves a roundtrip on
-      // the /<slug> editor surface.
-      const categoriesP = supabase
+      const { data: categoriesData } = await supabase
         .from('categories')
         .select('id, name, parent_id, is_active, is_kids_safe, sort_order')
         .eq('is_active', true)
@@ -289,22 +272,12 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
         .order('sort_order', { ascending: true, nullsFirst: false })
         .order('name');
 
-      const storiesP = embedded
-        ? Promise.resolve({ data: [] as ArticleRow[] })
-        : supabase
-            .from('articles')
-            .select('*, categories!fk_articles_category_id(name)')
-            .order('created_at', { ascending: false })
-            .limit(200);
-
-      const [storiesRes, categoriesRes] = await Promise.all([storiesP, categoriesP]);
       if (cancelled) return;
-      setStoryList((storiesRes.data as unknown as ArticleRow[]) || []);
 
       // T-018: load parents + subs, group subs by parent name for the
       // dependent-Select. Matches the shape the old SUBCATEGORIES const
       // had so downstream lookup keys are unchanged.
-      const catRows = (categoriesRes.data || []) as Array<{
+      const catRows = (categoriesData || []) as Array<{
         id: string; name: string; parent_id: string | null;
       }>;
       const idToName: Record<string, string> = {};
@@ -347,6 +320,27 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [articleId]);
 
+  // One-shot timeline backfill. If loadStory landed before the
+  // generation pipeline finished writing timeline rows, retry once
+  // after 4s. Bails when the user starts editing or any rows arrive;
+  // remembers the storyId we tried so genuinely empty articles don't
+  // re-poll.
+  const timelineRetryTriedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!storyId) return;
+    if (entries.length > 0) return;
+    if (isDirty || saving || loading) return;
+    if (timelineRetryTriedRef.current === storyId) return;
+    let cancelled = false;
+    const t = setTimeout(() => {
+      if (cancelled) return;
+      timelineRetryTriedRef.current = storyId;
+      loadStory(storyId);
+    }, 4000);
+    return () => { cancelled = true; clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storyId, entries.length, isDirty, saving, loading]);
+
   const resetToEmpty = () => {
     setStory(EMPTY_STORY);
     setStoryId(null);
@@ -355,7 +349,6 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
     setQuizzes([]);
     setExpandedEntry(null);
     setIsDirty(false);
-    setShowPicker(false);
     setArticleAgeBand(null);
     setFollowupOpen(false);
     setFollowupSourceUrls('');
@@ -498,18 +491,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
     }
 
     setIsDirty(false);
-    setShowPicker(false);
     setLoading(false);
-  };
-
-  const newStory = () => {
-    resetToEmpty();
-    if (embedded) {
-      onArticleChange?.(null);
-    } else {
-      onArticleChange?.(null);
-      try { router.replace('/admin/story-manager'); } catch { /* noop */ }
-    }
   };
 
   const updateStory = <K extends keyof StoryForm>(key: K, val: StoryForm[K]) => {
@@ -961,14 +943,6 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
       }
 
       setIsDirty(false);
-      if (!embedded) {
-        const { data: refreshed } = await supabase
-          .from('articles')
-          .select('*, categories!fk_articles_category_id(name)')
-          .order('created_at', { ascending: false })
-          .limit(200);
-        setStoryList((refreshed as unknown as ArticleRow[]) || []);
-      }
       toast.push({ message: 'Article saved.', variant: 'success' });
     } catch (err) {
       toast.push({ message: (err as Error)?.message || 'Save failed', variant: 'danger' });
@@ -1006,20 +980,9 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
           throw new Error(j.error || 'Delete failed');
         }
         toast.push({ message: 'Article deleted', variant: 'success' });
-        if (embedded) {
-          // Host decides where to send the user after a delete (typically
-          // /admin/newsroom). Clear local state regardless.
-          resetToEmpty();
-          onArticleChange?.(null);
-        } else {
-          newStory();
-          const { data: refreshed } = await supabase
-            .from('articles')
-            .select('*, categories!fk_articles_category_id(name)')
-            .order('created_at', { ascending: false })
-            .limit(200);
-          setStoryList((refreshed as unknown as ArticleRow[]) || []);
-        }
+        resetToEmpty();
+        onArticleChange?.(null);
+        if (!embedded) router.push('/admin/newsroom?tab=articles');
       },
     });
   };
@@ -1166,16 +1129,13 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
     <>
       {isDirty && <Badge variant="warn">Unsaved</Badge>}
       <Badge variant={story.status === 'published' ? 'success' : 'neutral'} dot>{story.status}</Badge>
-      {!embedded && (
-        <Button variant="secondary" size="sm" onClick={() => setShowPicker(true)}>Open</Button>
-      )}
       {lastPersistedSlugRef.current && (
         <Button
           variant="secondary"
           size="sm"
-          onClick={() => window.open(`/${lastPersistedSlugRef.current}`, '_blank', 'noopener,noreferrer')}
+          onClick={() => router.push(`/${lastPersistedSlugRef.current}`)}
         >
-          View
+          Open article
         </Button>
       )}
       <Button variant="secondary" size="sm" onClick={() => setViewMode('timeline')}>Timeline</Button>
@@ -1722,45 +1682,6 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
         actions={headerActions}
       />
       {editorBody}
-
-      <Drawer
-        open={showPicker}
-        onClose={() => setShowPicker(false)}
-        title="Open article"
-        description="Switch to an existing article or start a new one."
-        width="md"
-        footer={<Button variant="primary" onClick={newStory}>+ New article</Button>}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: S[1] }}>
-          {storyList.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => {
-                setShowPicker(false);
-                onArticleChange?.(s.id);
-                if (s.id !== storyId) loadStory(s.id);
-              }}
-              style={{
-                textAlign: 'left',
-                padding: `${S[2]}px ${S[3]}px`,
-                borderRadius: 8,
-                border: `1px solid ${s.id === storyId ? C.accent : C.divider}`,
-                background: s.id === storyId ? C.hover : C.bg,
-                cursor: 'pointer',
-                color: C.ink,
-                fontFamily: 'inherit',
-              }}
-            >
-              <div style={{ fontWeight: 600 }}>{s.title || 'Untitled'}</div>
-              <div style={{ fontSize: F.xs, color: C.dim }}>
-                {s.categories?.name || '—'} · {s.status || 'draft'} · {s.created_at ? new Date(s.created_at).toISOString().split('T')[0] : '—'}
-              </div>
-            </button>
-          ))}
-          {storyList.length === 0 && <div style={{ color: C.dim, fontSize: F.sm, padding: S[3] }}>No articles yet.</div>}
-        </div>
-      </Drawer>
 
       <DestructiveActionConfirm
         open={!!destructive}

@@ -1,21 +1,11 @@
 'use client';
 
 /**
- * Reusable kids story editor — the full legacy
- * /admin/kids-story-manager surface, refactored as a component so
- * /<slug> (in editor mode) and /admin/kids-story-manager can both
- * mount it.
- *
- * Source: web/src/app/admin/kids-story-manager/page.tsx
- * (KidsStoryManagerInner). Behavior is preserved 1:1 except where
- * `embedded` is true:
- *   - Page / PageHeader / PageSection chrome is dropped.
- *   - The "Open article" picker (Drawer + storyList) is dropped.
- *   - The "+ New article" / `newStory()` flow is dropped.
- *   - router-driven URL changes are skipped; the host owns navigation
- *     via `onArticleChange(id, slug?)`.
- *
- * The save endpoint stays /api/admin/articles/save unchanged.
+ * Reusable kids story editor. Mounts under /<slug> (embedded) and the
+ * legacy /admin/kids-story-manager wrapper. Article picking is owned
+ * by /admin/newsroom (Articles tab); this editor never lists or
+ * switches articles itself. In embedded mode the host suppresses
+ * chrome and owns URL changes via `onArticleChange(id, slug?)`.
  */
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -32,7 +22,6 @@ import Textarea from '@/components/admin/Textarea';
 import Select from '@/components/admin/Select';
 import DatePicker from '@/components/admin/DatePicker';
 import Badge from '@/components/admin/Badge';
-import Drawer from '@/components/admin/Drawer';
 import Spinner from '@/components/admin/Spinner';
 import { confirm, ConfirmDialogHost } from '@/components/admin/ConfirmDialog';
 import { useToast } from '@/components/admin/Toast';
@@ -191,8 +180,6 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
   const [isDirty, setIsDirty] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const [storyList, setStoryList] = useState<ArticleRow[]>([]);
-  const [showPicker, setShowPicker] = useState(false);
   const [categories, setCategories] = useState<KidsCategory[]>([]);
   const [subcategories, setSubcategories] = useState<Record<string, KidsCategory[]>>({});
   const [destructive, setDestructive] = useState<DestructiveState>(null);
@@ -241,22 +228,6 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
       setCategories(parents);
       setSubcategories(subsByParentName);
 
-      // Picker list is only used by the legacy admin wrapper.
-      if (!embedded) {
-        // Kids Story Manager is scoped to age_band='kids' specifically.
-        // NULL age_band rows surface here as legacy single-tier kid content.
-        const { data: stories } = await supabase
-          .from('articles')
-          .select('*, categories!fk_articles_category_id!inner(name, is_kids_safe)')
-          .eq('categories.is_kids_safe', true)
-          .or('age_band.eq.kids,age_band.is.null')
-          .order('created_at', { ascending: false })
-          .limit(200);
-
-        if (cancelled) return;
-        setStoryList((stories as unknown as ArticleRow[]) || []);
-      }
-
       if (articleId) {
         await loadStory(articleId);
       } else {
@@ -282,6 +253,23 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [articleId]);
 
+  // One-shot timeline backfill — see StoryEditor for rationale.
+  const timelineRetryTriedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!storyId) return;
+    if (entries.length > 0) return;
+    if (isDirty || saving || loading) return;
+    if (timelineRetryTriedRef.current === storyId) return;
+    let cancelled = false;
+    const t = setTimeout(() => {
+      if (cancelled) return;
+      timelineRetryTriedRef.current = storyId;
+      loadStory(storyId);
+    }, 4000);
+    return () => { cancelled = true; clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storyId, entries.length, isDirty, saving, loading]);
+
   const resetToEmpty = () => {
     setStory(EMPTY_STORY);
     setStoryId(null);
@@ -290,7 +278,6 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
     setQuizzes([]);
     setExpandedEntry(null);
     setIsDirty(false);
-    setShowPicker(false);
   };
 
   const loadStory = async (id: string) => {
@@ -393,13 +380,7 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
     }
 
     setIsDirty(false);
-    setShowPicker(false);
     setLoading(false);
-  };
-
-  const newStory = () => {
-    resetToEmpty();
-    onArticleChange?.(null);
   };
 
   const updateStory = <K extends keyof StoryForm>(key: K, val: StoryForm[K]) => {
@@ -573,17 +554,6 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
         onArticleChange?.(savedStoryId, slug);
       }
 
-      if (!embedded) {
-        // Phase 3: refetch scoped to age_band='kids' (or null for legacy).
-        const { data: refreshed } = await supabase
-          .from('articles')
-          .select('*, categories!fk_articles_category_id!inner(name, is_kids_safe)')
-          .eq('categories.is_kids_safe', true)
-          .or('age_band.eq.kids,age_band.is.null')
-          .order('created_at', { ascending: false })
-          .limit(200);
-        setStoryList((refreshed as unknown as ArticleRow[]) || []);
-      }
       toast.push({ message: 'Kids article saved', variant: 'success' });
     } catch (err) {
       toast.push({ message: (err as Error)?.message || 'Save failed', variant: 'danger' });
@@ -621,21 +591,9 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
           throw new Error(j.error || 'Delete failed');
         }
         toast.push({ message: 'Kids article deleted', variant: 'success' });
-        if (embedded) {
-          resetToEmpty();
-          onArticleChange?.(null);
-        } else {
-          newStory();
-          // Phase 3: refetch scoped to age_band='kids' (or null for legacy).
-          const { data: refreshed } = await supabase
-            .from('articles')
-            .select('*, categories!inner(name, is_kids_safe)')
-            .eq('categories.is_kids_safe', true)
-            .or('age_band.eq.kids,age_band.is.null')
-            .order('created_at', { ascending: false })
-            .limit(200);
-          setStoryList((refreshed as unknown as ArticleRow[]) || []);
-        }
+        resetToEmpty();
+        onArticleChange?.(null);
+        if (!embedded) router.push('/admin/newsroom?tab=articles');
       },
     });
   };
@@ -769,8 +727,14 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
       {isDirty && <Badge variant="warn">Unsaved</Badge>}
       <Badge variant="info">Kids</Badge>
       <Badge variant={story.status === 'published' ? 'success' : 'neutral'} dot>{story.status}</Badge>
-      {!embedded && (
-        <Button variant="secondary" size="sm" onClick={() => setShowPicker(true)}>Open</Button>
+      {lastPersistedSlugRef.current && (
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => router.push(`/${lastPersistedSlugRef.current}`)}
+        >
+          Open article
+        </Button>
       )}
       <Button variant="secondary" size="sm" onClick={() => setViewMode('timeline')}>Timeline</Button>
       <Button variant="secondary" size="sm" onClick={() => setViewMode('preview')}>Preview</Button>
@@ -1191,45 +1155,6 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
         actions={headerActions}
       />
       {editorBody}
-
-      <Drawer
-        open={showPicker}
-        onClose={() => setShowPicker(false)}
-        title="Open kids article"
-        description="Switch to an existing kids article or start a new one."
-        width="md"
-        footer={<Button variant="primary" onClick={newStory}>+ New kids article</Button>}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: S[1] }}>
-          {storyList.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => {
-                setShowPicker(false);
-                onArticleChange?.(s.id);
-                if (s.id !== storyId) loadStory(s.id);
-              }}
-              style={{
-                textAlign: 'left',
-                padding: `${S[2]}px ${S[3]}px`,
-                borderRadius: 8,
-                border: `1px solid ${s.id === storyId ? C.accent : C.divider}`,
-                background: s.id === storyId ? C.hover : C.bg,
-                cursor: 'pointer',
-                color: C.ink,
-                fontFamily: 'inherit',
-              }}
-            >
-              <div style={{ fontWeight: 600 }}>{s.title || 'Untitled'}</div>
-              <div style={{ fontSize: F.xs, color: C.dim }}>
-                {s.categories?.name || '—'} · {s.status || 'draft'} · {s.created_at ? new Date(s.created_at).toISOString().split('T')[0] : '—'}
-              </div>
-            </button>
-          ))}
-          {storyList.length === 0 && <div style={{ color: C.dim, fontSize: F.sm, padding: S[3] }}>No kids articles yet.</div>}
-        </div>
-      </Drawer>
 
       <DestructiveActionConfirm
         open={!!destructive}
