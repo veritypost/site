@@ -53,7 +53,6 @@ type Props = {
   mergeMode?: boolean;
   mergeSelected?: boolean;
   onMergeToggle?: (clusterId: string) => void;
-  onMuteOutlet?: (outletName: string) => void;
   selectedModelIdx?: number;
 };
 
@@ -85,7 +84,6 @@ export default function StoryCard({
   mergeMode,
   mergeSelected,
   onMergeToggle,
-  onMuteOutlet,
   selectedModelIdx = 0,
 }: Props) {
   const [selectedUrls, setSelectedUrls] = useState<Set<string>>(
@@ -132,7 +130,8 @@ export default function StoryCard({
     });
   }, []);
 
-  const selectedSourceUrlsArray = Array.from(selectedUrls);
+  const attachAsSourceUrlsArray = Array.from(selectedUrls);
+  const allSourceUrlsArray = visibleSources.map((s) => s.url);
 
   const workingHeadline =
     visibleSources[0]?.title?.trim() || cluster.title?.trim() || 'No working headline yet';
@@ -204,7 +203,8 @@ export default function StoryCard({
               initialErrorType={run?.error_type ?? null}
               initialErrorStep={null}
               workingHeadline={workingHeadline}
-              selectedSourceUrls={selectedSourceUrlsArray}
+              allSourceUrls={allSourceUrlsArray}
+              attachAsSourceUrls={attachAsSourceUrlsArray}
               selectedModelIdx={selectedModelIdx}
             />
           );
@@ -217,7 +217,6 @@ export default function StoryCard({
           selectedUrls={selectedUrls}
           onToggle={handleToggleUrl}
           onRemove={handleRemoveSource}
-          onMuteOutlet={onMuteOutlet}
         />
         {removeError && (
           <div style={{ padding: `0 ${S[4]}px ${S[2]}px`, fontSize: F.sm, color: C.danger }}>

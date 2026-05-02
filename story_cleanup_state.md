@@ -1743,7 +1743,7 @@ each call site in try/catch (many-place fix). Owner-locked decision
 needed before implementation.
 
 ### 31. Mute outlet — rip out, change selection semantics
-Status: PENDING
+Status: RESOLVED
 Symptom: "Mute outlet" UI is dead weight. Owner wants it removed entirely.
 Replacement behavior for the source checkbox on each Story:
   - Unchecked source = NOT attached to the published article as a "source"
@@ -1755,6 +1755,144 @@ Replacement behavior for the source checkbox on each Story:
     see it AND it can't be attached. We need to split these concerns.
 Surfaces: AudienceCard generate POST + StoryCard sources block + the
 mute modal in newsroom page.tsx + any mute-outlet API route.
+
+```
+RESOLUTION (concern 31) — 2026-05-02 (Session J)
+Investigate: Stage 1 mapped every surface. Mute UI lives in 4 web-admin
+             files: SourcesBlock.tsx (in-row "Mute outlet" button on each
+             source line, behind onMuteOutlet prop), StoryCard.tsx (prop
+             pass-through), page.tsx (4 useStates + handleMuteConfirm +
+             mute modal JSX + setMutingOutlet pass to StoryCard), and
+             outlets/mute/route.ts (the mute API). DB read-side: ingest/
+             run/route.ts queries muted_outlets to skip muted feeds. DB
+             schema: muted_outlets has 0 rows, no FKs in/out, no views,
+             0 audit_log rows for action LIKE 'outlet.%'; two RPCs
+             (upsert_muted_outlet, delete_muted_outlet) reference it.
+             Today's `source_urls` from AudienceCard is the
+             override-branch filter — it both narrows AI corpus AND the
+             persisted `public.sources` rows. Locked decision splits
+             these: the new POST body sends `source_urls` (full visible
+             list, AI context) AND `attach_as_source_urls` (subset to
+             persist). Persist filter happens at the
+             sourcesPayload `.map()` site, leaving `corpus` (line 1177)
+             unchanged. Categorized (c)+(d): intentional rip + new
+             feature; not a latent bug repair. iOS confirmed N/A —
+             grep finds zero references in VerityPost/ + VerityPostKids/.
+Review:      A (confirmer) re-derived independently. Verified all line
+             numbers match, the corpus-vs-persist filter is semantically
+             safe (filtering at map call doesn't mutate sourceTexts
+             already consumed by corpus). Two real gaps: (1) the source-
+             of-truth migration 20260503000002_feeds_priority_topic.sql
+             still creates muted_outlets, so a `supabase db reset`
+             would resurrect the dropped table — paired forward
+             migration needed; (2) Stage 1's `attach_as_source_urls`
+             cap was `.max(20)` while `source_urls` was still `.max(10)`
+             → silent break for any cluster with >10 sources. Verdict:
+             PARTIAL.
+             B (adversary) ran 12 attacks A-L. Refuted A (URL identity:
+             discovery_items.raw_url flows verbatim through the override
+             path, no canonicalization), C (standalone-mode no
+             interaction), D (kid pipeline shares the single
+             sourcesPayload site), E (visibleSources matches override-
+             path URLs), G (Remove button is server-side detach, not in
+             scope), H (NewArticleModal sends source_urls only, default
+             attaches all), J (zero iOS surfaces), K (persist RPC has no
+             min-source check — empty attach is safe), L (no scheduled
+             jobs hit ingest, code-vs-SQL ordering moot). Confirmed B/F
+             pre-existing (override branch already used today; selectedUrls
+             init invariant unchanged by this fix). Strongest finding
+             converged with A: cap mismatch. PARTIAL.
+             A and B converged on raise-both-caps + add forward migration.
+             A's empty-guard concern (operator publishes zero-source
+             article) is implementation of the locked decision verbatim;
+             not a divergence. B's retry-route forward gap is pre-
+             existing and out of #31 scope (Stage 1 didn't include
+             retry/route.ts). No tie-breaker needed.
+Fix:         web/src/app/admin/newsroom/_components/SourcesBlock.tsx —
+             dropped `onMuteOutlet?` prop + destructure + 19-line
+             "Mute outlet" button JSX block (was lines 128-146).
+             web/src/app/admin/newsroom/_components/StoryCard.tsx —
+             dropped `onMuteOutlet` prop/destructure/pass-through;
+             renamed `selectedSourceUrlsArray` → `attachAsSourceUrlsArray`;
+             added `allSourceUrlsArray = visibleSources.map(s => s.url)`;
+             AudienceCard now receives both via new prop names.
+             web/src/app/admin/newsroom/_components/AudienceCard.tsx —
+             replaced `selectedSourceUrls?: string[]` with
+             `allSourceUrls?: string[]` + `attachAsSourceUrls?: string[]`.
+             Empty-guard condition + copy switched to
+             `'Cluster has no sources to send.'` (only fires when
+             cluster genuinely has zero sources). POST body sends both
+             fields when defined. useCallback deps updated.
+             web/src/app/admin/newsroom/page.tsx — deleted 4 mute-modal
+             useStates, `handleMuteConfirm` async fn, `onMuteOutlet`
+             prop pass to StoryCard, the entire `<Modal title="Mute
+             outlet">` JSX block. Modal/Field imports kept (still used
+             by NewArticleModal).
+             web/src/app/api/admin/pipeline/generate/route.ts — added
+             `attach_as_source_urls: z.array(SourceUrlSchema).max(20).optional()`
+             to RequestSchema; raised `source_urls.max(10)` →
+             `.max(20)` to match (per Stage 2 convergent fix); added
+             `attach_as_source_urls` to the destructure; replaced the
+             unconditional `sourcesPayload = sourceTexts.map(...)` with
+             a filter against an attachSet (null when omitted = legacy
+             attach-all default; empty array = attach none). corpus
+             build at line 1177 unchanged — AI still sees every source.
+             web/src/app/api/admin/articles/new-draft/route.ts —
+             matched cap raise: `source_urls.min(1).max(20)`.
+             web/src/app/api/newsroom/ingest/run/route.ts — stripped
+             `mutedRows` query, `mutedSet`, `feedsMuted` counter,
+             skip-if-muted block, and `feedsMuted` from both the audit
+             output and JSON response.
+             DELETED: web/src/app/api/admin/newsroom/outlets/mute/route.ts
+             (171-line file) and the now-empty `outlets/` parent dir.
+             NEW: supabase/migrations/20260503000004_drop_muted_outlets.sql
+             — DROP FUNCTION upsert_muted_outlet, DROP FUNCTION
+             delete_muted_outlet, DROP TABLE muted_outlets CASCADE.
+             Owner runs forward (or `supabase db push` does on next
+             deploy).
+TypeScript:  pass (npx tsc --noEmit from web/, exit 0)
+iOS build:   n/a — grep across VerityPost/ + VerityPostKids/ returned
+             zero references to mute outlet, attach_as_source, or
+             allSourceUrls.
+Verifier:    pass — 12/12 checks. Generate POST body splits correctly,
+             empty-guard reads from allSourceUrls, StoryCard derives
+             allSourceUrlsArray from visibleSources, page.tsx + ingest/
+             run cleanup leaves no orphan refs, generate route
+             sourcesPayload filter handles both undefined (attach all)
+             and empty-array (attach none) cases without touching
+             corpus, new-draft cap raised in lockstep, mute API + dir
+             both gone, forward migration order is correct, repo-wide
+             sweep finds zero residual refs outside the two migration
+             files (history + new drop), iOS sweep clean.
+Status:      RESOLVED — operator can confirm by:
+             (1) opening newsroom and verifying no "Mute outlet" button
+                 on any source row and no mute modal trigger
+             (2) generating a story with one source unchecked: the
+                 generated article should have one fewer `public.sources`
+                 row, but the AI's content reflects the unchecked
+                 source's content (corpus reaches it via the new
+                 `source_urls` full list)
+             (3) running `supabase db push` (or executing the new
+                 migration manually) to drop the muted_outlets table
+                 + its two RPCs.
+             Out-of-scope adjacencies surfaced for future concerns:
+             - Retry route at runs/[id]/retry/route.ts:102-108 doesn't
+               forward `source_urls` or `attach_as_source_urls` from
+               the original run's input_params; pre-existing gap, more
+               visible after this split (retry of a partial-attach run
+               will fall back to attach-all default). Worth a follow-up
+               concern.
+             - selectedUrls/visibleSources state-staleness on parent
+               reload (StoryCard.tsx:91-94) — useState init runs once,
+               so newly-ingested sources mid-poll won't appear in the
+               checkbox list and won't reach allSourceUrls. Pre-existing,
+               unchanged here, but worth a follow-up if the operator
+               keeps a long-running newsroom page open during ingest.
+             - Scratch md/sql files at repo root (newsroom_upgrade.sql,
+               newsroom_upgrade_state.md, prompt.md) reference the
+               dropped surfaces; per CLAUDE.md memory feedback_no_external_working_dirs
+               these are scratch and out of scope.
+```
 
 ### 33. AudienceCard polling — articleId never updates on live transition
 Status: RESOLVED

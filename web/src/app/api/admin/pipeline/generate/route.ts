@@ -130,7 +130,12 @@ const RequestSchema = z.object({
   freeform_instructions: z.string().max(2000).optional(),
   provider: z.enum(['anthropic', 'openai']).default('anthropic'),
   model: z.string().min(3).max(100).default('claude-sonnet-4-6'),
-  source_urls: z.array(SourceUrlSchema).max(10).optional(),
+  source_urls: z.array(SourceUrlSchema).max(20).optional(),
+  // Subset of source_urls to persist as `public.sources` rows on the
+  // published article. Omitted = attach every source_urls entry (legacy
+  // default). Empty array = attach none (operator deliberately publishes
+  // with no source attribution; corpus still feeds the AI).
+  attach_as_source_urls: z.array(SourceUrlSchema).max(20).optional(),
   mode: z.enum(['cluster', 'standalone']).optional(),
   existing_story_id: z.string().uuid().optional(),
   category_id: z.string().uuid().optional(),
@@ -498,7 +503,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
   }
 
-  const { audience, freeform_instructions, provider, model, source_urls, mode } = input;
+  const { audience, freeform_instructions, provider, model, source_urls, attach_as_source_urls, mode } = input;
   const effectiveAgeBand: 'kids' | 'tweens' | 'adult' =
     audience === 'kid' ? (input.age_band ?? 'kids') : 'adult';
   // De-dupe + drop empties; the schema already trimmed + validated each entry.
@@ -1785,13 +1790,21 @@ Empty array if all correct.`;
     // 9n. Assemble persist payload
     // ────────────────────────────────────────────────────────────────────────
     const bodyHtml = renderBodyHtml(finalBodyMarkdown);
-    const sourcesPayload: PersistArticleSource[] = sourceTexts.map((s, i) => ({
-      title: s.outlet,
-      url: s.url,
-      publisher: s.outlet,
-      quote: s.text.slice(0, 500),
-      sort_order: i,
-    }));
+    // attach_as_source_urls (when provided) selects which sourceTexts entries
+    // become `public.sources` rows on the published article. Entries omitted
+    // from the attach set still feed `corpus` above — operator chose to use
+    // them as AI context only.
+    const attachSet =
+      attach_as_source_urls !== undefined ? new Set(attach_as_source_urls) : null;
+    const sourcesPayload: PersistArticleSource[] = sourceTexts
+      .filter((s) => attachSet === null || attachSet.has(s.url))
+      .map((s, i) => ({
+        title: s.outlet,
+        url: s.url,
+        publisher: s.outlet,
+        quote: s.text.slice(0, 500),
+        sort_order: i,
+      }));
     const timelinePayload: PersistArticleTimelineEntry[] = timelineParsed.events.map((e, i) => ({
       title: e.event_label,
       description: e.event_body ?? null,

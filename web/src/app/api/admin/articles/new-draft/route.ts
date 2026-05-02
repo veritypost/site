@@ -54,7 +54,7 @@ const RequestSchema = z.discriminatedUnion('mode', [
   z.object({
     mode: z.literal('ai_generate'),
     audience: z.enum(['adult', 'tweens', 'kids']),
-    source_urls: z.array(SourceUrlSchema).min(1).max(10),
+    source_urls: z.array(SourceUrlSchema).min(1).max(20),
     topic: z.string().trim().max(500).optional(),
     provider: z.enum(['anthropic', 'openai']).optional(),
     model: z.string().min(3).max(100).optional(),

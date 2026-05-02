@@ -25,10 +25,9 @@ type Props = {
   selectedUrls?: Set<string>;
   onToggle?: (url: string, checked: boolean) => void;
   onRemove?: (id: string) => Promise<void>;
-  onMuteOutlet?: (outletName: string) => void;
 };
 
-export default function SourcesBlock({ sources, selectedUrls, onToggle, onRemove, onMuteOutlet }: Props) {
+export default function SourcesBlock({ sources, selectedUrls, onToggle, onRemove }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
@@ -125,25 +124,6 @@ export default function SourcesBlock({ sources, selectedUrls, onToggle, onRemove
               >
                 {s.title || s.url}
               </a>
-              {onMuteOutlet && s.outlet_name && s.outlet_name !== 'Unknown source' && (
-                <button
-                  type="button"
-                  onClick={() => onMuteOutlet(s.outlet_name)}
-                  style={{
-                    background: 'transparent',
-                    border: `1px solid ${C.border}`,
-                    borderRadius: 4,
-                    padding: `2px ${S[2]}px`,
-                    fontSize: F.xs,
-                    color: C.dim,
-                    cursor: 'pointer',
-                    flexShrink: 0,
-                    fontFamily: 'inherit',
-                  }}
-                >
-                  Mute outlet
-                </button>
-              )}
               {onRemove && (
                 <button
                   type="button"

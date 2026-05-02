@@ -210,16 +210,6 @@ export async function POST(req: Request) {
       (a, b) => (b.priority_weight ?? 5) - (a.priority_weight ?? 5)
     );
 
-    // Load currently-active mutes (BEFORE HTTP fetches to avoid adding latency to the fanout)
-    // muted_outlets is a Wave 1 table not yet in generated DB types — use serviceAny.
-    const { data: mutedRows } = await serviceAny
-      .from('muted_outlets')
-      .select('outlet_name')
-      .gt('muted_until', new Date().toISOString());
-    const mutedSet = new Set(
-      ((mutedRows ?? []) as { outlet_name: string }[]).map((r) => r.outlet_name.toLowerCase())
-    );
-
     // 7. Fetch all feeds — full Promise.allSettled fanout, 6s timeout per feed.
     // Promise.allSettled preserves input order in results, so higher-weight feeds
     // appear first in fetchResults, matching the sorted feeds array above.
@@ -229,7 +219,6 @@ export async function POST(req: Request) {
 
     let feedsSucceeded = 0;
     let feedsFailed = 0;
-    let feedsMuted = 0;
     const allItems: FlatItem[] = [];
 
     // 8. Flatten — ignore items without .link
@@ -237,12 +226,6 @@ export async function POST(req: Request) {
       if (result.status === 'fulfilled') {
         feedsSucceeded++;
         const { feed, rss } = result.value;
-
-        const feedOutlet = ((feed.source_name || feed.name) ?? '').toLowerCase();
-        if (mutedSet.has(feedOutlet)) {
-          feedsMuted++;
-          continue;
-        }
 
         const items = rss?.items ?? [];
         const allowedSlugs = feed.allowed_category_slugs ?? [];
@@ -544,7 +527,6 @@ export async function POST(req: Request) {
     const output: Json = {
       feedsSucceeded,
       feedsFailed,
-      feedsMuted,
       itemsInserted,
       itemsSkipped,
       itemsRaceDeduped, // M6 — surface concurrent-ingest dedup count
@@ -593,7 +575,6 @@ export async function POST(req: Request) {
       runId,
       feedsSucceeded,
       feedsFailed,
-      feedsMuted,
       totalScanned: itemsProcessed,
       itemsInserted,
       skippedDuplicates,

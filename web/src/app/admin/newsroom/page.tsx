@@ -265,12 +265,6 @@ function DiscoveryTab({
   const [mergeMode, setMergeMode] = useState(false);
   const [mergeSelected, setMergeSelected] = useState<string[]>([]);
 
-  // Mute modal state
-  const [mutingOutlet, setMutingOutlet] = useState<string | null>(null);
-  const [muteDays, setMuteDays] = useState(7);
-  const [muteBusy, setMuteBusy] = useState(false);
-  const [muteError, setMuteError] = useState<string | null>(null);
-
   // Categories for filter select (parent_id powers the subcategory cascade)
   const [categories, setCategories] = useState<
     Array<{ id: string; name: string; slug: string; parent_id: string | null }>
@@ -389,31 +383,6 @@ function DiscoveryTab({
       await reload();
     } catch (err) {
       toast.push({ message: err instanceof Error ? err.message : 'Network error', variant: 'danger' });
-    }
-  }
-
-  async function handleMuteConfirm() {
-    if (!mutingOutlet) return;
-    setMuteBusy(true);
-    setMuteError(null);
-    try {
-      const res = await fetch('/api/admin/newsroom/outlets/mute', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ outlet_name: mutingOutlet, days: muteDays }),
-      });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        setMuteError(body.error ?? 'Mute failed');
-        return;
-      }
-      toast.push({ message: `Outlet muted for ${muteDays} day${muteDays === 1 ? '' : 's'}.`, variant: 'success' });
-      setMutingOutlet(null);
-      setMuteDays(7);
-    } catch (err) {
-      setMuteError(err instanceof Error ? err.message : 'Network error');
-    } finally {
-      setMuteBusy(false);
     }
   }
 
@@ -616,7 +585,6 @@ function DiscoveryTab({
               mergeMode={mergeMode}
               mergeSelected={mergeSelected.includes(row.cluster.id)}
               onMergeToggle={handleMergeToggle}
-              onMuteOutlet={setMutingOutlet}
               selectedModelIdx={selectedModelIdx}
             />
           ))}
@@ -624,47 +592,6 @@ function DiscoveryTab({
       )}
 
       {newOpen && <NewArticleModal onClose={() => setNewOpen(false)} />}
-
-      {/* Mute outlet modal */}
-      {mutingOutlet && (
-        <Modal
-          open
-          title={`Mute outlet`}
-          description={`Suppress articles from "${mutingOutlet}" for a set period.`}
-          onClose={() => { setMutingOutlet(null); setMuteError(null); setMuteDays(7); }}
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: S[3] }}>
-            <Field label="Mute duration">
-              <Select
-                value={String(muteDays)}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setMuteDays(Number(e.target.value))}
-              >
-                <option value="1">1 day</option>
-                <option value="3">3 days</option>
-                <option value="7">7 days</option>
-                <option value="14">14 days</option>
-                <option value="30">30 days</option>
-              </Select>
-            </Field>
-            {muteError && (
-              <div style={{ fontSize: F.sm, color: C.danger }}>{muteError}</div>
-            )}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: S[2] }}>
-              <Button
-                onClick={() => { setMutingOutlet(null); setMuteError(null); setMuteDays(7); }}
-                variant="ghost"
-                size="sm"
-                disabled={muteBusy}
-              >
-                Cancel
-              </Button>
-              <Button onClick={handleMuteConfirm} variant="primary" size="sm" disabled={muteBusy}>
-                {muteBusy ? 'Muting…' : `Mute for ${muteDays} day${muteDays === 1 ? '' : 's'}`}
-              </Button>
-            </div>
-          </div>
-        </Modal>
-      )}
     </div>
   );
 }

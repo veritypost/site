@@ -46,7 +46,8 @@ export type AudienceCardProps = {
   initialErrorType: string | null;
   initialErrorStep: string | null;
   workingHeadline: string;
-  selectedSourceUrls?: string[];
+  allSourceUrls?: string[];
+  attachAsSourceUrls?: string[];
   selectedModelIdx?: number;
 };
 
@@ -98,7 +99,8 @@ function AudienceCard(props: AudienceCardProps) {
     initialErrorType,
     initialErrorStep,
     workingHeadline,
-    selectedSourceUrls,
+    allSourceUrls,
+    attachAsSourceUrls,
     selectedModelIdx = 0,
   } = props;
 
@@ -216,8 +218,8 @@ function AudienceCard(props: AudienceCardProps) {
   }, [state, articleId, fetchArticleStatus]);
 
   const handleGenerate = useCallback(async () => {
-    if (selectedSourceUrls !== undefined && selectedSourceUrls.length === 0) {
-      setActionError('Select at least one source before generating.');
+    if (allSourceUrls !== undefined && allSourceUrls.length === 0) {
+      setActionError('Cluster has no sources to send.');
       return;
     }
     setBusy(true);
@@ -233,7 +235,8 @@ function AudienceCard(props: AudienceCardProps) {
           ...apiAudience,
           provider,
           model,
-          ...(selectedSourceUrls !== undefined ? { source_urls: selectedSourceUrls } : {}),
+          ...(allSourceUrls !== undefined ? { source_urls: allSourceUrls } : {}),
+          ...(attachAsSourceUrls !== undefined ? { attach_as_source_urls: attachAsSourceUrls } : {}),
         }),
       });
       const body = (await res.json().catch(() => ({}))) as {
@@ -254,7 +257,7 @@ function AudienceCard(props: AudienceCardProps) {
     } finally {
       setBusy(false);
     }
-  }, [clusterId, audienceBand, selectedSourceUrls, selectedModelIdx]);
+  }, [clusterId, audienceBand, allSourceUrls, attachAsSourceUrls, selectedModelIdx]);
 
   async function handleCancel() {
     if (!runId) return;
