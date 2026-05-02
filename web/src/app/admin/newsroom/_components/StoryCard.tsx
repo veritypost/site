@@ -7,12 +7,11 @@
  * narrow widths via flex-wrap.
  */
 
-import { useState, useRef, useCallback } from 'react';
-import AudienceCard, { type AudienceCardHandle, type AudienceCardState } from './AudienceCard';
+import { useState, useCallback } from 'react';
+import AudienceCard, { type AudienceCardState } from './AudienceCard';
 import SourcesBlock, { type SourceItem } from './SourcesBlock';
 import { type AudienceBand } from './PipelineStepLabels';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
-import Button from '@/components/admin/Button';
 
 type AudienceStateRow = {
   cluster_id: string;
@@ -95,11 +94,6 @@ export default function StoryCard({
   const [visibleSources, setVisibleSources] = useState<SourceItem[]>(sources);
   const [removeError, setRemoveError] = useState<string | null>(null);
 
-  // Refs MUST be at top level — never inside loops or conditionals.
-  const adultRef = useRef<AudienceCardHandle>(null);
-  const tweensRef = useRef<AudienceCardHandle>(null);
-  const kidsRef = useRef<AudienceCardHandle>(null);
-
   const handleRemoveSource = useCallback(async (itemId: string) => {
     setRemoveError(null);
     try {
@@ -129,12 +123,6 @@ export default function StoryCard({
     }
   }, [cluster.id]);
 
-  const handleGenerateAll = useCallback(() => {
-    adultRef.current?.triggerGenerate();
-    tweensRef.current?.triggerGenerate();
-    kidsRef.current?.triggerGenerate();
-  }, []);
-
   const handleToggleUrl = useCallback((url: string, checked: boolean) => {
     setSelectedUrls((prev) => {
       const next = new Set(prev);
@@ -144,7 +132,6 @@ export default function StoryCard({
     });
   }, []);
 
-  const anyIdle = audienceState.some((s) => deriveCardState(s.state) === 'idle');
   const selectedSourceUrlsArray = Array.from(selectedUrls);
 
   const workingHeadline =
@@ -190,11 +177,6 @@ export default function StoryCard({
           </span>
         </div>
         <div style={{ display: 'flex', gap: S[2], alignItems: 'center' }}>
-          {anyIdle && (
-            <Button onClick={handleGenerateAll} variant="secondary" size="sm">
-              Generate All
-            </Button>
-          )}
           <span style={{ color: C.muted, fontSize: F.xs }}>
             {cluster.updated_at
               ? `updated ${new Date(cluster.updated_at).toLocaleString()}`
@@ -209,11 +191,9 @@ export default function StoryCard({
           const cardState = deriveCardState(state?.state ?? 'pending');
           const run = recentRunPerBand.find((r) => r && r.audience_band === band) ?? null;
           const meta = state?.article_id ? articleMeta?.[state.article_id] : undefined;
-          const bandRef = band === 'adult' ? adultRef : band === 'tweens' ? tweensRef : kidsRef;
           return (
             <AudienceCard
               key={band}
-              ref={bandRef}
               clusterId={cluster.id}
               audienceBand={band}
               initialState={cardState}

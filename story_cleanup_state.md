@@ -249,9 +249,61 @@ Status:      RESOLVED — owner can confirm by reproducing: click Remove on
 ```
 
 ### 4. Newsroom — drop bulk-generate buttons
-Status: PENDING
+Status: RESOLVED
 Symptom: Both "Generate All Pending" (page) and "Generate All" (per-card,
 all 3 audiences at once) need to go. Generation is one-AudienceCard at a time.
+
+```
+RESOLUTION (concern 4) — 2026-05-02
+Investigate: Two surfaces fired bulk generation. (a) Page-level "Generate
+             All Pending" at page.tsx:507-514, backed by handleBulkGenerate
+             (page.tsx:390-430) and bulkBusy/bulkProgress state at 269-270.
+             Stage 1 noted this handler silently ignored selectedModelIdx
+             and POSTed without provider/model — a latent quality bug on
+             top of the dead-button concern. (b) Per-Story "Generate All"
+             at StoryCard.tsx:193-196, backed by handleGenerateAll (132-136)
+             which dispatched triggerGenerate() through three useRefs
+             (99-101) into AudienceCard's useImperativeHandle (223-225)
+             behind a forwardRef wrapper (91-92). The refs were the only
+             consumers of AudienceCardHandle and triggerGenerate repo-wide.
+Review:      A (confirmer) re-derived independently — line ranges
+             confirmed; flagged additional cleanup Stage 1 missed:
+             StoryCard.tsx bandRef derivation (212) + ref={bandRef} prop
+             (216), unused imports (useRef on :10, AudienceCardHandle on
+             :11, Button on :15), and a hard "yes, strip" verdict on
+             AudienceCard's forwardRef/useImperativeHandle/handle-type
+             plumbing. B (adversary) hit the same conclusions
+             independently — bandRef/ref prop omission would have broken
+             the build, and leaving the imperative-handle apparatus would
+             violate the genuine-fixes rule. Both reached PARTIAL agree
+             with Stage 1's targets but extended the delete list. No
+             tie-breaker needed — A and B converged.
+Fix:         web/src/app/admin/newsroom/page.tsx — removed bulk state
+             (bulkBusy, bulkProgress), removed handleBulkGenerate
+             function, removed "Generate All Pending" button.
+             web/src/app/admin/newsroom/_components/StoryCard.tsx —
+             removed three refs + handleGenerateAll + anyIdle + Button
+             JSX + bandRef derivation + ref={bandRef} prop; cleaned up
+             imports (dropped useRef, AudienceCardHandle, Button).
+             web/src/app/admin/newsroom/_components/AudienceCard.tsx —
+             reverted from forwardRef wrapper to plain function
+             component, removed useImperativeHandle block, removed
+             exported AudienceCardHandle type, dropped forwardRef +
+             useImperativeHandle from React import. Re-indented the
+             function body from 4-space to 2-space to match conventions.
+TypeScript:  pass (npx tsc --noEmit, exit 0)
+iOS build:   n/a — newsroom is web-admin only; both iOS apps verified
+             clean of any "Generate All" reflection (grep across
+             VerityPost/ and VerityPostKids/ — zero hits)
+Verifier:    pass — 9/9 checks. Bulk plumbing fully gone, AudienceCard
+             rendered as plain function component with default export,
+             every retained feature (global model picker, merge, new
+             article, ViewToggle, Runs/Costs/Cleanup, categories/dq,
+             per-card Generate/Skip/Cancel/Retry, source toggle/remove)
+             intact. Brace balance verified, no orphan imports, no
+             repo-wide refs to deleted symbols.
+Status:      RESOLVED
+```
 
 ### 5. Newsroom — DB wipe to start fresh
 Status: IN_PROGRESS

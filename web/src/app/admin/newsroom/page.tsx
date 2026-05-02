@@ -265,10 +265,6 @@ function DiscoveryTab({
   const [mergeMode, setMergeMode] = useState(false);
   const [mergeSelected, setMergeSelected] = useState<string[]>([]);
 
-  // Bulk generate state
-  const [bulkBusy, setBulkBusy] = useState(false);
-  const [bulkProgress, setBulkProgress] = useState<string | null>(null);
-
   // Mute modal state
   const [mutingOutlet, setMutingOutlet] = useState<string | null>(null);
   const [muteDays, setMuteDays] = useState(7);
@@ -387,48 +383,6 @@ function DiscoveryTab({
     }
   }
 
-  async function handleBulkGenerate() {
-    if (!data) return;
-    type Pair = { clusterId: string; audience: string; age_band?: string };
-    const pairs: Pair[] = [];
-    for (const row of data.clusters) {
-      for (const as of row.audience_state) {
-        if (as.state === 'pending') {
-          if (as.audience_band === 'adult') {
-            pairs.push({ clusterId: row.cluster.id, audience: 'adult' });
-          } else {
-            pairs.push({ clusterId: row.cluster.id, audience: 'kid', age_band: as.audience_band });
-          }
-        }
-      }
-    }
-    if (pairs.length === 0) {
-      toast.push({ message: 'No pending stories to generate.', variant: 'warn' });
-      return;
-    }
-    setBulkBusy(true);
-    for (let i = 0; i < pairs.length; i++) {
-      setBulkProgress(`Generating ${i + 1} of ${pairs.length}…`);
-      const pair = pairs[i];
-      try {
-        await fetch('/api/admin/pipeline/generate', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            cluster_id: pair.clusterId,
-            audience: pair.audience,
-            ...(pair.age_band ? { age_band: pair.age_band } : {}),
-          }),
-        });
-      } catch {
-        // Continue on error — individual failures don't abort the batch.
-      }
-    }
-    setBulkBusy(false);
-    setBulkProgress(null);
-    await reload();
-  }
-
   async function handleMuteConfirm() {
     if (!mutingOutlet) return;
     setMuteBusy(true);
@@ -503,14 +457,6 @@ function DiscoveryTab({
             size="sm"
           >
             {mergeMode ? 'Cancel merge' : 'Merge stories'}
-          </Button>
-          <Button
-            onClick={handleBulkGenerate}
-            disabled={bulkBusy}
-            variant="secondary"
-            size="sm"
-          >
-            {bulkProgress ?? 'Generate All Pending'}
           </Button>
         </div>
         <div style={{ display: 'flex', gap: S[2] }}>
