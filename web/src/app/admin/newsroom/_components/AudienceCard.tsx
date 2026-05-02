@@ -112,7 +112,6 @@ function AudienceCard(props: AudienceCardProps) {
   const [currentStep, setCurrentStep] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [instructions, setInstructions] = useState('');
   const pollHandle = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollRunId = useRef<string | null>(null);
 
@@ -194,7 +193,6 @@ function AudienceCard(props: AudienceCardProps) {
           provider,
           model,
           ...(selectedSourceUrls !== undefined ? { source_urls: selectedSourceUrls } : {}),
-          ...(instructions.trim() ? { freeform_instructions: instructions.trim() } : {}),
         }),
       });
       const body = (await res.json().catch(() => ({}))) as {
@@ -215,7 +213,7 @@ function AudienceCard(props: AudienceCardProps) {
     } finally {
       setBusy(false);
     }
-  }, [clusterId, audienceBand, selectedSourceUrls, selectedModelIdx, instructions]);
+  }, [clusterId, audienceBand, selectedSourceUrls, selectedModelIdx]);
 
   async function handleCancel() {
     if (!runId) return;
@@ -375,26 +373,6 @@ function AudienceCard(props: AudienceCardProps) {
 
       {actionError && (
         <div style={{ fontSize: F.sm, color: C.danger }}>{actionError}</div>
-      )}
-
-      {(state === 'idle' || state === 'failed') && (
-        <input
-          type="text"
-          value={instructions}
-          onChange={(e) => setInstructions(e.target.value)}
-          placeholder="Optional instructions…"
-          maxLength={500}
-          style={{
-            width: '100%',
-            boxSizing: 'border-box',
-            fontSize: F.sm,
-            border: `1px solid ${C.border}`,
-            borderRadius: 4,
-            padding: `${S[1]}px ${S[2]}px`,
-            color: C.ink,
-            background: C.bg,
-          }}
-        />
       )}
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: S[2], marginTop: 'auto' }}>

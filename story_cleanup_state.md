@@ -402,10 +402,57 @@ Reason: Big-feature peel-off — owner locked this for its own session
 (2026-05-02).
 
 ### 9. Newsroom — drop per-card freeform-instructions input
-Status: PENDING
+Status: RESOLVED
 Symptom: AudienceCard currently has its own per-article "Optional
 instructions…" textarea. Wanted: removed — replaced by the feed-level
 search prompt from #8.
+
+```
+RESOLUTION (concern 9) — 2026-05-02
+Investigate: AudienceCard.tsx had `instructions` useState + an
+             <input placeholder="Optional instructions…"> rendered when
+             state was idle/failed, plumbing into POST body as
+             `freeform_instructions`. Backend (generate route, retry,
+             new-draft) all consume freeform_instructions for legitimate
+             non-newsroom reasons: new-draft uses it for topic-seed
+             ("Topic seed: ${topic}"), retry preserves the original
+             run's value, generate route schema marks it optional.
+Review:      A (confirmer) re-derived independently — confirmed all 4
+             deletion targets, verified zero other consumers in the
+             file, confirmed schema is .optional() so omitting is safe,
+             confirmed retry round-trip works for stored runs. B
+             (adversary) ran 9 probe attacks — all came back clean: no
+             shared wrapper around the input, actionError fully
+             decoupled, 500-cap bypass impossible (no other user channel
+             into freeform_instructions), layout absorbs the loss
+             (minHeight:130 + marginTop:auto), no in-flight closure
+             race, no test/story files reference instructions. B's only
+             advisory: the second half of the owner's request ("add
+             general search prompt for the whole feed") is concern #8
+             and remains deferred — not in scope here. A and B
+             converged on AGREE; no tie-breaker needed.
+Fix:         web/src/app/admin/newsroom/_components/AudienceCard.tsx —
+             - removed `instructions` useState declaration
+             - removed the `<input>` rendered conditionally on
+               idle/failed state
+             - removed `freeform_instructions` from generate POST body
+             - removed `instructions` from handleGenerate's useCallback
+               dep array
+             Backend untouched (per locked recommendation): schema field
+             stays optional, DB column stays, retry preservation stays,
+             new-draft topic-seed still works.
+TypeScript:  pass (npx tsc --noEmit, exit 0)
+iOS build:   n/a — newsroom is web-admin only
+Verifier:    pass — 7/7 checks. Five expected removals confirmed,
+             POST body shape matches spec (cluster_id + apiAudience +
+             provider + model + optional source_urls), backend files
+             unchanged via git diff, no other newsroom file references
+             instructions, useState import still used by 9 other states.
+Status:      RESOLVED — backend `freeform_instructions` plumbing
+             intentionally retained for new-draft topic-seed + retry
+             round-trip. Concern #8 (general feed search prompt) is
+             still deferred to its own session.
+```
 
 ### 10. AudienceCard — Edit button after generate
 Status: PENDING
