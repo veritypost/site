@@ -160,15 +160,25 @@ final actor PermissionService {
 }
 
 /// SwiftUI-facing observable mirror. Views that gate on permissions can
-/// `@StateObject` or `@ObservedObject` this and call `PermissionService`
-/// for the actual checks. The published `changeToken` increments on
-/// every successful cache refresh.
+/// `@ObservedObject` this and call `PermissionService` for the actual checks.
+/// `changeToken` increments on every successful cache refresh. `isLoaded`
+/// flips to true on the first successful load — views can guard on it to
+/// avoid showing a false-permission flash while the cache warms on cold launch.
 @MainActor
 final class PermissionStore: ObservableObject {
     static let shared = PermissionStore()
     @Published private(set) var changeToken: Int = 0
-    private init() {}
-    fileprivate func bump() { changeToken &+= 1 }
+    @Published private(set) var isLoaded: Bool = false
+    private init() {
+        // Pre-warm the cache as soon as PermissionStore.shared is first
+        // accessed (before any view body runs when app.init touches it),
+        // narrowing the cold-launch false-state window.
+        Task { await PermissionService.shared.refreshIfStale() }
+    }
+    fileprivate func bump() {
+        changeToken &+= 1
+        if !isLoaded { isLoaded = true }
+    }
 }
 
 /// Minimal type-erased JSON value so `source_detail jsonb` decodes

@@ -45,6 +45,13 @@ struct VerityPostApp: App {
     @ObservedObject private var articleRouter = ArticleRouter.shared
     @Environment(\.scenePhase) private var scenePhase
 
+    init() {
+        // S-07 — access PermissionStore.shared before the view hierarchy
+        // builds so its pre-warm Task fires as early as possible, minimising
+        // the cold-launch window where permission-gated UI shows false state.
+        _ = PermissionStore.shared
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
