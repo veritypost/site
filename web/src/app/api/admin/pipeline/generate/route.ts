@@ -177,7 +177,7 @@ const ALL_STEPS: readonly Step[] = [
 // passes. Hardcoded here (not DB-driven) because these are internal fixed
 // supporting calls, not admin-picker selections. If the picker switches
 // primary provider to OpenAI, we keep using Anthropic for these small probes.
-const HAIKU_MODEL = 'claude-haiku-4-5';
+const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
 
 // Session A — per-run reservation envelope (Decision 14). Mirrors the
 // `pipeline.per_run_cost_usd_cap` setting (default $0.50). Reserved
@@ -347,7 +347,7 @@ const AudienceCheckSchema = z.object({
 
 const HeadlineSummarySchema = z.object({
   headline: z.string().max(200).optional().default(''),
-  summary: z.string().min(1).max(500),
+  summary: z.string().min(1).max(1000),
   slug: z.string().optional(),
 });
 
