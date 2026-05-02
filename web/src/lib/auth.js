@@ -395,11 +395,6 @@ export async function requirePermission(permissionKey, client, options = {}) {
   const supabase = await resolveAuthedClient(client);
   const user = await requireAuth(supabase, { kindAllowed });
 
-  // Item 11a — owner email override. Mirrors hasPermissionServer; trusted
-  // owner accounts pass every requirePermission gate regardless of grants.
-  const userEmail = user.email?.toLowerCase?.() ?? null;
-  if (userEmail && OWNER_EMAILS.has(userEmail)) return user;
-
   const { rows, error } = await loadEffectivePerms(supabase, user.id);
   if (error || rows == null) {
     const err = new Error('PERM_RESOLVE_FAILED');
@@ -408,11 +403,11 @@ export async function requirePermission(permissionKey, client, options = {}) {
     throw err;
   }
 
-  // Item 11a — god-mode short-circuit (DB grant path).
-  const hasGodMode = rows.some(
-    (r) => r && r.permission_key === 'admin.god_mode' && r.granted === true,
+  // Owner Mode short-circuit (DB grant path).
+  const hasOwnerMode = rows.some(
+    (r) => r && r.permission_key === 'admin.owner_mode' && r.granted === true,
   );
-  if (hasGodMode) return user;
+  if (hasOwnerMode) return user;
 
   // Build the candidate key set: array → all entries; string → key plus its
   // alias siblings (looked up only when the direct check fails, to keep the
@@ -452,34 +447,19 @@ export async function requirePermission(permissionKey, client, options = {}) {
 // without burning an RPC. Kid-route handlers don't use this helper
 // (they assert kid ownership directly via lib/kids); user routes
 // that do use it must always see kids as "no perm".
-// Item 11a — owner email allowlist. Force-passes hasPermissionServer
-// for these emails regardless of DB grants. Mirrors the client-side
-// override in lib/permissions.js so SSR + API routes match the client
-// behavior. Edit the set in BOTH files to add trusted accounts; the
-// proper per-user grant lands in 11b.
-const OWNER_EMAILS = new Set(['admin@veritypost.com']);
-
 export async function hasPermissionServer(permissionKey, client) {
   try {
     const supabase = await resolveAuthedClient(client);
     const user = await getUser(supabase);
     if (!user) return false;
     if (user.kind === 'kid') return false;
-    // Owner-email override: never deny a trusted owner account regardless
-    // of permission grants or RPC state.
-    const userEmail = user.email?.toLowerCase?.() ?? null;
-    if (userEmail && OWNER_EMAILS.has(userEmail)) return true;
     const { rows, error } = await loadEffectivePerms(supabase, user.id);
     if (error || rows == null) return false;
-    // Item 11a: god-mode short-circuit. Closes the gap until the SQL-side
-    // short-circuit in my_permission_keys lands (part-2 RPC patches file).
-    // Without this, server endpoints calling requirePermission(key) deny
-    // god-mode users for keys not in their role grants (expert features,
-    // anything not on the standard owner-set roster).
-    const hasGodMode = rows.some(
-      (r) => r && r.permission_key === 'admin.god_mode' && r.granted === true,
+    // Owner Mode short-circuit (DB grant path).
+    const hasOwnerMode = rows.some(
+      (r) => r && r.permission_key === 'admin.owner_mode' && r.granted === true,
     );
-    if (hasGodMode) return true;
+    if (hasOwnerMode) return true;
     const row = rows.find((r) => r && r.permission_key === permissionKey);
     return !!(row && row.granted === true);
   } catch {

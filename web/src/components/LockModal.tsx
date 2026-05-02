@@ -82,14 +82,14 @@ export default function LockModal({ open, onClose, capability }: LockModalProps)
   // `PermissionsContextValue`; the prior `as { user: unknown }` cast
   // actively defeated that typing. Drop the cast.
   const { user } = usePermissionsContext();
-  const { isGodMode } = useAuth();
+  const { isOwnerMode } = useAuth();
   const panelRef = useRef<HTMLDivElement | null>(null);
   const isOpen = !!(open && capability);
   useFocusTrap(isOpen, panelRef, { onEscape: onClose });
 
-  // Item 11a Phase 5 — god-mode users never see the lock interrupt modal.
-  // Belt-and-suspenders for the first-paint window before perms cache loads.
-  if (isGodMode) return null;
+  // Owner Mode holders never see the lock interrupt modal. Belt-and-
+  // suspenders for the first-paint window before perms cache loads.
+  if (isOwnerMode) return null;
   if (!isOpen || !capability) return null;
 
   const prompt = resolvePrompt({

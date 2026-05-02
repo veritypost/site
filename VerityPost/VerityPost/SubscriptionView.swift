@@ -26,12 +26,12 @@ struct SubscriptionView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                if auth.isGodMode {
-                    // Item 11a Phase 8 — god-mode users see a single "Full
-                    // access" card instead of the plan grid + restore/manage
-                    // links. Keeps the SubscriptionView reachable in nav so
-                    // the screen still renders, but hides every billing CTA
-                    // since god-mode has no real subscription to manage.
+                if auth.isOwnerMode {
+                    // Owner Mode holders see a single "Full access" card
+                    // instead of the plan grid + restore/manage links. Keeps
+                    // the SubscriptionView reachable in nav so the screen still
+                    // renders, but hides every billing CTA since Owner Mode
+                    // has no real subscription to manage.
                     VStack(spacing: 24) {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Full access")

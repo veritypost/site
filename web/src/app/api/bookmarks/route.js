@@ -1,7 +1,7 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified bookmarks 2026-04-18
 import { NextResponse } from 'next/server';
-import { requirePermission } from '@/lib/auth';
+import { requirePermission, hasPermissionServer } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { v2LiveGuard } from '@/lib/featureFlags';
 import { checkRateLimit } from '@/lib/rateLimit';
@@ -29,10 +29,12 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401, headers: NO_STORE });
   }
 
-  // God-mode bypass: owners skip maintenance gate, rate limit, and plan cap.
-  const isGodMode = user.email === 'admin@veritypost.com';
+  // Owner Mode bypass: holders skip maintenance gate, rate limit, and
+  // plan cap. Resolved from DB grants — sole identification path
+  // per DECISION #013.
+  const isOwnerMode = await hasPermissionServer('admin.owner_mode');
 
-  if (!isGodMode) {
+  if (!isOwnerMode) {
     const blocked = await v2LiveGuard();
     if (blocked) return blocked;
   }
@@ -43,7 +45,7 @@ export async function POST(request) {
 
   const service = createServiceClient();
 
-  if (!isGodMode) {
+  if (!isOwnerMode) {
     const rate = await checkRateLimit(service, {
       key: `bookmarks:${user.id}`,
       policyKey: 'bookmarks',
@@ -80,9 +82,10 @@ export async function POST(request) {
       if (existing?.id)
         return NextResponse.json({ id: existing.id, deduped: true }, { headers: NO_STORE });
     }
-    // P0001 from `enforce_bookmark_cap` — god-mode users bypass the cap
-    // via a SECURITY DEFINER RPC that disables the trigger for the insert.
-    if (isGodMode && error.code === 'P0001') {
+    // P0001 from `enforce_bookmark_cap` — Owner Mode holders bypass the
+    // cap via a SECURITY DEFINER RPC that disables the trigger for the
+    // insert.
+    if (isOwnerMode && error.code === 'P0001') {
       const { data: bypassId, error: bypassErr } = await service.rpc('admin_force_bookmark', {
         p_user_id: user.id,
         p_article_id: article_id,

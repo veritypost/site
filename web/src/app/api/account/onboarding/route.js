@@ -14,14 +14,14 @@ async function deriveServerTier(userId) {
   // Mirror NavWrapper.deriveTier — same buckets, same rules. T302 split
   // 'unverified' out of 'anon' so the funnel-join can distinguish
   // signed-in-unverified vs actually-anonymous viewers.
-  // Item 11a Phase 2 — god-mode owners bucket as 'godmode' so analytics
-  // doesn't lump them in with whatever tier their plan_id row resolves to
-  // (often null / free_verified for owner). Mirrors the early-return added
-  // to NavWrapper.deriveTier in Phase 4.
+  // Owner Mode holders bucket as 'ownermode' so analytics doesn't lump
+  // them in with whatever tier their plan_id row resolves to (often null /
+  // free_verified for owner). Mirrors the early-return in
+  // NavWrapper.deriveTier.
   if (!userId) return 'anon';
   try {
-    const isGodMode = await hasPermissionServer('admin.god_mode');
-    if (isGodMode) return 'godmode';
+    const isOwnerMode = await hasPermissionServer('admin.owner_mode');
+    if (isOwnerMode) return 'ownermode';
     const service = createServiceClient();
     const { data } = await service
       .from('users')

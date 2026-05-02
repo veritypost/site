@@ -62,12 +62,11 @@ async function loadSeatState(
   const meta = (sub?.plans?.metadata ?? {}) as Record<string, unknown>;
   const isFamily = sub?.plans?.tier === 'verity_family';
 
-  // Item 11a Phase 2 — god-mode bypass. Owner / any future god-mode user
-  // gets a synthetic "active Family sub" view so seat-management UI works
-  // even when no real subscription row exists. The numeric caps stay at
-  // sane defaults from plan metadata so the UI doesn't have to special-case
-  // an "infinite seats" render.
-  const godMode = await hasPermissionServer('admin.god_mode');
+  // Owner Mode bypass. Holders get a synthetic "active Family sub" view so
+  // seat-management UI works even when no real subscription row exists.
+  // The numeric caps stay at sane defaults from plan metadata so the UI
+  // doesn't have to special-case an "infinite seats" render.
+  const ownerMode = await hasPermissionServer('admin.owner_mode');
 
   return {
     used: usedCount ?? 0,
@@ -77,7 +76,7 @@ async function loadSeatState(
     max_total_seats: Number(meta.max_total_seats) || 6,
     extra_kid_price_cents: Number(meta.extra_kid_price_cents) || 499,
     platform: sub?.platform ?? null,
-    has_active_family_sub: !!isFamily || godMode,
+    has_active_family_sub: !!isFamily || ownerMode,
   };
 }
 
@@ -86,25 +85,26 @@ async function loadSeatState(
 // ---------------------------------------------------------------------------
 
 export async function GET() {
-  // Item 11a Phase 2 — god-mode owner-bypass. Without this, an owner who
-  // lacks family.seats.manage in their resolved key set 403s here even
-  // though the rest of the product treats them as having full reach. The
-  // god-mode probe is itself a permission check (returns false for anon),
-  // so it cannot be used to escape the auth gate below.
+  // Owner Mode owner-bypass. Without this, an owner who lacks
+  // family.seats.manage in their resolved key set 403s here even though
+  // the rest of the product treats them as having full reach. The Owner
+  // Mode probe is itself a permission check (returns false for anon), so
+  // it cannot be used to escape the auth gate below.
   let user;
   try {
     user = await requirePermission('family.seats.manage');
   } catch (err) {
-    const isGodMode = await hasPermissionServer('admin.god_mode');
-    if (!isGodMode) {
+    const isOwnerMode = await hasPermissionServer('admin.owner_mode');
+    if (!isOwnerMode) {
       const status = (err as { status?: number })?.status === 401 ? 401 : 403;
       return NextResponse.json(
         { error: status === 401 ? 'Unauthenticated' : 'Forbidden' },
         { status }
       );
     }
-    // god-mode caller — pull the user via the same auth helper requirePermission
-    // would have used so we have a stable user.id for the seat-state load.
+    // Owner Mode caller — pull the user via the same auth helper
+    // requirePermission would have used so we have a stable user.id for
+    // the seat-state load.
     user = await requireAuth();
   }
 

@@ -21,14 +21,14 @@ type Props = {
 const MILESTONES = [25, 50, 75, 90, 100] as const;
 
 export default function ArticleTracker({ articleId, articleSlug }: Props) {
-  // Item 11a Phase 3 — god-mode owners don't fire reading-funnel events so
-  // owner internal QA reads don't dilute the analytics. Server-side
-  // incrementViewCount is suppressed in the same item via the route handler.
-  const { isGodMode } = useAuth();
+  // Owner Mode holders don't fire reading-funnel events so owner internal
+  // QA reads don't dilute the analytics. Server-side incrementViewCount
+  // is suppressed in the same path via the route handler.
+  const { isOwnerMode } = useAuth();
   const fired = useRef<Set<number>>(new Set());
 
   useEffect(() => {
-    if (isGodMode) return;
+    if (isOwnerMode) return;
     track('article_read_start', 'product', {
       article_id: articleId,
       article_slug: articleSlug,
@@ -101,7 +101,7 @@ export default function ArticleTracker({ articleId, articleSlug }: Props) {
       observers.forEach((o) => o.disconnect());
       sentinels.forEach((s) => s.remove());
     };
-  }, [articleId, articleSlug, isGodMode]);
+  }, [articleId, articleSlug, isOwnerMode]);
 
   return null;
 }

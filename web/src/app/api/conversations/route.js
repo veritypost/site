@@ -1,7 +1,7 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified messaging 2026-04-18
 import { NextResponse } from 'next/server';
-import { requirePermission } from '@/lib/auth';
+import { requirePermission, hasPermissionServer } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 
@@ -39,11 +39,11 @@ export async function POST(request) {
     );
   }
 
-  const isGodMode = user.email === 'admin@veritypost.com';
+  const isOwnerMode = await hasPermissionServer('admin.owner_mode');
   const service = createServiceClient();
 
   // H27 — throttle conversation starts. Cap at 10/min per caller.
-  if (!isGodMode) {
+  if (!isOwnerMode) {
     const rate = await checkRateLimit(service, {
       key: `conversations.start:${user.id}`,
       policyKey: 'conversations.start',

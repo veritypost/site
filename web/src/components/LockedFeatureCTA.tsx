@@ -115,11 +115,11 @@ export default function LockedFeatureCTA({
 }: LockedFeatureCTAProps) {
   const router = useRouter();
   const { user } = usePermissionsContext() as { user: unknown };
-  const { isGodMode } = useAuth();
-  // Item 11a Phase 5 — god-mode users never see plan/role/verify nudges.
-  // Belt-and-suspenders for the first-paint window before perms cache loads;
-  // the server short-circuit covers steady-state.
-  if (isGodMode) return null;
+  const { isOwnerMode } = useAuth();
+  // Owner Mode holders never see plan/role/verify nudges. Belt-and-
+  // suspenders for the first-paint window before perms cache loads; the
+  // server short-circuit covers steady-state.
+  if (isOwnerMode) return null;
   const authed = !!user;
 
   const lockReason = gateTypeToLockReason(gateType, authed);

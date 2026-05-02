@@ -228,12 +228,12 @@ export default async function ArticleSlugPage({
 
   if (article.status !== 'published' && !canEdit) notFound();
 
-  // Item 11a Phase 3 — suppress view-count writes for god-mode users so
-  // owner reading their own articles doesn't pollute the read counter.
-  // The companion ArticleTracker (analytics events) is gated client-side
-  // in the same item via auth.isGodMode.
-  const isGodModeViewer = await hasPermissionServer('admin.god_mode');
-  if (article.status === 'published' && !isGodModeViewer) {
+  // Suppress view-count writes for Owner Mode holders so owner reading
+  // their own articles doesn't pollute the read counter. The companion
+  // ArticleTracker (analytics events) is gated client-side via
+  // auth.isOwnerMode.
+  const isOwnerModeViewer = await hasPermissionServer('admin.owner_mode');
+  if (article.status === 'published' && !isOwnerModeViewer) {
     incrementViewCount(service, article.id).catch((e) => console.error('[article] incrementViewCount failed', e));
   }
 
@@ -313,7 +313,7 @@ export default async function ArticleSlugPage({
               hasQuiz={hasQuiz}
               initialPassed={initialPassed}
               currentUserId={user?.id ?? null}
-              canBypassQuiz={canEdit || isGodModeViewer}
+              canBypassQuiz={canEdit || isOwnerModeViewer}
             />
           ) : null
         }

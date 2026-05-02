@@ -147,18 +147,18 @@ async function finalizeIdempotency(
 export async function POST(request: Request) {
   // Two permission gates — one for kids creation, one for billing mutation.
   // requirePermission throws on denial, returning the corresponding 401/403.
-  // Item 11a Phase 2 — god-mode owner-bypass. Without this, an owner without
-  // the kids/family keys 403s before any seat math runs even though the rest
+  // Owner Mode owner-bypass. Without this, an owner without the
+  // kids/family keys 403s before any seat math runs even though the rest
   // of the product treats them as having full reach. The bypass keeps the
-  // god-mode caller flowing into the family-sub branch below, which item 11a
-  // also gates explicitly.
+  // Owner Mode caller flowing into the family-sub branch below, which is
+  // also explicitly gated.
   let user;
   try {
     user = await requirePermission('kids.profile.create');
     await requirePermission('family.seats.manage');
   } catch (err) {
-    const isGodMode = await hasPermissionServer('admin.god_mode');
-    if (!isGodMode) {
+    const isOwnerMode = await hasPermissionServer('admin.owner_mode');
+    if (!isOwnerMode) {
       const status =
         (err as { status?: number })?.status === 401
           ? 401
@@ -170,7 +170,7 @@ export async function POST(request: Request) {
         { status }
       );
     }
-    // god-mode caller — pull the user via the auth helper so we have a
+    // Owner Mode caller — pull the user via the auth helper so we have a
     // stable user.id for the rest of the handler.
     user = await requireAuth();
   }
@@ -314,30 +314,30 @@ export async function POST(request: Request) {
     return NextResponse.json(payload, { status });
   };
 
-  // Item 11a Phase 2 — god-mode owner-bypass for the no-Family-sub branch.
-  // A god-mode caller without a real Family sub should still be able to add
-  // a kid; skip every Stripe step and create the kid_profiles row directly.
-  // Mirrors the /api/kids POST insert shape so we stay consistent with the
-  // simpler kid-create surface.
+  // Owner Mode owner-bypass for the no-Family-sub branch. An Owner Mode
+  // caller without a real Family sub should still be able to add a kid;
+  // skip every Stripe step and create the kid_profiles row directly.
+  // Mirrors the /api/kids POST insert shape so we stay consistent with
+  // the simpler kid-create surface.
   if (!sub || sub.plans?.tier !== 'verity_family') {
-    const isGodMode = await hasPermissionServer('admin.god_mode');
-    if (!isGodMode) {
+    const isOwnerMode = await hasPermissionServer('admin.owner_mode');
+    if (!isOwnerMode) {
       return respond(400, {
         error: 'No active Verity Family subscription on this account.',
         code: 'no_family_sub',
       });
     }
 
-    const nowIsoGm = now.toISOString();
-    const consentMetadataGm = {
+    const nowIsoOm = now.toISOString();
+    const consentMetadataOm = {
       coppa_consent: {
         version: COPPA_CONSENT_VERSION,
         parent_name: body.consent!.parent_name!.trim(),
-        accepted_at: nowIsoGm,
+        accepted_at: nowIsoOm,
         ip: clientIp(request),
       },
     };
-    const { data: kidRowGm, error: insertErrGm } = await service
+    const { data: kidRowOm, error: insertErrOm } = await service
       .from('kid_profiles')
       .insert({
         parent_user_id: user.id,
@@ -348,24 +348,24 @@ export async function POST(request: Request) {
         pin_hash_algo: pinCred.pin_hash_algo,
         date_of_birth: body.date_of_birth,
         coppa_consent_given: true,
-        coppa_consent_at: nowIsoGm,
-        metadata: consentMetadataGm,
+        coppa_consent_at: nowIsoOm,
+        metadata: consentMetadataOm,
       })
       .select('id')
       .single();
-    if (insertErrGm || !kidRowGm) {
-      console.error('[family.add_kid_with_seat] god_mode insert', insertErrGm?.message);
-      return respond(400, { error: insertErrGm?.message || 'Could not create kid profile.' });
+    if (insertErrOm || !kidRowOm) {
+      console.error('[family.add_kid_with_seat] owner_mode insert', insertErrOm?.message);
+      return respond(400, { error: insertErrOm?.message || 'Could not create kid profile.' });
     }
     await service.from('users').update({ has_kids_profiles: true }).eq('id', user.id);
     return respond(200, {
       ok: true,
-      kid_id: kidRowGm.id,
+      kid_id: kidRowOm.id,
       seats_paid: 0,
       extra_kid_price_cents: 0,
       seat_bumped: false,
       dry_run_stripe: true,
-      god_mode: true,
+      owner_mode: true,
     });
   }
 

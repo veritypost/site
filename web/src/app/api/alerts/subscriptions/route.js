@@ -33,7 +33,7 @@
 // the route safe to ship pre-S1 and live the moment the table lands.
 
 import { NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth';
+import { requireAuth, hasPermissionServer } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 
@@ -77,10 +77,10 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401, headers: NO_STORE });
   }
 
-  const isGodMode = user.email === 'admin@veritypost.com';
+  const isOwnerMode = await hasPermissionServer('admin.owner_mode');
   const service = createServiceClient();
 
-  if (!isGodMode) {
+  if (!isOwnerMode) {
     const rate = await checkRateLimit(service, {
       key: `alerts-subs:get:${user.id}`,
       policyKey: 'alerts_subs_get',
@@ -132,10 +132,10 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401, headers: NO_STORE });
   }
 
-  const isGodMode = user.email === 'admin@veritypost.com';
+  const isOwnerMode = await hasPermissionServer('admin.owner_mode');
   const service = createServiceClient();
 
-  if (!isGodMode) {
+  if (!isOwnerMode) {
     const rate = await checkRateLimit(service, {
       key: `alerts-subs:write:${user.id}`,
       policyKey: 'alerts_subs_write',
@@ -229,10 +229,10 @@ export async function DELETE(request) {
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401, headers: NO_STORE });
   }
 
-  const isGodMode = user.email === 'admin@veritypost.com';
+  const isOwnerMode = await hasPermissionServer('admin.owner_mode');
   const service = createServiceClient();
 
-  if (!isGodMode) {
+  if (!isOwnerMode) {
     const rate = await checkRateLimit(service, {
       key: `alerts-subs:write:${user.id}`,
       policyKey: 'alerts_subs_write',

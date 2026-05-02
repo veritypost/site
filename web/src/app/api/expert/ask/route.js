@@ -1,7 +1,7 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified expert 2026-04-18
 import { NextResponse } from 'next/server';
-import { requirePermission } from '@/lib/auth';
+import { requirePermission, hasPermissionServer } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { v2LiveGuard } from '@/lib/featureFlags';
@@ -24,16 +24,16 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
 
-  const isGodMode = user.email === 'admin@veritypost.com';
+  const isOwnerMode = await hasPermissionServer('admin.owner_mode');
 
-  if (!isGodMode) {
+  if (!isOwnerMode) {
     const blocked = await v2LiveGuard();
     if (blocked) return blocked;
   }
 
   const service = createServiceClient();
 
-  if (!isGodMode) {
+  if (!isOwnerMode) {
     const rate = await checkRateLimit(service, {
       key: `expert-ask:${user.id}`,
       policyKey: 'expert-ask',

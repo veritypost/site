@@ -46,18 +46,19 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401, headers: NO_STORE });
   }
 
-  // God-mode bypass: owners are exempt from maintenance gate, rate limits,
-  // and quiz gate. Email check is zero-overhead (no extra DB call).
-  const isGodMode = user.email === 'admin@veritypost.com';
+  // Owner Mode bypass: holders are exempt from maintenance gate, rate
+  // limits, and quiz gate. Resolved from DB grants — sole identification
+  // path per DECISION #013.
+  const isOwnerMode = await hasPermissionServer('admin.owner_mode');
 
-  if (!isGodMode) {
+  if (!isOwnerMode) {
     const blocked = await v2LiveGuard();
     if (blocked) return blocked;
   }
 
   const service = createServiceClient();
 
-  if (!isGodMode) {
+  if (!isOwnerMode) {
     const rate = await checkRateLimit(service, {
       key: `comments:${user.id}`,
       policyKey: 'comments_post',
@@ -115,8 +116,8 @@ export async function POST(request) {
   }
 
   // H4 — surface the quiz-gate failure as a specific 403 before
-  // hitting the post_comment RPC. Skipped for god-mode owners.
-  if (!isGodMode) {
+  // hitting the post_comment RPC. Skipped for Owner Mode holders.
+  if (!isOwnerMode) {
     const { data: passed, error: passErr } = await service.rpc('user_passed_article_quiz', {
       p_user_id: user.id,
       p_article_id: article_id,

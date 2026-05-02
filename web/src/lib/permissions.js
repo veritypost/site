@@ -98,14 +98,6 @@ export async function refreshIfStale() {
   }
 }
 
-// Item 11a — owner email allowlist. Force-injects `admin.god_mode`
-// into the perm cache for these emails regardless of DB grants. Belt-
-// and-suspenders backup so god-mode works even if the DB-side grant
-// path (role → permission_set → permission_set_perms → permissions)
-// or the RPC short-circuit isn't fully wired. Edit this set to add
-// trusted accounts; the proper per-user grant lands in 11b.
-const OWNER_EMAILS = new Set(['admin@veritypost.com']);
-
 // --------- New path: my_permission_keys ---------
 export async function refreshAllPermissions() {
   if (allPermsInflight) return allPermsInflight;
@@ -115,7 +107,6 @@ export async function refreshAllPermissions() {
     try {
       const { data: auth } = await supabase.auth.getUser();
       const userId = auth?.user?.id;
-      const userEmail = auth?.user?.email?.toLowerCase() ?? null;
       if (!userId) {
         allPermsCache = new Set();
         _allPermsFetchedAt = Date.now();
@@ -127,17 +118,7 @@ export async function refreshAllPermissions() {
         // L2 — on refetch error AFTER a version-bump hard-clear we leave
         // allPermsCache = null so hasPermission continues to deny-all. That's
         // fail-closed; a next poll or focus event will retry and swap in the
-        // fresh map on success. On refresh errors during the initial load
-        // (no prior cache) the same null-deny semantics apply. Previously
-        // this branch returned the prior cache, which re-exposed any stale
-        // grant that the revoke-driven version bump was trying to clear.
-        // EXCEPTION: owner-email accounts always get god-mode injected so
-        // they can never be locked out by a perms RPC failure.
-        if (userEmail && OWNER_EMAILS.has(userEmail)) {
-          allPermsCache = new Set(['admin.god_mode']);
-          _allPermsFetchedAt = Date.now();
-          return allPermsCache;
-        }
+        // fresh map on success.
         return new Set();
       }
       const next = new Set();
@@ -145,11 +126,6 @@ export async function refreshAllPermissions() {
         if (row && typeof row.permission_key === 'string') {
           next.add(row.permission_key);
         }
-      }
-      // Owner-email override: ensure god-mode is in the cache for trusted
-      // accounts even if the DB grant path didn't surface it.
-      if (userEmail && OWNER_EMAILS.has(userEmail)) {
-        next.add('admin.god_mode');
       }
       allPermsCache = next;
       _allPermsFetchedAt = Date.now();
@@ -193,15 +169,14 @@ export async function getCapabilities(section) {
 // has not loaded yet (allPermsCache null) — fail-closed by design. Callers
 // must await refreshAllPermissions() before reading this function.
 //
-// Item 11a: god-mode short-circuit. Anyone holding `admin.god_mode` in
-// their cache passes every key check until the SQL-side short-circuit
-// in my_permission_keys / get_my_capabilities lands (part-2 placeholder
-// migration). Without this, raw hasPermission() callers (expert pages,
-// settings/expert, /u/[username] expert badge, etc.) deny owner because
-// their granted-by-role keys don't include the per-feature keys.
+// Owner Mode short-circuit. Anyone holding `admin.owner_mode` in
+// their cache passes every key check. Without this, raw hasPermission()
+// callers (expert pages, settings/expert, /u/[username] expert badge,
+// etc.) would deny owner because their granted-by-role keys don't
+// include the per-feature keys.
 export function hasPermission(key) {
   if (!allPermsCache) return false;
-  if (allPermsCache.has('admin.god_mode')) return true;
+  if (allPermsCache.has('admin.owner_mode')) return true;
   return allPermsCache.has(key);
 }
 
@@ -209,7 +184,7 @@ export function hasPermission(key) {
 // synthetic object when the key is granted; null when absent.
 export function getPermission(key) {
   if (!allPermsCache) return null;
-  if (allPermsCache.has('admin.god_mode')) return { permission_key: key, granted: true };
+  if (allPermsCache.has('admin.owner_mode')) return { permission_key: key, granted: true };
   if (!allPermsCache.has(key)) return null;
   return { permission_key: key, granted: true };
 }
@@ -225,10 +200,10 @@ export function getCapability(key) {
 }
 
 // Single-permission server-side check (for RLS-mirroring UI logic
-// where you don't have the section cached). Item 11a: god-mode
-// short-circuits before the RPC round-trip.
+// where you don't have the section cached). Owner Mode short-circuits
+// before the RPC round-trip.
 export async function hasPermissionViaRpc(key) {
-  if (allPermsCache?.has('admin.god_mode')) return true;
+  if (allPermsCache?.has('admin.owner_mode')) return true;
   const supabase = createClient();
   const args = { p_key: key };
   const { data, error } = await supabase.rpc('has_permission', args);
@@ -237,9 +212,9 @@ export async function hasPermissionViaRpc(key) {
 }
 
 // Content-scoped check: e.g. "can this user view THIS article?"
-// Item 11a: god-mode short-circuits before the RPC round-trip.
+// Owner Mode short-circuits before the RPC round-trip.
 export async function hasPermissionFor(key, scopeType, scopeId) {
-  if (allPermsCache?.has('admin.god_mode')) return true;
+  if (allPermsCache?.has('admin.owner_mode')) return true;
   const supabase = createClient();
   const args = { p_key: key, p_scope_type: scopeType, p_scope_id: scopeId };
   const { data, error } = await supabase.rpc('has_permission_for', args);

@@ -55,14 +55,14 @@ final class AuthViewModel: ObservableObject {
     @Published var authError: String?
     @Published var userLoadError: String?
 
-    /// Item 11a Phase 8 — true when the current user holds `admin.god_mode`.
-    /// Drives FamilyViews seat-cap bypass and SubscriptionView "full access"
-    /// branch. Refreshed alongside PermissionService.loadAll() in the same
-    /// places (init's NotificationCenter observer + the
+    /// True when the current user holds `admin.owner_mode`. Drives FamilyViews
+    /// seat-cap bypass and SubscriptionView "full access" branch. Refreshed
+    /// alongside PermissionService.loadAll() in the same places (init's
+    /// NotificationCenter observer + the
     /// .tokenRefreshed/.signedIn/.initialSession branch in setupAuthListener).
     /// iOS lacks live cache invalidation today — cold launch is the practical
     /// refresh granularity, matching the rest of the perms cache.
-    @Published var isGodMode: Bool = false
+    @Published var isOwnerMode: Bool = false
 
     /// S9-Q2-iOS — set after a successful /api/auth/send-magic-link call so
     /// the LoginView / SignupView can swap to a "Check your inbox" card.
@@ -162,20 +162,20 @@ final class AuthViewModel: ObservableObject {
                 // SubscriptionContext post-purchase.
                 await PermissionService.shared.invalidate()
                 await PermissionService.shared.loadAll()
-                await self.refreshGodMode()
+                await self.refreshOwnerMode()
             }
         }
     }
 
-    /// Item 11a Phase 8 — refresh the published `isGodMode` flag from the
-    /// permission cache. Call after `PermissionService.shared.loadAll()`
-    /// every time the cache is reseeded so SwiftUI views observing
-    /// `auth.isGodMode` re-render with the new value.
+    /// Refresh the published `isOwnerMode` flag from the permission cache.
+    /// Call after `PermissionService.shared.loadAll()` every time the cache
+    /// is reseeded so SwiftUI views observing `auth.isOwnerMode` re-render
+    /// with the new value.
     @MainActor
-    private func refreshGodMode() async {
-        let next = await PermissionService.shared.has("admin.god_mode")
-        if isGodMode != next {
-            isGodMode = next
+    private func refreshOwnerMode() async {
+        let next = await PermissionService.shared.has("admin.owner_mode")
+        if isOwnerMode != next {
+            isOwnerMode = next
         }
     }
 
@@ -484,13 +484,13 @@ final class AuthViewModel: ObservableObject {
                         // restart / navigation triggered a refresh.
                         // Fire-and-forget — loadUser is the gating call,
                         // permissions are observability-adjacent.
-                        // Item 11a Phase 8 — also refresh isGodMode so any
-                        // owner mid-flight (signed in via deep link / token
-                        // refresh) gets the bypass without a cold launch.
+                        // Also refresh isOwnerMode so any owner mid-flight
+                        // (signed in via deep link / token refresh) gets the
+                        // bypass without a cold launch.
                         Task { [weak self] in
                             await PermissionService.shared.invalidate()
                             await PermissionService.shared.loadAll()
-                            await self?.refreshGodMode()
+                            await self?.refreshOwnerMode()
                         }
                         self.isLoggedIn = true
                         self.wasLoggedIn = true
@@ -929,9 +929,9 @@ final class AuthViewModel: ObservableObject {
         isRecoveringPassword = false
         bypassOnboardingLocally = false
         pendingHomeJump = false
-        // Item 11a Phase 8 — clear god-mode so a second login as a non-owner
-        // account doesn't inherit the previous user's bypass.
-        isGodMode = false
+        // Clear Owner Mode so a second login as a non-owner account doesn't
+        // inherit the previous user's bypass.
+        isOwnerMode = false
         dismissDeepLinkError()
     }
 

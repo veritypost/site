@@ -14,14 +14,14 @@ function clientIp(request) {
 }
 
 export async function GET() {
-  // Item 11a Phase 2 — god-mode owner-bypass. Lets god-mode users see kids
-  // listings without the kids.parent.view key.
+  // Owner Mode owner-bypass. Lets Owner Mode holders see kids listings
+  // without the kids.parent.view key.
   let user;
   try {
     user = await requirePermission('kids.parent.view');
   } catch (err) {
-    const isGodMode = await hasPermissionServer('admin.god_mode');
-    if (!isGodMode) {
+    const isOwnerMode = await hasPermissionServer('admin.owner_mode');
+    if (!isOwnerMode) {
       console.error('[kids.permission]', err?.message || err);
       return NextResponse.json(
         { error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' },
@@ -43,14 +43,14 @@ export async function GET() {
 }
 
 export async function POST(request) {
-  // Item 11a Phase 2 — god-mode owner-bypass. Lets god-mode users create
-  // kids without the kids.profile.create key.
+  // Owner Mode owner-bypass. Lets Owner Mode holders create kids without
+  // the kids.profile.create key.
   let user;
   try {
     user = await requirePermission('kids.profile.create');
   } catch (err) {
-    const isGodMode = await hasPermissionServer('admin.god_mode');
-    if (!isGodMode) {
+    const isOwnerMode = await hasPermissionServer('admin.owner_mode');
+    if (!isOwnerMode) {
       console.error('[kids.permission]', err?.message || err);
       return NextResponse.json(
         { error: err?.status === 401 ? 'Unauthenticated' : 'Forbidden' },
@@ -105,11 +105,11 @@ export async function POST(request) {
   // Reject create if at the cap with a 402 so the client can surface
   // the per-kid upsell ($4.99/mo).
   //
-  // Item 11a Phase 2 — god-mode owner-bypass. A god-mode caller skips the
-  // seat-cap math entirely (no plan / no seats sold = no cap). The cap is
-  // a billing protection, not a safety guard, so this is safe.
+  // Owner Mode owner-bypass. An Owner Mode caller skips the seat-cap
+  // math entirely (no plan / no seats sold = no cap). The cap is a
+  // billing protection, not a safety guard, so this is safe.
   try {
-    const isGodMode = await hasPermissionServer('admin.god_mode');
+    const isOwnerMode = await hasPermissionServer('admin.owner_mode');
     const [{ count: activeKidCount }, subRes] = await Promise.all([
       service
         .from('kid_profiles')
@@ -128,7 +128,7 @@ export async function POST(request) {
     const maxKids = Number(planMeta.max_kids) || 4;
     const extraKidPriceCents = Number(planMeta.extra_kid_price_cents) || 499;
     const next = (activeKidCount ?? 0) + 1;
-    if (!isGodMode && next > maxKids) {
+    if (!isOwnerMode && next > maxKids) {
       return NextResponse.json(
         {
           error: `Plan limit reached: up to ${maxKids} kid profiles per family.`,
@@ -138,7 +138,7 @@ export async function POST(request) {
         { status: 400 }
       );
     }
-    if (!isGodMode && next > seatsPaid) {
+    if (!isOwnerMode && next > seatsPaid) {
       return NextResponse.json(
         {
           error: `Adding this kid increases your subscription by $${(extraKidPriceCents / 100).toFixed(2)}/mo. Confirm seat purchase before retrying.`,

@@ -37,13 +37,13 @@ export default function PermissionGate({
   renderLocked,
 }: PermissionGateProps) {
   const { get, ready } = useCapabilities(section);
-  const { isGodMode } = useAuth();
+  const { isOwnerMode } = useAuth();
   const [modalOpen, setModalOpen] = useState<boolean>(false);
 
-  // Item 11a Phase 5 — god-mode users always see the gated content,
-  // even before the section's capability cache is ready. Belt-and-suspenders
-  // for the first-paint window; server short-circuit covers steady-state.
-  if (isGodMode) return <>{children}</>;
+  // Owner Mode holders always see the gated content, even before the
+  // section's capability cache is ready. Belt-and-suspenders for the
+  // first-paint window; server short-circuit covers steady-state.
+  if (isOwnerMode) return <>{children}</>;
 
   if (!ready) return null;
 
@@ -133,10 +133,10 @@ interface PermissionGateInlineProps {
 
 export function PermissionGateInline({ permission, section, children }: PermissionGateInlineProps) {
   const { get, ready } = useCapabilities(section);
-  const { isGodMode } = useAuth();
+  const { isOwnerMode } = useAuth();
   const [modalOpen, setModalOpen] = useState<boolean>(false);
-  // Item 11a Phase 5 — god-mode users always see the inline gated content.
-  if (isGodMode) return <>{children}</>;
+  // Owner Mode holders always see the inline gated content.
+  if (isOwnerMode) return <>{children}</>;
   if (!ready) return null;
   const cap = get(permission) as PermissionCapability | null;
   if (!cap) return null;

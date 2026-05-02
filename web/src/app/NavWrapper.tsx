@@ -57,28 +57,26 @@ interface AuthContextValue {
   /**
    * Normalized tier string for analytics / telemetry. One of:
    * 'anon' | 'unverified' | 'free_verified' | 'verity' |
-   * 'verity_pro' | 'verity_family' | 'godmode'. Derived from plan_id +
-   * email_verified + isGodMode. Never raw plan row — callers shouldn't
+   * 'verity_pro' | 'verity_family' | 'ownermode'. Derived from plan_id +
+   * email_verified + isOwnerMode. Never raw plan row — callers shouldn't
    * need to know the DB-side plan taxonomy to fire a track() call.
-   * (T302 added 'unverified'; T319 retired 'verity_family_xl'.)
-   * Item 11a added 'godmode' — owner / future per-user grant gets a
-   * dedicated bucket so analytics doesn't lump owner-QA reads in with
-   * any plan tier.
+   * 'ownermode' covers owner / granted-owner accounts so analytics
+   * doesn't lump owner-QA reads in with any plan tier.
    */
   userTier: string;
   /** Days since signup, or null for anon. */
   tenureDays: number | null;
   /**
-   * Item 11a — true when the current user holds `admin.god_mode`. Drives
+   * True when the current user holds `admin.owner_mode`. Drives
    * paywall/plan-card/featured-article bypass at the component layer; the
-   * server-side equivalent is hasPermissionServer('admin.god_mode').
+   * server-side equivalent is hasPermissionServer('admin.owner_mode').
    * Deliberately NOT named `isAdmin` — that name is already taken by the
    * module-scope path predicate `isAdmin(p: string)` below for "is this
    * an /admin route?", and overloading it would create a semantic
    * collision. Reuse `canSeeAdmin` (set from
    * hasPermission('admin.dashboard.view')) for "user has admin reach".
    */
-  isGodMode: boolean;
+  isOwnerMode: boolean;
 }
 
 export const AuthContext = createContext<AuthContextValue>({
@@ -87,11 +85,11 @@ export const AuthContext = createContext<AuthContextValue>({
   authLoaded: false,
   userTier: 'anon',
   tenureDays: null,
-  isGodMode: false,
+  isOwnerMode: false,
 });
 export const useAuth = () => useContext(AuthContext);
 
-function deriveTier(user: ProfileRow | null, isGodMode: boolean): string {
+function deriveTier(user: ProfileRow | null, isOwnerMode: boolean): string {
   // T302 — three states for the auth/verify dimension:
   //   'anon'        no signed-in user (logged out / cold visit)
   //   'unverified'  signed in but email_verified=false (was previously
@@ -99,11 +97,11 @@ function deriveTier(user: ProfileRow | null, isGodMode: boolean): string {
   //                 retention vs actually-anonymous retention).
   //   <plan-tier>   verified, bucketed by paid tier or 'free_verified'.
   if (!user) return 'anon';
-  // Item 11a — god-mode bucket beats every other label, including
-  // 'unverified'. Without this, owner mid-email-change would flip to
-  // 'unverified' and any tier-string equality check
-  // (e.g. signup _FeaturedArticle.tsx:28) would mis-route them.
-  if (isGodMode) return 'godmode';
+  // Owner Mode bucket beats every other label, including 'unverified'.
+  // Without this, owner mid-email-change would flip to 'unverified' and
+  // any tier-string equality check (e.g. signup _FeaturedArticle.tsx:28)
+  // would mis-route them.
+  if (isOwnerMode) return 'ownermode';
   if (!user.email_verified) return 'unverified';
   // Ext-B3 — read tier from the joined plans row instead of substring
   // matching the plan_id UUID. The previous heuristic could misfire if
@@ -188,10 +186,10 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
   // icon sits next to the wordmark — single discoverable entry point to
   // /search across every surface where the global chrome shows.
   const [canSearch, setCanSearch] = useState<boolean>(false);
-  // Item 11a — `admin.god_mode` membership. Refreshed in lockstep with the
+  // `admin.owner_mode` membership. Refreshed in lockstep with the
   // permissions cache so paywall components / plan card / signup featured
   // article never see a stale value.
-  const [isGodMode, setIsGodMode] = useState<boolean>(false);
+  const [isOwnerMode, setIsOwnerMode] = useState<boolean>(false);
   // T220 — skip-ref for the permission hydrate. Supabase's
   // onAuthStateChange fires on token refresh (not just real sign-in /
   // sign-out transitions), and re-running refreshAllPermissions() on
@@ -220,7 +218,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
           setAuthLoaded(true);
           setCanSeeAdmin(false);
           setCanSearch(false);
-          setIsGodMode(false);
+          setIsOwnerMode(false);
           lastHydrateRef.current = { userId: null, at: 0 };
         }
         return;
@@ -254,11 +252,11 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
         setAuthLoaded(true);
         setCanSeeAdmin(hasPermission('admin.dashboard.view'));
         setCanSearch(hasPermission('search.basic'));
-        // Item 11a — read after refreshAllPermissions so the cache is hot
-        // before this check fires. Phase 1 RPC patches return the full
-        // catalog when the caller has admin.god_mode, so a god-mode user's
-        // hasPermission('admin.god_mode') will resolve true here.
-        setIsGodMode(hasPermission('admin.god_mode'));
+        // Read after refreshAllPermissions so the cache is hot. The RPC
+        // patches return the full catalog when the caller has
+        // admin.owner_mode, so a holder's hasPermission('admin.owner_mode')
+        // resolves true here.
+        setIsOwnerMode(hasPermission('admin.owner_mode'));
         lastHydrateRef.current = { userId: authUser.id, at: now };
       }
     }
@@ -444,9 +442,9 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
         loggedIn,
         user,
         authLoaded,
-        userTier: deriveTier(user, isGodMode),
+        userTier: deriveTier(user, isOwnerMode),
         tenureDays: daysSince(user?.created_at ?? null),
-        isGodMode,
+        isOwnerMode,
       }}
     >
       {/* PageViewTrackListener calls useSearchParams() which triggers
