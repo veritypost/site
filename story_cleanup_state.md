@@ -518,17 +518,17 @@ Symptom: Card doesn't show a clear status (idle / generating / generated /
 published / failed). Wanted: persistent status badge per audience.
 
 ### 12. /admin/articles — clicking article opens view, not edit
-Status: PENDING
+Status: IN_PROGRESS
 Symptom: Default click on a row in /admin/articles navigates to the public
 view of the article. Wanted: navigate to the editor.
 
 ### 13. /admin/articles — "Open article" opens a sidebar
-Status: PENDING
+Status: IN_PROGRESS
 Symptom: The "Open article" affordance opens a sidebar drawer instead of
 navigating directly to the article.
 
 ### 14. Generated article — body not visible
-Status: PENDING
+Status: IN_PROGRESS
 Symptom: After a successful generate, the article's body doesn't show in
 the editor (or wherever the operator is looking). DB confirms body is
 written, so this is a render-side gap.
@@ -567,37 +567,37 @@ Unsave are scattered across the editor at inconsistent sizes and
 positions. Owner wants this condensed into one clear bar.
 
 ### 21. Public — published article not on home page
-Status: PENDING
+Status: IN_PROGRESS
 Symptom: Article was published from the editor (articles.status='published'
 + articles.published_at set) but doesn't appear on the home page.
 
 ### 22. Public story view — sources missing
-Status: PENDING
+Status: IN_PROGRESS
 Symptom: Sources block does not render on the public /<slug> story view.
 DB confirms 2 source rows exist for this article.
 
 ### 23. Public story view — timeline missing
-Status: PENDING
+Status: IN_PROGRESS
 Symptom: Timeline does not render on the public /<slug> story view.
 DB confirms 7 timeline rows for this story.
 
 ### 24. Public story view — quick-check questions missing
-Status: PENDING
+Status: IN_PROGRESS
 Symptom: Quiz questions do not render on the public /<slug> story view.
 DB confirms 5 active quiz rows for this article.
 
 ### 25. Public story view — discussion area missing
-Status: PENDING
+Status: IN_PROGRESS
 Symptom: Discussion / comments area does not render on the public
 /<slug> story view.
 
 ### 26. Timeline — date format MM/DD/YYYY everywhere
-Status: PENDING
+Status: IN_PROGRESS
 Symptom: Timeline event dates are not displayed as MM/DD/YYYY across all
 surfaces (public, editor, iOS, kids iOS).
 
 ### 27. Timeline — headline only, no body
-Status: PENDING
+Status: IN_PROGRESS
 Symptom: Timeline events render with body / description text. Wanted:
 date + headline only, never any body, on every surface.
 
@@ -658,7 +658,7 @@ Surfaces: AudienceCard generate POST + StoryCard sources block + the
 mute modal in newsroom page.tsx + any mute-outlet API route.
 
 ### 33. AudienceCard polling — articleId never updates on live transition
-Status: PENDING
+Status: RESOLVED
 Symptom: AudienceCard.tsx:141 calls `setArticleId(json.run.article_id)`
 inside the polling tick when status flips to completed. But `pipeline_runs`
 has NO `article_id` column (verified via web/src/types/database.ts:7977-8005
@@ -671,6 +671,71 @@ as `steps[].article_id` at route.ts line 87. Fix: read article_id from
 the last successful step in the steps array. Surfaced by concern #10's
 review pass — directly affects when the new Edit button (and the existing
 View article fallback) become visible without a page refresh.
+
+```
+RESOLUTION (concern 33) — 2026-05-02
+Investigate: Confirmed pipeline_runs schema has NO article_id column
+             (database.ts:7978-8005). The runs detail route at
+             api/admin/pipeline/runs/[id]/route.ts:43-60 selects `*` from
+             pipeline_runs and joins pipeline_costs into `steps`; the
+             route response shape is { ok, run: runRow, steps, totals }.
+             Each step row carries `article_id: string | null` (route.ts
+             :54, :87) sorted by created_at ascending (route.ts:128-130).
+             The article_id is written by the persist step in
+             generate/route.ts (cost row insert at ~1905-1929 carries
+             article_id + success:true). Local RunRow type at
+             AudienceCard.tsx:53-60 over-declared article_id; local
+             StepRow at :62-68 didn't include article_id at all.
+             Categorized as (b) data exists but render reads wrong field.
+Review:      A (confirmer) CONFIRMED diagnosis + fix; refined the
+             RunRow type pruning (drop only article_id, keep error_type
+             / error_message / audience which DO exist on pipeline_runs).
+             B (adversary) returned PARTIAL — flagged that
+             lastStep.article_id can be null on partial-success and
+             pushed for a route-level fix that surfaces article_id at
+             the top level of the response sourced from
+             output_summary.article_id (which is set unconditionally
+             pre-status-flip at generate/route.ts:2063-2085). No tie-
+             breaker required: owner's prompt explicitly LOCKED scope to
+             AudienceCard.tsx only ("no edits there [route file]"), so
+             B's route-level recommendation is out of scope. B's
+             partial-success concern is mitigated by reading "last
+             successful step" (matches owner's exact wording) instead
+             of just last step — only the persist step writes article_id,
+             so findLast(s.success && s.article_id) finds it iff persist
+             ran. Also confirmed B's adjacent finding that the cancel
+             route writes status='failed' (cancel/route.ts:102), so the
+             polling 'cancelled'|'aborted' branch is dead code, and the
+             'success' status is also dead (generate uses 'completed'
+             only) — orthogonal cleanup, not in #33's scope.
+Fix:         web/src/app/admin/newsroom/_components/AudienceCard.tsx —
+             - RunRow type: removed article_id field (pipeline_runs has
+               no such column).
+             - StepRow type: added article_id: string | null (matches
+               the route's pipeline_costs projection).
+             - Polling success branch: replaced
+               setArticleId(json.run.article_id) with a findLast scan
+               for the last step where success===true AND article_id is
+               non-null, then setArticleId(articleStep?.article_id ?? null).
+             - Added a short invariant comment explaining why we read
+               from steps not run.
+             Cancelled/failed branches untouched. Server-side
+             initialArticleId first-paint path untouched.
+TypeScript:  pass (npx tsc --noEmit, exit 0)
+iOS build:   n/a — newsroom is web-admin only; verified via grep that
+             VerityPost/ + VerityPostKids/ have no AudienceCard
+             references (consistent with kids_scope.md memory: kids =
+             iOS only, no admin newsroom).
+Verifier:    pass — 10/10 checks. Polling success populates articleId
+             from the persist-step row; gated JSX (View fallback Link
+             + new Edit Link) now renders after live transitions; no
+             dead refs to removed RunRow.article_id; first-paint path
+             intact; cross-platform scope correctly limited to web.
+Status:      RESOLVED — unblocks concern #34 (drop redundant
+             articleId-fallback View Link). Owner can now confirm by
+             generating a card live: Edit button should appear without
+             a page refresh once status flips to generated.
+```
 
 ### 34. AudienceCard — drop redundant articleId-fallback View Link
 Status: PENDING

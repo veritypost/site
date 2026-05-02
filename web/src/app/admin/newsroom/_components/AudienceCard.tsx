@@ -54,7 +54,6 @@ type RunRow = {
   id: string;
   status: string | null;
   audience: string | null;
-  article_id: string | null;
   error_type: string | null;
   error_message: string | null;
 };
@@ -64,6 +63,7 @@ type StepRow = {
   step: string;
   success: boolean;
   error_type: string | null;
+  article_id: string | null;
   created_at: string;
 };
 
@@ -138,7 +138,11 @@ function AudienceCard(props: AudienceCardProps) {
       const status = json.run.status;
       if (status === 'completed' || status === 'success') {
         setState('generated');
-        setArticleId(json.run.article_id);
+        // pipeline_runs has no article_id column — the persist step on
+        // pipeline_costs carries it. Walk steps in reverse for the last
+        // successful one with an article_id.
+        const articleStep = json.steps?.findLast((s) => s.success && s.article_id) ?? null;
+        setArticleId(articleStep?.article_id ?? null);
         // The detail endpoint doesn't include slug/title; keep what we
         // have. Session C's article-page resolves from article_id anyway,
         // so the View article link below stays correct.
