@@ -143,6 +143,12 @@ export function PrivacyCard({ user, preview }: Props) {
   const setAudienceTo = async (next: Audience) => {
     if (next === audience) return;
     if (next === 'hidden') {
+      // GAP-008 — don't open the confirm dialog until the follower count has
+      // finished loading. The dialog body quotes the count; showing it while
+      // followersLoading=true would display "all 0 current followers" regardless
+      // of the real count, which could mislead the user into confirming a
+      // lockdown they believe affects nobody.
+      if (followersLoading) return;
       setConfirmHidden(true);
       return;
     }
@@ -315,7 +321,7 @@ export function PrivacyCard({ user, preview }: Props) {
             danger
             body="Cut everyone off immediately. Profile becomes invisible and all current followers are removed."
             active={audience === 'hidden'}
-            disabled={busyKey === 'audience'}
+            disabled={busyKey === 'audience' || followersLoading}
             onPick={() => setAudienceTo('hidden')}
           />
         </div>

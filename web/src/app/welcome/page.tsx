@@ -3,7 +3,7 @@
 'use client';
 import { useState, useEffect, CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
-import { friendlyHttpError } from '@/lib/friendlyError';
+import { friendlyError, friendlyHttpError } from '@/lib/friendlyError';
 
 // First-login onboarding carousel was retired — `WelcomeModal` (mounted in
 // NavWrapper) handles the post-signin first-login username pick. This page
@@ -81,7 +81,7 @@ function GraduationClaim({ token }: { token: string }) {
       }
       setDone({ display_name: j.display_name ?? null });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Claim failed');
+      setError(friendlyError(err, 'Could not complete setup. Try again.'));
       setBusy(false);
     }
   };

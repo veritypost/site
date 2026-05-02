@@ -12,6 +12,7 @@ import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/perm
 import { getPlanLimitValue } from '@/lib/plans';
 import { formatDate } from '@/lib/dates';
 import { useToast } from '../../components/Toast';
+import { friendlyError } from '@/lib/friendlyError';
 import type { Tables } from '@/types/database-helpers';
 
 // T-016: bookmark cap is now DB-driven via plan_features.bookmarks
@@ -287,7 +288,7 @@ export default function BookmarksPage() {
           next.splice(idx, 0, bookmark);
           return next;
         });
-        setError(d?.error || 'Remove failed');
+        setError(friendlyError(d?.error, 'Remove failed'));
       } else {
         setDeletingId(null);
       }
@@ -303,7 +304,7 @@ export default function BookmarksPage() {
     });
     if (!res.ok) {
       const d = await res.json().catch(() => ({}));
-      setError(d?.error || 'Save failed');
+      setError(friendlyError(d?.error, 'Save failed'));
       return;
     }
     setItems((prev) => prev.map((b) => (b.id === id ? { ...b, notes: noteDraft } : b)));
@@ -319,7 +320,7 @@ export default function BookmarksPage() {
     });
     if (!res.ok) {
       const d = await res.json().catch(() => ({}));
-      setError(d?.error || 'Move failed');
+      setError(friendlyError(d?.error, 'Move failed'));
       return;
     }
     await load();
@@ -335,7 +336,7 @@ export default function BookmarksPage() {
     });
     if (!res.ok) {
       const d = await res.json().catch(() => ({}));
-      setError(d?.error || 'Create failed');
+      setError(friendlyError(d?.error, 'Create failed'));
       return;
     }
     setNewCollectionName('');
@@ -356,7 +357,7 @@ export default function BookmarksPage() {
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        setError(d?.error || 'Delete failed');
+        setError(friendlyError(d?.error, 'Delete failed'));
         return;
       }
       if (activeCollection === pendingDelete.id) setActiveCollection('all');

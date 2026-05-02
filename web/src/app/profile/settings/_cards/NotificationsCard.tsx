@@ -7,6 +7,8 @@
 
 import { useEffect, useState } from 'react';
 
+import { friendlyHttpError } from '@/lib/friendlyError';
+
 import { Card } from '../../_components/Card';
 import { useToast } from '../../_components/Toast';
 import { C, F, FONT, R, S } from '../../_lib/palette';
@@ -109,12 +111,17 @@ export function NotificationsCard({ preview }: Props) {
           channel_in_app: next.in_app,
         }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        // Roll back optimistic update before throwing so the catch can re-use prefs.
+        setPrefs(prefs);
+        toast.error(friendlyHttpError(res, 'Could not update notifications.'));
+        return;
+      }
       toast.success('Notifications updated.');
     } catch (err) {
-      // Roll back optimistic update.
+      // Roll back optimistic update (network-level failure — res never resolved).
       setPrefs(prefs);
-      toast.error(err instanceof Error ? err.message : 'Could not update notifications.');
+      toast.error('Could not update notifications.');
     } finally {
       setSaving(null);
     }

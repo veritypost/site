@@ -5,6 +5,7 @@ import { useState, useEffect, CSSProperties } from 'react';
 import { useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
+import { friendlyError } from '@/lib/friendlyError';
 import { formatDate } from '@/lib/dates';
 import type { Tables } from '@/types/database-helpers';
 
@@ -107,7 +108,7 @@ export default function RecapPlayer() {
       const res = await fetch(`/api/recap/${id}`);
       const data = (await res.json().catch(() => ({}))) as LoadResponse;
       if (!res.ok) {
-        setError(data.error || 'Load failed');
+        setError(friendlyError(data.error, 'Load failed'));
         setLoading(false);
         return;
       }
@@ -132,7 +133,7 @@ export default function RecapPlayer() {
     const data = (await res.json().catch(() => ({}))) as SubmitResponse & { error?: string };
     setBusy(false);
     if (!res.ok) {
-      setError(data.error || 'Submit failed');
+      setError(friendlyError(data.error, 'Submit failed'));
       return;
     }
     setResult(data);

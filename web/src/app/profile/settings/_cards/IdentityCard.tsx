@@ -16,6 +16,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Tables } from '@/types/database-helpers';
 
+import { friendlyError } from '@/lib/friendlyError';
+
 import { Card } from '../../_components/Card';
 import { Field, buttonPrimaryStyle, inputStyle, textareaStyle } from '../../_components/Field';
 import { useToast } from '../../_components/Toast';
@@ -58,10 +60,7 @@ export function IdentityCard({ user, preview, onUserUpdated }: Props) {
     });
     setSaving(false);
     if (error) {
-      // Surface the server's actual message — fixes the legacy "Could not
-      // update profile" generic that hid the real reason.
-      const msg = error.message ?? 'Save failed.';
-      toast.error(msg);
+      toast.error(friendlyError(error));
       return;
     }
     toast.success('Profile updated.');

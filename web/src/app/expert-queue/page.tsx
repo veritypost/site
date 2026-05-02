@@ -7,6 +7,7 @@ import { createClient } from '../../lib/supabase/client';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import type { Tables } from '@/types/database-helpers';
 import { formatDate, formatDateTime } from '@/lib/dates';
+import { friendlyError } from '@/lib/friendlyError';
 import { marked } from 'marked';
 // dompurify is browser-only. During SSR (Next.js renders 'use client'
 // modules on the server for the initial HTML payload) it returns input
@@ -157,8 +158,7 @@ export default function ExpertQueuePage() {
       if (!res.ok) throw new Error(data?.error || 'Queue load failed');
       setItems(data.items || []);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Queue load failed';
-      setError(msg);
+      setError(friendlyError(err, 'Queue load failed'));
     }
   }
   async function loadBackChannel(categoryId: string | null) {
@@ -169,8 +169,7 @@ export default function ExpertQueuePage() {
       if (!res.ok) throw new Error(data?.error || 'Back-channel load failed');
       setBackMessages(data.messages || []);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Back-channel load failed';
-      setError(msg);
+      setError(friendlyError(err, 'Back-channel load failed'));
     }
   }
 
@@ -186,7 +185,7 @@ export default function ExpertQueuePage() {
     try {
       const res = await fetch(`/api/expert/queue/${id}/claim`, { method: 'POST' });
       const data = await res.json().catch(() => ({}) as { error?: string });
-      if (!res.ok) { setError(data?.error || 'Claim failed'); return; }
+      if (!res.ok) { setError(friendlyError(data?.error, 'Claim failed')); return; }
       loadItems(tab);
     } finally {
       setPendingId(null);
@@ -197,7 +196,7 @@ export default function ExpertQueuePage() {
     try {
       const res = await fetch(`/api/expert/queue/${id}/decline`, { method: 'POST' });
       const data = await res.json().catch(() => ({}) as { error?: string });
-      if (!res.ok) { setError(data?.error || 'Decline failed'); return; }
+      if (!res.ok) { setError(friendlyError(data?.error, 'Decline failed')); return; }
       loadItems(tab);
     } finally {
       setPendingId(null);
@@ -214,7 +213,7 @@ export default function ExpertQueuePage() {
         body: JSON.stringify({ body }),
       });
       const data = (await res.json().catch(() => ({}))) as AnswerResponse;
-      if (!res.ok) { setError(data?.error || 'Answer failed'); return; }
+      if (!res.ok) { setError(friendlyError(data?.error, 'Answer failed')); return; }
       if (data.pending_review) {
         setFlash(
           'Saved. Your answer is in probation review and will go live once an editor approves it.'
@@ -242,7 +241,7 @@ export default function ExpertQueuePage() {
         body: JSON.stringify({ category_id: activeCategory, body }),
       });
       const data = (await res.json().catch(() => ({}))) as BackChannelResponse;
-      if (!res.ok) { setError(data?.error || 'Post failed'); return; }
+      if (!res.ok) { setError(friendlyError(data?.error, 'Post failed')); return; }
       setBackDraft('');
       loadBackChannel(activeCategory);
     } finally {

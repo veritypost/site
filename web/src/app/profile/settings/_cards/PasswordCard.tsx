@@ -8,6 +8,8 @@ import { useMemo, useState } from 'react';
 
 import { createClient } from '@/lib/supabase/client';
 
+import { friendlyError } from '@/lib/friendlyError';
+
 import { Card } from '../../_components/Card';
 import { Field, buttonPrimaryStyle, inputStyle } from '../../_components/Field';
 import { useToast } from '../../_components/Toast';
@@ -69,7 +71,7 @@ export function PasswordCard({ preview }: Props) {
         if (verifyRes.status === 429) {
           toast.error('Too many attempts. Try again in a few minutes.');
         } else {
-          toast.error((data as { error?: string }).error ?? 'Current password is incorrect.');
+          toast.error(friendlyError((data as { error?: string }).error, 'Current password is incorrect.'));
         }
         setSaving(false);
         return;

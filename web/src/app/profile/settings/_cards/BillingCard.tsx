@@ -10,6 +10,7 @@ import Link from 'next/link';
 
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/app/NavWrapper';
+import { friendlyError } from '@/lib/friendlyError';
 import type { Tables } from '@/types/database-helpers';
 
 import { Card } from '../../_components/Card';
@@ -118,7 +119,7 @@ export function BillingCard({ user, preview }: Props) {
       window.location.href = data.url;
     } catch (err) {
       setBusy(null);
-      toast.error(err instanceof Error ? err.message : 'Could not open billing portal.');
+      toast.error(friendlyError(err, 'Could not open billing portal.'));
     }
   };
 
@@ -140,7 +141,7 @@ export function BillingCard({ user, preview }: Props) {
       toast.success('Subscription cancelled. You keep access through the period.');
       setSub((s) => (s ? { ...s, cancel_at: data.cancel_at ?? new Date().toISOString() } : s));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Cancel failed.');
+      toast.error(friendlyError(err, 'Cancel failed.'));
     } finally {
       setBusy(null);
     }
@@ -163,7 +164,7 @@ export function BillingCard({ user, preview }: Props) {
       toast.success('Subscription resumed.');
       setSub((s) => (s ? { ...s, cancel_at: null } : s));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Resume failed.');
+      toast.error(friendlyError(err, 'Resume failed.'));
     } finally {
       setBusy(null);
     }

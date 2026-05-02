@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from 'react';
 
+import { friendlyError } from '@/lib/friendlyError';
 import { refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 
 import { C, FONT, R, S, SH } from '../_lib/palette';
@@ -37,7 +38,7 @@ export function PermsBoundary({ optional = false, children }: Props) {
         // a transient cache miss. The downstream perm checks remain
         // fail-closed individually.
         console.error('[redesign/perms] cache load failed', err);
-        setError(err instanceof Error ? err.message : 'Could not load your permissions.');
+        setError(friendlyError(err, 'Could not load your permissions.'));
         setReady(true);
       }
     })();
