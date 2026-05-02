@@ -72,6 +72,10 @@ final class AuthViewModel: ObservableObject {
     /// successful send. UI disables the resend button while > 0.
     @Published var magicLinkCooldownSec: Int = 0
     private var magicLinkCooldownTask: Task<Void, Never>?
+    /// True when the endpoint returned invite_required (beta gate blocked
+    /// this email). LoginView / SignupView should show the waitlist card.
+    /// No cooldown is started in this state — no email was sent.
+    @Published var magicLinkGated: Bool = false
 
     /// True when signup completed but the email has not yet been verified.
     /// ContentView uses this to show VerifyEmailView instead of the tab bar.
@@ -1173,7 +1177,7 @@ final class AuthViewModel: ObservableObject {
         struct Body: Encodable { let email: String }
         req.httpBody = try? JSONEncoder().encode(Body(email: trimmed))
         do {
-            let (_, response) = try await URLSession.shared.data(for: req)
+            let (data, response) = try await URLSession.shared.data(for: req)
             guard let http = response as? HTTPURLResponse else {
                 authError = "Network error. Try again."
                 return false
@@ -1184,6 +1188,11 @@ final class AuthViewModel: ObservableObject {
             }
             if !(200...299).contains(http.statusCode) {
                 authError = "Couldn\u{2019}t send the link. Try again."
+                return false
+            }
+            if let parsed = try? JSONDecoder().decode(MagicLinkResponse.self, from: data),
+               parsed.ok == false, parsed.reason == "invite_required" {
+                magicLinkGated = true
                 return false
             }
             magicLinkSentTo = trimmed
@@ -1202,6 +1211,7 @@ final class AuthViewModel: ObservableObject {
         magicLinkCooldownTask = nil
         magicLinkSentTo = nil
         magicLinkCooldownSec = 0
+        magicLinkGated = false
         authError = nil
     }
 
@@ -1278,5 +1288,10 @@ final class AuthViewModel: ObservableObject {
         guard let uid = (try? await client.auth.session)?.user.id.uuidString else { return }
         await loadUser(id: uid)
     }
+}
+
+private struct MagicLinkResponse: Decodable {
+    let ok: Bool?
+    let reason: String?
 }
 
