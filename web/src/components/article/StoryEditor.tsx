@@ -38,6 +38,7 @@ import Spinner from '@/components/admin/Spinner';
 import { confirm, ConfirmDialogHost } from '@/components/admin/ConfirmDialog';
 import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
+import { formatTimelineDate } from '@/lib/dates';
 
 // Editorial day = America/New_York. Same constant the home page uses
 // to filter today's hero. Returns "YYYY-MM-DD".
@@ -158,17 +159,6 @@ type ArticleRow = Tables<'articles'> & {
 
 const genId = (prefix: string) =>
   `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
-// US-format display for entry dates. Parse YYYY-MM-DD parts directly so
-// no timezone shift happens (`new Date('2024-06-15').toLocaleDateString`
-// would parse as UTC midnight and shift west of UTC). Falls back to the
-// raw string if it doesn't match the canonical shape.
-const formatMmDdYyyy = (s: string | null | undefined): string => {
-  if (!s) return '';
-  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (!m) return s;
-  return `${m[2]}/${m[3]}/${m[1]}`;
-};
 
 // Defined at module level — NOT inside the component body. Inline
 // component declarations get a fresh function reference on every parent
@@ -429,10 +419,17 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
       const loadedEntries: TimelineEntry[] = (eventData || []).map((e) => {
         const ev = e as unknown as Record<string, unknown>;
         const dbType = ev.type as string | null;
-        const localType: 'story' | 'event' = dbType === 'article' ? 'story' : 'event';
+        const isAnchor = dbType === 'article';
+        const localType: 'story' | 'event' = isAnchor ? 'story' : 'event';
         const eventBody = (ev.event_body as string | null) ?? '';
         const eventLabel = (ev.event_label as string | null) ?? (ev.title as string | null) ?? '';
         const eventDate = (ev.event_date as string | null) ?? '';
+        // Anchor row's event_body is NULL by design — persist_generated_article
+        // only writes event_label + event_date for type='article'. Body lives
+        // on articles.body. Always read from cast.body for the anchor (not
+        // event_body || cast.body — saveAll writes excerpt into event_body
+        // for the anchor, so the conditional would silently flip on reload).
+        const content = isAnchor ? (cast.body || '') : eventBody;
         return {
           id: e.id,
           event_date: eventDate,
@@ -440,7 +437,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
           type: localType,
           title: eventLabel,
           summary: eventBody,
-          content: eventBody,
+          content,
           timeline_date: eventDate,
           timeline_headline: eventLabel,
           comment_count: 0,
@@ -709,10 +706,12 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
       const reloadedEntries: TimelineEntry[] = (eventData || []).map((e) => {
         const ev = e as unknown as Record<string, unknown>;
         const dbType = ev.type as string | null;
-        const localType: 'story' | 'event' = dbType === 'article' ? 'story' : 'event';
+        const isAnchor = dbType === 'article';
+        const localType: 'story' | 'event' = isAnchor ? 'story' : 'event';
         const eventBody = (ev.event_body as string | null) ?? '';
         const eventLabel = (ev.event_label as string | null) ?? (ev.title as string | null) ?? '';
         const eventDate = (ev.event_date as string | null) ?? '';
+        const content = isAnchor ? (story.body || '') : eventBody;
         return {
           id: e.id,
           event_date: eventDate,
@@ -720,7 +719,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
           type: localType,
           title: eventLabel,
           summary: eventBody,
-          content: eventBody,
+          content,
           timeline_date: eventDate,
           timeline_headline: eventLabel,
           comment_count: 0,
