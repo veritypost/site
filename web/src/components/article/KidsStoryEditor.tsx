@@ -770,17 +770,25 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
       <Badge variant="info">Kids</Badge>
       <Badge variant={story.status === 'published' ? 'success' : 'neutral'} dot>{story.status}</Badge>
       {!embedded && (
-        <Button variant="secondary" size="sm" onClick={() => setShowPicker(true)}>Open article</Button>
+        <Button variant="secondary" size="sm" onClick={() => setShowPicker(true)}>Open</Button>
       )}
       <Button variant="secondary" size="sm" onClick={() => setViewMode('timeline')}>Timeline</Button>
       <Button variant="secondary" size="sm" onClick={() => setViewMode('preview')}>Preview</Button>
       <Button variant="primary" size="sm" loading={saving} onClick={() => saveAll()}>Save</Button>
+      <Button variant="secondary" size="sm" onClick={publishStory}>
+        {story.status === 'published' ? 'Update & publish' : 'Publish'}
+      </Button>
+      {storyId && (
+        <Button variant="ghost" size="sm" onClick={deleteStory} style={{ color: C.danger }}>
+          Delete
+        </Button>
+      )}
     </>
   );
 
   const editorBody = (
     <>
-      <Section embedded={embedded} divider={false}>
+      <Section embedded={embedded} divider={false} title="Tools">
         <div style={{ display: 'flex', gap: S[1], flexWrap: 'wrap' }}>
           <Button
             variant="secondary"
@@ -810,11 +818,6 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
           >
             Simplify language
           </Button>
-          <div style={{ flex: 1 }} />
-          <Button variant="primary" size="sm" onClick={publishStory}>
-            {story.status === 'published' ? 'Update & publish' : 'Publish'}
-          </Button>
-          {storyId && <Button variant="ghost" size="sm" onClick={deleteStory} style={{ color: C.danger }}>Delete article</Button>}
         </div>
       </Section>
 

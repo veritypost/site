@@ -1167,67 +1167,36 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
       {isDirty && <Badge variant="warn">Unsaved</Badge>}
       <Badge variant={story.status === 'published' ? 'success' : 'neutral'} dot>{story.status}</Badge>
       {!embedded && (
-        <Button variant="secondary" size="sm" onClick={() => setShowPicker(true)}>Open article</Button>
+        <Button variant="secondary" size="sm" onClick={() => setShowPicker(true)}>Open</Button>
       )}
       {lastPersistedSlugRef.current && (
-        <a
-          href={`/${lastPersistedSlugRef.current}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            fontSize: 12,
-            padding: '4px 10px',
-            border: '1px solid #444',
-            borderRadius: 4,
-            color: '#ccc',
-            textDecoration: 'none',
-            fontFamily: 'inherit',
-            lineHeight: '20px',
-            display: 'inline-block',
-          }}
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => window.open(`/${lastPersistedSlugRef.current}`, '_blank', 'noopener,noreferrer')}
         >
           View
-        </a>
+        </Button>
       )}
       <Button variant="secondary" size="sm" onClick={() => setViewMode('timeline')}>Timeline</Button>
       <Button variant="secondary" size="sm" onClick={() => setViewMode('preview')}>Preview</Button>
       <Button variant="primary" size="sm" loading={saving} onClick={() => saveAll()}>Save</Button>
+      <Button variant="secondary" size="sm" onClick={publishStory}>
+        {story.status === 'published' ? 'Update & publish' : 'Publish'}
+      </Button>
+      {storyId && (
+        <Button variant="ghost" size="sm" onClick={deleteStory} style={{ color: C.danger }}>
+          Delete
+        </Button>
+      )}
     </>
   );
 
   const editorBody = (
     <>
       <Section embedded={embedded} divider={false}>
-        <div style={{ display: 'flex', gap: S[1], flexWrap: 'wrap' }}>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={async () => {
-              try {
-                const res = await fetch('/api/ai/generate', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ storyId, type: 'story' }),
-                });
-                if (res.status === 503) toast.push({ message: 'AI API key not configured. Add it to .env.local.', variant: 'danger' });
-                else if (!res.ok) toast.push({ message: 'AI generation failed', variant: 'danger' });
-                else toast.push({ message: 'AI content generated — reload to see changes', variant: 'success' });
-              } catch {
-                toast.push({ message: 'AI API key not configured', variant: 'danger' });
-              }
-            }}
-          >
-            AI generate
-          </Button>
-          <div style={{ flex: 1 }} />
-          <Button variant="primary" size="sm" onClick={publishStory}>
-            {story.status === 'published' ? 'Update & publish' : 'Publish'}
-          </Button>
-          {storyId && <Button variant="ghost" size="sm" onClick={deleteStory} style={{ color: C.danger }}>Delete article</Button>}
-        </div>
-
         {storyId && (
-          <div style={{ marginTop: S[3] }}>
+          <div>
             {!followupOpen ? (
               <Button
                 variant="ghost"
