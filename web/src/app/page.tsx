@@ -262,7 +262,27 @@ export default async function HomePage() {
     return bT - aT;
   });
 
-  const displayedStories = topArticles.length > 0 ? topArticles : dateSorted;
+  // Editorial fallback: when no pinned top stories AND no articles published
+  // in today's editorial window, show the most-recent published articles so
+  // a quiet day (or pre-launch test) doesn't render an empty front page.
+  let recentFallback: HomeStory[] = [];
+  if (topArticles.length === 0 && dateSorted.length === 0 && !fetchThrew) {
+    const recentRes = await supabase
+      .from('articles')
+      .select(SELECT_COLS)
+      .eq('status', 'published')
+      .eq('browse_only', false)
+      .order('published_at', { ascending: false, nullsFirst: false })
+      .limit(12);
+    if (recentRes.error) {
+      console.error('[home.fetch.recent]', recentRes.error.message);
+    } else {
+      recentFallback = (recentRes.data as HomeStory[] | null) || [];
+    }
+  }
+
+  const displayedStories =
+    topArticles.length > 0 ? topArticles : dateSorted.length > 0 ? dateSorted : recentFallback;
 
   const breaking = ((breakingRes.data as HomeStory[] | null) || [])[0] || null;
 
