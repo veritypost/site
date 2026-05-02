@@ -399,7 +399,7 @@ export default function AudienceCard(props: AudienceCardProps) {
               </Link>
             ) : articleId ? (
               <Link
-                href={`/admin/story-manager?id=${articleId}`}
+                href={`/admin/story-manager?article=${articleId}`}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
