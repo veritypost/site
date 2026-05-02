@@ -19,6 +19,7 @@ import type { Database } from '@/types/database';
 import { Z } from '@/lib/zIndex';
 import Skeleton from './Skeleton';
 import { COMMENT_REPORT_REASONS } from '@/lib/reportReasons';
+import { friendlyError } from '@/lib/friendlyError';
 
 type CommentDb = Database['public']['Tables']['comments']['Row'];
 
@@ -170,7 +171,7 @@ export default function CommentThread({
       .order('created_at', { ascending: true })
       .range(0, 49);
     if (loadErr) {
-      setError(loadErr.message);
+      setError("Couldn't load comments. Try refreshing.");
       setLoading(false);
       return;
     }
@@ -379,7 +380,7 @@ export default function CommentThread({
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      setError(data?.error || 'Tag failed');
+      setError(friendlyError(data?.error, 'Tag failed'));
       return;
     }
     // The RPC always returns the canonical { tagged, count, tag_kind,
@@ -429,7 +430,7 @@ export default function CommentThread({
     });
     if (!res.ok) {
       const d = await res.json().catch(() => ({}));
-      setError(d?.error || 'Edit failed');
+      setError(d?.message ?? friendlyError(d?.error, 'Edit failed'));
       return;
     }
     setComments((prev) =>
@@ -470,7 +471,7 @@ export default function CommentThread({
         const res = await fetch(`/api/comments/${dialog.commentId}`, { method: 'DELETE' });
         if (!res.ok) {
           const d = await res.json().catch(() => ({}));
-          setError(d?.error || 'Delete failed');
+          setError(friendlyError(d?.error, 'Delete failed'));
           return;
         }
         setComments((prev) =>
@@ -498,7 +499,7 @@ export default function CommentThread({
         });
         if (!res.ok) {
           const d = await res.json().catch(() => ({}));
-          setError(d?.error || 'Report failed');
+          setError(friendlyError(d?.error, 'Report failed'));
           return;
         }
         closeDialog();
@@ -518,7 +519,7 @@ export default function CommentThread({
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          setError(data?.error || 'Flag failed');
+          setError(friendlyError(data?.error, 'Flag failed'));
           return;
         }
         closeDialog();
@@ -534,7 +535,7 @@ export default function CommentThread({
         });
         if (!res.ok) {
           const d = await res.json().catch(() => ({}));
-          setError(d?.error || 'Hide failed');
+          setError(friendlyError(d?.error, 'Hide failed'));
           return;
         }
         setComments((prev) => prev.filter((c) => c.id !== dialog.commentId));
@@ -550,7 +551,7 @@ export default function CommentThread({
         const res = await fetch(`/api/users/${dialog.targetUserId}/block`, { method: 'POST' });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          setError(data?.error || 'Block failed');
+          setError(friendlyError(data?.error, 'Block failed'));
           return;
         }
         setBlockedIds((prev) => new Set([...prev, dialog.targetUserId as string]));
@@ -595,7 +596,7 @@ export default function CommentThread({
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || 'Ask failed');
+      if (!res.ok) throw new Error(friendlyError(data?.error, 'Ask failed'));
       setExpertQuestion('');
       setExpertDialogOpen(false);
     } catch (err) {

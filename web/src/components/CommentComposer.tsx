@@ -6,6 +6,7 @@ import { createClient } from '../lib/supabase/client';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import { MENTION_RE } from '@/lib/mentions';
 import { COPY } from '@/lib/copy';
+import { friendlyError } from '@/lib/friendlyError';
 import type { Database } from '@/types/database';
 
 type Mention = { user_id: string; username: string };
@@ -285,7 +286,7 @@ export default function CommentComposer({
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || 'Could not post');
+      if (!res.ok) throw new Error(friendlyError(data?.error, 'Could not post'));
       setBody('');
       onPosted?.(data.comment || null);
       onCancel?.();
