@@ -85,9 +85,26 @@ struct BookmarksView: View {
                 }
 
                 if loading {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 40)
+                    VStack(spacing: 8) {
+                        ForEach(0..<4, id: \.self) { _ in
+                            VStack(alignment: .leading, spacing: 8) {
+                                SkeletonBar(height: 16)
+                                SkeletonBar(width: 220, height: 16)
+                                HStack(spacing: 8) {
+                                    SkeletonBar(width: 64, height: 11)
+                                    SkeletonBar(width: 88, height: 11)
+                                }
+                            }
+                            .padding(16)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(VP.card)
+                            .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
+                            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .accessibilityLabel("Loading bookmarks")
                 } else if filtered.isEmpty {
                     emptyState
                 } else {

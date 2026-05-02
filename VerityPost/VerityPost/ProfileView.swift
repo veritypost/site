@@ -1405,7 +1405,24 @@ struct ProfileView: View {
                     }
                 }
                 if !achievementsLoaded {
-                    ProgressView().padding(.top, 8)
+                    LazyVGrid(
+                        columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)],
+                        spacing: 10
+                    ) {
+                        ForEach(0..<4, id: \.self) { _ in
+                            VStack(spacing: 8) {
+                                SkeletonBar(width: 44, height: 44, radius: VP.radiusMD)
+                                SkeletonBar(width: 80, height: 12)
+                                SkeletonBar(width: 56, height: 10)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(12)
+                            .background(VP.card)
+                            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+                        }
+                    }
+                    .padding(.top, 8)
+                    .accessibilityLabel("Loading achievements")
                 } else if allAchievements.isEmpty {
                     emptyState(
                         title: "No achievements unlocked yet — keep reading and quizzing to earn your first.",

@@ -397,6 +397,24 @@ struct PillButton: View {
     }
 }
 
+// MARK: - Skeleton loading bar
+
+struct SkeletonBar: View {
+    var width: CGFloat? = nil
+    var height: CGFloat
+    var radius: CGFloat = VP.radiusSM
+    @State private var pulse = false
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: radius)
+            .fill(Color(hex: "e0e0e0"))
+            .frame(width: width, height: height)
+            .opacity(pulse ? 0.45 : 1.0)
+            .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulse)
+            .onAppear { pulse = true }
+    }
+}
+
 // MARK: - Time ago formatter
 
 private let _timeAgoFmt: DateFormatter = {

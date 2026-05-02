@@ -399,12 +399,40 @@ struct HomeView: View {
     // MARK: - Empty / loading / error
 
     private var loadingState: some View {
-        Text("Loading today’s front page…")
-            .font(.system(size: VP.Size.base, weight: .regular, design: .serif))
-            .italic()
-            .foregroundColor(VP.dim)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 64)
+        VStack(spacing: 0) {
+            // Hero block skeleton
+            VStack(alignment: .leading, spacing: 12) {
+                SkeletonBar(width: 72, height: 10)
+                SkeletonBar(height: 26)
+                SkeletonBar(height: 26)
+                SkeletonBar(width: 200, height: 26)
+                SkeletonBar(width: 56, height: 10)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 40)
+            .background(Color(hex: "d4d4d4").opacity(0.5))
+
+            // Three supporting card skeletons
+            VStack(spacing: 0) {
+                ForEach(0..<3, id: \.self) { i in
+                    VStack(alignment: .leading, spacing: 10) {
+                        SkeletonBar(width: 68, height: 10)
+                        SkeletonBar(height: 20)
+                        SkeletonBar(width: 220, height: 20)
+                        SkeletonBar(width: 56, height: 10)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 24)
+                    if i < 2 {
+                        Rectangle().fill(VP.rule).frame(height: 1).padding(.horizontal, 20)
+                    }
+                }
+            }
+            .padding(.top, 40)
+        }
+        .accessibilityLabel("Loading today’s front page")
     }
 
     private func errorState(_ message: String) -> some View {
