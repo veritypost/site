@@ -115,8 +115,13 @@
   --p-ring-strong: rgba(11, 92, 255, 0.60);
 }
 
+/* System dark: only fires when the OS is dark AND the user has not
+   set an explicit override via data-theme. :root:not([data-theme])
+   has specificity (0,1,1,0) — higher than bare :root (0,1,0,0) — so
+   this block wins over the base light tokens when it applies, and is
+   correctly suppressed by the explicit overrides below. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme]) {
     /* Surfaces */
     --p-bg: #0a0a0a;
     --p-surface: #111113;
@@ -154,6 +159,90 @@
     --p-ring: rgba(77, 143, 255, 0.35);
     --p-ring-strong: rgba(77, 143, 255, 0.65);
   }
+}
+
+/* Explicit dark override — set by JS when user picks "Dark".
+   Specificity (0,1,1,0) beats base :root (0,1,0,0); source order
+   after the media query block means it also wins when OS is dark. */
+:root[data-theme="dark"] {
+  /* Surfaces */
+  --p-bg: #0a0a0a;
+  --p-surface: #111113;
+  --p-surface-raised: #18181b;
+  --p-surface-sunken: #09090b;
+  /* Lines */
+  --p-border: #27272a;
+  --p-border-strong: #3f3f46;
+  --p-divider: #1c1c1f;
+  /* Ink */
+  --p-ink: #fafafa;
+  --p-ink-soft: #e4e4e7;
+  --p-ink-muted: #a1a1aa;
+  --p-ink-dim: #71717a;
+  --p-ink-faint: #52525b;
+  /* Brand accent */
+  --p-accent: #4d8fff;
+  --p-accent-soft: #0d1f4d;
+  --p-accent-ink: #ffffff;
+  /* Semantic states */
+  --p-success: #22c55e;
+  --p-success-soft: #052e16;
+  --p-warn: #fbbf24;
+  --p-warn-soft: #2d1d02;
+  --p-danger: #f87171;
+  --p-danger-soft: #2d0a0a;
+  --p-info: #60a5fa;
+  --p-info-soft: #0c1a3d;
+  /* Expert / verified badges */
+  --p-verified: #60a5fa;
+  --p-verified-soft: #0a1a30;
+  --p-expert: #a78bfa;
+  --p-expert-soft: #1e0a3c;
+  /* Focus ring */
+  --p-ring: rgba(77, 143, 255, 0.35);
+  --p-ring-strong: rgba(77, 143, 255, 0.65);
+}
+
+/* Explicit light override — allows OS-dark users who chose "Light"
+   to get light tokens. Suppresses the media query by setting
+   data-theme="light", which :root:not([data-theme]) won't match. */
+:root[data-theme="light"] {
+  /* Surfaces */
+  --p-bg: #ffffff;
+  --p-surface: #fafafa;
+  --p-surface-raised: #ffffff;
+  --p-surface-sunken: #f4f4f5;
+  /* Lines */
+  --p-border: #e4e4e7;
+  --p-border-strong: #d4d4d8;
+  --p-divider: #f1f1f3;
+  /* Ink */
+  --p-ink: #0a0a0a;
+  --p-ink-soft: #27272a;
+  --p-ink-muted: #52525b;
+  --p-ink-dim: #71717a;
+  --p-ink-faint: #a1a1aa;
+  /* Brand accent */
+  --p-accent: #0b5cff;
+  --p-accent-soft: #e6efff;
+  --p-accent-ink: #ffffff;
+  /* Semantic states */
+  --p-success: #15803d;
+  --p-success-soft: #dcfce7;
+  --p-warn: #b45309;
+  --p-warn-soft: #fef3c7;
+  --p-danger: #b91c1c;
+  --p-danger-soft: #fee2e2;
+  --p-info: #1d4ed8;
+  --p-info-soft: #dbeafe;
+  /* Expert / verified badges */
+  --p-verified: #0a66c2;
+  --p-verified-soft: #e3f0ff;
+  --p-expert: #7c3aed;
+  --p-expert-soft: #ede9fe;
+  /* Focus ring */
+  --p-ring: rgba(11, 92, 255, 0.30);
+  --p-ring-strong: rgba(11, 92, 255, 0.60);
 }
 
 /* Opt-in scope for the pages that adopt the vp-views layout so existing pages

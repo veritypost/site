@@ -99,18 +99,29 @@ export const viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: '#ffffff',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#0a0a0a' },
+  ],
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${inter.variable} ${sourceSerif.variable}`}>
+      <head>
+        {/* No-flash theme hydration: runs synchronously before first paint so
+            the user's stored preference (vp_theme) is applied before React
+            hydrates. 'system' (or unset) leaves data-theme absent, letting the
+            CSS media query govern. try/catch guards private-browsing contexts
+            where localStorage throws. */}
+        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var p=localStorage.getItem('vp_theme');if(p==='dark')document.documentElement.setAttribute('data-theme','dark');else if(p==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();` }} />
+      </head>
       <body
         style={{
           margin: 0,
           padding: 0,
-          background: '#ffffff',
-          color: '#111111',
+          background: 'var(--p-bg)',
+          color: 'var(--p-ink)',
           fontFamily:
             'var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         }}

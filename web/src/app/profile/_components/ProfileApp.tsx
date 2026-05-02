@@ -36,6 +36,7 @@ import { SecuritySection } from '../_sections/SecuritySection';
 import { SessionsSection } from '../_sections/SessionsSection';
 import { SignOutSection } from '../_sections/SignOutSection';
 import { YouSection } from '../_sections/YouSection';
+import { AppearanceSection } from '../_sections/AppearanceSection';
 
 type UserRow = Tables<'users'>;
 
@@ -401,6 +402,15 @@ export function ProfileApp({ defaultSection }: Props) {
       reason: 'How and where we reach you.',
       keywords: ['email', 'push', 'in-app', 'alerts', 'mute'],
       render: () => <NotificationsSection preview={false} />,
+    },
+    {
+      id: 'appearance',
+      glyph: '◑',
+      group: 'Settings',
+      title: 'Appearance',
+      reason: 'Light, dark, or system — your color theme on this device.',
+      keywords: ['theme', 'dark', 'light', 'dark mode', 'color', 'display'],
+      render: () => <AppearanceSection />,
     },
     {
       id: 'privacy',
