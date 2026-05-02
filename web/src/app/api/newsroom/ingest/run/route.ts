@@ -47,7 +47,11 @@ type DiscoveryInsert = Database['public']['Tables']['discovery_items']['Insert']
 type FeedRow = Pick<
   Database['public']['Tables']['feeds']['Row'],
   'id' | 'url' | 'source_name' | 'feed_type'
-> & { name?: string | null };
+> & {
+  name?: string | null;
+  priority_weight?: number | null;
+  allowed_category_slugs?: string[] | null;
+};
 
 interface FlatItem {
   feed_id: string;
@@ -189,23 +193,43 @@ export async function POST(req: Request) {
     // discovery pool. The audience column stays in DB (defaulted to 'adult')
     // for back-compat with the cluster-mutation RPCs that still take it as
     // a defensive parameter.
-    const { data: feedsData, error: feedsErr } = await service
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const serviceAny = service as any;
+    const { data: feedsData, error: feedsErr } = await serviceAny
       .from('feeds')
-      .select('id,url,source_name,feed_type,name')
+      .select('id,url,source_name,feed_type,name,priority_weight,allowed_category_slugs')
       .eq('is_active', true)
       .in('feed_type', ['feed', 'rss']);
     if (feedsErr) {
-      throw new Error(`feeds lookup failed: ${feedsErr.message}`);
+      throw new Error(`feeds lookup failed: ${(feedsErr as { message: string }).message}`);
     }
-    const feeds: FeedRow[] = feedsData ?? [];
+    // Sort feeds by priority_weight DESC so that when two feeds carry the same
+    // URL, the higher-weight feed's version appears first in allItems and wins
+    // the first-occurrence-wins dedup below.
+    const feeds: FeedRow[] = ((feedsData as FeedRow[]) ?? []).sort(
+      (a, b) => (b.priority_weight ?? 5) - (a.priority_weight ?? 5)
+    );
 
-    // 7. Fetch all feeds — full Promise.allSettled fanout, 6s timeout per feed
+    // Load currently-active mutes (BEFORE HTTP fetches to avoid adding latency to the fanout)
+    // muted_outlets is a Wave 1 table not yet in generated DB types — use serviceAny.
+    const { data: mutedRows } = await serviceAny
+      .from('muted_outlets')
+      .select('outlet_name')
+      .gt('muted_until', new Date().toISOString());
+    const mutedSet = new Set(
+      ((mutedRows ?? []) as { outlet_name: string }[]).map((r) => r.outlet_name.toLowerCase())
+    );
+
+    // 7. Fetch all feeds — full Promise.allSettled fanout, 6s timeout per feed.
+    // Promise.allSettled preserves input order in results, so higher-weight feeds
+    // appear first in fetchResults, matching the sorted feeds array above.
     const fetchResults = await Promise.allSettled(
       feeds.map((f) => fetchWithTimeout(f.url).then((rss) => ({ feed: f, rss })))
     );
 
     let feedsSucceeded = 0;
     let feedsFailed = 0;
+    let feedsMuted = 0;
     const allItems: FlatItem[] = [];
 
     // 8. Flatten — ignore items without .link
@@ -213,9 +237,21 @@ export async function POST(req: Request) {
       if (result.status === 'fulfilled') {
         feedsSucceeded++;
         const { feed, rss } = result.value;
+
+        const feedOutlet = ((feed.source_name || feed.name) ?? '').toLowerCase();
+        if (mutedSet.has(feedOutlet)) {
+          feedsMuted++;
+          continue;
+        }
+
         const items = rss?.items ?? [];
+        const allowedSlugs = feed.allowed_category_slugs ?? [];
         for (const item of items) {
           if (!item.link) continue;
+          if (allowedSlugs.length > 0) {
+            const text = `${item.title ?? ''} ${item.contentSnippet ?? ''}`.toLowerCase();
+            if (!allowedSlugs.some((slug) => text.includes(slug.toLowerCase()))) continue;
+          }
           const outlet = feed.source_name || feed.name || 'Unknown';
           allItems.push({
             feed_id: feed.id,
@@ -228,6 +264,19 @@ export async function POST(req: Request) {
         }
       } else {
         feedsFailed++;
+      }
+    }
+
+    // Deduplicate allItems by raw_url — keep first occurrence.
+    // Feeds were sorted by priority_weight DESC above, so higher-weight feeds
+    // appear first here. When two feeds carry the same URL, the higher-weight
+    // feed's version (outlet attribution, excerpt) wins.
+    const dedupedItems: FlatItem[] = [];
+    const seenUrls = new Set<string>();
+    for (const item of allItems) {
+      if (!seenUrls.has(item.raw_url)) {
+        seenUrls.add(item.raw_url);
+        dedupedItems.push(item);
       }
     }
 
@@ -321,7 +370,7 @@ export async function POST(req: Request) {
       inserted: itemsInserted,
       skipped: itemsSkipped,
       raceDeduped: itemsRaceDeduped,
-    } = await processItems(allItems);
+    } = await processItems(dedupedItems);
 
     // ----------------------------------------------------------------------
     // 10. Clustering orchestration (F7 Phase 2 wire-up — closes F1).
@@ -490,11 +539,12 @@ export async function POST(req: Request) {
     const completedAt = new Date();
     const durationMs = completedAt.getTime() - startedAtMs;
     const itemsCreated = itemsInserted;
-    const itemsProcessed = allItems.length;
+    const itemsProcessed = dedupedItems.length;
     const skippedDuplicates = itemsSkipped;
     const output: Json = {
       feedsSucceeded,
       feedsFailed,
+      feedsMuted,
       itemsInserted,
       itemsSkipped,
       itemsRaceDeduped, // M6 — surface concurrent-ingest dedup count
@@ -543,6 +593,7 @@ export async function POST(req: Request) {
       runId,
       feedsSucceeded,
       feedsFailed,
+      feedsMuted,
       totalScanned: itemsProcessed,
       itemsInserted,
       skippedDuplicates,

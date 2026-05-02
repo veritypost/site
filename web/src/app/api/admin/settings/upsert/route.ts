@@ -41,6 +41,16 @@ export async function POST(request: Request) {
   }
   const value = String(body.value);
 
+  // Defense in depth: the Prompts tab caps system-prompt textareas at 10K
+  // chars in the UI. A 50K prompt saved via curl would slow every newsroom
+  // generation and is almost always accidental — block it server-side too.
+  if (key.startsWith('pipeline.prompt.') && value.length > 10_000) {
+    return NextResponse.json(
+      { error: 'System prompt exceeds 10000 character limit' },
+      { status: 400 }
+    );
+  }
+
   const { data: existing } = await service
     .from('settings')
     .select('id, value, is_sensitive')

@@ -9,6 +9,8 @@ import { permissionError, recordAdminAction } from '@/lib/adminMutation';
 type PatchBody = {
   action?: 'toggle' | 'repull';
   is_active?: boolean;
+  priority_weight?: unknown;
+  allowed_category_slugs?: unknown;
 };
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
@@ -83,7 +85,51 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return NextResponse.json({ ok: true });
   }
 
-  return NextResponse.json({ error: 'no supported fields in body' }, { status: 400 });
+  // priority_weight and allowed_category_slugs
+  const patch: { priority_weight?: number; allowed_category_slugs?: string[] } = {};
+  if (body.priority_weight !== undefined) {
+    const n = body.priority_weight;
+    if (!Number.isInteger(n) || (n as number) < 1 || (n as number) > 10) {
+      return NextResponse.json(
+        { error: 'priority_weight must be an integer between 1 and 10' },
+        { status: 400 }
+      );
+    }
+    patch.priority_weight = n as number;
+  }
+  if (body.allowed_category_slugs !== undefined) {
+    const v = body.allowed_category_slugs;
+    if (
+      !Array.isArray(v) ||
+      v.length > 20 ||
+      v.some((s) => typeof s !== 'string' || s.trim().length === 0 || s.length > 50)
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            'allowed_category_slugs must be an array of up to 20 non-empty strings (max 50 chars each)',
+        },
+        { status: 400 }
+      );
+    }
+    patch.allowed_category_slugs = v as string[];
+  }
+  if (Object.keys(patch).length > 0) {
+    const { error } = await service.from('feeds').update(patch).eq('id', id);
+    if (error) {
+      console.error('[admin.feeds.patch]', error.message);
+      return NextResponse.json({ error: 'Could not update feed' }, { status: 500 });
+    }
+    await recordAdminAction({
+      action: 'feed.update',
+      targetTable: 'feeds',
+      targetId: id,
+      newValue: patch,
+    });
+    return NextResponse.json({ ok: true });
+  }
+
+  return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
 }
 
 export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
@@ -118,18 +164,18 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
     .maybeSingle();
   if (!prior) return NextResponse.json({ error: 'Feed not found' }, { status: 404 });
 
+  const { error } = await service.from('feeds').delete().eq('id', id);
+  if (error) {
+    console.error('[admin.feeds.delete]', error.message);
+    return NextResponse.json({ error: 'Could not delete feed' }, { status: 500 });
+  }
+
   await recordAdminAction({
     action: 'feed.delete',
     targetTable: 'feeds',
     targetId: id,
     oldValue: prior,
   });
-
-  const { error } = await service.from('feeds').delete().eq('id', id);
-  if (error) {
-    console.error('[admin.feeds.delete]', error.message);
-    return NextResponse.json({ error: 'Could not delete feed' }, { status: 500 });
-  }
 
   return NextResponse.json({ ok: true });
 }

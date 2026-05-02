@@ -107,6 +107,28 @@ function parseLimit(raw: string | null): number {
   return Math.min(n, MAX_LIMIT);
 }
 
+function parseSort(raw: string | null): 'newest' | 'oldest' | 'most_sources' | 'breaking_first' {
+  if (raw === 'oldest') return 'oldest';
+  if (raw === 'most_sources') return 'most_sources';
+  if (raw === 'breaking_first') return 'breaking_first';
+  return 'newest';
+}
+
+// Escape ILIKE special characters to prevent unintended wildcard expansion.
+function escapeIlike(raw: string): string {
+  return raw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+}
+
+// Parse comma-separated status values; maps 'done' → 'generated'.
+function parseStatuses(raw: string | null): string[] {
+  if (!raw) return [];
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => (s === 'done' ? 'generated' : s));
+}
+
 // pipeline_runs.audience is the legacy 'adult'|'kid' column. We disambiguate
 // kids vs tweens by reading age_band out of input_params or output_summary
 // (the generate route writes it on the way in).
@@ -153,6 +175,45 @@ export async function GET(req: Request) {
   const cursorRaw = url.searchParams.get('cursor');
   const cursor = cursorRaw && !Number.isNaN(Date.parse(cursorRaw)) ? cursorRaw : null;
 
+  const qRaw = url.searchParams.get('q');
+  const q = qRaw ? qRaw.trim().slice(0, 200) : null;
+  const categoryParam = url.searchParams.get('category');
+  const UUID_RE_PARAM = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const category = categoryParam && UUID_RE_PARAM.test(categoryParam) ? categoryParam : null;
+  const dateFrom = url.searchParams.get('date_from');
+  const dateTo = url.searchParams.get('date_to');
+  const sort = parseSort(url.searchParams.get('sort'));
+  const statuses = parseStatuses(url.searchParams.get('status'));
+
+  // 3a. Outlet pre-query — find cluster_ids that match the search term via
+  //     feed source_name/name. Wrapped in try/catch: any error is non-fatal
+  //     and the main search falls back to title/summary/keywords only.
+  let outletClusterIds: string[] = [];
+  if (q) {
+    try {
+      const escapedQ = escapeIlike(q);
+      const { data: outletRows } = await service
+        .from('discovery_items')
+        .select('cluster_id, feeds!inner(source_name, name)')
+        .or(`source_name.ilike.%${escapedQ}%,name.ilike.%${escapedQ}%`, {
+          foreignTable: 'feeds',
+        })
+        .not('cluster_id', 'is', null)
+        .limit(200);
+      if (outletRows) {
+        const seen = new Set<string>();
+        for (const row of outletRows as Array<{ cluster_id: string | null }>) {
+          if (row.cluster_id && !seen.has(row.cluster_id)) {
+            seen.add(row.cluster_id);
+            outletClusterIds.push(row.cluster_id);
+          }
+        }
+      }
+    } catch {
+      outletClusterIds = [];
+    }
+  }
+
   // 4. Read clusters (filter standalone marker + archived + dismissed).
   //    Sort by latest discovery_items.created_at descending. We approximate
   //    that ordering with feed_clusters.updated_at, which the ingest path
@@ -163,9 +224,32 @@ export async function GET(req: Request) {
     .is('archived_at', null)
     .is('dismissed_at', null)
     .not('keywords', 'cs', '{standalone}')
-    .order('updated_at', { ascending: false, nullsFirst: false })
+    .order('updated_at', { ascending: sort === 'oldest', nullsFirst: false })
     .limit(limit + 1); // peek one for cursor
-  if (cursor) clusterQ = clusterQ.lt('updated_at', cursor);
+  if (cursor) {
+    if (sort === 'oldest') clusterQ = clusterQ.gt('updated_at', cursor);
+    else clusterQ = clusterQ.lt('updated_at', cursor);
+  }
+  if (q) {
+    const escapedQ = escapeIlike(q);
+    // Strip PostgREST array-literal delimiters from q before use in ov clause
+    // to prevent malformed array syntax or filter injection.
+    const qForOv = q.replace(/[{}]/g, '');
+    const orParts: string[] = [
+      `title.ilike.%${escapedQ}%`,
+      `summary.ilike.%${escapedQ}%`,
+      ...(qForOv.length > 0 ? [`keywords.ov.{${qForOv}}`] : []),
+    ];
+    if (outletClusterIds.length > 0) {
+      orParts.push(`id.in.(${outletClusterIds.join(',')})`);
+    }
+    clusterQ = clusterQ.or(orParts.join(','));
+  }
+  if (category) clusterQ = clusterQ.eq('category_id', category);
+  if (dateFrom && !Number.isNaN(Date.parse(dateFrom)))
+    clusterQ = clusterQ.gte('created_at', dateFrom);
+  if (dateTo && !Number.isNaN(Date.parse(dateTo)))
+    clusterQ = clusterQ.lte('created_at', dateTo);
   const { data: clustersRaw, error: clustersErr } = await clusterQ;
   if (clustersErr) {
     console.error('[newsroom.clusters.list.read]', clustersErr.message);
@@ -282,8 +366,18 @@ export async function GET(req: Request) {
     return tab === 'completed' ? completed : !completed;
   });
 
+  // 8a. Status post-filter: keep clusters where at least one audience band
+  //     matches any of the requested statuses.
+  const statusFiltered =
+    statuses.length === 0
+      ? tabFiltered
+      : tabFiltered.filter((c) => {
+          const stateRows = stateByCluster.get(c.id) ?? [];
+          return statuses.some((s) => stateRows.some((r) => r.state === s));
+        });
+
   // 9. Shape response. Pad audience_state and recent_run_per_band to 3 rows.
-  const result = tabFiltered.map((c) => {
+  const result = statusFiltered.map((c) => {
     const stateRows = stateByCluster.get(c.id) ?? [];
     const audienceState = ALL_BANDS.map<AudienceStateRow>((band) => {
       const existing = stateRows.find((s) => s.audience_band === band);
@@ -303,6 +397,7 @@ export async function GET(req: Request) {
     const sources = sourceRows.map((d) => {
       const feed = d.feed_id ? feedMap.get(d.feed_id) : undefined;
       return {
+        id: d.id,
         outlet_name: feed?.source_name ?? feed?.name ?? 'Unknown source',
         title: d.raw_title,
         url: d.raw_url,
@@ -343,8 +438,18 @@ export async function GET(req: Request) {
     };
   });
 
+  if (sort === 'most_sources') {
+    result.sort((a, b) => b.sources.length - a.sources.length);
+  } else if (sort === 'breaking_first') {
+    result.sort(
+      (a, b) =>
+        Number(b.cluster.is_breaking) - Number(a.cluster.is_breaking) ||
+        (b.cluster.updated_at ?? '').localeCompare(a.cluster.updated_at ?? '')
+    );
+  }
+
   return NextResponse.json({
     clusters: result,
-    cursor: tabFiltered.length === page.length ? nextCursor : null,
+    cursor: nextCursor,
   });
 }

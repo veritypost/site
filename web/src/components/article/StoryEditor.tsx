@@ -249,6 +249,8 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
   const [destructive, setDestructive] = useState<DestructiveState>(null);
   const [saving, setSaving] = useState(false);
   const [regenQuizLoading, setRegenQuizLoading] = useState(false);
+  const [regenSourcesLoading, setRegenSourcesLoading] = useState(false);
+  const [regenTimelineLoading, setRegenTimelineLoading] = useState(false);
   const [followupLoading, setFollowupLoading] = useState(false);
   const [followupSourceUrls, setFollowupSourceUrls] = useState('');
   const [followupOpen, setFollowupOpen] = useState(false);
@@ -414,25 +416,33 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
       setStoryId(id);
       setArticleAgeBand(cast.age_band ?? null);
 
+      // Wave 7 fix: include type='article' anchor rows so quiz sections
+      // (which key off type='story' locally) find their parent entry.
+      // DB type='article' → local type='story'. DB type='event' stays 'event'.
       const { data: eventData } = await supabase
         .from('timelines')
         .select('*')
         .eq('story_id', cast.story_id as string)
-        .eq('type', 'event')
+        .in('type', ['event', 'article'])
         .order('event_date', { ascending: true });
 
       const loadedEntries: TimelineEntry[] = (eventData || []).map((e) => {
         const ev = e as unknown as Record<string, unknown>;
+        const dbType = ev.type as string | null;
+        const localType: 'story' | 'event' = dbType === 'article' ? 'story' : 'event';
+        const eventBody = (ev.event_body as string | null) ?? '';
+        const eventLabel = (ev.event_label as string | null) ?? (ev.title as string | null) ?? '';
+        const eventDate = (ev.event_date as string | null) ?? '';
         return {
           id: e.id,
-          event_date: (ev.date as string | null) || (ev.event_date as string | null) || '',
+          event_date: eventDate,
           is_current: Boolean(ev.is_current),
-          type: (ev.type as 'story' | 'event') || ((ev.content as string | null) ? 'story' : 'event'),
-          title: (ev.text as string | null) || (ev.event_label as string | null) || '',
-          summary: (ev.summary as string | null) || (ev.event_body as string | null) || '',
-          content: (ev.content as string | null) || '',
-          timeline_date: (ev.date as string | null) || '',
-          timeline_headline: (ev.text as string | null) || '',
+          type: localType,
+          title: eventLabel,
+          summary: eventBody,
+          content: eventBody,
+          timeline_date: eventDate,
+          timeline_headline: eventLabel,
           comment_count: 0,
         };
       });
@@ -624,6 +634,106 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
         .filter((q) => !(q._isNew && q._deleted)),
     );
     setIsDirty(true);
+  };
+
+  const regenSources = async (articleId: string) => {
+    if (regenSourcesLoading) return;
+    setRegenSourcesLoading(true);
+    try {
+      const res = await fetch('/api/admin/pipeline/sources-regenerate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ article_id: articleId }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.push({ message: json.error || 'Source regeneration failed', variant: 'danger' });
+        return;
+      }
+      const { data: sourceData } = await supabase
+        .from('sources')
+        .select('*')
+        .eq('article_id', articleId)
+        .order('sort_order', { ascending: true });
+      const reloadedSources: StorySource[] = (sourceData || []).map((s) => ({
+        id: s.id,
+        outlet: s.publisher || '',
+        url: s.url || '',
+        headline: s.title || '',
+        author_name: (s as unknown as { author_name?: string | null }).author_name ?? null,
+        published_date: (s as unknown as { published_date?: string | null }).published_date ?? null,
+        source_type: (s as unknown as { source_type?: string | null }).source_type ?? null,
+        quote: (s as unknown as { quote?: string | null }).quote ?? null,
+      }));
+      setStory((prev) => ({ ...prev, sources: reloadedSources }));
+      toast.push({ message: `Sources regenerated — ${json.count as number} source${json.count === 1 ? '' : 's'}`, variant: 'success' });
+    } catch (err) {
+      console.error('[regenSources]', err);
+      toast.push({ message: 'Source regeneration failed', variant: 'danger' });
+    } finally {
+      setRegenSourcesLoading(false);
+    }
+  };
+
+  const regenTimeline = async (articleId: string) => {
+    if (regenTimelineLoading) return;
+    setRegenTimelineLoading(true);
+    try {
+      const res = await fetch('/api/admin/pipeline/timeline-regenerate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ article_id: articleId }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.push({ message: json.error || 'Timeline regeneration failed', variant: 'danger' });
+        return;
+      }
+      // Re-fetch timelines for the article's story_id and rebuild local entries.
+      const { data: articleRow } = await supabase
+        .from('articles')
+        .select('story_id')
+        .eq('id', articleId)
+        .single();
+      const newStoryId = (articleRow as unknown as { story_id?: string | null } | null)?.story_id;
+      if (!newStoryId) {
+        toast.push({ message: 'Timeline reload skipped — no story_id', variant: 'warn' });
+        return;
+      }
+      const { data: eventData } = await supabase
+        .from('timelines')
+        .select('*')
+        .eq('story_id', newStoryId)
+        .in('type', ['event', 'article'])
+        .order('event_date', { ascending: true });
+      const reloadedEntries: TimelineEntry[] = (eventData || []).map((e) => {
+        const ev = e as unknown as Record<string, unknown>;
+        const dbType = ev.type as string | null;
+        const localType: 'story' | 'event' = dbType === 'article' ? 'story' : 'event';
+        const eventBody = (ev.event_body as string | null) ?? '';
+        const eventLabel = (ev.event_label as string | null) ?? (ev.title as string | null) ?? '';
+        const eventDate = (ev.event_date as string | null) ?? '';
+        return {
+          id: e.id,
+          event_date: eventDate,
+          is_current: Boolean(ev.is_current),
+          type: localType,
+          title: eventLabel,
+          summary: eventBody,
+          content: eventBody,
+          timeline_date: eventDate,
+          timeline_headline: eventLabel,
+          comment_count: 0,
+        };
+      });
+      setEntries(reloadedEntries);
+      toast.push({ message: `Timeline regenerated — ${json.count as number} event${json.count === 1 ? '' : 's'}`, variant: 'success' });
+    } catch (err) {
+      console.error('[regenTimeline]', err);
+      toast.push({ message: 'Timeline regeneration failed', variant: 'danger' });
+    } finally {
+      setRegenTimelineLoading(false);
+    }
   };
 
   const regenQuiz = async (articleId: string) => {
@@ -1254,6 +1364,14 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
         description={`${storiesCount} articles · ${eventsCount} events`}
         aside={
           <>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={!storyId || regenTimelineLoading}
+              onClick={() => storyId && regenTimeline(storyId)}
+            >
+              {regenTimelineLoading ? 'Redoing…' : 'Redo timeline'}
+            </Button>
             <Button variant="secondary" size="sm" onClick={addEvent}>+ Event</Button>
             <Button variant="primary" size="sm" onClick={addStoryEntry}>+ Article</Button>
           </>
@@ -1374,11 +1492,21 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
 
                     {entry.type === 'story' && (
                       <div style={{ marginTop: S[3], paddingTop: S[3], borderTop: `1px solid ${C.divider}` }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: S[2] }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: S[2], flexWrap: 'wrap', gap: S[2] }}>
                           <span style={{ fontSize: F.xs, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: C.soft }}>
                             Sources ({(story.sources || []).length})
                           </span>
-                          <Button variant="secondary" size="sm" onClick={addSource}>+ Add source</Button>
+                          <div style={{ display: 'flex', gap: S[2], flexWrap: 'wrap' }}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={!storyId || regenSourcesLoading}
+                              onClick={() => storyId && regenSources(storyId)}
+                            >
+                              {regenSourcesLoading ? 'Redoing…' : 'Redo sources'}
+                            </Button>
+                            <Button variant="secondary" size="sm" onClick={addSource}>+ Add source</Button>
+                          </div>
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: S[2] }}>
                           {(story.sources || []).map((s) => (
@@ -1387,7 +1515,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
                               style={{
                                 display: 'flex',
                                 gap: S[2],
-                                alignItems: 'center',
+                                alignItems: 'flex-start',
                                 padding: S[2],
                                 border: `1px solid ${C.divider}`,
                                 borderRadius: 8,
@@ -1395,10 +1523,19 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
                                 flexWrap: 'wrap',
                               }}
                             >
-                              <TextInput block={false} value={s.outlet} onChange={(e) => updateSource(s.id, 'outlet', e.target.value)} placeholder="Outlet" style={{ minWidth: 120, flex: '1 1 120px' }} />
-                              <TextInput block={false} value={s.url} onChange={(e) => updateSource(s.id, 'url', e.target.value)} placeholder="https://..." style={{ minWidth: 160, flex: '2 1 160px', fontFamily: 'ui-monospace, monospace', fontSize: F.sm }} />
-                              <TextInput block={false} value={s.headline} onChange={(e) => updateSource(s.id, 'headline', e.target.value)} placeholder="Original headline" style={{ minWidth: 160, flex: '3 1 200px' }} />
-                              <Button variant="ghost" size="sm" onClick={() => deleteSource(s.id)} style={{ color: C.muted }}>Remove</Button>
+                              <div style={{ display: 'flex', gap: S[2], flexWrap: 'wrap', flex: '1 1 100%', alignItems: 'center' }}>
+                                <TextInput block={false} value={s.outlet} onChange={(e) => updateSource(s.id, 'outlet', e.target.value)} placeholder="Outlet" style={{ minWidth: 120, flex: '1 1 120px' }} />
+                                <TextInput block={false} value={s.url} onChange={(e) => updateSource(s.id, 'url', e.target.value)} placeholder="https://..." style={{ minWidth: 160, flex: '2 1 160px', fontFamily: 'ui-monospace, monospace', fontSize: F.sm }} />
+                                <TextInput block={false} value={s.headline} onChange={(e) => updateSource(s.id, 'headline', e.target.value)} placeholder="Original headline" style={{ minWidth: 160, flex: '3 1 200px' }} />
+                                <Button variant="ghost" size="sm" onClick={() => deleteSource(s.id)} style={{ color: C.muted }}>Remove</Button>
+                              </div>
+                              <Textarea
+                                rows={2}
+                                value={s.quote ?? ''}
+                                onChange={(e) => updateSource(s.id, 'quote', e.target.value)}
+                                placeholder="Pull-quote (optional)"
+                                style={{ flex: '1 1 100%', fontSize: F.sm }}
+                              />
                             </div>
                           ))}
                           {(story.sources || []).length === 0 && (

@@ -7,10 +7,12 @@
  * narrow widths via flex-wrap.
  */
 
-import AudienceCard, { type AudienceCardState } from './AudienceCard';
+import { useState, useRef, useCallback } from 'react';
+import AudienceCard, { type AudienceCardHandle, type AudienceCardState } from './AudienceCard';
 import SourcesBlock, { type SourceItem } from './SourcesBlock';
 import { type AudienceBand } from './PipelineStepLabels';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
+import Button from '@/components/admin/Button';
 
 type AudienceStateRow = {
   cluster_id: string;
@@ -48,9 +50,11 @@ type Props = {
   audienceState: AudienceStateRow[];
   sources: SourceItem[];
   recentRunPerBand: RecentRun[];
-  // Optional pre-resolved articleSlug/articleTitle map for the
-  // 'generated' state — list endpoint does not include slug/title.
   articleMeta?: Record<string, { slug: string | null; title: string | null }>;
+  mergeMode?: boolean;
+  mergeSelected?: boolean;
+  onMergeToggle?: (clusterId: string) => void;
+  onMuteOutlet?: (outletName: string) => void;
 };
 
 const BANDS: AudienceBand[] = ['adult', 'tweens', 'kids'];
@@ -78,9 +82,71 @@ export default function StoryCard({
   sources,
   recentRunPerBand,
   articleMeta,
+  mergeMode,
+  mergeSelected,
+  onMergeToggle,
+  onMuteOutlet,
 }: Props) {
+  const [selectedUrls, setSelectedUrls] = useState<Set<string>>(
+    () => new Set(sources.map((s) => s.url))
+  );
+  const [visibleSources, setVisibleSources] = useState<SourceItem[]>(sources);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+
+  // Refs MUST be at top level — never inside loops or conditionals.
+  const adultRef = useRef<AudienceCardHandle>(null);
+  const tweensRef = useRef<AudienceCardHandle>(null);
+  const kidsRef = useRef<AudienceCardHandle>(null);
+
+  const handleRemoveSource = useCallback(async (itemId: string) => {
+    setRemoveError(null);
+    try {
+      const res = await fetch(`/api/admin/newsroom/clusters/${cluster.id}/move-item`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ item_id: itemId, target_cluster_id: null, audience: 'adult' }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setRemoveError(body.error ?? 'Could not remove source');
+        return;
+      }
+      setVisibleSources((prev) => {
+        const item = prev.find((s) => s.id === itemId);
+        if (item) {
+          setSelectedUrls((sel) => {
+            const next = new Set(sel);
+            next.delete(item.url);
+            return next;
+          });
+        }
+        return prev.filter((s) => s.id !== itemId);
+      });
+    } catch (err) {
+      setRemoveError(err instanceof Error ? err.message : 'Network error');
+    }
+  }, [cluster.id]);
+
+  const handleGenerateAll = useCallback(() => {
+    adultRef.current?.triggerGenerate();
+    tweensRef.current?.triggerGenerate();
+    kidsRef.current?.triggerGenerate();
+  }, []);
+
+  const handleToggleUrl = useCallback((url: string, checked: boolean) => {
+    setSelectedUrls((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(url);
+      else next.delete(url);
+      return next;
+    });
+  }, []);
+
+  const anyIdle = audienceState.some((s) => deriveCardState(s.state) === 'idle');
+  const selectedSourceUrlsArray = Array.from(selectedUrls);
+
   const workingHeadline =
-    sources[0]?.title?.trim() || cluster.title?.trim() || 'No working headline yet';
+    visibleSources[0]?.title?.trim() || cluster.title?.trim() || 'No working headline yet';
 
   return (
     <article
@@ -99,23 +165,40 @@ export default function StoryCard({
           background: C.card,
           display: 'flex',
           gap: S[2],
-          alignItems: 'baseline',
+          alignItems: 'center',
           justifyContent: 'space-between',
           fontSize: F.xs,
           color: C.muted,
         }}
       >
-        <span>
-          Story · {sources.length} {sources.length === 1 ? 'source' : 'sources'}
-          {cluster.is_breaking && (
-            <span style={{ marginLeft: S[2], color: C.danger, fontWeight: 700 }}>BREAKING</span>
+        <div style={{ display: 'flex', gap: S[2], alignItems: 'center' }}>
+          {mergeMode && (
+            <input
+              type="checkbox"
+              checked={mergeSelected ?? false}
+              onChange={() => onMergeToggle?.(cluster.id)}
+              style={{ flexShrink: 0 }}
+            />
           )}
-        </span>
-        <span>
-          {cluster.updated_at
-            ? `updated ${new Date(cluster.updated_at).toLocaleString()}`
-            : ''}
-        </span>
+          <span>
+            Story · {visibleSources.length} {visibleSources.length === 1 ? 'source' : 'sources'}
+            {cluster.is_breaking && (
+              <span style={{ marginLeft: S[2], color: C.danger, fontWeight: 700 }}>BREAKING</span>
+            )}
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: S[2], alignItems: 'center' }}>
+          {anyIdle && (
+            <Button onClick={handleGenerateAll} variant="secondary" size="sm">
+              Generate All
+            </Button>
+          )}
+          <span style={{ color: C.muted, fontSize: F.xs }}>
+            {cluster.updated_at
+              ? `updated ${new Date(cluster.updated_at).toLocaleString()}`
+              : ''}
+          </span>
+        </div>
       </header>
 
       <div style={{ padding: S[3], display: 'flex', flexWrap: 'wrap', gap: S[3] }}>
@@ -124,9 +207,11 @@ export default function StoryCard({
           const cardState = deriveCardState(state?.state ?? 'pending');
           const run = recentRunPerBand.find((r) => r && r.audience_band === band) ?? null;
           const meta = state?.article_id ? articleMeta?.[state.article_id] : undefined;
+          const bandRef = band === 'adult' ? adultRef : band === 'tweens' ? tweensRef : kidsRef;
           return (
             <AudienceCard
               key={band}
+              ref={bandRef}
               clusterId={cluster.id}
               audienceBand={band}
               initialState={cardState}
@@ -137,13 +222,25 @@ export default function StoryCard({
               initialErrorType={run?.error_type ?? null}
               initialErrorStep={null}
               workingHeadline={workingHeadline}
+              selectedSourceUrls={selectedSourceUrlsArray}
             />
           );
         })}
       </div>
 
       <div style={{ borderTop: `1px solid ${C.divider}` }}>
-        <SourcesBlock sources={sources} />
+        <SourcesBlock
+          sources={visibleSources}
+          selectedUrls={selectedUrls}
+          onToggle={handleToggleUrl}
+          onRemove={handleRemoveSource}
+          onMuteOutlet={onMuteOutlet}
+        />
+        {removeError && (
+          <div style={{ padding: `0 ${S[4]}px ${S[2]}px`, fontSize: F.sm, color: C.danger }}>
+            {removeError}
+          </div>
+        )}
       </div>
     </article>
   );

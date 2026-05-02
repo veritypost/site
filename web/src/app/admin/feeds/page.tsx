@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { Tables } from '@/types/database-helpers';
@@ -42,6 +42,8 @@ type DisplayFeed = FeedRow & {
   articles: number;
   active: boolean;
   failCount: number;
+  priority_weight: number;
+  allowed_category_slugs: string[];
 };
 
 function FeedsAdminInner() {
@@ -61,6 +63,9 @@ function FeedsAdminInner() {
   const [pullIntervalMin, setPullIntervalMin] = useState(30);
   const [selected, setSelected] = useState<DisplayFeed | null>(null);
   const [adding, setAdding] = useState(false);
+  const [categories, setCategories] = useState<Array<{ id: string; name: string; slug: string }>>([]);
+  const [alertDismissed, setAlertDismissed] = useState(false);
+  const priorityDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -114,6 +119,9 @@ function FeedsAdminInner() {
         });
       }
 
+      const { data: catRows } = await supabase.from('categories').select('id, name, slug').eq('is_active', true).order('name');
+      if (catRows) setCategories(catRows as Array<{ id: string; name: string; slug: string }>);
+
       setLoading(false);
     };
     init();
@@ -143,6 +151,22 @@ function FeedsAdminInner() {
     }
   };
 
+  const saveFeedField = async (id: string, key: string, value: unknown) => {
+    const res = await fetch(`/api/admin/feeds/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [key]: value }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      toast.push({ message: (j as { error?: string }).error ?? `Save failed`, variant: 'danger' });
+      return;
+    }
+    setFeeds((prev) => prev.map((f) => f.id === id ? { ...f, [key]: value } : f));
+    setSelected((prev) => prev ? ({ ...prev, [key]: value } as DisplayFeed) : prev);
+    toast.push({ message: 'Saved', variant: 'success', duration: 1200 });
+  };
+
   const deriveStatus = (f: FeedRow): FeedStatus => {
     const errors = f.error_count ?? 0;
     if (errors >= brokenFailCount) return 'broken';
@@ -152,15 +176,20 @@ function FeedsAdminInner() {
     return 'ok';
   };
 
-  const normFeed = (f: FeedRow): DisplayFeed => ({
-    ...f,
-    outlet: f.source_name || f.name || '',
-    status: deriveStatus(f),
-    lastPull: (f.last_polled_at || '').replace('T', ' ').slice(0, 16) || 'Never',
-    articles: f.articles_imported_count ?? 0,
-    active: f.is_active ?? true,
-    failCount: f.error_count ?? 0,
-  });
+  const normFeed = (f: FeedRow): DisplayFeed => {
+    const r = f as FeedRow & { priority_weight?: number | null; allowed_category_slugs?: string[] | null };
+    return {
+      ...f,
+      outlet: f.source_name || f.name || '',
+      status: deriveStatus(f),
+      lastPull: (f.last_polled_at || '').replace('T', ' ').slice(0, 16) || 'Never',
+      articles: f.articles_imported_count ?? 0,
+      active: f.is_active ?? true,
+      failCount: f.error_count ?? 0,
+      priority_weight: r.priority_weight ?? 5,
+      allowed_category_slugs: r.allowed_category_slugs ?? [],
+    };
+  };
 
   // normFeed closes over staleHours + brokenFailCount; listing those as
   // deps is equivalent to listing the function itself (re-created each
@@ -277,35 +306,27 @@ function FeedsAdminInner() {
     {
       key: 'outlet',
       header: 'Source',
-      render: (row: DisplayFeed) => (
-        <div style={{ minWidth: 0 }}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: S[2],
-              fontWeight: 600,
-              color: row.active ? ADMIN_C.ink : ADMIN_C.muted,
-            }}
-          >
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {row.outlet}
-            </span>
+      render: (row: DisplayFeed) => {
+        let dotColor: string | undefined;
+        if (row.active) {
+          dotColor = row.status === 'ok' ? ADMIN_C.success : row.status === 'stale' ? ADMIN_C.warn : ADMIN_C.danger;
+        }
+        return (
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: S[2], fontWeight: 600, color: row.active ? ADMIN_C.ink : ADMIN_C.muted }}>
+              {dotColor && (
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: dotColor, flexShrink: 0, display: 'inline-block' }} />
+              )}
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {row.outlet}
+              </span>
+            </div>
+            <div style={{ fontSize: F.xs, color: ADMIN_C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 360 }}>
+              {row.url}
+            </div>
           </div>
-          <div
-            style={{
-              fontSize: F.xs,
-              color: ADMIN_C.muted,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              maxWidth: 360,
-            }}
-          >
-            {row.url}
-          </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       key: 'status',
@@ -442,6 +463,15 @@ function FeedsAdminInner() {
         </div>
       </PageSection>
 
+      {!alertDismissed && displayFeeds.filter((f) => f.active && f.status === 'broken').length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: S[2], padding: `${S[2]}px ${S[3]}px`, marginBottom: S[3], background: '#FEF2F2', border: `1px solid ${ADMIN_C.danger}`, borderRadius: 8, fontSize: F.sm }}>
+          <span style={{ flex: 1, color: ADMIN_C.danger, fontWeight: 600 }}>
+            {displayFeeds.filter((f) => f.active && f.status === 'broken').length} active feed(s) need attention.
+          </span>
+          <button type="button" onClick={() => setAlertDismissed(true)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: F.sm, color: ADMIN_C.danger, fontFamily: 'inherit' }}>Dismiss</button>
+        </div>
+      )}
+
       <PageSection title="Feeds">
         <DataTable
           rowKey={(r: DisplayFeed) => r.id}
@@ -505,6 +535,49 @@ function FeedsAdminInner() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: S[3] }}>
             <KV label="Status" value={<Badge variant={statusVariant(selected.status)} dot>{statusLabel(selected.status)}</Badge>} />
             <KV label="Active" value={<Switch checked={selected.active} onChange={(next) => toggleFeed(selected.id, next)} />} />
+            <div>
+              <div style={labelStyle}>Priority weight (1–10)</div>
+              <NumberInput
+                size="sm"
+                value={selected.priority_weight}
+                min={1}
+                max={10}
+                step={1}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  const n = Math.max(1, Math.min(10, parseInt(e.target.value, 10) || 5));
+                  setSelected((prev) => prev ? ({ ...prev, priority_weight: n } as DisplayFeed) : prev);
+                  setFeeds((prev) => prev.map((f) => f.id === selected.id ? { ...f, priority_weight: n } : f));
+                  if (priorityDebounceRef.current) clearTimeout(priorityDebounceRef.current);
+                  priorityDebounceRef.current = setTimeout(() => void saveFeedField(selected.id, 'priority_weight', n), 300);
+                }}
+              />
+              <div style={{ fontSize: F.xs, color: ADMIN_C.muted, marginTop: S[1] }}>Higher = more stories from this feed in the daily pool</div>
+            </div>
+            <div>
+              <div style={labelStyle}>Topic filter (empty = all topics)</div>
+              <div style={{ maxHeight: 180, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: S[1], padding: `${S[1]}px 0` }}>
+                {categories.length === 0 ? (
+                  <div style={{ fontSize: F.xs, color: ADMIN_C.muted }}>No categories loaded</div>
+                ) : categories.map((cat) => (
+                  <label key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: S[2], fontSize: F.sm, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={(selected.allowed_category_slugs ?? []).includes(cat.slug)}
+                      onChange={(e) => {
+                        const current = selected.allowed_category_slugs ?? [];
+                        const next = e.target.checked
+                          ? [...current, cat.slug]
+                          : current.filter((s) => s !== cat.slug);
+                        setSelected((prev) => prev ? ({ ...prev, allowed_category_slugs: next } as DisplayFeed) : prev);
+                        setFeeds((prev) => prev.map((f) => f.id === selected.id ? { ...f, allowed_category_slugs: next } : f));
+                        void saveFeedField(selected.id, 'allowed_category_slugs', next);
+                      }}
+                    />
+                    {cat.name}
+                  </label>
+                ))}
+              </div>
+            </div>
             <KV label="Last polled" value={selected.lastPull} />
             <KV label="Error count" value={String(selected.failCount)} />
             <KV label="Articles imported" value={String(selected.articles)} />

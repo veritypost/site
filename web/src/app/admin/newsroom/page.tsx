@@ -7,6 +7,9 @@
  *   ?tab=discovery|articles      (default 'discovery')
  *   ?view=active|completed       (Discovery tab only, default 'active')
  *   ?panel=runs|costs|cleanup    (Discovery tab tertiary; renders sub-page)
+ *   ?dq=…                        (Discovery search query)
+ *   ?cat=<uuid>                  (Discovery category filter)
+ *   ?so=newest|oldest|…          (Discovery sort)
  *   ?audience=adult,kids…        (Articles tab — handled inside ArticlesTable)
  *   ?status=draft,published…
  *   ?q=…
@@ -240,18 +243,72 @@ function DiscoveryTab({
   onView: (v: ViewId) => void;
   onPanel: (p: PanelId) => void;
 }) {
+  const sp = useSearchParams();
+  const router = useRouter();
   const toast = useToast();
+
+  // URL filter params
+  const [dqInput, setDqInput] = useState(() => sp.get('dq') ?? '');
+  const dq = sp.get('dq') ?? '';
+  const cat = sp.get('cat') ?? '';
+  const so = sp.get('so') ?? '';
+
+  // Existing state
   const [data, setData] = useState<ListResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyIngest, setBusyIngest] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
 
+  // Merge state
+  const [mergeMode, setMergeMode] = useState(false);
+  const [mergeSelected, setMergeSelected] = useState<string[]>([]);
+
+  // Bulk generate state
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<string | null>(null);
+
+  // Mute modal state
+  const [mutingOutlet, setMutingOutlet] = useState<string | null>(null);
+  const [muteDays, setMuteDays] = useState(7);
+  const [muteBusy, setMuteBusy] = useState(false);
+  const [muteError, setMuteError] = useState<string | null>(null);
+
+  // Categories for filter select
+  const [categories, setCategories] = useState<Array<{ id: string; name: string; slug: string }>>([]);
+
+  // Debounce dqInput → URL (only fires when dqInput differs from current URL param)
+  useEffect(() => {
+    if (dqInput === dq) return;
+    const timer = setTimeout(() => {
+      const params = new URLSearchParams(sp.toString());
+      if (dqInput) params.set('dq', dqInput);
+      else params.delete('dq');
+      router.replace(`?${params.toString()}`, { scroll: false });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [dqInput, dq, sp, router]);
+
+  // Load categories once on mount
+  useEffect(() => {
+    const supabase = createClient();
+    supabase
+      .from('categories')
+      .select('id, name, slug')
+      .eq('is_active', true)
+      .order('name')
+      .then(({ data: rows }) => { if (rows) setCategories(rows); });
+  }, []);
+
   const reload = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/admin/newsroom/clusters/list?tab=${view}&limit=50`);
+      const params = new URLSearchParams({ tab: view, limit: '50' });
+      if (dq) params.set('q', dq);
+      if (cat) params.set('category', cat);
+      if (so) params.set('sort', so);
+      const res = await fetch(`/api/admin/newsroom/clusters/list?${params.toString()}`);
       const json = (await res.json().catch(() => ({}))) as ListResponse & { error?: string };
       if (!res.ok) {
         setError(json.error ?? `Load failed (${res.status})`);
@@ -264,7 +321,7 @@ function DiscoveryTab({
     } finally {
       setLoading(false);
     }
-  }, [view]);
+  }, [view, dq, cat, so]);
 
   useEffect(() => { void reload(); }, [reload]);
 
@@ -292,10 +349,126 @@ function DiscoveryTab({
     }
   }
 
+  function handleMergeToggle(clusterId: string) {
+    setMergeSelected((prev) => {
+      if (prev.includes(clusterId)) return prev.filter((id) => id !== clusterId);
+      if (prev.length >= 2) return prev;
+      return [...prev, clusterId];
+    });
+  }
+
+  async function handleMerge() {
+    if (mergeSelected.length !== 2) return;
+    if (mergeSelected[0] === mergeSelected[1]) {
+      toast.push({ message: 'Select two different stories.', variant: 'warn' });
+      return;
+    }
+    try {
+      const res = await fetch(`/api/admin/newsroom/clusters/${mergeSelected[0]}/merge`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ target_id: mergeSelected[1] }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        toast.push({ message: body.error ?? 'Merge failed', variant: 'danger' });
+        return;
+      }
+      toast.push({ message: 'Stories merged.', variant: 'success' });
+      setMergeMode(false);
+      setMergeSelected([]);
+      await reload();
+    } catch (err) {
+      toast.push({ message: err instanceof Error ? err.message : 'Network error', variant: 'danger' });
+    }
+  }
+
+  async function handleBulkGenerate() {
+    if (!data) return;
+    type Pair = { clusterId: string; audience: string; age_band?: string };
+    const pairs: Pair[] = [];
+    for (const row of data.clusters) {
+      for (const as of row.audience_state) {
+        if (as.state === 'pending') {
+          if (as.audience_band === 'adult') {
+            pairs.push({ clusterId: row.cluster.id, audience: 'adult' });
+          } else {
+            pairs.push({ clusterId: row.cluster.id, audience: 'kid', age_band: as.audience_band });
+          }
+        }
+      }
+    }
+    if (pairs.length === 0) {
+      toast.push({ message: 'No pending stories to generate.', variant: 'warn' });
+      return;
+    }
+    setBulkBusy(true);
+    for (let i = 0; i < pairs.length; i++) {
+      setBulkProgress(`Generating ${i + 1} of ${pairs.length}…`);
+      const pair = pairs[i];
+      try {
+        await fetch('/api/admin/pipeline/generate', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            cluster_id: pair.clusterId,
+            audience: pair.audience,
+            ...(pair.age_band ? { age_band: pair.age_band } : {}),
+          }),
+        });
+      } catch {
+        // Continue on error — individual failures don't abort the batch.
+      }
+    }
+    setBulkBusy(false);
+    setBulkProgress(null);
+    await reload();
+  }
+
+  async function handleMuteConfirm() {
+    if (!mutingOutlet) return;
+    setMuteBusy(true);
+    setMuteError(null);
+    try {
+      const res = await fetch('/api/admin/newsroom/outlets/mute', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ outlet_name: mutingOutlet, days: muteDays }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setMuteError(body.error ?? 'Mute failed');
+        return;
+      }
+      toast.push({ message: `Outlet muted for ${muteDays} day${muteDays === 1 ? '' : 's'}.`, variant: 'success' });
+      setMutingOutlet(null);
+      setMuteDays(7);
+    } catch (err) {
+      setMuteError(err instanceof Error ? err.message : 'Network error');
+    } finally {
+      setMuteBusy(false);
+    }
+  }
+
+  function handleCatChange(value: string) {
+    const params = new URLSearchParams(sp.toString());
+    if (value) params.set('cat', value);
+    else params.delete('cat');
+    router.replace(`?${params.toString()}`, { scroll: false });
+  }
+
+  function handleSoChange(value: string) {
+    const params = new URLSearchParams(sp.toString());
+    if (value) params.set('so', value);
+    else params.delete('so');
+    router.replace(`?${params.toString()}`, { scroll: false });
+  }
+
   const clusters = data?.clusters ?? [];
 
   return (
     <div>
+      {/* Toolbar */}
       <div
         style={{
           position: 'sticky',
@@ -303,7 +476,7 @@ function DiscoveryTab({
           zIndex: 5,
           background: C.bg,
           padding: `${S[3]}px 0`,
-          marginBottom: S[3],
+          marginBottom: S[2],
           borderBottom: `1px solid ${C.divider}`,
           display: 'flex',
           flexWrap: 'wrap',
@@ -320,6 +493,21 @@ function DiscoveryTab({
             + New article
           </Button>
           <ViewToggle view={view} onView={onView} />
+          <Button
+            onClick={() => { setMergeMode((v) => !v); setMergeSelected([]); }}
+            variant={mergeMode ? 'primary' : 'secondary'}
+            size="sm"
+          >
+            {mergeMode ? 'Cancel merge' : 'Merge stories'}
+          </Button>
+          <Button
+            onClick={handleBulkGenerate}
+            disabled={bulkBusy}
+            variant="secondary"
+            size="sm"
+          >
+            {bulkProgress ?? 'Generate All Pending'}
+          </Button>
         </div>
         <div style={{ display: 'flex', gap: S[2] }}>
           <Button onClick={() => onPanel('runs')} variant="ghost" size="sm">Runs</Button>
@@ -327,6 +515,84 @@ function DiscoveryTab({
           <Button onClick={() => onPanel('cleanup')} variant="ghost" size="sm">Cleanup</Button>
         </div>
       </div>
+
+      {/* Filter row */}
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: S[2],
+          marginBottom: S[3],
+          alignItems: 'center',
+        }}
+      >
+        <TextInput
+          value={dqInput}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDqInput(e.target.value)}
+          placeholder="Search stories…"
+          style={{ flex: '1 1 200px', minWidth: 160 } as React.CSSProperties}
+        />
+        <select
+          value={cat}
+          onChange={(e) => handleCatChange(e.target.value)}
+          style={{
+            fontSize: F.sm,
+            border: `1px solid ${C.border}`,
+            borderRadius: 6,
+            padding: `${S[1]}px ${S[2]}px`,
+            color: C.ink,
+            background: C.bg,
+            cursor: 'pointer',
+            minWidth: 140,
+          }}
+        >
+          <option value="">All categories</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+        <select
+          value={so}
+          onChange={(e) => handleSoChange(e.target.value)}
+          style={{
+            fontSize: F.sm,
+            border: `1px solid ${C.border}`,
+            borderRadius: 6,
+            padding: `${S[1]}px ${S[2]}px`,
+            color: C.ink,
+            background: C.bg,
+            cursor: 'pointer',
+            minWidth: 140,
+          }}
+        >
+          <option value="">Newest</option>
+          <option value="oldest">Oldest</option>
+          <option value="most_sources">Most sources</option>
+          <option value="breaking_first">Breaking first</option>
+        </select>
+      </div>
+
+      {/* Merge confirmation bar */}
+      {mergeMode && mergeSelected.length === 2 && (
+        <div
+          style={{
+            display: 'flex',
+            gap: S[2],
+            alignItems: 'center',
+            padding: `${S[2]}px ${S[3]}px`,
+            marginBottom: S[3],
+            background: C.card,
+            border: `1px solid ${C.border}`,
+            borderRadius: 8,
+            fontSize: F.sm,
+            color: C.ink,
+          }}
+        >
+          <span style={{ flex: 1 }}>Merge story 1 into story 2?</span>
+          <Button onClick={handleMerge} variant="primary" size="sm">Merge</Button>
+          <Button onClick={() => setMergeSelected([])} variant="ghost" size="sm">Clear</Button>
+        </div>
+      )}
 
       {error && <div style={{ padding: S[3], color: C.danger, fontSize: F.sm }}>{error}</div>}
 
@@ -352,12 +618,57 @@ function DiscoveryTab({
               audienceState={row.audience_state}
               sources={row.sources}
               recentRunPerBand={row.recent_run_per_band}
+              mergeMode={mergeMode}
+              mergeSelected={mergeSelected.includes(row.cluster.id)}
+              onMergeToggle={handleMergeToggle}
+              onMuteOutlet={setMutingOutlet}
             />
           ))}
         </div>
       )}
 
       {newOpen && <NewArticleModal onClose={() => setNewOpen(false)} />}
+
+      {/* Mute outlet modal */}
+      {mutingOutlet && (
+        <Modal
+          open
+          title={`Mute outlet`}
+          description={`Suppress articles from "${mutingOutlet}" for a set period.`}
+          onClose={() => { setMutingOutlet(null); setMuteError(null); setMuteDays(7); }}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: S[3] }}>
+            <Field label="Mute duration">
+              <Select
+                value={String(muteDays)}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setMuteDays(Number(e.target.value))}
+              >
+                <option value="1">1 day</option>
+                <option value="3">3 days</option>
+                <option value="7">7 days</option>
+                <option value="14">14 days</option>
+                <option value="30">30 days</option>
+              </Select>
+            </Field>
+            {muteError && (
+              <div style={{ fontSize: F.sm, color: C.danger }}>{muteError}</div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: S[2] }}>
+              <Button
+                onClick={() => { setMutingOutlet(null); setMuteError(null); setMuteDays(7); }}
+                variant="ghost"
+                size="sm"
+                disabled={muteBusy}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleMuteConfirm} variant="primary" size="sm" disabled={muteBusy}>
+                {muteBusy ? 'Muting…' : `Mute for ${muteDays} day${muteDays === 1 ? '' : 's'}`}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
