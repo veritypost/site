@@ -37,21 +37,6 @@ export default function ArticleEngagementZone({
     padding: '0 20px',
   };
 
-  // Anon: read-only comment thread only, no quiz
-  if (!currentUserId) {
-    return (
-      <section id="discussion" style={sectionStyle}>
-        <CommentThread
-          articleId={articleId}
-          articleCategoryId={articleCategoryId}
-          quizPassed={false}
-          justRevealed={false}
-        />
-      </section>
-    );
-  }
-
-  // Logged in
   return (
     <section id="discussion" style={sectionStyle}>
       {hasQuiz && (
@@ -64,7 +49,7 @@ export default function ArticleEngagementZone({
       <CommentThread
         articleId={articleId}
         articleCategoryId={articleCategoryId}
-        currentUserId={currentUserId}
+        currentUserId={currentUserId ?? null}
         currentUserTier={currentUserTier}
         quizPassed={hasQuiz ? hasPassed : false}
         justRevealed={justPassedThisSession}

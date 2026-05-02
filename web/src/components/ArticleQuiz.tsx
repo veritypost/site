@@ -99,7 +99,6 @@ export default function ArticleQuiz({
     setPassRevealed(false);
   }, [stage, result?.passed]);
 
-  const canStart = hasPermission('quiz.attempt.start');
   const canRetake = hasPermission('quiz.retake');
   const seeInterstitialAd = !hasPermission('article.view.ad_free');
 
@@ -265,7 +264,6 @@ export default function ArticleQuiz({
   }
 
   if (stage === 'idle' || stage === 'loading-start') {
-    if (!canStart) return null;
     return (
       <div
         style={{
