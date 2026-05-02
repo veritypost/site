@@ -1,5 +1,7 @@
 'use client';
 
+import { formatTimelineDate } from '@/lib/dates';
+
 export type TimelineItem = {
   id: string;
   event_date: string;
@@ -79,24 +81,6 @@ const LABEL_STYLE: React.CSSProperties = {
   margin: '0 0 4px',
 };
 
-const BODY_STYLE: React.CSSProperties = {
-  fontSize: 13,
-  lineHeight: 1.5,
-  color: 'var(--dim, #555)',
-  margin: 0,
-};
-
-function formatDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString('en-US', {
-      month: 'short',
-      year: 'numeric',
-    });
-  } catch {
-    return '';
-  }
-}
-
 export default function TimelineSection({
   events,
   storySlug,
@@ -116,7 +100,7 @@ export default function TimelineSection({
       <div style={SPINE_STYLE}>
         {sorted.map((ev, i) => (
           <div key={ev.id} style={EVENT_STYLE}>
-            <div style={DATE_STYLE}>{formatDate(ev.event_date)}</div>
+            <div style={DATE_STYLE}>{formatTimelineDate(ev.event_date)}</div>
             <div style={DOT_COL_STYLE}>
               <div style={DOT_STYLE} />
               {i < sorted.length - 1 && <div style={LINE_STYLE} />}
@@ -134,7 +118,6 @@ export default function TimelineSection({
               ) : (
                 <p style={LABEL_STYLE}>{ev.event_label}</p>
               )}
-              {ev.event_body && <p style={BODY_STYLE}>{ev.event_body}</p>}
             </div>
           </div>
         ))}

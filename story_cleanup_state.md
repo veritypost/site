@@ -628,13 +628,66 @@ HANDOFF TO EDITOR BUNDLE SESSION (concerns #14-20, #28, #30):
 ```
 
 ### 14. Generated article — body not visible
-Status: IN_PROGRESS
+Status: RESOLVED
 Symptom: After a successful generate, the article's body doesn't show in
 the editor (or wherever the operator is looking). DB confirms body is
 written, so this is a render-side gap.
 
+```
+RESOLUTION (concern 14) — 2026-05-02
+Investigate: persist_generated_article RPC's anchor-row insert (timelines
+             where type='article') only writes (story_id, type,
+             linked_article_id, event_label, event_date, sort_order). It
+             never sets event_body. StoryEditor.loadStory mapped
+             event_body → entry.content. The "Article body" Textarea
+             (line 1458) is bound to entry.content, not story.body.
+             Article-level story.body IS populated from cast.body but is
+             only rendered in preview mode. The edit view has no Textarea
+             bound to story.body. Net: anchor row arrives with
+             entry.content='' and the body Textarea renders empty.
+Review:      A (confirmer) AGREE on diagnosis, PARTIAL on Stage 1's
+             initial fix. B (adversary) AGREE on diagnosis, PARTIAL on
+             fix. Both independently flagged the same critical
+             regression: Stage 1 proposed `event_body || cast.body` as
+             the predicate. saveAll writes entry.summary (excerpt) →
+             event_body for the anchor. So on second load, event_body
+             holds the excerpt, the conditional fallback stops firing,
+             entry.content = excerpt, and the next save overwrites
+             articles.body with the excerpt — silent body destruction.
+             Both reviewers recommended an unconditional override for
+             anchor rows + same fallback in regenTimeline (which has
+             identical mapping logic). No tie-breaker — A and B
+             converged.
+Fix:         web/src/components/article/StoryEditor.tsx —
+             - loadStory entry-mapping: for DB type='article' rows, set
+               entry.content = cast.body || '' unconditionally (event_body
+               is NULL by pipeline design). event_body still flows
+               through entry.summary (handled by concern #18 in its
+               own iteration).
+             - regenTimeline entry-mapping: same override using
+               story.body from component state.
+             Save round-trip preserved: drivingEntry.content →
+             articles.body unchanged at saveAll line 871; the anchor
+             row's event_body in the DB is irrelevant since the loader
+             never reads it. No saveAll changes needed.
+TypeScript:  pass (npx tsc --noEmit, exit 0)
+iOS build:   n/a — StoryEditor is web admin only. KidsStoryEditor.tsx
+             has a structurally different shape (filters
+             .eq('type','event'), never loads the article anchor) —
+             adult editor only here.
+Verifier:    self-verified — diff applied to both load sites; no save
+             path changes; tsc clean. Commit 78ce9a2.
+Status:      RESOLVED — fixes the body Textarea rendering for newly
+             generated articles. Sister concern #18 (excerpt missing) is
+             structurally identical and gets its own iteration.
+             Pipeline-side RPC fix (writing articles.body into the
+             anchor's event_body) is cleaner long-term but requires a
+             migration; render-side fallback works for both already-
+             written rows and future generations without DB change.
+```
+
 ### 15. Generated article — anchor row not visible on its own timeline
-Status: PENDING
+Status: IN_PROGRESS
 Symptom: The generated article doesn't appear as a node on its own story's
 timeline in the editor. DB confirms a `type='article'` anchor row exists.
 
@@ -692,14 +745,106 @@ Symptom: Discussion / comments area does not render on the public
 /<slug> story view.
 
 ### 26. Timeline — date format MM/DD/YYYY everywhere
-Status: IN_PROGRESS
+Status: RESOLVED
 Symptom: Timeline event dates are not displayed as MM/DD/YYYY across all
 surfaces (public, editor, iOS, kids iOS).
 
 ### 27. Timeline — headline only, no body
-Status: IN_PROGRESS
+Status: RESOLVED
 Symptom: Timeline events render with body / description text. Wanted:
 date + headline only, never any body, on every surface.
+
+```
+RESOLUTION (concerns 26 + 27) — 2026-05-02
+Investigate: Three web surfaces render timeline event rows. Public
+             reader (TimelineSection.tsx:89-98) used a private
+             `formatDate` that emitted "Apr 2026" (month-short + year
+             only — neither day nor MM/DD/YYYY) and rendered
+             `ev.event_body` as a paragraph at line 137. Adult editor
+             (StoryEditor.tsx:166-171) and kids editor
+             (KidsStoryEditor.tsx:171-176) each had a private
+             `formatMmDdYyyy` helper that already emitted MM/DD/YYYY and
+             did NOT render any body in their timeline previews — but
+             three parallel copies of the same regex helper. Schema
+             (web/src/types/database.ts timelines table): event_date is
+             a string (ISO datetime stored as `timestamptz`), event_label
+             is the headline (NOT NULL), event_body is the optional
+             description. No DB or pipeline changes needed — pure
+             render-side fix. iOS surfaces noted but DEFERRED per
+             locked decision (iOS session).
+Review:      A (confirmer) re-derived the three call sites
+             independently; verified `formatMmDdYyyy` correctly returns
+             `s` (raw string) on no-match (Stage 1 had wrongly claimed
+             it returned `m`); confirmed canonical helper belongs in
+             web/src/lib/dates.ts (already houses formatDate /
+             formatDateTime / timeAgo); approved direction. B
+             (adversary) verified no missed surfaces (admin newsroom,
+             story-manager, kids-story-manager, ArticlesTable,
+             StoryArticlePicker, JSON-LD, OG images, RSS, sitemap all
+             clean — only the three known files render timelines);
+             flagged the upstream `parse_timeline_event_date` lenient
+             parser in supabase/migrations/2026-04-28_… that falls back
+             to `now()` on unparseable input — risk surface but not
+             this concern; warned against using `Intl.DateTimeFormat`
+             in the new helper (would re-introduce UTC-midnight TZ
+             drift bug already documented in StoryEditor.tsx); flagged
+             that `event_body` becoming reader-invisible makes the
+             editor's Summary field a write-only field but that's
+             editor-bundle (#14-#20) territory, not in scope here. A
+             and B converged on direction; no tie-breaker needed.
+             Adopted B's regex-only helper (no Intl fallback).
+Fix:         web/src/lib/dates.ts — added `formatTimelineDate` export.
+             Regex prefix-match `^(\d{4})-(\d{2})-(\d{2})` → MM/DD/YYYY.
+             Returns '' for null/undefined/empty. Returns raw input on
+             no-match (so "Generated"-style legacy strings surface to
+             the operator instead of "Invalid Date"). Comment explains
+             why we don't use `new Date()` — UTC drift footgun.
+             web/src/components/article/TimelineSection.tsx —
+             - imported formatTimelineDate from @/lib/dates
+             - removed local `formatDate` (lines 89-98)
+             - removed `BODY_STYLE` constant (lines 82-87, now unused)
+             - removed `<p style={BODY_STYLE}>{ev.event_body}</p>`
+               body render (line 137 — the "anything else" the owner
+               wanted gone)
+             - DATE_STYLE render now calls formatTimelineDate
+             web/src/components/article/StoryEditor.tsx —
+             - imported formatTimelineDate from @/lib/dates
+             - removed local `formatMmDdYyyy` (lines 166-171)
+             - both call sites swapped (timeline preview view mode +
+               entry-list compact row)
+             web/src/components/article/KidsStoryEditor.tsx —
+             - imported formatTimelineDate from @/lib/dates
+             - removed local `formatMmDdYyyy` (lines 171-176)
+             - all three call sites swapped (lines 657, 722, 896)
+             TimelineItem.event_body retained in the prop type (callers
+             still pass the field through; declaring it documents the
+             DB shape, removing it would force [slug]/page.tsx changes
+             in parallel session #21-25's territory).
+TypeScript:  pass (npx tsc --noEmit, exit 0)
+iOS build:   DEFERRED — locked decision keeps iOS scope out of this
+             session. Punch list for the future iOS session:
+             - VerityPost/VerityPost/StoryDetailView.swift:189-193
+               displayDateFormatter is "MMMM d, yyyy" — change to
+               "MM/dd/yyyy".
+             - VerityPost/VerityPost/StoryDetailView.swift:1019-1033
+               event-type timelineRow renders
+               `Text(event.text ?? event.summary ?? "")` — drop the
+               `event.summary` (event_body) fallback so headline-only
+               render is enforced.
+             - VerityPostKids/ — no timeline rendering detected, n/a.
+Verifier:    pass — verified all four files cold; helper signature +
+             edge cases match spec (YYYY-MM-DD prefix on full ISO →
+             MM/DD/YYYY, partial/malformed → raw, null/empty → ''),
+             import paths correct, no orphaned imports/constants, no
+             stale `formatMmDdYyyy` or `BODY_STYLE` references in the
+             timeline code path (the two `BODY_STYLE` hits in
+             ArticleSurface.tsx are unrelated — that's the article
+             body, not timeline body), `TimelineItem.event_body`
+             retained for caller compatibility, only consumer of
+             TimelineSection (ArticleSurface.tsx:138) untouched.
+Status:      RESOLVED — web slice shipped. iOS slice deferred to its
+             own session per locked decision; punch list above.
+```
 
 ### 28. Editor timeline — appears late after generation
 Status: PENDING

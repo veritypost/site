@@ -1119,7 +1119,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
                   Now
                 </span>
               )}
-              <div style={{ fontSize: F.sm, fontWeight: e.is_current ? 700 : 500, color: e.is_current ? C.now : C.dim, marginBottom: 2 }}>{formatMmDdYyyy(e.event_date)}</div>
+              <div style={{ fontSize: F.sm, fontWeight: e.is_current ? 700 : 500, color: e.is_current ? C.now : C.dim, marginBottom: 2 }}>{formatTimelineDate(e.event_date)}</div>
               <div style={{ fontSize: F.base, fontWeight: 600, color: e.is_current ? C.ink : C.soft }}>
                 {e.title || 'Untitled'}
               </div>
@@ -1401,7 +1401,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
                   {entry.is_current && <Badge variant="warn" size="xs">Now</Badge>}
                   {entry.event_date && (
                     <span style={{ fontSize: F.xs, color: C.muted, fontFamily: 'ui-monospace, monospace', whiteSpace: 'nowrap' }}>
-                      {formatMmDdYyyy(entry.event_date)}
+                      {formatTimelineDate(entry.event_date)}
                     </span>
                   )}
                   <span style={{ fontSize: F.base, fontWeight: 600, color: C.ink, flex: '1 1 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>

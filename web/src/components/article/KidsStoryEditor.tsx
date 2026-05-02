@@ -37,6 +37,7 @@ import Spinner from '@/components/admin/Spinner';
 import { confirm, ConfirmDialogHost } from '@/components/admin/ConfirmDialog';
 import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C, F, S } from '@/lib/adminPalette';
+import { formatTimelineDate } from '@/lib/dates';
 
 // Per-page accent override: kids experience uses a blue accent. `now`/`nowBg`
 // are shared story-timeline tokens and live on ADMIN_C directly.
@@ -164,16 +165,6 @@ function Section({ title, description, aside, divider, embedded, children }: Sec
     </section>
   );
 }
-
-// US-format display for entry dates. Parse YYYY-MM-DD parts directly so
-// no timezone shift happens. Falls back to the raw string if it doesn't
-// match the canonical shape.
-const formatMmDdYyyy = (s: string | null | undefined): string => {
-  if (!s) return '';
-  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (!m) return s;
-  return `${m[2]}/${m[3]}/${m[1]}`;
-};
 
 export type KidsStoryEditorProps = {
   articleId: string | null;
@@ -663,7 +654,7 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
         {e?.is_current && (
           <div style={{ display: 'flex', alignItems: 'center', gap: S[2], marginBottom: S[3] }}>
             <Badge variant="warn">Now</Badge>
-            <span style={{ fontSize: F.sm, color: C.dim }}>{formatMmDdYyyy(e.event_date)}</span>
+            <span style={{ fontSize: F.sm, color: C.dim }}>{formatTimelineDate(e.event_date)}</span>
           </div>
         )}
         <h1 style={{ fontSize: 26, fontWeight: 700, lineHeight: 1.2, letterSpacing: '-0.02em', margin: 0, marginBottom: S[3] }}>
@@ -728,7 +719,7 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
                   Now
                 </span>
               )}
-              <div style={{ fontSize: F.sm, fontWeight: e.is_current ? 700 : 500, color: e.is_current ? C.now : C.dim, marginBottom: 2 }}>{formatMmDdYyyy(e.event_date)}</div>
+              <div style={{ fontSize: F.sm, fontWeight: e.is_current ? 700 : 500, color: e.is_current ? C.now : C.dim, marginBottom: 2 }}>{formatTimelineDate(e.event_date)}</div>
               <div style={{ fontSize: F.base, fontWeight: 600, color: e.is_current ? C.ink : C.soft }}>
                 {e.title || 'Untitled'}
               </div>
@@ -902,7 +893,7 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
                   {entry.is_current && <Badge variant="warn" size="xs">Now</Badge>}
                   {entry.event_date && (
                     <span style={{ fontSize: F.xs, color: C.muted, fontFamily: 'ui-monospace, monospace', whiteSpace: 'nowrap' }}>
-                      {formatMmDdYyyy(entry.event_date)}
+                      {formatTimelineDate(entry.event_date)}
                     </span>
                   )}
                   <span style={{ fontSize: F.base, fontWeight: 600, color: C.ink, flex: '1 1 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
