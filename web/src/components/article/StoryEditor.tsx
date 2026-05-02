@@ -426,18 +426,20 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
         const rawEventDate = (ev.event_date as string | null) ?? '';
         const eventDate = rawEventDate ? rawEventDate.split('T')[0] : '';
         // Anchor row's event_body is NULL by design — persist_generated_article
-        // only writes event_label + event_date for type='article'. Body lives
-        // on articles.body. Always read from cast.body for the anchor (not
-        // event_body || cast.body — saveAll writes excerpt into event_body
-        // for the anchor, so the conditional would silently flip on reload).
+        // only writes event_label + event_date for type='article'. Body and
+        // excerpt live on articles.body / articles.excerpt. Always read from
+        // cast for the anchor (unconditional, not `event_body || cast.body`
+        // — saveAll writes excerpt into event_body for the anchor, so a
+        // conditional fallback would silently flip on reload).
         const content = isAnchor ? (cast.body || '') : eventBody;
+        const summary = isAnchor ? (cast.excerpt || '') : eventBody;
         return {
           id: e.id,
           event_date: eventDate,
           is_current: Boolean(ev.is_current),
           type: localType,
           title: eventLabel,
-          summary: eventBody,
+          summary,
           content,
           timeline_date: eventDate,
           timeline_headline: eventLabel,
@@ -714,13 +716,14 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
         const rawEventDate = (ev.event_date as string | null) ?? '';
         const eventDate = rawEventDate ? rawEventDate.split('T')[0] : '';
         const content = isAnchor ? (story.body || '') : eventBody;
+        const summary = isAnchor ? (story.summary || '') : eventBody;
         return {
           id: e.id,
           event_date: eventDate,
           is_current: Boolean(ev.is_current),
           type: localType,
           title: eventLabel,
-          summary: eventBody,
+          summary,
           content,
           timeline_date: eventDate,
           timeline_headline: eventLabel,

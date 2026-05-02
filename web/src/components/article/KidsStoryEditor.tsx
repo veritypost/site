@@ -355,7 +355,9 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
           is_current: Boolean(ev.is_current),
           type: localType,
           title: (ev.text as string | null) || (ev.event_label as string | null) || '',
-          summary: (ev.summary as string | null) || (ev.event_body as string | null) || '',
+          summary: isAnchor
+            ? ((cast as unknown as { excerpt?: string | null }).excerpt || '')
+            : ((ev.summary as string | null) || (ev.event_body as string | null) || ''),
           content: isAnchor ? ((cast as unknown as { body?: string | null }).body || '') : eventContent,
           timeline_date: timelineDate,
           timeline_headline: (ev.text as string | null) || '',
