@@ -4,13 +4,13 @@ Single-line state for the review system. Updated automatically at session end.
 
 ```
 CURRENT_PHASE: auto-detect
-CURRENT_UNIT: 4
-CURRENT_TITLE: Article reader layout (Slice 4 is next; Unit 1 Home fixed, Unit 2 Article reader findings already locked)
+CURRENT_UNIT: 2
+CURRENT_TITLE: Article reader broken-state cleanup (Slice 5 is next)
 CURRENT_WAVE: A
 CURRENT_DOC: UI_UX_REVIEW/A-2-article-reader.md
 STATUS: findings
-NEXT_BUILD_SLICE: Slice 4 — Unit 2 / Article reader / Layout overhaul (prereqs 1+2+3 all shipped)
-ANCHOR: Slice 3 (Unit 1 / Home cleanup) shipped 2026-05-02. 35 findings fixed across 7 files (4-stream parallel). Build + tsc clean. Auto-detect next: Slice 4 (Article reader layout).
+NEXT_BUILD_SLICE: Slice 5 — Unit 2 / Article reader / Broken-state cleanup (126 findings, 4-stream parallel)
+ANCHOR: Slice 4 (Article reader layout) shipped 2026-05-02. ArticleReaderTabs.tsx updated: desktop ≥1024px → 75/25 flex split with sticky timeline rail; mobile <1024px → 3-tab UI with CSS display:none state preservation. Build + tsc clean. Auto-detect next: Slice 5 (broken-state cleanup, elevated-care, adversary mandatory).
 LAST_UPDATED: 2026-05-02
 
 PARKED_UNITS:
