@@ -2,7 +2,7 @@
 // @feature-verified recap 2026-04-18
 'use client';
 import { useEffect, useState, CSSProperties } from 'react';
-import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
+import { hasPermission, refreshIfStale } from '@/lib/permissions';
 import type { Tables } from '@/types/database-helpers';
 
 type RecapAttempt = Pick<Tables<'weekly_recap_attempts'>, 'score' | 'total_questions'>;
@@ -15,7 +15,6 @@ export default function RecapCard() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      await refreshAllPermissions();
       await refreshIfStale();
       const allowed = hasPermission('recap.list.view');
       if (cancelled) return;

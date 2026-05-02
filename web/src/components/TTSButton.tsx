@@ -2,7 +2,7 @@
 // @feature-verified tts 2026-04-18
 'use client';
 import { useEffect, useRef, useState, CSSProperties } from 'react';
-import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
+import { hasPermission, refreshIfStale } from '@/lib/permissions';
 
 // D17 / Pass 17 — text-to-speech button. Uses the browser's
 // SpeechSynthesis API; no external service, no server calls.
@@ -42,7 +42,6 @@ export default function TTSButton({
   useEffect(() => {
     setSupported(typeof window !== 'undefined' && 'speechSynthesis' in window);
     (async () => {
-      await refreshAllPermissions();
       await refreshIfStale();
       setAllowed(hasPermission('article.listen_tts'));
     })();

@@ -6,8 +6,7 @@
 // needed only to gate the timestamp perk for paid subscribers
 // (`home.breaking_banner.view.paid`). The strip is suppressed until
 // perms hydrate so the timestamp doesn't flash-appear then disappear
-// for free/anon users. refreshAllPermissions resolves immediately for
-// anonymous users (returns an empty Set), so there is no visible delay.
+// for free/anon users.
 //
 // Slice 01 decision 4: the strip is proof of editorial judgment and
 // must be visible to the people we are asking to convert. The paywall
@@ -15,7 +14,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
+import { hasPermission, refreshIfStale } from '@/lib/permissions';
 import { type HomeStory, timeShort } from './_homeShared';
 
 export default function HomeBreakingStrip({ story }: { story: HomeStory }) {
@@ -25,7 +24,6 @@ export default function HomeBreakingStrip({ story }: { story: HomeStory }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      await refreshAllPermissions();
       await refreshIfStale();
       if (cancelled) return;
       setCanSeePaid(hasPermission('home.breaking_banner.view.paid'));

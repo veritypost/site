@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
+import { hasPermission, refreshIfStale } from '@/lib/permissions';
 import { friendlyError } from '@/lib/friendlyError';
 
 interface BookmarkButtonProps {
@@ -19,7 +19,6 @@ export default function BookmarkButton({ articleId, currentUserId }: BookmarkBut
   useEffect(() => {
     if (!currentUserId) return;
     (async () => {
-      await refreshAllPermissions();
       await refreshIfStale();
       setCanBookmark(hasPermission('article.bookmark.add'));
       setPermsReady(true);

@@ -3,7 +3,7 @@
 'use client';
 import { useState, useEffect, useRef, CSSProperties } from 'react';
 import { createClient } from '../lib/supabase/client';
-import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
+import { hasPermission, refreshIfStale } from '@/lib/permissions';
 import { MENTION_RE } from '@/lib/mentions';
 import { COPY } from '@/lib/copy';
 import { friendlyError } from '@/lib/friendlyError';
@@ -74,7 +74,6 @@ export default function CommentComposer({
 
   useEffect(() => {
     (async () => {
-      await refreshAllPermissions();
       await refreshIfStale();
       setCanPost(hasPermission(parentId ? 'comments.reply' : 'comments.post'));
       setCanMention(hasPermission('comments.mention.insert'));

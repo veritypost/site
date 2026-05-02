@@ -2,7 +2,7 @@
 // @feature-verified follow 2026-04-18
 'use client';
 import { useEffect, useState } from 'react';
-import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
+import { hasPermission, refreshIfStale } from '@/lib/permissions';
 import { friendlyError } from '@/lib/friendlyError';
 
 interface FollowButtonProps {
@@ -31,7 +31,6 @@ export default function FollowButton({
 
   useEffect(() => {
     (async () => {
-      await refreshAllPermissions();
       await refreshIfStale();
       setCanFollow(hasPermission('profile.follow'));
       setPermsReady(true);

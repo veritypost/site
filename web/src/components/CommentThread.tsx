@@ -14,7 +14,7 @@ import { createClient } from '../lib/supabase/client';
 import CommentComposer from './CommentComposer';
 import CommentRow, { EnrichedComment } from './CommentRow';
 import { useFocusTrap } from '../lib/useFocusTrap';
-import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
+import { hasPermission, refreshIfStale } from '@/lib/permissions';
 import type { Database } from '@/types/database';
 import { Z } from '@/lib/zIndex';
 import Skeleton from './Skeleton';
@@ -115,7 +115,6 @@ export default function CommentThread({
 
   useEffect(() => {
     (async () => {
-      await refreshAllPermissions();
       await refreshIfStale();
       setPermsLoaded(true);
     })();
