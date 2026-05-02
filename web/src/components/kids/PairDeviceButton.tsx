@@ -218,8 +218,8 @@ export default function PairDeviceButton({ kidId }: Props) {
           style={{
             padding: '8px 12px',
             borderRadius: 8,
-            background: '#fef2f2',
-            border: `1px solid #fecaca`,
+            background: 'var(--danger-bg)',
+            border: `1px solid var(--danger-border)`,
             color: C.danger,
             fontSize: 12,
             fontWeight: 600,

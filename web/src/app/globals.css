@@ -50,7 +50,10 @@
   /* DA-055 — `#ef4444` on a pale-red background (`#fef2f2`) falls
      below 4.5:1 AA normal text. `#b91c1c` pushes the ratio above 7:1
      on that background and keeps readable contrast on white too. */
-  --danger-bg: rgba(239, 68, 68, 0.08);
+  --danger-bg: #fef2f2;
+  --danger-border: #fecaca;
+  --warn-bg: #fef3c7;
+  --warn-border: #fcd34d;
   --danger: #b91c1c;
   --wrong: #b91c1c;
   /* C10 — saturated alert red used by the BREAKING banner (home + story).

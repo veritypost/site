@@ -95,8 +95,8 @@ export default function ProfileCategoryDrillIn() {
           style={{
             padding: '12px 14px',
             borderRadius: 8,
-            background: '#fef2f2',
-            border: '1px solid #fecaca',
+            background: 'var(--danger-bg)',
+            border: '1px solid var(--danger-border)',
             color: '#991b1b',
             fontSize: 13,
           }}

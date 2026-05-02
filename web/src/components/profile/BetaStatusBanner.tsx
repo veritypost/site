@@ -19,7 +19,7 @@ const C = {
   warnBg: '#fffbeb',
   warnBorder: '#d97706',
   warnText: '#92400e',
-  errBg: '#fef2f2',
+  errBg: 'var(--danger-bg)',
   errBorder: '#dc2626',
   errText: '#991b1b',
   cta: 'var(--accent)',

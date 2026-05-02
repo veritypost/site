@@ -234,7 +234,7 @@ export default function AddKidUpsellModal({
         {error && (
           <div
             style={{
-              background: '#fef2f2',
+              background: 'var(--danger-bg)',
               border: `1px solid ${C.danger}`,
               color: C.danger,
               borderRadius: 10,

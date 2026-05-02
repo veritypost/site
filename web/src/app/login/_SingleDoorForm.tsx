@@ -205,8 +205,8 @@ export default function SingleDoorForm({ notice }: Props) {
             style={{
               padding: '10px 14px',
               borderRadius: 10,
-              background: '#fef3c7',
-              border: '1px solid #fcd34d',
+              background: 'var(--warn-bg)',
+              border: '1px solid var(--warn-border)',
               color: '#78350f',
               fontSize: 13,
               marginBottom: 16,
@@ -221,8 +221,8 @@ export default function SingleDoorForm({ notice }: Props) {
           <div
             role="alert"
             style={{
-              backgroundColor: '#fef2f2',
-              border: '1px solid #fecaca',
+              backgroundColor: 'var(--danger-bg)',
+              border: '1px solid var(--danger-border)',
               borderRadius: '10px',
               padding: '12px 14px',
               marginBottom: '16px',
@@ -351,8 +351,8 @@ export default function SingleDoorForm({ notice }: Props) {
         <div
           role="alert"
           style={{
-            backgroundColor: '#fef2f2',
-            border: '1px solid #fecaca',
+            backgroundColor: 'var(--danger-bg)',
+            border: '1px solid var(--danger-border)',
             borderRadius: '10px',
             padding: '12px 14px',
             marginBottom: '16px',

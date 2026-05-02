@@ -420,7 +420,7 @@ export default function ParentKidsPage() {
       {error && (
         <div
           style={{
-            background: '#fef2f2',
+            background: 'var(--danger-bg)',
             border: `1px solid ${C.danger}`,
             color: C.danger,
             borderRadius: 10,
@@ -436,7 +436,7 @@ export default function ParentKidsPage() {
       {loadError && (
         <div
           style={{
-            background: '#fef2f2',
+            background: 'var(--danger-bg)',
             border: `1px solid ${C.danger}`,
             borderRadius: 10,
             padding: 12,
@@ -817,7 +817,7 @@ function TrialExpiredHero({
   return (
     <div
       style={{
-        background: '#fef2f2',
+        background: 'var(--danger-bg)',
         border: `1px solid ${C.danger}`,
         borderRadius: 14,
         padding: 20,

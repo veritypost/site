@@ -282,8 +282,8 @@ export default function PickCategoriesPage() {
           <div
             role="alert"
             style={{
-              backgroundColor: '#fef2f2',
-              border: '1px solid #fecaca',
+              backgroundColor: 'var(--danger-bg)',
+              border: '1px solid var(--danger-border)',
               borderRadius: '10px',
               padding: '12px 14px',
               marginBottom: '16px',

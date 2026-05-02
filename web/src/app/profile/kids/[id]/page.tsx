@@ -433,7 +433,7 @@ export default function KidDashboardPage() {
       {error && (
         <div
           style={{
-            background: '#fef2f2',
+            background: 'var(--danger-bg)',
             border: `1px solid ${C.danger}`,
             color: C.danger,
             borderRadius: 10,
@@ -716,7 +716,7 @@ function LeaderboardOptIn({
 const KIND_META: Record<TimelineEvent['kind'], { label: string; bg: string; fg: string }> = {
   read: { label: 'Read', bg: '#dbeafe', fg: '#1d4ed8' },
   quiz_pass: { label: 'Quiz', bg: '#dcfce7', fg: '#15803d' },
-  badge: { label: 'Badge', bg: '#fef3c7', fg: '#b45309' },
+  badge: { label: 'Badge', bg: 'var(--warn-bg)', fg: '#b45309' },
   question: { label: 'Ask', bg: '#ede9fe', fg: '#6d28d9' },
 };
 
@@ -938,7 +938,7 @@ function BandPanel({
           style={{
             marginTop: 10,
             padding: 10,
-            background: '#fef3c7',
+            background: 'var(--warn-bg)',
             border: '1px solid #b45309',
             borderRadius: 8,
             fontSize: 12,

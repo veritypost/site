@@ -198,7 +198,7 @@ export default function DobCorrectionDetailPage() {
           style={{
             marginTop: 16,
             padding: 12,
-            background: '#fef3c7',
+            background: 'var(--warn-bg)',
             border: `1px solid ${ADMIN_C.warn}`,
             borderRadius: 6,
           }}

@@ -520,7 +520,7 @@ function StatusCard({
   const colors: Record<string, { bg: string; border: string }> = {
     success: { bg: '#ecfdf5', border: '#16a34a' },
     warn: { bg: '#fffbeb', border: '#b45309' },
-    danger: { bg: '#fef2f2', border: '#dc2626' },
+    danger: { bg: 'var(--danger-bg)', border: '#dc2626' },
   };
   const picked = colors[tone] || { bg: '#f7f7f7', border: '#e5e5e5' };
   return (

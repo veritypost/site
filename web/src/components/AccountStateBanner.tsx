@@ -10,7 +10,7 @@ type UserRow = Partial<Tables<'users'>>;
 // The red/amber banner tokens are bespoke severity variants (no matching
 // global vars; would need new tokens to consolidate, out of scope here).
 const C = {
-  redBg: '#fef2f2',
+  redBg: 'var(--danger-bg)',
   redBorder: '#dc2626',
   redText: '#991b1b',
   amberBg: '#fffbeb',

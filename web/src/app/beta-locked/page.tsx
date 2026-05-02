@@ -72,8 +72,8 @@ export default async function BetaLockedPage({
             style={{
               fontSize: 14,
               padding: '12px 14px',
-              background: '#fef2f2',
-              border: '1px solid #fecaca',
+              background: 'var(--danger-bg)',
+              border: '1px solid var(--danger-border)',
               color: '#991b1b',
               borderRadius: 8,
               marginBottom: 20,

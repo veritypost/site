@@ -533,7 +533,7 @@ export default function ExpertQueuePage() {
                       style={{
                         padding: '2px 8px',
                         borderRadius: 6,
-                        background: '#fef3c7',
+                        background: 'var(--warn-bg)',
                         color: '#92400e',
                         fontSize: 11,
                         fontWeight: 700,

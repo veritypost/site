@@ -528,10 +528,10 @@ const mentionHintStyle: CSSProperties = {
   lineHeight: 1.4,
 };
 const muteBannerStyle: CSSProperties = {
-  border: '1px solid #fecaca',
+  border: '1px solid var(--danger-border)',
   borderRadius: 12,
   padding: '12px 16px',
-  background: '#fef2f2',
+  background: 'var(--danger-bg)',
   marginBottom: 16,
   fontSize: 14,
   color: '#991b1b',

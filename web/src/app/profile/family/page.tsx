@@ -185,7 +185,7 @@ export default function FamilyDashboard() {
       {loadError && (
         <div
           style={{
-            background: '#fef2f2',
+            background: 'var(--danger-bg)',
             border: '1px solid #dc2626',
             borderRadius: 10,
             padding: 12,

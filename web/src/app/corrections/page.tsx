@@ -103,8 +103,8 @@ export default async function CorrectionsPage() {
             style={{
               padding: '14px 16px',
               borderRadius: 10,
-              background: '#fef2f2',
-              border: '1px solid #fecaca',
+              background: 'var(--danger-bg)',
+              border: '1px solid var(--danger-border)',
               color: '#991b1b',
               fontSize: 14,
             }}
