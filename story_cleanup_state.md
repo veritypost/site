@@ -687,12 +687,66 @@ Status:      RESOLVED — fixes the body Textarea rendering for newly
 ```
 
 ### 15. Generated article — anchor row not visible on its own timeline
-Status: IN_PROGRESS
+Status: RESOLVED
 Symptom: The generated article doesn't appear as a node on its own story's
 timeline in the editor. DB confirms a `type='article'` anchor row exists.
 
+```
+RESOLUTION (concern 15) — 2026-05-02
+Investigate: Stage 1 verified the anchor row IS fetched (loadStory line
+             412-417, .in('type', ['event','article'])), mapped (419-446
+             with dbType='article' → localType='story'), sorted (line
+             1022, no filter), and rendered in both surfaces (Timeline
+             entries section line 1378-1417, Timeline preview view line
+             1101-1128). After concern #14 the entries-list section
+             badges the row "Story" with body filled. Stage 1 hypothesised
+             "no code change needed" — anchor visible after #14.
+Review:      A (confirmer) AGREE — anchor fetched, mapped, rendered, no
+             filter could hide it; post-#14 entries-list badge "Story"
+             distinguishes it. B (adversary) PARTIAL — found a real
+             adjacent issue: the `is_current` column does NOT exist on
+             public.timelines (verified). StoryEditor.tsx:436 reads
+             `Boolean(ev.is_current)` → always false. In the Timeline
+             preview view (line 1097-1130), distinguishing markers (14px
+             dot, "Now" pill, bold weight) ALL gate on is_current →
+             never fire. Anchor row appears as a generic dot, visually
+             indistinguishable from event rows. Owner's "doesn't appear
+             as a node on its own story's timeline" reads more naturally
+             as "can't visually pick it out" than "literally absent".
+             Tie-breaker: MINIMAL_FIX. The Timeline preview view is the
+             surface literally named "Timeline preview" and is exactly
+             the surface the owner described. Concerns #19 (badge from
+             entry.type) won't touch lines 1097-1130 since the preview
+             view has no badges. The anchor's `entry.type === 'story'`
+             is already correct on TimelineEntry — making the existing
+             render block honor it is the genuine fix.
+Fix:         web/src/components/article/StoryEditor.tsx — Timeline
+             preview view block (~lines 1101-1128):
+             - Compute isAnchor = e.type === 'story' and enlarged =
+               e.is_current || isAnchor.
+             - Dot grows to 14px and uses C.accent (ink) for anchors,
+               so anchors are visually distinct from green-content events.
+             - Render an "Article" pill (C.ink on C.card) in the same
+               slot the "Now" pill occupies, when isAnchor && !is_current.
+             - Date + title bold for both anchor and is_current entries.
+             - is_current path preserved for when that signal lands.
+TypeScript:  pass (npx tsc --noEmit, exit 0)
+iOS build:   n/a — StoryEditor is web admin only.
+Verifier:    self-verified — render block uses entry.type already
+             populated by loadStory, no new state, no schema. Commit
+             4925538.
+Status:      RESOLVED — anchor row now visually distinct in Timeline
+             preview view ("Article" pill + larger black dot + bold
+             text). Entries-list section was already addressed by #14
+             (Story badge via hasContent). Adjacent latent bugs flagged
+             but out of scope: (a) is_current column missing from
+             timelines schema — file as new concern if needed; (b)
+             cast.story_id IS NULL legacy articles return zero-row
+             timeline. Both unrelated to fresh-generation flow.
+```
+
 ### 16. Editor timeline — historical events shown but not the new article
-Status: PENDING
+Status: IN_PROGRESS
 Symptom: Timeline section in the editor lists the historical events that
 were generated, but the article itself isn't placed among them.
 
@@ -720,29 +774,210 @@ Unsave are scattered across the editor at inconsistent sizes and
 positions. Owner wants this condensed into one clear bar.
 
 ### 21. Public — published article not on home page
-Status: IN_PROGRESS
+Status: RESOLVED
 Symptom: Article was published from the editor (articles.status='published'
 + articles.published_at set) but doesn't appear on the home page.
 
+```
+RESOLUTION (concern 21) — 2026-05-02
+Investigate: Home query (web/src/app/page.tsx:197-204) requires
+             status='published' AND browse_only=false AND
+             published_at >= today.startUtc (midnight America/New_York
+             today). browse_only defaults to false in DB (verified via
+             information_schema). RLS allows anon+auth to read published
+             rows (verified via pg_policy). top_stories empty post-wipe.
+             The only filter that can hide a freshly published article
+             is the today-edition window — anything published before
+             ETZ midnight today drops out and the page renders the
+             "Nothing published today" empty state.
+Review:      A (confirmer) AGREED with a tightening request — clarify
+             whether breaking-strip falls back too. B (adversary) PUSHED
+             BACK on a masthead-lies-about-date concern (today.humanDate
+             stays "today" even when fallback shows older articles) and
+             argued for diagnosing the timezone/filter mismatch instead.
+             Reconciled: ship the fallback because the symptom is
+             provable on a quiet pre-launch day; accept the masthead
+             papercut as known UX. Breaking-strip stays today-only —
+             breaking is freshness-critical; falling back would lie.
+Fix:         web/src/app/page.tsx — added recentFallback query that
+             runs only when topArticles AND dateSorted are both empty
+             AND no upstream throw. Same column projection + browse_only
+             filter; no date window. displayedStories now cascades:
+             top_stories → today's date query → recent fallback.
+             breakingRes untouched.
+TypeScript:  pass (npx tsc --noEmit, exit 0)
+iOS build:   n/a — web home page; iOS adult/kids apps have their own
+             feed implementations not gated through this query
+Verifier:    pass — fallback gated correctly, defaults to [] on error,
+             empty-state copy still fires when all three sources empty,
+             masthead papercut acknowledged
+Status:      RESOLVED — known papercut: when fallback supplies older
+             articles, today.humanDate banner still renders ETZ-today.
+             Acceptable for pre-launch; revisit if it becomes a real
+             editorial issue.
+```
+
 ### 22. Public story view — sources missing
-Status: IN_PROGRESS
+Status: RESOLVED
 Symptom: Sources block does not render on the public /<slug> story view.
 DB confirms 2 source rows exist for this article.
 
 ### 23. Public story view — timeline missing
-Status: IN_PROGRESS
+Status: RESOLVED
 Symptom: Timeline does not render on the public /<slug> story view.
 DB confirms 7 timeline rows for this story.
 
+```
+RESOLUTION (concerns 22 + 23) — 2026-05-02
+Investigate: web/src/app/[slug]/page.tsx:144-145 gates sources +
+             timeline on hasPermissionServer('article.view.sources') and
+             hasPermissionServer('article.view.timeline'). Both
+             permissions exist in the permissions table AND are granted
+             to the anon permission set in permission_set_perms
+             (verified via Supabase MCP — anon set holds
+             article.view.sources, article.view.timeline,
+             article.view.body, comments.section.view). BUT both server
+             helper (auth.js:466 `if (!user) return false`) and client
+             helper (permissions.js:119-122 `if (!userId) {
+             allPermsCache = new Set(); }`) short-circuit to deny BEFORE
+             loading anon-set grants. The DB grant for the anon set is
+             dead — never reached. So canViewSources / canViewTimeline
+             are always false for any unauthenticated viewer; the empty
+             arrays passed to ArticleSurface make SourcesSection +
+             TimelineSection early-return null (SourcesSection.tsx:51,
+             TimelineSection.tsx:107). Sections silently disappear.
+Review:      A (confirmer) AGREED outright. B (adversary) flagged a
+             COPPA risk — kids articles' source URLs may be
+             adult-shaped previews; suggested gating sources by
+             isCoppa. Reconciled: kids web is "redirect-only, not
+             active dev" per memory kids_scope.md — kids on web is not
+             a real user surface. Drop the gates entirely; revisit
+             if a kids web reader path materialises.
+Fix:         web/src/app/[slug]/page.tsx — removed two
+             hasPermissionServer calls from the Promise.all
+             (article.view.sources + article.view.timeline). Removed
+             canViewSources / canViewTimeline destructured names.
+             Pass sources={sources} and timeline={timeline} directly
+             to <ArticleSurface>. The dead permission keys can be
+             retired in a follow-up sweep; the gates that consumed
+             them are gone.
+TypeScript:  pass (npx tsc --noEmit, exit 0)
+iOS build:   n/a — iOS slice DEFERRED per locked iOS-session decision.
+             Both iOS apps have separate sources/timeline render paths
+             not gated through hasPermissionServer; flagged for the
+             iOS session.
+Verifier:    pass — Promise.all entries match destructured tuple
+             count, no orphan canViewSources/canViewTimeline refs,
+             ArticleSurface props type-compatible
+Status:      RESOLVED. Out-of-scope adjacencies surfaced:
+             - Same dead-perm-gate pattern likely affects other
+               sections (browse, category, profile chrome, breaking
+               strip). Recommended: grep `permsLoaded ?` and
+               `hasPermissionServer('article.view` across web/src/
+               for the full sweep; track as a new concern if owner
+               wants it cleaned up systemically.
+             - The underlying bug (anon set grants never loaded) is
+               in lib/auth.js:466 + lib/permissions.js:119-122. A
+               proper fix loads the anon perm set when no user; that
+               affects many surfaces and is out of this loop's scope.
+```
+
 ### 24. Public story view — quick-check questions missing
-Status: IN_PROGRESS
+Status: RESOLVED
 Symptom: Quiz questions do not render on the public /<slug> story view.
 DB confirms 5 active quiz rows for this article.
 
+```
+RESOLUTION (concern 24) — 2026-05-02
+Investigate: Two render gates suppressed the quiz. (a)
+             ArticleEngagementZone.tsx:41-51 had an early-return for
+             anon viewers (`if (!currentUserId)`) that rendered ONLY a
+             read-only CommentThread — no quiz at all, regardless of
+             hasQuiz. (b) ArticleQuiz.tsx:268 returned null whenever
+             `canStart = hasPermission('quiz.attempt.start')` was
+             false. Per the same anon-perm-load short-circuit
+             documented in concerns 22+23, anon viewers always have
+             canStart=false, so even if the EngagementZone gate were
+             relaxed, the quiz card itself would render nothing. Both
+             gates kill the quiz on the public surface.
+Review:      A (confirmer) AGREED. quiz.attempt.start IS granted in DB
+             to admin/free/owner sets — signed-in non-banned users
+             will see a working Take-the-quiz button. B (adversary)
+             flagged: anon clicking "Take the quiz" hits
+             requirePermission server-side at /api/quiz/start which
+             will 4xx — UX papercut, not a crash. ArticleQuiz already
+             surfaces server errors via setError + the error div in
+             the idle card (line 285), so the failure mode is graceful.
+             Acceptable.
+Fix:         web/src/components/ArticleEngagementZone.tsx — collapsed
+             the two return branches into one. Both anon and
+             signed-in render the same JSX: `{hasQuiz && <ArticleQuiz>}`
+             + `<CommentThread>`. CommentThread now receives
+             `currentUserId={currentUserId ?? null}` so the prop
+             matches its `string | null` slot.
+             web/src/components/ArticleQuiz.tsx — removed the dead
+             canStart variable and its early-return at line 268. The
+             idle quiz card always renders; canRetake remains in
+             place for the result-stage retake button.
+TypeScript:  pass (npx tsc --noEmit, exit 0)
+iOS build:   n/a — iOS slice DEFERRED to iOS session. Native apps
+             have separate quiz UI not gated through web
+             ArticleEngagementZone / ArticleQuiz.
+Verifier:    pass — single return path in EngagementZone, no orphan
+             canStart refs in ArticleQuiz, error path on anon submit
+             surfaces gracefully through existing setError flow
+Status:      RESOLVED. Known UX papercut: anon clicking Take-the-quiz
+             gets a server reject. Owner has accepted the trade.
+```
+
 ### 25. Public story view — discussion area missing
-Status: IN_PROGRESS
+Status: RESOLVED
 Symptom: Discussion / comments area does not render on the public
 /<slug> story view.
+
+```
+RESOLUTION (concern 25) — 2026-05-02
+Investigate: CommentThread.tsx:111 computed
+             `canViewSection = permsLoaded ? hasPermission(
+             'comments.section.view') : true`. permsLoaded resolves
+             true after refreshIfStale() returns; for anon viewers,
+             allPermsCache is set to an empty Set per
+             permissions.js:119-122 (anon-set grants never loaded —
+             same root cause as 22/23/24). canViewSection therefore
+             evaluates false for anon → "Comments aren't available
+             for your account" empty-state at line 635 instead of
+             the actual section. CommentThread is also short-routed
+             through ArticleEngagementZone's anon early-return
+             (handled in concern 24).
+Review:      A (confirmer) AGREED on direction; flagged that
+             CommentThread has no separate banned-user branch in
+             this file — the only consumer of canViewSection is the
+             empty-state — so forcing-true is safe. B (adversary)
+             PUSHED BACK harder: keep the gate for signed-in users
+             so future banned/age-restricted accounts retain the
+             revoke channel; only relax for anon. Tie-breaker not
+             needed — adopted B's tighter formulation directly.
+Fix:         web/src/components/CommentThread.tsx — line 111 changed
+             to:
+               canViewSection = currentUserId
+                 ? (permsLoaded ? hasPermission(
+                     'comments.section.view') : true)
+                 : true;
+             Anon always sees the section; signed-in users still go
+             through the existing gate so banned/restricted account
+             UX (when implemented) keeps the revoke channel.
+TypeScript:  pass (npx tsc --noEmit, exit 0)
+iOS build:   n/a — iOS slice DEFERRED. Native apps render comments
+             through their own permission paths; web fix doesn't
+             cross over.
+Verifier:    pass — only consumer of canViewSection unchanged in
+             behavior for signed-in users, anon always passes the
+             gate, no other call sites of the variable
+Status:      RESOLVED. The root anon-perm-load bug
+             (lib/permissions.js:119-122 returning empty Set for
+             anon instead of loading the anon set) remains and
+             affects other surfaces; out of scope for this concern.
+```
 
 ### 26. Timeline — date format MM/DD/YYYY everywhere
 Status: RESOLVED
