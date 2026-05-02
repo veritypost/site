@@ -100,7 +100,7 @@ export default function CohortsAdmin() {
         setCampaigns(
           (prev) => [{ ...(inserted as Campaign), cohort_name: cohort.name }, ...prev]
         );
-        push({ message: 'Campaign sent', variant: 'success' });
+        push({ message: 'Campaign saved', variant: 'success' });
       }
       setShowCompose(false); setMsgSubject(''); setMsgBody('');
     } finally { setSending(false); }

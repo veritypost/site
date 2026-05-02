@@ -74,6 +74,9 @@ struct SubscriptionView: View {
             .navigationTitle("Subscription")
             .navigationBarTitleDisplayMode(.inline)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .vpSubscriptionSyncFailed)) { _ in
+            purchaseError = "Your purchase was processed by Apple but couldn't sync to our servers. Tap \"Restore Purchases\" below to retry, or contact support@veritypost.com if the issue persists."
+        }
     }
 
     // MARK: - Legal Disclosures (Apple Review 3.1.2)

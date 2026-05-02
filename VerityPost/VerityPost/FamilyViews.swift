@@ -597,11 +597,18 @@ struct FamilyLeaderboardView: View {
 
     @State private var entries: [FamilyLeaderboardEntry] = []
     @State private var loading = true
+    @State private var loadError: String?
 
     var body: some View {
         ScrollView {
             if loading {
                 ProgressView().padding(.top, 40)
+            } else if let err = loadError {
+                Text(err)
+                    .font(.footnote).foregroundColor(VP.dim)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 40)
+                    .padding(.horizontal, 40)
             } else if entries.isEmpty {
                 Text("No data yet.")
                     .font(.footnote).foregroundColor(VP.dim)
@@ -653,7 +660,10 @@ struct FamilyLeaderboardView: View {
             let list = (try? JSONDecoder().decode([FamilyLeaderboardEntry].self, from: data)) ?? []
             await MainActor.run { entries = list; loading = false }
         } catch {
-            await MainActor.run { loading = false }
+            await MainActor.run {
+                loading = false
+                loadError = "Couldn't load the leaderboard. Check your connection and try again."
+            }
         }
     }
 }
@@ -669,11 +679,19 @@ struct FamilyAchievementsView: View {
     @EnvironmentObject var auth: AuthViewModel
     @State private var achievements: [FamilyAchievementEntry] = []
     @State private var loading = true
+    @State private var loadError: String?
 
     var body: some View {
         ScrollView {
             if loading {
                 ProgressView().padding(.top, 40)
+            } else if let err = loadError {
+                Text(err)
+                    .font(.footnote)
+                    .foregroundColor(VP.dim)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 40)
+                    .padding(.horizontal, 40)
             } else if achievements.isEmpty {
                 Text("No shared achievements yet. Keep reading as a family.")
                     .font(.footnote)
@@ -730,7 +748,10 @@ struct FamilyAchievementsView: View {
             let list = (try? JSONDecoder().decode([FamilyAchievementEntry].self, from: data)) ?? []
             await MainActor.run { achievements = list; loading = false }
         } catch {
-            await MainActor.run { loading = false }
+            await MainActor.run {
+                loading = false
+                loadError = "Couldn't load achievements. Check your connection and try again."
+            }
         }
     }
 }
