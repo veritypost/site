@@ -93,12 +93,11 @@ export default function HomeFirstLoginMoment() {
         // see the welcome moment (acceptable), but the flag prevents re-fetching.
         if (!cancelled) {
           const supabase2 = createClient();
-          supabase2
+          void supabase2
             .from('users')
             .update({ onboarding_completed_at: new Date().toISOString() })
             .eq('id', user.id)
-            .then(() => {/* noop */})
-            .catch(() => {/* also acceptable — loop stops when connectivity returns */});
+            .then(undefined, () => {/* acceptable — loop stops when connectivity returns */});
         }
       }
     })();
