@@ -329,12 +329,83 @@ Status:      RESOLVED
 ```
 
 ### 6. Newsroom — manual create flow (no AI)
-Status: DEFERRED
+Status: RESOLVED
 Symptom: Need a "+ New manual story" path that opens a blank StoryEditor
 without invoking any AI. Owner enters a slug (required) up front; the rest
 is blank.
-Reason: Big-feature peel-off — owner locked this for its own session
-(2026-05-02).
+
+```
+RESOLUTION (concern 6) — 2026-05-02
+Investigate: The "+ New article" modal in page.tsx:684-803 already
+             carried a manual vs ai_generate mode toggle (line 688
+             default 'manual') and a slug field, but slug was
+             documented "URL slug (optional)" with auto-suffix
+             fallback. Submit handler at :701 omitted slug from POST
+             when empty. Server route new-draft/route.ts:61 declared
+             slug `.optional()` and at :161-170 fell back to
+             `untitled-<6char>` then ran findFreeSlug (silent -2/-3
+             dedupe). Manual branch already insert-ordered stories →
+             articles synchronously and returns article_id+slug, so
+             no DB-shape change needed; story-manager and kids-story-
+             manager both accept ?article=ID. Public /<slug> does NOT
+             auto-redirect admins to the editor — admins land on the
+             public reader for an empty "Untitled draft", which is
+             a real UX hit.
+Review:      A (confirmer) re-derived independently and CONFIRMED the
+             modal-already-toggleable + slug-currently-optional read.
+             Verified single caller of the new-draft route
+             (NewArticleModal). Audited kill-switch + COPPA — clean
+             (manual branch never invokes pipeline/generate, so
+             items 8/9/10 don't gate it). Flagged the slug-uniqueness
+             gap independently. B (adversary) ran ten attacks A-J;
+             converged on PARTIAL with the same two deltas. Three
+             converged points: (1) drop `.optional()` from the
+             discriminated-union manual variant for type-level
+             enforcement (not just runtime), (2) bypass findFreeSlug
+             for manual mode and pre-check stories.slug uniqueness
+             — return 409 on collision, matching the locked decision
+             "must be unique against stories.slug" verbatim,
+             (3) redirect change is real UX improvement, not cosmetic
+             (public /<slug> doesn't auto-redirect admins). Both
+             confirmed iOS n/a (newsroom is web-admin only) and field
+             order Audience → Mode → Slug stays. No tie-breaker.
+Fix:         web/src/app/api/admin/articles/new-draft/route.ts —
+             - dropped crypto + findFreeSlug imports; removed
+               slugSuffix() helper.
+             - manual variant Zod: slug `.optional()` → required
+               `min(1).max(120)`.
+             - replaced auto-suffix block with: lowercase slug,
+               SLUG_SAFE regex check (422 on bad format), then
+               .from('stories').select('id').eq('slug', finalSlug)
+               .maybeSingle() + 409 if collision found. AI branch
+               untouched.
+             - updated the route header doc-comment to describe the
+               new manual contract (slug required, unique, no AI).
+             web/src/app/admin/newsroom/page.tsx (NewArticleModal) —
+             - Field label: "URL slug (optional)" → "URL slug
+               (required)"; hint changed from "Leave blank…" to
+               "Lowercase letters, numbers, and hyphens. Must be
+               unique."
+             - submit handler: for mode==='manual', toast "Enter a
+               slug." and bail when slug.trim() is empty; otherwise
+               attach to body.
+             - mode-keyed redirect on success: manual + article_id →
+               /admin/story-manager?article=ID (adult) or
+               /admin/kids-story-manager?article=ID (tweens|kids);
+               AI mode keeps /<slug> redirect; final fallback closes
+               modal.
+TypeScript:  pass (npx tsc --noEmit, exit 0)
+iOS build:   n/a — newsroom is web-admin only; no manual-create flow
+             in VerityPost/ or VerityPostKids/.
+Verifier:    pass — 10/10 checks. Schema enforcement tight (manual
+             slug now `string` not `string | undefined`), 409 path
+             precedes inserts, SLUG_SAFE preserved, both inserts
+             unchanged with all NOT NULL columns satisfied, modal UX
+             gated correctly, AI path untouched, dead code removed.
+Status:      RESOLVED — manual create now lands operator straight in
+             the editor with their typed slug; collisions surface a
+             clear 409 toast instead of silently auto-suffixing.
+```
 
 ### 7. Newsroom — top-row buttons different sizes
 Status: RESOLVED
@@ -517,7 +588,7 @@ Status:      RESOLVED — Edit button visible immediately on refresh-
 ```
 
 ### 11. AudienceCard — live status
-Status: PENDING
+Status: IN_PROGRESS
 Symptom: Card doesn't show a clear status (idle / generating / generated /
 published / failed). Wanted: persistent status badge per audience.
 
@@ -576,7 +647,7 @@ Status:      RESOLVED
 ```
 
 ### 13. /admin/articles — "Open article" opens a sidebar
-Status: DEFERRED
+Status: IN_PROGRESS
 Symptom: The "Open article" affordance opens a sidebar drawer instead of
 navigating directly to the article.
 
@@ -1273,7 +1344,7 @@ Status:      RESOLVED — web slice shipped. iOS slice deferred to its
 ```
 
 ### 28. Editor timeline — appears late after generation
-Status: DEFERRED
+Status: IN_PROGRESS
 Symptom: After the pipeline completes, the timeline section in the editor
 takes minutes to populate. Owner saw the rows appear long after the article
 was generated.
@@ -1318,7 +1389,7 @@ Status:      DEFERRED — real fix is a newsroom progress-label change
 ```
 
 ### 29. Mobile + iOS — 3-tab article layout
-Status: DEFERRED
+Status: IN_PROGRESS
 Decision: Top tabs (Option B) — Article / Timeline / Quiz & Discussion.
 Kids: no Discussion tab (Article / Timeline / Quiz only).
 Surfaces: web mobile reader, iOS adult reader, kids iOS reader.

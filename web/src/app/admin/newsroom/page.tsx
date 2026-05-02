@@ -698,7 +698,13 @@ function NewArticleModal({ onClose }: { onClose: () => void }) {
     try {
       const body: Record<string, unknown> = { mode, audience };
       if (mode === 'manual') {
-        if (slug.trim().length > 0) body.slug = slug.trim();
+        const trimmed = slug.trim();
+        if (trimmed.length === 0) {
+          toast.push({ message: 'Enter a slug.', variant: 'warn' });
+          setBusy(false);
+          return;
+        }
+        body.slug = trimmed;
       } else {
         const urls = sourceUrls
           .split(/\r?\n/)
@@ -730,7 +736,10 @@ function NewArticleModal({ onClose }: { onClose: () => void }) {
         return;
       }
       toast.push({ message: mode === 'manual' ? 'Draft created.' : 'Article generated.', variant: 'success' });
-      if (json.slug) {
+      if (mode === 'manual' && json.article_id) {
+        const editor = audience === 'adult' ? '/admin/story-manager' : '/admin/kids-story-manager';
+        router.push(`${editor}?article=${json.article_id}`);
+      } else if (json.slug) {
         router.push(`/${json.slug}`);
       } else {
         onClose();
@@ -765,7 +774,7 @@ function NewArticleModal({ onClose }: { onClose: () => void }) {
           </Select>
         </Field>
         {mode === 'manual' ? (
-          <Field label="URL slug (optional)" hint="Leave blank for an auto-suffixed slug.">
+          <Field label="URL slug (required)" hint="Lowercase letters, numbers, and hyphens. Must be unique.">
             <TextInput
               value={slug}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSlug(e.target.value)}

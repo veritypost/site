@@ -1,37 +1,28 @@
 /**
- * Session A — POST /api/admin/articles/new-draft
+ * POST /api/admin/articles/new-draft — backend for the "+ New article"
+ * newsroom button.
  *
- * Backend for the "+ New article" Newsroom button (Decision 19). Two
- * modes:
+ *   manual:      audience + operator-typed slug → empty stories+articles
+ *                rows. Slug is required and must be unique against
+ *                stories.slug; collisions return 409 so the operator
+ *                picks another. No AI is invoked.
  *
- *   manual:      pick audience + URL → empty draft articles row →
- *                response carries article_id + slug; client lands on
- *                /<slug> in admin edit mode (Session C wires the page).
- *
- *   ai_generate: pick audience + paste source URLs (or a topic). The
- *                route delegates to /api/admin/pipeline/generate with
+ *   ai_generate: audience + source URLs (and optional topic seed).
+ *                Delegates to /api/admin/pipeline/generate with
  *                mode='standalone' so the synthetic-cluster, lock,
- *                audience-state, and cost-reservation flows all match
- *                the cluster-card path.
+ *                audience-state, and cost-reservation flows match the
+ *                cluster-card path. The pipeline owns slug generation
+ *                + dedupe.
  *
- * Permission: dual-check (articles.edit, admin.articles.create) so the
- *   existing admin role works without re-grant during the bridge;
- *   Session E drops the legacy half.
- *
- * URL collisions: system-side first save silently appends -2, -3, …
- *   via findFreeSlug (Decision 20). Manual edits later go through the
- *   article-page editor and use the 409 path; that endpoint lives in
- *   Session C.
+ * Permission: dual-check (articles.edit, admin.articles.create).
  */
 
 import { NextResponse } from 'next/server';
-import crypto from 'crypto';
 import { z } from 'zod';
 import { requirePermission } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction } from '@/lib/adminMutation';
-import { findFreeSlug } from '@/lib/pipeline/slug-collide';
 import { pipelineLog } from '@/lib/pipeline/logger';
 
 export const runtime = 'nodejs';
@@ -58,7 +49,7 @@ const RequestSchema = z.discriminatedUnion('mode', [
   z.object({
     mode: z.literal('manual'),
     audience: z.enum(['adult', 'tweens', 'kids']),
-    slug: z.string().trim().min(1).max(120).optional(),
+    slug: z.string().trim().min(1).max(120),
   }),
   z.object({
     mode: z.literal('ai_generate'),
@@ -70,15 +61,6 @@ const RequestSchema = z.discriminatedUnion('mode', [
   }),
 ]);
 
-// 6-char lowercase-alphanumeric suffix. Self-contained — avoids pulling
-// nanoid into the deps for one callsite.
-function slugSuffix(): string {
-  const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  const bytes = crypto.randomBytes(6);
-  let out = '';
-  for (let i = 0; i < 6; i++) out += alphabet[bytes[i] % alphabet.length];
-  return out;
-}
 const SLUG_SAFE = /^[a-z0-9][a-z0-9-]{0,118}[a-z0-9]$|^[a-z0-9]$/;
 
 function audienceToBand(audience: 'adult' | 'tweens' | 'kids'): 'adult' | 'tweens' | 'kids' {
@@ -158,16 +140,28 @@ export async function POST(req: Request) {
       );
     }
 
-    const candidateRaw =
-      input.slug && input.slug.length > 0 ? input.slug : `untitled-${slugSuffix()}`;
-    const candidate = candidateRaw.toLowerCase();
-    if (!SLUG_SAFE.test(candidate)) {
+    const finalSlug = input.slug.toLowerCase();
+    if (!SLUG_SAFE.test(finalSlug)) {
       return NextResponse.json(
         { error: 'slug must be lowercase alphanumerics or hyphens (start/end alphanumeric)' },
         { status: 422 }
       );
     }
-    const finalSlug = await findFreeSlug(service, candidate);
+    const { data: collision, error: collisionErr } = await service
+      .from('stories')
+      .select('id')
+      .eq('slug', finalSlug)
+      .maybeSingle();
+    if (collisionErr) {
+      console.error('[admin.articles.new-draft.manual.slug_check]', collisionErr.message);
+      return NextResponse.json({ error: 'Could not validate slug' }, { status: 500 });
+    }
+    if (collision) {
+      return NextResponse.json(
+        { error: 'Slug already taken — pick another' },
+        { status: 409 }
+      );
+    }
 
     // Slice 05: create story first (slug lives on stories), then article.
     const { data: newStory, error: storyInsertErr } = await service
