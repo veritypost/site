@@ -272,7 +272,7 @@ function PlacementsInner() {
                       textAlign: 'left', padding: `${S[2]}px ${S[3]}px`, borderRadius: 8,
                       border: `1px solid ${isSel ? C.accent : C.divider}`,
                       background: isSel ? C.hover : C.bg,
-                      cursor: 'pointer', font: 'inherit', color: C.white, width: '100%',
+                      cursor: 'pointer', font: 'inherit', color: C.ink, width: '100%',
                     }}
                   >
                     <div style={{ fontSize: F.base, fontWeight: 600 }}>{p.display_name || p.name}</div>

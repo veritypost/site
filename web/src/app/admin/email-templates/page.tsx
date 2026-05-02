@@ -269,7 +269,7 @@ function EmailTemplatesInner() {
                   padding: `${S[1]}px ${S[3]}px`, borderRadius: 6,
                   border: `1px solid ${tab === t.key ? C.accent : C.divider}`,
                   background: tab === t.key ? C.hover : 'transparent',
-                  color: tab === t.key ? C.white : C.soft,
+                  color: tab === t.key ? C.ink : C.soft,
                   fontSize: F.sm, fontWeight: tab === t.key ? 600 : 500,
                   cursor: 'pointer', font: 'inherit',
                 }}
@@ -322,7 +322,7 @@ function EmailTemplatesInner() {
                     padding: `${S[2]}px ${S[3]}px`, borderRadius: 8,
                     border: `1px solid ${isSel ? C.accent : C.divider}`,
                     background: isSel ? C.hover : C.bg,
-                    cursor: 'pointer', font: 'inherit', color: C.white,
+                    cursor: 'pointer', font: 'inherit', color: C.ink,
                     transition: 'background 90ms ease, border-color 90ms ease',
                   }}
                   onMouseEnter={(e) => { if (!isSel) (e.currentTarget as HTMLButtonElement).style.background = C.hover; }}
@@ -330,7 +330,7 @@ function EmailTemplatesInner() {
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: S[2], marginBottom: 2, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: F.base, fontWeight: 600, color: C.white }}>{t.name}</span>
+                      <span style={{ fontSize: F.base, fontWeight: 600, color: C.ink }}>{t.name}</span>
                       {wired ? (
                         <>
                           <Badge size="xs" variant="success">active</Badge>

@@ -411,7 +411,7 @@ export default function ArticlesTable() {
                     <Link
                       href={row.stories?.slug ? `/${row.stories.slug}` : '#'}
                       style={{
-                        color: C.white,
+                        color: C.ink,
                         textDecoration: 'none',
                         fontWeight: 500,
                       }}
@@ -462,7 +462,7 @@ export default function ArticlesTable() {
                           padding: `${S[1]}px ${S[2]}px`,
                           border: `1px solid ${C.divider}`,
                           borderRadius: 4,
-                          color: C.white,
+                          color: C.ink,
                           textDecoration: 'none',
                           fontFamily: 'inherit',
                           whiteSpace: 'nowrap',
@@ -593,7 +593,7 @@ function FilterChip({
         border: `1px solid ${active ? C.border : C.divider}`,
         borderRadius: 999,
         background: active ? C.accent : C.bg,
-        color: active ? C.bg : C.white,
+        color: active ? C.bg : C.ink,
         fontSize: F.xs,
         fontWeight: 500,
         cursor: 'pointer',

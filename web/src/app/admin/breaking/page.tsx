@@ -259,7 +259,7 @@ function BreakingInner() {
                       flex: 1, padding: `${S[2]}px ${S[2]}px`, borderRadius: 6,
                       border: `1px solid ${target === t.k ? C.accent : C.divider}`,
                       background: target === t.k ? C.hover : C.bg,
-                      color: target === t.k ? C.white : C.soft,
+                      color: target === t.k ? C.ink : C.soft,
                       fontSize: F.sm, fontWeight: target === t.k ? 600 : 500,
                       cursor: 'pointer', font: 'inherit',
                     }}
@@ -285,7 +285,7 @@ function BreakingInner() {
                 padding: S[3], borderRadius: 8,
                 border: `1px solid ${C.divider}`, background: C.bg,
               }}>
-                <div style={{ fontSize: F.base, fontWeight: 600, color: C.white, marginBottom: S[1], lineHeight: 1.4 }}>{a.title}</div>
+                <div style={{ fontSize: F.base, fontWeight: 600, color: C.ink, marginBottom: S[1], lineHeight: 1.4 }}>{a.title}</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: S[2], fontSize: F.xs, color: C.dim, alignItems: 'center' }}>
                   {a.categories?.name && <Badge variant="neutral" size="xs">{a.categories.name}</Badge>}
                   {(() => {

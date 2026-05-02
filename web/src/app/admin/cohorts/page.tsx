@@ -251,7 +251,7 @@ export default function CohortsAdmin() {
 function CampaignStat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div style={{ textAlign: 'center' }}>
-      <div style={{ fontSize: F.lg, fontWeight: 700, color: C.white }}>{value}</div>
+      <div style={{ fontSize: F.lg, fontWeight: 700, color: C.ink }}>{value}</div>
       <div style={{ fontSize: F.xs, color: C.dim }}>{label}</div>
     </div>
   );

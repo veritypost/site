@@ -245,7 +245,7 @@ export default function SupportAdmin() {
       truncate: true,
       render: (row: TicketWithUser) => (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-          <span style={{ fontWeight: 500, color: C.white, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span style={{ fontWeight: 500, color: C.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {row.subject}
           </span>
           <span style={{ fontSize: F.xs, color: C.muted }}>
@@ -450,7 +450,7 @@ export default function SupportAdmin() {
                         {' · '}
                         {msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                       </div>
-                      <div style={{ fontSize: F.base, color: C.white, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                      <div style={{ fontSize: F.base, color: C.ink, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
                         {msg.body}
                       </div>
                     </div>

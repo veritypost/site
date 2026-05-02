@@ -283,7 +283,7 @@ function ReaderInner() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: S[2], marginBottom: S[1], flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: S[2], minWidth: 0, flex: 1 }}>
                   <span style={{ fontSize: F.sm, fontWeight: 700, color: C.dim, width: 18 }}>{step.order}</span>
-                  <span style={{ fontSize: F.base, fontWeight: 600, color: step.enabled ? C.white : C.muted }}>{step.name}</span>
+                  <span style={{ fontSize: F.base, fontWeight: 600, color: step.enabled ? C.ink : C.muted }}>{step.name}</span>
                   {!step.enabled && <Badge variant="neutral" size="xs">Disabled</Badge>}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: S[2] }}>
@@ -334,7 +334,7 @@ function ConfigGroup({
             flexWrap: 'wrap',
           }}>
             <div style={{ minWidth: 0, flex: '1 1 260px' }}>
-              <div style={{ fontSize: F.base, fontWeight: 500, color: C.white }}>{item.l}</div>
+              <div style={{ fontSize: F.base, fontWeight: 500, color: C.ink }}>{item.l}</div>
               <div style={{ fontSize: F.sm, color: C.dim, marginTop: 2 }}>{item.desc}</div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: S[2] }}>

@@ -782,7 +782,7 @@ function MiniStat({ label, value, color }: { label: string; value: string; color
         fontSize: F.xs, color: C.dim, textTransform: 'uppercase',
         letterSpacing: '0.04em', fontWeight: 600,
       }}>{label}</div>
-      <div style={{ fontSize: F.md, fontWeight: 700, color: color || C.white }}>{value}</div>
+      <div style={{ fontSize: F.md, fontWeight: 700, color: color || C.ink }}>{value}</div>
     </div>
   );
 }

@@ -206,7 +206,7 @@ function TabBar({
             borderBottom: `2px solid ${active === t.id ? C.accent : 'transparent'}`,
             padding: `${S[2]}px ${S[3]}px`,
             cursor: 'pointer',
-            color: active === t.id ? C.white : C.dim,
+            color: active === t.id ? C.ink : C.dim,
             fontSize: F.md,
             fontWeight: active === t.id ? 600 : 500,
             fontFamily: 'inherit',
@@ -223,7 +223,7 @@ function PanelShell({ title, onClose, children }: { title: string; onClose: () =
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: S[3] }}>
-        <h2 style={{ margin: 0, fontSize: F.lg, color: C.white }}>{title}</h2>
+        <h2 style={{ margin: 0, fontSize: F.lg, color: C.ink }}>{title}</h2>
         <Button onClick={onClose} variant="ghost" size="sm">Close</Button>
       </div>
       <div>{children}</div>
@@ -373,7 +373,7 @@ function ViewToggle({ view, onView }: { view: ViewId; onView: (v: ViewId) => voi
           style={{
             padding: `${S[1]}px ${S[3]}px`,
             background: view === v ? C.accent : 'transparent',
-            color: view === v ? C.bg : C.white,
+            color: view === v ? C.bg : C.ink,
             border: 'none',
             cursor: 'pointer',
             fontSize: F.sm,

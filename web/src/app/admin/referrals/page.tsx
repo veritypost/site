@@ -139,7 +139,7 @@ function ReferralsInner() {
     {
       key: 'code', header: 'Code',
       render: (c: Code) => (
-        <code style={{ fontSize: F.sm, fontWeight: 700, color: C.white, letterSpacing: '0.04em' }}>
+        <code style={{ fontSize: F.sm, fontWeight: 700, color: C.ink, letterSpacing: '0.04em' }}>
           {c.code}
         </code>
       ),
@@ -300,7 +300,7 @@ function ReferralsInner() {
               Last minted
             </div>
             <div style={{
-              fontFamily: 'ui-monospace, monospace', fontSize: F.sm, color: C.white, marginBottom: 8,
+              fontFamily: 'ui-monospace, monospace', fontSize: F.sm, color: C.ink, marginBottom: 8,
               wordBreak: 'break-all',
             }}>
               {lastMinted.url}

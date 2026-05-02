@@ -321,7 +321,7 @@ export default function AudienceCard(props: AudienceCardProps) {
         </span>
       </div>
 
-      <div style={{ fontSize: F.base, lineHeight: 1.35, color: C.white, fontWeight: 500 }}>
+      <div style={{ fontSize: F.base, lineHeight: 1.35, color: C.ink, fontWeight: 500 }}>
         {headline}
       </div>
 
@@ -390,7 +390,7 @@ export default function AudienceCard(props: AudienceCardProps) {
                   border: `1px solid ${C.border}`,
                   borderRadius: 6,
                   textDecoration: 'none',
-                  color: C.white,
+                  color: C.ink,
                   fontSize: F.sm,
                   fontWeight: 500,
                 }}
@@ -407,7 +407,7 @@ export default function AudienceCard(props: AudienceCardProps) {
                   border: `1px solid ${C.border}`,
                   borderRadius: 6,
                   textDecoration: 'none',
-                  color: C.white,
+                  color: C.ink,
                   fontSize: F.sm,
                   fontWeight: 500,
                 }}
@@ -435,7 +435,7 @@ export default function AudienceCard(props: AudienceCardProps) {
                   border: `1px solid ${C.border}`,
                   borderRadius: 6,
                   textDecoration: 'none',
-                  color: C.white,
+                  color: C.ink,
                   fontSize: F.sm,
                   fontWeight: 500,
                 }}

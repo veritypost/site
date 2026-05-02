@@ -126,7 +126,7 @@ function PipelineConfigInner() {
                 borderBottom: `2px solid ${active ? C.accent : 'transparent'}`,
                 padding: `${S[2]}px ${S[3]}px`,
                 cursor: 'pointer',
-                color: active ? C.white : C.dim,
+                color: active ? C.ink : C.dim,
                 fontSize: F.md,
                 fontWeight: active ? 600 : 500,
                 fontFamily: 'inherit',

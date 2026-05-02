@@ -257,7 +257,7 @@ function RequestsInner() {
     {
       key: 'email', header: 'Email', sortable: false,
       render: (r: Req) => (
-        <div style={{ fontWeight: 600, color: C.white, fontFamily: 'ui-monospace, monospace' }}>{r.email}</div>
+        <div style={{ fontWeight: 600, color: C.ink, fontFamily: 'ui-monospace, monospace' }}>{r.email}</div>
       ),
     },
     {
@@ -532,7 +532,7 @@ function DetailRow({ label, children, small }: { label: string; children: React.
   return (
     <div>
       <div style={{ fontSize: F.xs, fontWeight: 600, color: C.dim, marginBottom: S[1], textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
-      <div style={{ fontSize: small ? F.xs : F.sm, color: C.white }}>{children}</div>
+      <div style={{ fontSize: small ? F.xs : F.sm, color: C.ink }}>{children}</div>
     </div>
   );
 }
@@ -566,7 +566,7 @@ function ApprovedInviteLink({
             fontSize: F.xs,
             wordBreak: 'break-all',
             flex: 1,
-            color: redeemed || expired ? C.dim : C.white,
+            color: redeemed || expired ? C.dim : C.ink,
             textDecoration: redeemed || expired ? 'line-through' : 'none',
           }}
         >

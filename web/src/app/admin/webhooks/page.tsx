@@ -194,7 +194,7 @@ export default function WebhooksAdmin() {
       truncate: true,
       render: (row: WebhookLog) => (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <span style={{ fontWeight: 500, color: C.white }}>{row.event_type || '—'}</span>
+          <span style={{ fontWeight: 500, color: C.ink }}>{row.event_type || '—'}</span>
           {(row.retry_count ?? 0) > 0 && (
             <span style={{ fontSize: F.xs, color: C.warn }}>
               {row.retry_count} {row.retry_count === 1 ? 'retry' : 'retries'}
@@ -330,7 +330,7 @@ export default function WebhooksAdmin() {
                 }}
               >
                 <div style={{ flex: '1 1 160px', minWidth: 0 }}>
-                  <div style={{ fontSize: F.md, fontWeight: 600, color: C.white }}>{src.name}</div>
+                  <div style={{ fontSize: F.md, fontWeight: 600, color: C.ink }}>{src.name}</div>
                   <div style={{ fontSize: F.xs, color: C.dim }}>
                     Last event: {prettyTime(src.lastEvent)}
                   </div>
@@ -433,7 +433,7 @@ export default function WebhooksAdmin() {
                   border: `1px solid ${C.divider}`,
                   borderRadius: 6,
                   fontSize: F.xs,
-                  color: C.white,
+                  color: C.ink,
                   lineHeight: 1.5,
                   overflow: 'auto',
                   maxHeight: 360,
@@ -449,7 +449,7 @@ export default function WebhooksAdmin() {
               <div style={{ fontSize: F.xs, fontWeight: 600, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: S[1] }}>
                 Processed at
               </div>
-              <div style={{ fontSize: F.sm, color: C.white }}>{prettyTime(drawerLog.processed_at)}</div>
+              <div style={{ fontSize: F.sm, color: C.ink }}>{prettyTime(drawerLog.processed_at)}</div>
             </div>
           </div>
         )}

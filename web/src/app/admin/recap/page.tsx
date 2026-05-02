@@ -287,7 +287,7 @@ function RecapInner() {
                         textAlign: 'left', padding: `${S[2]}px ${S[3]}px`, borderRadius: 8,
                         border: `1px solid ${isSel ? C.accent : C.divider}`,
                         background: isSel ? C.hover : C.bg,
-                        cursor: 'pointer', font: 'inherit', color: C.white,
+                        cursor: 'pointer', font: 'inherit', color: C.ink,
                       }}
                     >
                       <div style={{ fontSize: F.base, fontWeight: 600 }}>{r.title}</div>

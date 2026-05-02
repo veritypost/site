@@ -149,7 +149,7 @@ function Section({ title, description, aside, divider, embedded, children }: Sec
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: S[3], marginBottom: S[3], flexWrap: 'wrap' }}>
           <div>
             {title && (
-              <div style={{ fontSize: F.base, fontWeight: 700, color: C.white }}>{title}</div>
+              <div style={{ fontSize: F.base, fontWeight: 700, color: C.ink }}>{title}</div>
             )}
             {description && (
               <div style={{ fontSize: F.sm, color: C.dim, marginTop: 2 }}>{description}</div>
@@ -675,7 +675,7 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
           </p>
         )}
         {e?.content && (
-          <div style={{ fontSize: F.lg, color: C.white, lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
+          <div style={{ fontSize: F.lg, color: C.ink, lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
             {e.content}
           </div>
         )}
@@ -729,7 +729,7 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
                 </span>
               )}
               <div style={{ fontSize: F.sm, fontWeight: e.is_current ? 700 : 500, color: e.is_current ? C.now : C.dim, marginBottom: 2 }}>{formatMmDdYyyy(e.event_date)}</div>
-              <div style={{ fontSize: F.base, fontWeight: 600, color: e.is_current ? C.white : C.soft }}>
+              <div style={{ fontSize: F.base, fontWeight: 600, color: e.is_current ? C.ink : C.soft }}>
                 {e.title || 'Untitled'}
               </div>
             </div>
@@ -905,7 +905,7 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
                       {formatMmDdYyyy(entry.event_date)}
                     </span>
                   )}
-                  <span style={{ fontSize: F.base, fontWeight: 600, color: C.white, flex: '1 1 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
+                  <span style={{ fontSize: F.base, fontWeight: 600, color: C.ink, flex: '1 1 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
                     {entry.title || 'Untitled'}
                   </span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
@@ -1098,7 +1098,7 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
                                         {['A', 'B', 'C', 'D'][ci]}
                                       </button>
                                       {isTF ? (
-                                        <span style={{ fontSize: F.base, color: C.white }}>{ch}</span>
+                                        <span style={{ fontSize: F.base, color: C.ink }}>{ch}</span>
                                       ) : (
                                         <TextInput value={ch} onChange={(e) => updateQuizOption(q.id, ci, e.target.value)} placeholder={`Choice ${['A', 'B', 'C', 'D'][ci]}`} />
                                       )}
@@ -1210,7 +1210,7 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
                 border: `1px solid ${s.id === storyId ? C.accent : C.divider}`,
                 background: s.id === storyId ? C.hover : C.bg,
                 cursor: 'pointer',
-                color: C.white,
+                color: C.ink,
                 fontFamily: 'inherit',
               }}
             >

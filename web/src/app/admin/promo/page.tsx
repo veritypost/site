@@ -263,7 +263,7 @@ function PromoInner() {
       key: 'code', header: 'Code', truncate: true,
       render: (p: Promo) => (
         <div>
-          <code style={{ fontSize: F.base, fontWeight: 700, color: C.white, letterSpacing: '0.04em' }}>{p.code}</code>
+          <code style={{ fontSize: F.base, fontWeight: 700, color: C.ink, letterSpacing: '0.04em' }}>{p.code}</code>
           <div style={{ fontSize: F.xs, color: C.muted, marginTop: 2 }}>
             {p.duration}{p.duration === 'repeating' && p.duration_months ? ` (${p.duration_months}mo)` : ''}
           </div>

@@ -800,7 +800,7 @@ function CategoryRowView({
             style={{
               fontSize: F.md,
               fontWeight: depth === 0 ? 600 : 500,
-              color: C.white,
+              color: C.ink,
               textDecoration: archived ? 'line-through' : 'none',
             }}
           >

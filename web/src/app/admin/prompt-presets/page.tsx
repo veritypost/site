@@ -481,7 +481,7 @@ function PromptPresetsAdminInner() {
                     <div
                       style={{
                         fontWeight: 600,
-                        color: archived ? C.dim : C.white,
+                        color: archived ? C.dim : C.ink,
                         fontSize: F.md,
                         flex: 1,
                         minWidth: 0,
@@ -644,7 +644,7 @@ function PromptPresetsAdminInner() {
                     alignItems: 'center',
                     gap: S[1] + 2,
                     fontSize: F.sm,
-                    color: C.white,
+                    color: C.ink,
                     cursor: 'pointer',
                   }}
                 >

@@ -280,7 +280,7 @@ export default function SystemAdmin() {
       header: 'Endpoint',
       render: (row: UILimit) => (
         <div>
-          <div style={{ fontWeight: 500, color: C.white }}>{row.endpoint}</div>
+          <div style={{ fontWeight: 500, color: C.ink }}>{row.endpoint}</div>
           {row.note && <div style={{ fontSize: F.xs, color: C.warn }}>{row.note}</div>}
         </div>
       ),
@@ -402,7 +402,7 @@ export default function SystemAdmin() {
           }}
         >
           <div>
-            <div style={{ fontSize: F.base, fontWeight: 500, color: C.white }}>{item.l}</div>
+            <div style={{ fontSize: F.base, fontWeight: 500, color: C.ink }}>{item.l}</div>
             <div style={{ fontSize: F.xs, color: C.dim }}>{item.desc}</div>
           </div>
           <Switch
@@ -434,7 +434,7 @@ export default function SystemAdmin() {
               borderBottom: i < list.length - 1 ? `1px solid ${C.divider}` : 'none',
               background: C.bg,
             }}>
-              <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: F.sm, color: C.white }}>
+              <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: F.sm, color: C.ink }}>
                 {entry}
               </span>
               <Button variant="ghost" size="sm" onClick={() => removeFromList(kind, entry)}>Remove</Button>
@@ -546,7 +546,7 @@ export default function SystemAdmin() {
                 gap: S[3], padding: `${S[3]}px ${S[4]}px`, borderBottom: `1px solid ${C.divider}`, background: C.bg,
               }}>
                 <div>
-                  <div style={{ fontSize: F.base, fontWeight: 500, color: C.white }}>Stale feed threshold</div>
+                  <div style={{ fontSize: F.base, fontWeight: 500, color: C.ink }}>Stale feed threshold</div>
                   <div style={{ fontSize: F.xs, color: C.dim }}>Mark feed as stale after this many hours without new content</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: S[2] }}>
@@ -566,7 +566,7 @@ export default function SystemAdmin() {
                 gap: S[3], padding: `${S[3]}px ${S[4]}px`, background: C.bg,
               }}>
                 <div>
-                  <div style={{ fontSize: F.base, fontWeight: 500, color: C.white }}>Broken feed threshold</div>
+                  <div style={{ fontSize: F.base, fontWeight: 500, color: C.ink }}>Broken feed threshold</div>
                   <div style={{ fontSize: F.xs, color: C.dim }}>Mark feed as broken after this many consecutive failures</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: S[2] }}>

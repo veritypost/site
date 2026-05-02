@@ -167,7 +167,7 @@ export default function AdminHubPage() {
             border: `1px solid ${C.warn}`,
             borderRadius: 8,
             background: 'rgba(245, 158, 11, 0.08)',
-            color: C.white,
+            color: C.ink,
             textDecoration: 'none',
             fontFamily: 'inherit',
           }}
@@ -212,7 +212,7 @@ export default function AdminHubPage() {
                 border: `1px solid ${C.divider}`,
                 borderRadius: 8,
                 background: C.bg,
-                color: C.white,
+                color: C.ink,
                 textDecoration: 'none',
                 fontSize: F.base,
                 fontWeight: 500,
@@ -259,7 +259,7 @@ export default function AdminHubPage() {
                   border: `1px solid ${C.divider}`,
                   borderRadius: 8,
                   background: C.bg,
-                  color: C.white,
+                  color: C.ink,
                   textDecoration: 'none',
                   transition: 'background 120ms ease, border-color 120ms ease',
                 }}
@@ -272,7 +272,7 @@ export default function AdminHubPage() {
                   e.currentTarget.style.borderColor = C.divider;
                 }}
               >
-                <div style={{ fontSize: F.md, fontWeight: 600, color: C.white, lineHeight: 1.3 }}>
+                <div style={{ fontSize: F.md, fontWeight: 600, color: C.ink, lineHeight: 1.3 }}>
                   {page.title}
                 </div>
                 <div style={{ fontSize: F.sm, color: C.dim, lineHeight: 1.45 }}>

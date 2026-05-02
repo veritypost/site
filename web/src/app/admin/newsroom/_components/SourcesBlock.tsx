@@ -52,7 +52,7 @@ export default function SourcesBlock({ sources }: Props) {
         <span style={{ color: C.soft, fontWeight: 600 }}>
           Sources ({sources.length}):
         </span>
-        <span style={{ color: C.white }}>
+        <span style={{ color: C.ink }}>
           {headOutlets.join(' · ')}
           {remaining > 0 && (
             <>
@@ -95,7 +95,7 @@ export default function SourcesBlock({ sources }: Props) {
                 href={s.url}
                 target="_blank"
                 rel="noreferrer noopener"
-                style={{ color: C.white, textDecoration: 'none', flex: 1, lineHeight: 1.4 }}
+                style={{ color: C.ink, textDecoration: 'none', flex: 1, lineHeight: 1.4 }}
               >
                 {s.title || s.url}
               </a>

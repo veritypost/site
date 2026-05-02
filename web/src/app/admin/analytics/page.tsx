@@ -217,7 +217,7 @@ function AnalyticsInner() {
               padding: `${S[2]}px ${S[4]}px`, borderRadius: 8,
               border: `1px solid ${tab === t.k ? C.accent : C.divider}`,
               background: tab === t.k ? C.hover : 'transparent',
-              color: tab === t.k ? C.white : C.soft,
+              color: tab === t.k ? C.ink : C.soft,
               fontSize: F.sm, fontWeight: tab === t.k ? 600 : 500,
               cursor: 'pointer', font: 'inherit',
             }}
@@ -244,7 +244,7 @@ function AnalyticsInner() {
                       transition: 'height 300ms ease',
                     }} />
                     <div style={{ fontSize: F.xs, color: C.dim }}>{d.day}</div>
-                    <div style={{ fontSize: F.xs, fontWeight: 600, color: C.white }}>
+                    <div style={{ fontSize: F.xs, fontWeight: 600, color: C.ink }}>
                       {d.views >= 1000 ? `${(d.views / 1000).toFixed(1)}K` : d.views}
                     </div>
                   </div>
@@ -332,7 +332,7 @@ function AnalyticsInner() {
                       {q.flagged && <Badge variant="warn" size="xs">Flagged</Badge>}
                       <span style={{ fontSize: F.xs, color: C.muted }}>{q.attempts} attempts</span>
                     </div>
-                    <div style={{ fontSize: F.base, fontWeight: 600, marginBottom: S[2], color: C.white }}>{q.question}</div>
+                    <div style={{ fontSize: F.base, fontWeight: 600, marginBottom: S[2], color: C.ink }}>{q.question}</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: S[3], marginBottom: S[2] }}>
                       <div style={{ flex: 1, height: 6, borderRadius: 3, background: C.card, overflow: 'hidden' }}>
                         <div style={{ height: 6, background: failColor, width: `${q.failRate}%`, transition: 'width 200ms' }} />

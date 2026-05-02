@@ -192,7 +192,7 @@ function TopStoriesInner() {
             <div style={{ flex: 1, minWidth: 0 }}>
               {slot.article ? (
                 <div>
-                  <div style={{ fontSize: F.base, fontWeight: 600, color: C.white, lineHeight: 1.3 }}>
+                  <div style={{ fontSize: F.base, fontWeight: 600, color: C.ink, lineHeight: 1.3 }}>
                     {slot.article.title}
                   </div>
                   <div style={{ fontSize: F.sm, color: C.dim, marginTop: S[1] }}>
@@ -242,7 +242,7 @@ function TopStoriesInner() {
                       onMouseEnter={(e) => { e.currentTarget.style.background = C.hover; }}
                       onMouseLeave={(e) => { e.currentTarget.style.background = C.bg; }}
                     >
-                      <div style={{ fontSize: F.base, color: C.white, fontWeight: 500 }}>{r.title}</div>
+                      <div style={{ fontSize: F.base, color: C.ink, fontWeight: 500 }}>{r.title}</div>
                       <div style={{ fontSize: F.sm, color: C.dim, marginTop: 2 }}>
                         {r.categories?.name ? `${r.categories.name} · ` : ''}
                         {formatDate(r.published_at)}

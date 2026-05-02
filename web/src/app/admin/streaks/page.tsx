@@ -300,7 +300,7 @@ function ConfigGroup({
             flexWrap: 'wrap',
           }}>
             <div style={{ minWidth: 0, flex: '1 1 260px' }}>
-              <div style={{ fontSize: F.base, fontWeight: 500, color: C.white }}>{item.l}</div>
+              <div style={{ fontSize: F.base, fontWeight: 500, color: C.ink }}>{item.l}</div>
               <div style={{ fontSize: F.sm, color: C.dim, marginTop: 2 }}>{item.desc}</div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: S[2] }}>
