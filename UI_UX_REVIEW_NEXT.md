@@ -4,13 +4,13 @@ Single-line state for the review system. Updated automatically at session end.
 
 ```
 CURRENT_PHASE: auto-detect
-CURRENT_UNIT: 2
-CURRENT_TITLE: Article reader broken-state cleanup (Slice 5 is next)
+CURRENT_UNIT: cross-cutting
+CURRENT_TITLE: Registration wall (Slice 6) or iOS CSAM bridge (Slice 8) — parallel eligible
 CURRENT_WAVE: A
-CURRENT_DOC: UI_UX_REVIEW/A-2-article-reader.md
-STATUS: findings
-NEXT_BUILD_SLICE: Slice 5 — Unit 2 / Article reader / Broken-state cleanup (126 findings, 4-stream parallel)
-ANCHOR: Slice 4 (Article reader layout) shipped 2026-05-02. ArticleReaderTabs.tsx updated: desktop ≥1024px → 75/25 flex split with sticky timeline rail; mobile <1024px → 3-tab UI with CSS display:none state preservation. Build + tsc clean. Auto-detect next: Slice 5 (broken-state cleanup, elevated-care, adversary mandatory).
+CURRENT_DOC: UI_UX_REVIEW_SLICES.md
+STATUS: ready
+NEXT_BUILD_SLICE: Slice 6 — Registration wall (cross-cutting); or Slice 8 — iOS CSAM bridge (independent, can run in parallel)
+ANCHOR: Slice 5 (Article reader broken-state cleanup) shipped 2026-05-02. 17 files, 452 insertions, commit cc8142a pushed. All 126 findings fixed; 2 adversary gaps closed (DECISION #033 preview intercepts + DECISION #034 hide-reason required dropdown); tsc clean. Auto-detect next: Slice 6 (registration wall) — no shared files with Slice 7, can run in parallel if desired.
 LAST_UPDATED: 2026-05-02
 
 PARKED_UNITS:
