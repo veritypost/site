@@ -4,13 +4,13 @@ Single-line state for the review system. Updated automatically at session end.
 
 ```
 CURRENT_PHASE: auto-detect
-CURRENT_UNIT: cross-cutting
-CURRENT_TITLE: Slice 9 — Cross-platform parity bridges (prereq: Slice 4 shipped)
+CURRENT_UNIT: pending
+CURRENT_TITLE: Unit 3 — Browse (/browse)
 CURRENT_WAVE: A
-CURRENT_DOC: UI_UX_REVIEW_SLICES.md
-STATUS: ready
-NEXT_BUILD_SLICE: Slice 9 — Cross-platform parity bridges (web Up-Next sheet + progress ribbon + iOS comment sort/mod; prereq Slice 4 met)
-ANCHOR: Slice 7 (Admin ad system) shipped 2026-05-02. 4-stream parallel (targeting UI, analytics dashboard, slot wiring, freq-cap + preview), adversary 8 gaps closed, tsc clean, commit 196508b pushed. DECISIONS #048-#051 locked. Auto-detect next: Slice 9 (Parity bridges) — prereq Slice 4 met. Slice 10 (Wave A verification) still needs remaining Wave A unit reviews (Slices 11–19) before it can fire.
+CURRENT_DOC: UI_UX_REVIEW/A-3-browse.md
+STATUS: pending
+NEXT_BUILD_SLICE: Unit 3 review → Slice 11 (Browse fix)
+ANCHOR: Slice 9 (Cross-platform parity bridges) shipped 2026-05-02. UpNextSheet (90% scroll + post-comment), ReadingProgressRibbon, MidBodyQuizTeaser, Timeline NOW marker, iOS comment sort/denial/mod — all 3 streams clean; commit c9a1837 pushed. DECISION #052 locked. All Wave A cross-cutting slices (1-9) now shipped. Next: review Wave A units 3-11 to build Slices 11-19, then Slice 10 (Wave A verification). Starting with Unit 3 (Browse).
 LAST_UPDATED: 2026-05-02
 
 PARKED_UNITS:
