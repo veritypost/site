@@ -364,24 +364,23 @@ export function AppShell({ user, tier, preview, defaultSection = 'you', sections
         >
           {active ? (
             <article key={active.id} className="redesign-section-fade" style={{ maxWidth: 720 }}>
-              <header style={{ marginBottom: S[6] }}>
+              <header className="redesign-section-header">
                 <h1
                   id="redesign-section-title"
+                  className="redesign-section-h1"
                   style={{
                     fontFamily: FONT.serif,
-                    fontSize: F.display,
                     fontWeight: 600,
                     color: C.ink,
                     margin: 0,
-                    marginBottom: S[2],
                     letterSpacing: '-0.02em',
                   }}
                 >
                   {active.title}
                 </h1>
                 <p
+                  className="redesign-section-reason"
                   style={{
-                    fontSize: F.lg,
                     color: C.inkMuted,
                     margin: 0,
                     lineHeight: 1.5,
@@ -659,8 +658,18 @@ const shellCss = `
 .redesign-shell-panel {
   flex: 1;
   min-width: 0;
-  padding: ${S[6]}px ${S[5]}px ${S[9]}px;
+  padding: ${S[4]}px ${S[4]}px ${S[9]}px;
   background: ${C.bg};
+}
+.redesign-section-header {
+  margin-bottom: ${S[4]}px;
+}
+.redesign-section-h1 {
+  font-size: 24px;
+  margin-bottom: ${S[1]}px;
+}
+.redesign-section-reason {
+  font-size: ${F.sm}px;
 }
 @media (min-width: 860px) {
   .redesign-shell-mobilebar { display: none; }
@@ -679,6 +688,16 @@ const shellCss = `
   }
   .redesign-shell-panel {
     padding: ${S[8]}px ${S[8]}px ${S[9]}px;
+  }
+  .redesign-section-header {
+    margin-bottom: ${S[6]}px;
+  }
+  .redesign-section-h1 {
+    font-size: ${F.display}px;
+    margin-bottom: ${S[2]}px;
+  }
+  .redesign-section-reason {
+    font-size: ${F.lg}px;
   }
 }
 `;

@@ -217,3 +217,22 @@ textarea::placeholder {
   border-radius: 4px;
   display: block;
 }
+
+/* Profile: stat grid + stat value — base (desktop) */
+.redesign-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+}
+.redesign-stat-value {
+  font-size: 36px;
+}
+
+/* Profile: mobile responsive overrides (<860px) */
+@media (max-width: 859px) {
+  .redesign-stat-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .redesign-stat-value {
+    font-size: 28px;
+  }
+}

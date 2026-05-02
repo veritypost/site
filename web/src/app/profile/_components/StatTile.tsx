@@ -47,9 +47,9 @@ export function StatTile({ label, value, hint, href }: Props) {
         {label}
       </div>
       <div
+        className="redesign-stat-value"
         style={{
           fontFamily: FONT.sans,
-          fontSize: F.display,
           fontWeight: 800,
           color: C.ink,
           letterSpacing: 0,
