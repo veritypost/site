@@ -207,6 +207,7 @@ struct KidReaderView: View {
                 .clipShape(Circle())
                 .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
         }
+        .accessibilityLabel("Close article")
         .buttonStyle(.plain)
         .padding(.leading, 20)
         .padding(.top, 60)
@@ -267,6 +268,7 @@ struct KidReaderView: View {
                 .single()
                 .execute()
                 .value
+            self.loadError = nil
             self.body_ = row.kids_summary ?? ""
             self.startTime = Date()
         } catch {
