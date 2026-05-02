@@ -5,17 +5,17 @@ Single-line state for the review system. Updated automatically at session end.
 ```
 CURRENT_PHASE: auto-detect
 CURRENT_UNIT: cross-cutting
-CURRENT_TITLE: Slice 7 — Admin ad system completion (prereqs 2+4 met)
+CURRENT_TITLE: Slice 9 — Cross-platform parity bridges (prereq: Slice 4 shipped)
 CURRENT_WAVE: A
 CURRENT_DOC: UI_UX_REVIEW_SLICES.md
 STATUS: ready
-NEXT_BUILD_SLICE: Slice 7 — Admin ad system (9 steps; prereqs 2+4 shipped)
-ANCHOR: Slice 8 (iOS CSAM-trio bridge) shipped 2026-05-02. BlockService.swift ReportReason enum extended with csam/child_exploitation/grooming at top; adversary clean; pre-existing union-enum divergence logged to drift bin. Auto-detect next: Slice 7 (Admin ad system) — all prereqs met.
+NEXT_BUILD_SLICE: Slice 9 — Cross-platform parity bridges (web Up-Next sheet + progress ribbon + iOS comment sort/mod; prereq Slice 4 met)
+ANCHOR: Slice 7 (Admin ad system) shipped 2026-05-02. 4-stream parallel (targeting UI, analytics dashboard, slot wiring, freq-cap + preview), adversary 8 gaps closed, tsc clean, commit 196508b pushed. DECISIONS #048-#051 locked. Auto-detect next: Slice 9 (Parity bridges) — prereq Slice 4 met. Slice 10 (Wave A verification) still needs remaining Wave A unit reviews (Slices 11–19) before it can fire.
 LAST_UPDATED: 2026-05-02
 
 PARKED_UNITS:
 - Unit 1 (Home) — status: fixed (Slice 3 shipped 2026-05-02). HomeBrokenPinBanner admin signal TODO in page.tsx.
-- Unit 2 (Article reader) — status: findings (build-ready); 128 findings (1 refuted) + DECISIONS #030–#047 locked; fix pass = Slices 4 (layout) + 5 (cleanup).
+- Unit 2 (Article reader) — status: fixed (Slices 4+5 shipped 2026-05-02). All 128 findings resolved.
 
 EXECUTION_PLAN: UI_UX_REVIEW_SLICES.md
 SLICE_NAMING: sequential numbers (Slice 1, 2, 3, ...). See SLICES.md tracking table for type (Foundation / Unit fix / Cross-cutting / Verification) and dependencies.
