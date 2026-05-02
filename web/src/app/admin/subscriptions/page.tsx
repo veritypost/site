@@ -392,7 +392,7 @@ function SubscriptionsInner() {
       {loadError && (
         <div style={{
           padding: S[2], marginBottom: S[3], borderRadius: 6,
-          background: 'rgba(239,68,68,0.08)', border: `1px solid ${C.danger}`, color: C.danger, fontSize: F.sm,
+          background: 'var(--danger-bg)', border: `1px solid ${C.danger}`, color: C.danger, fontSize: F.sm,
         }}>Failed to load subscriptions: {loadError}</div>
       )}
 

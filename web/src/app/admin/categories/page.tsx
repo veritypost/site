@@ -707,7 +707,7 @@ function CategoriesAdminInner() {
                 style={{
                   marginTop: S[2],
                   padding: `${S[2]}px ${S[3]}px`,
-                  background: 'rgba(239,68,68,0.08)',
+                  background: 'var(--danger-bg)',
                   border: '1px solid rgba(239,68,68,0.35)',
                   borderRadius: 6,
                   color: C.danger,
@@ -903,7 +903,7 @@ function CategoryForm({
           style={{
             marginBottom: S[3],
             padding: `${S[2]}px ${S[3]}px`,
-            background: 'rgba(239,68,68,0.08)',
+            background: 'var(--danger-bg)',
             border: '1px solid rgba(239,68,68,0.35)',
             borderRadius: 6,
             color: C.danger,

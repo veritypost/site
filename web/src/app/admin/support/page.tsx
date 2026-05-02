@@ -303,7 +303,7 @@ export default function SupportAdmin() {
             marginBottom: S[4],
             padding: `${S[2]}px ${S[3]}px`,
             borderRadius: 6,
-            background: 'rgba(239,68,68,0.08)',
+            background: 'var(--danger-bg)',
             border: `1px solid ${C.danger}44`,
             color: C.danger,
             fontSize: F.sm,

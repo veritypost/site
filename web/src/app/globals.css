@@ -43,12 +43,14 @@
   --muted: #999999;
   --accent: #111111;
   --success: #22c55e;
+  --success-text: #16a34a;
   --right: #22c55e;
   --warn: #f59e0b;
   --amber: #f59e0b;
   /* DA-055 — `#ef4444` on a pale-red background (`#fef2f2`) falls
      below 4.5:1 AA normal text. `#b91c1c` pushes the ratio above 7:1
      on that background and keeps readable contrast on white too. */
+  --danger-bg: rgba(239, 68, 68, 0.08);
   --danger: #b91c1c;
   --wrong: #b91c1c;
   /* C10 — saturated alert red used by the BREAKING banner (home + story).

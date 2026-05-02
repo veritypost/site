@@ -89,6 +89,18 @@ function LockedCard({ capability, onClick }: LockedCardProps) {
         borderRadius: 12,
         cursor: 'pointer',
       }}
+      onMouseEnter={(e) => { e.currentTarget.style.filter = 'brightness(0.88)'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.filter = ''; }}
+      onFocus={(e) => {
+        if (e.currentTarget.matches(':focus-visible')) {
+          e.currentTarget.style.outline = '2px solid var(--accent)';
+          e.currentTarget.style.outlineOffset = '2px';
+        }
+      }}
+      onBlur={(e) => {
+        e.currentTarget.style.outline = '';
+        e.currentTarget.style.outlineOffset = '';
+      }}
     >
       <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
         {capability.label || 'Locked'}

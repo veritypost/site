@@ -119,6 +119,18 @@ export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody
               textDecoration: 'none',
               fontSize: 13,
             }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.filter = 'brightness(0.88)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.filter = ''; }}
+            onFocus={(e) => {
+              if ((e.currentTarget as HTMLAnchorElement).matches(':focus-visible')) {
+                (e.currentTarget as HTMLAnchorElement).style.outline = '2px solid var(--accent)';
+                (e.currentTarget as HTMLAnchorElement).style.outlineOffset = '2px';
+              }
+            }}
+            onBlur={(e) => {
+              (e.currentTarget as HTMLAnchorElement).style.outline = '';
+              (e.currentTarget as HTMLAnchorElement).style.outlineOffset = '';
+            }}
           >
             Sign in
           </a>

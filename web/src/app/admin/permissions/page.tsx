@@ -1397,7 +1397,7 @@ function UserGrantsTab(props: {
                     border: `1px solid ${ADMIN_C.divider}`,
                     borderRadius: 8,
                     marginBottom: S[1],
-                    background: expired ? 'rgba(239,68,68,0.08)' : ADMIN_C.bg,
+                    background: expired ? 'var(--danger-bg)' : ADMIN_C.bg,
                   }}
                 >
                   <div style={{ minWidth: 0 }}>

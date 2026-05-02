@@ -140,7 +140,7 @@ export default function WelcomeModal({ nextPath }: Props) {
   const cardStyle: CSSProperties = {
     backgroundColor: C.card,
     border: `1px solid ${C.border}`,
-    borderRadius: '18px',
+    borderRadius: 14,
     padding: '40px 36px',
     width: '100%',
     maxWidth: '440px',

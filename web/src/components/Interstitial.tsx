@@ -52,7 +52,7 @@ export default function Interstitial({
   };
   const panelStyle: CSSProperties = {
     background: '#fff',
-    borderRadius: 16,
+    borderRadius: 14,
     padding: '26px 24px',
     maxWidth: 420,
     width: '100%',

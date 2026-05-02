@@ -29,7 +29,7 @@ export type TagKind = 'context' | 'helpful' | 'cite_needed' | 'off_topic';
 // Four tags: two additive (helpful, context), two challenge (cite_needed, off_topic).
 // No counts shown in UI — quality_score is the only derived number surfaced.
 const TAG_META: Record<TagKind, { label: string; color: string; challenge: boolean }> = {
-  helpful:     { label: 'Helpful',     color: '#1a7a4a', challenge: false },
+  helpful:     { label: 'Helpful',     color: 'var(--success-text)', challenge: false },
   context:     { label: 'Context',     color: 'var(--accent, #111)', challenge: false },
   cite_needed: { label: 'Cite needed', color: '#ea580c', challenge: true },
   off_topic:   { label: 'Off-topic',   color: '#6b7280', challenge: true },
@@ -222,7 +222,7 @@ export default function CommentRow({
         borderBottom: depth === 0 && !comment.is_expert_reply ? '1px solid #e5e5e5' : 'none',
         ...(comment.is_expert_reply ? {
           background: '#f0faf4',
-          borderLeft: '3px solid #2d9e6b',
+          borderLeft: '3px solid var(--success-text)',
           borderRadius: '0 8px 8px 0',
           padding: depth > 0 ? '14px 16px' : '14px 16px',
           marginTop: 4,
@@ -266,7 +266,7 @@ export default function CommentRow({
               fontWeight: 700,
               letterSpacing: '0.07em',
               textTransform: 'uppercase',
-              color: '#2d9e6b',
+              color: 'var(--success-text)',
               marginBottom: 4,
             }}>
               Expert Reply{user.expert_title ? ` · ${user.expert_title}` : ''}
@@ -274,7 +274,7 @@ export default function CommentRow({
           )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--white, #111)' }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary, #111)' }}>
               {user.username || 'user'}
             </span>
             <VerifiedBadge user={user} />
@@ -287,7 +287,7 @@ export default function CommentRow({
                   padding: '1px 6px',
                   borderRadius: 4,
                   background: 'rgba(22,163,74,0.12)',
-                  color: '#16a34a',
+                  color: 'var(--success-text)',
                 }}
               >
                 Helpful
@@ -321,7 +321,7 @@ export default function CommentRow({
                     style={{
                       fontSize: 11,
                       fontWeight: 600,
-                      color: (comment.quality_score ?? 0) > 0 ? '#1a7a4a' : '#b94040',
+                      color: (comment.quality_score ?? 0) > 0 ? 'var(--success-text)' : '#b94040',
                       fontVariantNumeric: 'tabular-nums',
                     }}
                   >
@@ -642,7 +642,7 @@ export default function CommentRow({
                         border: 'none',
                         background: 'transparent',
                         color: yourReaction === r
-                          ? (r === 'agree' ? '#1a7a4a' : '#b94040')
+                          ? (r === 'agree' ? 'var(--success-text)' : '#b94040')
                           : 'var(--dim, #888)',
                         cursor: busy ? 'default' : 'pointer',
                         touchAction: 'manipulation',
@@ -697,7 +697,7 @@ function MenuItem({ children, onClick, danger }: MenuItemProps) {
         fontSize: 13,
         background: 'transparent',
         border: 'none',
-        color: danger ? '#dc2626' : 'var(--white, #111)',
+        color: danger ? '#dc2626' : 'var(--text-primary, #111)',
         cursor: 'pointer',
         borderRadius: 6,
       }}

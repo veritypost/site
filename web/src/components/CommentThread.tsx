@@ -764,9 +764,9 @@ export default function CommentThread({
             fontWeight: 600,
             padding: '6px 12px',
             borderRadius: 6,
-            border: `1px solid ${expertFilter ? '#16a34a' : 'var(--border, #e5e5e5)'}`,
+            border: `1px solid ${expertFilter ? 'var(--success-text)' : 'var(--border, #e5e5e5)'}`,
             background: expertFilter ? 'rgba(34,197,94,0.10)' : 'transparent',
-            color: expertFilter ? '#16a34a' : 'var(--dim, #666)',
+            color: expertFilter ? 'var(--success-text)' : 'var(--dim, #666)',
             cursor: 'pointer',
             marginBottom: 16,
           }}
@@ -936,7 +936,7 @@ export default function CommentThread({
                           alignItems: 'center',
                           gap: 8,
                           fontSize: 13,
-                          color: 'var(--white, #111)',
+                          color: 'var(--text-primary, #111)',
                           cursor: 'pointer',
                           minHeight: 28,
                         }}
@@ -1213,5 +1213,5 @@ const dialogStyle: CSSProperties = {
   padding: 22,
   width: '90%',
   maxWidth: 420,
-  color: 'var(--white, #111)',
+  color: 'var(--text-primary, #111)',
 };

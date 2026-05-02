@@ -113,7 +113,7 @@ export default function LockModal({ open, onClose, capability }: LockModalProps)
     background: 'var(--card)',
     color: 'var(--text-primary)',
     border: '1px solid var(--border)',
-    borderRadius: 12,
+    borderRadius: 14,
     maxWidth: 420,
     width: '100%',
     padding: 24,
@@ -167,6 +167,18 @@ export default function LockModal({ open, onClose, capability }: LockModalProps)
                 router.push(prompt.ctaHref as string);
               }}
               style={primaryBtnStyle}
+              onMouseEnter={(e) => { e.currentTarget.style.filter = 'brightness(0.88)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.filter = ''; }}
+              onFocus={(e) => {
+                if (e.currentTarget.matches(':focus-visible')) {
+                  e.currentTarget.style.outline = '2px solid var(--accent)';
+                  e.currentTarget.style.outlineOffset = '2px';
+                }
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.outline = '';
+                e.currentTarget.style.outlineOffset = '';
+              }}
             >
               {prompt.ctaLabel}
             </button>

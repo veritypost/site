@@ -559,7 +559,7 @@ export default function UsersAdmin() {
       {loadError && (
         <div style={{
           padding: S[2], marginBottom: S[3], borderRadius: 6,
-          background: 'rgba(239,68,68,0.08)', border: `1px solid ${ADMIN_C.danger}`,
+          background: 'var(--danger-bg)', border: `1px solid ${ADMIN_C.danger}`,
           color: ADMIN_C.danger, fontSize: F.sm,
         }}>
           {loadError}

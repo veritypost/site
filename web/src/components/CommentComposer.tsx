@@ -410,7 +410,7 @@ export default function CommentComposer({
                 </span>
               )}
               {u.is_expert && (
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#2d9e6b', marginLeft: 'auto' }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--success-text)', marginLeft: 'auto' }}>
                   Expert
                 </span>
               )}
@@ -473,7 +473,7 @@ const textareaStyle: CSSProperties = {
   width: '100%',
   background: 'transparent',
   border: 'none',
-  color: 'var(--white, #111)',
+  color: 'var(--text-primary, #111)',
   fontSize: 14,
   lineHeight: 1.6,
   padding: '4px 0',
