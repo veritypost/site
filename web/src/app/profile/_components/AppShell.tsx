@@ -645,7 +645,7 @@ const shellCss = `
 }
 .redesign-shell-mobilebar {
   position: sticky;
-  top: 0;
+  top: var(--vp-top-bar-h, 0px);
   z-index: 20;
   display: flex;
   align-items: center;
