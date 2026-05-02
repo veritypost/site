@@ -2,7 +2,8 @@
  * Step + error_type humanization for the per-audience progress UI.
  *
  * Maps come straight from AI-today.md Decisions 11 and 12. Adult runs
- * cover 12 steps; tween/kids runs add `kid_url_sanitizer` for 13.
+ * cover 11 steps; tween/kids runs add `audience_safety_check` +
+ * `kid_url_sanitizer` for 13.
  *
  * Helpers fall back to the raw input when a key is unmapped — the UI
  * surfaces something readable even if the pipeline grows a new step
@@ -39,7 +40,6 @@ export const ERROR_LABELS: Record<string, string> = {
 };
 
 export const ADULT_STEPS: string[] = [
-  'audience_safety_check',
   'source_fetch',
   'headline',
   'summary',

@@ -102,7 +102,7 @@ function FeedsAdminInner() {
       const { data: settingsRows } = await supabase
         .from('settings')
         .select('key, value')
-        .in('key', ['stale_feed_hours', 'broken_feed_failures']);
+        .in('key', ['stale_feed_hours', 'broken_feed_failures', 'pull_interval_minutes']);
       if (settingsRows) {
         (settingsRows as Array<{ key: string; value: string | null }>).forEach((r) => {
           if (r.value == null) return;
@@ -110,6 +110,7 @@ function FeedsAdminInner() {
           if (!Number.isFinite(n) || n <= 0) return;
           if (r.key === 'stale_feed_hours') setStaleHours(n);
           if (r.key === 'broken_feed_failures') setBrokenFailCount(n);
+          if (r.key === 'pull_interval_minutes') setPullIntervalMin(n);
         });
       }
 
@@ -427,7 +428,16 @@ function FeedsAdminInner() {
           </div>
           <div style={{ flex: '1 1 140px', minWidth: 120 }}>
             <label style={labelStyle}>Pull interval (min)</label>
-            <NumberInput size="sm" value={pullIntervalMin} min={1} onChange={(e) => setPullIntervalMin(parseInt(e.target.value, 10) || 0)} />
+            <NumberInput
+              size="sm"
+              value={pullIntervalMin}
+              min={1}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10) || 0;
+                setPullIntervalMin(n);
+                if (n > 0) saveThreshold('pull_interval_minutes', n);
+              }}
+            />
           </div>
         </div>
       </PageSection>

@@ -138,7 +138,7 @@ export async function refreshAllPermissions() {
           _allPermsFetchedAt = Date.now();
           return allPermsCache;
         }
-        return allPermsCache;
+        return new Set();
       }
       const next = new Set();
       for (const row of Array.isArray(data) ? data : []) {

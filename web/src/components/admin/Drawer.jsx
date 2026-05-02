@@ -41,7 +41,7 @@ export default function Drawer({
   const panelRef = useRef(null);
 
   const attemptClose = () => {
-    if (onRequestClose) return onRequestClose();
+    if (onRequestClose) { onRequestClose(); return; }
     if (dirty) {
       if (typeof window !== 'undefined' && !window.confirm(dirtyMessage)) return;
     }

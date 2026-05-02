@@ -43,7 +43,7 @@ export default function Modal({
   const panelRef = useRef(null);
 
   const attemptClose = () => {
-    if (onRequestClose) return onRequestClose();
+    if (onRequestClose) { onRequestClose(); return; }
     if (dirty) {
       // Intentional: single-step native confirm. The guidance is no modal
       // pyramids — if the consumer needs a branded confirm, they override
