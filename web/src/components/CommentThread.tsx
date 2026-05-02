@@ -108,7 +108,9 @@ export default function CommentThread({
   const [loading, setLoading] = useState<boolean>(true);
   const [permsLoaded, setPermsLoaded] = useState<boolean>(false);
 
-  const canViewSection = permsLoaded ? hasPermission('comments.section.view') : true;
+  const canViewSection = currentUserId
+    ? (permsLoaded ? hasPermission('comments.section.view') : true)
+    : true;
   const canViewScore = permsLoaded ? hasPermission('comments.score.view_subcategory') : false;
   const canSubscribe = permsLoaded ? hasPermission('comments.realtime.subscribe') : false;
   const canAskExpert = permsLoaded ? hasPermission('expert.ask') : false;
