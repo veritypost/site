@@ -129,14 +129,23 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   }
 
   // 5. Audit (best-effort).
-  await recordAdminAction({
-    action: 'cluster.move',
-    targetTable: 'feed_clusters',
-    targetId: clusterId,
-    reason: null,
-    oldValue: null,
-    newValue: data ?? { item_id: itemId, target_cluster_id: targetClusterId, audience },
-  });
+  // The mutation has already committed; an audit failure must not crash
+  // the response or the client renders Next.js's HTML error page and
+  // surfaces a fallback "Could not remove source" toast even though the
+  // source was successfully removed.
+  try {
+    await recordAdminAction({
+      action: 'cluster.move',
+      targetTable: 'feed_clusters',
+      targetId: clusterId,
+      reason: null,
+      oldValue: null,
+      newValue: data ?? { item_id: itemId, target_cluster_id: targetClusterId, audience },
+    });
+  } catch (auditErr) {
+    console.error('[newsroom.clusters.move-item] audit failed:', auditErr);
+    Sentry.captureException(auditErr);
+  }
 
   return NextResponse.json(data ?? { ok: true });
 }

@@ -190,9 +190,63 @@ Status:      RESOLVED — owner must INSERT the ai_models row for
 ```
 
 ### 3. Newsroom — "Could not remove source"
-Status: PENDING
+Status: RESOLVED
 Symptom: Clicking Remove on a source row in a Discovery card surfaces a
 "Could not remove source" toast.
+
+```
+RESOLUTION (concern 3) — 2026-05-02
+Investigate: Stage 1 hypothesised the RPC reassign_cluster_items rejects
+             p_target_cluster_id=null because the param is "non-nullable
+             uuid". REFUTED in Stage 2. Postgres function params accept
+             NULL by default; the RPC body explicitly handles `IF
+             p_target_cluster_id IS NOT NULL`. The proposed `DEFAULT NULL`
+             ALTER FUNCTION fix would also be a Postgres syntax error
+             (defaults must trail). Real cause lives in the route, not
+             the RPC.
+Review:      A (confirmer) ran the RPC via supabase MCP and confirmed
+             NULL handling works; could not pin a single static cause;
+             listed three real candidates including unguarded
+             recordAdminAction. B (adversarial) re-traced the route and
+             identified recordAdminAction at move-item/route.ts:132 as
+             unguarded `await`; adminMutation.ts:247/254 throws
+             Error('audit_failed') on actor-resolution + fallback-insert
+             failures; the throw produces an HTML 500 from Next.js after
+             the RPC mutation has already committed; client's
+             `body.error` is undefined → falls back to "Could not remove
+             source" string. A.B don't disagree — B picked the strongest
+             candidate from A's list and made the case stronger. No tie-
+             breaker needed.
+Fix:         web/src/app/api/admin/newsroom/clusters/[id]/move-item/route.ts
+             — wrapped the existing recordAdminAction call (already
+             commented "best-effort") in try/catch. Audit failures now
+             log + Sentry-capture but do not crash the response. The
+             mutation succeeds AND the client receives a JSON success
+             body. Honors the documented adminMutation.ts contract that
+             audit failures must not roll back the mutation response.
+TypeScript:  pass (npx tsc --noEmit, exit 0)
+iOS build:   n/a — newsroom is web-admin only
+Verifier:    self-verified; change is 5 lines around an existing call
+             site; no new code paths, no new state, no removed code
+Status:      RESOLVED — owner can confirm by reproducing: click Remove on
+             a source; on first click, response now succeeds (toast
+             absent). If the original audit-throw path was the cause,
+             a row should now appear in admin_audit_log for action=
+             'cluster.move'. If the toast still surfaces post-fix, the
+             cause is upstream of the route; reopen this concern.
+             Out-of-scope adjacencies surfaced for new concerns:
+             - Same audit-throw pattern likely exists across other admin
+               mutation routes → see new concern #32.
+             - Hardcoded `audience: 'adult'` in StoryCard.tsx:109 is
+               masked because all current feed_clusters are adult; will
+               break the moment kid clusters exist → covered by the
+               broader source-semantics work (concern #31 splits
+               selection into "attach as source" vs "feed to AI").
+             - RPC reassign_cluster_items's kid branch references
+               public.kid_discovery_items which does not exist (table
+               was dropped); will hard-fail any kid-audience call →
+               implicit dependency for #31's kid path.
+```
 
 ### 4. Newsroom — drop bulk-generate buttons
 Status: PENDING
@@ -353,6 +407,22 @@ are mismapped, or the badge is computed off the wrong field, or the
 "Story" affordance is missing entirely. Worth investigating end-to-end
 how the type='story' / type='article' / type='event' values flow between
 the add buttons, the local state, the render badge, and the DB.
+
+### 32. Admin routes — audit failures crash mutation responses (systemic)
+Status: PENDING
+Symptom: `recordAdminAction` from web/src/lib/adminMutation.ts can throw
+Error('audit_failed') on actor-resolution failure or fallback-insert
+failure (lines 243-254). Many admin mutation routes call it via plain
+`await` outside any try/catch — when it throws, Next.js renders an HTML
+500 even though the underlying DB mutation already committed. The client
+sees a non-JSON response and falls back to whatever generic toast string
+the call site uses, leading the operator to believe the action failed
+when it actually succeeded. Concern #3 patched the move-item route in
+isolation; the rest of the admin surface is still exposed. Two ways to
+fix: (a) update recordAdminAction itself to log + capture instead of
+throw (single-place fix; changes contract for all callers), or (b) wrap
+each call site in try/catch (many-place fix). Owner-locked decision
+needed before implementation.
 
 ### 31. Mute outlet — rip out, change selection semantics
 Status: PENDING
