@@ -6,7 +6,7 @@ import { resolveNext } from '@/lib/authRedirect';
 
 // [S3-Q2-d] OAuth feature flag. Default false during closed beta /
 // pre-launch hide. Code preserved — one-line flip re-enables.
-export const OAUTH_ENABLED = true;
+export const OAUTH_ENABLED = false;
 
 const C = {
   bg: 'var(--bg)',
