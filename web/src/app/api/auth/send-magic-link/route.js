@@ -249,7 +249,7 @@ export async function POST(request) {
       } catch (err) {
         console.error('[auth.send-magic-link] beta gate threw:', err?.message || err);
         await writeAuditRow(service, { email, reason: 'beta_gate_error', ipTruncated });
-        return gated();
+        return genericOk();
       }
     }
   }
