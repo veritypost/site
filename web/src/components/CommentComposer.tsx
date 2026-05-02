@@ -306,7 +306,14 @@ export default function CommentComposer({
   const showMentionHint = permsLoaded && !canMention && draftHasMention;
 
   if (!permsLoaded) return null;
-  if (!canPost) return null;
+
+  if (!canPost) {
+    return (
+      <div style={muteBannerStyle}>
+        Posting comments requires a Verity subscription.
+      </div>
+    );
+  }
 
   if (muteState) {
     return (

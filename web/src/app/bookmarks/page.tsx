@@ -157,7 +157,12 @@ export default function BookmarksPage() {
       .eq('user_id', authUser.id)
       .order('created_at', { ascending: false })
       .limit(PAGE_SIZE);
-    if (bmsErr) console.error('[bookmarks] load failed', bmsErr);
+    if (bmsErr) {
+      console.error('[bookmarks] load failed', bmsErr);
+      setError("Couldn't load bookmarks. Try refreshing.");
+      setLoading(false);
+      return;
+    }
     const firstPage = (bms as unknown as BookmarkRow[] | null) || [];
     setItems(firstPage);
     setHasMore(firstPage.length === PAGE_SIZE);
@@ -722,7 +727,7 @@ export default function BookmarksPage() {
                 ))}
             </div>
           ))}
-          {filtered.length === 0 && (
+          {filtered.length === 0 && !error && (
             // T-041: replaced inline empty-state div with shared EmptyState component.
             <EmptyState
               headline="No bookmarks yet"

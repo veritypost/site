@@ -638,7 +638,22 @@ export default function CommentThread({
     );
   }
 
-  if (!canViewSection) return null;
+  if (!canViewSection) {
+    return (
+      <div
+        style={{
+          padding: '16px 18px',
+          border: '1px solid var(--border, #e5e5e5)',
+          borderRadius: 12,
+          marginBottom: 16,
+        }}
+      >
+        <div style={{ fontSize: 14, color: 'var(--dim, #888)', lineHeight: 1.5 }}>
+          Comments aren&apos;t available for your account.
+        </div>
+      </div>
+    );
+  }
 
   const visible = comments.filter((c) => !blockedIds.has(c.user_id));
   const displayComments = expertFilter
