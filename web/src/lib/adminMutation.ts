@@ -138,10 +138,10 @@ export async function requireAdminOutranks(
 // S6-A5: structured audit-failure surface. Stops the swallow-and-forget
 // pattern. When the RPC fails we log a tagged line with full context, then
 // attempt a service-role direct insert into admin_audit_log so the row
-// still lands. If even the fallback fails, the error propagates to the
-// caller — the caller decides whether to surface it or not. Default:
-// callers should NOT roll back the mutation over an audit failure;
-// rolling back makes the system more brittle than missing one audit row.
+// still lands. If even the fallback fails, the failure is captured via
+// logAuditFailure (structured log + Sentry) and the function resolves
+// normally — the originating mutation has already committed and must not
+// be reported as failed because the audit row could not be written.
 type AuditFailureContext = {
   actorId: string | null;
   args: RecordAdminActionArgs;
@@ -207,8 +207,10 @@ async function fallbackInsertAuditLog(
 // the caller, so the primary path runs on the cookie-scoped authed
 // client. On RPC failure we log + fallback-insert under service role so
 // the audit row lands. On terminal failure (both paths broken) the
-// error throws — callers should propagate but NOT roll back the
-// originating mutation.
+// failure is captured via logAuditFailure and the function resolves
+// without throwing — the originating mutation has already committed
+// and a failed audit write must not turn a successful response into
+// an HTML 500 (story-cleanup #32, 2026-05-02).
 export async function recordAdminAction(args: RecordAdminActionArgs): Promise<void> {
   const authed = createClient();
   // Best-effort actor capture — used for fallback insert + log context.
@@ -242,15 +244,19 @@ export async function recordAdminAction(args: RecordAdminActionArgs): Promise<vo
 
   if (!actorId) {
     // Without an actor ID we cannot satisfy the NOT NULL constraint on
-    // admin_audit_log.actor_user_id. Surface the failure.
-    throw new Error('audit_failed');
+    // admin_audit_log.actor_user_id, so the fallback insert can't run.
+    // Failure is already on the [AUDIT-FAILURE] log line; resolve so the
+    // originating mutation's success response reaches the client.
+    return;
   }
 
   try {
     await fallbackInsertAuditLog(args, actorId);
   } catch (fallbackErr) {
     logAuditFailure({ actorId, args, error: fallbackErr });
-    throw new Error('audit_failed');
+    // Both audit paths failed; failure is captured on [AUDIT-FAILURE].
+    // Do not throw — the mutation has committed and the response must
+    // reflect that.
   }
 }
 

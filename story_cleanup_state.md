@@ -1727,7 +1727,7 @@ Status:      RESOLVED — closed transitively by concern #19.
 ```
 
 ### 32. Admin routes — audit failures crash mutation responses (systemic)
-Status: PENDING
+Status: RESOLVED
 Symptom: `recordAdminAction` from web/src/lib/adminMutation.ts can throw
 Error('audit_failed') on actor-resolution failure or fallback-insert
 failure (lines 243-254). Many admin mutation routes call it via plain
@@ -1741,6 +1741,102 @@ fix: (a) update recordAdminAction itself to log + capture instead of
 throw (single-place fix; changes contract for all callers), or (b) wrap
 each call site in try/catch (many-place fix). Owner-locked decision
 needed before implementation.
+
+```
+RESOLUTION (concern 32) — 2026-05-02 (Session K)
+Investigate: Stage 1 (Explore) confirmed both throw sites in
+             web/src/lib/adminMutation.ts — line 246 in the no-actorId
+             branch and line 253 in the fallback-insert catch. Both
+             throws are preceded by a logAuditFailure() call that emits
+             the structured `[AUDIT-FAILURE]` console line and (when
+             SENTRY_DSN is set) a Sentry capture. The function signature
+             is `Promise<void>`. Inventoried call sites: ~125 await
+             callers across ~96 files. Found NO caller depending on the
+             throw — no `err.message === 'audit_failed'` checks
+             anywhere, no Promise.all/allSettled wrappers, no tests
+             asserting the throw, no re-exports. The withDestructiveAction
+             helper (lines 268-281) already has its own try/catch that
+             swallows audit failures; unaffected. safeErrorResponse
+             only maps Postgres SQLSTATE codes; uninvolved. Locked
+             decision: option A (modify recordAdminAction). Concern #3
+             commit 64f58d0 wrapped the move-item route's audit call —
+             that wrap becomes redundant after option A.
+Review:      A (confirmer) re-derived independently, CORRECTED Stage 1's
+             wrap-site count: 12 sites in 9 files (Stage 1 said 5 in 5).
+             Missed sites: a second call in articles/new-draft, plus
+             settings/invalidate/route.js, pipeline/generate/route.ts,
+             pipeline/runs/[id]/cancel + retry, and two in
+             newsroom/clusters/[id]/skip. Notably,
+             settings/invalidate/route.js and the two skip-route sites
+             have wraps that misclassify audit failures as 500s today —
+             option A fixes that as a free bonus. Verdict: PARTIAL
+             (corrects inventory, confirms cause + fix shape).
+             B (adversary) ran the diff against alternate causes,
+             regressions, missed surfaces, kill-switch / locked
+             decisions, subtle bugs, and lint risk. Confirmed there is
+             no middleware mapping admin success → error; no
+             error.tsx for /api/**; client toast fallback shape exactly
+             matches the symptom (`await res.json().catch(() => ({}))`).
+             Found 3 NON-admin callers that benefit too:
+             family/add-kid-with-seat:639, newsroom/ingest/run:560,
+             reports/route.js:122. Flagged GDPR/COPPA-touching routes
+             (data-requests/[id]/{approve,reject}, users/[id] DELETE,
+             family/add-kid-with-seat) as silent-on-double-failure —
+             owner accepted via locked decision. Lint check:
+             @typescript-eslint/only-throw-error is OFF in the project
+             config; no warning regression. No tests reference
+             recordAdminAction or 'audit_failed'. Verdict: CLEAR-TO-SHIP.
+             A and B converged. No tie-breaker needed.
+Fix:         web/src/lib/adminMutation.ts — replaced
+             `throw new Error('audit_failed')` at the no-actorId branch
+             with an early return after logAuditFailure; replaced the
+             fallback-catch throw with a fall-through after a second
+             logAuditFailure. Function signature `Promise<void>`
+             unchanged. Updated the comment block above
+             recordAdminAction (and the smaller block above
+             logAuditFailure) to document the new contract: failures
+             land on `[AUDIT-FAILURE]` + Sentry, function resolves so
+             the originating mutation's success response reaches the
+             client. Behavioral effect: ~113 unwrapped admin routes
+             that previously surfaced HTML 500 on audit failure now
+             ship the success response. The 12 belt-and-suspenders
+             wraps continue to work (catch becomes unreachable but
+             harmless); 3 of them (settings/invalidate, two skip
+             routes) stop misclassifying audit failures as mutation
+             failures.
+             web/src/app/api/admin/newsroom/clusters/[id]/move-item/route.ts
+             — removed the now-redundant try/catch + Sentry.captureException
+             that wrapped the recordAdminAction call (concern #3's
+             belt-and-suspenders patch). The ~6-line comment block
+             explaining the wrap was replaced with a one-line note
+             stating recordAdminAction never throws. Sentry import
+             retained — still used by the RPC error path at line 127.
+             Per "kill the thing being replaced" feedback rule.
+TypeScript:  pass (npx tsc --noEmit from web/, exit 0)
+iOS build:   n/a — server-only TS lib + admin route; no Swift surface
+             references recordAdminAction (verified via grep across
+             VerityPost/ + VerityPostKids/)
+Verifier:    pass — no `throw new Error('audit_failed')` anywhere; both
+             failure branches now resolve cleanly; logAuditFailure runs
+             in both branches; withDestructiveAction untouched;
+             move-item route's success response unobstructed; Sentry
+             import in move-item route still used at line 127; no
+             dead callers checking `'audit_failed'` anywhere in repo
+Status:      RESOLVED — fix is shared by ~3 non-admin callers
+             (family/add-kid-with-seat, newsroom/ingest/run, reports)
+             that hit the same shared helper; their success responses
+             also stop dying on audit failures. Optional follow-ups
+             surfaced (NOT ship-blocking, NOT scheduled here):
+             - The 12 belt-and-suspenders try/catch blocks in 9 files
+               are now dead code; a tidiness sweep can drop them, but
+               keeping them is cheap future-proofing.
+             - GDPR/COPPA routes (data-requests/*, users/[id] DELETE,
+               family/add-kid-with-seat) silently drop the audit row
+               when both the RPC and fallback fail; a periodic
+               grep-and-alert on `[AUDIT-FAILURE]` in Vercel runtime
+               logs would close the visibility gap. Sentry-deferred-
+               until-monetization rule applies; revisit later.
+```
 
 ### 31. Mute outlet — rip out, change selection semantics
 Status: RESOLVED
