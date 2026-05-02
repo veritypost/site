@@ -1,5 +1,3 @@
-// @migrated-to-permissions 2026-04-18
-// @feature-verified comments 2026-04-18
 'use client';
 import {
   useState,
@@ -33,6 +31,15 @@ type CommentDb = Database['public']['Tables']['comments']['Row'];
 // `assertReportReason` and the urgent code path is handled by the
 // comment-report route.
 const REPORT_REASONS = COMMENT_REPORT_REASONS;
+
+const HIDE_REASONS = [
+  { value: 'harassment', label: 'Harassment' },
+  { value: 'spam', label: 'Spam' },
+  { value: 'off_topic', label: 'Off-topic' },
+  { value: 'abuse_or_threats', label: 'Abuse or threats' },
+  { value: 'context_blocking', label: 'Context blocking' },
+  { value: 'other', label: 'Other' },
+];
 
 type CommentWithAuthor = CommentDb & {
   users?: {
@@ -76,6 +83,7 @@ type DialogState = {
   reason: string;
   description: string;
   submitting: boolean;
+  error?: string;
   commentId?: string;
   targetUserId?: string;
 } | null;
@@ -91,10 +99,11 @@ export default function CommentThread({
   currentUserTier,
   justRevealed = false,
   emptyStateExtra,
-  quizPassed = true,
+  quizPassed = false,
 }: CommentThreadProps) {
   const supabase = createClient();
   const [comments, setComments] = useState<CommentWithAuthor[]>([]);
+  const commentsRef = useRef<CommentWithAuthor[]>([]);
   const [authorScores, setAuthorScores] = useState<Record<string, number>>({});
   const [yourReactions, setYourReactions] = useState<Record<string, 'agree' | 'disagree'>>({});
   const [yourTags, setYourTags] = useState<Map<string, Set<TagKind>>>(new Map());
@@ -106,6 +115,7 @@ export default function CommentThread({
   const [viewerIsSupervisor, setViewerIsSupervisor] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<boolean>(false);
   const [permsLoaded, setPermsLoaded] = useState<boolean>(false);
 
   const canViewSection = currentUserId
@@ -121,6 +131,10 @@ export default function CommentThread({
       setPermsLoaded(true);
     })();
   }, []);
+
+  useEffect(() => {
+    commentsRef.current = comments;
+  }, [comments]);
 
   // Section A — pull the editorial threshold from /api/settings/public.
   // Same endpoint CommentRow already uses for `comment_max_depth`, so no
@@ -172,10 +186,11 @@ export default function CommentThread({
       .order('created_at', { ascending: true })
       .range(0, 49);
     if (loadErr) {
-      setError("Couldn't load comments. Try refreshing.");
+      setLoadError(true);
       setLoading(false);
       return;
     }
+    setLoadError(false);
     const rowsSafe = (rows || []) as CommentWithAuthor[];
 
     const userIds = Array.from(new Set(rowsSafe.map((c) => c.user_id).filter(Boolean)));
@@ -270,9 +285,8 @@ export default function CommentThread({
   }, [articleId, articleCategoryId, currentUserId, canViewScore, supabase]);
 
   useEffect(() => {
-    if (!permsLoaded) return;
     loadAll();
-  }, [loadAll, permsLoaded]);
+  }, [loadAll]);
 
   useEffect(() => {
     if (!articleId || !canSubscribe) return;
@@ -324,18 +338,20 @@ export default function CommentThread({
         async (payload: { new: CommentDb }) => {
           if (cancelled) return;
           if (payload.new.status && payload.new.status !== 'visible') {
-            setComments((prev) => prev.filter((c) => c.id !== payload.new.id));
+            setComments((prev) =>
+              prev.map((c) =>
+                c.id !== payload.new.id
+                  ? c
+                  : { ...c, body: '[deleted]', status: 'deleted' as string, deleted_at: new Date().toISOString() }
+              )
+            );
             return;
           }
           const id = payload.new.id;
-          let alreadyPresent = false;
-          setComments((prev) => {
-            alreadyPresent = !!prev.find((c) => c.id === id);
-            return alreadyPresent
-              ? prev.map((c) => (c.id === id ? { ...c, ...payload.new } : c))
-              : prev;
-          });
-          if (!alreadyPresent) {
+          const alreadyPresent = commentsRef.current.find((c) => c.id === id);
+          if (alreadyPresent) {
+            setComments((prev) => prev.map((c) => (c.id === id ? { ...c, ...payload.new } : c)));
+          } else {
             const { data: row } = await supabase
               .from('comments')
               .select('*')
@@ -437,7 +453,7 @@ export default function CommentThread({
   const [flashMessage, setFlashMessage] = useState<string>('');
 
   const openDialog = (action: DialogAction, payload: Partial<NonNullable<DialogState>> = {}) =>
-    setDialog({ action, reason: '', description: '', submitting: false, ...payload });
+    setDialog({ action, reason: '', description: '', submitting: false, error: undefined, ...payload });
   const closeDialog = () => setDialog(null);
   const updateDialog = (patch: Partial<NonNullable<DialogState>>) =>
     setDialog((prev) => (prev ? { ...prev, ...patch } : prev));
@@ -466,7 +482,7 @@ export default function CommentThread({
         const res = await fetch(`/api/comments/${dialog.commentId}`, { method: 'DELETE' });
         if (!res.ok) {
           const d = await res.json().catch(() => ({}));
-          setError(friendlyError(d?.error, 'Delete failed'));
+          updateDialog({ error: friendlyError(d?.error, 'Delete failed'), submitting: false });
           return;
         }
         setComments((prev) =>
@@ -494,7 +510,7 @@ export default function CommentThread({
         });
         if (!res.ok) {
           const d = await res.json().catch(() => ({}));
-          setError(friendlyError(d?.error, 'Report failed'));
+          updateDialog({ error: friendlyError(d?.error, 'Report failed'), submitting: false });
           return;
         }
         closeDialog();
@@ -514,7 +530,7 @@ export default function CommentThread({
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          setError(friendlyError(data?.error, 'Flag failed'));
+          updateDialog({ error: friendlyError(data?.error, 'Flag failed'), submitting: false });
           return;
         }
         closeDialog();
@@ -526,11 +542,14 @@ export default function CommentThread({
         const res = await fetch(`/api/admin/moderation/comments/${dialog.commentId}/hide`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reason: dialog.reason || 'moderator action' }),
+          body: JSON.stringify({
+            reason: dialog.reason,
+            ...(dialog.reason === 'other' && dialog.description.trim() ? { context: dialog.description.trim() } : {}),
+          }),
         });
         if (!res.ok) {
           const d = await res.json().catch(() => ({}));
-          setError(friendlyError(d?.error, 'Hide failed'));
+          updateDialog({ error: friendlyError(d?.error, 'Hide failed'), submitting: false });
           return;
         }
         setComments((prev) => prev.filter((c) => c.id !== dialog.commentId));
@@ -546,7 +565,7 @@ export default function CommentThread({
         const res = await fetch(`/api/users/${dialog.targetUserId}/block`, { method: 'POST' });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          setError(friendlyError(data?.error, 'Block failed'));
+          updateDialog({ error: friendlyError(data?.error, 'Block failed'), submitting: false });
           return;
         }
         setBlockedIds((prev) => new Set([...prev, dialog.targetUserId as string]));
@@ -562,11 +581,34 @@ export default function CommentThread({
   const dialogRef = useRef<HTMLDivElement | null>(null);
   useFocusTrap(!!dialog, dialogRef, { onEscape: closeDialog });
 
+  useEffect(() => {
+    if (dialog) {
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = '';
+      };
+    }
+  }, [dialog]);
+
   function handlePosted(comment: CommentDb | null) {
     if (!comment) return;
-    setComments((prev) =>
-      prev.find((c) => c.id === comment.id) ? prev : [...prev, comment as CommentWithAuthor]
-    );
+    const enrich = async () => {
+      let author: CommentWithAuthor['users'] | undefined;
+      if (comment.user_id) {
+        const { data: authorRow } = await supabase
+          .from('public_profiles_v')
+          .select('id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert, expert_title')
+          .eq('id', comment.user_id)
+          .maybeSingle();
+        if (authorRow) author = authorRow as unknown as CommentWithAuthor['users'];
+      }
+      setComments((prev) =>
+        prev.find((c) => c.id === comment.id)
+          ? prev
+          : [...prev, { ...comment, users: author } as CommentWithAuthor]
+      );
+    };
+    enrich();
   }
 
   const [sort, setSort] = useState<'top' | 'newest'>('newest');
@@ -601,7 +643,7 @@ export default function CommentThread({
     }
   }
 
-  if (!permsLoaded || loading) {
+  if (loading) {
     // T-042: Skeleton loading rows replace the "Loading discussion…" text.
     // Three comment-shaped rows: avatar circle + 2-3 text lines each.
     // Shimmer animation defined in globals.css (.vp-skeleton / vpShimmer).
@@ -630,6 +672,26 @@ export default function CommentThread({
             <Skeleton width="50%" height={13} />
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div style={{ padding: '16px 0' }}>
+        <p style={{ fontSize: 14, color: 'var(--dim, #888)', margin: '0 0 10px' }}>
+          Comments couldn&apos;t load.
+        </p>
+        <button
+          onClick={() => { setLoadError(false); loadAll(); }}
+          style={{
+            fontSize: 13, color: 'var(--accent, #111)', background: 'transparent',
+            border: 'none', padding: 0, cursor: 'pointer',
+            textDecoration: 'underline', textUnderlineOffset: 3,
+          }}
+        >
+          Try again
+        </button>
       </div>
     );
   }
@@ -988,7 +1050,7 @@ export default function CommentThread({
               </>
             )}
 
-            {(dialog.action === 'flag' || dialog.action === 'hide') && (
+            {dialog.action === 'flag' && (
               <>
                 <label
                   style={{
@@ -1006,11 +1068,7 @@ export default function CommentThread({
                   autoFocus
                   value={dialog.reason}
                   onChange={(e) => updateDialog({ reason: e.target.value })}
-                  placeholder={
-                    dialog.action === 'hide'
-                      ? 'moderator action'
-                      : 'e.g. harassment, spam, misinformation'
-                  }
+                  placeholder="e.g. harassment, spam, misinformation"
                   style={{
                     width: '100%',
                     padding: '8px 10px',
@@ -1023,7 +1081,74 @@ export default function CommentThread({
                     boxSizing: 'border-box',
                   }}
                 />
-                {dialog.action !== 'hide' && (
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: 'var(--dim, #666)',
+                    textTransform: 'uppercase',
+                    marginBottom: 4,
+                  }}
+                >
+                  Context (optional)
+                </label>
+                <textarea
+                  value={dialog.description}
+                  onChange={(e) => updateDialog({ description: e.target.value })}
+                  rows={3}
+                  style={{
+                    width: '100%',
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    border: '1px solid var(--border, #e5e5e5)',
+                    fontSize: 13,
+                    outline: 'none',
+                    fontFamily: 'inherit',
+                    marginBottom: 10,
+                    boxSizing: 'border-box',
+                    resize: 'vertical',
+                  }}
+                />
+              </>
+            )}
+
+            {dialog.action === 'hide' && (
+              <>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: 'var(--dim, #666)',
+                    textTransform: 'uppercase',
+                    marginBottom: 4,
+                  }}
+                >
+                  Reason <span style={{ color: 'var(--danger, #dc2626)' }}>*</span>
+                </label>
+                <select
+                  value={dialog.reason}
+                  onChange={(e) => updateDialog({ reason: e.target.value })}
+                  autoFocus
+                  style={{
+                    width: '100%',
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    border: '1px solid var(--border, #e5e5e5)',
+                    fontSize: 13,
+                    fontFamily: 'inherit',
+                    marginBottom: 10,
+                    background: 'var(--card, #fff)',
+                    color: 'var(--text, #111)',
+                  }}
+                >
+                  <option value="">Select a reason…</option>
+                  {HIDE_REASONS.map((r) => (
+                    <option key={r.value} value={r.value}>{r.label}</option>
+                  ))}
+                </select>
+                {dialog.reason === 'other' && (
                   <>
                     <label
                       style={{
@@ -1035,19 +1160,20 @@ export default function CommentThread({
                         marginBottom: 4,
                       }}
                     >
-                      Context (optional)
+                      Context <span style={{ color: 'var(--danger, #dc2626)' }}>*</span>
                     </label>
                     <textarea
                       value={dialog.description}
                       onChange={(e) => updateDialog({ description: e.target.value })}
                       rows={3}
+                      maxLength={500}
+                      placeholder="Describe the issue."
                       style={{
                         width: '100%',
                         padding: '8px 10px',
                         borderRadius: 8,
                         border: '1px solid var(--border, #e5e5e5)',
                         fontSize: 13,
-                        outline: 'none',
                         fontFamily: 'inherit',
                         marginBottom: 10,
                         boxSizing: 'border-box',
@@ -1057,6 +1183,12 @@ export default function CommentThread({
                   </>
                 )}
               </>
+            )}
+
+            {dialog.error && (
+              <p style={{ fontSize: 12, color: 'var(--danger, #dc2626)', margin: '0 0 10px 0' }}>
+                {dialog.error}
+              </p>
             )}
 
             <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 14 }}>
@@ -1084,6 +1216,10 @@ export default function CommentThread({
                   // requires non-empty context so we don't ship the server
                   // an empty meaningless payload.
                   (dialog.action === 'report' &&
+                    (!dialog.reason || (dialog.reason === 'other' && !dialog.description.trim()))) ||
+                  // DECISION #034 — hide requires a pre-set reason; "other"
+                  // additionally requires a context description.
+                  (dialog.action === 'hide' &&
                     (!dialog.reason || (dialog.reason === 'other' && !dialog.description.trim())))
                 }
                 style={{
@@ -1126,17 +1262,27 @@ export default function CommentThread({
         // T11 — when the article has same-category siblings, the story
         // page passes them in via `emptyStateExtra` so the passed-but-
         // alone reader has an editorial follow-up rather than a dead end.
-        <div
-          style={{
-            padding: '24px 0',
-          }}
-        >
+        <div style={{ padding: '24px 0' }}>
           <div style={{ fontSize: 14, color: 'var(--dim, #666)' }}>
             No one has joined this discussion yet.
           </div>
-          {emptyStateExtra && (
-            <div style={{ marginTop: 24, textAlign: 'left' }}>{emptyStateExtra}</div>
+          {!currentUserId && (
+            <a
+              href={`/login?next=${encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname + window.location.search : '/')}`}
+              style={{
+                display: 'inline-block',
+                marginTop: 12,
+                fontSize: 13,
+                fontWeight: 500,
+                color: 'var(--accent, #111)',
+                textDecoration: 'underline',
+                textUnderlineOffset: 3,
+              }}
+            >
+              Sign in to start the discussion
+            </a>
           )}
+          {emptyStateExtra && <div style={{ marginTop: 24, textAlign: 'left' }}>{emptyStateExtra}</div>}
         </div>
       ) : (
         <>

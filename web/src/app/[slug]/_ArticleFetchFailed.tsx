@@ -1,9 +1,19 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-
 export default function ArticleFetchFailed() {
-  const router = useRouter();
+  function handleRetry() {
+    const key = 'vp_fetch_retry';
+    const count = parseInt(sessionStorage.getItem(key) || '0', 10);
+    if (count >= 2) {
+      sessionStorage.removeItem(key);
+      // After 2 failed retries, suggest contacting support rather than looping
+      window.location.href = '/'; // Send to home after 3rd failure
+      return;
+    }
+    sessionStorage.setItem(key, String(count + 1));
+    window.location.reload();
+  }
+
   return (
     <section
       aria-label="Couldn't load this story"
@@ -22,7 +32,7 @@ export default function ArticleFetchFailed() {
       <p style={{ margin: '20px 0 0' }}>
         <button
           type="button"
-          onClick={() => router.refresh()}
+          onClick={handleRetry}
           style={{
             fontSize: 15,
             color: 'var(--accent, #1a1a2e)',

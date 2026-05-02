@@ -1,11 +1,9 @@
 'use client';
 
-export default function ArticleError({
-  reset,
-}: {
-  error: Error;
-  reset: () => void;
-}) {
+export default function ArticleError({ error, reset }: { error: Error; reset: () => void }) {
+  // Log for observability — not surfaced to the user
+  console.error('[article.error]', error);
+
   return (
     <section
       aria-label="Couldn't load this story"

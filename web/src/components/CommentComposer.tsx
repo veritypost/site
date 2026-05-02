@@ -1,5 +1,3 @@
-// @migrated-to-permissions 2026-04-18
-// @feature-verified comments 2026-04-18
 'use client';
 import { useState, useEffect, useRef, CSSProperties } from 'react';
 import { createClient } from '../lib/supabase/client';
@@ -240,6 +238,7 @@ export default function CommentComposer({
   async function submit() {
     const trimmed = body.trim();
     if (!trimmed || busy) return;
+    setBusy(true);
     setError('');
 
     // Extract @-tokens once. MENTION_RE is `/g`-flagged so we deliberately
@@ -253,6 +252,7 @@ export default function CommentComposer({
     if (mentionNames.length > 0) {
       const verdict = await checkCanMention(mentionNames);
       if (!verdict.ok) {
+        setBusy(false);
         if (verdict.reason === 'free_tier_mention_disabled') {
           setError(
             'Mentions are a Pro feature. Upgrade or remove the @username to post.'
@@ -271,7 +271,6 @@ export default function CommentComposer({
       }
     }
 
-    setBusy(true);
     try {
       const mentions = await resolveMentions(trimmed);
       const res = await fetch('/api/comments', {
@@ -285,6 +284,11 @@ export default function CommentComposer({
         }),
       });
       const data = await res.json().catch(() => ({}));
+      if (data.preview) {
+        setBusy(false);
+        setError('Preview mode — comment not saved.');
+        return;
+      }
       if (!res.ok) throw new Error(friendlyError(data?.error, 'Could not post'));
       setBody('');
       onPosted?.(data.comment || null);

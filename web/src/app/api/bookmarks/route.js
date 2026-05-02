@@ -12,6 +12,33 @@ import { trackServer } from '@/lib/trackServer';
 // or shared proxy.
 const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
 
+// GET /api/bookmarks?article_id=<id> — check if current user has bookmarked a specific article.
+// Returns { bookmarked: boolean }
+export async function GET(request) {
+  let user;
+  try {
+    user = await requirePermission('article.bookmark.add');
+  } catch {
+    return NextResponse.json({ bookmarked: false }, { headers: NO_STORE });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const article_id = searchParams.get('article_id');
+  if (!article_id) {
+    return NextResponse.json({ error: 'article_id required' }, { status: 400, headers: NO_STORE });
+  }
+
+  const service = createServiceClient();
+  const { data } = await service
+    .from('bookmarks')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('article_id', article_id)
+    .maybeSingle();
+
+  return NextResponse.json({ bookmarked: !!data }, { headers: NO_STORE });
+}
+
 // POST /api/bookmarks — create. Cap enforced by trigger.
 // Body: { article_id, collection_id?, notes? }
 export async function POST(request) {
@@ -57,6 +84,23 @@ export async function POST(request) {
         { error: 'Too many requests' },
         { status: 429, headers: { ...NO_STORE, 'Retry-After': '60' } }
       );
+    }
+  }
+
+  // Preview intercept (DECISION #033): when the target article is non-published
+  // and the actor is an editor/owner, return a preview signal without writing.
+  const { data: targetArticle } = await service
+    .from('articles')
+    .select('status')
+    .eq('id', article_id)
+    .maybeSingle();
+  if (targetArticle && targetArticle.status !== 'published') {
+    const isEditor =
+      isOwnerMode ||
+      (await hasPermissionServer('articles.edit')) ||
+      (await hasPermissionServer('admin.articles.edit.any'));
+    if (isEditor) {
+      return NextResponse.json({ preview: true }, { headers: NO_STORE });
     }
   }
 

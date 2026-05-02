@@ -9,8 +9,8 @@ interface ArticleEngagementZoneProps {
   hasQuiz: boolean;
   initialPassed: boolean;
   currentUserId?: string | null;
-  currentUserTier?: string;
   canBypassQuiz?: boolean;
+  isPreview?: boolean;
 }
 
 export default function ArticleEngagementZone({
@@ -19,8 +19,8 @@ export default function ArticleEngagementZone({
   hasQuiz,
   initialPassed,
   currentUserId,
-  currentUserTier,
   canBypassQuiz = false,
+  isPreview = false,
 }: ArticleEngagementZoneProps) {
   const [hasPassed, setHasPassed] = useState(initialPassed || canBypassQuiz);
   const [justPassedThisSession, setJustPassedThisSession] = useState(false);
@@ -31,7 +31,6 @@ export default function ArticleEngagementZone({
   }
 
   const sectionStyle = {
-    marginTop: 40,
     maxWidth: 680,
     margin: '40px auto 0',
     padding: '0 20px',
@@ -39,6 +38,20 @@ export default function ArticleEngagementZone({
 
   return (
     <section id="discussion" style={sectionStyle}>
+      {isPreview && (
+        <div style={{
+          background: 'var(--warn-bg, #fffbeb)',
+          border: '1px solid var(--warn-border, #fde68a)',
+          borderRadius: 8,
+          padding: '8px 14px',
+          fontSize: 12,
+          fontWeight: 600,
+          color: 'var(--warn-text, #b45309)',
+          marginBottom: 16,
+        }}>
+          DRAFT — not visible to readers
+        </div>
+      )}
       {hasQuiz && (
         <ArticleQuiz
           articleId={articleId}
@@ -50,8 +63,7 @@ export default function ArticleEngagementZone({
         articleId={articleId}
         articleCategoryId={articleCategoryId}
         currentUserId={currentUserId ?? null}
-        currentUserTier={currentUserTier}
-        quizPassed={hasQuiz ? hasPassed : false}
+        quizPassed={hasQuiz ? hasPassed : true}
         justRevealed={justPassedThisSession}
       />
     </section>

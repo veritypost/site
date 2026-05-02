@@ -99,9 +99,9 @@ export async function generateMetadata({
   const found = await fetchBySlug(params.slug);
   if (!found) return { title: 'Article not found · Verity Post' };
 
-  const article =
-    found.articles.find((a) => a.status === 'published' && a.published_at !== null) ??
-    found.articles[0];
+  const publishedArticle = found.articles.find((a) => a.status === 'published' && a.published_at !== null);
+  if (!publishedArticle) return { title: 'Article not found · Verity Post' };
+  const article = publishedArticle;
   const meta: Metadata = {
     title: article.title,
     description: article.excerpt ?? undefined,
@@ -226,7 +226,7 @@ export default async function ArticleSlugPage({
         .filter((r) => r.stories?.slug)
         .map((r) => ({ slug: r.stories!.slug, title: r.title }));
 
-  if (article.status !== 'published' && !canEdit) notFound();
+  if (article.status !== 'published' && !canEdit) redirect(`/${story.slug}`);
 
   // Suppress view-count writes for Owner Mode holders so owner reading
   // their own articles doesn't pollute the read counter. The companion
@@ -290,7 +290,7 @@ export default async function ArticleSlugPage({
               canEdit={canEdit}
               canViewBody={canViewBody}
             />
-            {!isCoppa && article.status === 'published' && (
+            {!isCoppa && (article.status === 'published' || canEdit || isOwnerModeViewer) && (
               <ArticleActions
                 articleId={article.id}
                 currentUserId={user?.id ?? null}
@@ -305,7 +305,38 @@ export default async function ArticleSlugPage({
           </>
         }
         engagementSlot={
-          !isCoppa && article.status === 'published' ? (
+          isCoppa ? (
+            <div style={{
+              padding: '20px 0',
+              fontSize: 14,
+              color: 'var(--dim, #666)',
+              lineHeight: 1.6,
+            }}>
+              <p style={{ margin: '0 0 12px' }}>
+                From the Kids edition. The quiz, discussion, and reactions live in the Verity Kids iOS app.
+              </p>
+              {process.env.NEXT_PUBLIC_KIDS_APP_URL ? (
+                <a
+                  href={process.env.NEXT_PUBLIC_KIDS_APP_URL}
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'inline-block',
+                    padding: '8px 16px',
+                    borderRadius: 8,
+                    background: 'var(--accent, #111)',
+                    color: '#fff',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    textDecoration: 'none',
+                  }}
+                >
+                  Open in Verity Kids
+                </a>
+              ) : (
+                <span style={{ fontSize: 13 }}>Download the Verity Kids app to join.</span>
+              )}
+            </div>
+          ) : (article.status === 'published' || canEdit || isOwnerModeViewer) ? (
             <ArticleEngagementZone
               key={article.id}
               articleId={article.id}
@@ -314,6 +345,7 @@ export default async function ArticleSlugPage({
               initialPassed={initialPassed}
               currentUserId={user?.id ?? null}
               canBypassQuiz={canEdit || isOwnerModeViewer}
+              isPreview={article.status !== 'published'}
             />
           ) : null
         }

@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 export default function ShareButton() {
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
 
   async function handleCopy() {
     try {
@@ -12,6 +13,8 @@ export default function ShareButton() {
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error('[ShareButton] clipboard.writeText failed', err);
+      setCopyFailed(true);
+      setTimeout(() => setCopyFailed(false), 3000);
     }
   }
 
@@ -24,9 +27,9 @@ export default function ShareButton() {
         gap: 6,
         fontSize: 13,
         fontWeight: 500,
-        color: copied ? '#fff' : 'var(--text, #1a1a1a)',
-        background: copied ? 'var(--accent)' : 'transparent',
-        border: `1px solid ${copied ? 'var(--accent)' : 'var(--border, #e5e5e5)'}`,
+        color: copyFailed ? 'var(--danger, #dc2626)' : copied ? '#fff' : 'var(--text, #1a1a1a)',
+        background: copyFailed ? 'transparent' : copied ? 'var(--accent)' : 'transparent',
+        border: `1px solid ${copyFailed ? 'var(--danger, #dc2626)' : copied ? 'var(--accent)' : 'var(--border, #e5e5e5)'}`,
         borderRadius: 8,
         padding: '0 14px',
         minHeight: 36,
@@ -46,7 +49,7 @@ export default function ShareButton() {
           <line x1="12" y1="1" x2="6" y2="7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
         </svg>
       )}
-      {copied ? 'Copied' : 'Copy link'}
+      {copyFailed ? 'Copy failed — try the URL bar' : copied ? 'Copied' : 'Copy link'}
     </button>
   );
 }

@@ -37,6 +37,15 @@ export async function POST(request, { params }) {
   }
   const body = await request.json().catch(() => ({}));
   const reason = body?.reason;
+
+  // DECISION #034 — reason is required; reject before touching the DB.
+  if (!reason || !reason.trim()) {
+    return NextResponse.json(
+      { error: 'reason is required' },
+      { status: 400 }
+    );
+  }
+
   // T279 — two-mode soft-removal. 'hide' is the routine moderator path
   // (status flips to hidden, body preserved for unhide / appeals). 'redact'
   // additionally overwrites the body so that on a legal/safety action the
@@ -48,7 +57,7 @@ export async function POST(request, { params }) {
   const { error } = await service.rpc('hide_comment', {
     p_mod_id: user.id,
     p_comment_id: params.id,
-    p_reason: reason || 'moderator action',
+    p_reason: reason,
   });
   if (error)
     return safeErrorResponse(NextResponse, error, {
@@ -60,7 +69,7 @@ export async function POST(request, { params }) {
     comment_id: params.id,
     moderator_id: user.id,
     action: mode === 'redact' ? 'redact' : 'hide',
-    reason: reason || null,
+    reason: reason,
   });
 
   if (mode === 'redact') {
@@ -84,7 +93,7 @@ export async function POST(request, { params }) {
     action: 'moderation.comment.hide',
     targetTable: 'comments',
     targetId: params.id,
-    newValue: { reason: reason || 'moderator action', mode },
+    newValue: { reason, mode },
   });
 
   return NextResponse.json({ ok: true, mode });

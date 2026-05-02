@@ -1,5 +1,3 @@
-// @migrated-to-permissions 2026-04-18
-// @feature-verified comments 2026-04-18
 'use client';
 import { useState, useEffect, useRef, ReactNode } from 'react';
 import Avatar from './Avatar';

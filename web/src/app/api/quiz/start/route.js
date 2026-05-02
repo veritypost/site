@@ -1,12 +1,15 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified quiz 2026-04-18
 import { NextResponse } from 'next/server';
-import { requirePermission } from '@/lib/auth';
+import { requirePermission, hasPermissionServer } from '@/lib/auth';
 import { assertKidOwnership } from '@/lib/kids';
 import { createServiceClient } from '@/lib/supabase/server';
 import { v2LiveGuard } from '@/lib/featureFlags';
 import { safeErrorResponse } from '@/lib/apiErrors';
 import { checkRateLimit } from '@/lib/rateLimit';
+
+// T170/T209 — quiz state is per-user; never cacheable by a CDN.
+const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
 
 export async function POST(request) {
   const blocked = await v2LiveGuard();
@@ -50,6 +53,23 @@ export async function POST(request) {
       { error: 'Too many quiz attempts. Wait a moment and try again.' },
       { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 600) } }
     );
+  }
+
+  // Preview intercept (DECISION #033): when the target article is non-published
+  // and the actor is an editor/owner, return a preview signal without writing.
+  const { data: targetArticle } = await service
+    .from('articles')
+    .select('status')
+    .eq('id', article_id)
+    .maybeSingle();
+  if (targetArticle && targetArticle.status !== 'published') {
+    const isEditor =
+      (await hasPermissionServer('articles.edit')) ||
+      (await hasPermissionServer('admin.articles.edit.any')) ||
+      (await hasPermissionServer('admin.owner_mode'));
+    if (isEditor) {
+      return NextResponse.json({ preview: true }, { headers: NO_STORE });
+    }
   }
 
   const { data, error } = await service.rpc('start_quiz_attempt', {

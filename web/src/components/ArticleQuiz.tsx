@@ -1,7 +1,5 @@
-// @migrated-to-permissions 2026-04-18
-// @feature-verified quiz 2026-04-18
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Interstitial from './Interstitial';
 import { bumpQuizCount } from '../lib/session';
 import { hasPermission } from '@/lib/permissions';
@@ -89,6 +87,7 @@ export default function ArticleQuiz({
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [showInterstitial, setShowInterstitial] = useState<boolean>(false);
   const [passRevealed, setPassRevealed] = useState<boolean>(false);
+  const submittingRef = useRef(false);
   const trackEvent = useTrack();
 
   useEffect(() => {
@@ -112,6 +111,11 @@ export default function ArticleQuiz({
         body: JSON.stringify({ article_id: articleId, kid_profile_id: kidProfileId }),
       });
       const data = await res.json().catch(() => ({}));
+      if (data.preview) {
+        setError('Preview mode — quiz runs won\'t be saved.');
+        setStage('idle');
+        return;
+      }
       if (!res.ok) {
         const msg = data?.error || 'Could not start quiz';
         if (/pool not ready/i.test(msg))
@@ -156,6 +160,11 @@ export default function ArticleQuiz({
         body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => ({}));
+      if (data.preview) {
+        setError('Preview mode — result won\'t be saved.');
+        setStage('idle');
+        return;
+      }
       if (!res.ok) throw new Error(data?.error || 'Could not submit quiz');
       setResult(data);
       setStage('result');
@@ -196,13 +205,17 @@ export default function ArticleQuiz({
   }
 
   function selectOption(q: QuizQuestion, oi: number) {
-    if (answers[q.id] != null) return;
+    if (answers[q.id] != null || submittingRef.current) return;
+    const isLast = currentIndex >= questions.length - 1;
+    if (isLast) submittingRef.current = true;
     const next = { ...answers, [q.id]: q.options[oi].text };
     setAnswers(next);
-    const isLast = currentIndex >= questions.length - 1;
     setTimeout(() => {
-      if (isLast) submitAttempt(next);
-      else setCurrentIndex((i) => i + 1);
+      if (isLast) {
+        submitAttempt(next).finally(() => { submittingRef.current = false; });
+      } else {
+        setCurrentIndex((i) => i + 1);
+      }
     }, 350);
   }
 
@@ -439,7 +452,21 @@ export default function ArticleQuiz({
             {'Grading…'}
           </div>
         )}
-        {error && <div style={{ fontSize: 12, color: C.danger, marginTop: 10 }}>{error}</div>}
+        {error && stage === 'answering' && (
+          <>
+            <p style={{ fontSize: 13, color: 'var(--danger, #dc2626)', margin: '10px 0 8px' }}>{error}</p>
+            <button
+              onClick={() => { setError(''); setAnswers({}); setCurrentIndex(0); setStage('idle'); }}
+              style={{
+                fontSize: 12, fontWeight: 600, color: 'var(--accent, #111)',
+                background: 'transparent', border: 'none', padding: 0,
+                cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 3,
+              }}
+            >
+              Try again
+            </button>
+          </>
+        )}
       </div>
     );
   }

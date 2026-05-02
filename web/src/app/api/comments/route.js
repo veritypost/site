@@ -132,6 +132,23 @@ export async function POST(request) {
     }
   }
 
+  // Preview intercept (DECISION #033): when the target article is non-published
+  // and the actor is an editor/owner, return a preview signal without writing.
+  const { data: targetArticle } = await service
+    .from('articles')
+    .select('status')
+    .eq('id', article_id)
+    .maybeSingle();
+  if (targetArticle && targetArticle.status !== 'published') {
+    const isEditor =
+      isOwnerMode ||
+      (await hasPermissionServer('articles.edit')) ||
+      (await hasPermissionServer('admin.articles.edit.any'));
+    if (isEditor) {
+      return NextResponse.json({ preview: true }, { headers: NO_STORE });
+    }
+  }
+
   const { data, error } = await service.rpc('post_comment', {
     p_user_id: user.id,
     p_article_id: article_id,

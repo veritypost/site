@@ -25,6 +25,21 @@ export default function BookmarkButton({ articleId, currentUserId }: BookmarkBut
     })();
   }, [currentUserId]);
 
+  useEffect(() => {
+    if (!currentUserId || !permsReady || !canBookmark) return;
+    let cancelled = false;
+    fetch(`/api/bookmarks?article_id=${encodeURIComponent(articleId)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled) return;
+        if (data?.bookmarked === true) setBookmarked(true);
+      })
+      .catch(() => {
+        // Silently fail — default unbookmarked; server will handle duplicate gracefully
+      });
+    return () => { cancelled = true; };
+  }, [articleId, currentUserId, permsReady, canBookmark]);
+
   if (!currentUserId || !permsReady || !canBookmark) return null;
 
   async function handleBookmark() {
@@ -38,6 +53,11 @@ export default function BookmarkButton({ articleId, currentUserId }: BookmarkBut
         body: JSON.stringify({ article_id: articleId }),
       });
       const data = await res.json().catch(() => ({}));
+      if (data.preview) {
+        setBusy(false);
+        setError('Preview mode — bookmark not saved.');
+        return;
+      }
       if (!res.ok) throw new Error(friendlyError(data?.error, 'Could not bookmark. Try again.'));
       setBookmarked(true);
     } catch (err) {
