@@ -255,7 +255,7 @@ export default function WordsAdmin() {
                   border: `1px solid ${ADMIN_C.divider}`,
                   background: ADMIN_C.card,
                   fontSize: F.sm,
-                  color: ADMIN_C.white,
+                  color: ADMIN_C.ink,
                   fontFamily: 'ui-monospace, monospace',
                 }}
               >

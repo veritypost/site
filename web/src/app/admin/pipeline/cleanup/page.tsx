@@ -224,7 +224,7 @@ function PipelineCleanupInner() {
   const tdStyle: React.CSSProperties = {
     padding: `${S[3]}px ${S[3]}px`,
     fontSize: F.sm,
-    color: ADMIN_C.white,
+    color: ADMIN_C.ink,
     borderBottom: `1px solid ${ADMIN_C.divider}`,
     verticalAlign: 'middle',
   };
@@ -419,7 +419,7 @@ function Counter({ label, value }: { label: string; value: number }) {
       <div style={{ fontSize: F.xs, color: ADMIN_C.dim, textTransform: 'uppercase', letterSpacing: 0.5 }}>
         {label}
       </div>
-      <div style={{ fontSize: F.lg, fontWeight: 600, color: ADMIN_C.white }}>
+      <div style={{ fontSize: F.lg, fontWeight: 600, color: ADMIN_C.ink }}>
         {value}
       </div>
     </div>

@@ -344,7 +344,7 @@ function PipelineRunsInner() {
   const tdStyle: React.CSSProperties = {
     padding: `${S[3]}px ${S[3]}px`,
     fontSize: F.sm,
-    color: ADMIN_C.white,
+    color: ADMIN_C.ink,
     borderBottom: `1px solid ${ADMIN_C.divider}`,
     verticalAlign: 'middle',
   };

@@ -93,7 +93,7 @@ export function ToastProvider({ children, position = 'bottom' }) {
               onClick={() => dismiss(t.id)}
               style={{
                 background: ADMIN_C.bg,
-                color: ADMIN_C.white,
+                color: ADMIN_C.ink,
                 borderRadius: 8,
                 border: `1px solid ${ADMIN_C.divider}`,
                 borderLeft: `3px solid ${palette.accent}`,

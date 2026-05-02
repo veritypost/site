@@ -99,7 +99,7 @@ const Switch = forwardRef(function Switch(
       {toggle}
       <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {label && (
-          <span style={{ fontSize: F.base, color: ADMIN_C.white, lineHeight: 1.4 }}>{label}</span>
+          <span style={{ fontSize: F.base, color: ADMIN_C.ink, lineHeight: 1.4 }}>{label}</span>
         )}
         {hint && (
           <span style={{ fontSize: F.xs, color: ADMIN_C.dim, lineHeight: 1.4 }}>{hint}</span>

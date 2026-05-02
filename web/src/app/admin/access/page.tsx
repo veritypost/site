@@ -283,7 +283,7 @@ export default function AccessAdmin() {
           style={{
             fontFamily: 'ui-monospace, monospace',
             fontWeight: 600,
-            color: c.is_active ? ADMIN_C.white : ADMIN_C.muted,
+            color: c.is_active ? ADMIN_C.ink : ADMIN_C.muted,
           }}
         >
           {c.code}
@@ -331,7 +331,7 @@ export default function AccessAdmin() {
         if (!c.expires_at) return <span style={{ color: ADMIN_C.muted }}>never</span>;
         const expired = new Date(c.expires_at) < new Date();
         return (
-          <span style={{ color: expired ? ADMIN_C.danger : ADMIN_C.white, fontSize: F.sm }}>
+          <span style={{ color: expired ? ADMIN_C.danger : ADMIN_C.ink, fontSize: F.sm }}>
             {expired ? 'expired ' : ''}{new Date(c.expires_at).toLocaleDateString()}
           </span>
         );
@@ -366,7 +366,7 @@ export default function AccessAdmin() {
       sortable: false,
       render: (r: AccessRequest) => (
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontWeight: 600, color: ADMIN_C.white }}>{r.name || r.email}</div>
+          <div style={{ fontWeight: 600, color: ADMIN_C.ink }}>{r.name || r.email}</div>
           {r.name && <div style={{ fontSize: F.xs, color: ADMIN_C.dim }}>{r.email}</div>}
         </div>
       ),

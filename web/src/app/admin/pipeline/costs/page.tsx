@@ -401,7 +401,7 @@ function PipelineCostsPageInner() {
                 width: '100%',
                 borderCollapse: 'collapse',
                 fontSize: F.base,
-                color: ADMIN_C.white,
+                color: ADMIN_C.ink,
               }}
             >
               <thead>
@@ -504,7 +504,7 @@ function PipelineCostsPageInner() {
                 width: '100%',
                 borderCollapse: 'collapse',
                 fontSize: F.base,
-                color: ADMIN_C.white,
+                color: ADMIN_C.ink,
               }}
             >
               <thead>

@@ -88,7 +88,7 @@ export default function Drawer({
           width: '100%',
           maxWidth: WIDTHS[width] || WIDTHS.md,
           background: ADMIN_C.bg,
-          color: ADMIN_C.white,
+          color: ADMIN_C.ink,
           borderLeft: `1px solid ${ADMIN_C.divider}`,
           boxShadow: '-12px 0 40px rgba(0,0,0,0.14)',
           fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -117,7 +117,7 @@ export default function Drawer({
                   margin: 0,
                   fontSize: F.lg,
                   fontWeight: 600,
-                  color: ADMIN_C.white,
+                  color: ADMIN_C.ink,
                   letterSpacing: '-0.01em',
                 }}
               >

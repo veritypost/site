@@ -494,7 +494,7 @@ function RunDetailInner() {
           }}
         >
           <div style={{ color: ADMIN_C.muted }}>Run id</div>
-          <div style={{ fontFamily: MONO_STACK, color: ADMIN_C.white, wordBreak: 'break-all' }}>
+          <div style={{ fontFamily: MONO_STACK, color: ADMIN_C.ink, wordBreak: 'break-all' }}>
             {run.id}
           </div>
 
@@ -562,7 +562,7 @@ function RunDetailInner() {
             <div
               style={{
                 fontWeight: 600,
-                color: ADMIN_C.white,
+                color: ADMIN_C.ink,
                 marginBottom: S[1],
               }}
             >
@@ -765,7 +765,7 @@ function RunDetailInner() {
             background: ADMIN_C.card,
             fontFamily: MONO_STACK,
             fontSize: F.sm,
-            color: run.prompt_fingerprint ? ADMIN_C.white : ADMIN_C.muted,
+            color: run.prompt_fingerprint ? ADMIN_C.ink : ADMIN_C.muted,
             wordBreak: 'break-all',
           }}
         >
@@ -809,7 +809,7 @@ function StatTile({
         style={{
           fontSize: F.xl,
           fontWeight: 600,
-          color: emphasis === 'danger' ? ADMIN_C.danger : ADMIN_C.white,
+          color: emphasis === 'danger' ? ADMIN_C.danger : ADMIN_C.ink,
           fontFamily: MONO_STACK,
           lineHeight: 1.2,
         }}

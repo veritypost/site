@@ -262,7 +262,7 @@ function CommentsAdminInner() {
                 }}
               >
                 <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-                  <div style={{ fontSize: F.base, fontWeight: 500, color: ADMIN_C.white, lineHeight: 1.4 }}>{item.l}</div>
+                  <div style={{ fontSize: F.base, fontWeight: 500, color: ADMIN_C.ink, lineHeight: 1.4 }}>{item.l}</div>
                   <div style={{ fontSize: F.xs, color: ADMIN_C.dim, marginTop: 2, lineHeight: 1.4 }}>{item.desc}</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: S[2], flexWrap: 'wrap', justifyContent: 'flex-end' }}>

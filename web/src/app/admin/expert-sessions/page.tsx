@@ -165,7 +165,7 @@ function ExpertSessionsInner() {
       truncate: true,
       render: (row: KidExpertSession) => (
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontWeight: 600, color: ADMIN_C.white, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <div style={{ fontWeight: 600, color: ADMIN_C.ink, overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {row.title || 'Untitled'}
           </div>
           <div style={{ fontSize: F.xs, color: ADMIN_C.dim }}>

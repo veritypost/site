@@ -42,7 +42,7 @@ const TextInput = forwardRef(function TextInput(
     padding: `${padY}px ${padX}px`,
     fontSize,
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-    color: ADMIN_C.white,
+    color: ADMIN_C.ink,
     background: ADMIN_C.bg,
     border: leftAddon || rightAddon ? 'none' : `1px solid ${borderColor}`,
     borderRadius: 6,

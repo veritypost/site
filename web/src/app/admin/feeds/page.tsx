@@ -284,7 +284,7 @@ function FeedsAdminInner() {
               alignItems: 'center',
               gap: S[2],
               fontWeight: 600,
-              color: row.active ? ADMIN_C.white : ADMIN_C.muted,
+              color: row.active ? ADMIN_C.ink : ADMIN_C.muted,
             }}
           >
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -571,7 +571,7 @@ function KV({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: S[3], padding: `${S[1]}px 0`, borderBottom: `1px solid ${ADMIN_C.divider}` }}>
       <span style={{ fontSize: F.sm, color: ADMIN_C.dim }}>{label}</span>
-      <span style={{ fontSize: F.sm, color: ADMIN_C.white, textAlign: 'right' }}>{value}</span>
+      <span style={{ fontSize: F.sm, color: ADMIN_C.ink, textAlign: 'right' }}>{value}</span>
     </div>
   );
 }

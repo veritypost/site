@@ -40,7 +40,7 @@ export const ADMIN_C = {
   bg: '#ffffff',
   card: '#f7f7f7',
   border: '#222222',
-  white: '#111111',
+  ink: '#111111',
   dim: '#666666',
   soft: '#444444',
   muted: '#999999',

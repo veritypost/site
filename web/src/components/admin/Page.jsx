@@ -25,7 +25,7 @@ export default function Page({ children, maxWidth = 1280, style }) {
       style={{
         minHeight: '100vh',
         background: ADMIN_C.bg,
-        color: ADMIN_C.white,
+        color: ADMIN_C.ink,
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         fontSize: F.base,
         lineHeight: 1.5,
@@ -140,7 +140,7 @@ export function PageHeader({
               fontSize: F.xxl,
               fontWeight: 600,
               letterSpacing: '-0.02em',
-              color: ADMIN_C.white,
+              color: ADMIN_C.ink,
               lineHeight: 1.15,
             }}
           >

@@ -62,7 +62,7 @@ const Textarea = forwardRef(function Textarea(
         padding: '8px 10px',
         fontSize: F.base,
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        color: ADMIN_C.white,
+        color: ADMIN_C.ink,
         background: ADMIN_C.bg,
         border: `1px solid ${borderColor}`,
         borderRadius: 6,

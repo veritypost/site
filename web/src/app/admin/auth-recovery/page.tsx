@@ -167,13 +167,13 @@ export default function AuthRecoveryAdmin() {
         <div
           style={{
             background: ADMIN_C.card,
-            border: `1px solid ${ADMIN_C.border}`,
+            border: `1px solid ${ADMIN_C.divider}`,
             borderRadius: 8,
             padding: S[6],
           }}
         >
           <div style={{ marginBottom: S[4] }}>
-            <div style={{ fontSize: F.lg, fontWeight: 600, color: ADMIN_C.white }}>
+            <div style={{ fontSize: F.lg, fontWeight: 600, color: ADMIN_C.ink }}>
               {user.display_name || user.username || user.email || user.id}
             </div>
             <div style={{ fontSize: F.sm, color: ADMIN_C.dim }}>
@@ -285,7 +285,7 @@ function StatePill({
     <div
       style={{
         background: ADMIN_C.bg,
-        border: `1px solid ${ADMIN_C.border}`,
+        border: `1px solid ${ADMIN_C.divider}`,
         borderRadius: 6,
         padding: S[3],
       }}

@@ -70,7 +70,7 @@ export default function StatCard({ label, value, delta, trend, sparkline, footno
           style={{
             fontSize: F.xxl,
             fontWeight: 600,
-            color: ADMIN_C.white,
+            color: ADMIN_C.ink,
             letterSpacing: '-0.02em',
             lineHeight: 1.1,
             minWidth: 0,

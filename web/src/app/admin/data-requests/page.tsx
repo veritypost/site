@@ -195,7 +195,7 @@ export default function DataRequestsAdmin() {
       sortable: false,
       render: (r: DataRequestRow) => (
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontWeight: 600, color: ADMIN_C.white, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div style={{ fontWeight: 600, color: ADMIN_C.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {r.users?.username || r.users?.email || r.user_id}
           </div>
           <div style={{ fontSize: F.xs, color: ADMIN_C.dim, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

@@ -246,7 +246,7 @@ export default function DataTable({
                             style={{
                               padding: `${cellPadY}px ${cellPadX}px`,
                               borderBottom: `1px solid ${ADMIN_C.divider}`,
-                              color: ADMIN_C.white,
+                              color: ADMIN_C.ink,
                               textAlign: col.align || 'left',
                               verticalAlign: 'middle',
                               maxWidth: col.truncate ? 0 : undefined,
@@ -293,7 +293,7 @@ export default function DataTable({
                 padding: '2px 6px',
                 fontSize: F.sm,
                 background: ADMIN_C.bg,
-                color: ADMIN_C.white,
+                color: ADMIN_C.ink,
                 border: `1px solid ${ADMIN_C.divider}`,
                 borderRadius: 4,
                 cursor: 'pointer',

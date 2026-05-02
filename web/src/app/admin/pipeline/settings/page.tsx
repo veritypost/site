@@ -51,6 +51,21 @@ const THRESHOLD_KEYS = [
 
 const DEFAULT_CATEGORY_KEY = 'pipeline.default_category_id';
 
+const SETTING_LABELS: Record<string, string> = {
+  'ai.ingest_enabled': 'RSS ingest',
+  'ai.adult_generation_enabled': 'Adult article generation',
+  'ai.kid_generation_enabled': 'Kids article generation',
+  'pipeline.daily_cost_usd_cap': 'Daily cost cap (USD)',
+  'pipeline.per_run_cost_usd_cap': 'Per-run cost cap (USD)',
+  'pipeline.daily_cost_soft_alert_pct': 'Daily cost soft-alert threshold (%)',
+  'pipeline.cluster_overlap_pct': 'Cluster overlap threshold (%)',
+  'pipeline.story_match_overlap_pct': 'Story-match overlap threshold (%)',
+  'pipeline.plagiarism_ngram_size': 'Plagiarism n-gram size',
+  'pipeline.plagiarism_flag_pct': 'Plagiarism flag threshold (%)',
+  'pipeline.plagiarism_rewrite_pct': 'Plagiarism rewrite threshold (%)',
+  'pipeline.default_category_id': 'Default category',
+};
+
 // Keys whose numeric values must be within 0-100 (percentages).
 const PERCENT_KEYS = new Set<string>([
   'pipeline.daily_cost_soft_alert_pct',
@@ -241,7 +256,7 @@ export default function PipelineSettingsPage() {
         });
         return;
       }
-      toast.push({ message: `Saved ${key}`, variant: 'success' });
+      toast.push({ message: `Saved ${SETTING_LABELS[key] ?? key}`, variant: 'success' });
       setSettings((prev) => ({
         ...prev,
         [key]: { ...prev[key], value: payload },
@@ -436,7 +451,7 @@ function SettingsGroup({
                   style={{
                     fontSize: F.base,
                     fontWeight: 600,
-                    color: ADMIN_C.white,
+                    color: ADMIN_C.ink,
                     fontFamily: 'ui-monospace, monospace',
                     wordBreak: 'break-all',
                   }}
@@ -507,8 +522,8 @@ function FieldFor({ setting, value, onChange, categories }: FieldProps) {
         value={value === 'true' ? 'true' : 'false'}
         onChange={(e) => onChange(e.target.value)}
         options={[
-          { value: 'true', label: 'true' },
-          { value: 'false', label: 'false' },
+          { value: 'true', label: 'Yes' },
+          { value: 'false', label: 'No' },
         ]}
       />
     );
@@ -533,7 +548,7 @@ function FieldFor({ setting, value, onChange, categories }: FieldProps) {
         border: `1px solid ${ADMIN_C.divider}`,
         borderRadius: 6,
         background: ADMIN_C.bg,
-        color: ADMIN_C.white,
+        color: ADMIN_C.ink,
         fontSize: F.sm,
         fontFamily: 'ui-monospace, monospace',
       }}

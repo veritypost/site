@@ -1198,7 +1198,7 @@ function GrantsMatrix<T extends { id: string }>(props: {
                     fontFamily: 'ui-monospace, monospace',
                     textAlign: 'center',
                     fontStyle: c.is_active ? 'normal' : 'italic',
-                    color: c.is_active ? ADMIN_C.white : ADMIN_C.muted,
+                    color: c.is_active ? ADMIN_C.ink : ADMIN_C.muted,
                     whiteSpace: 'nowrap',
                   }}
                   title={c.display_name + (c.is_active ? '' : ' (inactive)')}
@@ -1338,7 +1338,7 @@ function UserGrantsTab(props: {
                   background: active ? ADMIN_C.card : ADMIN_C.bg,
                   cursor: 'pointer',
                   fontFamily: 'inherit',
-                  color: ADMIN_C.white,
+                  color: ADMIN_C.ink,
                 }}
               >
                 <div style={{ fontSize: F.base, fontWeight: 600 }}>{u.username || u.email || u.id}</div>

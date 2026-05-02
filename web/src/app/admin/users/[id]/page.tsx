@@ -280,7 +280,7 @@ export default function UserDossierPage() {
             {initial}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: F.lg, fontWeight: 700, color: ADMIN_C.white }}>{user.username || '—'}</div>
+            <div style={{ fontSize: F.lg, fontWeight: 700, color: ADMIN_C.ink }}>{user.username || '—'}</div>
             <div style={{ fontSize: F.sm, color: ADMIN_C.dim, marginTop: 2 }}>{user.email}</div>
             <div style={{ display: 'flex', gap: S[1], flexWrap: 'wrap', marginTop: S[2] }}>
               <Badge size="xs" style={{ color: tierColor }}>{tier?.display_name || 'Newcomer'}</Badge>
@@ -342,7 +342,7 @@ export default function UserDossierPage() {
                 }}
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, color: ADMIN_C.white }}>{kid.display_name}</div>
+                  <div style={{ fontWeight: 600, color: ADMIN_C.ink }}>{kid.display_name}</div>
                   <div style={{ fontSize: F.xs, color: ADMIN_C.dim, marginTop: 2 }}>
                     {/* Phase 3: kid_profiles.age_range was retired; reading_band
                         is the system-derived band ('kids' | 'tweens' | 'graduated'). */}
@@ -389,7 +389,7 @@ export default function UserDossierPage() {
                 }}
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, color: ADMIN_C.white, fontSize: F.sm }}>
+                  <div style={{ fontWeight: 600, color: ADMIN_C.ink, fontSize: F.sm }}>
                     {t.device_name || 'Unknown device'}
                   </div>
                   <div style={{ fontSize: F.xs, color: ADMIN_C.dim }}>
@@ -428,7 +428,7 @@ export default function UserDossierPage() {
                   <Badge variant={w.warning_level >= 4 ? 'danger' : w.warning_level >= 3 ? 'warn' : 'neutral'} size="xs">
                     Level {w.warning_level}
                   </Badge>
-                  <span style={{ fontSize: F.sm, fontWeight: 600, color: ADMIN_C.white }}>{w.action_taken}</span>
+                  <span style={{ fontSize: F.sm, fontWeight: 600, color: ADMIN_C.ink }}>{w.action_taken}</span>
                   {w.appeal_status && (
                     <Badge
                       variant={w.appeal_status === 'approved' ? 'success' : w.appeal_status === 'denied' ? 'danger' : 'info'}

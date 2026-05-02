@@ -70,12 +70,12 @@ export function TrialOverrideCard({ userId, compedUntil, trialExtensionUntil, on
             color: ADMIN_C.dim,
           }}
         >
-          <span style={{ color: ADMIN_C.white, fontWeight: 600 }}>comped_until </span>
+          <span style={{ color: ADMIN_C.ink, fontWeight: 600 }}>comped_until </span>
           {fmt(compedUntil)}
           {trialExtensionUntil && (
             <>
               <span style={{ margin: `0 ${S[2]}px` }}>·</span>
-              <span style={{ color: ADMIN_C.white, fontWeight: 600 }}>override </span>
+              <span style={{ color: ADMIN_C.ink, fontWeight: 600 }}>override </span>
               {fmt(trialExtensionUntil)}
             </>
           )}
@@ -152,7 +152,7 @@ export function TrialOverrideCard({ userId, compedUntil, trialExtensionUntil, on
               background: ADMIN_C.card,
               border: `1px solid ${ADMIN_C.divider}`,
               borderRadius: 6,
-              color: ADMIN_C.white,
+              color: ADMIN_C.ink,
               padding: `${S[1]}px ${S[2]}px`,
               fontSize: F.sm,
             }}

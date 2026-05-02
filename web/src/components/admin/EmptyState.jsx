@@ -51,7 +51,7 @@ export default function EmptyState({ icon, title, description, cta, size = 'md',
           {icon}
         </div>
       )}
-      <div style={{ fontSize: F.md, fontWeight: 600, color: ADMIN_C.white }}>{title}</div>
+      <div style={{ fontSize: F.md, fontWeight: 600, color: ADMIN_C.ink }}>{title}</div>
       {description && (
         <div style={{ fontSize: F.sm, color: ADMIN_C.dim, maxWidth: 360, lineHeight: 1.5 }}>
           {description}

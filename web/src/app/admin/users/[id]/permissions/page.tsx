@@ -463,7 +463,7 @@ export default function UserPermissionsPage() {
         const display = r.permission_display_name || r.display_name || '';
         return (
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontWeight: 600, color: ADMIN_C.white, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ fontWeight: 600, color: ADMIN_C.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {display || key}
             </div>
             <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: F.xs, color: ADMIN_C.dim, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -779,7 +779,7 @@ export default function UserPermissionsPage() {
                   padding: `${S[2]}px ${S[3]}px`,
                   textDecoration: 'none',
                   borderBottom: `1px solid ${ADMIN_C.divider}`,
-                  color: ADMIN_C.white,
+                  color: ADMIN_C.ink,
                 }}
               >
                 <div style={{ fontSize: F.base, fontWeight: 600 }}>{u.username || u.email || u.id}</div>

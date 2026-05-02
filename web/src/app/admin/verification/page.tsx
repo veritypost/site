@@ -273,7 +273,7 @@ export default function VerificationAdmin() {
       sortable: false,
       render: (a: Application) => (
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontWeight: 600, color: ADMIN_C.white, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div style={{ fontWeight: 600, color: ADMIN_C.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {a.users?.username || a.full_name || '—'}
           </div>
           <div style={{ fontSize: F.xs, color: ADMIN_C.dim }}>

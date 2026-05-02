@@ -96,7 +96,7 @@ export default function Modal({
           width: '100%',
           maxWidth: WIDTHS[width] || WIDTHS.md,
           background: ADMIN_C.bg,
-          color: ADMIN_C.white,
+          color: ADMIN_C.ink,
           border: `1px solid ${ADMIN_C.divider}`,
           borderRadius: 10,
           boxShadow: '0 20px 60px rgba(0,0,0,0.18)',
@@ -125,7 +125,7 @@ export default function Modal({
                     margin: 0,
                     fontSize: F.lg,
                     fontWeight: 600,
-                    color: ADMIN_C.white,
+                    color: ADMIN_C.ink,
                     letterSpacing: '-0.01em',
                   }}
                 >

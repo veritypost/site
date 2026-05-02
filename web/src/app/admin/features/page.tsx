@@ -446,7 +446,7 @@ export default function FeatureFlagsAdmin() {
         if (!f.expires_at) return <span style={{ color: ADMIN_C.muted }}>—</span>;
         const expired = new Date(f.expires_at) < new Date();
         return (
-          <span style={{ color: expired ? ADMIN_C.danger : ADMIN_C.white, fontSize: F.sm }}>
+          <span style={{ color: expired ? ADMIN_C.danger : ADMIN_C.ink, fontSize: F.sm }}>
             {new Date(f.expires_at).toLocaleDateString()}
           </span>
         );
@@ -611,12 +611,12 @@ Known cohorts: ${cohorts.map((c) => c.name).join(', ') || '(none loaded)'}`;
           </Field>
           <div style={{ display: 'flex', flexDirection: 'column', gap: S[2], paddingTop: 20 }}>
             <Checkbox
-              label="is_enabled"
+              label="Enabled"
               checked={!!form.is_enabled}
               onChange={(e) => updateField('is_enabled', (e.target as HTMLInputElement).checked)}
             />
             <Checkbox
-              label="is_killswitch"
+              label="Kill switch"
               checked={!!form.is_killswitch}
               onChange={(e) => updateField('is_killswitch', (e.target as HTMLInputElement).checked)}
             />

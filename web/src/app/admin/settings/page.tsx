@@ -196,7 +196,7 @@ export default function SettingsAdminPage() {
                         style={{
                           fontSize: F.base,
                           fontWeight: 600,
-                          color: ADMIN_C.white,
+                          color: ADMIN_C.ink,
                           fontFamily: 'ui-monospace, monospace',
                           wordBreak: 'break-all',
                         }}
@@ -300,7 +300,7 @@ export default function SettingsAdminPage() {
               <div style={{ fontSize: F.xs, color: ADMIN_C.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: S[1] }}>
                 Key
               </div>
-              <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: F.sm, color: ADMIN_C.white }}>
+              <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: F.sm, color: ADMIN_C.ink }}>
                 {confirmPending.key}
               </div>
               {confirmPending.description && (
@@ -339,7 +339,7 @@ export default function SettingsAdminPage() {
                   style={{
                     fontFamily: 'ui-monospace, monospace',
                     fontSize: F.sm,
-                    color: ADMIN_C.white,
+                    color: ADMIN_C.ink,
                     padding: `${S[2]}px ${S[2]}px`,
                     background: ADMIN_C.card,
                     borderRadius: 6,

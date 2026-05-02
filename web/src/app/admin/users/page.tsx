@@ -480,7 +480,7 @@ export default function UsersAdmin() {
               <div
                 style={{
                   fontWeight: 600,
-                  color: u.is_banned ? ADMIN_C.danger : ADMIN_C.white,
+                  color: u.is_banned ? ADMIN_C.danger : ADMIN_C.ink,
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',

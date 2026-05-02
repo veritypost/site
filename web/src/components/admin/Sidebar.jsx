@@ -123,7 +123,7 @@ function SidebarItem({ item, pathname, depth }) {
           marginLeft: depth * 12,
           borderRadius: 6,
           textDecoration: 'none',
-          color: active ? ADMIN_C.white : ADMIN_C.soft,
+          color: active ? ADMIN_C.ink : ADMIN_C.soft,
           background: active ? ADMIN_C.hover : 'transparent',
           fontWeight: active ? 600 : 500,
           fontSize: F.base,

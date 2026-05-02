@@ -531,7 +531,7 @@ function ModerationConsoleInner() {
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: S[2] }}>
                   <div>
-                    <div style={{ fontSize: F.base, fontWeight: 700, color: ADMIN_C.white }}>
+                    <div style={{ fontSize: F.base, fontWeight: 700, color: ADMIN_C.ink }}>
                       @{a.users?.username} — {PENALTY_LABELS[a.warning_level] || a.action_taken}
                     </div>
                     <div style={{ fontSize: F.xs, color: ADMIN_C.dim }}>{new Date(a.created_at).toLocaleString()}</div>
@@ -545,7 +545,7 @@ function ModerationConsoleInner() {
                     </Button>
                   </div>
                 </div>
-                <div style={{ fontSize: F.sm, color: ADMIN_C.white }}>
+                <div style={{ fontSize: F.sm, color: ADMIN_C.ink }}>
                   <strong>Reason given:</strong> {a.reason}
                 </div>
                 <div style={{ fontSize: F.sm, color: ADMIN_C.soft }}>

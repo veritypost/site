@@ -94,7 +94,7 @@ export default function ConfirmDialog({
               margin: 0,
               fontSize: F.lg,
               fontWeight: 600,
-              color: ADMIN_C.white,
+              color: ADMIN_C.ink,
               letterSpacing: '-0.01em',
             }}
           >

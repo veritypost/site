@@ -53,7 +53,7 @@ const Select = forwardRef(function Select(
         padding: `${padY}px ${padX + 18}px ${padY}px ${padX}px`,
         fontSize,
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        color: ADMIN_C.white,
+        color: ADMIN_C.ink,
         background: `${ADMIN_C.bg} url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='%23666666' d='M0 0l5 6 5-6z'/></svg>") no-repeat right 10px center`,
         border: `1px solid ${borderColor}`,
         borderRadius: 6,

@@ -427,7 +427,7 @@ function ReportsAdminInner() {
                       border: `1px solid ${isActive ? ADMIN_C.accent : ADMIN_C.divider}`,
                       background: isActive ? ADMIN_C.hover : ADMIN_C.bg,
                       cursor: 'pointer',
-                      color: ADMIN_C.white,
+                      color: ADMIN_C.ink,
                       fontFamily: 'inherit',
                     }}
                   >
@@ -460,7 +460,7 @@ function ReportsAdminInner() {
                     border: `1px solid ${isActive ? ADMIN_C.accent : ADMIN_C.divider}`,
                     background: isActive ? ADMIN_C.hover : ADMIN_C.bg,
                     cursor: 'pointer',
-                    color: ADMIN_C.white,
+                    color: ADMIN_C.ink,
                     fontFamily: 'inherit',
                   }}
                 >
@@ -488,7 +488,7 @@ function ReportsAdminInner() {
             />
           ) : selectedAi ? (
             <div style={{ border: `1px solid ${ADMIN_C.divider}`, borderRadius: 10, background: ADMIN_C.bg, padding: S[4], display: 'flex', flexDirection: 'column', gap: S[3] }}>
-              <div style={{ fontSize: F.lg, fontWeight: 700, color: ADMIN_C.white }}>
+              <div style={{ fontSize: F.lg, fontWeight: 700, color: ADMIN_C.ink }}>
                 Auto-flagged comment
               </div>
               {selectedAi.reason && (
@@ -499,7 +499,7 @@ function ReportsAdminInner() {
                   <div style={{ fontSize: F.xs, color: ADMIN_C.dim, marginBottom: S[1] }}>
                     @{targetComment.users?.username || 'user'} · status: {targetComment.status}
                   </div>
-                  <div style={{ fontSize: F.base, color: ADMIN_C.white, lineHeight: 1.5 }}>{targetComment.body}</div>
+                  <div style={{ fontSize: F.base, color: ADMIN_C.ink, lineHeight: 1.5 }}>{targetComment.body}</div>
                   {moderationHistory.length > 0 && (
                     <div style={{ marginTop: S[2], paddingTop: S[2], borderTop: `1px solid ${ADMIN_C.divider}` }}>
                       <div style={{ fontSize: F.xs, color: ADMIN_C.dim }}>
@@ -535,7 +535,7 @@ function ReportsAdminInner() {
             <div style={{ border: `1px solid ${ADMIN_C.divider}`, borderRadius: 10, background: ADMIN_C.bg, padding: S[4], display: 'flex', flexDirection: 'column', gap: S[3] }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: S[2], flexWrap: 'wrap' }}>
                 <div>
-                  <div style={{ fontSize: F.lg, fontWeight: 700, color: ADMIN_C.white }}>{selected.reason}</div>
+                  <div style={{ fontSize: F.lg, fontWeight: 700, color: ADMIN_C.ink }}>{selected.reason}</div>
                   {selected.description && (
                     <div style={{ fontSize: F.base, color: ADMIN_C.soft, marginTop: S[1], lineHeight: 1.5 }}>
                       {selected.description}
@@ -557,7 +557,7 @@ function ReportsAdminInner() {
                   <div style={{ fontSize: F.xs, color: ADMIN_C.dim, marginBottom: S[1] }}>
                     @{targetComment.users?.username || 'user'} · comment · status: {targetComment.status}
                   </div>
-                  <div style={{ fontSize: F.base, color: ADMIN_C.white, lineHeight: 1.5 }}>{targetComment.body}</div>
+                  <div style={{ fontSize: F.base, color: ADMIN_C.ink, lineHeight: 1.5 }}>{targetComment.body}</div>
                   {moderationHistory.length > 0 && (
                     <div style={{ marginTop: S[2], paddingTop: S[2], borderTop: `1px solid ${ADMIN_C.divider}` }}>
                       <div style={{ fontSize: F.xs, color: ADMIN_C.dim }}>

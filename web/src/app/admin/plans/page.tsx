@@ -438,7 +438,7 @@ export default function PlansAdmin() {
                   cursor: 'pointer',
                   textAlign: 'left',
                   fontFamily: 'inherit',
-                  color: ADMIN_C.white,
+                  color: ADMIN_C.ink,
                   minWidth: 0,
                 }}
               >
