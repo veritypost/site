@@ -75,7 +75,6 @@ struct LoginView: View {
                     .environmentObject(auth)
             }
         }
-        .preferredColorScheme(.light)
         .onChange(of: auth.authError) { _, newValue in
             if let msg = newValue {
                 UIAccessibility.post(notification: .announcement, argument: msg)

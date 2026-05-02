@@ -192,7 +192,6 @@ struct ContentView: View {
             // resolve against the current viewer's perspective.
             Task { await BlockService.shared.refresh(currentUserId: newId) }
         }
-        .preferredColorScheme(.light)
     }
 
     // 600ms branded splash sequence. Skips re-running if the splash is

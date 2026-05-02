@@ -28,7 +28,6 @@ enum VP {
     static let danger = Color(hex: "b91c1c")
     static let wrong = Color(hex: "b91c1c")
     static let breaking = Color(hex: "ef4444")
-    static let purple = Color(hex: "111111")
     static let tlLine = Color(hex: "e5e5e5")
     static let tlDot = Color(hex: "d4d4d4")
 
@@ -375,7 +374,7 @@ struct PillButton: View {
                 .font(.system(.footnote, design: .default, weight: .semibold))
                 .padding(.horizontal, 16)
                 .padding(.vertical, 6)
-                .background(isActive ? VP.accent : Color.white)
+                .background(isActive ? VP.brand : Color.white)
                 .foregroundColor(isActive ? .white : VP.dim)
                 .overlay(
                     RoundedRectangle(cornerRadius: 99)

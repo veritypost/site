@@ -99,7 +99,6 @@ struct SignupView: View {
             }
             .background(VP.bg.ignoresSafeArea())
         }
-        .preferredColorScheme(.light)
         .onChange(of: auth.authError) { _, newValue in
             if let msg = newValue {
                 UIAccessibility.post(notification: .announcement, argument: msg)

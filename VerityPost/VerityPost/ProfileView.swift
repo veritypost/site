@@ -1334,7 +1334,7 @@ struct ProfileView: View {
             let current = tierFor(score: score)
             let next = nextTier(after: current)
             // Owner rule: no color-per-tier — neutral palette token only.
-            let tierColor = VP.muted
+            let tierColor = VP.inkMuted
             let tierLabel = current?.displayName ?? "Newcomer"
             let minScore = current?.minScore ?? 0
             let range = (next?.minScore ?? 0) - minScore

@@ -297,7 +297,7 @@ struct LeaderboardView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 10)
-                .background(VP.card)
+                .background(.ultraThinMaterial)
                 .overlay(Rectangle().fill(VP.border).frame(height: 1), alignment: .top)
             }
         }
