@@ -665,6 +665,8 @@ struct SettingsView: View {
     @State private var mfaEnabled: Bool = false
     @State private var dmReceiptsEnabled: Bool = true
     @State private var dmReceiptsLoading: Bool = true
+    // RID-031 — shown when saveDmReceiptsPref fails and reverts the toggle.
+    @State private var dmReceiptsErrorAlert: Bool = false
 
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
@@ -699,6 +701,11 @@ struct SettingsView: View {
         }
         .sensoryFeedback(.selection, trigger: tapTick)
         .sheet(isPresented: $showFeedback) { FeedbackSheet().environmentObject(auth) }
+        .alert("Couldn\u{2019}t save", isPresented: $dmReceiptsErrorAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("DM read receipts preference couldn\u{2019}t be saved. Your setting has been reverted. Try again.")
+        }
         .task(id: perms.changeToken) { await loadPerms() }
         .task { await loadPreviews() }
         .onChange(of: searchText) { _, new in
@@ -1241,8 +1248,12 @@ struct SettingsView: View {
             ).execute()
         } catch {
             Log.d("Hub saveDmReceiptsPref error:", error)
-            // Revert on failure so UI stays coherent with server.
-            await MainActor.run { self.dmReceiptsEnabled = !newValue }
+            // Revert on failure so UI stays coherent with server,
+            // and show an alert so the user knows why it reverted.
+            await MainActor.run {
+                self.dmReceiptsEnabled = !newValue
+                self.dmReceiptsErrorAlert = true
+            }
         }
     }
 
@@ -1671,10 +1682,17 @@ struct LoginActivityView: View {
 
     @State private var rows: [AuditRow] = []
     @State private var loaded = false
+    @State private var loadError = false
 
     var body: some View {
         SettingsPageShell(title: "Sign-in activity") {
-            if !loaded {
+            if loadError {
+                SettingsErrorBanner(text: "Couldn\u{2019}t load sign-in activity. Try again.", actionLabel: "Retry") {
+                    loadError = false
+                    Task { await load() }
+                }
+                .padding(.top, 16)
+            } else if !loaded {
                 ProgressView().padding(.top, 40)
             } else if rows.isEmpty {
                 Text("No recent sign-in activity.")
@@ -1734,8 +1752,11 @@ struct LoginActivityView: View {
                 .rpc("get_own_login_activity", params: Params(p_limit: 50))
                 .execute().value
             rows = data
-        } catch { Log.d("Login activity load error:", error) }
-        loaded = true
+            loaded = true
+        } catch {
+            Log.d("Login activity load error:", error)
+            loadError = true
+        }
     }
 }
 
@@ -2812,12 +2833,12 @@ private struct ExpertProfileView: View {
             let (data, _) = try await URLSession.shared.data(for: req)
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let err = json["error"] as? String {
-                credentialsError = err
+                credentialsError = friendlyApiError(err, fallback: "Couldn\u{2019}t save credentials. Try again.")
             } else {
                 credentialsSaved = true
             }
         } catch {
-            credentialsError = "Could not save credentials."
+            credentialsError = "Couldn\u{2019}t save credentials. Try again."
         }
         isSavingCredentials = false
     }
@@ -2875,8 +2896,10 @@ struct DataPrivacyView: View {
     private let client = SupabaseManager.shared.client
 
     @State private var exportRequested = false
+    @State private var exportError: String? = nil
     @State private var showDeleteConfirm = false
     @State private var deleteSubmitted = false
+    @State private var deleteError: String? = nil
     // Task 62 — DM read receipts opt-out (migration 044).
     @State private var dmReceiptsEnabled = true
     @State private var dmReceiptsLoading = true
@@ -2911,6 +2934,9 @@ struct DataPrivacyView: View {
                 if exportRequested {
                     SettingsNote(text: "We\u{2019}ll email you a downloadable archive within 30 days, per GDPR.")
                 }
+                if let err = exportError {
+                    SettingsErrorBanner(text: err)
+                }
             }
 
             SettingsSectionHeader(title: "Delete account", tone: .danger)
@@ -2925,6 +2951,9 @@ struct DataPrivacyView: View {
             }
             if deleteSubmitted {
                 SettingsNote(text: "Request submitted. Your account will be deleted within 30 days; log back in to cancel.")
+            }
+            if let err = deleteError {
+                SettingsErrorBanner(text: err)
             }
 
             SettingsNote(text: "Data requests and deletions are processed via the data_requests queue. This complies with GDPR and CCPA obligations.")
@@ -2969,12 +2998,16 @@ struct DataPrivacyView: View {
     private func requestExport() async {
         guard let userId = auth.currentUser?.id else { return }
         struct Entry: Encodable { let user_id: String; let type: String }
+        exportError = nil
         do {
             try await client.from("data_requests")
                 .insert(Entry(user_id: userId, type: "export"))
                 .execute()
             exportRequested = true
-        } catch { Log.d("Data export request error:", error) }
+        } catch {
+            Log.d("Data export request error:", error)
+            exportError = "Couldn\u{2019}t queue export. Try again."
+        }
     }
 
     private func requestDeletion() async {
@@ -2985,14 +3018,19 @@ struct DataPrivacyView: View {
         req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = "{}".data(using: .utf8)
+        deleteError = nil
         do {
             let (_, resp) = try await URLSession.shared.data(for: req)
             if let http = resp as? HTTPURLResponse, (200...299).contains(http.statusCode) {
                 deleteSubmitted = true
             } else {
                 Log.d("account delete request non-2xx")
+                deleteError = "Couldn\u{2019}t submit deletion request. Try again."
             }
-        } catch { Log.d("Data deletion request error:", error) }
+        } catch {
+            Log.d("Data deletion request error:", error)
+            deleteError = "Couldn\u{2019}t submit deletion request. Try again."
+        }
     }
 }
 
@@ -3306,5 +3344,39 @@ struct BlockedAccountsView: View {
             if ok { rows.removeAll { $0.id == rowId } }
             busyId = nil
         }
+    }
+}
+
+// MARK: - Friendly API error mapper (RID-032)
+// Maps raw API error strings to user-facing copy. Keeps developer-shaped
+// strings (JSON schemas, internal codes) out of the UI. Matches the
+// implementation in StoryDetailView.swift — both files own the same logic
+// so neither pulls in the other as a dependency.
+private func friendlyApiError(_ raw: String?, fallback: String) -> String {
+    guard let raw = raw?.trimmingCharacters(in: .whitespaces), !raw.isEmpty else {
+        return fallback
+    }
+    switch raw {
+    case "comment_too_long", "payload too large":
+        return "Your comment is too long."
+    case "Unauthenticated":
+        return "Please sign in and try again."
+    case "Not allowed to post comments":
+        return "You\u{2019}re not able to post comments right now."
+    case "Not allowed to start quiz":
+        return "You don\u{2019}t have access to this quiz."
+    case "Forbidden":
+        return fallback
+    default:
+        // Developer-shaped strings that are never meant for users: JSON schema
+        // literals, internal field references, and similar internal prefixes.
+        if raw.contains("{") ||
+           raw.hasPrefix("article_id") ||
+           raw.hasPrefix("each answer") ||
+           raw.hasPrefix("Kid profile") ||
+           raw.hasPrefix("Expected ") {
+            return fallback
+        }
+        return raw
     }
 }

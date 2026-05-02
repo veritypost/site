@@ -632,6 +632,15 @@ struct KidQuizEngineView: View {
                 // if the disk-persisted write eventually replays on
                 // next launch, this session's celebration shouldn't lie.
                 writeFailures += 1
+                // RID-037: close the race between this observer and
+                // runResultGate's MainActor.run. Both await the same
+                // task value; if the observer wins the MainActor queue
+                // and runResultGate reads writeFailures before we
+                // increment it, drainHadFailures stays false and the
+                // kid lands on the success screen with unsaved progress.
+                // Setting it here guarantees the error path regardless
+                // of scheduling order.
+                drainHadFailures = true
             }
         }
     }
