@@ -845,6 +845,7 @@ export type Database = {
           targeting_countries: Json | null
           targeting_plans: Json | null
           targeting_platforms: Json | null
+          targeting_subcategories: Json | null
           total_budget_cents: number | null
           updated_at: string
           weight: number
@@ -881,6 +882,7 @@ export type Database = {
           targeting_countries?: Json | null
           targeting_plans?: Json | null
           targeting_platforms?: Json | null
+          targeting_subcategories?: Json | null
           total_budget_cents?: number | null
           updated_at?: string
           weight?: number
@@ -917,6 +919,7 @@ export type Database = {
           targeting_countries?: Json | null
           targeting_plans?: Json | null
           targeting_platforms?: Json | null
+          targeting_subcategories?: Json | null
           total_budget_cents?: number | null
           updated_at?: string
           weight?: number

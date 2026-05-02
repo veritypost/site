@@ -9,8 +9,8 @@ CURRENT_TITLE: Browse (next pending unit; auto-detect may pick a fix slice or fo
 CURRENT_WAVE: A
 CURRENT_DOC: UI_UX_REVIEW/A-3-browse.md
 STATUS: pending
-NEXT_BUILD_SLICE: Slice 2 — Subcategory schema (foundation; Slice 1 fully shipped including live DB)
-ANCHOR: Slice 1 (god_mode rename) shipped 2026-05-02: 19 web files + 3 iOS files renamed, OWNER_EMAILS allowlist removed per DECISION #013, 5 API routes converted email-based isGodMode → hasPermissionServer('admin.owner_mode'), tier string 'godmode' → 'ownermode'. DB migration applied — permissions + permission_sets rows renamed, my_permission_keys + compute_effective_perms RPCs rebuilt with new key + 'owner_mode' attribution (MCP-verified: 0 RPCs still reference old key). Code awaiting push (held until DB migration done; now safe). Continuation protocol auto-detects next action — Slice 2 (Subcategory schema) is the next unblocked foundation slice.
+NEXT_BUILD_SLICE: Slice 3 — Unit 1 / Home cleanup (49 findings; prereqs 1+2 now both shipped)
+ANCHOR: Slice 2 (Subcategory schema) shipped 2026-05-02. Pre-flight revealed most of the plan was already built: categories.parent_id hierarchy (45 child rows seeded), articles.subcategory_id FK to categories (confirmed via pg_constraint), admin categories tree + subcategory CRUD, StoryEditor + KidsStoryEditor subcategory dropdowns — all pre-existing. Only gap was ad_units.targeting_subcategories column (missing). Applied via supabase db query --linked. database.ts updated (Row/Insert/Update). TypeScript clean. Adversary SHIP-READY. One non-blocking out-of-scope finding logged to OUT_OF_WAVE.md (S?6 — StoryEditor stale subcategory on category change). Both foundation slices now done. Auto-detect next: Slice 3 (Unit 1 / Home).
 LAST_UPDATED: 2026-05-02
 
 PARKED_UNITS:

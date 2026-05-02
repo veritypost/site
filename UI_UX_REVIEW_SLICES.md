@@ -62,6 +62,7 @@ Both are load-bearing for downstream slices.
 ### Slice 1 — admin.god_mode → admin.owner_mode rename
 
 **Prerequisite:** None.
+**Elevated-care:** YES (RBAC). Adversary pass mandatory before ship.
 
 **Scope:** Per DECISION #013, replace every reference to the legacy `admin.god_mode` permission key with `admin.owner_mode`. The DB row in the perms catalog gets renamed, and all 10+ call sites get updated.
 
@@ -96,6 +97,7 @@ Verify via MCP `execute_sql`: `SELECT key FROM permissions WHERE key LIKE '%god_
 ### Slice 2 — Subcategory schema
 
 **Prerequisite:** None. Self-contained DB + admin work.
+**Elevated-care:** YES (schema migration). Adversary pass mandatory before ship.
 
 **Scope:**
 1. Migration: create `public.subcategories` table:
@@ -141,6 +143,7 @@ Verify via MCP `execute_sql`: `SELECT key FROM permissions WHERE key LIKE '%god_
 **Status:** placeholder — fix recipes to be populated when this slice opens. Decisions for Unit 1 already locked at DECISIONS #021–#029. Unit doc: `UI_UX_REVIEW/A-1-home.md`.
 
 **Prerequisite:** Slices 1 + 2 done.
+**Elevated-care:** NO (visual + state cleanup; no RBAC / payments / kid-safety / migration). Adversary pass recommended but not mandatory.
 
 **Scope summary:** Unit 1 surfaced 49 findings on the home page (`/`). Covered:
 - "Today's edition" / "today" framing strip (DECISION #021 — curated front, not today-bound).
@@ -173,6 +176,7 @@ Unit 2's fix work is split into two consecutive slices:
 ### Slice 4 — Article reader layout overhaul
 
 **Prerequisite:** Slices 1 + 2 done.
+**Elevated-care:** NO. Adversary pass recommended.
 
 **Why before Slice 5:** Slice 5's broken-state cleanup includes findings (#1, #109) that disappear when the layout changes. Doing layout first means Slice 5 doesn't waste effort on the old single-column design.
 
@@ -207,6 +211,7 @@ Unit 2's fix work is split into two consecutive slices:
 ### Slice 5 — Article reader broken-state cleanup
 
 **Prerequisite:** Slices 1 + 2 + 4 done.
+**Elevated-care:** YES — touches RBAC (canBypassQuiz role logic per finding #94), comment moderation flows (Hide/Report/Block dialogs per findings #63, #100), and restricted-account composer states. Adversary pass mandatory.
 
 **Why this size:** 21 confirmed-broken findings + ~70 polish/parity findings + a handful of refuted/deferred. Bundled because they all touch the same ~12 files. Splitting risks merge conflicts. Recommended pattern: 4-stream parallel cleanup (per memory `feedback_4_stream_parallel_cleanup.md`).
 
@@ -275,6 +280,7 @@ Recipes are sized for direct execution. Each cites the finding number in `UI_UX_
 ## Slice 6 — Registration wall
 
 **Prerequisite:** Slices 1 + 2 done; Slice 4 optional (for rail signup nudge placement).
+**Elevated-care:** YES — auth flow (anon counter, signup trigger logic, suppression cookie). Adversary pass mandatory.
 
 **Why parallel-able with Slice 7:** No file overlap if executed carefully.
 
@@ -319,6 +325,7 @@ Recipes are sized for direct execution. Each cites the finding number in `UI_UX_
 ## Slice 7 — Admin ad system completion
 
 **Prerequisite:** Slice 2 (subcategory schema) + Slice 4 (rail layout for `article_rail` placement).
+**Elevated-care:** YES — revenue + privacy (impression tracking, cohort targeting, scroll-depth analytics, tier-hiding rules). Adversary pass mandatory per sub-step.
 
 **Scope:** 9-step build per DECISION #044.
 
@@ -409,6 +416,7 @@ Seed `ad_placements` rows + add `<Ad placement="..."/>` calls:
 ## Slice 8 — iOS CSAM-trio bridge
 
 **Prerequisite:** None. Fully independent.
+**Elevated-care:** YES — legal hardening (18 U.S.C. § 2258A reporting). Adversary pass mandatory.
 
 **Scope:** Add `csam`, `child_exploitation`, `grooming` cases to iOS `ReportReason` enum. Reorder confirmation dialog so urgent trio appears first (matching web).
 
@@ -433,6 +441,7 @@ Seed `ad_placements` rows + add `<Ad placement="..."/>` calls:
 ## Slice 9 — Cross-platform parity bridges
 
 **Prerequisite:** Slice 4 (article reader layout) for the web bridges that depend on the rail.
+**Elevated-care:** NO. Adversary pass recommended.
 
 **Scope (web — bridge from iOS):**
 1. **Up-Next sheet** at 95% scroll + post-comment-send. Auto-pop modal sheet showing 3 next articles (already-fetched via `nearbyStories`). Replace static `NextStoryFooter` "More in [Category]" footer.
@@ -504,7 +513,7 @@ Seed `ad_placements` rows + add `<Ad placement="..."/>` calls:
 | Slice | Type | Status | Prereq | Decisions consumed | Sessions |
 |-------|------|--------|--------|---------------------|----------|
 | Slice 1 — `god_mode` → `owner_mode` rename | Foundation | shipped (code + DB applied 2026-05-02) | — | #013 | 1 |
-| Slice 2 — Subcategory schema | Foundation | not started | — | TODO-010 | 1 |
+| Slice 2 — Subcategory schema | Foundation | shipped (DB column + database.ts applied 2026-05-02; existing categories.parent_id hierarchy + articles.subcategory_id + admin UI all pre-built) | — | TODO-010 | 1 |
 | Slice 3 — Unit 1 / Home (49 findings) | Unit fix | not started — placeholder | 1 + 2 | #021–#029 | 2 |
 | Slice 4 — Unit 2 / Article reader / Layout | Unit fix | not started | 1 + 2 | #008 / #009 / #011 | 2 |
 | Slice 5 — Unit 2 / Article reader / Cleanup (126 findings) | Unit fix | not started | 1 + 2 + 4 | #030–#039 | 4 (4-stream parallel) + 1 verification |
