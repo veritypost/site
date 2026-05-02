@@ -19,7 +19,7 @@ export default function HomeFetchFailed() {
   const router = useRouter();
   return (
     <section
-      aria-label="Couldn't load today's front page"
+      aria-label="Front page failed to load — retry available"
       style={{ textAlign: 'center', padding: '64px 0' }}
     >
       <p
@@ -43,11 +43,14 @@ export default function HomeFetchFailed() {
             color: C.accent,
             background: 'transparent',
             border: 'none',
-            padding: 0,
+            padding: '10px 4px',
             cursor: 'pointer',
             textDecoration: 'underline',
             textUnderlineOffset: 4,
             fontWeight: 500,
+            minHeight: 44,
+            display: 'inline-flex',
+            alignItems: 'center',
           }}
         >
           Try again &rarr;

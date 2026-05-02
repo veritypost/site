@@ -140,7 +140,7 @@ Verify via MCP `execute_sql`: `SELECT key FROM permissions WHERE key LIKE '%god_
 
 ## Slice 3 — Unit 1 / Home cleanup (49 findings)
 
-**Status:** placeholder — fix recipes to be populated when this slice opens. Decisions for Unit 1 already locked at DECISIONS #021–#029. Unit doc: `UI_UX_REVIEW/A-1-home.md`.
+**Status:** shipped 2026-05-02 (build clean, tsc clean). Decisions for Unit 1 locked at DECISIONS #021–#029. Unit doc: `UI_UX_REVIEW/A-1-home.md`.
 
 **Prerequisite:** Slices 1 + 2 done.
 **Elevated-care:** NO (visual + state cleanup; no RBAC / payments / kid-safety / migration). Adversary pass recommended but not mandatory.
@@ -514,7 +514,7 @@ Seed `ad_placements` rows + add `<Ad placement="..."/>` calls:
 |-------|------|--------|--------|---------------------|----------|
 | Slice 1 — `god_mode` → `owner_mode` rename | Foundation | shipped (code + DB applied 2026-05-02) | — | #013 | 1 |
 | Slice 2 — Subcategory schema | Foundation | shipped (DB column + database.ts applied 2026-05-02; existing categories.parent_id hierarchy + articles.subcategory_id + admin UI all pre-built) | — | TODO-010 | 1 |
-| Slice 3 — Unit 1 / Home (49 findings) | Unit fix | not started — placeholder | 1 + 2 | #021–#029 | 2 |
+| Slice 3 — Unit 1 / Home (49 findings) | Unit fix | shipped 2026-05-02 (4-stream parallel; tsc + build clean; 10 MOOT findings removed by DECISION #026; 35 confirmed findings fixed; HomeBrokenPinBanner TODO deferred) | 1 + 2 | #021–#029 | 1 |
 | Slice 4 — Unit 2 / Article reader / Layout | Unit fix | not started | 1 + 2 | #008 / #009 / #011 | 2 |
 | Slice 5 — Unit 2 / Article reader / Cleanup (126 findings) | Unit fix | not started | 1 + 2 + 4 | #030–#039 | 4 (4-stream parallel) + 1 verification |
 | Slice 6 — Registration wall | Cross-cutting | not started | 1 + 2 (4 optional) | #043 | 2 |

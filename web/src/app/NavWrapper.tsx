@@ -583,23 +583,6 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
           >
             {BRAND_NAME.toLowerCase()}
           </a>
-          {topBarActive && (
-            <span
-              style={{
-                fontSize: 12,
-                fontWeight: 500,
-                color: C.dim,
-                letterSpacing: '0.01em',
-              }}
-            >
-              {new Intl.DateTimeFormat('en-US', {
-                timeZone: 'America/New_York',
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric',
-              }).format(new Date())}
-            </span>
-          )}
         </header>
       )}
 

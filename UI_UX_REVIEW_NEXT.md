@@ -4,17 +4,17 @@ Single-line state for the review system. Updated automatically at session end.
 
 ```
 CURRENT_PHASE: auto-detect
-CURRENT_UNIT: 3
-CURRENT_TITLE: Browse (next pending unit; auto-detect may pick a fix slice or foundation slice ahead of review)
+CURRENT_UNIT: 4
+CURRENT_TITLE: Article reader layout (Slice 4 is next; Unit 1 Home fixed, Unit 2 Article reader findings already locked)
 CURRENT_WAVE: A
-CURRENT_DOC: UI_UX_REVIEW/A-3-browse.md
-STATUS: pending
-NEXT_BUILD_SLICE: Slice 3 — Unit 1 / Home cleanup (49 findings; prereqs 1+2 now both shipped)
-ANCHOR: Slice 2 (Subcategory schema) shipped 2026-05-02. Pre-flight revealed most of the plan was already built: categories.parent_id hierarchy (45 child rows seeded), articles.subcategory_id FK to categories (confirmed via pg_constraint), admin categories tree + subcategory CRUD, StoryEditor + KidsStoryEditor subcategory dropdowns — all pre-existing. Only gap was ad_units.targeting_subcategories column (missing). Applied via supabase db query --linked. database.ts updated (Row/Insert/Update). TypeScript clean. Adversary SHIP-READY. One non-blocking out-of-scope finding logged to OUT_OF_WAVE.md (S?6 — StoryEditor stale subcategory on category change). Both foundation slices now done. Auto-detect next: Slice 3 (Unit 1 / Home).
+CURRENT_DOC: UI_UX_REVIEW/A-2-article-reader.md
+STATUS: findings
+NEXT_BUILD_SLICE: Slice 4 — Unit 2 / Article reader / Layout overhaul (prereqs 1+2+3 all shipped)
+ANCHOR: Slice 3 (Unit 1 / Home cleanup) shipped 2026-05-02. 35 findings fixed across 7 files (4-stream parallel). Build + tsc clean. Auto-detect next: Slice 4 (Article reader layout).
 LAST_UPDATED: 2026-05-02
 
 PARKED_UNITS:
-- Unit 1 (Home) — status: findings; 49 findings + DECISIONS #021–#029 locked; fix pass = Slice 3 (placeholder, recipes populated at slice open).
+- Unit 1 (Home) — status: fixed (Slice 3 shipped 2026-05-02). HomeBrokenPinBanner admin signal TODO in page.tsx.
 - Unit 2 (Article reader) — status: findings (build-ready); 128 findings (1 refuted) + DECISIONS #030–#047 locked; fix pass = Slices 4 (layout) + 5 (cleanup).
 
 EXECUTION_PLAN: UI_UX_REVIEW_SLICES.md
