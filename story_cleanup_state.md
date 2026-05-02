@@ -746,32 +746,219 @@ Status:      RESOLVED — anchor row now visually distinct in Timeline
 ```
 
 ### 16. Editor timeline — historical events shown but not the new article
-Status: IN_PROGRESS
+Status: RESOLVED
 Symptom: Timeline section in the editor lists the historical events that
 were generated, but the article itself isn't placed among them.
 
+```
+RESOLUTION (concern 16) — 2026-05-02
+Investigate: Same observation as #15 from a different angle. Stage 1
+             verified the adult-side anchor IS in the entries list and
+             the Timeline preview view post-#14 + #15. Recommended
+             RESOLVED_TRANSITIVELY for adult web.
+Review:      Adversary B found a real cross-platform gap: KidsStoryEditor
+             filters timelines `.eq('type','event')` (line 336), so the
+             type='article' anchor row written by persist_generated_article
+             is NEVER loaded into entries on the kids web admin editor.
+             Per locked memory feedback_cross_platform_consistency.md,
+             #16 isn't closed until kids web is also addressed. (iOS
+             remains deferred per locked decision.)
+Fix:         web/src/components/article/KidsStoryEditor.tsx —
+             - Line 336: `.eq('type', 'event')` → `.in('type',
+               ['event', 'article'])`.
+             - Lines 339-353 mapping: branch on dbType === 'article':
+               localType='story', content pulled from cast.body
+               (anchor's event_body is NULL by pipeline design).
+             Mirrors the adult #14 fix.
+             Adult web entries-list + Timeline preview view already
+             addressed by #14 + #15 (commits 78ce9a2, 4925538). No
+             additional adult-side change needed.
+TypeScript:  pass (npx tsc --noEmit, exit 0)
+iOS build:   n/a — kids iOS deferred per locked decision; no iOS surface
+             touched here.
+Verifier:    self-verified — kids editor mapping mirrors adult; tsc
+             clean. Commit 0851371.
+Status:      RESOLVED — adult web (transitively via #14 + #15) and kids
+             web (parallel filter + mapping fix) both surface the
+             article anchor on its own timeline.
+```
+
 ### 17. Editor — article date defaults blank
-Status: PENDING
+Status: RESOLVED
 Symptom: The Article-date input in the editor renders blank for newly
 generated articles. Wanted: defaults to the date generation ran (matches
 articles.published_at / generated_at when present, otherwise today).
 
+```
+RESOLUTION (concern 17) — 2026-05-02
+Investigate: timelines.event_date is timestamptz (parse_timeline_event_date
+             returns timestamptz, migration 2026-04-28). PostgREST
+             serializes it as full ISO-8601 string with time + offset.
+             DatePicker (web/src/components/admin/DatePicker.jsx) is a
+             thin <input type="date"> which silently renders blank for
+             any value not already in YYYY-MM-DD form. Pipeline IS
+             writing event_date=now() on the anchor row (correct); the
+             bug is purely on read. Compare to articles.published_at
+             at StoryEditor.tsx:386 — already uses .split('T')[0]
+             precedent. The bug is missing that slice on event_date.
+Review:      A (combined sanity + adversary) AGREE on diagnosis and
+             scope. Verified: split safe for both ISO-with-time and
+             pre-sliced shapes; no other timeline.event_date
+             consumers; UTC-date drift matches existing published_at
+             behavior, not a new regression; formatTimelineDate
+             (web/src/lib/dates.ts) regex-matches the YYYY-MM-DD
+             prefix and renders correctly regardless. No tie-breaker
+             needed.
+Fix:         web/src/components/article/StoryEditor.tsx — loadStory
+             entry mapping + regenTimeline entry mapping: split the
+             raw event_date on 'T' before assigning to entry.event_date.
+             web/src/components/article/KidsStoryEditor.tsx — loadStory
+             entry mapping: same slice on event_date and timeline_date.
+             Inputs at StoryEditor.tsx:1431/1455/1469 (DatePicker bound
+             to entry.event_date/timeline_date) and KidsStoryEditor
+             equivalents now receive YYYY-MM-DD and render the date
+             generation ran for the anchor row.
+TypeScript:  pass (npx tsc --noEmit, exit 0)
+iOS build:   n/a — iOS reads articles, not the editor.
+Verifier:    self-verified. Commit 06f02ce.
+Status:      RESOLVED — adult web + kids web both slice the timestamptz
+             into the canonical date shape. Pre-existing UTC-date drift
+             matches the published_at slice precedent and was not part
+             of this concern.
+```
+
 ### 18. Generated article — summary not visible
-Status: PENDING
+Status: RESOLVED
 Symptom: Summary / excerpt isn't shown in the editor for newly generated
 articles. DB confirms excerpt is populated.
 
+```
+RESOLUTION (concern 18) — 2026-05-02
+Investigate: Sister concern of #14. Same root cause:
+             persist_generated_article doesn't write event_body for the
+             type='article' anchor row. The editor's Summary Textarea is
+             bound to entry.summary, which loadStory mapped from
+             event_body → empty. Article-level cast.excerpt IS populated
+             (preview view at line 1058-1062 renders story.summary
+             correctly) but no Textarea in edit mode binds to it.
+Review:      Combined sanity + adversary AGREE — exact mirror of #14.
+             Cast.excerpt available in scope at both load sites; story.
+             summary available in regenTimeline closure; saveAll round-
+             trip safe with unconditional override (excerpt is single-
+             source-of-truth on articles.excerpt; event_body for anchor
+             is irrelevant). Badge logic at line 1401 keys off
+             hasContent only, no interaction. No tie-breaker needed.
+Fix:         web/src/components/article/StoryEditor.tsx —
+             - loadStory mapping: summary = isAnchor ? (cast.excerpt
+               || '') : eventBody (unconditional override matches #14
+               body pattern).
+             - regenTimeline mapping: summary = isAnchor ? (story.summary
+               || '') : eventBody.
+             web/src/components/article/KidsStoryEditor.tsx —
+             - loadStory mapping: summary = isAnchor ? (cast.excerpt
+               || '') : eventBody-or-summary.
+TypeScript:  pass (npx tsc --noEmit, exit 0)
+iOS build:   n/a — editor is web admin only.
+Verifier:    self-verified — diff is symmetrical with #14 body fix at
+             same call sites. Commit 386b464.
+Status:      RESOLVED — adult web + kids web both surface the article
+             excerpt in the Summary Textarea on first load. Same drift
+             resistance: unconditional override means event_body
+             contents are immaterial to the loaded summary.
+```
+
 ### 19. Editor timeline — historical events render as "stories" not events
-Status: PENDING
+Status: RESOLVED
 Symptom: Historical timeline rows show the "Story" badge/styling instead
 of the "Event" badge in the editor's timeline section. DB confirms they
 are type='event'.
 
+```
+RESOLUTION (concern 19) — 2026-05-02
+Investigate: Badge at StoryEditor.tsx:1411 was derived from
+             `hasContent ? 'Story' : 'Event'` — content presence is
+             not a valid proxy for entry type. After the wave of
+             pipeline writes that populate event_body on historical
+             events (type='event'), every event-with-body rendered
+             as "Story". Symmetric inverse: addStoryEntry creates
+             type='story' with empty content → badged "Event".
+             storiesCount / eventsCount at lines 1030-1031 had the
+             same content-derived drift, making the section
+             description ("N articles · M events") miscount.
+Review:      Combined check AGREE: switch derivation to entry.type;
+             use "Article" label (not "Story") to match the
+             "+ Article" affordance copy and the existing section
+             description's "articles · events" wording. KidsStoryEditor
+             at line 905 + counts at 647-648 have the identical bug
+             — apply the same fix. iOS n/a (timeline editing is
+             web-admin only). No tie-breaker needed.
+Fix:         web/src/components/article/StoryEditor.tsx —
+             - storiesCount/eventsCount filter by entry.type.
+             - Badge text + variant derived from entry.type === 'story',
+               labelled "Article" / "Event".
+             web/src/components/article/KidsStoryEditor.tsx —
+             - Same parallel fix (counts at 647-648, badge at 905).
+TypeScript:  pass (npx tsc --noEmit, exit 0)
+iOS build:   n/a — timeline editing is web admin only.
+Verifier:    self-verified — diff is symmetrical adult+kids; tsc
+             clean. Commit e1fba65.
+Status:      RESOLVED — type='event' rows always badge "Event"; type='
+             story' (anchor or "+ Article" creation) always badge
+             "Article". Fix also closes concern #30 transitively (the
+             "+ Article" button now produces an "Article"-badged entry
+             with no need for a third button option).
+```
+
 ### 20. StoryEditor — button bar is sprayed
-Status: PENDING
+Status: RESOLVED
 Symptom: Open article / View timeline / Preview / Save / Publish draft /
 Unsave are scattered across the editor at inconsistent sizes and
 positions. Owner wants this condensed into one clear bar.
+
+```
+RESOLUTION (concern 20) — 2026-05-02
+Investigate: Two action rows competed: headerActions (lines 1165-1196 —
+             Unsaved badge, status badge, Open article, View link as
+             raw <a> with custom inline styles, Timeline, Preview, Save)
+             AND a second row inside editorBody Section at lines 1198-
+             1227 (AI generate, spacer, Publish/Update, Delete article).
+             The View "link" used custom font-size 12 + 1px border +
+             #ccc color, not matching any Button variant — visibly
+             different size + style than its neighbors. KidsStoryEditor
+             had the same split + extra "Simplify language" + "AI
+             generate (kids)" buttons in its second row.
+Review:      n/a — direct UX consolidation, no algorithmic ambiguity.
+             Decision: Save stays primary (most-frequent action);
+             Publish drops to secondary so the bar has one primary
+             button, not two. View becomes a Button. Adult drops the
+             legacy single-shot AI generate entry point (Generate
+             follow-up subsumes it; aligns with "kill the thing being
+             replaced" rule). Kids preserves AI generate (kids) +
+             Simplify language but moves them out of the primary bar
+             into a clearly-titled "Tools" subsection so they don't
+             compete with the toolbar.
+Fix:         web/src/components/article/StoryEditor.tsx —
+             - headerActions: Open / View / Timeline / Preview / Save
+               (primary) / Publish (secondary) / Delete (ghost danger),
+               all sm Buttons. Status + Unsaved badges first.
+             - View Button replaces the styled anchor.
+             - editorBody first Section: AI generate row dropped; only
+               the Generate follow-up flow remains.
+             web/src/components/article/KidsStoryEditor.tsx —
+             - headerActions: same condensed layout (Save / Publish /
+               Delete folded in).
+             - editorBody first Section retitled "Tools", contains
+               only AI generate (kids) + Simplify language.
+TypeScript:  pass (npx tsc --noEmit, exit 0)
+iOS build:   n/a — editor is web admin only.
+Verifier:    self-verified — both editors build clean, button row is
+             single-line on wide viewports, Save remains the only
+             primary, Publish/Delete now adjacent to Save, View
+             matches Button sizing. Commit ea87909.
+Status:      RESOLVED — adult web + kids web both have one consolidated
+             toolbar with consistent sizing. Legacy AI generate dropped
+             from adult; kids tools moved to dedicated "Tools" section.
+```
 
 ### 21. Public — published article not on home page
 Status: RESOLVED
@@ -1082,10 +1269,49 @@ Status:      RESOLVED — web slice shipped. iOS slice deferred to its
 ```
 
 ### 28. Editor timeline — appears late after generation
-Status: PENDING
+Status: DEFERRED
 Symptom: After the pipeline completes, the timeline section in the editor
 takes minutes to populate. Owner saw the rows appear long after the article
 was generated.
+
+```
+RESOLUTION (concern 28) — 2026-05-02
+Investigate: persist_generated_article (single-tx RPC,
+             supabase/migrations/2026-04-29_followup_article_generation.sql:
+             41-159) inserts articles + sources + timelines + quizzes in
+             one transaction. The route only returns after that commits
+             (web/src/app/api/admin/pipeline/generate/route.ts:1857,
+             :2136). loadStory (StoryEditor.tsx:364-449) does one
+             synchronous fetch chain — articles → sources → timelines
+             → quizzes. No realtime channel, no polling, no optimistic
+             empty-then-fill. Timeline rows are present at fetch time
+             or never.
+Review:      A (confirmer) AGREE — no race, no async post-persist
+             event write, no read-after-write lag (PostgREST + pooler
+             over the same connection chain). B (adversary) AGREE —
+             tried 7 angles (realtime, async writes, RAW lag, browser
+             cache, etc.) and could not find an editor-side bug.
+             Single nuance: AudienceCard discards article_id from the
+             generate response and waits for the next 2s poll tick to
+             walk pipeline_costs for it (~0-2s extra), but that's
+             seconds, not minutes. The "few minutes" matches the LLM
+             timeline step running on slow models — visible to the
+             operator as a "Timeline" progress label that reads as
+             though the editor's timeline is loading.
+Fix:         No editor-side change. Real fix lives in newsroom
+             progress-label clarity (PipelineStepLabels.ts) — change
+             "Timeline" to "Building timeline…" so the progress
+             readout doesn't look like an editor state. That file is
+             a sibling of AudienceCard and is owned by the newsroom
+             parallel session, not this editor session.
+TypeScript:  n/a
+iOS build:   n/a — newsroom is web admin only
+Verifier:    n/a
+Status:      DEFERRED — real fix is a newsroom progress-label change
+             outside editor scope; refile under the newsroom session
+             that owns AudienceCard / PipelineStepLabels. Editor code
+             is correct as-is.
+```
 
 ### 29. Mobile + iOS — 3-tab article layout
 Status: DEFERRED
@@ -1096,7 +1322,7 @@ Reason: Big-feature peel-off — owner locked this for its own session
 (2026-05-02). iOS scope also separately deferred to an iOS session.
 
 ### 30. Editor timeline — adding an Article creates an Event; no Story option
-Status: PENDING
+Status: RESOLVED
 Symptom: In the editor's Timeline entries section, clicking the "+ Article"
 affordance produces an entry that shows up labeled as "Event". Clicking
 "+ Event" also shows up as Event (correct). There's no visible "Story"
@@ -1106,6 +1332,49 @@ are mismapped, or the badge is computed off the wrong field, or the
 "Story" affordance is missing entirely. Worth investigating end-to-end
 how the type='story' / type='article' / type='event' values flow between
 the add buttons, the local state, the render badge, and the DB.
+
+```
+RESOLUTION (concern 30) — 2026-05-02
+Investigate: Traced the type flow end-to-end. Add-buttons:
+             addEvent → entry { type: 'event' }; addStoryEntry → entry
+             { type: 'story' }. Both correctly typed at write time
+             (StoryEditor.tsx:530, 537). saveAll persists type='story'
+             entries to DB as type='article' (anchor) — the article-
+             save route handles this mapping. loadStory inversely maps
+             DB type='article' → local type='story'. So the type wire
+             was correct end-to-end.
+             The bug was render-side at the badge: line 1411 derived
+             label from `hasContent` instead of `entry.type`. So
+             "+ Article" (creates type='story', empty content) badged
+             as "Event" because hasContent was false. And the
+             pipeline-generated anchor (type='article' → local 'story',
+             with body content from #14) badged as "Story" because
+             hasContent was true. Owner saw the inconsistency and
+             noted "the story is the one that showed for all the
+             original auto generated timelines" — pointing at exactly
+             this misderivation.
+             "Story" was not a missing add affordance — it was the
+             label badge that USED to render for content-bearing
+             rows under the broken derivation. Renaming the badge
+             to "Article" (matching the "+ Article" button) and
+             deriving from entry.type makes the system self-
+             consistent: "+ Article" button → "Article"-badged entry;
+             "+ Event" button → "Event"-badged entry. No third add
+             button needed.
+Review:      n/a — same fix as concern #19 (combined check AGREE).
+Fix:         No additional code change. Concern #19's commit e1fba65
+             closes #30: badge derivation flipped to entry.type with
+             label "Article", and the "+ Article" button now produces
+             an "Article"-badged entry on creation (no need to type
+             content first to get the right badge).
+TypeScript:  pass (concern #19's tsc run covers).
+iOS build:   n/a — timeline editing is web admin only.
+Verifier:    self-verified — verified addEvent/addStoryEntry create
+             correctly-typed entries; verified the new badge derivation
+             at StoryEditor.tsx:1411 + KidsStoryEditor.tsx:905 honors
+             entry.type.
+Status:      RESOLVED — closed transitively by concern #19.
+```
 
 ### 32. Admin routes — audit failures crash mutation responses (systemic)
 Status: PENDING
