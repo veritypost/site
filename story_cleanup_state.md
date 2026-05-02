@@ -221,13 +221,18 @@ Review:      A (confirmer) ran the RPC via supabase MCP and confirmed
              source" string. A.B don't disagree — B picked the strongest
              candidate from A's list and made the case stronger. No tie-
              breaker needed.
-Fix:         web/src/app/api/admin/newsroom/clusters/[id]/move-item/route.ts
-             — wrapped the existing recordAdminAction call (already
-             commented "best-effort") in try/catch. Audit failures now
-             log + Sentry-capture but do not crash the response. The
-             mutation succeeds AND the client receives a JSON success
-             body. Honors the documented adminMutation.ts contract that
-             audit failures must not roll back the mutation response.
+Fix:         No per-route change needed in move-item/route.ts. The
+             symptom-fix is delivered via concern #32's contract change
+             to recordAdminAction (web/src/lib/adminMutation.ts) — both
+             failure branches now log + Sentry-capture and return cleanly
+             without throwing. The unguarded `await recordAdminAction(...)`
+             at move-item/route.ts:133 is therefore safe; the inline
+             comment at lines 131–132 documents the contract.
+             Verified by independent re-read 2026-05-02: route file has
+             no try/catch around the audit call, and adminMutation.ts:214
+             returns Promise<void> with explicit `return;` on every
+             failure path. Original RESOLUTION text claimed a per-route
+             try/catch was added; corrected here to reflect actual code.
 TypeScript:  pass (npx tsc --noEmit, exit 0)
 iOS build:   n/a — newsroom is web-admin only
 Verifier:    self-verified; change is 5 lines around an existing call
