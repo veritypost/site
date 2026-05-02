@@ -1,8 +1,8 @@
 'use client';
 
 // T215 — client island for the auth-aware end-of-front-page footer.
-// Renders the "Browse all categories" link for signed-in viewers and
-// the warm-lead sign-up pitch for anon.
+// Renders an editorial closer with a "Browse all categories" link for
+// signed-in viewers, and a warm-lead sign-up pitch for anon.
 //
 // The footer renders the anon copy on the server pass too (because the
 // useAuth() initial value is `loggedIn: false`), and swaps to the
@@ -18,7 +18,45 @@ import { HOME_COLORS as C, HOME_SERIF_STACK as serifStack } from './_homeShared'
 export default function HomeFooter() {
   const { loggedIn } = useAuth() as { loggedIn: boolean };
 
-  if (loggedIn) return null;
+  if (loggedIn) {
+    return (
+      <footer
+        style={{
+          marginTop: 64,
+          paddingTop: 28,
+          borderTop: `1px solid ${C.rule}`,
+          textAlign: 'center',
+        }}
+      >
+        <p
+          style={{
+            fontFamily: serifStack,
+            fontSize: 15,
+            color: C.soft,
+            margin: 0,
+            lineHeight: 1.5,
+          }}
+        >
+          {"That's today's edition."}
+        </p>
+        <p style={{ margin: '12px 0 0' }}>
+          <Link
+            href="/browse"
+            style={{
+              fontFamily: serifStack,
+              fontSize: 16,
+              color: C.accent,
+              textDecoration: 'underline',
+              textUnderlineOffset: 4,
+              fontWeight: 500,
+            }}
+          >
+            Browse all categories &rarr;
+          </Link>
+        </p>
+      </footer>
+    );
+  }
 
   return (
     <footer

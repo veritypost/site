@@ -14,14 +14,14 @@ export type HomeStory = Pick<
 };
 
 export const HOME_COLORS = {
-  bg: '#ffffff',
-  text: '#111111',
-  soft: '#444444',
-  dim: '#666666',
-  muted: '#999999',
-  rule: '#e5e5e5',
-  accent: '#111111',
-} as const;
+  bg: 'var(--p-bg)',
+  text: 'var(--p-ink)',
+  soft: 'var(--p-ink-soft)',
+  dim: 'var(--p-ink-dim)',
+  muted: 'var(--p-ink-muted)',
+  rule: 'var(--p-border)',
+  accent: 'var(--p-ink)',
+};
 
 export const HOME_SERIF_STACK = "Georgia, 'Times New Roman', 'Source Serif 4', serif";
 

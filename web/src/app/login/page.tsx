@@ -14,6 +14,7 @@ import { useSearchParams } from 'next/navigation';
 import { usePageViewTrack } from '@/lib/useTrack';
 import SingleDoorForm from './_SingleDoorForm';
 import WaitlistForm from './_WaitlistForm';
+import RequestAccessForm from './_RequestAccessForm';
 
 const C = {
   bg: 'var(--bg)',
@@ -108,7 +109,13 @@ function LoginPageInner() {
           </div>
         </a>
 
-        {mode === 'waitlist' ? <WaitlistForm /> : <SingleDoorForm notice={notice} />}
+        {mode === 'waitlist' ? (
+          <WaitlistForm />
+        ) : mode === 'request' ? (
+          <RequestAccessForm />
+        ) : (
+          <SingleDoorForm notice={notice} />
+        )}
       </div>
     </div>
   );

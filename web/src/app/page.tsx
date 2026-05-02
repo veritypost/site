@@ -199,14 +199,16 @@ export default async function HomePage() {
         .select(SELECT_COLS)
         .eq('status', 'published')
         .eq('browse_only', false)
+        .gte('published_at', today.startUtc)
         .order('published_at', { ascending: false })
-        .limit(50),
+        .limit(12),
       supabase
         .from('articles')
         .select(SELECT_COLS)
         .eq('status', 'published')
         .eq('is_breaking', true)
         .eq('browse_only', false)
+        .gte('published_at', today.startUtc)
         .order('published_at', { ascending: false })
         .limit(1),
       supabase
@@ -219,7 +221,7 @@ export default async function HomePage() {
         }),
       supabase
         .from('top_stories')
-        .select('position, articles(id, title, stories(slug, lifecycle_status), excerpt, category_id, is_breaking, is_developing, published_at)')
+        .select('position, articles!top_stories_article_id_fkey(id, title, stories(slug, lifecycle_status), excerpt, category_id, is_breaking, is_developing, published_at)')
         .order('position'),
       userMetaPromise,
     ]);
@@ -320,6 +322,20 @@ export default async function HomePage() {
           </p>
         )}
 
+        {!fetchFailed && !hero && (
+          <p
+            style={{
+              fontFamily: serifStack,
+              fontStyle: 'italic',
+              fontSize: 16,
+              color: C.dim,
+              margin: '32px 0 0',
+            }}
+          >
+            Nothing published today. Check back later.
+          </p>
+        )}
+
         {!fetchFailed && hero && (
           <Hero
             story={hero}
@@ -387,6 +403,7 @@ function NewPill() {
 }
 
 function LifecyclePill({ status, dark = false }: { status: string; dark?: boolean }) {
+  if (status !== 'breaking' && status !== 'developing') return null;
   const isBreaking = status === 'breaking';
   return (
     <span

@@ -92,8 +92,7 @@ export default function HomeFirstLoginMoment() {
         // a permanent retry loop on every subsequent page load. The user won't
         // see the welcome moment (acceptable), but the flag prevents re-fetching.
         if (!cancelled) {
-          const supabase2 = createClient();
-          void supabase2
+          void supabase
             .from('users')
             .update({ onboarding_completed_at: new Date().toISOString() })
             .eq('id', user.id)

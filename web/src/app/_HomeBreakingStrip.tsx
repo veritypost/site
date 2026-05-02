@@ -34,8 +34,6 @@ export default function HomeBreakingStrip({ story }: { story: HomeStory }) {
     };
   }, []);
 
-  if (!permsReady) return null;
-
   return (
     <Link
       href={story.stories?.slug ? `/${story.stories.slug}` : '#'}
