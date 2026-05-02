@@ -644,8 +644,8 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
     (a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime(),
   );
   const currentEntry = entries.find((e) => e.is_current) || entries[entries.length - 1];
-  const storiesCount = entries.filter((e) => e.content?.trim()).length;
-  const eventsCount = entries.filter((e) => !e.content?.trim()).length;
+  const storiesCount = entries.filter((e) => e.type === 'story').length;
+  const eventsCount = entries.filter((e) => e.type === 'event').length;
 
   const Frame = ({ children }: { children: React.ReactNode }) =>
     embedded ? <div>{children}</div> : <Page>{children}</Page>;
@@ -902,7 +902,7 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
                     flexWrap: 'wrap',
                   }}
                 >
-                  <Badge variant={hasContent ? 'info' : 'neutral'} size="xs">{hasContent ? 'Story' : 'Event'}</Badge>
+                  <Badge variant={entry.type === 'story' ? 'info' : 'neutral'} size="xs">{entry.type === 'story' ? 'Article' : 'Event'}</Badge>
                   {entry.is_current && <Badge variant="warn" size="xs">Now</Badge>}
                   {entry.event_date && (
                     <span style={{ fontSize: F.xs, color: C.muted, fontFamily: 'ui-monospace, monospace', whiteSpace: 'nowrap' }}>

@@ -1027,8 +1027,8 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
   const sortedEntries = [...entries].sort(
     (a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime(),
   );
-  const storiesCount = entries.filter((e) => e.content?.trim()).length;
-  const eventsCount = entries.filter((e) => !e.content?.trim()).length;
+  const storiesCount = entries.filter((e) => e.type === 'story').length;
+  const eventsCount = entries.filter((e) => e.type === 'event').length;
 
   // Wrap the legacy admin chrome in <Page>; in embedded mode the host
   // already supplies layout, so render directly.
@@ -1408,7 +1408,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
                     flexWrap: 'wrap',
                   }}
                 >
-                  <Badge variant={hasContent ? 'info' : 'neutral'} size="xs">{hasContent ? 'Story' : 'Event'}</Badge>
+                  <Badge variant={entry.type === 'story' ? 'info' : 'neutral'} size="xs">{entry.type === 'story' ? 'Article' : 'Event'}</Badge>
                   {entry.is_current && <Badge variant="warn" size="xs">Now</Badge>}
                   {entry.event_date && (
                     <span style={{ fontSize: F.xs, color: C.muted, fontFamily: 'ui-monospace, monospace', whiteSpace: 'nowrap' }}>
