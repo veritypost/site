@@ -28,7 +28,6 @@ export type ArticleSurfaceProps = {
   article: ArticleSurfaceArticle;
   bodyHtml: string;
   canEdit: boolean;
-  canPublish: boolean;
   canViewBody?: boolean;
   sources?: SourceItem[];
   timeline?: TimelineItem[];

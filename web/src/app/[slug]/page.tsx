@@ -96,7 +96,9 @@ export async function generateMetadata({
   const found = await fetchBySlug(params.slug);
   if (!found) return { title: 'Article not found · Verity Post' };
 
-  const { article } = found;
+  const article =
+    found.articles.find((a) => a.status === 'published' && a.published_at !== null) ??
+    found.articles[0];
   const meta: Metadata = {
     title: article.title,
     description: article.excerpt ?? undefined,
@@ -118,7 +120,9 @@ export default async function ArticleSlugPage({
   if (!found) notFound();
 
   const { story, articles } = found;
-  let article = found.article;
+  const defaultArticle =
+    articles.find((a) => a.status === 'published' && a.published_at !== null) ?? articles[0];
+  let article = defaultArticle;
   if (searchParams.a) {
     const matched = found.articles.find((a) => a.id === searchParams.a);
     if (!matched) redirect(`/${story.slug}`);
@@ -250,20 +254,18 @@ export default async function ArticleSlugPage({
         })
       : null;
 
+  const pickerArticles = (canEdit ? articles : articles.filter((a) => a.status === 'published'))
+    .map((a) => ({ id: a.id, title: a.title, published_at: a.published_at, status: a.status }));
+
   return (
     <>
       {jsonLd && <JsonLd data={jsonLd} />}
       {!isCoppa && article.status === 'published' && (
         <ArticleTracker articleId={article.id} articleSlug={story.slug} />
       )}
-      {articles.length > 1 && (
+      {pickerArticles.length > 1 && (
         <StoryArticlePicker
-          articles={articles.map((a) => ({
-            id: a.id,
-            title: a.title,
-            published_at: a.published_at,
-            status: a.status,
-          }))}
+          articles={pickerArticles}
           currentArticleId={article.id}
           storySlug={story.slug}
         />
@@ -284,7 +286,6 @@ export default async function ArticleSlugPage({
         }}
         bodyHtml={bodyHtml}
         canEdit={canEdit}
-        canPublish={false}
         canViewBody={canViewBody}
         sources={canViewSources ? sources : []}
         timeline={canViewTimeline ? timeline : []}

@@ -7,13 +7,8 @@ interface NextStoryFooterProps {
 
 export default function NextStoryFooter({ category, nearbyStories }: NextStoryFooterProps) {
   return (
-    <footer
-      style={{
-        marginTop: 48,
-        paddingTop: 24,
-        borderTop: '1px solid var(--border, #e5e5e5)',
-      }}
-    >
+    <footer style={{ marginTop: 48, borderTop: '1px solid var(--border, #e5e5e5)' }}>
+    <div style={{ maxWidth: 680, margin: '0 auto', padding: '24px 20px 0' }}>
       {nearbyStories.length > 0 && category && (
         <section style={{ marginBottom: 28 }}>
           <p
@@ -75,6 +70,7 @@ export default function NextStoryFooter({ category, nearbyStories }: NextStoryFo
         </svg>
         Back to edition
       </Link>
+    </div>
     </footer>
   );
 }

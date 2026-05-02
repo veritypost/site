@@ -32,12 +32,8 @@ export type ArticleEditorProps = {
   canPublish: boolean;
 };
 
-// `canPublish` is accepted for typing parity with ArticleSurface but
-// not forwarded — story-manager owns the publish flow itself via the
-// status column on its save form, which the server gates on
-// admin.articles.edit.any (covers publish for the same actor set
-// admin.articles.publish does in the legacy keys; the dual-check in
-// /<slug>/page.tsx still controls editor visibility).
+// `canPublish` drives whether the publish action appears in the story-manager
+// save form; the server gates it on admin.articles.edit.any.
 export default function ArticleEditor({ initialArticle }: ArticleEditorProps) {
   const router = useRouter();
   const band = initialArticle.age_band;

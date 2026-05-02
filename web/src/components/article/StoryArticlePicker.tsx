@@ -20,13 +20,14 @@ export default function StoryArticlePicker({
   storySlug,
 }: StoryArticlePickerProps) {
   return (
+    <div style={{ maxWidth: 680, margin: '0 auto' }}>
     <nav
       aria-label="Story articles"
       style={{
         display: 'flex',
         gap: '8px',
         overflowX: 'auto',
-        padding: '12px 0',
+        padding: '12px 20px',
         borderBottom: '1px solid var(--border, #e5e5e5)',
         marginBottom: '24px',
       }}
@@ -62,5 +63,6 @@ export default function StoryArticlePicker({
         );
       })}
     </nav>
+    </div>
   );
 }
