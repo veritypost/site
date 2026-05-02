@@ -44,6 +44,7 @@ import ArticlesTable from './_components/ArticlesTable';
 import RunsSubpage from './_subpages/Runs';
 import CostsSubpage from './_subpages/Costs';
 import CleanupSubpage from './_subpages/Cleanup';
+import { MODEL_OPTIONS } from '@/lib/newsroomModels';
 
 type TabId = 'discovery' | 'articles';
 type ViewId = 'active' | 'completed';
@@ -276,6 +277,9 @@ function DiscoveryTab({
 
   // Categories for filter select
   const [categories, setCategories] = useState<Array<{ id: string; name: string; slug: string }>>([]);
+
+  // Global model picker — drives every per-card generate in this Discovery tab
+  const [selectedModelIdx, setSelectedModelIdx] = useState(0);
 
   // Debounce dqInput → URL (only fires when dqInput differs from current URL param)
   useEffect(() => {
@@ -570,6 +574,25 @@ function DiscoveryTab({
           <option value="most_sources">Most sources</option>
           <option value="breaking_first">Breaking first</option>
         </select>
+        <select
+          aria-label="Generation model"
+          value={String(selectedModelIdx)}
+          onChange={(e) => setSelectedModelIdx(Number(e.target.value))}
+          style={{
+            fontSize: F.sm,
+            border: `1px solid ${C.border}`,
+            borderRadius: 6,
+            padding: `${S[1]}px ${S[2]}px`,
+            color: C.ink,
+            background: C.bg,
+            cursor: 'pointer',
+            minWidth: 180,
+          }}
+        >
+          {MODEL_OPTIONS.map((opt, i) => (
+            <option key={opt.model} value={i}>{opt.label}</option>
+          ))}
+        </select>
       </div>
 
       {/* Merge confirmation bar */}
@@ -622,6 +645,7 @@ function DiscoveryTab({
               mergeSelected={mergeSelected.includes(row.cluster.id)}
               onMergeToggle={handleMergeToggle}
               onMuteOutlet={setMutingOutlet}
+              selectedModelIdx={selectedModelIdx}
             />
           ))}
         </div>

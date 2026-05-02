@@ -55,6 +55,7 @@ type Props = {
   mergeSelected?: boolean;
   onMergeToggle?: (clusterId: string) => void;
   onMuteOutlet?: (outletName: string) => void;
+  selectedModelIdx?: number;
 };
 
 const BANDS: AudienceBand[] = ['adult', 'tweens', 'kids'];
@@ -86,6 +87,7 @@ export default function StoryCard({
   mergeSelected,
   onMergeToggle,
   onMuteOutlet,
+  selectedModelIdx = 0,
 }: Props) {
   const [selectedUrls, setSelectedUrls] = useState<Set<string>>(
     () => new Set(sources.map((s) => s.url))
@@ -223,6 +225,7 @@ export default function StoryCard({
               initialErrorStep={null}
               workingHeadline={workingHeadline}
               selectedSourceUrls={selectedSourceUrlsArray}
+              selectedModelIdx={selectedModelIdx}
             />
           );
         })}

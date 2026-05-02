@@ -24,6 +24,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import Link from 'next/link';
 import Button from '@/components/admin/Button';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
+import { MODEL_OPTIONS } from '@/lib/newsroomModels';
 import {
   type AudienceBand,
   humanizeError,
@@ -46,6 +47,7 @@ export type AudienceCardProps = {
   initialErrorStep: string | null;
   workingHeadline: string;
   selectedSourceUrls?: string[];
+  selectedModelIdx?: number;
 };
 
 export type AudienceCardHandle = { triggerGenerate: () => void };
@@ -81,12 +83,6 @@ const BAND_LABEL: Record<AudienceBand, string> = {
   kids: 'Kids',
 };
 
-const MODEL_OPTIONS = [
-  { label: 'Claude Sonnet', provider: 'anthropic' as const, model: 'claude-sonnet-4-6' },
-  { label: 'Claude Opus',   provider: 'anthropic' as const, model: 'claude-opus-4-7'   },
-  { label: 'GPT-4o',        provider: 'openai'    as const, model: 'gpt-4o'            },
-] as const;
-
 function audienceForApi(band: AudienceBand): { audience: 'adult' | 'kid'; age_band?: 'kids' | 'tweens' } {
   if (band === 'adult') return { audience: 'adult' };
   return { audience: 'kid', age_band: band };
@@ -106,6 +102,7 @@ const AudienceCard = forwardRef<AudienceCardHandle, AudienceCardProps>(
       initialErrorStep,
       workingHeadline,
       selectedSourceUrls,
+      selectedModelIdx = 0,
     } = props;
 
     const [state, setState] = useState<AudienceCardState>(initialState);
@@ -118,7 +115,6 @@ const AudienceCard = forwardRef<AudienceCardHandle, AudienceCardProps>(
     const [currentStep, setCurrentStep] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const [actionError, setActionError] = useState<string | null>(null);
-    const [modelIdx, setModelIdx] = useState(0);
     const [instructions, setInstructions] = useState('');
     const pollHandle = useRef<ReturnType<typeof setInterval> | null>(null);
     const pollRunId = useRef<string | null>(null);
@@ -191,7 +187,7 @@ const AudienceCard = forwardRef<AudienceCardHandle, AudienceCardProps>(
       setActionError(null);
       try {
         const apiAudience = audienceForApi(audienceBand);
-        const { provider, model } = MODEL_OPTIONS[modelIdx];
+        const { provider, model } = MODEL_OPTIONS[selectedModelIdx];
         const res = await fetch('/api/admin/pipeline/generate', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
@@ -222,7 +218,7 @@ const AudienceCard = forwardRef<AudienceCardHandle, AudienceCardProps>(
       } finally {
         setBusy(false);
       }
-    }, [clusterId, audienceBand, selectedSourceUrls, modelIdx, instructions, stopPolling]);
+    }, [clusterId, audienceBand, selectedSourceUrls, selectedModelIdx, instructions]);
 
     useImperativeHandle(ref, () => ({
       triggerGenerate: () => { if (state === 'idle') void handleGenerate(); },
@@ -411,24 +407,6 @@ const AudienceCard = forwardRef<AudienceCardHandle, AudienceCardProps>(
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: S[2], marginTop: 'auto' }}>
           {state === 'idle' && (
             <>
-              <select
-                value={modelIdx}
-                onChange={(e) => setModelIdx(Number(e.target.value))}
-                disabled={busy}
-                style={{
-                  fontSize: F.sm,
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 4,
-                  padding: `${S[1]}px ${S[2]}px`,
-                  color: C.ink,
-                  background: C.bg,
-                  cursor: busy ? 'not-allowed' : 'pointer',
-                }}
-              >
-                {MODEL_OPTIONS.map((opt, i) => (
-                  <option key={opt.model} value={i}>{opt.label}</option>
-                ))}
-              </select>
               <Button onClick={() => void handleGenerate()} disabled={busy} variant="primary" size="sm">
                 {busy ? 'Starting…' : 'Generate'}
               </Button>
@@ -486,24 +464,6 @@ const AudienceCard = forwardRef<AudienceCardHandle, AudienceCardProps>(
           )}
           {state === 'failed' && (
             <>
-              <select
-                value={modelIdx}
-                onChange={(e) => setModelIdx(Number(e.target.value))}
-                disabled={busy}
-                style={{
-                  fontSize: F.sm,
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 4,
-                  padding: `${S[1]}px ${S[2]}px`,
-                  color: C.ink,
-                  background: C.bg,
-                  cursor: busy ? 'not-allowed' : 'pointer',
-                }}
-              >
-                {MODEL_OPTIONS.map((opt, i) => (
-                  <option key={opt.model} value={i}>{opt.label}</option>
-                ))}
-              </select>
               <Button onClick={() => void handleRetry()} disabled={busy} variant="primary" size="sm">
                 {busy ? 'Retrying…' : 'Retry'}
               </Button>
