@@ -110,7 +110,7 @@ export const FONT = {
   sans:
     "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, " +
     "'Helvetica Neue', Arial, 'Noto Sans', sans-serif",
-  serif: "'Source Serif Pro', ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif",
+  serif: 'var(--font-serif)',
   mono: "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
 } as const;
 

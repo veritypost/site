@@ -388,13 +388,20 @@ function ViewToggle({ view, onView }: { view: ViewId; onView: (v: ViewId) => voi
 }
 
 function ArticlesTabShell() {
+  const toast = useToast();
   return (
     <PageSection
       title="All articles"
       description="Drafts, published, archived, and failed runs across every audience"
     >
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: S[2] }}>
-        <Button onClick={() => alert('Use the Discovery tab to launch + New article.')} variant="ghost" size="sm">
+        <Button
+          onClick={() =>
+            toast.push({ message: 'Use the Discovery tab to launch + New article.', variant: 'warn' })
+          }
+          variant="ghost"
+          size="sm"
+        >
           + New article
         </Button>
       </div>

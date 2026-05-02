@@ -8,6 +8,7 @@
 
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { CheckoutButton } from './_CheckoutButton';
 
 export const metadata: Metadata = {
   title: 'Pricing — Verity Post',
@@ -33,6 +34,7 @@ function PlanCard({
   features,
   cta,
   ctaHref,
+  planName,
   highlight,
   footer,
 }: {
@@ -42,7 +44,8 @@ function PlanCard({
   blurb: string;
   features: string[];
   cta: string;
-  ctaHref: string;
+  ctaHref?: string;
+  planName?: string;
   highlight?: boolean;
   footer?: string;
 }) {
@@ -86,23 +89,27 @@ function PlanCard({
         ))}
       </ul>
       {footer && <div style={{ fontSize: 12, color: C.dim, marginTop: 4 }}>{footer}</div>}
-      <Link
-        href={ctaHref}
-        style={{
-          marginTop: 'auto',
-          padding: '12px 16px',
-          textAlign: 'center',
-          fontSize: 14,
-          fontWeight: 700,
-          textDecoration: 'none',
-          background: highlight ? C.accent : 'transparent',
-          color: highlight ? '#fff' : C.accent,
-          border: `1px solid ${C.accent}`,
-          borderRadius: 10,
-        }}
-      >
-        {cta}
-      </Link>
+      {planName ? (
+        <CheckoutButton planName={planName} cta={cta} highlight={highlight} />
+      ) : (
+        <Link
+          href={ctaHref!}
+          style={{
+            marginTop: 'auto',
+            padding: '12px 16px',
+            textAlign: 'center',
+            fontSize: 14,
+            fontWeight: 700,
+            textDecoration: 'none',
+            background: highlight ? C.accent : 'transparent',
+            color: highlight ? '#fff' : C.accent,
+            border: `1px solid ${C.accent}`,
+            borderRadius: 10,
+          }}
+        >
+          {cta}
+        </Link>
+      )}
     </div>
   );
 }
@@ -157,7 +164,7 @@ export default function PricingPage() {
             'Weekly recap quizzes',
           ]}
           cta="Start Verity"
-          ctaHref="/login"
+          planName="verity_monthly"
           highlight
           footer="$79.99/yr — save ~16%."
         />
@@ -177,7 +184,7 @@ export default function PricingPage() {
             'Parent dashboard + parental controls',
           ]}
           cta="Start Family"
-          ctaHref="/login"
+          planName="verity_family_monthly"
           footer="$149.99/yr — save ~16%. Each extra kid: $49.99/yr."
         />
       </div>
