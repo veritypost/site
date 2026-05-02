@@ -149,6 +149,17 @@ enum VP {
         static let xl: CGFloat = 20
         static let pill: CGFloat = 999
     }
+
+    // Radius scale
+    static let radiusXS:   CGFloat = 4   // badges, tiny labels
+    static let radiusSM:   CGFloat = 8   // text fields, small buttons, stat cells
+    static let radiusMD:   CGFloat = 12  // cards, action buttons, list rows
+    static let radiusLG:   CGFloat = 16  // sections, overlays
+    static let radiusFull: CGFloat = 99  // pills, capsule elements
+
+    // Kid-specific radii
+    static let kidRadius:     CGFloat = 22  // kid category tiles
+    static let kidCardRadius: CGFloat = 18  // kid cards
 }
 
 // MARK: - Redesign shadow modifiers

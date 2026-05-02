@@ -192,6 +192,7 @@ struct BookmarksView: View {
         pendingDelete = target
         pendingDeleteOriginalIndex = idx
         items.remove(at: idx)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
         pendingDeleteTask = Task {
             // SwiftUI View is a struct — `[weak self]` is invalid. The
             // closure captures the View by value; @State is reference-
@@ -253,7 +254,7 @@ struct BookmarksView: View {
                     items.insert(b, at: safeIdx)
                     pendingDelete = nil
                     pendingDeleteOriginalIndex = nil
-                    errorText = "Couldn\u{2019}t remove bookmark. Try again."
+                    errorText = "We couldn\u{2019}t remove that bookmark \u{2014} try again."
                 }
             }
         } catch {
@@ -264,7 +265,7 @@ struct BookmarksView: View {
                 items.insert(b, at: safeIdx)
                 pendingDelete = nil
                 pendingDeleteOriginalIndex = nil
-                errorText = "Network error. Couldn\u{2019}t remove bookmark."
+                errorText = "We couldn\u{2019}t remove that bookmark \u{2014} try again."
             }
         }
     }
@@ -407,6 +408,7 @@ struct BookmarksView: View {
                         .stroke(active ? Color.clear : VP.border)
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 99))
+                .frame(minHeight: 44)
         }
         .buttonStyle(.plain)
     }
@@ -552,7 +554,7 @@ struct BookmarksView: View {
             let names = Set(items.compactMap { $0.collectionName }.filter { !$0.isEmpty })
             collections = Array(names).sorted()
         } catch {
-            errorText = "Couldn\u{2019}t load bookmarks."
+            errorText = "We couldn\u{2019}t load your bookmarks \u{2014} check your connection."
         }
     }
 

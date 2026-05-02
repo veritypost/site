@@ -150,7 +150,7 @@ struct HomeView: View {
                             errorState(err)
                         } else if stories.isEmpty {
                             VStack(spacing: 8) {
-                                Text("No stories today")
+                                Text("No stories match this filter")
                                     .font(.system(.callout, design: .default, weight: .semibold))
                                     .foregroundColor(VP.text)
                                 Text("Check back soon for the latest news.")
@@ -192,6 +192,7 @@ struct HomeView: View {
                     .padding(.bottom, 80)
                 }
                 .refreshable {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     refreshTask?.cancel()
                     refreshTask = Task { await loadData() }
                     _ = await refreshTask?.value

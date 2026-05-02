@@ -38,6 +38,7 @@ struct ProfileView: View {
     @EnvironmentObject var auth: AuthViewModel
     @ObservedObject private var perms = PermissionStore.shared
     private let client = SupabaseManager.shared.client
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
 
     // Permission-gated flags. Populated in a `.task(id: perms.changeToken)`.
     @State private var canShareProfileCard: Bool = false
@@ -564,6 +565,7 @@ struct ProfileView: View {
                 ShareLink(item: url) {
                     quickActionChip(icon: "square.and.arrow.up", label: "Share")
                 }
+                .accessibilityLabel("Share profile")
             }
             if canViewFamily {
                 NavigationLink {
@@ -1081,10 +1083,24 @@ struct ProfileView: View {
                 }
                 let filtered = filteredActivityItems()
                 if filtered.isEmpty {
-                    emptyState(
-                        title: "No activity yet",
-                        description: "Read an article, leave a comment, or save a bookmark to see it here."
-                    )
+                    VStack(spacing: 10) {
+                        emptyState(
+                            title: "No activity yet — read an article to get started.",
+                            description: "Read an article, leave a comment, or save a bookmark to see it here."
+                        )
+                        Button {
+                            auth.pendingHomeJump = true
+                        } label: {
+                            Text("Browse articles")
+                                .font(.system(.footnote, design: .default, weight: .semibold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 10)
+                                .frame(minHeight: 44)
+                                .background(VP.accent)
+                                .cornerRadius(10)
+                        }
+                    }
                 } else {
                     VStack(spacing: 0) {
                         ForEach(filtered) { item in
@@ -1189,7 +1205,7 @@ struct ProfileView: View {
                 )
             } else if categories.isEmpty {
                 emptyState(
-                    title: "No categories yet",
+                    title: "No category stats yet — start reading to see your breakdown.",
                     description: "Choose topics you care about to personalize your feed and unlock category scoring."
                 )
             } else {
@@ -1240,7 +1256,7 @@ struct ProfileView: View {
                         Image(systemName: "chevron.right")
                             .font(.caption).foregroundColor(VP.dim)
                             .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                            .animation(.easeOut(duration: 0.2), value: isExpanded)
+                            .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: isExpanded)
                     }
                     .padding(14)
                 }
@@ -1302,7 +1318,7 @@ struct ProfileView: View {
                         Image(systemName: "chevron.right")
                             .font(.caption2).foregroundColor(VP.dim)
                             .rotationEffect(.degrees(open ? 90 : 0))
-                            .animation(.easeOut(duration: 0.2), value: open)
+                            .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: open)
                     }
                 }
                 .padding(.vertical, 8)
@@ -1392,7 +1408,7 @@ struct ProfileView: View {
                     ProgressView().padding(.top, 8)
                 } else if allAchievements.isEmpty {
                     emptyState(
-                        title: "No achievements yet",
+                        title: "No achievements unlocked yet — keep reading and quizzing to earn your first.",
                         description: "Complete a quiz to start collecting badges."
                     )
                 } else {

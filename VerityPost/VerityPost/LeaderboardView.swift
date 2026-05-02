@@ -46,6 +46,7 @@ private let leaderboardISO8601 = ISO8601DateFormatter()
 struct LeaderboardView: View {
     @EnvironmentObject var auth: AuthViewModel
     @ObservedObject private var permStore = PermissionStore.shared
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let client = SupabaseManager.shared.client
 
     // Tab + filters
@@ -124,7 +125,7 @@ struct LeaderboardView: View {
                                     Text(tab.label)
                                         .font(.system(.caption, design: .default, weight: .medium))
                                         .padding(.horizontal, 14)
-                                        .padding(.vertical, 7)
+                                        .padding(.vertical, 10)
                                         .background(activeTab == tab ? VP.accent.opacity(0.15) : VP.card)
                                         .foregroundColor(activeTab == tab ? VP.accent : VP.dim)
                                         .cornerRadius(20)
@@ -149,7 +150,7 @@ struct LeaderboardView: View {
                                 Text(p.label)
                                     .font(.system(.caption, design: .default, weight: .medium))
                                     .padding(.horizontal, 12)
-                                    .padding(.vertical, 5)
+                                    .padding(.vertical, 10)
                                     .background(activePeriod == p ? VP.text : .clear)
                                     .foregroundColor(activePeriod == p ? .white : VP.dim)
                                     .cornerRadius(14)
@@ -202,12 +203,9 @@ struct LeaderboardView: View {
                     .padding(.top, 40)
                 } else if users.isEmpty {
                     VStack(spacing: 8) {
-                        Text("No results")
+                        Text("No results for this filter — try a different category or time range.")
                             .font(.system(.subheadline, design: .default, weight: .bold))
                             .foregroundColor(VP.text)
-                        Text("No one has earned points with these filters yet.")
-                            .font(.footnote)
-                            .foregroundColor(VP.dim)
                             .multilineTextAlignment(.center)
                         if activeCategory != nil {
                             Button {
@@ -362,7 +360,7 @@ struct LeaderboardView: View {
             Text(label)
                 .font(.system(.caption, design: .default, weight: .medium))
                 .padding(.horizontal, 12)
-                .padding(.vertical, 5)
+                .padding(.vertical, 10)
                 .background(active ? VP.accent.opacity(0.1) : .clear)
                 .foregroundColor(active ? VP.accent : VP.dim)
                 .cornerRadius(14)
@@ -413,7 +411,7 @@ struct LeaderboardView: View {
                         .foregroundColor(VP.accent)
                     if canExpand {
                         Button {
-                            withAnimation(.easeInOut(duration: 0.15)) {
+                            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.15)) {
                                 expanded = isExpanded ? nil : user.id
                             }
                         } label: {

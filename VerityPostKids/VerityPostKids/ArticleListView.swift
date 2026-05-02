@@ -102,7 +102,7 @@ struct ArticleListView: View {
                 .font(.system(.largeTitle, weight: .bold))
                 .foregroundStyle(K.dim)
                 .accessibilityHidden(true)
-            Text("No articles in this category yet.\nTry another or go back home.")
+            Text("No articles in this category yet — try a different one!")
                 .font(.system(.subheadline, design: .rounded, weight: .medium))
                 .foregroundStyle(K.dim)
                 .multilineTextAlignment(.center)

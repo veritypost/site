@@ -80,7 +80,7 @@ struct VerifyEmailView: View {
                     .foregroundColor(VP.success)
                     .padding(.top, 8)
             } else if resendState == .failed {
-                Text("Couldn\u{2019}t send. Try again in a moment.")
+                Text("We couldn\u{2019}t send the link \u{2014} try again in a moment.")
                     .font(.footnote)
                     .foregroundColor(VP.danger)
                     .padding(.top, 8)

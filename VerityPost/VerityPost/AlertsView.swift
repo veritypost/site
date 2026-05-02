@@ -182,7 +182,7 @@ struct AlertsView: View {
             Text("Notifications unavailable")
                 .font(.system(.callout, design: .default, weight: .semibold))
                 .foregroundColor(VP.text)
-            Text("Your account doesn\u{2019}t have access to the notifications inbox right now.")
+            Text("Notifications aren\u{2019}t available on your current plan.")
                 .font(.caption)
                 .foregroundColor(VP.dim)
                 .multilineTextAlignment(.center)

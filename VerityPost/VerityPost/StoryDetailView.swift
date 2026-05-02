@@ -266,7 +266,7 @@ struct StoryDetailView: View {
                 ScrollView {
                     if let loadError = loadError {
                         VStack(spacing: 10) {
-                            Text("Couldn't load this story")
+                            Text("We couldn't load this article — check your connection.")
                                 .font(.system(.callout, design: .default, weight: .semibold))
                                 .foregroundColor(VP.text)
                             Text(loadError)
@@ -493,7 +493,7 @@ struct StoryDetailView: View {
         }
         .onDisappear { tts.stop() }
         .overlay(alignment: .top) { toastOverlay }
-        .animation(.easeInOut(duration: 0.3), value: showAchievementToast)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: showAchievementToast)
     }
 
     // OwnersAudit Story Task 18: Discussion tab is now always visible
@@ -1090,8 +1090,8 @@ struct StoryDetailView: View {
                     ForEach(0..<quizQuestions.count, id: \.self) { i in
                         RoundedRectangle(cornerRadius: 3)
                             .fill(dotColor(for: i))
-                            .frame(width: 7, height: 5)
-                            .animation(.easeInOut(duration: 0.2), value: quizCurrent)
+                            .frame(width: 10, height: 5)
+                            .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: quizCurrent)
                     }
                 }
             }
@@ -1143,7 +1143,7 @@ struct StoryDetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(VP.card)
         .cornerRadius(14)
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(VP.border, lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(VP.accent.opacity(0.35), lineWidth: 1.5))
         .clipped()
     }
 
@@ -1339,6 +1339,7 @@ struct StoryDetailView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 11)
+            .frame(minHeight: 44)
             .background(selected ? VP.accent : Color(.secondarySystemBackground))
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(selected ? VP.accent : VP.border, lineWidth: 1))
             .cornerRadius(10)
@@ -1502,7 +1503,7 @@ struct StoryDetailView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
         .background(Color(hex: "fef2f2"))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(hex: "fecaca")))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(VP.failBorder))
         .cornerRadius(12)
     }
 
@@ -2100,6 +2101,9 @@ struct StoryDetailView: View {
                 .shadow(radius: 4)
                 .padding(.top, 8)
                 .transition(.move(edge: .top).combined(with: .opacity))
+                .onAppear {
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                }
         }
     }
 
@@ -2736,6 +2740,7 @@ struct StoryDetailView: View {
                let decoded = try? JSONDecoder().decode(Resp.self, from: data) {
                 isBookmarked = true
                 bookmarkId = decoded.id
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 return
             }
             // Cap-exceeded — surface upgrade affordance instead of failing
@@ -2815,12 +2820,12 @@ struct StoryDetailView: View {
             quizResult = nil
         }
         guard let session = try? await client.auth.session else {
-            await MainActor.run { quizStage = .idle; quizError = "Please sign in." }
+            await MainActor.run { quizStage = .idle; quizError = "Sign in to take quizzes." }
             return
         }
         let siteUrl = SupabaseManager.shared.siteURL
         guard let url = URL(string: "/api/quiz/start", relativeTo: siteUrl) else {
-            await MainActor.run { quizStage = .idle; quizError = "Couldn't start quiz." }
+            await MainActor.run { quizStage = .idle; quizError = "We couldn't start the quiz — try again." }
             return
         }
         struct Body: Encodable {
@@ -2837,7 +2842,7 @@ struct StoryDetailView: View {
             let (data, response) = try await URLSession.shared.data(for: req)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
                 let rawMsg = (try? JSONDecoder().decode([String: String].self, from: data))?["error"]
-                let msg = friendlyApiError(rawMsg, fallback: "Couldn\u{2019}t start quiz.")
+                let msg = friendlyApiError(rawMsg, fallback: "We couldn\u{2019}t start the quiz \u{2014} try again.")
                 await MainActor.run { quizStage = .idle; quizError = msg }
                 return
             }
@@ -2853,7 +2858,7 @@ struct StoryDetailView: View {
                 quizStage = .answering
             }
         } catch {
-            await MainActor.run { quizStage = .idle; quizError = "Network issue." }
+            await MainActor.run { quizStage = .idle; quizError = "Connection issue \u{2014} check your internet and try again." }
         }
     }
 
@@ -2863,12 +2868,12 @@ struct StoryDetailView: View {
             quizError = nil
         }
         guard let session = try? await client.auth.session else {
-            await MainActor.run { quizStage = .answering; quizError = "Please sign in." }
+            await MainActor.run { quizStage = .answering; quizError = "Sign in to take quizzes." }
             return
         }
         let siteUrl = SupabaseManager.shared.siteURL
         guard let url = URL(string: "/api/quiz/submit", relativeTo: siteUrl) else {
-            await MainActor.run { quizStage = .answering; quizError = "Couldn't submit quiz." }
+            await MainActor.run { quizStage = .answering; quizError = "We couldn\u{2019}t start the quiz \u{2014} try again." }  // URL build failure
             return
         }
         struct AnswerEntry: Encodable {
@@ -2917,10 +2922,12 @@ struct StoryDetailView: View {
                        !push.hasBeenPrompted {
                         showPushPrompt = true
                     }
+                } else {
+                    UINotificationFeedbackGenerator().notificationOccurred(.error)
                 }
             }
         } catch {
-            await MainActor.run { quizStage = .answering; quizError = "Network issue." }
+            await MainActor.run { quizStage = .answering; quizError = "Connection issue \u{2014} check your internet and try again." }
         }
     }
 
@@ -3007,9 +3014,8 @@ struct StoryDetailView: View {
                         commentText = ""
                         replyingTo = nil
                         composerFocused = false
-                        // Light selection haptic to confirm the send. Matches the
-                        // quiz-answer tap pattern — discrete, single-action.
-                        UISelectionFeedbackGenerator().selectionChanged()
+                        // Success haptic to confirm the comment was posted.
+                        UINotificationFeedbackGenerator().notificationOccurred(.success)
                         // Post-send Up Next: show once, only if we have
                         // recommendations queued and the user hasn't already seen
                         // the sheet via the end-of-article trigger.
@@ -3072,6 +3078,7 @@ struct StoryDetailView: View {
         let wasDisagreed = disagreedComments.contains(comment.id)
         // Optimistic toggle.
         await MainActor.run {
+            UISelectionFeedbackGenerator().selectionChanged()
             if reaction == "agree" {
                 if wasAgreed { agreedComments.remove(comment.id) }
                 else { agreedComments.insert(comment.id); disagreedComments.remove(comment.id) }

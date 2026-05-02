@@ -14,6 +14,7 @@ import SwiftUI
 /// `MainTabView` automatically — no explicit callback needed.
 struct WelcomeView: View {
     @EnvironmentObject var auth: AuthViewModel
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
 
     @State private var page = 0
     @State private var submitting = false
@@ -49,7 +50,7 @@ struct WelcomeView: View {
                     screenThree.tag(2)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
-                .animation(.easeInOut, value: page)
+                .animation(reduceMotion ? nil : .easeInOut, value: page)
                 .frame(minHeight: 360)
 
                 // Pagination dots

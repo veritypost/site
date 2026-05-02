@@ -160,6 +160,7 @@ struct MessagesView: View {
                             .font(.subheadline)
                             .foregroundColor(VP.accent)
                     }
+                    .accessibilityLabel("New message")
                 }
             }
             // Apple Guideline 1.2 — Report / Block affordances on every DM

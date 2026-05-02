@@ -166,10 +166,21 @@ struct FamilyDashboardView: View {
                     }
 
                     if kids.isEmpty {
-                        Text("No kid profiles set up yet.")
-                            .font(.footnote)
-                            .foregroundColor(VP.dim)
-                            .padding(.top, 4)
+                        VStack(spacing: 10) {
+                            Text("No kid profiles yet")
+                                .font(.footnote)
+                                .foregroundColor(VP.dim)
+                                .padding(.top, 4)
+                            Button {
+                                error = ""; flash = ""
+                                showAddKid = true
+                            } label: {
+                                Text("Add a child profile")
+                                    .font(.system(.footnote, design: .default, weight: .semibold))
+                                    .foregroundColor(VP.accent)
+                            }
+                            .buttonStyle(.plain)
+                        }
                     } else {
                         ForEach(kids) { kid in
                             kidRow(kid)
@@ -308,6 +319,7 @@ struct FamilyDashboardView: View {
                     }
                 }
                 Button {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     KidsAppLauncher.open(kidId: kid.id)
                 } label: {
                     Label("Open Kids App", systemImage: "arrow.up.forward.app")

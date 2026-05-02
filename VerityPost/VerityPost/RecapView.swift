@@ -238,6 +238,7 @@ struct RecapQuizView: View {
     @State private var totalAnswered = 0
     @State private var results: [RecapResultRow] = []
     @State private var missedArticles: [Story] = []
+    @State private var missedLoadError = false
 
     var body: some View {
         Group {
@@ -359,7 +360,12 @@ struct RecapQuizView: View {
                     Divider().background(VP.border)
                 }
 
-                if missedArticles.isEmpty {
+                if missedLoadError {
+                    Text("Couldn\u{2019}t load missed articles")
+                        .font(.footnote)
+                        .foregroundColor(VP.danger)
+                        .padding(.top, 6)
+                } else if missedArticles.isEmpty {
                     Text("You caught everything this week.")
                         .font(.footnote)
                         .foregroundColor(VP.soft)
@@ -431,7 +437,7 @@ struct RecapQuizView: View {
               let session = try? await client.auth.session else {
             await MainActor.run {
                 submitting = false
-                errorText = "Could not submit."
+                errorText = "We couldn\u{2019}t submit your answers \u{2014} try again."
             }
             return
         }
@@ -458,7 +464,7 @@ struct RecapQuizView: View {
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
                 await MainActor.run {
                     submitting = false
-                    errorText = "Could not submit."
+                    errorText = "We couldn\u{2019}t submit your answers \u{2014} try again."
                 }
                 return
             }
@@ -474,7 +480,7 @@ struct RecapQuizView: View {
         } catch {
             await MainActor.run {
                 submitting = false
-                errorText = "Could not submit."
+                errorText = "We couldn\u{2019}t submit your answers \u{2014} try again."
             }
         }
     }
@@ -489,6 +495,7 @@ struct RecapQuizView: View {
             await MainActor.run { missedArticles = rows }
         } catch {
             Log.d("recap missed load failed: \(error)")
+            await MainActor.run { missedLoadError = true }
         }
     }
 }

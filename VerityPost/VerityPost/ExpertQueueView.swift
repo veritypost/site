@@ -157,7 +157,7 @@ struct ExpertQueueView: View {
                     }
                     .font(.system(.caption, design: .default, weight: .semibold))
                     .foregroundColor(.white)
-                    .padding(.horizontal, 12).padding(.vertical, 6)
+                    .padding(.horizontal, 12).padding(.vertical, 10)
                     .background(VP.accent).cornerRadius(6)
 
                     Button("Decline") {
@@ -165,7 +165,7 @@ struct ExpertQueueView: View {
                     }
                     .font(.system(.caption, design: .default, weight: .semibold))
                     .foregroundColor(VP.dim)
-                    .padding(.horizontal, 12).padding(.vertical, 6)
+                    .padding(.horizontal, 12).padding(.vertical, 10)
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(VP.border))
                 }
             } else if activeTab == .claimed {
@@ -318,7 +318,7 @@ struct ExpertQueueView: View {
 
             let (data, response) = try await URLSession.shared.data(for: req)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                await MainActor.run { loadError = "Couldn't load the queue. Try again."; loading = false }
+                await MainActor.run { loadError = "Something went wrong \u{2014} try again."; loading = false }
                 return
             }
 
@@ -347,7 +347,7 @@ struct ExpertQueueView: View {
             }
         } catch {
             await MainActor.run {
-                loadError = "Couldn't load the queue. Check your connection."
+                loadError = "Connection issue \u{2014} check your internet."
                 loading = false
             }
         }
