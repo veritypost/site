@@ -3,7 +3,7 @@
 import { createClient } from '../../../lib/supabase/server';
 import { getSiteUrl } from '../../../lib/siteUrl';
 
-const PUBLIC_PROFILE_ENABLED = false;
+const PUBLIC_PROFILE_ENABLED = true;
 
 export async function generateMetadata({ params }) {
   if (!PUBLIC_PROFILE_ENABLED) {

@@ -1,16 +1,17 @@
-// Public profile by id — kill-switched while the surface is being
-// cleaned up. The canonical route is /u/[username]; both are gated to
-// "Under construction" until owner unhides. To re-enable, replace this
-// file with the prior redirect-to-/u/[username] (see git history of
-// commit ccffa86 for the redirect shape).
-//
-// Per CLAUDE.md kill-switch pattern: hide via gate, keep state +
-// queries + types alive so unhide is one-line flip. This file goes
-// further (full replace) because it was already a thin shim and there
-// was no live state to preserve.
+import { redirect, notFound } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
 
-import UnderConstruction from '@/components/UnderConstruction';
+export default async function ProfileByIdPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const supabase = createClient();
 
-export default function PublicProfileByIdUnderConstruction() {
-  return <UnderConstruction surface="public profile" />;
+  const { data } = await supabase
+    .from('public_profiles_v')
+    .select('username')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (!data?.username) notFound();
+
+  redirect(`/u/${data.username}`);
 }

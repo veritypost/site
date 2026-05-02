@@ -19,7 +19,7 @@ import { PROFILE_REPORT_REASONS } from '@/lib/reportReasons';
 // PUBLIC_PROFILE_ENABLED back to true to restore the real UI; all
 // state, queries, and component logic below are preserved intact for
 // one-line revert. See /profile/[id] for the matching gate.
-const PUBLIC_PROFILE_ENABLED = false;
+const PUBLIC_PROFILE_ENABLED = true;
 
 // D28 + D32 / Pass 17 — public profile by username.
 // Permission swap:
