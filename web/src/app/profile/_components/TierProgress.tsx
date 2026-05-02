@@ -110,6 +110,7 @@ export function TierProgress({ score, current, next }: Props) {
             position: 'absolute',
             inset: 0,
             width: `${pct}%`,
+            minWidth: 8,
             background: C.ink,
             borderRadius: R.pill,
             transition: 'width 600ms ease',

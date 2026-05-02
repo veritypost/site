@@ -206,7 +206,7 @@ export function ExpertProfileSection({ preview }: Props) {
               border: `1px solid ${statusInk(app.status)}`,
             }}
           >
-            {app.status}
+            {statusLabel(app.status)}
           </span>
         </div>
       </Card>

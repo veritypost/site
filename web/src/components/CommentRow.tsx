@@ -255,7 +255,7 @@ export default function CommentRow({
             minWidth: 0,
             ...(depth > 0 ? {
               paddingLeft: 16,
-              borderLeft: '2px solid #e0e0e0',
+              ...(!comment.is_expert_reply ? { borderLeft: '2px solid #e0e0e0' } : {}),
               marginLeft: 12,
             } : {}),
           }}

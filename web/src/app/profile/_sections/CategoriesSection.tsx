@@ -477,7 +477,7 @@ function DrillStat({ label, value }: { label: string; value: string }) {
     >
       <div
         style={{
-          fontSize: 10,
+          fontSize: F.xs,
           fontWeight: 600,
           color: C.inkMuted,
           textTransform: 'uppercase',

@@ -305,6 +305,22 @@ export default async function HomePage() {
       >
         {fetchFailed && <HomeFetchFailed />}
 
+        {!fetchFailed && (
+          <p
+            style={{
+              margin: '0 0 24px',
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase' as const,
+              color: C.muted,
+              fontFamily: serifStack,
+            }}
+          >
+            {today.humanDate}
+          </p>
+        )}
+
         {!fetchFailed && hero && (
           <Hero
             story={hero}
