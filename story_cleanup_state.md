@@ -455,10 +455,62 @@ Status:      RESOLVED — backend `freeform_instructions` plumbing
 ```
 
 ### 10. AudienceCard — Edit button after generate
-Status: PENDING
+Status: RESOLVED
 Symptom: After an AudienceCard finishes generating, there's no way to jump
 straight into editing the article. Operator has to leave the newsroom and
 navigate to /admin/articles. Wanted: Edit button right on the card.
+
+```
+RESOLUTION (concern 10) — 2026-05-02
+Investigate: Generated-state JSX in AudienceCard.tsx (~lines 394-435)
+             rendered "View article" Link (slug→public; articleId→editor
+             fallback) + "Skip" Button. No Edit button. Editor URL
+             pattern verified: adult → /admin/story-manager?article=ID,
+             tweens/kids → /admin/kids-story-manager?article=ID
+             (matches ArticlesTable.tsx Edit button + ArticleSurface
+             routing). AudienceCard already has `audienceBand` prop +
+             `articleId` state, so no new data dependency needed.
+Review:      A (confirmer) re-derived independently and pushed for an
+             A2 plan: drop the existing articleId-fallback "View article"
+             Link entirely so View=public, Edit=editor (clear-affordance
+             contract, kills parallel paths). B (adversary) verified a
+             real bug that A2 ignored: AudienceCard.tsx:141 calls
+             setArticleId(json.run.article_id), but pipeline_runs has NO
+             article_id column (database.ts:7977-8005, route.ts:43-60).
+             Live `generating`→`generated` transitions overwrite
+             articleId with undefined. The existing articleId-fallback
+             Link is the only thing that ever rendered for live
+             transitions, and even that's broken; A2's drop would make
+             the failure more total. B pushed for A1.5 (keep fallback,
+             add Edit, ALSO fix polling bug, ALSO add Published status
+             pill, ALSO add Edit to failed state, ALSO refactor styles).
+             Tie-breaker chose Option 2 (A1 narrow): keep fallback, add
+             Edit, file polling bug as new concern #33 and the
+             post-#33 cleanup as new concern #34. Reason: locked
+             "single concern at a time"; A2's clean contract depends on
+             #33 landing first; Published-status is concern #11
+             territory; failed-state Edit and style refactor are scope
+             creep.
+Fix:         web/src/app/admin/newsroom/_components/AudienceCard.tsx —
+             added an Edit Link in the generated-state JSX block,
+             rendered when articleId is truthy. Routes by audienceBand:
+             'adult' → /admin/story-manager?article=ID, else →
+             /admin/kids-story-manager?article=ID. Style matches the
+             existing View article pill exactly. Order: View article →
+             Edit → Skip. Kept the existing articleId-fallback View
+             Link untouched (will be removed in concern #34 once #33
+             fixes the polling article_id bug).
+TypeScript:  pass (npx tsc --noEmit, exit 0)
+iOS build:   n/a — newsroom is web-admin only
+Verifier:    self-verified — Edit Link added at correct position with
+             matching pill style, routes by audienceBand, gated on
+             articleId. Existing JSX preserved verbatim around the
+             insertion. tsc clean.
+Status:      RESOLVED — Edit button visible immediately on refresh-
+             rendered cards (server-side initialArticleId path); live
+             post-generation transitions still need concern #33 to
+             land before Edit shows without a refresh.
+```
 
 ### 11. AudienceCard — live status
 Status: PENDING
@@ -604,6 +656,35 @@ Replacement behavior for the source checkbox on each Story:
     see it AND it can't be attached. We need to split these concerns.
 Surfaces: AudienceCard generate POST + StoryCard sources block + the
 mute modal in newsroom page.tsx + any mute-outlet API route.
+
+### 33. AudienceCard polling — articleId never updates on live transition
+Status: PENDING
+Symptom: AudienceCard.tsx:141 calls `setArticleId(json.run.article_id)`
+inside the polling tick when status flips to completed. But `pipeline_runs`
+has NO `article_id` column (verified via web/src/types/database.ts:7977-8005
+and the runs detail endpoint at web/src/app/api/admin/pipeline/runs/[id]/route.ts
+which returns the raw run row). `json.run.article_id` is always undefined,
+so a card transitioning live from `generating` → `generated` writes
+undefined into the articleId state and overwrites whatever was passed in.
+The article_id IS available on each joined `pipeline_costs` row returned
+as `steps[].article_id` at route.ts line 87. Fix: read article_id from
+the last successful step in the steps array. Surfaced by concern #10's
+review pass — directly affects when the new Edit button (and the existing
+View article fallback) become visible without a page refresh.
+
+### 34. AudienceCard — drop redundant articleId-fallback View Link
+Status: PENDING
+Symptom: AudienceCard's generated-state currently renders "View article"
+twice in fallback chain — first as a Link to the public slug, then (if
+slug missing) as a Link to /admin/story-manager?article=ID. The
+articleId-fallback Link is now redundant after concern #10 added a
+dedicated Edit button. Drop the fallback so View=public-page only,
+Edit=editor only — clean affordance contract, no parallel paths.
+Blocked by #33: until polling correctly populates articleId on live
+transitions, the fallback is the only path that ever fires for live-
+generated cards. Resolve #33 first, then this. Also has a latent
+bug — the fallback hardcodes `/admin/story-manager` even for
+tweens/kids articles, which would route to the adult editor.
 
 ---
 

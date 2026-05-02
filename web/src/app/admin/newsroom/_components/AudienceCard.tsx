@@ -428,6 +428,28 @@ function AudienceCard(props: AudienceCardProps) {
                 View article
               </Link>
             ) : null}
+            {articleId && (
+              <Link
+                href={
+                  audienceBand === 'adult'
+                    ? `/admin/story-manager?article=${articleId}`
+                    : `/admin/kids-story-manager?article=${articleId}`
+                }
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: `${S[1]}px ${S[3]}px`,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 6,
+                  textDecoration: 'none',
+                  color: C.ink,
+                  fontSize: F.sm,
+                  fontWeight: 500,
+                }}
+              >
+                Edit
+              </Link>
+            )}
             <Button onClick={handleSkip} disabled={busy} variant="ghost" size="sm">
               Skip
             </Button>
