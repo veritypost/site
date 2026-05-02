@@ -35,6 +35,9 @@ struct HomeView: View {
     // requests fighting to write the same @State.
     @State private var refreshTask: Task<Void, Never>? = nil
 
+    @ScaledMetric(relativeTo: .largeTitle) private var heroTitleSize: CGFloat = 32
+    @ScaledMetric(relativeTo: .title3) private var cardTitleSize: CGFloat = 21
+
     @State private var canViewBreakingBanner: Bool = false
     @State private var canViewBreakingBannerPaid: Bool = false
     // Search affordance — magnifier above the masthead, gated by
@@ -276,14 +279,14 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 0) {
                 if let cat = categoryName(for: story.categoryId) {
                     Text(cat.uppercased())
-                        .font(.system(size: VP.Size.xs, weight: .semibold, design: .serif))
+                        .font(.system(.caption2, design: .serif, weight: .semibold))
                         .tracking(1.4)
                         .foregroundColor(.white.opacity(0.65))
                         .padding(.bottom, 14)
                 }
                 if story.isBreaking == true {
                     Text("Breaking")
-                        .font(.system(size: VP.Size.xs, weight: .semibold))
+                        .font(.system(.caption2, design: .default, weight: .semibold))
                         .tracking(0.8)
                         .textCase(.uppercase)
                         .foregroundColor(.white.opacity(0.9))
@@ -293,7 +296,7 @@ struct HomeView: View {
                         .padding(.bottom, 8)
                 } else if story.isDeveloping == true {
                     Text("Developing")
-                        .font(.system(size: VP.Size.xs, weight: .semibold))
+                        .font(.system(.caption2, design: .default, weight: .semibold))
                         .tracking(0.8)
                         .textCase(.uppercase)
                         .foregroundColor(VP.warn)
@@ -303,21 +306,21 @@ struct HomeView: View {
                         .padding(.bottom, 8)
                 }
                 Text(story.title ?? "Untitled")
-                    .font(.system(size: 32, weight: .bold, design: .serif))  // hero display size, no token
+                    .font(.system(size: heroTitleSize, weight: .bold, design: .serif))
                     .tracking(-0.4)
                     .lineSpacing(2)
                     .foregroundColor(.white)
                     .fixedSize(horizontal: false, vertical: true)
                 if let excerpt = story.excerpt, !excerpt.isEmpty {
                     Text(excerpt)
-                        .font(.system(size: VP.Size.lg, weight: .regular, design: .serif))
+                        .font(.system(.body, design: .serif, weight: .regular))
                         .lineSpacing(4)
                         .foregroundColor(.white.opacity(0.80))
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 14)
                 }
                 Text(timeShort(story.publishedAt))
-                    .font(.system(size: VP.Size.sm, weight: .medium))
+                    .font(.system(.footnote, design: .default, weight: .medium))
                     .foregroundColor(.white.opacity(0.55))
                     .padding(.top, 10)
             }
@@ -337,14 +340,14 @@ struct HomeView: View {
             }
             if story.isBreaking == true {
                 Text("Breaking")
-                    .font(.system(size: VP.Size.xs, weight: .semibold))
+                    .font(.system(.caption2, design: .default, weight: .semibold))
                     .tracking(0.8)
                     .textCase(.uppercase)
                     .foregroundColor(VP.breaking)
                     .padding(.bottom, 4)
             } else if story.isDeveloping == true {
                 Text("Developing")
-                    .font(.system(size: VP.Size.xs, weight: .semibold))
+                    .font(.system(.caption2, design: .default, weight: .semibold))
                     .tracking(0.8)
                     .textCase(.uppercase)
                     .foregroundColor(VP.warn)
@@ -352,7 +355,7 @@ struct HomeView: View {
             }
 
             Text(story.title ?? "Untitled")
-                .font(.system(size: 21, weight: .bold, design: .serif))
+                .font(.system(size: cardTitleSize, weight: .bold, design: .serif))
                 .tracking(-0.2)
                 .lineSpacing(1)
                 .foregroundColor(VP.text)
@@ -360,7 +363,7 @@ struct HomeView: View {
 
             if let excerpt = story.excerpt, !excerpt.isEmpty {
                 Text(excerpt)
-                    .font(.system(size: VP.Size.base, weight: .regular, design: .serif))
+                    .font(.system(.subheadline, design: .serif, weight: .regular))
                     .lineSpacing(2)
                     .foregroundColor(VP.soft)
                     .lineLimit(2)
@@ -378,7 +381,7 @@ struct HomeView: View {
     @ViewBuilder
     private func eyebrow(_ name: String) -> some View {
         Text(name.uppercased())
-            .font(.system(size: VP.Size.xs, weight: .semibold, design: .serif))
+            .font(.system(.caption2, design: .serif, weight: .semibold))
             .tracking(1.4)
             .foregroundColor(VP.muted)
     }
@@ -386,7 +389,7 @@ struct HomeView: View {
     @ViewBuilder
     private func metaLine(for story: Story) -> some View {
         Text(timeShort(story.publishedAt))
-            .font(.system(size: VP.Size.sm, weight: .medium))
+            .font(.system(.footnote, design: .default, weight: .medium))
             .foregroundColor(VP.muted)
     }
 
@@ -679,6 +682,8 @@ struct BrowseLanding: View {
         }
     }
 
+    @ScaledMetric(relativeTo: .largeTitle) private var screenTitleSize: CGFloat = 32
+
     @State private var categories: [VPCategory] = []
     @State private var loading = true
     @State private var loadError: String?
@@ -695,7 +700,7 @@ struct BrowseLanding: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 Text("Browse")
-                    .font(.system(size: 32, weight: .bold, design: .serif))
+                    .font(.system(size: screenTitleSize, weight: .bold, design: .serif))
                     .tracking(-0.4)
                     .foregroundColor(VP.text)
                     .padding(.top, 24)
