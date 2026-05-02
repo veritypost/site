@@ -129,7 +129,7 @@ export async function POST(request: Request) {
 
   const { data: newStory, error: storyInsErr } = await service
     .from('stories')
-    .insert({ slug, title, published_at: now } as never)
+    .insert({ slug, title, published_at: now })
     .select('id')
     .single();
   if (storyInsErr || !newStory) {
@@ -150,7 +150,7 @@ export async function POST(request: Request) {
       visibility: 'public',
       published_at: now,
       metadata: { target },
-    } as never)
+    })
     .select('*, categories!fk_articles_category_id(name)')
     .single();
 

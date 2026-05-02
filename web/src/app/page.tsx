@@ -217,8 +217,7 @@ export default async function HomePage() {
           ascending: true,
           nullsFirst: false,
         }),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (supabase as any)
+      supabase
         .from('top_stories')
         .select('position, articles(id, title, stories(slug, lifecycle_status), excerpt, category_id, is_breaking, is_developing, published_at)')
         .order('position'),

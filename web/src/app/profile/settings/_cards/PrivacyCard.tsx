@@ -187,8 +187,7 @@ export function PrivacyCard({ user, preview }: Props) {
     // users primitive), writes an audit row, and bumps perms_version so
     // the visibility flip propagates to the cache without waiting for the
     // 60s poll.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase.rpc as any)('lockdown_self', {
+    const { error } = await supabase.rpc('lockdown_self', {
       p_user_id: authUser.id,
     });
     if (error) {

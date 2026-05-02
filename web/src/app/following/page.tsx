@@ -84,8 +84,7 @@ export default function FollowingPage() {
     if (storyIds.length === 0) { setLoading(false); return; }
 
     // Step 2: active stories from that set
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: storyRows, error: storyErr } = await (supabase as any)
+    const { data: storyRows, error: storyErr } = await supabase
       .from('stories')
       .select('id, title, lifecycle_status, published_at, slug')
       .in('id', storyIds)

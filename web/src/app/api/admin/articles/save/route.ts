@@ -167,7 +167,7 @@ export async function POST(request: Request) {
       if (currentStory?.slug !== rawSlug) {
         await service
           .from('stories')
-          .update({ slug: rawSlug, title: String(body.article.title ?? ''), updated_at: new Date().toISOString() } as never)
+          .update({ slug: rawSlug, title: String(body.article.title ?? ''), updated_at: new Date().toISOString() })
           .eq('id', storyId);
       }
     }
@@ -175,7 +175,7 @@ export async function POST(request: Request) {
     // New article: create the story first, then the article with story_id.
     const { data: newStory, error: storyErr } = await service
       .from('stories')
-      .insert({ slug: rawSlug, title: String(body.article.title ?? '') } as never)
+      .insert({ slug: rawSlug, title: String(body.article.title ?? '') })
       .select('id')
       .single();
     if (storyErr || !newStory) {

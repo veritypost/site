@@ -21,8 +21,7 @@ async function run(request: Request) {
   await logCronHeartbeat(CRON_NAME, 'start');
   try {
     const service = createServiceClient();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (service as any).rpc('expire_elapsed_mutes');
+    const { error } = await service.rpc('expire_elapsed_mutes');
     if (error) {
       await logCronHeartbeat(CRON_NAME, 'error', { error: error.message });
       return safeErrorResponse(NextResponse, error, {

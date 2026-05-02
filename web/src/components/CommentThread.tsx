@@ -181,15 +181,14 @@ export default function CommentThread({
 
     // Fetch authors via public_profiles_v + merge into the comment rows
     // so the existing CommentRow render (`comment.users.username` etc.)
-    // keeps working without further changes. `as never` cast: view added
-    // by migration after the last database-types regen.
+    // keeps working without further changes.
     type AuthorRow = NonNullable<CommentWithAuthor['users']>;
     let authorById = new Map<string, AuthorRow>();
     if (userIds.length > 0) {
       const { data: authorRows } = await supabase
-        .from('public_profiles_v' as never)
+        .from('public_profiles_v')
         .select('id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert, expert_title')
-        .in('id' as never, userIds as never);
+        .in('id', userIds);
       authorById = new Map(
         ((authorRows as unknown as AuthorRow[]) || [])
           .filter((a): a is AuthorRow & { id: string } => typeof a?.id === 'string')
@@ -207,23 +206,18 @@ export default function CommentThread({
     if (currentUserId) {
       if (commentIds.length > 0) {
         const { data: ar } = await supabase
-          .from('comment_agree_disagree' as never)
+          .from('comment_agree_disagree')
           .select('comment_id, reaction')
-          .eq('user_id' as never, currentUserId as never)
-          .in('comment_id' as never, commentIds as never);
+          .eq('user_id', currentUserId)
+          .in('comment_id', commentIds);
         const reactions: Record<string, 'agree' | 'disagree'> = {};
         ((ar || []) as unknown as Array<{ comment_id: string; reaction: 'agree' | 'disagree' }>)
           .forEach((row) => { reactions[row.comment_id] = row.reaction; });
         setYourReactions(reactions);
 
-        // `tag_kind` cast: the database.ts type still names the column
-        // `tag_type` until the next regen post-migration; the migration
-        // landing this Section A renames it to `tag_kind`. The cast
-        // keeps the build green during the transition window without
-        // hand-editing the generated types file.
         const { data: t } = await supabase
           .from('comment_context_tags')
-          .select('comment_id, tag_kind' as never)
+          .select('comment_id, tag_kind')
           .eq('user_id', currentUserId)
           .in('comment_id', commentIds);
         const tagMap = new Map<string, Set<TagKind>>();
@@ -305,9 +299,9 @@ export default function CommentThread({
           let author: AuthorRow | undefined;
           if (row.user_id) {
             const { data: authorRow } = await supabase
-              .from('public_profiles_v' as never)
+              .from('public_profiles_v')
               .select('id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert, expert_title')
-              .eq('id' as never, row.user_id as never)
+              .eq('id', row.user_id)
               .maybeSingle();
             if (authorRow) author = authorRow as unknown as AuthorRow;
           }
@@ -351,9 +345,9 @@ export default function CommentThread({
             let author: AuthorRow | undefined;
             if (row.user_id) {
               const { data: authorRow } = await supabase
-                .from('public_profiles_v' as never)
+                .from('public_profiles_v')
                 .select('id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert, expert_title')
-                .eq('id' as never, row.user_id as never)
+                .eq('id', row.user_id)
                 .maybeSingle();
               if (authorRow) author = authorRow as unknown as AuthorRow;
             }

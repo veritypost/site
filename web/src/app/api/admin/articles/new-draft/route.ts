@@ -172,7 +172,7 @@ export async function POST(req: Request) {
     // Slice 05: create story first (slug lives on stories), then article.
     const { data: newStory, error: storyInsertErr } = await service
       .from('stories')
-      .insert({ slug: finalSlug, title: 'Untitled draft' } as never)
+      .insert({ slug: finalSlug, title: 'Untitled draft' })
       .select('id')
       .single();
     if (storyInsertErr || !newStory) {

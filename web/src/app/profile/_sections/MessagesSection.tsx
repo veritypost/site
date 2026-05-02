@@ -108,7 +108,7 @@ export function MessagesSection({ preview }: Props) {
                 transition: 'background 120ms ease',
               }}
             >
-              <Avatar user={t.other_user as never} size={36} />
+              <Avatar user={t.other_user} size={36} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div
                   style={{

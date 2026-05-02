@@ -231,10 +231,10 @@ export function AvatarEditor({ user, preview, onUserUpdated }: Props) {
             minWidth: 160,
           }}
         >
-          <Avatar user={previewUser as never} size={104} />
+          <Avatar user={previewUser} size={104} />
           <div style={{ display: 'flex', gap: S[2], alignItems: 'center', marginTop: S[1] }}>
-            <Avatar user={previewUser as never} size={36} />
-            <Avatar user={previewUser as never} size={24} />
+            <Avatar user={previewUser} size={36} />
+            <Avatar user={previewUser} size={24} />
           </div>
           <div
             style={{

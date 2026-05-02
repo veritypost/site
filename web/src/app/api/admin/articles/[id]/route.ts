@@ -534,13 +534,13 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     const publishedAt = (update.published_at as string) ?? new Date().toISOString();
     const { data: newStory, error: storyCreateErr } = await service
       .from('stories')
-      .insert({ slug: storySlug, title: prior.title ?? 'Untitled', published_at: publishedAt } as never)
+      .insert({ slug: storySlug, title: prior.title ?? 'Untitled', published_at: publishedAt })
       .select('id')
       .single();
     if (storyCreateErr || !newStory) {
       console.error('[admin.articles.patch] stories create for orphan failed:', storyCreateErr?.message);
     } else {
-      await service.from('articles').update({ story_id: (newStory as { id: string }).id } as never).eq('id', id);
+      await service.from('articles').update({ story_id: (newStory as { id: string }).id }).eq('id', id);
     }
   }
 
@@ -860,18 +860,9 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   // string for any tooling that filters on it; the RPC's audit row is
   // the structurally-canonical record going forward.
   //
-  // `as never` cast: the RPC was added by migration after the last
-  // database-types regen. Same pattern lib/trackServer.ts uses for the
-  // events table. Drop the cast on the next types regeneration.
-  const { error } = await (
-    service.rpc as unknown as (
-      name: string,
-      args: Record<string, unknown>
-    ) => Promise<{ error: { message?: string } | null }>
-  )('admin_soft_delete_article', {
+  const { error } = await service.rpc('admin_soft_delete_article', {
     p_article_id: id,
     p_admin_id: actor.id,
-    p_reason: null,
   });
   if (error) {
     console.error('[admin.articles.delete]', error.message);

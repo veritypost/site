@@ -181,15 +181,12 @@ export default function ProfilePage() {
       // (email, plan_id, stripe_customer_id, cohort, frozen_at, kill-
       // switch flags) never reach this surface.
       //
-      // Cast through `as never` because the view was added by migration
-      // after the last database-types regen — same pattern lib/trackServer.ts
-      // uses for the events table. Drop the cast on next types regeneration.
       const { data: targetRow } = await supabase
-        .from('public_profiles_v' as never)
+        .from('public_profiles_v')
         .select(
           'id, username, display_name, bio, avatar_url, avatar_color, banner_url, verity_score, followers_count, following_count, quizzes_completed_count, comment_count, profile_visibility, show_activity, is_expert, expert_title, expert_organization, is_verified_public_figure, created_at'
         )
-        .eq('username' as never, username as never)
+        .eq('username', username)
         .maybeSingle<TargetRow>();
       if (!targetRow) {
         setNotFoundFlag(true);

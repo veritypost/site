@@ -2706,26 +2706,79 @@ export type Database = {
           },
         ]
       }
-      comment_context_tags: {
+      comment_agree_disagree: {
         Row: {
           comment_id: string
           created_at: string
           id: string
-          tag_type: string
+          reaction: string
           user_id: string
         }
         Insert: {
           comment_id: string
           created_at?: string
           id?: string
-          tag_type?: string
+          reaction: string
           user_id: string
         }
         Update: {
           comment_id?: string
           created_at?: string
           id?: string
-          tag_type?: string
+          reaction?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comment_agree_disagree_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comment_agree_disagree_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles_v"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comment_agree_disagree_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "public_user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comment_agree_disagree_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comment_context_tags: {
+        Row: {
+          comment_id: string
+          created_at: string
+          id: string
+          tag_kind: string
+          user_id: string
+        }
+        Insert: {
+          comment_id: string
+          created_at?: string
+          id?: string
+          tag_kind?: string
+          user_id: string
+        }
+        Update: {
+          comment_id?: string
+          created_at?: string
+          id?: string
+          tag_kind?: string
           user_id?: string
         }
         Relationships: [
@@ -2814,6 +2867,7 @@ export type Database = {
       }
       comments: {
         Row: {
+          agree_count: number
           ai_sentiment: string | null
           ai_tag: string | null
           ai_tag_confidence: number | null
@@ -2821,16 +2875,19 @@ export type Database = {
           article_id: string
           body: string
           body_html: string | null
+          cite_needed_count: number
           context_pinned_at: string | null
           context_tag_count: number
           created_at: string
           deleted_at: string | null
+          disagree_count: number
           downvote_count: number
           edit_count: number
           edited_at: string | null
           expert_question_status: string | null
           expert_question_target_id: string | null
           expert_question_target_type: string | null
+          helpful_count: number
           id: string
           ip_address: string | null
           is_author_reply: boolean
@@ -2844,7 +2901,9 @@ export type Database = {
           moderated_at: string | null
           moderated_by: string | null
           moderation_reason: string | null
+          off_topic_count: number
           parent_id: string | null
+          quality_score: number
           reply_count: number
           root_id: string | null
           status: string
@@ -2856,6 +2915,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          agree_count?: number
           ai_sentiment?: string | null
           ai_tag?: string | null
           ai_tag_confidence?: number | null
@@ -2863,16 +2923,19 @@ export type Database = {
           article_id: string
           body: string
           body_html?: string | null
+          cite_needed_count?: number
           context_pinned_at?: string | null
           context_tag_count?: number
           created_at?: string
           deleted_at?: string | null
+          disagree_count?: number
           downvote_count?: number
           edit_count?: number
           edited_at?: string | null
           expert_question_status?: string | null
           expert_question_target_id?: string | null
           expert_question_target_type?: string | null
+          helpful_count?: number
           id?: string
           ip_address?: string | null
           is_author_reply?: boolean
@@ -2886,7 +2949,9 @@ export type Database = {
           moderated_at?: string | null
           moderated_by?: string | null
           moderation_reason?: string | null
+          off_topic_count?: number
           parent_id?: string | null
+          quality_score?: number
           reply_count?: number
           root_id?: string | null
           status?: string
@@ -2898,6 +2963,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          agree_count?: number
           ai_sentiment?: string | null
           ai_tag?: string | null
           ai_tag_confidence?: number | null
@@ -2905,16 +2971,19 @@ export type Database = {
           article_id?: string
           body?: string
           body_html?: string | null
+          cite_needed_count?: number
           context_pinned_at?: string | null
           context_tag_count?: number
           created_at?: string
           deleted_at?: string | null
+          disagree_count?: number
           downvote_count?: number
           edit_count?: number
           edited_at?: string | null
           expert_question_status?: string | null
           expert_question_target_id?: string | null
           expert_question_target_type?: string | null
+          helpful_count?: number
           id?: string
           ip_address?: string | null
           is_author_reply?: boolean
@@ -2928,7 +2997,9 @@ export type Database = {
           moderated_at?: string | null
           moderated_by?: string | null
           moderation_reason?: string | null
+          off_topic_count?: number
           parent_id?: string | null
+          quality_score?: number
           reply_count?: number
           root_id?: string | null
           status?: string
@@ -4745,6 +4816,339 @@ export type Database = {
         }
         Relationships: []
       }
+      events_20260501: {
+        Row: {
+          article_id: string | null
+          article_slug: string | null
+          author_id: string | null
+          category_slug: string | null
+          consent_ads: boolean | null
+          consent_analytics: boolean | null
+          content_type: string | null
+          country_iso2: string | null
+          created_at: string
+          device_id: string | null
+          device_type: string | null
+          event_category: string
+          event_id: string
+          event_name: string
+          experiment_bucket: string | null
+          ip_hash: string | null
+          is_bot: boolean
+          occurred_at: string
+          page: string | null
+          payload: Json
+          received_at: string
+          referrer_domain: string | null
+          region: string | null
+          session_id: string
+          subcategory_slug: string | null
+          user_agent_hash: string | null
+          user_id: string | null
+          user_tenure_days: number | null
+          user_tier: string | null
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          viewport_h: number | null
+          viewport_w: number | null
+        }
+        Insert: {
+          article_id?: string | null
+          article_slug?: string | null
+          author_id?: string | null
+          category_slug?: string | null
+          consent_ads?: boolean | null
+          consent_analytics?: boolean | null
+          content_type?: string | null
+          country_iso2?: string | null
+          created_at?: string
+          device_id?: string | null
+          device_type?: string | null
+          event_category: string
+          event_id: string
+          event_name: string
+          experiment_bucket?: string | null
+          ip_hash?: string | null
+          is_bot?: boolean
+          occurred_at: string
+          page?: string | null
+          payload?: Json
+          received_at?: string
+          referrer_domain?: string | null
+          region?: string | null
+          session_id: string
+          subcategory_slug?: string | null
+          user_agent_hash?: string | null
+          user_id?: string | null
+          user_tenure_days?: number | null
+          user_tier?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          viewport_h?: number | null
+          viewport_w?: number | null
+        }
+        Update: {
+          article_id?: string | null
+          article_slug?: string | null
+          author_id?: string | null
+          category_slug?: string | null
+          consent_ads?: boolean | null
+          consent_analytics?: boolean | null
+          content_type?: string | null
+          country_iso2?: string | null
+          created_at?: string
+          device_id?: string | null
+          device_type?: string | null
+          event_category?: string
+          event_id?: string
+          event_name?: string
+          experiment_bucket?: string | null
+          ip_hash?: string | null
+          is_bot?: boolean
+          occurred_at?: string
+          page?: string | null
+          payload?: Json
+          received_at?: string
+          referrer_domain?: string | null
+          region?: string | null
+          session_id?: string
+          subcategory_slug?: string | null
+          user_agent_hash?: string | null
+          user_id?: string | null
+          user_tenure_days?: number | null
+          user_tier?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          viewport_h?: number | null
+          viewport_w?: number | null
+        }
+        Relationships: []
+      }
+      events_20260502: {
+        Row: {
+          article_id: string | null
+          article_slug: string | null
+          author_id: string | null
+          category_slug: string | null
+          consent_ads: boolean | null
+          consent_analytics: boolean | null
+          content_type: string | null
+          country_iso2: string | null
+          created_at: string
+          device_id: string | null
+          device_type: string | null
+          event_category: string
+          event_id: string
+          event_name: string
+          experiment_bucket: string | null
+          ip_hash: string | null
+          is_bot: boolean
+          occurred_at: string
+          page: string | null
+          payload: Json
+          received_at: string
+          referrer_domain: string | null
+          region: string | null
+          session_id: string
+          subcategory_slug: string | null
+          user_agent_hash: string | null
+          user_id: string | null
+          user_tenure_days: number | null
+          user_tier: string | null
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          viewport_h: number | null
+          viewport_w: number | null
+        }
+        Insert: {
+          article_id?: string | null
+          article_slug?: string | null
+          author_id?: string | null
+          category_slug?: string | null
+          consent_ads?: boolean | null
+          consent_analytics?: boolean | null
+          content_type?: string | null
+          country_iso2?: string | null
+          created_at?: string
+          device_id?: string | null
+          device_type?: string | null
+          event_category: string
+          event_id: string
+          event_name: string
+          experiment_bucket?: string | null
+          ip_hash?: string | null
+          is_bot?: boolean
+          occurred_at: string
+          page?: string | null
+          payload?: Json
+          received_at?: string
+          referrer_domain?: string | null
+          region?: string | null
+          session_id: string
+          subcategory_slug?: string | null
+          user_agent_hash?: string | null
+          user_id?: string | null
+          user_tenure_days?: number | null
+          user_tier?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          viewport_h?: number | null
+          viewport_w?: number | null
+        }
+        Update: {
+          article_id?: string | null
+          article_slug?: string | null
+          author_id?: string | null
+          category_slug?: string | null
+          consent_ads?: boolean | null
+          consent_analytics?: boolean | null
+          content_type?: string | null
+          country_iso2?: string | null
+          created_at?: string
+          device_id?: string | null
+          device_type?: string | null
+          event_category?: string
+          event_id?: string
+          event_name?: string
+          experiment_bucket?: string | null
+          ip_hash?: string | null
+          is_bot?: boolean
+          occurred_at?: string
+          page?: string | null
+          payload?: Json
+          received_at?: string
+          referrer_domain?: string | null
+          region?: string | null
+          session_id?: string
+          subcategory_slug?: string | null
+          user_agent_hash?: string | null
+          user_id?: string | null
+          user_tenure_days?: number | null
+          user_tier?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          viewport_h?: number | null
+          viewport_w?: number | null
+        }
+        Relationships: []
+      }
+      events_20260503: {
+        Row: {
+          article_id: string | null
+          article_slug: string | null
+          author_id: string | null
+          category_slug: string | null
+          consent_ads: boolean | null
+          consent_analytics: boolean | null
+          content_type: string | null
+          country_iso2: string | null
+          created_at: string
+          device_id: string | null
+          device_type: string | null
+          event_category: string
+          event_id: string
+          event_name: string
+          experiment_bucket: string | null
+          ip_hash: string | null
+          is_bot: boolean
+          occurred_at: string
+          page: string | null
+          payload: Json
+          received_at: string
+          referrer_domain: string | null
+          region: string | null
+          session_id: string
+          subcategory_slug: string | null
+          user_agent_hash: string | null
+          user_id: string | null
+          user_tenure_days: number | null
+          user_tier: string | null
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          viewport_h: number | null
+          viewport_w: number | null
+        }
+        Insert: {
+          article_id?: string | null
+          article_slug?: string | null
+          author_id?: string | null
+          category_slug?: string | null
+          consent_ads?: boolean | null
+          consent_analytics?: boolean | null
+          content_type?: string | null
+          country_iso2?: string | null
+          created_at?: string
+          device_id?: string | null
+          device_type?: string | null
+          event_category: string
+          event_id: string
+          event_name: string
+          experiment_bucket?: string | null
+          ip_hash?: string | null
+          is_bot?: boolean
+          occurred_at: string
+          page?: string | null
+          payload?: Json
+          received_at?: string
+          referrer_domain?: string | null
+          region?: string | null
+          session_id: string
+          subcategory_slug?: string | null
+          user_agent_hash?: string | null
+          user_id?: string | null
+          user_tenure_days?: number | null
+          user_tier?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          viewport_h?: number | null
+          viewport_w?: number | null
+        }
+        Update: {
+          article_id?: string | null
+          article_slug?: string | null
+          author_id?: string | null
+          category_slug?: string | null
+          consent_ads?: boolean | null
+          consent_analytics?: boolean | null
+          content_type?: string | null
+          country_iso2?: string | null
+          created_at?: string
+          device_id?: string | null
+          device_type?: string | null
+          event_category?: string
+          event_id?: string
+          event_name?: string
+          experiment_bucket?: string | null
+          ip_hash?: string | null
+          is_bot?: boolean
+          occurred_at?: string
+          page?: string | null
+          payload?: Json
+          received_at?: string
+          referrer_domain?: string | null
+          region?: string | null
+          session_id?: string
+          subcategory_slug?: string | null
+          user_agent_hash?: string | null
+          user_id?: string | null
+          user_tenure_days?: number | null
+          user_tier?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          viewport_h?: number | null
+          viewport_w?: number | null
+        }
+        Relationships: []
+      }
       events_default: {
         Row: {
           article_id: string | null
@@ -4922,6 +5326,7 @@ export type Database = {
           title: string | null
           updated_at: string
           user_id: string
+          vacation_until: string | null
           verification_documents: Json
           website_url: string | null
         }
@@ -4954,6 +5359,7 @@ export type Database = {
           title?: string | null
           updated_at?: string
           user_id: string
+          vacation_until?: string | null
           verification_documents?: Json
           website_url?: string | null
         }
@@ -4986,6 +5392,7 @@ export type Database = {
           title?: string | null
           updated_at?: string
           user_id?: string
+          vacation_until?: string | null
           verification_documents?: Json
           website_url?: string | null
         }
@@ -9277,6 +9684,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          lifecycle_status: string
           published_at: string | null
           slug: string
           title: string
@@ -9285,6 +9693,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          lifecycle_status?: string
           published_at?: string | null
           slug: string
           title?: string
@@ -9293,6 +9702,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          lifecycle_status?: string
           published_at?: string | null
           slug?: string
           title?: string
@@ -9891,6 +10301,38 @@ export type Database = {
             columns: ["story_id"]
             isOneToOne: false
             referencedRelation: "stories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      top_stories: {
+        Row: {
+          article_id: string
+          id: string
+          pinned_at: string
+          pinned_by: string | null
+          position: number
+        }
+        Insert: {
+          article_id: string
+          id?: string
+          pinned_at?: string
+          pinned_by?: string | null
+          position: number
+        }
+        Update: {
+          article_id?: string
+          id?: string
+          pinned_at?: string
+          pinned_by?: string | null
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "top_stories_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: true
+            referencedRelation: "articles"
             referencedColumns: ["id"]
           },
         ]
@@ -11256,6 +11698,15 @@ export type Database = {
         }
         Returns: undefined
       }
+      admin_force_bookmark: {
+        Args: {
+          p_article_id: string
+          p_collection_id?: string
+          p_notes?: string
+          p_user_id: string
+        }
+        Returns: string
+      }
       admin_restore_article: {
         Args: { p_admin_id: string; p_article_id: string }
         Returns: undefined
@@ -11556,6 +12007,7 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: boolean
       }
+      expire_elapsed_mutes: { Args: never; Returns: undefined }
       export_user_data: { Args: { p_user_id: string }; Returns: Json }
       family_members: {
         Args: { p_owner_id: string }
@@ -12140,10 +12592,16 @@ export type Database = {
         Args: { p_decision_reason?: string; p_request_id: string }
         Returns: undefined
       }
-      toggle_context_tag: {
-        Args: { p_comment_id: string; p_user_id: string }
-        Returns: Json
-      }
+      toggle_context_tag:
+        | { Args: { p_comment_id: string; p_user_id: string }; Returns: Json }
+        | {
+            Args: {
+              p_comment_id: string
+              p_tag_kind?: string
+              p_user_id: string
+            }
+            Returns: Json
+          }
       toggle_follow: {
         Args: { p_follower_id: string; p_target_id: string }
         Returns: Json
@@ -12361,3 +12819,4 @@ export const Constants = {
     },
   },
 } as const
+
