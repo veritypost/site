@@ -5,12 +5,12 @@ Single-line state for the review system. Updated automatically at session end.
 ```
 CURRENT_PHASE: auto-detect
 CURRENT_UNIT: cross-cutting
-CURRENT_TITLE: Registration wall (Slice 6) or iOS CSAM bridge (Slice 8) — parallel eligible
+CURRENT_TITLE: Slice 7 — Admin ad system completion (prereqs 2+4 met)
 CURRENT_WAVE: A
 CURRENT_DOC: UI_UX_REVIEW_SLICES.md
 STATUS: ready
-NEXT_BUILD_SLICE: Slice 6 — Registration wall (cross-cutting); or Slice 8 — iOS CSAM bridge (independent, can run in parallel)
-ANCHOR: Slice 5 (Article reader broken-state cleanup) shipped 2026-05-02. 17 files, 452 insertions, commit cc8142a pushed. All 126 findings fixed; 2 adversary gaps closed (DECISION #033 preview intercepts + DECISION #034 hide-reason required dropdown); tsc clean. Auto-detect next: Slice 6 (registration wall) — no shared files with Slice 7, can run in parallel if desired.
+NEXT_BUILD_SLICE: Slice 7 — Admin ad system (9 steps; prereqs 2+4 shipped)
+ANCHOR: Slice 8 (iOS CSAM-trio bridge) shipped 2026-05-02. BlockService.swift ReportReason enum extended with csam/child_exploitation/grooming at top; adversary clean; pre-existing union-enum divergence logged to drift bin. Auto-detect next: Slice 7 (Admin ad system) — all prereqs met.
 LAST_UPDATED: 2026-05-02
 
 PARKED_UNITS:

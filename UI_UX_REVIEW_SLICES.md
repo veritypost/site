@@ -517,9 +517,9 @@ Seed `ad_placements` rows + add `<Ad placement="..."/>` calls:
 | Slice 3 — Unit 1 / Home (49 findings) | Unit fix | shipped 2026-05-02 (4-stream parallel; tsc + build clean; 10 MOOT findings removed by DECISION #026; 35 confirmed findings fixed; HomeBrokenPinBanner TODO deferred) | 1 + 2 | #021–#029 | 1 |
 | Slice 4 — Unit 2 / Article reader / Layout | Unit fix | shipped 2026-05-02 (desktop 75/25 flex rail + mobile 3-tab; tsc + build clean) | 1 + 2 | #008 / #009 / #011 | 1 |
 | Slice 5 — Unit 2 / Article reader / Cleanup (126 findings) | Unit fix | shipped 2026-05-02 (4-stream parallel + adversary; 2 gap agents; tsc clean; all 126 findings fixed; commit cc8142a pushed) | 1 + 2 + 4 | #030–#039 | 4 (4-stream parallel) + 1 verification |
-| Slice 6 — Registration wall | Cross-cutting | not started | 1 + 2 (4 optional) | #043 | 2 |
+| Slice 6 — Registration wall | Cross-cutting | shipped 2026-05-02 (commit bff449e; tsc clean; adversary gaps closed) | 1 + 2 (4 optional) | #043 | 1 |
 | Slice 7 — Admin ad system completion | Cross-cutting | not started | 2 + 4 | #044 + #041 / #042 / #045 | 4 (steps in parallel where possible) + 1 verification |
-| Slice 8 — iOS CSAM-trio bridge | Cross-cutting | not started | — | #047 | 1 |
+| Slice 8 — iOS CSAM-trio bridge | Cross-cutting | shipped 2026-05-02 (BlockService.swift enum extended; adversary clean; pre-existing union-enum divergence logged to drift bin) | — | #047 | 1 |
 | Slice 9 — Cross-platform parity bridges | Cross-cutting | not started | 4 | Q7 | 2-3 |
 | Slice 10 — Wave A verification sweep | Verification | not started | all Wave A unit-fix slices | — | 1 |
 

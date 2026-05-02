@@ -139,6 +139,10 @@ final class BlockService: ObservableObject {
 // { targetType, targetId, reason, description }.
 enum ReportTargetType: String { case comment, conversation, user, article }
 enum ReportReason: String, CaseIterable, Identifiable {
+    // 18 U.S.C. § 2258A — urgent trio appears first in all report dialogs
+    case csam = "csam"
+    case childExploitation = "child_exploitation"
+    case grooming = "grooming"
     case spam = "spam"
     case harassment = "harassment"
     case offTopic = "off_topic"
@@ -148,6 +152,9 @@ enum ReportReason: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var label: String {
         switch self {
+        case .csam: return "Sexual content involving a minor"
+        case .childExploitation: return "Suspected child exploitation"
+        case .grooming: return "Grooming / contact attempt by an adult"
         case .spam: return "Spam"
         case .harassment: return "Harassment or hate"
         case .offTopic: return "Off-topic"

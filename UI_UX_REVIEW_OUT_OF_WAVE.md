@@ -43,6 +43,20 @@ Format: `S?<n> — <pattern>` — `S?` = sweep candidate, becomes `S<n>` if prom
 - **Fix shape:** Add `updateStory('subcategory', '')` inside the category onChange handler before or after updating category. One-line fix per editor.
 - **Scope:** Admin surface only; not a public-facing bug. Flag when Unit 49 (Newsroom cluster) is reviewed.
 
+### S?7 — iOS ReportReason union-enum vs web per-surface lists
+- **First sighted:** Slice 8 adversary pass, 2026-05-02
+- **Pattern:** iOS uses a single `ReportReason` enum for all report surfaces (comment, article, conversation, profile). Web uses per-surface lists (`COMMENT_REPORT_REASONS`, `ARTICLE_REPORT_REASONS`, `PROFILE_REPORT_REASONS`) with different subsets. Effect: iOS conversation reports offer `misinformation` / `off_topic` (doesn't apply to DMs), and iOS profile / article reports omit `impersonation` and `hate_speech` that web provides.
+- **Affected surfaces:** `StoryDetailView` (article report), `MessagesView` (conversation report), `PublicProfileView` (profile report).
+- **Fix shape:** Split `ReportReason` into per-surface enums or filter `allCases` at call site by surface. Mirror web's subset design.
+- **Decision needed at wave-end:** fold into iOS parity sweep (Slice 9 or separate iOS surface pass).
+
+### S?8 — VerityPostKids has no in-app report path (Guideline 1.2 / NCMEC gap)
+- **First sighted:** Slice 8 adversary pass, 2026-05-02
+- **Pattern:** Kids iOS app has no `ReportService`, no `ReportReason`, and no content-report affordance. If any user-visible content surface exists in the kids app (expert sessions, leaderboard names, etc.) where exploitative content could appear, Apple Guideline 1.2 requires a report path.
+- **Affected units:** VerityPostKids (entire app). Currently read-only; gap is benign only if the app truly surfaces zero UGC.
+- **Fix shape:** Confirm zero UGC surfaces in kids app; if any exist, add `ReportService` + `BlockService` parity from adult app.
+- **Decision needed:** owner to confirm kids app content model before Wave D (kids iOS review).
+
 ### S?2 — Footer links at 11px without hit-target padding
 - **First sighted:** Unit 1 (Home), 2026-05-02
 - **Pattern:** `NavWrapper.tsx:530-563` global footer renders 14 links + Cookie preferences button at `fontSize:11` with no padding. Tap targets ~14px tall, far below §2.1's 44px floor.
