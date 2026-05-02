@@ -423,7 +423,8 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
         const localType: 'story' | 'event' = isAnchor ? 'story' : 'event';
         const eventBody = (ev.event_body as string | null) ?? '';
         const eventLabel = (ev.event_label as string | null) ?? (ev.title as string | null) ?? '';
-        const eventDate = (ev.event_date as string | null) ?? '';
+        const rawEventDate = (ev.event_date as string | null) ?? '';
+        const eventDate = rawEventDate ? rawEventDate.split('T')[0] : '';
         // Anchor row's event_body is NULL by design — persist_generated_article
         // only writes event_label + event_date for type='article'. Body lives
         // on articles.body. Always read from cast.body for the anchor (not
@@ -710,7 +711,8 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
         const localType: 'story' | 'event' = isAnchor ? 'story' : 'event';
         const eventBody = (ev.event_body as string | null) ?? '';
         const eventLabel = (ev.event_label as string | null) ?? (ev.title as string | null) ?? '';
-        const eventDate = (ev.event_date as string | null) ?? '';
+        const rawEventDate = (ev.event_date as string | null) ?? '';
+        const eventDate = rawEventDate ? rawEventDate.split('T')[0] : '';
         const content = isAnchor ? (story.body || '') : eventBody;
         return {
           id: e.id,

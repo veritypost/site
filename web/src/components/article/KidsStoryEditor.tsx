@@ -345,15 +345,19 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
           : (dbType as 'story' | 'event') || ((ev.content as string | null) ? 'story' : 'event');
         // Anchor row's event_body is NULL by design — body lives on articles.body.
         const eventContent = (ev.content as string | null) || '';
+        const rawEventDate = (ev.date as string | null) || (ev.event_date as string | null) || '';
+        const eventDate = rawEventDate ? rawEventDate.split('T')[0] : '';
+        const rawTimelineDate = (ev.date as string | null) || '';
+        const timelineDate = rawTimelineDate ? rawTimelineDate.split('T')[0] : '';
         return {
           id: e.id,
-          event_date: (ev.date as string | null) || (ev.event_date as string | null) || '',
+          event_date: eventDate,
           is_current: Boolean(ev.is_current),
           type: localType,
           title: (ev.text as string | null) || (ev.event_label as string | null) || '',
           summary: (ev.summary as string | null) || (ev.event_body as string | null) || '',
           content: isAnchor ? ((cast as unknown as { body?: string | null }).body || '') : eventContent,
-          timeline_date: (ev.date as string | null) || '',
+          timeline_date: timelineDate,
           timeline_headline: (ev.text as string | null) || '',
           comment_count: 0,
         };
