@@ -107,6 +107,7 @@ function AudienceCard(props: AudienceCardProps) {
   const [articleId, setArticleId] = useState<string | null>(initialArticleId);
   const [articleSlug] = useState<string | null>(initialArticleSlug);
   const [articleTitle] = useState<string | null>(initialArticleTitle);
+  const [articleStatus, setArticleStatus] = useState<'draft' | 'published' | 'archived' | null>(null);
   const [errorType, setErrorType] = useState<string | null>(initialErrorType);
   const [errorStep, setErrorStep] = useState<string | null>(initialErrorStep);
   const [currentStep, setCurrentStep] = useState<string | null>(null);
@@ -177,6 +178,42 @@ function AudienceCard(props: AudienceCardProps) {
 
   // Cleanup on unmount.
   useEffect(() => () => { stopPolling(); }, [stopPolling]);
+
+  // Article publish status — read once whenever we land in `generated` with
+  // an articleId, then refresh whenever the operator returns to this tab
+  // (window focus / bfcache restore covers the back-from-editor flow).
+  // Errors are silent — pill falls back to "Generated".
+  const fetchArticleStatus = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/admin/articles/${id}`);
+      if (!res.ok) return;
+      const json = (await res.json().catch(() => null)) as
+        | { article?: { status?: string } }
+        | null;
+      const next = json?.article?.status;
+      if (next === 'draft' || next === 'published' || next === 'archived') {
+        setArticleStatus(next);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (state !== 'generated' || !articleId) return;
+    void fetchArticleStatus(articleId);
+  }, [state, articleId, fetchArticleStatus]);
+
+  useEffect(() => {
+    if (state !== 'generated' || !articleId) return;
+    const refetch = () => { void fetchArticleStatus(articleId); };
+    window.addEventListener('focus', refetch);
+    window.addEventListener('pageshow', refetch);
+    return () => {
+      window.removeEventListener('focus', refetch);
+      window.removeEventListener('pageshow', refetch);
+    };
+  }, [state, articleId, fetchArticleStatus]);
 
   const handleGenerate = useCallback(async () => {
     if (selectedSourceUrls !== undefined && selectedSourceUrls.length === 0) {
@@ -313,6 +350,31 @@ function AudienceCard(props: AudienceCardProps) {
       ? articleTitle || workingHeadline || 'Generated article'
       : workingHeadline || 'No working headline yet';
 
+  let pillLabel: string;
+  let pillColor: string;
+  if (state === 'idle') {
+    pillLabel = 'Pending';
+    pillColor = C.muted;
+  } else if (state === 'skipped') {
+    pillLabel = 'Skipped';
+    pillColor = C.muted;
+  } else if (state === 'generating') {
+    pillLabel = 'Working';
+    pillColor = C.ink;
+  } else if (state === 'failed') {
+    pillLabel = 'Failed';
+    pillColor = C.danger;
+  } else if (articleStatus === 'published') {
+    pillLabel = 'Published';
+    pillColor = C.success;
+  } else if (articleStatus === 'archived') {
+    pillLabel = 'Archived';
+    pillColor = C.muted;
+  } else {
+    pillLabel = 'Generated';
+    pillColor = C.ink;
+  }
+
   return (
     <div
       style={{
@@ -333,8 +395,8 @@ function AudienceCard(props: AudienceCardProps) {
         <span style={{ fontSize: F.xs, fontWeight: 700, letterSpacing: 0.5, color: C.soft }}>
           {BAND_LABEL[audienceBand].toUpperCase()}
         </span>
-        <span style={{ fontSize: F.xs, color: C.muted }}>
-          {state === 'idle' ? 'Pending' : state === 'skipped' ? 'Skipped' : state === 'generating' ? 'Working' : state === 'failed' ? 'Failed' : 'Generated'}
+        <span style={{ fontSize: F.xs, fontWeight: 700, letterSpacing: 0.5, color: pillColor }}>
+          {pillLabel.toUpperCase()}
         </span>
       </div>
 
@@ -397,7 +459,7 @@ function AudienceCard(props: AudienceCardProps) {
         )}
         {state === 'generated' && (
           <>
-            {articleSlug ? (
+            {articleSlug && (
               <Link
                 href={`/${articleSlug}`}
                 style={{
@@ -414,24 +476,7 @@ function AudienceCard(props: AudienceCardProps) {
               >
                 View article
               </Link>
-            ) : articleId ? (
-              <Link
-                href={`/admin/story-manager?article=${articleId}`}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  padding: `${S[1]}px ${S[3]}px`,
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 6,
-                  textDecoration: 'none',
-                  color: C.ink,
-                  fontSize: F.sm,
-                  fontWeight: 500,
-                }}
-              >
-                View article
-              </Link>
-            ) : null}
+            )}
             {articleId && (
               <Link
                 href={

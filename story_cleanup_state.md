@@ -1716,7 +1716,7 @@ Status:      RESOLVED — unblocks concern #34 (drop redundant
 ```
 
 ### 34. AudienceCard — drop redundant articleId-fallback View Link
-Status: IN_PROGRESS
+Status: RESOLVED
 Symptom: AudienceCard's generated-state currently renders "View article"
 twice in fallback chain — first as a Link to the public slug, then (if
 slug missing) as a Link to /admin/story-manager?article=ID. The
@@ -1728,6 +1728,63 @@ transitions, the fallback is the only path that ever fires for live-
 generated cards. Resolve #33 first, then this. Also has a latent
 bug — the fallback hardcodes `/admin/story-manager` even for
 tweens/kids articles, which would route to the adult editor.
+
+```
+RESOLUTION (concern 34) — 2026-05-02
+Investigate: Generated-state JSX in AudienceCard.tsx had a chained
+             ternary: articleSlug ? <Link href=`/${slug}`>View
+             article</Link> : articleId ? <Link href=`/admin/story-
+             manager?article=${id}`>View article</Link> : null.
+             Concern #10 already shipped a dedicated Edit Link gated
+             only on articleId that routes by audienceBand
+             (adult → story-manager, tweens/kids → kids-story-
+             manager). The articleId-fallback Link duplicated the
+             editor route AND hardcoded the adult editor — for kids/
+             tweens cards with no slug, "View article" silently
+             routed to the wrong editor. Categorized (b) parallel
+             code paths + (a) latent kids routing bug.
+Review:      A (confirmer) AGREED — verified the fallback is the only
+             "View article" rendering today (because the articleSlug
+             branch is dead code: articleMeta is never wired through
+             page.tsx → StoryCard, and the polling tick comment at
+             lines 147-149 explicitly notes the run-detail endpoint
+             doesn't return slug). Confirmed Edit Link covers all
+             editor access with correct audienceBand routing. Other
+             editor paths preserved: ArticlesTable Edit button (#12),
+             direct URL.
+             B (adversary) AGREE-WITH-CHANGES — surfaced that the
+             articleSlug branch is also dead code today, and
+             recommended KEEPING it anyway as the correct public-page
+             affordance for when slug-wiring eventually lands. B
+             noted a follow-up worth filing separately: wire
+             articleMeta from page.tsx so the slug branch actually
+             renders for published articles. NOT in #34 scope; the
+             cluster list endpoint at clusters/list/route.ts joins
+             audience_state but never resolves
+             audience_state.article_id → articles.story_id →
+             stories.slug.
+             No tie-breaker — A and B converged on Stage 1's plan
+             (delete fallback only, keep slug branch).
+Fix:         web/src/app/admin/newsroom/_components/AudienceCard.tsx —
+             Replaced the chained ternary in the state==='generated'
+             block with two independent conditionals: articleSlug &&
+             <View Link>, articleId && <Edit Link from #10>. The
+             articleId-fallback "View article" Link was deleted
+             outright (17 lines). Skip button untouched. The
+             articleSlug branch is preserved (currently inert; will
+             render once a future fix wires articleMeta).
+TypeScript:  pass (npx tsc --noEmit, exit 0)
+iOS build:   n/a — newsroom is web-admin only.
+Verifier:    pass — 7/7 checks. JSX shape is now the clean affordance
+             contract (View=public, Edit=editor, Skip=skip), no
+             parallel paths, no kids-routed-to-adult-editor latent
+             bug. Cross-platform scope confirmed admin-web only.
+Status:      RESOLVED — clean affordance contract, latent bug fixed.
+             Optional follow-up (NOT this concern): wire articleMeta
+             through page.tsx → StoryCard so the slug branch renders
+             for published articles. File as a new concern if owner
+             wants the public-page View link to actually work.
+```
 
 ---
 
