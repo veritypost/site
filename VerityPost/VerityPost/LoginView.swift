@@ -25,16 +25,26 @@ struct LoginView: View {
                 VStack(spacing: 0) {
                     // Hero
                     Text("Verity Post")
-                        .font(.system(.largeTitle, design: .default, weight: .bold))
-                        .tracking(-1)
+                        .font(.system(size: VP.Size.xl, weight: .bold, design: .serif))
+                        .tracking(-0.4)
                         .foregroundColor(VP.text)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.top, 56)
+                        .padding(.bottom, 24)
+
+                    Text("Pick up where you left off.")
+                        .font(.system(size: VP.Size.xxl, weight: .bold))
+                        .tracking(-0.3)
+                        .foregroundColor(VP.text)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.bottom, 8)
 
                     Text("Welcome back.")
                         .font(.subheadline)
                         .foregroundColor(VP.dim)
-                        .padding(.bottom, 36)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.bottom, 32)
 
                     if let sentTo = auth.magicLinkSentTo {
                         sentCard(email: sentTo)
@@ -111,7 +121,10 @@ struct LoginView: View {
                 .frame(minHeight: 44)
                 .background(VP.card)
                 .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
-                .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
+                .overlay(
+                    RoundedRectangle(cornerRadius: VP.radiusMD)
+                        .stroke(emailFocused ? VP.accent : VP.border, lineWidth: 1.5)
+                )
         }
         .padding(.bottom, 22)
 
@@ -135,7 +148,7 @@ struct LoginView: View {
             }
             .frame(maxWidth: .infinity)
             .frame(minHeight: 48)
-            .background(canSubmit ? VP.text : VP.muted)
+            .background(canSubmit ? VP.accent : VP.muted)
             .foregroundColor(.white)
             .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
         }
@@ -147,7 +160,7 @@ struct LoginView: View {
     @ViewBuilder
     private func sentCard(email: String) -> some View {
         VStack(spacing: 14) {
-            Image(systemName: "envelope.badge")
+            Image(systemName: "envelope.circle")
                 .font(.largeTitle)
                 .foregroundColor(VP.accent)
                 .accessibilityHidden(true)
@@ -180,7 +193,7 @@ struct LoginView: View {
 
             Button("Use a different email") {
                 auth.clearMagicLinkState()
-                email.isEmpty ? () : (self.email = "")
+                self.email = ""
             }
             .font(.footnote)
             .foregroundColor(VP.dim)
@@ -193,7 +206,7 @@ struct LoginView: View {
     @ViewBuilder
     private var gatedCard: some View {
         VStack(spacing: 14) {
-            Image(systemName: "clock")
+            Image(systemName: "clock.badge.checkmark")
                 .font(.largeTitle)
                 .foregroundColor(VP.accent)
                 .accessibilityHidden(true)

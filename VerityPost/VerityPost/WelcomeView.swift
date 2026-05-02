@@ -24,88 +24,93 @@ struct WelcomeView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header — wordmark + Skip
-            HStack(alignment: .firstTextBaseline) {
-                Text("Verity Post")
-                    .font(.system(size: VP.Size.xl, weight: .bold, design: .serif))
-                    .tracking(-0.4)
-                    .foregroundColor(VP.text)
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 0) {
+                    // Header — wordmark + Skip
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("Verity Post")
+                            .font(.system(size: VP.Size.xl, weight: .bold, design: .serif))
+                            .tracking(-0.4)
+                            .foregroundColor(VP.text)
 
-                Spacer()
+                        Spacer()
 
-                Button("Skip") { complete() }
-                    .font(.system(.footnote, design: .default, weight: .semibold))
-                    .foregroundColor(VP.dim)
-                    .frame(minHeight: 44)
-                    .accessibilityLabel("Skip onboarding")
-            }
-            .padding(.horizontal, 24)
-            .padding(.top, 24)
-
-            // Card
-            VStack(alignment: .leading, spacing: 0) {
-                TabView(selection: $page) {
-                    screenOne.tag(0)
-                    screenTwo.tag(1)
-                    screenThree.tag(2)
-                }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-                .animation(reduceMotion ? nil : .easeInOut, value: page)
-                .frame(minHeight: 360)
-
-                // Pagination dots
-                HStack(spacing: 8) {
-                    ForEach(0..<totalPages, id: \.self) { i in
-                        Capsule()
-                            .fill(i == page ? VP.accent : VP.border)
-                            .frame(width: i == page ? 24 : 8, height: 8)
-                            .animation(.easeInOut(duration: 0.2), value: page)
+                        Button("Skip") { complete() }
+                            .font(.system(.footnote, design: .default, weight: .semibold))
+                            .foregroundColor(VP.dim)
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                            .accessibilityLabel("Skip onboarding")
                     }
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.top, 8)
+                    .padding(.horizontal, 24)
+                    .padding(.top, 24)
 
-                if stampError {
-                    VStack(spacing: 8) {
-                        Text("Couldn\u{2019}t finish onboarding. Please try again.")
-                            .font(.footnote)
-                            .foregroundColor(VP.danger)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                        // T88 — escape hatch after repeated stamp failures so
-                        // a flaky network on first launch doesn't permanently
-                        // block app entry. Bypass is local-only; the welcome
-                        // flow re-fires next launch if the server stamp is
-                        // still missing.
-                        Button("Continue anyway") {
-                            auth.bypassOnboardingLocally = true
+                    // Card
+                    VStack(alignment: .leading, spacing: 0) {
+                        TabView(selection: $page) {
+                            screenOne.tag(0)
+                            screenTwo.tag(1)
+                            screenThree.tag(2)
                         }
-                        .font(.footnote.weight(.semibold))
-                        .foregroundColor(VP.accent)
+                        .tabViewStyle(.page(indexDisplayMode: .never))
+                        .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: page)
+                        .frame(minHeight: 360)
+
+                        // Pagination dots
+                        HStack(spacing: 8) {
+                            ForEach(0..<totalPages, id: \.self) { i in
+                                Capsule()
+                                    .fill(i == page ? VP.accent : VP.border)
+                                    .frame(width: i == page ? 24 : 8, height: 8)
+                                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: page)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 8)
+
+                        if stampError {
+                            VStack(spacing: 8) {
+                                Text("Couldn\u{2019}t finish onboarding. Please try again.")
+                                    .font(.footnote)
+                                    .foregroundColor(VP.danger)
+                                    .frame(maxWidth: .infinity, alignment: .center)
+                                // T88 — escape hatch after repeated stamp failures so
+                                // a flaky network on first launch doesn't permanently
+                                // block app entry. Bypass is local-only; the welcome
+                                // flow re-fires next launch if the server stamp is
+                                // still missing.
+                                Button("Continue anyway") {
+                                    auth.bypassOnboardingLocally = true
+                                }
+                                .font(.footnote.weight(.semibold))
+                                .foregroundColor(VP.accent)
+                            }
+                            .padding(.top, 10)
+                        }
                     }
-                    .padding(.top, 10)
+                    .padding(.vertical, 20)
+                    .padding(.horizontal, 8)
+                    .background(VP.card)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18)
+                            .strokeBorder(VP.border, lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 18))
+                    .padding(.horizontal, 20)
+                    .padding(.top, 24)
+
+                    Spacer(minLength: 20)
                 }
             }
-            .padding(.vertical, 20)
-            .padding(.horizontal, 8)
-            .background(VP.card)
-            .overlay(
-                RoundedRectangle(cornerRadius: 18)
-                    .strokeBorder(VP.border, lineWidth: 1)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 18))
-            .padding(.horizontal, 20)
-            .padding(.top, 24)
 
-            Spacer(minLength: 0)
-
-            // Bottom action row
+            // Bottom action row (always visible)
             HStack(spacing: 10) {
                 if page > 0 {
                     Button("Back") { withAnimation { page -= 1 } }
                         .font(.system(.subheadline, design: .default, weight: .semibold))
                         .foregroundColor(VP.text)
                         .padding(.horizontal, 18)
-                        .frame(minHeight: 48)
+                        .frame(minWidth: 88, minHeight: 48)
                         .overlay(
                             RoundedRectangle(cornerRadius: VP.radiusMD)
                                 .strokeBorder(VP.border, lineWidth: 1)
@@ -138,6 +143,7 @@ struct WelcomeView: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 28)
             .padding(.top, 20)
+            .background(VP.bg)
         }
         .background(VP.bg.ignoresSafeArea())
     }
@@ -205,17 +211,17 @@ struct WelcomeView: View {
 
     private var screenThree: some View {
         VStack(alignment: .leading, spacing: 14) {
-            eyebrow("Ready?")
-            Text("Your first read is waiting.")
+            eyebrow("You're in")
+            Text("Now go earn your voice.")
                 .font(.system(size: VP.Size.xxl, weight: .bold, design: .serif))
                 .tracking(-0.6)
                 .foregroundColor(VP.text)
-            Text("Head to the home feed — pick any article, read it, and the quiz is right below.")
+            Text("Pick any article from the home feed and start reading. The quiz is right below the article.")
                 .font(.callout)
                 .foregroundColor(VP.text)
                 .lineSpacing(3)
                 .padding(.top, 2)
-            Text("Score 3/5 and you\u{2019}re talking.")
+            Text("Every comment here cost a quiz. That\u{2019}s worth something.")
                 .font(.footnote)
                 .foregroundColor(VP.dim)
                 .lineSpacing(2)
@@ -238,7 +244,7 @@ struct WelcomeView: View {
 
     private func step(_ label: String, bg: Color, color: Color, border: Color) -> some View {
         Text(label)
-            .font(.system(.caption, design: .default, weight: .bold))
+            .font(.system(.footnote, design: .default, weight: .bold))
             .tracking(0.3)
             .foregroundColor(color)
             .padding(.vertical, 10)

@@ -758,6 +758,7 @@ final class AuthViewModel: ObservableObject {
                 deepLinkErrorDismissTask?.cancel()
                 await loadUser(id: session.user.id.uuidString)
                 isLoggedIn = true
+                wasLoggedIn = true
                 needsEmailVerification = false
                 pendingVerificationEmail = nil
                 return

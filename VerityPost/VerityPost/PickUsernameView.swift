@@ -27,7 +27,6 @@ struct PickUsernameView: View {
         case checking
         case available
         case taken
-        case reserved
         case tooShort
         case malformed
         case networkError
@@ -63,6 +62,8 @@ struct PickUsernameView: View {
                         .textContentType(.username)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled(true)
+                        .submitLabel(.continue)
+                        .onSubmit(submit)
                         .foregroundColor(VP.text)
                         .padding(12)
                         .frame(minHeight: 44)
@@ -104,7 +105,7 @@ struct PickUsernameView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .frame(minHeight: 48)
-                    .background(canSubmit ? VP.text : VP.muted)
+                    .background(canSubmit ? VP.accent : VP.muted)
                     .foregroundColor(.white)
                     .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                 }
@@ -114,7 +115,6 @@ struct PickUsernameView: View {
             .padding(.horizontal, 24)
         }
         .background(VP.bg.ignoresSafeArea())
-        .preferredColorScheme(.light)
     }
 
     private var statusLabel: String? {
@@ -123,7 +123,6 @@ struct PickUsernameView: View {
         case .checking: return "Checking…"
         case .available: return "Available"
         case .taken: return "Taken — try another"
-        case .reserved: return "That username is reserved"
         case .tooShort: return "At least 3 characters (a-z, 0-9, underscore)"
         case .malformed: return "Use a-z, 0-9, underscore only"
         case .networkError: return "Couldn\u{2019}t check. Try again."
@@ -133,7 +132,7 @@ struct PickUsernameView: View {
     private var statusColor: Color {
         switch checkState {
         case .available: return VP.success
-        case .taken, .reserved, .malformed, .networkError: return VP.danger
+        case .taken, .malformed, .networkError: return VP.danger
         case .tooShort: return VP.dim
         case .checking, .idle: return VP.dim
         }
@@ -142,7 +141,7 @@ struct PickUsernameView: View {
     private var borderColor: Color {
         switch checkState {
         case .available: return VP.success
-        case .taken, .reserved, .malformed: return VP.danger
+        case .taken, .malformed: return VP.danger
         default: return VP.border
         }
     }
@@ -189,39 +188,46 @@ struct PickUsernameView: View {
     }
 
     private func runCheck(for normalized: String) async {
+        guard let session = try? await SupabaseManager.shared.client.auth.session else {
+            guard normalized == username else { return }
+            submitError = "Your session expired. Tap your magic link again."
+            checkState = .networkError
+            return
+        }
         let url = SupabaseManager.shared.siteURL.appendingPathComponent("api/auth/check-username")
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
         struct Body: Encodable { let username: String }
-        struct Resp: Decodable { let available: Bool?; let reserved: Bool? }
+        struct Resp: Decodable { let available: Bool? }
         req.httpBody = try? JSONEncoder().encode(Body(username: normalized))
         do {
             let (data, response) = try await URLSession.shared.data(for: req)
             guard !Task.isCancelled else { return }
-            // Don't overwrite a newer state — if the user kept typing,
-            // the field value diverged from `normalized`.
             guard normalized == username else { return }
             guard let http = response as? HTTPURLResponse else {
                 checkState = .networkError
                 return
             }
-            if http.statusCode == 429 {
+            switch http.statusCode {
+            case 200...299:
+                let parsed = (try? JSONDecoder().decode(Resp.self, from: data)) ?? Resp(available: nil)
+                if parsed.available == true {
+                    checkState = .available
+                } else if parsed.available == false {
+                    checkState = .taken
+                } else {
+                    checkState = .networkError
+                }
+            case 400:
+                checkState = .malformed
+            case 401:
+                submitError = "Your session expired. Tap your magic link again."
                 checkState = .networkError
-                return
-            }
-            if !(200...299).contains(http.statusCode) {
+            case 429:
                 checkState = .networkError
-                return
-            }
-            let parsed = (try? JSONDecoder().decode(Resp.self, from: data)) ?? Resp(available: nil, reserved: nil)
-            if parsed.reserved == true {
-                checkState = .reserved
-            } else if parsed.available == false {
-                checkState = .taken
-            } else if parsed.available == true {
-                checkState = .available
-            } else {
+            default:
                 checkState = .networkError
             }
         } catch {
@@ -269,6 +275,11 @@ struct PickUsernameView: View {
             case 409:
                 checkState = .taken
                 submitError = "That username was just taken. Pick another."
+            case 403:
+                // Username already set server-side (cross-device race).
+                // Reload the user row — once username is populated,
+                // needsPickUsername flips false and the sheet auto-dismisses.
+                await auth.loadUser(id: session.user.id.uuidString)
             case 429:
                 submitError = "Too many attempts. Wait a minute."
             default:

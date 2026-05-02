@@ -37,9 +37,9 @@ struct SignupView: View {
                 VStack(spacing: 0) {
                     // Hero
                     Text("Verity Post")
-                        .font(.system(.title, design: .default, weight: .bold))
-                        .tracking(-0.5)
-                        .foregroundColor(VP.accent)
+                        .font(.system(size: VP.Size.xl, weight: .bold, design: .serif))
+                        .tracking(-0.4)
+                        .foregroundColor(VP.text)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.top, 16)
                         .padding(.bottom, 24)
@@ -131,6 +131,7 @@ struct SignupView: View {
                 .autocorrectionDisabled(true)
                 .submitLabel(.send)
                 .focused($emailFocused)
+                .onSubmit(submit)
                 .foregroundColor(VP.text)
                 .padding(12)
                 .frame(minHeight: 44)
@@ -144,32 +145,32 @@ struct SignupView: View {
         .padding(.bottom, 18)
 
         // Combined age + terms acknowledgement (COPPA gate + ToS).
-        Button {
-            agreed.toggle()
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        } label: {
-            HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: 10) {
+            Button {
+                agreed.toggle()
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            } label: {
                 Image(systemName: agreed ? "checkmark.square.fill" : "square")
                     .foregroundColor(agreed ? VP.accent : VP.dim)
                     .font(.title3)
-                (Text("I\u{2019}m 13 or older and agree to the ")
-                    .foregroundColor(VP.dim)
-                 + Text("Terms")
-                    .foregroundColor(VP.accent)
-                    .fontWeight(.semibold)
-                 + Text(" and ")
-                    .foregroundColor(VP.dim)
-                 + Text("Privacy Policy")
-                    .foregroundColor(VP.accent)
-                    .fontWeight(.semibold)
-                 + Text(".").foregroundColor(VP.dim))
-                    .font(.footnote)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 0)
             }
+            .buttonStyle(.plain)
+
+            Group {
+                if let attrStr = try? AttributedString(markdown: "I\u{2019}m 13 or older and agree to the [Terms](https://veritypost.com/terms) and [Privacy Policy](https://veritypost.com/privacy).") {
+                    Text(attrStr)
+                        .tint(VP.accent)
+                } else {
+                    Text("I\u{2019}m 13 or older and agree to the Terms and Privacy Policy.")
+                }
+            }
+            .font(.footnote)
+            .foregroundColor(VP.dim)
+            .multilineTextAlignment(.leading)
+            .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 0)
         }
-        .buttonStyle(.plain)
         .padding(.bottom, 18)
 
         Button {
@@ -186,7 +187,7 @@ struct SignupView: View {
             }
             .frame(maxWidth: .infinity)
             .frame(minHeight: 48)
-            .background(canSubmit ? VP.text : VP.border)
+            .background(canSubmit ? VP.accent : VP.muted)
             .foregroundColor(.white)
             .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
         }
@@ -198,7 +199,7 @@ struct SignupView: View {
     @ViewBuilder
     private func sentCard(email: String) -> some View {
         VStack(spacing: 14) {
-            Image(systemName: "envelope.badge")
+            Image(systemName: "envelope.circle")
                 .font(.largeTitle)
                 .foregroundColor(VP.accent)
                 .accessibilityHidden(true)
@@ -231,7 +232,7 @@ struct SignupView: View {
 
             Button("Use a different email") {
                 auth.clearMagicLinkState()
-                email.isEmpty ? () : (self.email = "")
+                self.email = ""
             }
             .font(.footnote)
             .foregroundColor(VP.dim)
@@ -244,7 +245,7 @@ struct SignupView: View {
     @ViewBuilder
     private var gatedCard: some View {
         VStack(spacing: 14) {
-            Image(systemName: "clock")
+            Image(systemName: "clock.badge.checkmark")
                 .font(.largeTitle)
                 .foregroundColor(VP.accent)
                 .accessibilityHidden(true)
@@ -353,6 +354,7 @@ struct SignupView: View {
     }
 
     private func resend() {
+        localError = nil
         guard let target = auth.magicLinkSentTo, canResend else { return }
         loading = true
         Task {
