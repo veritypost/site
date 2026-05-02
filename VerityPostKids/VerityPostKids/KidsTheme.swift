@@ -22,7 +22,7 @@ enum K {
     static let bg        = Color(hex: "FAFAFA")
     static let card      = Color.white
     static let text      = Color(hex: "1A1A1A")
-    static let dim       = Color(hex: "9CA3AF")
+    static let dim       = Color(hex: "6B7280")
     static let border    = Color(hex: "E5E7EB")
 
     // Particle sampling pool

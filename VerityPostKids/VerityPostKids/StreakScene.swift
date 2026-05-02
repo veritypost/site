@@ -185,7 +185,7 @@ struct StreakScene: View {
                         .font(.scaledSystem(size: 15, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity, minHeight: 48)
-                        .background(K.teal)
+                        .background(K.tealDark)
                         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .shadow(color: K.teal.opacity(0.3), radius: 12, y: 4)
                 }

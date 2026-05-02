@@ -305,7 +305,7 @@ struct KidsAppRoot: View {
             VStack(spacing: 14) {
                 ProgressView()
                     .controlSize(.large)
-                    .tint(K.teal)
+                    .tint(K.tealDark)
                 Text("Loading…")
                     .font(.scaledSystem(size: 14, weight: .semibold, design: .rounded))
                     .foregroundStyle(K.dim)

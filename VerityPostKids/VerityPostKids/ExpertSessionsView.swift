@@ -63,7 +63,7 @@ struct ExpertSessionsView: View {
                                 .padding(.horizontal, 18)
                                 .padding(.vertical, 8)
                                 .frame(minHeight: 44)
-                                .background(K.teal)
+                                .background(K.tealDark)
                                 .clipShape(Capsule())
                         }
                         .buttonStyle(.plain)
@@ -133,7 +133,7 @@ struct ExpertSessionsView: View {
         VStack(spacing: 14) {
             Image(systemName: "person.2.badge.key")
                 .font(.scaledSystem(size: 40, weight: .bold))
-                .foregroundStyle(K.teal)
+                .foregroundStyle(K.tealDark)
                 .accessibilityHidden(true)
             Text("Parent check needed")
                 .font(.scaledSystem(size: 18, weight: .black, design: .rounded))
@@ -152,7 +152,7 @@ struct ExpertSessionsView: View {
                     .padding(.horizontal, 20)
                     .padding(.vertical, 10)
                     .frame(minHeight: 44)
-                    .background(K.teal)
+                    .background(K.tealDark)
                     .clipShape(Capsule())
             }
             .buttonStyle(.plain)

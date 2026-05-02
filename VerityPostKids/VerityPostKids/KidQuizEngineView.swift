@@ -417,7 +417,7 @@ struct KidQuizEngineView: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 22)
                     .padding(.vertical, 12)
-                    .background(K.teal)
+                    .background(K.tealDark)
                     .clipShape(Capsule())
             }
             .buttonStyle(.plain)
@@ -478,7 +478,7 @@ struct KidQuizEngineView: View {
                         .font(.scaledSystem(size: 16, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity, minHeight: 54)
-                        .background(K.teal)
+                        .background(K.tealDark)
                         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .shadow(color: K.teal.opacity(0.3), radius: 12, y: 4)
                 }
@@ -498,8 +498,8 @@ struct KidQuizEngineView: View {
             return K.card
         }()
         let border: Color = {
-            if !revealed { return isSelected ? K.teal : K.border }
-            if opt.isCorrect { return K.teal }
+            if !revealed { return isSelected ? K.tealDark : K.border }
+            if opt.isCorrect { return K.tealDark }
             if isSelected { return K.coralDark }
             return K.border
         }()
@@ -518,7 +518,7 @@ struct KidQuizEngineView: View {
                 if revealed {
                     if opt.isCorrect {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(K.teal)
+                            .foregroundStyle(K.tealDark)
                     } else if isSelected {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(K.coralDark)
@@ -870,7 +870,7 @@ struct KidQuizEngineView: View {
                         .font(.scaledSystem(size: 16, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity, minHeight: 54)
-                        .background(K.teal)
+                        .background(K.tealDark)
                         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .shadow(color: K.teal.opacity(0.3), radius: 12, y: 4)
                 }
@@ -897,7 +897,7 @@ struct KidQuizEngineView: View {
                 .frame(width: 120, height: 120)
             Image(systemName: r.passed ? "checkmark.seal.fill" : "arrow.counterclockwise.circle.fill")
                 .font(.scaledSystem(size: 60, weight: .bold))
-                .foregroundStyle(r.passed ? K.teal : K.coral)
+                .foregroundStyle(r.passed ? K.tealDark : K.coral)
         }
 
         Text(r.passed ? "Great job!" : "Give it another go?")
@@ -958,7 +958,7 @@ struct KidQuizEngineView: View {
                     .font(.scaledSystem(size: 16, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity, minHeight: 54)
-                    .background(K.teal)
+                    .background(K.tealDark)
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .shadow(color: K.teal.opacity(0.3), radius: 12, y: 4)
             }
@@ -1011,7 +1011,7 @@ struct KidQuizEngineView: View {
                     .font(.scaledSystem(size: 16, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity, minHeight: 54)
-                    .background(K.teal)
+                    .background(K.tealDark)
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .shadow(color: K.teal.opacity(0.3), radius: 12, y: 4)
             }
@@ -1049,7 +1049,7 @@ struct KidQuizEngineView: View {
                     .padding(.horizontal, 22)
                     .padding(.vertical, 12)
                     .frame(minHeight: 44)
-                    .background(K.teal)
+                    .background(K.tealDark)
                     .clipShape(Capsule())
             }
             .buttonStyle(.plain)
@@ -1072,7 +1072,7 @@ struct KidQuizEngineView: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 22)
                     .padding(.vertical, 12)
-                    .background(K.teal)
+                    .background(K.tealDark)
                     .clipShape(Capsule())
             }
             .buttonStyle(.plain)

@@ -5,8 +5,10 @@ import SwiftUI
 // on independent phases.
 
 struct KidFlame: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
-        TimelineView(.animation) { timeline in
+        TimelineView(.animation(minimumInterval: nil, paused: reduceMotion)) { timeline in
             let t = timeline.date.timeIntervalSinceReferenceDate
             let outerT = CGFloat(0.5 + 0.5 * sin(t * 2 * .pi / 1.8))  // 1.8s cycle
             let innerT = CGFloat(0.5 + 0.5 * sin(t * 2 * .pi / 1.4))  // 1.4s cycle

@@ -213,7 +213,7 @@ struct ProfileView: View {
                             .padding(.horizontal, 18)
                             .padding(.vertical, 8)
                             .frame(minHeight: 36)
-                            .background(K.teal)
+                            .background(K.tealDark)
                             .clipShape(Capsule())
                     }
                     .buttonStyle(.plain)

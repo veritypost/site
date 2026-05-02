@@ -48,7 +48,7 @@ struct ArticleListView: View {
                                     .font(.system(.subheadline, design: .rounded, weight: .bold))
                                     .foregroundStyle(.white)
                                     .frame(maxWidth: 180, minHeight: 44)
-                                    .background(K.teal)
+                                    .background(K.tealDark)
                                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                             }
                             .buttonStyle(.plain)
@@ -112,7 +112,7 @@ struct ArticleListView: View {
                     .font(.system(.subheadline, design: .rounded, weight: .bold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: 180, minHeight: 44)
-                    .background(K.teal)
+                    .background(K.tealDark)
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
             .buttonStyle(.plain)

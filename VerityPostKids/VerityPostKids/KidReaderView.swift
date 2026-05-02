@@ -188,7 +188,7 @@ struct KidReaderView: View {
                 }
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity, minHeight: 54)
-                .background(K.teal)
+                .background(K.tealDark)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .shadow(color: K.teal.opacity(0.3), radius: 12, y: 4)
             }
@@ -230,7 +230,7 @@ struct KidReaderView: View {
                     .font(.system(.subheadline, design: .rounded, weight: .bold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: 180, minHeight: 44)
-                    .background(K.teal)
+                    .background(K.tealDark)
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
             .buttonStyle(.plain)

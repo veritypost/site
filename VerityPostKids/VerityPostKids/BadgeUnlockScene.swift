@@ -203,7 +203,7 @@ struct BadgeUnlockScene: View {
                     .foregroundStyle(.white)
                     .padding(.vertical, 14)
                     .padding(.horizontal, 32)
-                    .background(K.teal)
+                    .background(K.tealDark)
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .shadow(color: K.teal.opacity(0.3), radius: 12, y: 4)
             }

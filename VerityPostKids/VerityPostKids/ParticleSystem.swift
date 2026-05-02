@@ -123,9 +123,10 @@ final class ParticleEmitter: ObservableObject {
 
 struct ParticleLayer: View {
     @ObservedObject var emitter: ParticleEmitter
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: false)) { timeline in
+        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: reduceMotion)) { timeline in
             Canvas { ctx, _ in
                 for p in emitter.particles {
                     ctx.drawLayer { layer in
@@ -141,6 +142,7 @@ struct ParticleLayer: View {
             }
         }
         .allowsHitTesting(false)
+        .onChange(of: reduceMotion) { _, on in if on { emitter.clear() } }
     }
 
     private func drawShape(_ p: Particle, in ctx: inout GraphicsContext) {

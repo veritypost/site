@@ -105,7 +105,7 @@ struct PairCodeView: View {
                     }
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity, minHeight: 52)
-                    .background(K.teal)
+                    .background(K.tealDark)
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .shadow(color: K.teal.opacity(0.3), radius: 12, y: 4)
                 }
@@ -125,7 +125,7 @@ struct PairCodeView: View {
                     } label: {
                         Text("Need help?")
                             .font(.system(.caption, design: .rounded, weight: .semibold))
-                            .foregroundStyle(K.teal)
+                            .foregroundStyle(K.tealDark)
                             .frame(minHeight: 44)
                     }
                     .buttonStyle(.plain)
@@ -174,7 +174,7 @@ struct PairCodeView: View {
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(focused ? K.teal : K.border, lineWidth: focused ? 2 : 1)
+                .strokeBorder(focused ? K.tealDark : K.border, lineWidth: focused ? 2 : 1)
         )
         .onSubmit {
             if canSubmit { pairNow() }

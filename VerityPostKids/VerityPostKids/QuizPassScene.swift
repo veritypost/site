@@ -153,7 +153,7 @@ struct QuizPassScene: View {
                 Spacer()
                 if highlighted && chipCheckVisible {
                     ZStack {
-                        Circle().fill(K.teal).frame(width: 26, height: 26)
+                        Circle().fill(K.tealDark).frame(width: 26, height: 26)
                         Image(systemName: "checkmark")
                             .font(.scaledSystem(size: 12, weight: .heavy))
                             .foregroundStyle(.white)
@@ -169,7 +169,7 @@ struct QuizPassScene: View {
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(highlighted ? K.teal : K.border, lineWidth: 2)
+                .strokeBorder(highlighted ? K.tealDark : K.border, lineWidth: 2)
         )
         .scaleEffect(highlighted ? 1.04 : 1.0)
     }
@@ -182,7 +182,7 @@ struct QuizPassScene: View {
                 .font(.scaledSystem(size: 12, weight: .heavy, design: .rounded))
                 .kerning(1.5)
                 .textCase(.uppercase)
-                .foregroundStyle(K.teal)
+                .foregroundStyle(K.tealDark)
 
             // Score ring
             ZStack {
@@ -192,7 +192,7 @@ struct QuizPassScene: View {
 
                 Circle()
                     .trim(from: 0, to: ringProgress)
-                    .stroke(K.teal, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                    .stroke(K.tealDark, style: StrokeStyle(lineWidth: 8, lineCap: .round))
                     .frame(width: 140, height: 140)
                     .rotationEffect(.degrees(-90))
 
@@ -231,7 +231,7 @@ struct QuizPassScene: View {
                     .font(.scaledSystem(size: 16, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity, minHeight: 50)
-                    .background(K.teal)
+                    .background(K.tealDark)
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .shadow(color: K.teal.opacity(0.3), radius: 12, y: 4)
             }

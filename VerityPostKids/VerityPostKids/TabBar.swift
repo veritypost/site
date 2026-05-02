@@ -60,10 +60,10 @@ struct KidTabBar: View {
             VStack(spacing: 4) {
                 Image(systemName: tab.icon)
                     .font(.scaledSystem(size: 22, weight: isActive ? .heavy : .semibold))
-                    .foregroundStyle(isActive ? K.teal : K.dim)
+                    .foregroundStyle(isActive ? K.tealDark : K.dim)
                 Text(tab.label)
                     .font(.scaledSystem(size: 10, weight: isActive ? .bold : .semibold, design: .rounded))
-                    .foregroundStyle(isActive ? K.teal : K.dim)
+                    .foregroundStyle(isActive ? K.tealDark : K.dim)
             }
             .frame(maxWidth: .infinity)
         }

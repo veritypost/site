@@ -88,7 +88,7 @@ struct LeaderboardView: View {
                                 .padding(.horizontal, 18)
                                 .padding(.vertical, 8)
                                 .frame(minHeight: 44)
-                                .background(K.teal)
+                                .background(K.tealDark)
                                 .clipShape(Capsule())
                         }
                         .buttonStyle(.plain)
@@ -124,9 +124,9 @@ struct LeaderboardView: View {
                         .foregroundStyle(active ? .white : K.text)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 10)
-                        .background(active ? K.teal : K.card)
+                        .background(active ? K.tealDark : K.card)
                         .clipShape(Capsule())
-                        .overlay(Capsule().strokeBorder(active ? K.teal : K.border, lineWidth: 1.5))
+                        .overlay(Capsule().strokeBorder(active ? K.tealDark : K.border, lineWidth: 1.5))
                 }
                 .buttonStyle(.plain)
             }
@@ -154,9 +154,9 @@ struct LeaderboardView: View {
                             .foregroundStyle(active ? .white : K.text)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
-                            .background(active ? K.teal : K.card)
+                            .background(active ? K.tealDark : K.card)
                             .clipShape(Capsule())
-                            .overlay(Capsule().strokeBorder(active ? K.teal : K.border, lineWidth: 1))
+                            .overlay(Capsule().strokeBorder(active ? K.tealDark : K.border, lineWidth: 1))
                     }
                     .buttonStyle(.plain)
                 }

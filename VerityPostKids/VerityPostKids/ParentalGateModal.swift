@@ -93,7 +93,7 @@ struct ParentalGateModal: View {
                     .frame(width: 64, height: 64)
                 Image(systemName: "checkmark.shield.fill")
                     .font(.scaledSystem(size: 28, weight: .bold))
-                    .foregroundStyle(K.teal)
+                    .foregroundStyle(K.tealDark)
             }
 
             Text("Grown-up check")
@@ -128,7 +128,7 @@ struct ParentalGateModal: View {
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(showError ? K.coralDark : (focused ? K.teal : K.border),
+                            .strokeBorder(showError ? K.coralDark : (focused ? K.tealDark : K.border),
                                           lineWidth: focused || showError ? 2 : 1)
                     )
                     .focused($focused)
@@ -143,7 +143,7 @@ struct ParentalGateModal: View {
                         .font(.scaledSystem(size: 18, weight: .heavy))
                         .foregroundStyle(.white)
                         .frame(width: 60, height: 60)
-                        .background(answer.isEmpty ? K.dim : K.teal)
+                        .background(answer.isEmpty ? K.dim : K.tealDark)
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
                 .buttonStyle(.plain)
@@ -172,7 +172,7 @@ struct ParentalGateModal: View {
                 .foregroundStyle(K.dim)
             Text(formatCountdown(lockRemaining))
                 .font(.scaledSystem(size: 40, weight: .black, design: .rounded))
-                .foregroundStyle(K.teal)
+                .foregroundStyle(K.tealDark)
                 .monospacedDigit()
         }
         .padding(.vertical, 20)
@@ -278,6 +278,7 @@ extension View {
                 }
             )
         }
+        .interactiveDismissDisabled(true)
     }
 }
 
