@@ -13,7 +13,7 @@ struct AlertsView: View {
     private let client = SupabaseManager.shared.client
 
     @State private var activeSection = "Alerts"
-    private let sections = ["Alerts", "Manage"]
+    private var sections: [String] { manageSubscriptionsEnabled ? ["Alerts", "Manage"] : ["Alerts"] }
 
     @State private var notifications: [VPNotification] = []
     @State private var loading = true

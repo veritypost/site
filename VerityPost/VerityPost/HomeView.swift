@@ -231,7 +231,7 @@ struct HomeView: View {
 
     private var topBar: some View {
         HStack(spacing: 0) {
-            Text("verity post")
+            Text("Verity Post")
                 .font(.system(size: 15, weight: .heavy))
                 .tracking(-0.15)
                 .foregroundColor(VP.text)

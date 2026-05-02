@@ -122,7 +122,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                   ? '3px solid #ef4444'
                   : t.tone === 'success'
                     ? '3px solid #22c55e'
-                    : '3px solid #111111',
+                    : '3px solid #6b7280',
             }}
           >
             {t.message}

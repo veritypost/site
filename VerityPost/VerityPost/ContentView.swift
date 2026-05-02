@@ -473,6 +473,11 @@ struct TextTabBar: View {
                         .padding(.vertical, 14)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
+                        .overlay(alignment: .bottom) {
+                            Rectangle()
+                                .fill(selected == item.id ? VP.accent : Color.clear)
+                                .frame(height: 2)
+                        }
                 }
                 .buttonStyle(.plain)
             }
