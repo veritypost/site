@@ -21,20 +21,18 @@ actually succeeded.
 Concern #3 patched the move-item route in isolation (commit `64f58d0`); the
 rest of the admin surface is still exposed.
 
-## Owner-locked decision needed up front
+## Owner-locked approach: option A (single-place fix)
 
-The state file says: "Two ways to fix:
+The state file said two approaches were possible:
 - (a) update `recordAdminAction` itself to log + capture instead of throw
-  (single-place fix; changes contract for all callers), or
-- (b) wrap each call site in try/catch (many-place fix). Owner-locked
-  decision needed before implementation."
+  (single-place fix; changes contract for all callers).
+- (b) wrap each call site in try/catch (many-place fix).
 
-**In Stage 1, decide which approach via the 4-agent review pattern. Then
-flag the chosen approach to the owner BEFORE implementing.** If the
-investigation makes the right call obvious (it almost certainly will: option
-A is single-place, matches the documented contract, and concern #3's fix
-implicitly assumed audit failures shouldn't crash responses), proceed with
-option A. Otherwise STOP and ask.
+**Owner picked option A on 2026-05-02 (locked). Implement option A directly
+— no need to re-investigate the choice in Stage 1.** Stage 1's job is to
+verify the function's current contract, find every call site (so you can
+confirm option A doesn't break any of them), and propose the precise edit
+to `recordAdminAction`.
 
 ## File scope (option A — single-place fix)
 

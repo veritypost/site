@@ -112,6 +112,10 @@ evidence that the bug is render-side, not evidence that the user is wrong.
 - **iOS scope** — DEFERRED to a separate iOS-specific session. Within this
   loop, iOS slices are noted but not implemented; the web slice ships
   here. (2026-05-02)
+- **Concern #32 audit-failure fix** — owner picked option A (single-place
+  fix on `recordAdminAction` in `web/src/lib/adminMutation.ts`: log +
+  Sentry-capture instead of throwing). Option B (wrap every call site in
+  try/catch) rejected. (2026-05-02)
 
 ---
 
