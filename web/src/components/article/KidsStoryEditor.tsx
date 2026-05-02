@@ -333,19 +333,26 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
         .from('timelines')
         .select('*')
         .eq('story_id', cast.story_id as string)
-        .eq('type', 'event')
+        .in('type', ['event', 'article'])
         .order('event_date', { ascending: true });
 
       const loadedEntries: TimelineEntry[] = (eventData || []).map((e) => {
         const ev = e as unknown as Record<string, unknown>;
+        const dbType = ev.type as string | null;
+        const isAnchor = dbType === 'article';
+        const localType: 'story' | 'event' = isAnchor
+          ? 'story'
+          : (dbType as 'story' | 'event') || ((ev.content as string | null) ? 'story' : 'event');
+        // Anchor row's event_body is NULL by design — body lives on articles.body.
+        const eventContent = (ev.content as string | null) || '';
         return {
           id: e.id,
           event_date: (ev.date as string | null) || (ev.event_date as string | null) || '',
           is_current: Boolean(ev.is_current),
-          type: (ev.type as 'story' | 'event') || ((ev.content as string | null) ? 'story' : 'event'),
+          type: localType,
           title: (ev.text as string | null) || (ev.event_label as string | null) || '',
           summary: (ev.summary as string | null) || (ev.event_body as string | null) || '',
-          content: (ev.content as string | null) || '',
+          content: isAnchor ? ((cast as unknown as { body?: string | null }).body || '') : eventContent,
           timeline_date: (ev.date as string | null) || '',
           timeline_headline: (ev.text as string | null) || '',
           comment_count: 0,
