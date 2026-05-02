@@ -175,7 +175,7 @@ struct ProfileView: View {
                                 .padding(.vertical, 8)
                                 .frame(minHeight: 44)
                                 .background(VP.accent)
-                                .cornerRadius(8)
+                                .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
                         }
                     }
                     .padding(.top, 80)
@@ -247,7 +247,7 @@ struct ProfileView: View {
         HStack(spacing: 0) {
             // A52 — canonical brand casing is "Verity Post" (Title Case).
             Text("Verity Post")
-                .font(.system(size: 15, weight: .heavy))
+                .font(.system(size: VP.Size.base, weight: .heavy))
                 .tracking(-0.15)
                 .foregroundColor(VP.text)
                 .lineLimit(1)
@@ -271,7 +271,7 @@ struct ProfileView: View {
                 SettingsView().environmentObject(auth)
             } label: {
                 Image(systemName: "gearshape")
-                    .font(.system(size: 18, weight: .regular))
+                    .font(.system(size: VP.Size.lg, weight: .regular))
                     .foregroundColor(VP.dim)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
@@ -307,7 +307,7 @@ struct ProfileView: View {
                 .padding(.vertical, 12)
                 .frame(minHeight: 44)
                 .background(VP.accent)
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
             Button("Create free account") { showSignup = true }
                 .font(.system(.footnote, design: .default, weight: .medium))
                 .foregroundColor(VP.accent)
@@ -327,7 +327,7 @@ struct ProfileView: View {
         VStack(spacing: 12) {
             Spacer().frame(height: 32)
             Image(systemName: "envelope.badge.shield.half.filled")
-                .font(.system(size: 40, weight: .regular))
+                .font(.system(size: VP.Size.display, weight: .regular))
                 .foregroundColor(VP.dim)
             Text("Verify your email")
                 .font(.system(.title3, design: .default, weight: .bold))
@@ -347,7 +347,7 @@ struct ProfileView: View {
                     .padding(.vertical, 12)
                     .frame(minHeight: 44)
                     .background(VP.accent)
-                    .cornerRadius(10)
+                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
             }
             Spacer().frame(height: 20)
         }
@@ -366,7 +366,7 @@ struct ProfileView: View {
         } label: {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "snowflake")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: VP.Size.base, weight: .semibold))
                     .foregroundColor(VP.danger)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Your Verity Score is frozen")
@@ -384,8 +384,8 @@ struct ProfileView: View {
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(VP.danger.opacity(0.08))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.danger.opacity(0.32)))
-            .cornerRadius(10)
+            .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.danger.opacity(0.32)))
+            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
             .padding(.horizontal, 16)
             .padding(.top, 12)
         }
@@ -419,7 +419,7 @@ struct ProfileView: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
                     Text(displayTitle)
-                        .font(.system(size: 22, weight: .semibold, design: .serif))
+                        .font(.system(size: VP.Size.xl, weight: .semibold, design: .serif))
                         .foregroundColor(VP.ink)
                         .lineLimit(1)
                     VerifiedBadgeView(user: user, size: 11)
@@ -427,28 +427,28 @@ struct ProfileView: View {
                        let title = user.expertTitle?.trimmingCharacters(in: .whitespaces),
                        !title.isEmpty {
                         Text(title)
-                            .font(.system(size: 10, weight: .semibold))
+                            .font(.system(size: VP.Size.xs, weight: .semibold))
                             .foregroundColor(VP.inkSoft)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(VP.surfaceSunken)
                             .overlay(
-                                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                RoundedRectangle(cornerRadius: VP.radiusXS, style: .continuous)
                                     .stroke(VP.borderSoft)
                             )
-                            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: VP.radiusXS, style: .continuous))
                             .lineLimit(1)
                     }
                 }
 
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(score.formatted())
-                        .font(.system(size: 22, weight: .heavy))
+                        .font(.system(size: VP.Size.xl, weight: .heavy))
                         .tracking(-0.5)
                         .foregroundColor(VP.ink)
                         .contentTransition(.numericText())
                     Text("Verity score")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: VP.Size.xs, weight: .semibold))
                         .foregroundColor(VP.inkMuted)
                 }
             }
@@ -457,10 +457,10 @@ struct ProfileView: View {
         .frame(maxWidth: .infinity)
         .background(VP.surfaceRaised)
         .overlay(
-            RoundedRectangle(cornerRadius: VP.Radius.lg, style: .continuous)
+            RoundedRectangle(cornerRadius: VP.radiusMD, style: .continuous)
                 .stroke(VP.borderSoft)
         )
-        .clipShape(RoundedRectangle(cornerRadius: VP.Radius.lg, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD, style: .continuous))
         .vpShadowAmbient()
         .padding(.horizontal, 16)
         .padding(.top, 12)
@@ -489,7 +489,7 @@ struct ProfileView: View {
     private func statTile(label: String, value: String, icon: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: VP.Size.sm, weight: .semibold))
                 .foregroundColor(VP.dim)
             VStack(alignment: .leading, spacing: 2) {
                 Text(value)
@@ -506,8 +506,8 @@ struct ProfileView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
         .background(VP.card)
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(VP.border))
-        .cornerRadius(12)
+        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
     }
 
     // MARK: - Social row (Followers / Following)
@@ -590,7 +590,7 @@ struct ProfileView: View {
     private func quickActionChip(icon: String, label: String) -> some View {
         VStack(spacing: 6) {
             Image(systemName: icon)
-                .font(.system(size: 18, weight: .semibold))
+                .font(.system(size: VP.Size.lg, weight: .semibold))
                 .foregroundColor(VP.text)
                 .frame(height: 22)
             Text(label)
@@ -602,8 +602,8 @@ struct ProfileView: View {
         .frame(minHeight: 64)
         .padding(.vertical, 10)
         .background(VP.card)
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(VP.border))
-        .cornerRadius(12)
+        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
     }
 
     // MARK: - Recent activity preview (top 3 + see all)
@@ -650,8 +650,8 @@ struct ProfileView: View {
                     }
                 }
                 .background(VP.card)
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(VP.border))
-                .cornerRadius(12)
+                .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
+                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
             }
         }
         .padding(.horizontal, 16)
@@ -669,7 +669,7 @@ struct ProfileView: View {
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 4)
+                        RoundedRectangle(cornerRadius: VP.radiusXS)
                             .stroke(activityColor(item.type), lineWidth: 1)
                     )
                 VStack(alignment: .leading, spacing: 1) {
@@ -703,19 +703,19 @@ struct ProfileView: View {
 
     private func compactSkeletonRow() -> some View {
         HStack(spacing: 10) {
-            RoundedRectangle(cornerRadius: 4).fill(VP.surfaceSunken)
+            RoundedRectangle(cornerRadius: VP.radiusXS).fill(VP.surfaceSunken)
                 .frame(width: 40, height: 14)
-            RoundedRectangle(cornerRadius: 4).fill(VP.surfaceSunken)
+            RoundedRectangle(cornerRadius: VP.radiusXS).fill(VP.surfaceSunken)
                 .frame(height: 14)
             Spacer()
-            RoundedRectangle(cornerRadius: 4).fill(VP.surfaceSunken)
+            RoundedRectangle(cornerRadius: VP.radiusXS).fill(VP.surfaceSunken)
                 .frame(width: 36, height: 10)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background(VP.card)
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(VP.border))
-        .cornerRadius(12)
+        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
     }
 
     private func compactLastRowId() -> String {
@@ -747,7 +747,7 @@ struct ProfileView: View {
             if !achievementsLoaded {
                 HStack(spacing: 10) {
                     ForEach(0..<3, id: \.self) { _ in
-                        RoundedRectangle(cornerRadius: 12).fill(VP.surfaceSunken)
+                        RoundedRectangle(cornerRadius: VP.radiusMD).fill(VP.surfaceSunken)
                             .frame(height: 68)
                     }
                 }
@@ -779,7 +779,7 @@ struct ProfileView: View {
     private func achievementChip(_ ua: UserAchievement) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Image(systemName: "rosette")
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: VP.Size.md, weight: .semibold))
                 .foregroundColor(VP.success)
             Text(ua.achievements?.name ?? "Badge")
                 .font(.system(.caption, design: .default, weight: .semibold))
@@ -790,14 +790,14 @@ struct ProfileView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
         .background(VP.card)
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(VP.success.opacity(0.4)))
-        .cornerRadius(12)
+        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.success.opacity(0.4)))
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
     }
 
     private func nextAchievementPlaceholder() -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Image(systemName: "lock.fill")
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: VP.Size.md, weight: .semibold))
                 .foregroundColor(VP.muted)
             Text("Keep reading")
                 .font(.system(.caption, design: .default, weight: .semibold))
@@ -809,7 +809,7 @@ struct ProfileView: View {
         .padding(10)
         .background(Color.clear)
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: VP.radiusMD)
                 .stroke(style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
                 .foregroundColor(VP.border)
         )
@@ -890,7 +890,7 @@ struct ProfileView: View {
                                     .padding(.horizontal, 14)
                                     .padding(.vertical, 8)
                                     .frame(minHeight: 36)
-                                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(VP.border))
+                                    .overlay(RoundedRectangle(cornerRadius: VP.radiusSM).stroke(VP.border))
                             }
                             .buttonStyle(.plain)
                         }
@@ -904,7 +904,7 @@ struct ProfileView: View {
                                     .padding(.vertical, 8)
                                     .frame(minHeight: 36)
                                     .background(VP.accent)
-                                    .cornerRadius(8)
+                                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
                             }
                         }
                     }
@@ -977,8 +977,8 @@ struct ProfileView: View {
             .padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(VP.card)
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border))
-            .cornerRadius(10)
+            .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
+            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
         }
         .buttonStyle(.plain)
     }
@@ -1008,8 +1008,8 @@ struct ProfileView: View {
         }
         .padding(12)
         .background(VP.card)
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border))
-        .cornerRadius(10)
+        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
     }
 
     private func inlineStat(value: String, label: String) -> some View {
@@ -1052,9 +1052,9 @@ struct ProfileView: View {
                             .padding(.vertical, 7)
                             .background(activityFilter == f ? VP.accent : Color.white)
                             .overlay(
-                                RoundedRectangle(cornerRadius: 8).stroke(activityFilter == f ? VP.accent : VP.border)
+                                RoundedRectangle(cornerRadius: VP.radiusSM).stroke(activityFilter == f ? VP.accent : VP.border)
                             )
-                            .cornerRadius(8)
+                            .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
                     }
                     .buttonStyle(.plain)
                 }
@@ -1098,7 +1098,7 @@ struct ProfileView: View {
                                 .padding(.vertical, 10)
                                 .frame(minHeight: 44)
                                 .background(VP.accent)
-                                .cornerRadius(10)
+                                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                         }
                     }
                 } else {
@@ -1137,7 +1137,7 @@ struct ProfileView: View {
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 4)
+                        RoundedRectangle(cornerRadius: VP.radiusXS)
                             .stroke(activityColor(item.type), lineWidth: 1)
                     )
                 VStack(alignment: .leading, spacing: 2) {
@@ -1191,10 +1191,10 @@ struct ProfileView: View {
             if !categoriesLoaded && !categoriesLoadError {
                 VStack(spacing: 8) {
                     ForEach(0..<4, id: \.self) { _ in
-                        RoundedRectangle(cornerRadius: 10)
+                        RoundedRectangle(cornerRadius: VP.radiusMD)
                             .fill(VP.surfaceSunken)
                             .frame(height: 48)
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border))
+                            .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
                     }
                 }
                 .padding(.horizontal, 16)
@@ -1241,8 +1241,8 @@ struct ProfileView: View {
                 .frame(maxWidth: .infinity)
                 .padding(14)
                 .background(VP.card)
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border))
-                .cornerRadius(10)
+                .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
+                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                 .opacity(0.45)
             } else {
                 Button {
@@ -1289,8 +1289,8 @@ struct ProfileView: View {
             }
         }
         .background(anyProgress ? VP.card : Color.clear)
-        .cornerRadius(10)
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(anyProgress ? VP.border : Color.clear))
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(anyProgress ? VP.border : Color.clear))
     }
 
     private func subcategoryRow(sub: VPSubcategory) -> some View {
@@ -1375,7 +1375,7 @@ struct ProfileView: View {
                             .padding(.horizontal, 8)
                             .padding(.vertical, 2)
                             .overlay(
-                                RoundedRectangle(cornerRadius: 99).stroke(tierColor, lineWidth: 1)
+                                RoundedRectangle(cornerRadius: VP.radiusFull).stroke(tierColor, lineWidth: 1)
                             )
                     }
                     GeometryReader { geo in
@@ -1390,8 +1390,8 @@ struct ProfileView: View {
                 }
                 .padding(14)
                 .background(VP.card)
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border))
-                .cornerRadius(10)
+                .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
+                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
             }
 
             VStack(alignment: .leading, spacing: 10) {
@@ -1445,7 +1445,7 @@ struct ProfileView: View {
             HStack(alignment: .top) {
                 HStack(spacing: 6) {
                     Image(systemName: isEarned ? "rosette" : "lock.fill")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: VP.Size.sm, weight: .semibold))
                         .foregroundColor(isEarned ? VP.success : VP.muted)
                     Text(a.name ?? "Achievement")
                         .font(.system(.subheadline, design: .default, weight: .semibold))
@@ -1459,7 +1459,7 @@ struct ProfileView: View {
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 4)
+                        RoundedRectangle(cornerRadius: VP.radiusXS)
                             .stroke(isEarned ? VP.success : VP.border, lineWidth: 1)
                     )
             }
@@ -1479,8 +1479,8 @@ struct ProfileView: View {
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(VP.card)
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border))
-        .cornerRadius(10)
+        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
         .opacity(isEarned ? 1 : 0.55)
     }
 
@@ -1517,7 +1517,7 @@ struct ProfileView: View {
                 .foregroundColor(VP.wrong)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border))
+                .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
         }
         .padding(.horizontal, 16)
         .padding(.top, 16)
@@ -1945,7 +1945,7 @@ struct AvatarQuickEditSheet: View {
 
                     if let err = errorMsg {
                         Text(err)
-                            .font(.system(size: 13))
+                            .font(.system(size: VP.Size.sm))
                             .foregroundColor(VP.danger)
                             .multilineTextAlignment(.center)
                     }
@@ -1974,7 +1974,7 @@ struct AvatarQuickEditSheet: View {
     @ViewBuilder
     private func sectionLabel(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 13, weight: .semibold))
+            .font(.system(size: VP.Size.sm, weight: .semibold))
             .foregroundColor(VP.dim)
     }
 

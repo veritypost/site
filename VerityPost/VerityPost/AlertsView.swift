@@ -109,7 +109,7 @@ struct AlertsView: View {
                     .foregroundColor(.white)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
-                    .background(RoundedRectangle(cornerRadius: 10).fill(VP.danger))
+                    .background(RoundedRectangle(cornerRadius: VP.radiusMD).fill(VP.danger))
                     .shadow(radius: 4)
                     .padding(.top, 8)
                     .transition(.move(edge: .top).combined(with: .opacity))
@@ -162,7 +162,7 @@ struct AlertsView: View {
                 .padding(.vertical, 11)
                 .frame(minHeight: 44)
                 .background(VP.accent)
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
             Button("Create free account") { showSignup = true }
                 .font(.system(.footnote, design: .default, weight: .medium))
                 .foregroundColor(VP.accent)
@@ -409,7 +409,7 @@ struct AlertsView: View {
                             .padding(.horizontal, 14)
                             .padding(.vertical, 10)
                             .background(VP.card)
-                            .cornerRadius(8)
+                            .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
                         }
                     }
 
@@ -436,7 +436,7 @@ struct AlertsView: View {
                                     .frame(minHeight: 44)
                                     .background(VP.accent)
                                     .foregroundColor(.white)
-                                    .cornerRadius(8)
+                                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
                             }
                             .disabled(selectedCategoryToAdd.isEmpty)
                         }
@@ -475,7 +475,7 @@ struct AlertsView: View {
                             .padding(.horizontal, 14)
                             .padding(.vertical, 10)
                             .background(VP.card)
-                            .cornerRadius(8)
+                            .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
                         }
                     }
 
@@ -502,7 +502,7 @@ struct AlertsView: View {
                                     .frame(minHeight: 44)
                                     .background(VP.accent)
                                     .foregroundColor(.white)
-                                    .cornerRadius(8)
+                                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
                             }
                             .disabled(selectedSubcategoryToAdd.isEmpty)
                         }
@@ -541,8 +541,8 @@ struct AlertsView: View {
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 6)
                                 .background(VP.card)
-                                .cornerRadius(16)
-                                .overlay(RoundedRectangle(cornerRadius: 16).stroke(VP.border))
+                                .clipShape(RoundedRectangle(cornerRadius: VP.radiusFull))
+                                .overlay(RoundedRectangle(cornerRadius: VP.radiusFull).stroke(VP.border))
                             }
                         }
                     }
@@ -556,8 +556,8 @@ struct AlertsView: View {
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 10)
                                 .background(VP.card)
-                                .cornerRadius(8)
-                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(VP.border))
+                                .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
+                                .overlay(RoundedRectangle(cornerRadius: VP.radiusSM).stroke(VP.border))
 
                             Button {
                                 Task { await addKeywordSubscription() }
@@ -618,7 +618,7 @@ struct AlertsView: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
                         .background(VP.card)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                 }
                 Text(notif.title ?? "Notification")
                     .font(.system(.subheadline, design: .default, weight: .semibold))
@@ -640,14 +640,14 @@ struct AlertsView: View {
                     .padding(.top, 2)
             }
         }
-        .padding(12)
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(notif.isRead ? VP.card : Color.white)
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
+            RoundedRectangle(cornerRadius: VP.radiusMD)
                 .stroke(notif.isRead ? VP.border : VP.accent, lineWidth: 1)
         )
-        .cornerRadius(10)
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
         .padding(.horizontal, 16)
         .padding(.vertical, 4)
     }

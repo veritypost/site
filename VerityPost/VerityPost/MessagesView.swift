@@ -103,7 +103,7 @@ struct MessagesView: View {
                             .padding(.vertical, 12)
                             .frame(minHeight: 44)
                             .background(VP.accent)
-                            .cornerRadius(10)
+                            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                     }
                     .padding(.top, 8)
                 }
@@ -132,7 +132,7 @@ struct MessagesView: View {
                             .padding(.vertical, 12)
                             .frame(minHeight: 44)
                             .background(VP.accent)
-                            .cornerRadius(10)
+                            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                     }
                     .padding(.top, 8)
                 }
@@ -234,7 +234,7 @@ struct MessagesView: View {
                     .foregroundColor(.white)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
-                    .background(RoundedRectangle(cornerRadius: 10).fill(VP.accent))
+                    .background(RoundedRectangle(cornerRadius: VP.radiusMD).fill(VP.accent))
                     .shadow(radius: 4)
                     .padding(.top, 8)
                     .transition(.move(edge: .top).combined(with: .opacity))
@@ -275,7 +275,7 @@ struct MessagesView: View {
                             .padding(.vertical, 8)
                             .frame(minHeight: 44)
                             .background(VP.accent)
-                            .cornerRadius(8)
+                            .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
                     }
                 }
                 .padding(.top, 80)
@@ -297,7 +297,7 @@ struct MessagesView: View {
                             .padding(.vertical, 8)
                             .frame(minHeight: 44)
                             .background(VP.accent)
-                            .cornerRadius(8)
+                            .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
                     }
                 }
                 .padding(.top, 80)
@@ -375,7 +375,7 @@ struct MessagesView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
                 .background(VP.card)
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
 
@@ -393,7 +393,7 @@ struct MessagesView: View {
                                     .padding(.vertical, 5)
                                     .background(roleFilter == r ? VP.text : VP.card)
                                     .foregroundColor(roleFilter == r ? .white : VP.dim)
-                                    .cornerRadius(12)
+                                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                                     .frame(minHeight: 36)
                             }
                             .buttonStyle(.plain)
@@ -865,7 +865,7 @@ struct DMThreadView: View {
                                             .padding(.horizontal, 14)
                                             .padding(.vertical, 9)
                                             .background(isMe ? VP.accent : Color(hex: "E9E9EB"))
-                                            .cornerRadius(18)
+                                            .clipShape(RoundedRectangle(cornerRadius: 18))
                                         if !isMe { Spacer(minLength: 60) }
                                     }
                                     if msg.id == lastReadOwnId {
@@ -913,8 +913,8 @@ struct DMThreadView: View {
                         .padding(.horizontal, 14)
                         .padding(.vertical, 10)
                         .background(VP.bg)
-                        .cornerRadius(20)
-                        .overlay(RoundedRectangle(cornerRadius: 20).stroke(VP.border))
+                        .clipShape(RoundedRectangle(cornerRadius: VP.radiusFull))
+                        .overlay(RoundedRectangle(cornerRadius: VP.radiusFull).stroke(VP.border))
                         .onSubmit { Task { await send() } }
 
                     Button {

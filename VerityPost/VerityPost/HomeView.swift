@@ -233,14 +233,14 @@ struct HomeView: View {
     private var topBar: some View {
         HStack(spacing: 0) {
             Text("Verity Post")
-                .font(.system(size: 15, weight: .heavy))
+                .font(.system(size: VP.Size.base, weight: .heavy))
                 .tracking(-0.15)
                 .foregroundColor(VP.text)
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
             Spacer()
             Text(today.humanDate)
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: VP.Size.sm, weight: .medium))
                 .foregroundColor(VP.dim)
                 .lineLimit(1)
                 .padding(.trailing, canSearch ? 8 : 0)
@@ -249,7 +249,7 @@ struct HomeView: View {
                     FindView().environmentObject(auth)
                 } label: {
                     Image(systemName: "magnifyingglass")
-                        .font(.system(size: 18, weight: .regular))
+                        .font(.system(size: VP.Size.lg, weight: .regular))
                         .foregroundColor(VP.dim)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
@@ -276,14 +276,14 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 0) {
                 if let cat = categoryName(for: story.categoryId) {
                     Text(cat.uppercased())
-                        .font(.system(size: 11, weight: .semibold, design: .serif))
+                        .font(.system(size: VP.Size.xs, weight: .semibold, design: .serif))
                         .tracking(1.4)
                         .foregroundColor(.white.opacity(0.65))
                         .padding(.bottom, 14)
                 }
                 if story.isBreaking == true {
                     Text("Breaking")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.system(size: VP.Size.xs, weight: .semibold))
                         .tracking(0.8)
                         .textCase(.uppercase)
                         .foregroundColor(.white.opacity(0.9))
@@ -293,7 +293,7 @@ struct HomeView: View {
                         .padding(.bottom, 8)
                 } else if story.isDeveloping == true {
                     Text("Developing")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.system(size: VP.Size.xs, weight: .semibold))
                         .tracking(0.8)
                         .textCase(.uppercase)
                         .foregroundColor(VP.warn)
@@ -303,21 +303,21 @@ struct HomeView: View {
                         .padding(.bottom, 8)
                 }
                 Text(story.title ?? "Untitled")
-                    .font(.system(size: 32, weight: .bold, design: .serif))
+                    .font(.system(size: 32, weight: .bold, design: .serif))  // hero display size, no token
                     .tracking(-0.4)
                     .lineSpacing(2)
                     .foregroundColor(.white)
                     .fixedSize(horizontal: false, vertical: true)
                 if let excerpt = story.excerpt, !excerpt.isEmpty {
                     Text(excerpt)
-                        .font(.system(size: 18, weight: .regular, design: .serif))
+                        .font(.system(size: VP.Size.lg, weight: .regular, design: .serif))
                         .lineSpacing(4)
                         .foregroundColor(.white.opacity(0.80))
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 14)
                 }
                 Text(timeShort(story.publishedAt))
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: VP.Size.sm, weight: .medium))
                     .foregroundColor(.white.opacity(0.55))
                     .padding(.top, 10)
             }
@@ -337,14 +337,14 @@ struct HomeView: View {
             }
             if story.isBreaking == true {
                 Text("Breaking")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: VP.Size.xs, weight: .semibold))
                     .tracking(0.8)
                     .textCase(.uppercase)
                     .foregroundColor(VP.breaking)
                     .padding(.bottom, 4)
             } else if story.isDeveloping == true {
                 Text("Developing")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: VP.Size.xs, weight: .semibold))
                     .tracking(0.8)
                     .textCase(.uppercase)
                     .foregroundColor(VP.warn)
@@ -360,7 +360,7 @@ struct HomeView: View {
 
             if let excerpt = story.excerpt, !excerpt.isEmpty {
                 Text(excerpt)
-                    .font(.system(size: 15, weight: .regular, design: .serif))
+                    .font(.system(size: VP.Size.base, weight: .regular, design: .serif))
                     .lineSpacing(2)
                     .foregroundColor(VP.soft)
                     .lineLimit(2)
@@ -378,7 +378,7 @@ struct HomeView: View {
     @ViewBuilder
     private func eyebrow(_ name: String) -> some View {
         Text(name.uppercased())
-            .font(.system(size: 11, weight: .semibold, design: .serif))
+            .font(.system(size: VP.Size.xs, weight: .semibold, design: .serif))
             .tracking(1.4)
             .foregroundColor(VP.muted)
     }
@@ -386,7 +386,7 @@ struct HomeView: View {
     @ViewBuilder
     private func metaLine(for story: Story) -> some View {
         Text(timeShort(story.publishedAt))
-            .font(.system(size: 13, weight: .medium))
+            .font(.system(size: VP.Size.sm, weight: .medium))
             .foregroundColor(VP.muted)
     }
 
@@ -400,7 +400,7 @@ struct HomeView: View {
 
     private var loadingState: some View {
         Text("Loading today’s front page…")
-            .font(.system(size: 15, weight: .regular, design: .serif))
+            .font(.system(size: VP.Size.base, weight: .regular, design: .serif))
             .italic()
             .foregroundColor(VP.dim)
             .frame(maxWidth: .infinity)
@@ -410,7 +410,7 @@ struct HomeView: View {
     private func errorState(_ message: String) -> some View {
         VStack(spacing: 12) {
             Text(message)
-                .font(.system(size: 14, weight: .regular, design: .serif))
+                .font(.system(size: VP.Size.base, weight: .regular, design: .serif))
                 .foregroundColor(VP.dim)
                 .multilineTextAlignment(.center)
             Button {
@@ -418,7 +418,7 @@ struct HomeView: View {
                 refreshTask = Task { await loadData() }
             } label: {
                 Text("Try again")
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: VP.Size.base, weight: .medium))
                     .foregroundColor(VP.accent)
             }
         }
@@ -436,7 +436,7 @@ struct HomeView: View {
 
         HStack(spacing: 10) {
             Text("BREAKING")
-                .font(.system(size: 11, weight: .heavy))
+                .font(.system(size: VP.Size.xs, weight: .heavy))
                 .tracking(1.4)
                 .foregroundColor(.white)
                 .padding(.horizontal, 8)
@@ -446,14 +446,14 @@ struct HomeView: View {
                 )
 
             Text(truncated)
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: VP.Size.sm, weight: .medium))
                 .foregroundColor(.white)
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             if canViewBreakingBannerPaid {
                 Text(timeShort(story.publishedAt))
-                    .font(.system(size: 11))
+                    .font(.system(size: VP.Size.xs))
                     .foregroundColor(.white.opacity(0.85))
             }
         }
@@ -570,7 +570,7 @@ struct HomeView: View {
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .background(RoundedRectangle(cornerRadius: 12).fill(VP.accent))
+                        .background(RoundedRectangle(cornerRadius: VP.radiusMD).fill(VP.accent))
                 }
                 Button("Maybe Later") {
                     showRegistrationWall = false
@@ -579,7 +579,7 @@ struct HomeView: View {
                 .foregroundColor(VP.dim)
             }
             .padding(28)
-            .background(RoundedRectangle(cornerRadius: 16).fill(VP.bg))
+            .background(RoundedRectangle(cornerRadius: VP.radiusLG).fill(VP.bg))
             .padding(.horizontal, 32)
             .shadow(radius: 10)
         }
@@ -675,10 +675,10 @@ struct BrowseLanding: View {
 
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.system(size: VP.Size.base, weight: .medium))
                         .foregroundColor(VP.muted)
                     TextField("Search stories, topics, timelines…", text: $searchText)
-                        .font(.system(size: 15, design: .serif))
+                        .font(.system(size: VP.Size.base, design: .serif))
                         .foregroundColor(VP.text)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
@@ -686,10 +686,10 @@ struct BrowseLanding: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
                 .background(
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: VP.radiusSM)
                         .fill(VP.bg)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 8)
+                            RoundedRectangle(cornerRadius: VP.radiusSM)
                                 .stroke(VP.rule, lineWidth: 1)
                         )
                 )
@@ -697,7 +697,7 @@ struct BrowseLanding: View {
 
                 if loading {
                     Text("Loading…")
-                        .font(.system(size: 14, design: .serif))
+                        .font(.system(size: VP.Size.base, design: .serif))
                         .italic()
                         .foregroundColor(VP.dim)
                         .padding(.vertical, 48)
@@ -705,19 +705,19 @@ struct BrowseLanding: View {
                 } else if let err = loadError {
                     VStack(spacing: 12) {
                         Text(err)
-                            .font(.system(size: 14, design: .serif))
+                            .font(.system(size: VP.Size.base, design: .serif))
                             .italic()
                             .foregroundColor(VP.dim)
                             .multilineTextAlignment(.center)
                         Button("Try again") { Task { await load() } }
-                            .font(.system(size: 14, weight: .medium, design: .serif))
+                            .font(.system(size: VP.Size.base, weight: .medium, design: .serif))
                             .foregroundColor(VP.accent)
                     }
                     .padding(.vertical, 48)
                     .frame(maxWidth: .infinity)
                 } else if filteredCategories.isEmpty {
                     Text(searchText.isEmpty ? "No categories available." : "No results.")
-                        .font(.system(size: 14, design: .serif))
+                        .font(.system(size: VP.Size.base, design: .serif))
                         .italic()
                         .foregroundColor(VP.dim)
                         .padding(.vertical, 48)
@@ -750,13 +750,13 @@ struct BrowseLanding: View {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(cat.displayName)
-                        .font(.system(size: 20, weight: .semibold, design: .serif))
+                        .font(.system(size: VP.Size.xl, weight: .semibold, design: .serif))
                         .foregroundColor(VP.text)
                     activityLabel(for: cat)
                 }
                 Spacer(minLength: 8)
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: VP.Size.base, weight: .semibold))
                     .foregroundColor(VP.dim)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -770,11 +770,11 @@ struct BrowseLanding: View {
     private func activityLabel(for cat: VPCategory) -> some View {
         if let n = activeStoryCounts[cat.id], n > 0 {
             Text(n == 1 ? "1 active story" : "\(n) active stories")
-                .font(.system(size: 12, weight: .regular, design: .serif))
+                .font(.system(size: VP.Size.sm, weight: .regular, design: .serif))
                 .foregroundColor(VP.dim)
         } else {
             Text("quiet this week")
-                .font(.system(size: 12, weight: .regular, design: .serif))
+                .font(.system(size: VP.Size.sm, weight: .regular, design: .serif))
                 .foregroundColor(VP.muted)
         }
     }
@@ -885,21 +885,21 @@ struct CategoryDetailView: View {
 
                 if loading {
                     Text("Loading…")
-                        .font(.system(size: 14, design: .serif))
+                        .font(.system(size: VP.Size.base, design: .serif))
                         .italic()
                         .foregroundColor(VP.dim)
                         .padding(.vertical, 48)
                         .frame(maxWidth: .infinity)
                 } else if loadFailed {
                     Text("Couldn't load stories. Pull to retry.")
-                        .font(.system(size: 14, design: .serif))
+                        .font(.system(size: VP.Size.base, design: .serif))
                         .italic()
                         .foregroundColor(VP.dim)
                         .padding(.vertical, 48)
                         .frame(maxWidth: .infinity)
                 } else if storyItems.isEmpty {
                     Text("No active stories in this category.")
-                        .font(.system(size: 14, design: .serif))
+                        .font(.system(size: VP.Size.base, design: .serif))
                         .italic()
                         .foregroundColor(VP.dim)
                         .padding(.vertical, 48)
@@ -937,7 +937,7 @@ struct CategoryDetailView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(lifecycleLabel(item.lifecycleStatus))
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: VP.Size.xs, weight: .semibold))
                     .tracking(0.8)
                     .foregroundColor(lifecycleColor(item.lifecycleStatus))
                     .textCase(.uppercase)
@@ -948,7 +948,7 @@ struct CategoryDetailView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Text(scopeText(item))
-                .font(.system(size: 12, weight: .regular))
+                .font(.system(size: VP.Size.sm, weight: .regular))
                 .foregroundColor(VP.muted)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

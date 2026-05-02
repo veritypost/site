@@ -463,7 +463,7 @@ struct StoryDetailView: View {
                     .foregroundColor(.white)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
-                    .background(RoundedRectangle(cornerRadius: 10).fill(VP.accent))
+                    .background(RoundedRectangle(cornerRadius: VP.radiusMD).fill(VP.accent))
                     .shadow(radius: 4)
                     .padding(.top, 8)
                     .transition(.move(edge: .top).combined(with: .opacity))
@@ -524,7 +524,7 @@ struct StoryDetailView: View {
                     .padding(.vertical, 12)
                     .frame(minHeight: 44)
                     .background(VP.accent)
-                    .cornerRadius(10)
+                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
             }
             .buttonStyle(.plain)
             .padding(.top, 4)
@@ -570,7 +570,7 @@ struct StoryDetailView: View {
                     .padding(.vertical, 10)
                     .frame(minHeight: 44)
                     .background(VP.accent)
-                    .cornerRadius(10)
+                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
             }
             .buttonStyle(.plain)
             .padding(.top, 4)
@@ -701,7 +701,7 @@ struct StoryDetailView: View {
                             .padding(.horizontal, 18)
                             .padding(.vertical, 10)
                             .background(VP.accent)
-                            .cornerRadius(10)
+                            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                     }
                 }
                 .padding(20)
@@ -744,7 +744,7 @@ struct StoryDetailView: View {
                             .padding(.horizontal, 20)
                             .padding(.vertical, 10)
                             .background(VP.accent)
-                            .cornerRadius(9)
+                            .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
                     }
                     .buttonStyle(.plain)
                 } else {
@@ -757,18 +757,18 @@ struct StoryDetailView: View {
                             .padding(.horizontal, 20)
                             .padding(.vertical, 10)
                             .background(VP.accent)
-                            .cornerRadius(9)
+                            .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
                     }
                     .buttonStyle(.plain)
                 }
             }
             .padding(20)
             .background(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: VP.radiusMD)
                     .fill(VP.card)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: VP.radiusMD)
                     .stroke(VP.border, lineWidth: 1)
             )
             .padding(.horizontal, 20)
@@ -792,7 +792,7 @@ struct StoryDetailView: View {
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
                         .background(VP.accent)
-                        .cornerRadius(8)
+                        .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
                 }
                 .buttonStyle(.plain)
                 Button {
@@ -804,7 +804,7 @@ struct StoryDetailView: View {
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 8)
+                            RoundedRectangle(cornerRadius: VP.radiusSM)
                                 .stroke(VP.border, lineWidth: 1)
                         )
                 }
@@ -826,7 +826,7 @@ struct StoryDetailView: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .background(VP.accent)
-                    .cornerRadius(8)
+                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
             }
             .buttonStyle(.plain)
         }
@@ -884,7 +884,7 @@ struct StoryDetailView: View {
                         .foregroundColor(VP.text)
                     Spacer()
                     Image(systemName: isOpen ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: VP.Size.xs, weight: .semibold))
                         .foregroundColor(VP.dim)
                 }
                 .padding(.horizontal, 12)
@@ -906,7 +906,7 @@ struct StoryDetailView: View {
                             HStack(spacing: 4) {
                                 Text("Read on \(outlet)")
                                 Image(systemName: "arrow.up.right")
-                                    .font(.system(size: 10, weight: .semibold))
+                                    .font(.system(size: VP.Size.xs, weight: .semibold))
                             }
                             .font(.system(.caption, design: .default, weight: .semibold))
                             .foregroundColor(VP.accent)
@@ -920,8 +920,8 @@ struct StoryDetailView: View {
             }
         }
         .background(VP.card)
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border, lineWidth: 1))
-        .cornerRadius(10)
+        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
     }
 
     // MARK: - Timeline content
@@ -1131,7 +1131,7 @@ struct StoryDetailView: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
                             .background(VP.accent)
-                            .cornerRadius(10)
+                            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                     }
                     .disabled(quizStage == .loading)
                     .buttonStyle(.plain)
@@ -1142,8 +1142,8 @@ struct StoryDetailView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(VP.card)
-        .cornerRadius(14)
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(VP.accent.opacity(0.35), lineWidth: 1.5))
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.accent.opacity(0.35), lineWidth: 1.5))
         .clipped()
     }
 
@@ -1237,7 +1237,7 @@ struct StoryDetailView: View {
                         .padding(10)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(Color(.secondarySystemBackground))
-                        .cornerRadius(10)
+                        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                     }
                 }
 
@@ -1254,7 +1254,7 @@ struct StoryDetailView: View {
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 12)
                                 .background(VP.accent)
-                                .cornerRadius(10)
+                                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                         }
                         .buttonStyle(.plain)
                     } else if canRetakeQuiz {
@@ -1267,18 +1267,18 @@ struct StoryDetailView: View {
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 12)
                                 .background(VP.accent)
-                                .cornerRadius(10)
+                                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                         }
                         .buttonStyle(.plain)
                     }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(18)
+            .padding(16)
             .background(Color(.systemBackground))
-            .cornerRadius(14)
+            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
             .overlay(
-                RoundedRectangle(cornerRadius: 14)
+                RoundedRectangle(cornerRadius: VP.radiusMD)
                     .stroke(r.passed ? VP.right.opacity(0.4) : Color(.systemRed).opacity(0.3), lineWidth: 1)
             )
         }
@@ -1330,7 +1330,7 @@ struct StoryDetailView: View {
                     .foregroundColor(selected ? VP.accent : .secondary)
                     .frame(width: 24, height: 24)
                     .background(selected ? Color.white : Color.primary.opacity(0.08))
-                    .cornerRadius(6)
+                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusXS))
                 Text(text)
                     .foregroundColor(selected ? .white : VP.text)
                     .font(.system(.subheadline, design: .default, weight: selected ? .semibold : .regular))
@@ -1341,8 +1341,8 @@ struct StoryDetailView: View {
             .padding(.vertical, 11)
             .frame(minHeight: 44)
             .background(selected ? VP.accent : Color(.secondarySystemBackground))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(selected ? VP.accent : VP.border, lineWidth: 1))
-            .cornerRadius(10)
+            .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(selected ? VP.accent : VP.border, lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
             .opacity(answered && !selected ? 0.35 : 1.0)
             .animation(.easeInOut(duration: 0.15), value: selected)
         }
@@ -1368,11 +1368,11 @@ struct StoryDetailView: View {
                             .padding(.horizontal, 10)
                             .padding(.vertical, 4)
                             .background(
-                                RoundedRectangle(cornerRadius: 20)
+                                RoundedRectangle(cornerRadius: VP.radiusFull)
                                     .fill(expertFilterActive ? Color(hex: "#16a34a").opacity(0.10) : Color.clear)
                             )
                             .overlay(
-                                RoundedRectangle(cornerRadius: 20)
+                                RoundedRectangle(cornerRadius: VP.radiusFull)
                                     .stroke(expertFilterActive ? Color(hex: "#16a34a") : VP.border, lineWidth: 1)
                             )
                     }
@@ -1389,8 +1389,8 @@ struct StoryDetailView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
                     .background(VP.card)
-                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border))
-                    .cornerRadius(10)
+                    .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
+                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                     .padding(.horizontal, 20)
                     .padding(.top, 12)
             } else {
@@ -1503,8 +1503,8 @@ struct StoryDetailView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
         .background(Color(hex: "fef2f2"))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(VP.failBorder))
-        .cornerRadius(12)
+        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.failBorder))
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
     }
 
     private var activeComposer: some View {
@@ -1569,8 +1569,8 @@ struct StoryDetailView: View {
                     }
                 }
                 .background(VP.bg)
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border))
-                .cornerRadius(10)
+                .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
+                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                 .padding(.bottom, 8)
             }
 
@@ -1602,7 +1602,7 @@ struct StoryDetailView: View {
                         }
                         .padding(10)
                         .background(Color(.secondarySystemBackground))
-                        .cornerRadius(12)
+                        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                     HStack {
                         Spacer()
                         Button {
@@ -1625,10 +1625,10 @@ struct StoryDetailView: View {
                     }
                 }
             }
-            .padding(14)
+            .padding(16)
             .background(VP.card)
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(VP.border))
-            .cornerRadius(14)
+            .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
+            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
         }
     }
 
@@ -1723,7 +1723,7 @@ struct StoryDetailView: View {
                         .foregroundColor(Color.green)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(RoundedRectangle(cornerRadius: 4).fill(Color.green.opacity(0.12)))
+                        .background(RoundedRectangle(cornerRadius: VP.radiusXS).fill(Color.green.opacity(0.12)))
                 }
                 HStack(spacing: 6) {
                     if let uname = u?.username {
@@ -1754,7 +1754,7 @@ struct StoryDetailView: View {
                             .foregroundColor(VP.tagHelpful)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(RoundedRectangle(cornerRadius: 4).fill(VP.tagHelpful.opacity(0.12)))
+                            .background(RoundedRectangle(cornerRadius: VP.radiusXS).fill(VP.tagHelpful.opacity(0.12)))
                     }
                     if comment.isEdited == true && !comment.isDeleted {
                         Text("(edited)")
@@ -1786,7 +1786,7 @@ struct StoryDetailView: View {
                         .frame(minHeight: 80)
                         .padding(8)
                         .background(VP.card)
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(VP.border))
+                        .overlay(RoundedRectangle(cornerRadius: VP.radiusSM).stroke(VP.border))
                         .accessibilityLabel("Edit comment")
                     HStack(spacing: 10) {
                         Button {
@@ -1810,7 +1810,7 @@ struct StoryDetailView: View {
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 4)
                                     .background(VP.accent)
-                                    .cornerRadius(6)
+                                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusXS))
                             }
                         }
                         .buttonStyle(.plain)
@@ -1858,7 +1858,7 @@ struct StoryDetailView: View {
                                 Task { await reactOnComment(comment, reaction: "agree") }
                             } label: {
                                 Text("Agree")
-                                    .font(.system(size: 12, weight: agreed ? .bold : .medium))
+                                    .font(.system(size: VP.Size.sm, weight: agreed ? .bold : .medium))
                                     .foregroundColor(agreed ? Color(hex: "#1a7a4a") : VP.dim)
                             }
                             .buttonStyle(.plain)
@@ -1866,7 +1866,7 @@ struct StoryDetailView: View {
                                 Task { await reactOnComment(comment, reaction: "disagree") }
                             } label: {
                                 Text("Disagree")
-                                    .font(.system(size: 12, weight: disagreed ? .bold : .medium))
+                                    .font(.system(size: VP.Size.sm, weight: disagreed ? .bold : .medium))
                                     .foregroundColor(disagreed ? Color(hex: "#b94040") : VP.dim)
                             }
                             .buttonStyle(.plain)
@@ -1895,10 +1895,10 @@ struct StoryDetailView: View {
         .padding(comment.isExpertReply == true ? 10 : 0)
         .background(comment.isExpertReply == true ? Color.green.opacity(0.06) : Color.clear)
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
+            RoundedRectangle(cornerRadius: VP.radiusMD)
                 .stroke(comment.isExpertReply == true ? Color.green.opacity(0.18) : Color.clear, lineWidth: 1)
         )
-        .cornerRadius(comment.isExpertReply == true ? 10 : 0)
+        .clipShape(RoundedRectangle(cornerRadius: comment.isExpertReply == true ? VP.radiusMD : 0))
         // Apple Guideline 1.2 — long-press affords Report + Block on every
         // comment. Author-self check skips blocking yourself; the API also
         // rejects it but we suppress the option entirely to avoid a dead-end.
@@ -2097,7 +2097,7 @@ struct StoryDetailView: View {
                 .foregroundColor(.white)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
-                .background(RoundedRectangle(cornerRadius: 10).fill(VP.accent))
+                .background(RoundedRectangle(cornerRadius: VP.radiusMD).fill(VP.accent))
                 .shadow(radius: 4)
                 .padding(.top, 8)
                 .transition(.move(edge: .top).combined(with: .opacity))
@@ -2150,7 +2150,7 @@ struct StoryDetailView: View {
                         .foregroundColor(VP.accent)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 6)
-                        .background(RoundedRectangle(cornerRadius: 99).fill(VP.accent.opacity(0.1)))
+                        .background(RoundedRectangle(cornerRadius: VP.radiusFull).fill(VP.accent.opacity(0.1)))
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
@@ -2168,7 +2168,7 @@ struct StoryDetailView: View {
         if showQuizTeaser, !userPassedQuiz, !quizTeaserDismissed, canTakeQuiz {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "checklist")
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.system(size: VP.Size.lg, weight: .semibold))
                     .foregroundColor(VP.accent)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("5 questions waiting at the end")
@@ -2183,7 +2183,7 @@ struct StoryDetailView: View {
                     quizTeaserDismissed = true
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: VP.Size.xs, weight: .semibold))
                         .foregroundColor(VP.dim)
                         .frame(width: 28, height: 28)
                         .contentShape(Rectangle())
@@ -2191,10 +2191,10 @@ struct StoryDetailView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Dismiss quiz reminder")
             }
-            .padding(12)
+            .padding(16)
             .background(VP.card)
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border, lineWidth: 1))
-            .cornerRadius(10)
+            .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border, lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
             .padding(.horizontal, 20)
             .padding(.top, 18)
             .transition(reduceMotion ? .opacity : .move(edge: .leading).combined(with: .opacity))
@@ -2276,10 +2276,10 @@ struct StoryDetailView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
+        .padding(16)
         .background(VP.card)
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(VP.border, lineWidth: 1))
-        .cornerRadius(12)
+        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
     }
 
     // MARK: - Scroll + engagement triggers
@@ -2396,7 +2396,7 @@ struct StoryDetailView: View {
             .foregroundColor(.white)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(RoundedRectangle(cornerRadius: 4).fill(color))
+            .background(RoundedRectangle(cornerRadius: VP.radiusXS).fill(color))
     }
 
     private func formatDate(_ date: Date) -> String {
@@ -3159,7 +3159,7 @@ struct StoryDetailView: View {
                 withAnimation(.easeOut(duration: 0.15)) { tagOpenCommentId = comment.id }
             } label: {
                 Text("+ Tag")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: VP.Size.xs, weight: .medium))
                     .foregroundColor(VP.dim.opacity(0.7))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
@@ -3179,7 +3179,7 @@ struct StoryDetailView: View {
                             }
                         } label: {
                             Text(tagPickerOpen(for: comment) ? "\u{2212}" : "+")
-                                .font(.system(size: 11, weight: .medium))
+                                .font(.system(size: VP.Size.xs, weight: .medium))
                                 .foregroundColor(VP.dim.opacity(0.7))
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
@@ -3209,7 +3209,7 @@ struct StoryDetailView: View {
             Task { await toggleCommentTag(comment, kind: entry.kind) }
         } label: {
             Text(entry.label)
-                .font(.system(size: 11, weight: isCast ? .bold : .medium))
+                .font(.system(size: VP.Size.xs, weight: isCast ? .bold : .medium))
                 .foregroundColor(isCast ? entry.color : VP.dim)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)

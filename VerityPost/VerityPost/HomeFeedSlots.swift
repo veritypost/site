@@ -60,8 +60,8 @@ struct HomeRecapCard: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(VP.accent.opacity(0.05))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(VP.accent.opacity(0.25)))
-        .cornerRadius(12)
+        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.accent.opacity(0.25)))
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
     }
@@ -129,11 +129,11 @@ struct HomeAdSlot: View {
                                 .multilineTextAlignment(.leading)
                         }
                     }
-                    .padding(14)
+                    .padding(16)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(VP.card)
-                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border))
-                    .cornerRadius(10)
+                    .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
+                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                     .padding(.horizontal, 16)
                     .padding(.vertical, 6)
                 }

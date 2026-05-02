@@ -27,7 +27,7 @@ struct WelcomeView: View {
             // Header — wordmark + Skip
             HStack(alignment: .firstTextBaseline) {
                 Text("Verity Post")
-                    .font(.system(size: 22, weight: .bold, design: .serif))
+                    .font(.system(size: VP.Size.xl, weight: .bold, design: .serif))
                     .tracking(-0.4)
                     .foregroundColor(VP.text)
 
@@ -107,7 +107,7 @@ struct WelcomeView: View {
                         .padding(.horizontal, 18)
                         .frame(minHeight: 48)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 10)
+                            RoundedRectangle(cornerRadius: VP.radiusMD)
                                 .strokeBorder(VP.border, lineWidth: 1)
                         )
                 }
@@ -131,7 +131,7 @@ struct WelcomeView: View {
                     .frame(height: 48)
                     .background(VP.accent)
                     .foregroundColor(.white)
-                    .cornerRadius(10)
+                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                 }
                 .disabled(submitting)
             }
@@ -148,7 +148,7 @@ struct WelcomeView: View {
         VStack(alignment: .leading, spacing: 12) {
             eyebrow("Welcome")
             Text("Welcome to Verity Post.")
-                .font(.system(size: 30, weight: .bold, design: .serif))
+                .font(.system(size: VP.Size.display, weight: .bold, design: .serif))
                 .tracking(-0.6)
                 .foregroundColor(VP.text)
                 .fixedSize(horizontal: false, vertical: true)
@@ -173,7 +173,7 @@ struct WelcomeView: View {
         VStack(alignment: .leading, spacing: 14) {
             eyebrow("How it works")
             Text("Read. Quiz. Discuss.")
-                .font(.system(size: 28, weight: .bold, design: .serif))
+                .font(.system(size: VP.Size.xxl, weight: .bold, design: .serif))
                 .tracking(-0.6)
                 .foregroundColor(VP.text)
 
@@ -207,7 +207,7 @@ struct WelcomeView: View {
         VStack(alignment: .leading, spacing: 14) {
             eyebrow("Ready?")
             Text("Your first read is waiting.")
-                .font(.system(size: 28, weight: .bold, design: .serif))
+                .font(.system(size: VP.Size.xxl, weight: .bold, design: .serif))
                 .tracking(-0.6)
                 .foregroundColor(VP.text)
             Text("Head to the home feed — pick any article, read it, and the quiz is right below.")
@@ -244,10 +244,10 @@ struct WelcomeView: View {
             .padding(.vertical, 10)
             .frame(maxWidth: .infinity)
             .background(
-                RoundedRectangle(cornerRadius: 10).fill(bg)
+                RoundedRectangle(cornerRadius: VP.radiusMD).fill(bg)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 10).strokeBorder(border, lineWidth: 1)
+                RoundedRectangle(cornerRadius: VP.radiusMD).strokeBorder(border, lineWidth: 1)
             )
     }
 

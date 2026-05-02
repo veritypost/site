@@ -45,7 +45,7 @@ struct SignupView: View {
                         .padding(.bottom, 24)
 
                     Text("Join the discussion that\u{2019}s earned.")
-                        .font(.system(size: 26, weight: .bold))
+                        .font(.system(size: VP.Size.xxl, weight: .bold))
                         .tracking(-0.3)
                         .foregroundColor(VP.text)
                         .multilineTextAlignment(.leading)
@@ -133,9 +133,9 @@ struct SignupView: View {
                 .padding(12)
                 .frame(minHeight: 44)
                 .background(VP.card)
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10)
+                    RoundedRectangle(cornerRadius: VP.radiusMD)
                         .stroke(emailFocused ? VP.accent : VP.border, lineWidth: 1.5)
                 )
         }
@@ -186,7 +186,7 @@ struct SignupView: View {
             .frame(minHeight: 48)
             .background(canSubmit ? VP.text : VP.border)
             .foregroundColor(.white)
-            .cornerRadius(12)
+            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
         }
         .disabled(!canSubmit)
     }
@@ -260,7 +260,7 @@ struct SignupView: View {
         .signInWithAppleButtonStyle(.black)
         .frame(maxWidth: .infinity)
         .frame(height: 48)
-        .cornerRadius(12)
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
         .disabled(loading)
         .padding(.bottom, 10)
 
@@ -278,8 +278,8 @@ struct SignupView: View {
                 .frame(minHeight: 48)
                 .foregroundColor(VP.text)
                 .background(Color.white)
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(VP.border, lineWidth: 1.5))
-                .cornerRadius(12)
+                .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border, lineWidth: 1.5))
+                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
         }
         .disabled(loading)
         .padding(.bottom, 18)
@@ -300,8 +300,8 @@ struct SignupView: View {
         }
         .padding(12)
         .background(VP.failBg)
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.failBorder))
-        .cornerRadius(10)
+        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.failBorder))
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
         .padding(.bottom, 14)
     }
 

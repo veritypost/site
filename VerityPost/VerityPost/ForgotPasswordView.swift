@@ -80,8 +80,8 @@ struct ForgotPasswordView: View {
                 .padding(12)
                 .frame(minHeight: 44)
                 .background(VP.card)
-                .cornerRadius(10)
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border))
+                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+                .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
         }
         .padding(.bottom, 20)
 
@@ -106,7 +106,7 @@ struct ForgotPasswordView: View {
             .frame(minHeight: 48)
             .background(canSubmit ? VP.text : VP.muted)
             .foregroundColor(.white)
-            .cornerRadius(12)
+            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
         }
         .disabled(!canSubmit)
     }
@@ -130,8 +130,8 @@ struct ForgotPasswordView: View {
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(VP.passBg)
-                .cornerRadius(10)
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.passBorder))
+                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+                .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.passBorder))
         }
         .padding(.bottom, 20)
 
@@ -151,8 +151,8 @@ struct ForgotPasswordView: View {
             .frame(minHeight: 44)
             .foregroundColor(cooldown > 0 ? VP.dim : VP.text)
             .background(VP.card)
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border))
-            .cornerRadius(10)
+            .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
+            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
         }
         .disabled(loading || cooldown > 0)
         .padding(.bottom, 10)

@@ -59,7 +59,7 @@ struct PushPromptSheet: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 13)
                         .background(VP.accent)
-                        .cornerRadius(12)
+                        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                     }
                     .disabled(isRequesting)
 

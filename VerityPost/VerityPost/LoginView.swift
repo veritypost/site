@@ -108,8 +108,8 @@ struct LoginView: View {
                 .padding(12)
                 .frame(minHeight: 44)
                 .background(VP.card)
-                .cornerRadius(10)
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border))
+                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+                .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
         }
         .padding(.bottom, 22)
 
@@ -135,7 +135,7 @@ struct LoginView: View {
             .frame(minHeight: 48)
             .background(canSubmit ? VP.text : VP.muted)
             .foregroundColor(.white)
-            .cornerRadius(12)
+            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
         }
         .disabled(!canSubmit)
     }
@@ -208,7 +208,7 @@ struct LoginView: View {
         .signInWithAppleButtonStyle(.black)
         .frame(maxWidth: .infinity)
         .frame(height: 48)
-        .cornerRadius(12)
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
         .disabled(loading)
         .padding(.bottom, 10)
 
@@ -225,8 +225,8 @@ struct LoginView: View {
                 .frame(minHeight: 48)
                 .foregroundColor(VP.text)
                 .background(VP.card)
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(VP.border))
-                .cornerRadius(12)
+                .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
+                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
         }
         .disabled(loading)
         .padding(.bottom, 22)

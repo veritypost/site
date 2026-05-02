@@ -293,7 +293,7 @@ struct BookmarksView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .background(VP.text)
-        .cornerRadius(10)
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
         .padding(.horizontal, 20)
     }
 
@@ -404,10 +404,10 @@ struct BookmarksView: View {
                 .padding(.vertical, 6)
                 .background(active ? VP.accent : VP.card)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 99)
+                    RoundedRectangle(cornerRadius: VP.radiusFull)
                         .stroke(active ? Color.clear : VP.border)
                 )
-                .clipShape(RoundedRectangle(cornerRadius: 99))
+                .clipShape(RoundedRectangle(cornerRadius: VP.radiusFull))
                 .frame(minHeight: 44)
         }
         .buttonStyle(.plain)
@@ -462,14 +462,14 @@ struct BookmarksView: View {
                         .padding(8)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(Color.white)
-                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(VP.border))
+                        .overlay(RoundedRectangle(cornerRadius: VP.radiusSM).stroke(VP.border))
                 }
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(VP.card)
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border))
-            .cornerRadius(10)
+            .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
+            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
         }
         .buttonStyle(.plain)
     }
@@ -493,7 +493,7 @@ struct BookmarksView: View {
                     .padding(.vertical, 10)
                     .frame(minHeight: 44)
                     .background(VP.accent)
-                    .cornerRadius(10)
+                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
             }
         }
         .frame(maxWidth: .infinity)
@@ -523,8 +523,8 @@ struct BookmarksView: View {
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(bg)
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(border))
-        .cornerRadius(10)
+        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(border))
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
     }
 
     // MARK: - Data

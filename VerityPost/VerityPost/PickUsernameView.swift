@@ -67,9 +67,9 @@ struct PickUsernameView: View {
                         .padding(12)
                         .frame(minHeight: 44)
                         .background(VP.card)
-                        .cornerRadius(10)
+                        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 10)
+                            RoundedRectangle(cornerRadius: VP.radiusMD)
                                 .stroke(borderColor, lineWidth: 1.5)
                         )
                         .accessibilityLabel("Username")
@@ -106,7 +106,7 @@ struct PickUsernameView: View {
                     .frame(minHeight: 48)
                     .background(canSubmit ? VP.text : VP.muted)
                     .foregroundColor(.white)
-                    .cornerRadius(12)
+                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                 }
                 .disabled(!canSubmit)
                 .padding(.bottom, 28)

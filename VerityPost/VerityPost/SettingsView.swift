@@ -41,7 +41,7 @@ private struct SettingsSectionHeader: View {
             }
             Text(icon == nil ? title.uppercased() : title)
                 .font(icon == nil
-                      ? .system(size: 11, weight: .heavy)
+                      ? .system(size: VP.Size.xs, weight: .heavy)
                       : .system(.callout, design: .default, weight: .bold))
                 .tracking(icon == nil ? 0.8 : -0.3)
                 .foregroundColor(tone == .danger ? VP.danger : (icon == nil ? VP.dim : VP.text))
@@ -85,10 +85,10 @@ private struct SettingsCard<Content: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(VP.surfaceRaised)
             .overlay(
-                RoundedRectangle(cornerRadius: VP.Radius.lg, style: .continuous)
+                RoundedRectangle(cornerRadius: VP.radiusMD, style: .continuous)
                     .stroke(VP.borderSoft, lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: VP.Radius.lg, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD, style: .continuous))
             .vpShadowAmbient()
             .padding(.horizontal, 16)
     }
@@ -117,7 +117,7 @@ private struct SettingsRowLink<Destination: View>: View {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.system(size: 15, weight: .regular))
+                        .font(.system(size: VP.Size.base, weight: .regular))
                         .foregroundColor(VP.ink)
                     if let subtitle {
                         Text(subtitle)
@@ -127,7 +127,7 @@ private struct SettingsRowLink<Destination: View>: View {
                 }
                 Spacer(minLength: 8)
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: VP.Size.sm, weight: .semibold))
                     .foregroundColor(VP.inkFaint)
             }
             .padding(.horizontal, 16)
@@ -156,11 +156,11 @@ private struct SettingsRowExternal: View {
         Link(destination: url) {
             HStack(spacing: 12) {
                 Text(title)
-                    .font(.system(size: 15, weight: .regular))
+                    .font(.system(size: VP.Size.base, weight: .regular))
                     .foregroundColor(tone == .accent ? VP.accent : VP.text)
                 Spacer(minLength: 8)
                 Image(systemName: "arrow.up.right")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: VP.Size.sm, weight: .semibold))
                     .foregroundColor(VP.muted)
             }
             .padding(.horizontal, 16)
@@ -198,7 +198,7 @@ private struct SettingsRowButton: View {
         Button(action: action) {
             HStack(spacing: 12) {
                 Text(title)
-                    .font(.system(size: 15, weight: tone == .accent ? .semibold : .regular))
+                    .font(.system(size: VP.Size.base, weight: tone == .accent ? .semibold : .regular))
                     .foregroundColor(textColor)
                 Spacer(minLength: 8)
                 if let trailing {
@@ -229,11 +229,11 @@ private struct SettingsRowValue: View {
     var body: some View {
         HStack(spacing: 12) {
             Text(title)
-                .font(.system(size: 15, weight: .regular))
+                .font(.system(size: VP.Size.base, weight: .regular))
                 .foregroundColor(VP.text)
             Spacer(minLength: 8)
             Text(value)
-                .font(.system(size: 14, weight: .regular))
+                .font(.system(size: VP.Size.base, weight: .regular))
                 .foregroundColor(valueColor)
         }
         .padding(.horizontal, 16)
@@ -258,13 +258,13 @@ private struct SettingsTopBar: View {
     var body: some View {
         ZStack {
             Text(title)
-                .font(.system(size: 15, weight: .heavy))
+                .font(.system(size: VP.Size.base, weight: .heavy))
                 .tracking(-0.15)
                 .foregroundColor(VP.text)
             HStack(spacing: 0) {
                 Button(action: onBack) {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.system(size: VP.Size.lg, weight: .semibold))
                         .foregroundColor(VP.text)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
@@ -367,12 +367,12 @@ private struct SettingsPrimaryButton: View {
             HStack {
                 if isLoading { ProgressView().tint(VP.bg) }
                 Text(title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: VP.Size.base, weight: .semibold))
                     .foregroundColor(VP.bg)
             }
             .frame(maxWidth: .infinity, minHeight: 44)
             .background(isDisabled ? VP.muted : VP.text)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
         }
         .buttonStyle(.plain)
         .disabled(isDisabled || isLoading)
@@ -406,13 +406,13 @@ private struct SettingsTextField: View {
                         .autocorrectionDisabled(!autocorrect)
                 }
             }
-            .font(.system(size: 15))
+            .font(.system(size: VP.Size.base))
             .foregroundColor(VP.text)
             .padding(.horizontal, 12)
             .padding(.vertical, 11)
             .background(VP.bg)
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(VP.border, lineWidth: 1))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: VP.radiusSM).stroke(VP.border, lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
         }
     }
 }
@@ -429,7 +429,7 @@ private struct SettingsToggleRow: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 15, weight: .regular))
+                    .font(.system(size: VP.Size.base, weight: .regular))
                     .foregroundColor(VP.text)
                 if let subtitle {
                     Text(subtitle)
@@ -521,12 +521,12 @@ private struct HubRow: View {
             RowIconTile(system: icon, tint: iconTint)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 16, weight: .medium))
+                    .font(.system(size: VP.Size.md, weight: .medium))
                     .foregroundColor(labelColor)
                     .lineLimit(1)
                 if let subtitle {
                     Text(subtitle)
-                        .font(.system(size: 13, weight: .regular))
+                        .font(.system(size: VP.Size.sm, weight: .regular))
                         .foregroundColor(VP.dim)
                         .lineLimit(1)
                 }
@@ -554,27 +554,27 @@ private struct HubRow: View {
         case .push:
             if let valuePreview, !valuePreview.isEmpty {
                 Text(valuePreview)
-                    .font(.system(size: 14, weight: .regular))
+                    .font(.system(size: VP.Size.base, weight: .regular))
                     .foregroundColor(valueTone)
                     .lineLimit(1)
             }
             Image(systemName: "chevron.right")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: VP.Size.sm, weight: .semibold))
                 .foregroundColor(VP.muted)
         case .external:
             if let valuePreview, !valuePreview.isEmpty {
                 Text(valuePreview)
-                    .font(.system(size: 14, weight: .regular))
+                    .font(.system(size: VP.Size.base, weight: .regular))
                     .foregroundColor(valueTone)
                     .lineLimit(1)
             }
             Image(systemName: "arrow.up.right")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: VP.Size.sm, weight: .semibold))
                 .foregroundColor(VP.muted)
         case .action:
             if let valuePreview, !valuePreview.isEmpty {
                 Text(valuePreview)
-                    .font(.system(size: 14, weight: .regular))
+                    .font(.system(size: VP.Size.base, weight: .regular))
                     .foregroundColor(valueTone)
                     .lineLimit(1)
             }
@@ -586,7 +586,7 @@ private struct HubRow: View {
         case .staticValue:
             if let valuePreview {
                 Text(valuePreview)
-                    .font(.system(size: 14, weight: .regular))
+                    .font(.system(size: VP.Size.base, weight: .regular))
                     .foregroundColor(valueTone)
                     .lineLimit(1)
             }
@@ -741,7 +741,7 @@ struct SettingsView: View {
             }
             Spacer(minLength: 8)
             Text(user.planDisplay)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: VP.Size.sm, weight: .semibold))
                 .foregroundColor(VP.text)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 4)
@@ -756,10 +756,10 @@ struct SettingsView: View {
     private var searchField: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: VP.Size.base, weight: .semibold))
                 .foregroundColor(VP.muted)
             TextField("Search settings", text: $searchText)
-                .font(.system(size: 15))
+                .font(.system(size: VP.Size.base))
                 .foregroundColor(VP.text)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled(true)
@@ -770,7 +770,7 @@ struct SettingsView: View {
                     searchQuery = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 15))
+                        .font(.system(size: VP.Size.base))
                         .foregroundColor(VP.muted)
                 }
                 .buttonStyle(.plain)
@@ -780,8 +780,8 @@ struct SettingsView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background(VP.card)
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border, lineWidth: 1))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
         .padding(.horizontal, 16)
         .padding(.top, 2)
         .padding(.bottom, 10)
@@ -890,10 +890,10 @@ struct SettingsView: View {
     private var emptySearchState: some View {
         VStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 22, weight: .regular))
+                .font(.system(size: VP.Size.xl, weight: .regular))
                 .foregroundColor(VP.muted)
             Text("No matches for \u{201C}\(searchText)\u{201D}")
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: VP.Size.base, weight: .semibold))
                 .foregroundColor(VP.text)
             Text("Try a different word.")
                 .font(.caption)
@@ -1414,14 +1414,14 @@ struct AccountSettingsView: View {
             SettingsCard {
                 VStack(alignment: .leading, spacing: 6) {
                     TextField("Tell us about yourself...", text: $bio, axis: .vertical)
-                        .font(.system(size: 15))
+                        .font(.system(size: VP.Size.base))
                         .foregroundColor(VP.text)
                         .lineLimit(3...8)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 11)
                         .background(VP.bg)
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(VP.border, lineWidth: 1))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(RoundedRectangle(cornerRadius: VP.radiusSM).stroke(VP.border, lineWidth: 1))
+                        .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
                 }
                 .padding(16)
             }
@@ -1705,7 +1705,7 @@ struct LoginActivityView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
                                 Text(r.action.replacingOccurrences(of: "_", with: " ").capitalized)
-                                    .font(.system(size: 14, weight: .semibold))
+                                    .font(.system(size: VP.Size.base, weight: .semibold))
                                     .foregroundColor(VP.text)
                                 Spacer()
                                 Text(Self.formatDate(r.created_at))
@@ -1844,8 +1844,8 @@ struct MFASettingsView: View {
                                 .multilineTextAlignment(.center)
                                 .padding(.vertical, 12)
                                 .background(VP.bg)
-                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(VP.border, lineWidth: 1))
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .overlay(RoundedRectangle(cornerRadius: VP.radiusSM).stroke(VP.border, lineWidth: 1))
+                                .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
                                 .onChange(of: code) { _, new in
                                     let digits = new.filter { $0.isNumber }
                                     if digits != new { code = String(digits.prefix(6)) }
@@ -2353,14 +2353,14 @@ struct VerificationRequestView: View {
                         TextField("One paragraph readers will see next to your badge. ~280 characters.",
                                   text: $bio,
                                   axis: .vertical)
-                            .font(.system(size: 15))
+                            .font(.system(size: VP.Size.base))
                             .foregroundColor(VP.text)
                             .lineLimit(3...8)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 11)
                             .background(VP.bg)
-                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(VP.border, lineWidth: 1))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .overlay(RoundedRectangle(cornerRadius: VP.radiusSM).stroke(VP.border, lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
                     }
                 }
                 .padding(16)
@@ -2392,7 +2392,7 @@ struct VerificationRequestView: View {
                                     else { pickedCategoryIDs.insert(cat.id) }
                                 } label: {
                                     Text(cat.displayName)
-                                        .font(.system(size: 13, weight: .semibold))
+                                        .font(.system(size: VP.Size.sm, weight: .semibold))
                                         .foregroundColor(active ? VP.bg : VP.dim)
                                         .padding(.horizontal, 12)
                                         .padding(.vertical, 6)
@@ -2418,14 +2418,14 @@ struct VerificationRequestView: View {
                         .font(.caption)
                         .foregroundColor(VP.dim)
                     TextField("Tell us what qualifies you...", text: $credentials, axis: .vertical)
-                        .font(.system(size: 15))
+                        .font(.system(size: VP.Size.base))
                         .foregroundColor(VP.text)
                         .lineLimit(3...8)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 11)
                         .background(VP.bg)
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(VP.border, lineWidth: 1))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(RoundedRectangle(cornerRadius: VP.radiusSM).stroke(VP.border, lineWidth: 1))
+                        .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
                 }
                 .padding(16)
             }
@@ -2499,14 +2499,14 @@ struct VerificationRequestView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Sample \(index)").font(.caption).foregroundColor(VP.dim)
             TextField("Your response", text: text, axis: .vertical)
-                .font(.system(size: 15))
+                .font(.system(size: VP.Size.base))
                 .foregroundColor(VP.text)
                 .lineLimit(3...8)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 11)
                 .background(VP.bg)
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(VP.border, lineWidth: 1))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: VP.radiusSM).stroke(VP.border, lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
         }
     }
 
@@ -2882,8 +2882,8 @@ private struct ExpertAreaPills: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
                     .background(VP.surface)
-                    .overlay(RoundedRectangle(cornerRadius: 99).stroke(VP.border))
-                    .cornerRadius(99)
+                    .overlay(RoundedRectangle(cornerRadius: VP.radiusFull).stroke(VP.border))
+                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusFull))
             }
         }
     }
@@ -3063,14 +3063,14 @@ struct FeedbackSheet: View {
                     SettingsSectionHeader(title: "Your feedback", tone: .normal)
                     SettingsCard {
                         TextField("Tell us what\u{2019}s up...", text: $message, axis: .vertical)
-                            .font(.system(size: 15))
+                            .font(.system(size: VP.Size.base))
                             .foregroundColor(VP.text)
                             .lineLimit(4...10)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 11)
                             .background(VP.bg)
-                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(VP.border, lineWidth: 1))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .overlay(RoundedRectangle(cornerRadius: VP.radiusSM).stroke(VP.border, lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
                             .padding(16)
                     }
 
@@ -3239,7 +3239,7 @@ struct BlockedAccountsView: View {
             } else if let err = loadError {
                 VStack(spacing: 8) {
                     Text("Couldn\u{2019}t load blocks")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: VP.Size.base, weight: .semibold))
                         .foregroundColor(VP.text)
                     Text(err).font(.caption).foregroundColor(VP.dim)
                     Button("Try again") { Task { await load() } }
@@ -3250,7 +3250,7 @@ struct BlockedAccountsView: View {
             } else if rows.isEmpty {
                 VStack(spacing: 6) {
                     Text("No blocks")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: VP.Size.base, weight: .semibold))
                         .foregroundColor(VP.text)
                     Text("People you block will appear here.")
                         .font(.caption).foregroundColor(VP.dim)
@@ -3267,12 +3267,12 @@ struct BlockedAccountsView: View {
                                 .frame(width: 36, height: 36)
                                 .overlay(
                                     Text(String((row.username ?? "?").prefix(1)).uppercased())
-                                        .font(.system(size: 13, weight: .bold))
+                                        .font(.system(size: VP.Size.sm, weight: .bold))
                                         .foregroundColor(.white)
                                 )
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(row.username.map { "@\($0)" } ?? "Unknown user")
-                                    .font(.system(size: 14, weight: .semibold))
+                                    .font(.system(size: VP.Size.base, weight: .semibold))
                                     .foregroundColor(VP.text)
                                 if let r = row.reason, !r.isEmpty {
                                     Text(r).font(.caption).foregroundColor(VP.dim)
@@ -3285,11 +3285,11 @@ struct BlockedAccountsView: View {
                                 }
                             } label: {
                                 Text(busyId == row.id ? "\u{2026}" : "Unblock")
-                                    .font(.system(size: 13, weight: .semibold))
+                                    .font(.system(size: VP.Size.sm, weight: .semibold))
                                     .foregroundColor(VP.accent)
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 6)
-                                    .overlay(RoundedRectangle(cornerRadius: 99)
+                                    .overlay(RoundedRectangle(cornerRadius: VP.radiusFull)
                                         .stroke(VP.border, lineWidth: 1))
                             }
                             .buttonStyle(.plain)

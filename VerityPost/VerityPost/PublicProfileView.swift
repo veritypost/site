@@ -140,7 +140,7 @@ struct PublicProfileView: View {
                     .overlay(Circle().stroke(VP.border))
                     .frame(width: 64, height: 64)
                 Text("@")
-                    .font(.system(size: 24, weight: .bold, design: .monospaced))
+                    .font(.system(size: VP.Size.xxl, weight: .bold, design: .monospaced))
                     .foregroundColor(VP.accent)
             }
             Text("Sign up to see @\(username)\u{2019}s profile")
@@ -159,7 +159,7 @@ struct PublicProfileView: View {
                 .padding(.vertical, 12)
                 .frame(minHeight: 44)
                 .background(VP.accent)
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
             Button("Already have an account? Sign in") { showLogin = true }
                 .font(.system(.footnote, design: .default, weight: .medium))
                 .foregroundColor(VP.accent)
@@ -233,8 +233,8 @@ struct PublicProfileView: View {
                         .padding(.vertical, 8)
                         .frame(minHeight: 44)
                         .background(isFollowing ? VP.card : VP.accent)
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(isFollowing ? VP.border : Color.clear))
-                        .cornerRadius(8)
+                        .overlay(RoundedRectangle(cornerRadius: VP.radiusSM).stroke(isFollowing ? VP.border : Color.clear))
+                        .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
                 }
                 .disabled(followBusy)
             }
@@ -334,8 +334,8 @@ struct PublicProfileView: View {
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(VP.card)
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border))
-        .cornerRadius(10)
+        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
     }
 
     // MARK: - Data

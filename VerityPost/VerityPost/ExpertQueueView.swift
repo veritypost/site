@@ -158,7 +158,7 @@ struct ExpertQueueView: View {
                     .font(.system(.caption, design: .default, weight: .semibold))
                     .foregroundColor(.white)
                     .padding(.horizontal, 12).padding(.vertical, 10)
-                    .background(VP.accent).cornerRadius(6)
+                    .background(VP.accent).clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
 
                     Button("Decline") {
                         Task { await decline(item) }
@@ -166,14 +166,14 @@ struct ExpertQueueView: View {
                     .font(.system(.caption, design: .default, weight: .semibold))
                     .foregroundColor(VP.dim)
                     .padding(.horizontal, 12).padding(.vertical, 10)
-                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(VP.border))
+                    .overlay(RoundedRectangle(cornerRadius: VP.radiusSM).stroke(VP.border))
                 }
             } else if activeTab == .claimed {
                 Button("Answer") { answerTarget = item }
                     .font(.system(.caption, design: .default, weight: .semibold))
                     .foregroundColor(.white)
                     .padding(.horizontal, 12).padding(.vertical, 6)
-                    .background(VP.accent).cornerRadius(6)
+                    .background(VP.accent).clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
             } else if activeTab == .answered, let ans = item.answer {
                 Text(ans)
                     .font(.footnote)
@@ -239,7 +239,7 @@ struct ExpertQueueView: View {
                 .foregroundColor(.white)
                 .padding(.horizontal, 22).padding(.vertical, 10)
                 .frame(minHeight: 44)
-                .background(VP.accent).cornerRadius(10)
+                .background(VP.accent).clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                 .padding(.top, 6)
             Spacer()
         }
@@ -427,7 +427,7 @@ private struct AnswerComposerSheet: View {
                     TextEditor(text: $answerText)
                         .frame(minHeight: 200)
                         .padding(10)
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border))
+                        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
                         .accessibilityLabel("Answer this question")
                 } else {
                     ScrollView {
@@ -439,7 +439,7 @@ private struct AnswerComposerSheet: View {
                     }
                     .frame(minHeight: 200)
                     .padding(10)
-                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border))
+                    .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
                 }
 
                 Spacer()

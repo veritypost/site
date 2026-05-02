@@ -111,7 +111,7 @@ struct RecapListView: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
                     .background(VP.accent)
-                    .cornerRadius(6)
+                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
             }
         }
         .padding(.vertical, 14)
@@ -316,10 +316,10 @@ struct RecapQuizView: View {
                     .multilineTextAlignment(.leading)
                 Spacer()
             }
-            .padding(12)
+            .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(border, lineWidth: 1))
-            .cornerRadius(10)
+            .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(border, lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
         }
         .buttonStyle(.plain)
         .disabled(answered)
@@ -589,7 +589,7 @@ struct UpgradePromptInline: View {
                 .padding(.vertical, 10)
                 .frame(minHeight: 44)
                 .background(VP.accent)
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -44,11 +44,11 @@ struct SubscriptionView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(20)
                         .background(
-                            RoundedRectangle(cornerRadius: 14)
+                            RoundedRectangle(cornerRadius: VP.radiusMD)
                                 .fill(VP.card)
                         )
                         .overlay(
-                            RoundedRectangle(cornerRadius: 14)
+                            RoundedRectangle(cornerRadius: VP.radiusMD)
                                 .stroke(VP.border, lineWidth: 1)
                         )
                     }
@@ -139,11 +139,11 @@ struct SubscriptionView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(18)
         .background(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: VP.radiusMD)
                 .fill(VP.card)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: VP.radiusMD)
                 .stroke(VP.border, lineWidth: 1)
         )
     }
@@ -183,7 +183,7 @@ struct SubscriptionView: View {
                         .padding(.horizontal, 10)
                         .padding(.vertical, 3)
                         .background(
-                            RoundedRectangle(cornerRadius: 8)
+                            RoundedRectangle(cornerRadius: VP.radiusSM)
                                 .fill(VP.accent.opacity(0.12))
                         )
                 }
@@ -205,8 +205,8 @@ struct SubscriptionView: View {
             toggleButton("Monthly", active: !isAnnual) { isAnnual = false }
             toggleButton("Annual", active: isAnnual) { isAnnual = true }
         }
-        .background(RoundedRectangle(cornerRadius: 10).fill(VP.card))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border, lineWidth: 1))
+        .background(RoundedRectangle(cornerRadius: VP.radiusMD).fill(VP.card))
+        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border, lineWidth: 1))
     }
 
     private func toggleButton(_ label: String, active: Bool, action: @escaping () -> Void) -> some View {
@@ -217,7 +217,7 @@ struct SubscriptionView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
                 .background(
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: VP.radiusSM)
                         .fill(active ? VP.accent : .clear)
                         .padding(2)
                 )
@@ -248,7 +248,7 @@ struct SubscriptionView: View {
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
                         .background(
-                            RoundedRectangle(cornerRadius: 6)
+                            RoundedRectangle(cornerRadius: VP.radiusSM)
                                 .fill(VP.success.opacity(0.12))
                         )
                 }
@@ -307,7 +307,7 @@ struct SubscriptionView: View {
                         .padding(.vertical, 12)
                         .frame(minHeight: 44)
                         .background(
-                            RoundedRectangle(cornerRadius: 10)
+                            RoundedRectangle(cornerRadius: VP.radiusMD)
                                 .fill(VP.accent)
                         )
                     }
@@ -335,11 +335,11 @@ struct SubscriptionView: View {
         }
         .padding(18)
         .background(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: VP.radiusMD)
                 .fill(isCurrent ? VP.accent.opacity(0.04) : VP.card)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: VP.radiusMD)
                 .stroke(isCurrent ? VP.accent : VP.border, lineWidth: isCurrent ? 2 : 1)
         )
     }
@@ -370,7 +370,7 @@ struct SubscriptionView: View {
                         .padding(.vertical, 9)
                         .frame(minHeight: 44)
                         .background(
-                            RoundedRectangle(cornerRadius: 8)
+                            RoundedRectangle(cornerRadius: VP.radiusSM)
                                 .fill(promoCode.isEmpty ? VP.dim : VP.accent)
                         )
                 }
@@ -386,11 +386,11 @@ struct SubscriptionView: View {
         }
         .padding(18)
         .background(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: VP.radiusMD)
                 .fill(VP.card)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: VP.radiusMD)
                 .stroke(VP.border, lineWidth: 1)
         )
     }

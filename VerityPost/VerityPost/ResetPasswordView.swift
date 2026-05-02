@@ -71,7 +71,7 @@ struct ResetPasswordView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             HStack(spacing: 4) {
                                 ForEach(1...4, id: \.self) { i in
-                                    RoundedRectangle(cornerRadius: 99)
+                                    RoundedRectangle(cornerRadius: VP.radiusFull)
                                         .fill(i <= strength.bars ? strength.color : VP.border)
                                         .frame(height: 3)
                                 }
@@ -99,8 +99,8 @@ struct ResetPasswordView: View {
                     .padding(12)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(VP.bg)
-                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border))
-                    .cornerRadius(10)
+                    .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
+                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                     .padding(.bottom, 14)
 
                     // Confirm password
@@ -110,7 +110,7 @@ struct ResetPasswordView: View {
                             .foregroundColor(VP.dim)
                         passwordField(placeholder: "Repeat your password", text: $confirm, field: .confirm)
                             .overlay(
-                                RoundedRectangle(cornerRadius: 10)
+                                RoundedRectangle(cornerRadius: VP.radiusMD)
                                     .stroke(confirmBorder, lineWidth: 1.5)
                             )
                         if !confirm.isEmpty {
@@ -154,7 +154,7 @@ struct ResetPasswordView: View {
                         .frame(minHeight: 48)
                         .background(canSubmit ? VP.text : VP.muted)
                         .foregroundColor(.white)
-                        .cornerRadius(12)
+                        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                     }
                     .disabled(!canSubmit)
                     .padding(.bottom, 40)
@@ -209,8 +209,8 @@ struct ResetPasswordView: View {
         .padding(12)
         .frame(minHeight: 44)
         .background(VP.card)
-        .cornerRadius(10)
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border))
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
     }
 
     @ViewBuilder

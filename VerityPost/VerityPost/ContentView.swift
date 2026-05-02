@@ -55,7 +55,7 @@ struct ContentView: View {
                     VP.bg.ignoresSafeArea()
                     VStack(spacing: 14) {
                         ZStack {
-                            RoundedRectangle(cornerRadius: 14)
+                            RoundedRectangle(cornerRadius: VP.radiusMD)
                                 .fill(VP.text)
                                 .frame(width: 64, height: 64)
                                 .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
@@ -126,7 +126,7 @@ struct ContentView: View {
                         .padding(.vertical, 11)
                         .frame(minHeight: 44)
                         .background(VP.accent)
-                        .cornerRadius(10)
+                        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                         Button("Continue without signing in") {
                             auth.splashTimedOut = false
                         }
@@ -391,7 +391,7 @@ struct MainTabView: View {
                     .padding(.horizontal, 12)
                     .frame(minHeight: 44)
                     .background(
-                        RoundedRectangle(cornerRadius: 8)
+                        RoundedRectangle(cornerRadius: VP.radiusSM)
                             .fill(Color.white.opacity(0.18))
                     )
             }
@@ -516,7 +516,7 @@ struct SignInGate: View {
                 .padding(.vertical, 11)
                 .frame(minHeight: 44)
                 .background(VP.accent)
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
             Button("Create free account") { showSignup = true }
                 .font(.system(.footnote, design: .default, weight: .medium))
                 .foregroundColor(VP.accent)

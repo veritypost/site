@@ -113,7 +113,7 @@ struct FamilyDashboardView: View {
                             } label: {
                                 HStack(alignment: .top, spacing: 10) {
                                     Image(systemName: "exclamationmark.circle.fill")
-                                        .font(.system(size: 14, weight: .bold))
+                                        .font(.system(size: VP.Size.base, weight: .bold))
                                         .foregroundColor(VP.accent)
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(atCap
@@ -132,8 +132,8 @@ struct FamilyDashboardView: View {
                                 }
                                 .padding(12)
                                 .background(VP.card)
-                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border))
-                                .cornerRadius(10)
+                                .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
+                                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel(atCap
@@ -147,7 +147,7 @@ struct FamilyDashboardView: View {
                         } label: {
                             HStack(spacing: 6) {
                                 Image(systemName: "plus")
-                                    .font(.system(size: 12, weight: .bold))
+                                    .font(.system(size: VP.Size.sm, weight: .bold))
                                 Text("Add a kid")
                                     .font(.system(.footnote, design: .default, weight: .semibold))
                             }
@@ -156,7 +156,7 @@ struct FamilyDashboardView: View {
                             .padding(.vertical, 10)
                             .frame(minHeight: 44)
                             .background(atCap || noFamilyPlan ? VP.accent.opacity(0.4) : VP.accent)
-                            .cornerRadius(10)
+                            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                         }
                         .buttonStyle(.plain)
                         .disabled(atCap || noFamilyPlan)
@@ -200,9 +200,9 @@ struct FamilyDashboardView: View {
                                 .font(.caption)
                                 .foregroundColor(VP.dim)
                         }
-                        .padding(14)
+                        .padding(16)
                         .background(VP.card)
-                        .cornerRadius(10)
+                        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                     }
                     .buttonStyle(.plain)
 
@@ -219,9 +219,9 @@ struct FamilyDashboardView: View {
                                 .font(.caption)
                                 .foregroundColor(VP.dim)
                         }
-                        .padding(14)
+                        .padding(16)
                         .background(VP.card)
-                        .cornerRadius(10)
+                        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                     }
                     .buttonStyle(.plain)
                 }
@@ -383,9 +383,9 @@ struct FamilyDashboardView: View {
                 .font(.caption)
                 .foregroundColor(VP.dim)
         }
-        .padding(14)
+        .padding(16)
         .background(VP.card)
-        .cornerRadius(10)
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
     }
 
     /// OwnersAudit Kids Mgmt Task 4 — toggle paused via API and refresh list.
@@ -422,7 +422,7 @@ struct FamilyDashboardView: View {
                 if kind == .success { flash = "" } else { error = "" }
             } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.system(size: VP.Size.xs, weight: .bold))
                     .foregroundColor(color.opacity(0.7))
                     .padding(6)
                     .frame(minWidth: 28, minHeight: 28)
@@ -432,8 +432,8 @@ struct FamilyDashboardView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background(bg)
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(border))
-        .cornerRadius(10)
+        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(border))
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
     }
 
     // MARK: - Loading + mutations
@@ -559,9 +559,9 @@ struct KidDashboardView: View {
                 .foregroundColor(VP.dim)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
+        .padding(16)
         .background(VP.card)
-        .cornerRadius(10)
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
     }
 
     private func load() async {
@@ -1194,7 +1194,7 @@ struct PairCodeSheet: View {
                             .tracking(1)
                             .foregroundColor(expired ? VP.danger : VP.dim)
                         Text(code)
-                            .font(.system(size: 40, weight: .heavy, design: .monospaced))
+                            .font(.system(size: VP.Size.display, weight: .heavy, design: .monospaced))
                             .tracking(4)
                             .foregroundColor(VP.text)
                             .textSelection(.enabled)
@@ -1209,9 +1209,9 @@ struct PairCodeSheet: View {
                     .padding(.vertical, 24)
                     .padding(.horizontal, 16)
                     .background(VP.card)
-                    .overlay(RoundedRectangle(cornerRadius: 12)
+                    .overlay(RoundedRectangle(cornerRadius: VP.radiusMD)
                         .stroke(expired ? VP.danger : VP.border))
-                    .cornerRadius(12)
+                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                     .padding(.horizontal, 20)
 
                     HStack(spacing: 8) {
@@ -1231,8 +1231,8 @@ struct PairCodeSheet: View {
                                     .padding(.vertical, 10)
                                     .frame(minHeight: 44)
                                     .background(copyFlash ? VP.success : Color.white)
-                                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border))
-                                    .cornerRadius(10)
+                                    .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
+                                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                             }
                             .buttonStyle(.plain)
                         }
@@ -1245,8 +1245,8 @@ struct PairCodeSheet: View {
                                 .padding(.horizontal, 18)
                                 .padding(.vertical, 10)
                                 .frame(minHeight: 44)
-                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border))
-                                .cornerRadius(10)
+                                .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
+                                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                         }
                         .buttonStyle(.plain)
                         .disabled(loading)

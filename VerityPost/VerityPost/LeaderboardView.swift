@@ -89,7 +89,7 @@ struct LeaderboardView: View {
                 // `.toolbar(.hidden, for: .navigationBar)` below.
                 HStack(spacing: 0) {
                     Text("most informed")
-                        .font(.system(size: 15, weight: .heavy))
+                        .font(.system(size: VP.Size.base, weight: .heavy))
                         .tracking(-0.15)
                         .foregroundColor(VP.text)
                         .lineLimit(1)
@@ -128,7 +128,7 @@ struct LeaderboardView: View {
                                         .padding(.vertical, 10)
                                         .background(activeTab == tab ? VP.accent.opacity(0.15) : VP.card)
                                         .foregroundColor(activeTab == tab ? VP.accent : VP.dim)
-                                        .cornerRadius(20)
+                                        .clipShape(RoundedRectangle(cornerRadius: VP.radiusFull))
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -153,9 +153,9 @@ struct LeaderboardView: View {
                                     .padding(.vertical, 10)
                                     .background(activePeriod == p ? VP.text : .clear)
                                     .foregroundColor(activePeriod == p ? .white : VP.dim)
-                                    .cornerRadius(14)
+                                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                                     .overlay(
-                                        RoundedRectangle(cornerRadius: 14)
+                                        RoundedRectangle(cornerRadius: VP.radiusMD)
                                             .stroke(activePeriod == p ? .clear : VP.border)
                                     )
                             }
@@ -265,8 +265,8 @@ struct LeaderboardView: View {
                         }
                     }
                     .background(VP.bg)
-                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(VP.border))
-                    .cornerRadius(12)
+                    .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
+                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                     .padding(.horizontal, 20)
                 }
 
@@ -347,8 +347,8 @@ struct LeaderboardView: View {
         }
         .padding(12)
         .background(VP.card)
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(VP.border))
-        .cornerRadius(10)
+        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
     }
 
     private func catPill(id: String?, label: String) -> some View {
@@ -363,8 +363,8 @@ struct LeaderboardView: View {
                 .padding(.vertical, 10)
                 .background(active ? VP.accent.opacity(0.1) : .clear)
                 .foregroundColor(active ? VP.accent : VP.dim)
-                .cornerRadius(14)
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(active ? VP.accent : VP.border))
+                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+                .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(active ? VP.accent : VP.border))
         }
         .buttonStyle(.plain)
     }
@@ -416,7 +416,7 @@ struct LeaderboardView: View {
                             }
                         } label: {
                             Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(.system(size: VP.Size.sm, weight: .semibold))
                                 .foregroundColor(VP.dim)
                                 .frame(width: 28, height: 28)
                                 .contentShape(Rectangle())

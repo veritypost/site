@@ -151,10 +151,10 @@ struct InviteFriendsView: View {
                     .padding(.horizontal, VP.Spacing.s3)
                     .background(copiedSlot == s.slot ? VP.brand : VP.surfaceRaised)
                     .overlay(
-                        RoundedRectangle(cornerRadius: VP.Radius.md, style: .continuous)
+                        RoundedRectangle(cornerRadius: VP.radiusMD, style: .continuous)
                             .stroke(copiedSlot == s.slot ? VP.brand : VP.borderStrong, lineWidth: 1)
                     )
-                    .clipShape(RoundedRectangle(cornerRadius: VP.Radius.md, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD, style: .continuous))
             }
             .buttonStyle(.plain)
             .disabled(used)
@@ -170,10 +170,10 @@ struct InviteFriendsView: View {
             .padding(VP.Spacing.s4)
             .background(VP.surfaceRaised)
             .overlay(
-                RoundedRectangle(cornerRadius: VP.Radius.lg, style: .continuous)
+                RoundedRectangle(cornerRadius: VP.radiusMD, style: .continuous)
                     .stroke(VP.borderSoft, lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: VP.Radius.lg, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD, style: .continuous))
             .vpShadowAmbient()
     }
 

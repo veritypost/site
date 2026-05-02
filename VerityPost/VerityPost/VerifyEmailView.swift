@@ -69,7 +69,7 @@ struct VerifyEmailView: View {
                 .frame(minHeight: 48)
                 .background(VP.text)
                 .foregroundColor(.white)
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
             }
             .padding(.horizontal, 24)
             .disabled(resendState == .sending || cooldownRemaining > 0)
