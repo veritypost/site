@@ -1,11 +1,12 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified home_feed 2026-04-18
 'use client';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/client';
 import { formatDate } from '../../../lib/dates';
 import { Z } from '../../../lib/zIndex';
+import Ad from '../../../components/Ad';
 
 const SORT_OPTIONS = ['Latest', 'Trending'];
 
@@ -419,6 +420,9 @@ export default function CategoryPage() {
               </div>
             )}
 
+            {/* category_top: above article list */}
+            <Ad placement="category_top" page="category" position="top" />
+
             {/* Article Cards */}
             {stories.length === 0 && (
               <div
@@ -444,9 +448,13 @@ export default function CategoryPage() {
                 </div>
               </div>
             )}
-            {visible.map((story) => (
+            {visible.map((story, idx) => (
+              <React.Fragment key={story.id}>
+                {/* category_in_feed_1: between articles 4 and 5 */}
+                {idx === 4 && (
+                  <Ad placement="category_in_feed_1" page="category" position="in_feed_1" />
+                )}
               <a
-                key={story.id}
                 href={story.stories?.slug ? `/${story.stories.slug}` : '#'}
                 style={{
                   background: '#f7f7f7',
@@ -536,6 +544,7 @@ export default function CategoryPage() {
                   </div>
                 </div>
               </a>
+              </React.Fragment>
             ))}
 
             {activeSubcat !== null && filtered.length === 0 && stories.length > 0 && (

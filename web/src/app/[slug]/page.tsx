@@ -31,6 +31,7 @@ import StoryArticlePicker from '@/components/article/StoryArticlePicker';
 import AnonArticleCtaBanner from '@/components/article/AnonArticleCtaBanner';
 import ArticleFetchFailed from './_ArticleFetchFailed';
 import NextStoryFooter from '@/components/NextStoryFooter';
+import Ad from '@/components/Ad';
 
 export const dynamic = 'force-dynamic';
 
@@ -319,6 +320,8 @@ export default async function ArticleSlugPage({
           <>
             <TimelineSection events={!isAnon ? timeline : []} storySlug={story.slug} showTease={isAnon && timeline.length > 0} articleCountReached={anonReadCount >= WALL_THRESHOLD} />
             <SourcesSection sources={!isAnon ? sources : []} showTease={isAnon && sources.length > 0} articleCountReached={anonReadCount >= WALL_THRESHOLD} />
+            {/* article_rail: sticky right-rail ad on desktop (non-COPPA articles only) */}
+            {!isCoppa && <Ad placement="article_rail" page="article" position="rail" articleId={article.id} />}
           </>
         }
         engagementSlot={
@@ -367,6 +370,8 @@ export default async function ArticleSlugPage({
           ) : null
         }
       />
+      {/* article_end: before NextStoryFooter */}
+      <Ad placement="article_end" page="article" position="end" articleId={article.id} />
       <NextStoryFooter category={category} nearbyStories={nearbyStories} />
       </>
     </RegistrationWallProvider>

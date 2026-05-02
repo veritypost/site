@@ -30,6 +30,7 @@ export default function Ad({ placement, page = 'unknown', position = 'inline', a
   const [ad, setAd] = useState(null);
   const [impressionId, setImpressionId] = useState(null);
   const loggedRef = useRef(false);
+  const containerRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -81,6 +82,46 @@ export default function Ad({ placement, page = 'unknown', position = 'inline', a
         console.error('[ads] impression log', err);
       });
   }, [ad, page, position, articleId]);
+
+  // Viewability tracking: fires after we have an impressionId. Counts as
+  // viewable when 50%+ of the ad is on-screen for ≥1 second. PATCH is
+  // fire-and-forget; errors are logged but never surface to the user.
+  useEffect(() => {
+    if (!impressionId || !containerRef.current) return;
+    let viewStartTime = null;
+    let timerHandle = null;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry.isIntersecting) {
+          viewStartTime = Date.now();
+          // Only fire after 1+ second of continuous visibility.
+          timerHandle = setTimeout(() => {
+            const viewableSecs = (Date.now() - viewStartTime) / 1000;
+            const sessionId = getSessionId();
+            fetch(`/api/ads/impression/${impressionId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ is_viewable: true, viewable_seconds: viewableSecs, session_id: sessionId }),
+            }).catch((err) => {
+              console.error('[ads] viewability patch', err);
+            });
+          }, 1000);
+        } else {
+          clearTimeout(timerHandle);
+          viewStartTime = null;
+        }
+      },
+      { threshold: 0.5 },
+    );
+
+    observer.observe(containerRef.current);
+    return () => {
+      clearTimeout(timerHandle);
+      observer.disconnect();
+    };
+  }, [impressionId]);
 
   if (!ad) return null;
 
@@ -149,7 +190,7 @@ export default function Ad({ placement, page = 'unknown', position = 'inline', a
   // fallback content for every unit regardless of network.
   if (ad.ad_network === 'google_adsense' && ad.ad_network_unit_id && ADSENSE_PUBLISHER_ID) {
     return (
-      <div style={wrapStyle}>
+      <div ref={containerRef} style={wrapStyle}>
         {sponsoredLabel}
         <AdSenseSlot
           slotId={ad.ad_network_unit_id}
@@ -166,12 +207,12 @@ export default function Ad({ placement, page = 'unknown', position = 'inline', a
   // iframe same-origin-isolated from the page.
   if (ad.creative_html) {
     return (
-      <div style={wrapStyle} onClick={handleClick}>
+      <div ref={containerRef} style={wrapStyle} onClick={handleClick}>
         {sponsoredLabel}
         <iframe
           title="Sponsored"
           srcDoc={ad.creative_html}
-          sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
+          sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
           style={{ width: '100%', minHeight: 120, border: 'none', display: 'block' }}
         />
       </div>
@@ -180,6 +221,7 @@ export default function Ad({ placement, page = 'unknown', position = 'inline', a
 
   return (
     <a
+      ref={containerRef}
       href={safeClickUrl || '#'}
       onClick={handleClick}
       target={safeClickUrl ? '_blank' : undefined}

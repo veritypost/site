@@ -13,6 +13,7 @@ import { JsonLd, organizationAndWebSite } from '../components/JsonLd';
 import CookieBanner from '../components/CookieBanner';
 import ConsentedScripts from '../components/ConsentedScripts';
 import { BRAND_NAME, BRAND_DOMAIN } from '../lib/brand';
+import MobileStickyAd from '../components/MobileStickyAd';
 
 // GA4 measurement ID. Set via NEXT_PUBLIC_GA_MEASUREMENT_ID in Vercel env;
 // fallback literal is the Verity Post production property so the tag ships
@@ -166,6 +167,8 @@ export default function RootLayout({ children }) {
                 the footer "Cookie preferences" link (dispatches a
                 vp-open-cookie-banner event the component subscribes to). */}
             <CookieBanner />
+            {/* mobile_sticky_footer: shown only on ≤768px via CSS; see MobileStickyAd */}
+            <MobileStickyAd />
           </ToastProvider>
         </PermissionsProvider>
       </body>

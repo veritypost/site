@@ -34,6 +34,7 @@ import HomeBreakingStrip from './_HomeBreakingStrip';
 import HomeFooter from './_HomeFooter';
 import HomeFetchFailed from './_HomeFetchFailed';
 import HomeVisitTimestamp from './_HomeVisitTimestamp';
+import Ad from '@/components/Ad';
 
 // Curated front page — top_stories is the source of truth. Owner pins
 // articles by position; any-age curation, no editorial-day cutoff.
@@ -312,6 +313,14 @@ export default async function HomePage() {
           </p>
         )}
 
+        {/* home_top — "Advertisement" label required per DECISION #050 */}
+        <div style={{ textAlign: 'center', marginBottom: 8, marginTop: 24 }}>
+          <div style={{ fontSize: 10, color: 'var(--dim, #5a5a5a)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
+            Advertisement
+          </div>
+          <Ad placement="home_top" page="home" position="top" />
+        </div>
+
         {!fetchFailed && hero && (
           <Hero
             story={hero}
@@ -325,6 +334,14 @@ export default async function HomePage() {
             {supporting.map((story, idx) => (
               <Fragment key={story.id}>
                 {idx > 0 && <div role="presentation" aria-hidden="true" style={hairlineStyle} />}
+                {/* home_in_feed_1: between cards 4 and 5 (idx 3→4 boundary) */}
+                {idx === 4 && (
+                  <Ad placement="home_in_feed_1" page="home" position="in_feed_1" />
+                )}
+                {/* home_in_feed_2: between cards 8 and 9 (idx 7→8 boundary) */}
+                {idx === 8 && (
+                  <Ad placement="home_in_feed_2" page="home" position="in_feed_2" />
+                )}
                 <SupportingCard
                   story={story}
                   category={story.category_id ? categoryById[story.category_id] : undefined}
@@ -334,6 +351,9 @@ export default async function HomePage() {
             ))}
           </section>
         )}
+
+        {/* home_below_fold: before footer */}
+        {!fetchFailed && hero && <Ad placement="home_below_fold" page="home" position="below_fold" />}
 
         {!fetchFailed && hero && <HomeFooter />}
 

@@ -3,6 +3,7 @@ import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import Link from 'next/link';
 import { createClient } from '../../lib/supabase/client';
 import { usePageViewTrack } from '@/lib/useTrack';
+import Ad from '@/components/Ad';
 
 const SERIF = "var(--font-serif, 'Source Serif 4', Georgia, serif)";
 const SANS  = "var(--font-sans, Inter, system-ui, sans-serif)";
@@ -624,6 +625,9 @@ export default function BrowsePage() {
 
       {/* Content */}
       <main style={{ maxWidth: 720, margin: '0 auto', paddingTop: `calc(${activeFilterCount > 0 ? 220 : 188}px + var(--vp-top-bar-h, 0px))`, paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 0px))' }}>
+
+        {/* browse_top: above category grid */}
+        <Ad placement="browse_top" page="browse" position="top" />
 
         {grouped.length === 0 && (
           <div style={{ textAlign: 'center', padding: '60px 20px' }}>

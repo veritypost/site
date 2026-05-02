@@ -6,7 +6,9 @@
  * the story-manager without leaving the current reader context.
  */
 
+import { useEffect } from 'react';
 import Link from 'next/link';
+import Ad from '@/components/Ad';
 
 export type ArticleSurfaceArticle = {
   id: string;
@@ -61,6 +63,37 @@ export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody
     ? `/admin/kids-story-manager?article=${article.id}`
     : `/admin/story-manager?article=${article.id}`;
 
+  // Scroll-depth tracking: fires 25/50/75/100% milestones for the article body.
+  // Fire-and-forget; errors are swallowed so reader UX is never affected.
+  useEffect(() => {
+    if (!canViewBody) return;
+    const bodyEl = document.querySelector('[data-article-body]') as HTMLElement | null;
+    if (!bodyEl) return;
+
+    const milestones = [25, 50, 75, 100];
+    const fired = new Set<number>();
+
+    const onScroll = () => {
+      const rect = bodyEl.getBoundingClientRect();
+      const viewH = window.innerHeight;
+      // How far through the body the viewport bottom has scrolled (0–100+)
+      const scrolledPct = ((viewH - rect.top) / rect.height) * 100;
+      for (const m of milestones) {
+        if (!fired.has(m) && scrolledPct >= m) {
+          fired.add(m);
+          fetch('/api/analytics/scroll', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ article_id: article.id, milestone: m }),
+          }).catch(() => {});
+        }
+      }
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [article.id, canViewBody]);
+
   return (
     <article style={PAGE_STYLE}>
       {canEdit && (
@@ -84,14 +117,22 @@ export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody
       <h1 style={TITLE_STYLE}>{article.title}</h1>
       {article.subtitle && <p style={SUBTITLE_STYLE}>{article.subtitle}</p>}
       <p style={{ fontSize: 12, color: 'var(--dim, #5a5a5a)', marginBottom: 16, letterSpacing: '0.03em' }}>verity post</p>
+      {/* article_header: between title/byline block and body (DECISION #048) */}
+      <Ad placement="article_header" page="article" position="header" articleId={article.id} />
       {canViewBody ? (
-        <div
-          data-article-body
-          style={BODY_STYLE}
-          // bodyHtml is server-sanitized via renderBodyHtml (sanitize-html);
-          // never user-supplied raw HTML at this point.
-          dangerouslySetInnerHTML={{ __html: bodyHtml }}
-        />
+        <>
+          <div
+            data-article-body
+            style={BODY_STYLE}
+            // bodyHtml is server-sanitized via renderBodyHtml (sanitize-html);
+            // never user-supplied raw HTML at this point.
+            dangerouslySetInnerHTML={{ __html: bodyHtml }}
+          />
+          {/* article_in_body: placed immediately after the body div; most
+              articles are long enough that the reader has scrolled 30%+ by
+              the time this slot is visible. */}
+          <Ad placement="article_in_body" page="article" position="in_body" articleId={article.id} />
+        </>
       ) : (
         <div
           style={{

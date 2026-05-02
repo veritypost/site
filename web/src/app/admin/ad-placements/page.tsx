@@ -338,6 +338,7 @@ function PlacementsInner() {
                           {u.approval_status}
                         </Badge>
                         <Button size="sm" variant="ghost" onClick={() => startEditUnit(u)}>Edit</Button>
+                        <Button size="sm" variant="ghost" onClick={() => router.push(`/admin/ad-units/${u.id}`)}>Targeting</Button>
                         <Button size="sm" variant="ghost" onClick={() => deleteUnit(u)} style={{ color: C.danger }}>Del</Button>
                       </div>
                     ))}

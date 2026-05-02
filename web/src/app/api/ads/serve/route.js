@@ -5,8 +5,11 @@ import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { v2LiveGuard } from '@/lib/featureFlags';
 import { safeErrorResponse } from '@/lib/apiErrors';
 
-// GET /api/ads/serve?placement=NAME&article_id=...&session_id=...
+// GET /api/ads/serve?placement=NAME&article_id=...&session_id=...&preview_tier=...
 // Anon-friendly. Returns { ad_unit: {...} } or { ad_unit: null }.
+// preview_tier is accepted but currently unused by the RPC; it is wired here
+// so the admin preview tool can pass it and the RPC can start consuming it
+// when the DB function is updated to accept p_preview_tier.
 export async function GET(request) {
   const blocked = await v2LiveGuard();
   if (blocked) return blocked;
@@ -14,6 +17,10 @@ export async function GET(request) {
   const placement = url.searchParams.get('placement');
   const article_id = url.searchParams.get('article_id') || null;
   const session_id = url.searchParams.get('session_id') || null;
+  // preview_tier — admin preview tool passes this to simulate a specific tier.
+  // Not yet forwarded to the RPC; logged here for future RPC wiring.
+  // eslint-disable-next-line no-unused-vars
+  const preview_tier = url.searchParams.get('preview_tier') || null;
   if (!placement) return NextResponse.json({ error: 'placement required' }, { status: 400 });
 
   const supabase = await createClient();
@@ -52,17 +59,54 @@ export async function GET(request) {
     if (!isSafeAdUrl(safeUnit.creative_url)) safeUnit = { ...safeUnit, creative_url: null };
     if (!isSafeAdUrl(safeUnit.click_url)) safeUnit = { ...safeUnit, click_url: null };
   }
-  // T219 — Browser + edge caching for ad creative. Ad.jsx fetches this
-  // route on every article render; without Cache-Control the response
-  // is uncacheable and re-hits Supabase per article. Creative is fine
-  // to serve stale for ~5 minutes (admin-side edits don't need to land
-  // instantly), and stale-while-revalidate keeps perceived latency at
-  // zero for the first hour after that.
+  // D1 — Belt-and-suspenders frequency cap guard. The serve_ad() RPC is the
+  // primary enforcement layer; this server-side check is a fallback in case
+  // the RPC was deployed without cap logic. Runs only when a non-null unit is
+  // returned by the RPC (no-op on misses). Wrapped in try/catch so any DB
+  // error fails open (serves the ad) rather than failing closed — ad revenue
+  // takes priority over perfect cap enforcement.
+  if (safeUnit) {
+    try {
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+      // User-level cap: max impressions per user in the past 24 hours.
+      if (safeUnit.frequency_cap_per_user > 0 && authUser?.id) {
+        const { count: userCount } = await service
+          .from('ad_impressions')
+          .select('id', { count: 'exact', head: true })
+          .eq('ad_unit_id', safeUnit.id)
+          .eq('user_id', authUser.id)
+          .gte('created_at', oneDayAgo);
+        if (userCount >= safeUnit.frequency_cap_per_user) {
+          return NextResponse.json({ ad_unit: null }, { headers: { 'Cache-Control': 'no-store' } });
+        }
+      }
+
+      // Session-level cap: max impressions per session.
+      if (safeUnit.frequency_cap_per_session > 0 && session_id) {
+        const { count: sessionCount } = await service
+          .from('ad_impressions')
+          .select('id', { count: 'exact', head: true })
+          .eq('ad_unit_id', safeUnit.id)
+          .eq('session_id', session_id);
+        if (sessionCount >= safeUnit.frequency_cap_per_session) {
+          return NextResponse.json({ ad_unit: null }, { headers: { 'Cache-Control': 'no-store' } });
+        }
+      }
+    } catch (capErr) {
+      // Fail open: log the error but still serve the ad.
+      console.warn('[ads.serve] frequency cap check failed, serving ad anyway:', capErr?.message);
+    }
+  }
+
+  // Ad responses are user-specific (frequency caps, tier filtering). Must not
+  // be cached by browsers or shared proxies — a cached response would serve
+  // User A's ad to User B and skip per-user cap re-checks within the window.
   return NextResponse.json(
     { ad_unit: safeUnit },
     {
       headers: {
-        'Cache-Control': 'max-age=300, stale-while-revalidate=3600',
+        'Cache-Control': 'no-store',
       },
     }
   );
