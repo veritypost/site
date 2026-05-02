@@ -141,8 +141,6 @@ export default async function ArticleSlugPage({
           hasPermissionServer('articles.edit', supabase),
           hasPermissionServer('admin.articles.edit.any', supabase),
           hasPermissionServer('article.view.body', supabase),
-          hasPermissionServer('article.view.sources', supabase),
-          hasPermissionServer('article.view.timeline', supabase),
           service
             .from('quizzes')
             .select('*', { count: 'exact', head: true })
@@ -199,8 +197,6 @@ export default async function ArticleSlugPage({
     canEditNew,
     canEditLegacy,
     canViewBody,
-    canViewSources,
-    canViewTimeline,
     quizCountResult,
     passCheckResult,
     sourcesResult,
@@ -287,8 +283,8 @@ export default async function ArticleSlugPage({
         bodyHtml={bodyHtml}
         canEdit={canEdit}
         canViewBody={canViewBody}
-        sources={canViewSources ? sources : []}
-        timeline={canViewTimeline ? timeline : []}
+        sources={sources}
+        timeline={timeline}
       />
       {!isCoppa && article.status === 'published' && (
         <>
