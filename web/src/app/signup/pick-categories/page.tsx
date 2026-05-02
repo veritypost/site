@@ -125,6 +125,7 @@ export default function PickCategoriesPage() {
         }
       } catch (err) {
         console.error('[pick-categories] load failed', err);
+        if (!cancelled) setError("Couldn’t load categories. Try refreshing.");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -247,7 +248,7 @@ export default function PickCategoriesPage() {
     return null;
   }
 
-  const canContinue = selected.size >= MIN_PICKS && !saving && !skipping;
+  const canContinue = selected.size >= MIN_PICKS && !saving && !skipping && categories.length > 0;
   const counterText =
     selected.size === 0
       ? `Pick at least ${MIN_PICKS}.`

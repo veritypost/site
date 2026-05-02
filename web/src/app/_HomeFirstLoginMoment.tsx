@@ -88,6 +88,18 @@ export default function HomeFirstLoginMoment() {
       } catch (e) {
         console.error('[home.first-login-moment] fetch error', e);
         setCopy(null);
+        // Stamp the marker fire-and-forget so a network error doesn't create
+        // a permanent retry loop on every subsequent page load. The user won't
+        // see the welcome moment (acceptable), but the flag prevents re-fetching.
+        if (!cancelled) {
+          const supabase2 = createClient();
+          supabase2
+            .from('users')
+            .update({ onboarding_completed_at: new Date().toISOString() })
+            .eq('id', user.id)
+            .then(() => {/* noop */})
+            .catch(() => {/* also acceptable — loop stops when connectivity returns */});
+        }
       }
     })();
 

@@ -137,7 +137,8 @@ async function loadStories(): Promise<Story[]> {
     .order('updated_at', { ascending: false })
     .limit(80);
 
-  if (error || !data) return [];
+  if (error) throw new Error(error.message);
+  if (!data) return [];
   return (data as unknown as ClusterRow[]).map(toStory).filter((s): s is Story => s !== null);
 }
 
