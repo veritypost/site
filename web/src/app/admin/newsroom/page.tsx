@@ -19,7 +19,7 @@
  * live on the API routes via requirePermission dual-check.
  */
 
-import { Suspense, useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { ADMIN_ROLES } from '@/lib/roles';
@@ -271,8 +271,10 @@ function DiscoveryTab({
   const [muteBusy, setMuteBusy] = useState(false);
   const [muteError, setMuteError] = useState<string | null>(null);
 
-  // Categories for filter select
-  const [categories, setCategories] = useState<Array<{ id: string; name: string; slug: string }>>([]);
+  // Categories for filter select (parent_id powers the subcategory cascade)
+  const [categories, setCategories] = useState<
+    Array<{ id: string; name: string; slug: string; parent_id: string | null }>
+  >([]);
 
   // Global model picker — drives every per-card generate in this Discovery tab
   const [selectedModelIdx, setSelectedModelIdx] = useState(0);
@@ -294,7 +296,7 @@ function DiscoveryTab({
     const supabase = createClient();
     supabase
       .from('categories')
-      .select('id, name, slug')
+      .select('id, name, slug, parent_id')
       .eq('is_active', true)
       .order('name')
       .then(({ data: rows }) => { if (rows) setCategories(rows); });
@@ -335,6 +337,13 @@ function DiscoveryTab({
       });
       if (res.status === 429) {
         toast.push({ message: 'Refreshing too fast. Try again in a moment.', variant: 'warn' });
+        return;
+      }
+      if (res.status === 503) {
+        toast.push({
+          message: 'Feed ingestion is disabled. Flip ai.ingest_enabled in Pipeline Settings to re-enable.',
+          variant: 'warn',
+        });
         return;
       }
       await res.json().catch(() => ({}));
@@ -408,11 +417,38 @@ function DiscoveryTab({
     }
   }
 
-  function handleCatChange(value: string) {
+  // The `cat` URL param holds whichever category id (parent or leaf) the
+  // operator most recently picked at the most-specific level. The API
+  // expands a parent id to itself + descendants, so a parent pick returns
+  // every cluster under that branch; a leaf pick narrows to that subcat.
+  const catById = useMemo(() => {
+    const m = new Map<string, { id: string; name: string; parent_id: string | null }>();
+    for (const c of categories) m.set(c.id, c);
+    return m;
+  }, [categories]);
+  const parentCats = useMemo(
+    () => categories.filter((c) => c.parent_id === null),
+    [categories]
+  );
+  const picked = cat ? catById.get(cat) ?? null : null;
+  const parentVal = picked ? (picked.parent_id ?? picked.id) : '';
+  const subVal = picked && picked.parent_id ? picked.id : '';
+  const subOptions = useMemo(
+    () => (parentVal ? categories.filter((c) => c.parent_id === parentVal) : []),
+    [categories, parentVal]
+  );
+
+  function setCatParam(value: string | null) {
     const params = new URLSearchParams(sp.toString());
     if (value) params.set('cat', value);
     else params.delete('cat');
     router.replace(`?${params.toString()}`, { scroll: false });
+  }
+  function handleParentCatChange(value: string) {
+    setCatParam(value || null);
+  }
+  function handleSubCatChange(value: string) {
+    setCatParam(value || parentVal || null);
   }
 
   function handleSoChange(value: string) {
@@ -479,20 +515,34 @@ function DiscoveryTab({
         <TextInput
           value={dqInput}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDqInput(e.target.value)}
-          placeholder="Search stories…"
+          placeholder="Search across all feeds (e.g. tigers)"
           style={{ flex: '1 1 200px', minWidth: 160, minHeight: 44, padding: '0 10px' } as React.CSSProperties}
         />
         <Select
-          value={cat}
-          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleCatChange(e.target.value)}
+          value={parentVal}
+          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleParentCatChange(e.target.value)}
           block={false}
           style={{ minWidth: 140, minHeight: 44 }}
         >
           <option value="">All categories</option>
-          {categories.map((c) => (
+          {parentCats.map((c) => (
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
         </Select>
+        {parentVal && subOptions.length > 0 && (
+          <Select
+            value={subVal}
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleSubCatChange(e.target.value)}
+            block={false}
+            style={{ minWidth: 160, minHeight: 44 }}
+            aria-label="Subcategory"
+          >
+            <option value="">All subcategories</option>
+            {subOptions.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </Select>
+        )}
         <Select
           value={so}
           onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleSoChange(e.target.value)}

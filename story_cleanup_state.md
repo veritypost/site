@@ -468,11 +468,104 @@ Status:      RESOLVED
 ```
 
 ### 8. Newsroom — feed run becomes search
-Status: IN_PROGRESS
+Status: RESOLVED
 Symptom: Today the feed-run flow is opaque. Wanted: two modes — General
 (grab everything) and Custom (operator types a prompt + picks category and
 subcategory). Search runs across all ~250 feeds' ingested clusters, e.g.
 "tigers" returns every cluster mentioning tigers.
+
+```
+RESOLUTION (concern 8) — 2026-05-02
+Investigate: Run Feed today triggers /api/newsroom/ingest/run — a real
+             RSS pipeline (rss-parser, 6s/feed, dedupes by raw_url,
+             upserts discovery_items, then preCluster/findBestMatch
+             into feed_clusters). The clusters/list route already
+             supports `q`, `category`, sort, dates, status — the
+             search box at page.tsx:479-484 already wired to it. Two
+             gaps vs the owner's words: (1) `q` searches
+             feed_clusters.title/summary/keywords[] + outlet name,
+             but NOT discovery_items.raw_title — so a cluster about
+             tigers whose roll-up title says "Endangered cats" misses
+             a "tigers" search; (2) the category dropdown is flat (65
+             active rows = ~20 parent + ~45 child via
+             categories.parent_id) and the API does an exact
+             .eq('category_id') so picking a parent never matches
+             clusters tagged at the leaf level. There's no separate
+             subcategories table; subcats are just categories rows
+             with non-null parent_id. discovery_items.raw_title has
+             no trigram index, but at expected scale (~thousands of
+             rows in the 6h cluster window) ILIKE is fine.
+Review:      A (confirmer) re-derived independently and verified all
+             findings, then DISAGREED with Stage 1's "split Run Feed
+             into General/Custom + add modal" plan: the existing
+             inline filter row IS the search the owner described,
+             and a modal would duplicate it (parallel-paths
+             violation). B (adversary) ran twelve attacks A-L and
+             also DISAGREED on the same architecture point — owner's
+             "general search prompt for the whole feed, not a per
+             article prompt" reads as "ONE search input at the
+             newsroom level," not as two button modes. B's other
+             load-bearing catch: API must expand parent → descendants
+             when a parent category is picked, otherwise leaf-tagged
+             clusters silently disappear. A and B independently
+             converged on the same plan; no tie-breaker needed.
+             Convergent verdict: keep Run Feed button as-is, extend
+             the inline filter row, add raw_title search reach, add
+             subcategory cascade, expand parent→descendants in the
+             API.
+Fix:         web/src/app/api/admin/newsroom/clusters/list/route.ts —
+             - new pre-query 3b: SELECT cluster_id FROM
+               discovery_items WHERE raw_title ILIKE %q% ORDER BY
+               created_at DESC LIMIT 1000; errors caught silently.
+             - merged outletClusterIds + rawTitleClusterIds via Set
+               and pushed `id.in.(...)` into the existing orParts
+               chain (replaces the old outlet-only branch).
+             - new pre-query 3c: when `category` set, look up
+               descendants via .from('categories').eq('parent_id',
+               category); build categoryFilter = [category,
+               ...childIds]. Replaced .eq('category_id', category)
+               with .in('category_id', categoryFilter); leaf picks
+               degenerate to single-element .in() — same effect as
+               eq.
+             web/src/app/admin/newsroom/page.tsx (DiscoveryTab) —
+             - useMemo added to react imports.
+             - categories state shape and SELECT now include
+               parent_id.
+             - useMemo helpers: catById, parentCats (top-level only),
+               picked, parentVal, subVal, subOptions.
+             - replaced single flat category <Select> with parent
+               <Select> + conditional subcategory <Select>; subcat
+               only renders when parentVal is set AND that parent has
+               children.
+             - URL state: `cat` holds the most-specific picked id
+               (parent or leaf). Picking a parent overwrites with
+               parent id; picking a subcat overwrites with leaf id;
+               picking "All subcategories" reverts to parent id;
+               picking "All categories" deletes the param.
+             - search box placeholder: "Search stories…" → "Search
+               across all feeds (e.g. tigers)".
+             - runFeed 503 toast: special-cased to surface "Feed
+               ingestion is disabled. Flip ai.ingest_enabled in
+               Pipeline Settings to re-enable." instead of the
+               generic "Could not run feeds." path.
+             Run Feed button JSX itself is unchanged.
+TypeScript:  pass (npx tsc --noEmit, exit 0)
+iOS build:   n/a — newsroom is web-admin only; no iOS surface calls
+             clusters/list or ingest/run.
+Verifier:    pass — 12/12 checks. raw_title pre-query gated, ordered,
+             capped, error-isolated; merge dedupes via Set; category
+             expansion handles parent + leaf cases; cascade UI hides
+             empty subcat dropdown; URL transitions traced through
+             five scenarios; placeholder + 503 toast strings match;
+             only the two intended files modified; useMemo deps
+             correct; .in() single-element semantics safe.
+Status:      RESOLVED — owner's "tigers" example now hits clusters
+             whose source headlines mention tigers even when the
+             roll-up title doesn't; "search by category and maybe
+             subcategory" delivered via parent-then-subcat cascade
+             with API-side descendant expansion; Run Feed kept as
+             the General "grab everything" ingest. No modal added.
+```
 
 ### 9. Newsroom — drop per-card freeform-instructions input
 Status: RESOLVED

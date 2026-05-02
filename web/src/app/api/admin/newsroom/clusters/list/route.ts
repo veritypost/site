@@ -189,6 +189,7 @@ export async function GET(req: Request) {
   //     feed source_name/name. Wrapped in try/catch: any error is non-fatal
   //     and the main search falls back to title/summary/keywords only.
   let outletClusterIds: string[] = [];
+  let rawTitleClusterIds: string[] = [];
   if (q) {
     try {
       const escapedQ = escapeIlike(q);
@@ -211,6 +212,49 @@ export async function GET(req: Request) {
       }
     } catch {
       outletClusterIds = [];
+    }
+
+    // 3b. Per-source headline pre-query — clusters whose discovery_items
+    //     carry the term in raw_title. Owner expectation: typing "tigers"
+    //     matches every cluster whose source items mention tigers, even
+    //     when the rolled-up cluster title doesn't.
+    try {
+      const escapedQ = escapeIlike(q);
+      const { data: rawRows } = await service
+        .from('discovery_items')
+        .select('cluster_id')
+        .ilike('raw_title', `%${escapedQ}%`)
+        .not('cluster_id', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(1000);
+      if (rawRows) {
+        const seen = new Set<string>();
+        for (const row of rawRows as Array<{ cluster_id: string | null }>) {
+          if (row.cluster_id && !seen.has(row.cluster_id)) {
+            seen.add(row.cluster_id);
+            rawTitleClusterIds.push(row.cluster_id);
+          }
+        }
+      }
+    } catch {
+      rawTitleClusterIds = [];
+    }
+  }
+
+  // 3c. Category descendants — when the operator picks a parent category,
+  //     return clusters tagged either at the parent itself OR any of its
+  //     children. Subcategory leaves are passed through unchanged.
+  let categoryFilter: string[] | null = null;
+  if (category) {
+    try {
+      const { data: childRows } = await service
+        .from('categories')
+        .select('id')
+        .eq('parent_id', category);
+      const childIds = (childRows ?? []).map((r) => r.id as string);
+      categoryFilter = [category, ...childIds];
+    } catch {
+      categoryFilter = [category];
     }
   }
 
@@ -240,12 +284,15 @@ export async function GET(req: Request) {
       `summary.ilike.%${escapedQ}%`,
       ...(qForOv.length > 0 ? [`keywords.ov.{${qForOv}}`] : []),
     ];
-    if (outletClusterIds.length > 0) {
-      orParts.push(`id.in.(${outletClusterIds.join(',')})`);
+    const idMatchSet = new Set<string>();
+    for (const id of outletClusterIds) idMatchSet.add(id);
+    for (const id of rawTitleClusterIds) idMatchSet.add(id);
+    if (idMatchSet.size > 0) {
+      orParts.push(`id.in.(${Array.from(idMatchSet).join(',')})`);
     }
     clusterQ = clusterQ.or(orParts.join(','));
   }
-  if (category) clusterQ = clusterQ.eq('category_id', category);
+  if (categoryFilter) clusterQ = clusterQ.in('category_id', categoryFilter);
   if (dateFrom && !Number.isNaN(Date.parse(dateFrom)))
     clusterQ = clusterQ.gte('created_at', dateFrom);
   if (dateTo && !Number.isNaN(Date.parse(dateTo)))
