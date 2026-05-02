@@ -6,9 +6,13 @@
  * the story-manager without leaving the current reader context.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Ad from '@/components/Ad';
+import UpNextSheet from '@/components/article/UpNextSheet';
+import ReadingProgressRibbon from '@/components/ReadingProgressRibbon';
+import MidBodyQuizTeaser from '@/components/article/MidBodyQuizTeaser';
+import type { UpNextArticle, UpNextSheetHandle } from '@/components/article/UpNextSheet';
 
 export type ArticleSurfaceArticle = {
   id: string;
@@ -29,6 +33,9 @@ export type ArticleSurfaceProps = {
   bodyHtml: string;
   canEdit: boolean;
   canViewBody?: boolean;
+  nearbyArticles?: UpNextArticle[];
+  hasQuiz?: boolean;
+  quizPassed?: boolean;
 };
 
 const PAGE_STYLE: React.CSSProperties = {
@@ -58,10 +65,19 @@ const BODY_STYLE: React.CSSProperties = {
   color: 'var(--text-primary, #111)',
 };
 
-export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody = true }: ArticleSurfaceProps) {
+export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody = true, nearbyArticles = [], hasQuiz = false, quizPassed = false }: ArticleSurfaceProps) {
   const editHref = article.is_kids_safe
     ? `/admin/kids-story-manager?article=${article.id}`
     : `/admin/story-manager?article=${article.id}`;
+
+  const upNextRef = useRef<UpNextSheetHandle>(null);
+
+  // Fire the Up Next sheet when a comment is successfully posted.
+  useEffect(() => {
+    const handler = () => upNextRef.current?.fire();
+    window.addEventListener('vp:comment-sent', handler);
+    return () => window.removeEventListener('vp:comment-sent', handler);
+  }, []);
 
   // Scroll-depth tracking: fires 25/50/75/100% milestones for the article body.
   // Fire-and-forget; errors are swallowed so reader UX is never affected.
@@ -95,6 +111,8 @@ export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody
   }, [article.id, canViewBody]);
 
   return (
+    <>
+    <ReadingProgressRibbon />
     <article style={PAGE_STYLE}>
       {canEdit && (
         <div style={{ textAlign: 'right', marginBottom: 16 }}>
@@ -132,6 +150,11 @@ export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody
               articles are long enough that the reader has scrolled 30%+ by
               the time this slot is visible. */}
           <Ad placement="article_in_body" page="article" position="in_body" articleId={article.id} />
+          <MidBodyQuizTeaser
+            hasQuiz={hasQuiz}
+            quizPassed={quizPassed}
+            onScrollToQuiz={() => document.getElementById('article-quiz')?.scrollIntoView({ behavior: 'smooth' })}
+          />
         </>
       ) : (
         <div
@@ -173,5 +196,7 @@ export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody
         </div>
       )}
     </article>
+    <UpNextSheet ref={upNextRef} articles={nearbyArticles} />
+    </>
   );
 }

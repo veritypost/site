@@ -53,12 +53,14 @@ export default function ArticleEngagementZone({
         </div>
       )}
       {hasQuiz && (
-        <ArticleQuiz
-          articleId={articleId}
-          initialPassed={initialPassed}
-          currentUserId={currentUserId ?? null}
-          onPass={handlePass}
-        />
+        <div id="article-quiz">
+          <ArticleQuiz
+            articleId={articleId}
+            initialPassed={initialPassed}
+            currentUserId={currentUserId ?? null}
+            onPass={handlePass}
+          />
+        </div>
       )}
       <CommentThread
         articleId={articleId}

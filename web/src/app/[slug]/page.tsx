@@ -189,7 +189,7 @@ export default async function ArticleSlugPage({
           article.category_id
             ? service
                 .from('articles')
-                .select('title, story_id, stories!articles_story_id_fkey(slug)')
+                .select('id, title, excerpt, story_id, stories!articles_story_id_fkey(slug)')
                 .eq('category_id', article.category_id)
                 .eq('status', 'published')
                 .is('deleted_at', null)
@@ -232,12 +232,21 @@ export default async function ArticleSlugPage({
   const sources = sourcesResult.data ?? [];
   const timeline = timelineResult.data ?? [];
   const category = categoryResult.error ? null : (categoryResult.data as { name: string; slug: string } | null);
-  type NearbyRow = { title: string; story_id: string | null; stories: { slug: string } | null };
-  const nearbyStories: { slug: string; title: string }[] = nearbyStoriesResult.error
+  type NearbyRow = { id: string; title: string; excerpt: string | null; story_id: string | null; stories: { slug: string } | null };
+  const nearbyRows: NearbyRow[] = nearbyStoriesResult.error
     ? []
-    : ((nearbyStoriesResult.data ?? []) as NearbyRow[])
-        .filter((r) => r.stories?.slug)
-        .map((r) => ({ slug: r.stories!.slug, title: r.title }));
+    : ((nearbyStoriesResult.data ?? []) as NearbyRow[]).filter((r) => r.stories?.slug);
+  const nearbyStories: { slug: string; title: string }[] = nearbyRows.map((r) => ({
+    slug: r.stories!.slug,
+    title: r.title,
+  }));
+  const nearbyArticles = nearbyRows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    slug: r.stories!.slug,
+    excerpt: r.excerpt,
+    category_name: category?.name ?? null,
+  }));
 
   if (article.status !== 'published' && !canEdit) redirect(`/${story.slug}`);
 
@@ -306,6 +315,9 @@ export default async function ArticleSlugPage({
               bodyHtml={bodyHtml}
               canEdit={canEdit}
               canViewBody={canViewBody}
+              nearbyArticles={nearbyArticles}
+              hasQuiz={hasQuiz}
+              quizPassed={initialPassed}
             />
             {!isCoppa && (article.status === 'published' || canEdit || isOwnerModeViewer) && (
               <ArticleActions

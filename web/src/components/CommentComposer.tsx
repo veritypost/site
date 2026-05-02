@@ -291,6 +291,7 @@ export default function CommentComposer({
       }
       if (!res.ok) throw new Error(friendlyError(data?.error, 'Could not post'));
       setBody('');
+      window.dispatchEvent(new Event('vp:comment-sent'));
       onPosted?.(data.comment || null);
       onCancel?.();
     } catch (err) {

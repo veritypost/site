@@ -47,6 +47,14 @@ struct StoryDetailView: View {
     /// /api/comments/[id] with the new body. Server is still the
     /// authoritative window enforcer (refusing PATCHes past the deadline).
     @State private var canEditOwnComment: Bool = false
+    // C2 — comments.section.view permission flag. When false, the
+    // discussion tab body is replaced with a denial message.
+    @State private var canViewComments: Bool = true
+    // C3 — moderator permission flags for comment hide and supervisor flag.
+    @State private var canHideComments: Bool = false
+    @State private var canFlagComments: Bool = false
+    // C1 — sort order for the discussion comment list. Mirrors web Top/Newest toggle.
+    @State private var commentSortOrder: String = "top"
     @State private var editingCommentId: String? = nil
     @State private var editingCommentBody: String = ""
     @State private var editSaving: Bool = false
@@ -306,7 +314,14 @@ struct StoryDetailView: View {
                             // visible to anonymous users so the product mechanic
                             // (earn the discussion) is discoverable. Tap → auth
                             // gate prompt; logged-in → real discussion content.
-                            if auth.isLoggedIn {
+                            // C2 — comments.section.view denial (web parity).
+                            if !canViewComments {
+                                Text("Comments aren't available for your account.")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                    .padding()
+                                    .frame(maxWidth: .infinity)
+                            } else if auth.isLoggedIn {
                                 discussionContent
                             } else {
                                 anonDiscussionPrompt
@@ -495,6 +510,11 @@ struct StoryDetailView: View {
             canViewSources = await PermissionService.shared.has("article.view.sources")
             canViewTimeline = await PermissionService.shared.has("article.view.timeline")
             canEditOwnComment = await PermissionService.shared.has("comments.edit.own")
+            // C2 — comments.section.view
+            canViewComments = await PermissionService.shared.has("comments.section.view")
+            // C3 — moderator actions
+            canHideComments = await PermissionService.shared.has("comments.moderate")
+            canFlagComments = await PermissionService.shared.has("comments.flag")
         }
         .onDisappear { tts.stop() }
         .overlay(alignment: .top) { toastOverlay }
@@ -1383,6 +1403,14 @@ struct StoryDetailView: View {
                     }
                     .buttonStyle(.plain)
                 }
+                Spacer()
+                // C1 — Top / Newest sort toggle (web parity).
+                Picker("Sort", selection: $commentSortOrder) {
+                    Text("Top").tag("top")
+                    Text("Newest").tag("newest")
+                }
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 160)
             }
             .padding(.top, 20)
             .padding(.horizontal, 20)
@@ -1442,6 +1470,20 @@ struct StoryDetailView: View {
         for key in childrenByParent.keys {
             childrenByParent[key]?.sort { (a, b) in
                 (a.createdAt ?? .distantPast) < (b.createdAt ?? .distantPast)
+            }
+        }
+        // C1 — apply Top / Newest sort to top-level comments.
+        // Pinned comments always surface first regardless of sort mode.
+        // "Top" sorts non-pinned by upvoteCount descending; "Newest"
+        // sorts by createdAt descending (mirrors web CommentThread sort).
+        topLevel.sort { (a, b) in
+            let aPinned = a.isPinned == true || a.isContextPinned == true
+            let bPinned = b.isPinned == true || b.isContextPinned == true
+            if aPinned != bPinned { return aPinned }
+            if commentSortOrder == "newest" {
+                return (a.createdAt ?? .distantPast) > (b.createdAt ?? .distantPast)
+            } else {
+                return (a.upvoteCount ?? 0) > (b.upvoteCount ?? 0)
             }
         }
         var ordered: [(VPComment, Int)] = []
@@ -1919,6 +1961,21 @@ struct StoryDetailView: View {
                         blockTargetUser = (id: authorId, username: comment.users?.username)
                     } label: {
                         Label("Block @\(comment.users?.username ?? "user")", systemImage: "hand.raised")
+                    }
+                }
+                // C3 — moderator actions (hide + supervisor flag).
+                if canHideComments {
+                    Button(role: .destructive) {
+                        Task { await hideComment(comment) }
+                    } label: {
+                        Label("Hide comment", systemImage: "eye.slash")
+                    }
+                }
+                if canFlagComments {
+                    Button {
+                        Task { await flagForSupervisor(comment) }
+                    } label: {
+                        Label("Flag for review", systemImage: "flag")
                     }
                 }
             }
@@ -3316,6 +3373,40 @@ struct StoryDetailView: View {
             let current = commentHelpfulCounts[commentId] ?? 0
             commentHelpfulCounts[commentId] = max(0, current + (wasCast ? 1 : -1))
         }
+    }
+
+    // MARK: - C3: Moderator comment actions
+
+    /// C3 — hide a comment (comments.moderate permission required).
+    /// POSTs to /api/comments/[id]/hide. On success, removes the comment
+    /// from the local array (optimistic UI). No undo affordance — the
+    /// moderator dashboard is the canonical recovery path.
+    private func hideComment(_ comment: VPComment) async {
+        let site = SupabaseManager.shared.siteURL
+        guard let url = URL(string: "/api/comments/\(comment.id)/hide", relativeTo: site) else { return }
+        guard let session = try? await client.auth.session else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        _ = try? await URLSession.shared.data(for: req)
+        // Optimistic UI: remove from local comments array.
+        await MainActor.run { comments.removeAll { $0.id == comment.id } }
+    }
+
+    /// C3 — flag a comment for supervisor review (comments.flag permission required).
+    /// POSTs to /api/comments/[id]/flag. No optimistic UI — the comment
+    /// stays visible; the flag is a signal to the moderation queue only.
+    private func flagForSupervisor(_ comment: VPComment) async {
+        let site = SupabaseManager.shared.siteURL
+        guard let url = URL(string: "/api/comments/\(comment.id)/flag", relativeTo: site) else { return }
+        guard let session = try? await client.auth.session else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        _ = try? await URLSession.shared.data(for: req)
+        // No optimistic UI — the comment stays visible after flagging.
     }
 
 }

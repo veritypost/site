@@ -121,33 +121,69 @@ export default function TimelineSection({ events, storySlug, showTease = false, 
     (a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime()
   );
 
+  // Most-recent event index: prefer the last article-typed event, fall back to the last event overall.
+  const lastArticleIdx = sorted.reduce<number>((acc, ev, i) => (ev.type === 'article' ? i : acc), -1);
+  const nowIdx = lastArticleIdx >= 0 ? lastArticleIdx : sorted.length - 1;
+
   return (
     <section style={SECTION_STYLE}>
       <h2 style={HEADING_STYLE}>Timeline</h2>
       <div style={SPINE_STYLE}>
-        {sorted.map((ev, i) => (
-          <div key={ev.id} style={EVENT_STYLE}>
-            <div style={DATE_STYLE}>{formatTimelineDate(ev.event_date)}</div>
-            <div style={DOT_COL_STYLE}>
-              <div style={DOT_STYLE} />
-              {i < sorted.length - 1 && <div style={LINE_STYLE} />}
+        {sorted.map((ev, i) => {
+          const isNow = i === nowIdx;
+          const dotStyle: React.CSSProperties = isNow
+            ? {
+                ...DOT_STYLE,
+                width: 10,
+                height: 10,
+                background: 'var(--accent, #2563eb)',
+                boxShadow: '0 0 0 2px var(--accent, #2563eb)',
+              }
+            : DOT_STYLE;
+
+          return (
+            <div key={ev.id} style={EVENT_STYLE}>
+              <div style={DATE_STYLE}>{formatTimelineDate(ev.event_date)}</div>
+              <div style={DOT_COL_STYLE}>
+                {isNow && (
+                  <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--accent, #2563eb)', letterSpacing: 1, textTransform: 'uppercase' }}>
+                    NOW
+                  </span>
+                )}
+                <div style={dotStyle} />
+                {i < sorted.length - 1 && <div style={LINE_STYLE} />}
+              </div>
+              <div style={CONTENT_STYLE}>
+                {ev.type === 'article' && storySlug && ev.linked_article_id ? (
+                  <p style={LABEL_STYLE}>
+                    <a
+                      href={`/${storySlug}?a=${ev.linked_article_id}`}
+                      style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 3 }}
+                    >
+                      {ev.event_label}
+                    </a>
+                  </p>
+                ) : (
+                  <p style={LABEL_STYLE}>{ev.event_label}</p>
+                )}
+                {isNow && ev.type === 'article' && (
+                  ev.linked_article_id && storySlug ? (
+                    <a
+                      href={`/${storySlug}?a=${ev.linked_article_id}`}
+                      style={{ fontSize: 11, color: 'var(--accent, #2563eb)', marginTop: 4, display: 'block', textDecoration: 'none' }}
+                    >
+                      ↗ Read this coverage
+                    </a>
+                  ) : (
+                    <span style={{ fontSize: 11, color: 'var(--accent, #2563eb)', marginTop: 4, display: 'block' }}>
+                      ↗ Read this coverage
+                    </span>
+                  )
+                )}
+              </div>
             </div>
-            <div style={CONTENT_STYLE}>
-              {ev.type === 'article' && storySlug && ev.linked_article_id ? (
-                <p style={LABEL_STYLE}>
-                  <a
-                    href={`/${storySlug}?a=${ev.linked_article_id}`}
-                    style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 3 }}
-                  >
-                    {ev.event_label}
-                  </a>
-                </p>
-              ) : (
-                <p style={LABEL_STYLE}>{ev.event_label}</p>
-              )}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );

@@ -464,6 +464,12 @@ This model nets ~$833 per 1,000 12-mo visitors per panel modeling; ~75% of that 
 Key: revenue excluded from pitch export (leaks pricing floor). Bot impressions excluded from both exports (internal audit only). Revenue/eCPM in USD with 2 decimal places (cents ÷ 100). ISO date (YYYY-MM-DD).
 **Apply:** `/admin/ad-analytics` CSV export buttons generate files matching these exact column headers. Date range and drill-down dimension (campaign/category) are pre-applied before export.
 
+## #052 — Up-Next sheet scroll trigger threshold
+**Date:** 2026-05-02 **Scope:** web + iOS adult (article reader)
+**Q:** At what scroll depth should the Up-Next sheet fire?
+**A:** 90%. 3-expert panel unanimous: 90% targets the seam between article body and discussion zone, catching readers at natural exit intent without interrupting reading. 95% fires too late (reader deep in discussion); 85% risks clipping the body on short articles. Post-comment-send is the primary high-intent trigger; scroll-90% is the fallback for non-commenters. Auto-locked: 3/3 convergence.
+**Apply:** UpNextSheet fires when `window.scrollY / (document.body.scrollHeight - window.innerHeight) >= 0.90`. Also fires immediately after a successful comment POST. Fires once per article-page-load — set a ref to prevent double-fire.
+
 ---
 
 *New decisions append below. Never delete — supersede with a follow-up entry referencing the prior number.*
