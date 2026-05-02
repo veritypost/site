@@ -2836,7 +2836,8 @@ struct StoryDetailView: View {
         do {
             let (data, response) = try await URLSession.shared.data(for: req)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                let msg = (try? JSONDecoder().decode([String: String].self, from: data))?["error"] ?? "Couldn't start quiz."
+                let rawMsg = (try? JSONDecoder().decode([String: String].self, from: data))?["error"]
+                let msg = friendlyApiError(rawMsg, fallback: "Couldn\u{2019}t start quiz.")
                 await MainActor.run { quizStage = .idle; quizError = msg }
                 return
             }
@@ -2893,7 +2894,8 @@ struct StoryDetailView: View {
         do {
             let (data, response) = try await URLSession.shared.data(for: req)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                let msg = (try? JSONDecoder().decode([String: String].self, from: data))?["error"] ?? "Couldn't submit quiz."
+                let rawMsg = (try? JSONDecoder().decode([String: String].self, from: data))?["error"]
+                let msg = friendlyApiError(rawMsg, fallback: "Couldn\u{2019}t submit quiz.")
                 await MainActor.run { quizStage = .answering; quizError = msg }
                 return
             }
@@ -3025,12 +3027,14 @@ struct StoryDetailView: View {
                         }
                     }
                 } else {
-                    let err = (try? decoder.decode(Err.self, from: data))?.error ?? "Comment couldn\u{2019}t be posted. Try again."
+                    let rawErr = (try? decoder.decode(Err.self, from: data))?.error
+                    let err = friendlyApiError(rawErr, fallback: "Comment couldn\u{2019}t be posted. Try again.")
                     await MainActor.run { flashModerationToast(err) }
                 }
             } else {
                 struct Err: Decodable { let error: String? }
-                let err = (try? JSONDecoder().decode(Err.self, from: data))?.error ?? "Could not post comment"
+                let rawErr = (try? JSONDecoder().decode(Err.self, from: data))?.error
+                let err = friendlyApiError(rawErr, fallback: "Couldn\u{2019}t post your comment. Try again.")
                 await MainActor.run {
                     flashModerationToast(err)
                     if http.statusCode == 429 {
@@ -3346,4 +3350,38 @@ struct APIQuizSubmitResponse: Codable {
     let percentile: Int?
     let attempts_remaining: Int?
     let results: [APIQuizResultRow]
+}
+
+// MARK: - API error mapping
+
+/// Maps raw API error codes to user-facing copy. Strings that are already
+/// user-friendly pass through unchanged; developer-shaped codes and schema
+/// descriptions return the caller-supplied fallback.
+private func friendlyApiError(_ raw: String?, fallback: String) -> String {
+    guard let raw = raw?.trimmingCharacters(in: .whitespaces), !raw.isEmpty else {
+        return fallback
+    }
+    switch raw {
+    case "comment_too_long", "payload too large":
+        return "Your comment is too long."
+    case "Unauthenticated":
+        return "Please sign in and try again."
+    case "Not allowed to post comments":
+        return "You\u{2019}re not able to post comments right now."
+    case "Not allowed to start quiz":
+        return "You don\u{2019}t have access to this quiz."
+    case "Forbidden":
+        return fallback
+    default:
+        // Developer-shaped strings that are never meant for users: JSON schema
+        // literals, internal field references, and similar internal prefixes.
+        if raw.contains("{") ||
+           raw.hasPrefix("article_id") ||
+           raw.hasPrefix("each answer") ||
+           raw.hasPrefix("Kid profile") ||
+           raw.hasPrefix("Expected ") {
+            return fallback
+        }
+        return raw
+    }
 }
