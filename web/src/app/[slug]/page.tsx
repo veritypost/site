@@ -298,6 +298,7 @@ export default async function ArticleSlugPage({
           <ArticleEngagementZone
             key={article.id}
             articleId={article.id}
+            articleCategoryId={article.category_id}
             hasQuiz={hasQuiz}
             initialPassed={initialPassed}
             currentUserId={user?.id ?? null}

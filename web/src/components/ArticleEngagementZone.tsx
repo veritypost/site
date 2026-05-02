@@ -5,6 +5,7 @@ import CommentThread from './CommentThread';
 
 interface ArticleEngagementZoneProps {
   articleId: string;
+  articleCategoryId?: string | null;
   hasQuiz: boolean;
   initialPassed: boolean;
   currentUserId?: string | null;
@@ -14,6 +15,7 @@ interface ArticleEngagementZoneProps {
 
 export default function ArticleEngagementZone({
   articleId,
+  articleCategoryId,
   hasQuiz,
   initialPassed,
   currentUserId,
@@ -41,6 +43,7 @@ export default function ArticleEngagementZone({
       <section id="discussion" style={sectionStyle}>
         <CommentThread
           articleId={articleId}
+          articleCategoryId={articleCategoryId}
           quizPassed={false}
           justRevealed={false}
         />
@@ -60,6 +63,7 @@ export default function ArticleEngagementZone({
       )}
       <CommentThread
         articleId={articleId}
+        articleCategoryId={articleCategoryId}
         currentUserId={currentUserId}
         currentUserTier={currentUserTier}
         quizPassed={hasQuiz ? hasPassed : false}
