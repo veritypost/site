@@ -41,10 +41,9 @@ function LoginFallback() {
           borderRadius: '50%',
           border: `3px solid ${C.border}`,
           borderTopColor: C.accent,
-          animation: 'vp-spin 0.75s linear infinite',
+          animation: 'vpSpin 0.75s linear infinite',
         }}
       />
-      <style>{`@keyframes vp-spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   );
 }

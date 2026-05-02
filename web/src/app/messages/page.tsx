@@ -103,10 +103,9 @@ function MessagesFallback() {
           borderRadius: '50%',
           border: '3px solid #e5e5e5',
           borderTopColor: '#111',
-          animation: 'vp-spin 0.75s linear infinite',
+          animation: 'vpSpin 0.75s linear infinite',
         }}
       />
-      <style>{`@keyframes vp-spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   );
 }
