@@ -18,6 +18,9 @@ import { JsonLd, newsArticle } from '@/components/JsonLd';
 import { getSiteUrlOrNull } from '@/lib/siteUrl';
 import { incrementViewCount } from '@/lib/counters';
 import ArticleSurface from '@/components/article/ArticleSurface';
+import ArticleReaderTabs from '@/components/article/ArticleReaderTabs';
+import TimelineSection from '@/components/article/TimelineSection';
+import SourcesSection from '@/components/article/SourcesSection';
 import ArticleEngagementZone from '@/components/ArticleEngagementZone';
 import ArticleActions from '@/components/ArticleActions';
 import ArticleTracker from '@/components/article/ArticleTracker';
@@ -266,43 +269,55 @@ export default async function ArticleSlugPage({
           storySlug={story.slug}
         />
       )}
-      <ArticleSurface
-        article={{
-          id: article.id,
-          slug: story.slug,
-          title: article.title,
-          subtitle: article.subtitle,
-          excerpt: article.excerpt,
-          body: article.body ?? '',
-          status: article.status,
-          age_band: article.age_band,
-          is_kids_safe: article.is_kids_safe,
-          published_at: article.published_at,
-          updated_at: article.updated_at,
-        }}
-        bodyHtml={bodyHtml}
-        canEdit={canEdit}
-        canViewBody={canViewBody}
-        sources={sources}
-        timeline={timeline}
+      <ArticleReaderTabs
+        articleSlot={
+          <>
+            <ArticleSurface
+              article={{
+                id: article.id,
+                slug: story.slug,
+                title: article.title,
+                subtitle: article.subtitle,
+                excerpt: article.excerpt,
+                body: article.body ?? '',
+                status: article.status,
+                age_band: article.age_band,
+                is_kids_safe: article.is_kids_safe,
+                published_at: article.published_at,
+                updated_at: article.updated_at,
+              }}
+              bodyHtml={bodyHtml}
+              canEdit={canEdit}
+              canViewBody={canViewBody}
+            />
+            {!isCoppa && article.status === 'published' && (
+              <ArticleActions
+                articleId={article.id}
+                currentUserId={user?.id ?? null}
+              />
+            )}
+          </>
+        }
+        timelineSlot={
+          <>
+            <TimelineSection events={timeline} storySlug={story.slug} />
+            <SourcesSection sources={sources} />
+          </>
+        }
+        engagementSlot={
+          !isCoppa && article.status === 'published' ? (
+            <ArticleEngagementZone
+              key={article.id}
+              articleId={article.id}
+              articleCategoryId={article.category_id}
+              hasQuiz={hasQuiz}
+              initialPassed={initialPassed}
+              currentUserId={user?.id ?? null}
+              canBypassQuiz={canEdit || isGodModeViewer}
+            />
+          ) : null
+        }
       />
-      {!isCoppa && article.status === 'published' && (
-        <>
-          <ArticleActions
-            articleId={article.id}
-            currentUserId={user?.id ?? null}
-          />
-          <ArticleEngagementZone
-            key={article.id}
-            articleId={article.id}
-            articleCategoryId={article.category_id}
-            hasQuiz={hasQuiz}
-            initialPassed={initialPassed}
-            currentUserId={user?.id ?? null}
-            canBypassQuiz={canEdit || isGodModeViewer}
-          />
-        </>
-      )}
       <NextStoryFooter category={category} nearbyStories={nearbyStories} />
     </>
   );

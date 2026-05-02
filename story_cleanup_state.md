@@ -468,13 +468,11 @@ Status:      RESOLVED
 ```
 
 ### 8. Newsroom — feed run becomes search
-Status: DEFERRED
+Status: IN_PROGRESS
 Symptom: Today the feed-run flow is opaque. Wanted: two modes — General
 (grab everything) and Custom (operator types a prompt + picks category and
 subcategory). Search runs across all ~250 feeds' ingested clusters, e.g.
 "tigers" returns every cluster mentioning tigers.
-Reason: Big-feature peel-off — owner locked this for its own session
-(2026-05-02).
 
 ### 9. Newsroom — drop per-card freeform-instructions input
 Status: RESOLVED
@@ -588,9 +586,87 @@ Status:      RESOLVED — Edit button visible immediately on refresh-
 ```
 
 ### 11. AudienceCard — live status
-Status: IN_PROGRESS
+Status: RESOLVED
 Symptom: Card doesn't show a clear status (idle / generating / generated /
 published / failed). Wanted: persistent status badge per audience.
+
+```
+RESOLUTION (concern 11) — 2026-05-02
+Investigate: AudienceCard pill at AudienceCard.tsx:336-338 maps a
+             5-state enum (idle/skipped/generating/failed/generated) to
+             labels. No "Published" branch — once a card lands in
+             `generated` it shows "Generated" forever, regardless of
+             whether the operator subsequently published from the
+             editor. articles.status (draft/published/archived per
+             /api/admin/articles/[id]/route.ts:188-192 +
+             route.ts:250 zod enum) is the source of truth, but
+             AudienceCard never reads it. Categorized (b) data exists
+             but render hides it. Three options considered: (A) new
+             batch endpoint + plumb through list route, (B) embed in
+             run-detail response, (C) per-card client-side fetch on
+             mount + on window focus/pageshow.
+Review:      A (confirmer) re-derived 4/4 root causes and DISAGREED-ON-
+             SCOPE with Stage 1's 4-file plan to LEFT-JOIN articles in
+             the cluster list endpoint + plumb through StoryCard +
+             page.tsx, citing SESSION_G's "Touch ONLY" lock and
+             Session F's ownership of page.tsx.
+             B (adversary) flagged FIVE attack vectors:
+             (1) visibilitychange does NOT fire on same-tab back-
+             navigation — owner's primary newsroom→editor→back flow
+             would leave the pill stale forever, (2) scope inflation,
+             (3) reuse the polling tick (rejected — articles always
+             draft at completion), (4) articles.status has THREE values
+             not two (must handle archived), (5) existing GET
+             /api/admin/articles/[id] already returns status (no new
+             endpoint needed).
+             Tie-breaker picked Option E: 1 file (AudienceCard.tsx
+             only), reuse existing GET endpoint, pageshow + window
+             focus listeners (covers back-from-editor where
+             visibilitychange doesn't fire).
+Fix:         web/src/app/admin/newsroom/_components/AudienceCard.tsx —
+             - Added articleStatus state ('draft'|'published'|
+               'archived'|null), narrow union not loose string.
+             - Added fetchArticleStatus useCallback that GETs
+               /api/admin/articles/{id}, parses safely (no throw on
+               bad JSON or non-200), runtime type-narrows the status
+               string before setting state.
+             - Added two effects, both gated on
+               state==='generated' && articleId: one fires the fetch
+               when those conditions become true (covers initial mount
+               AND post-poll articleId-now-populated transition), the
+               other registers window focus + pageshow listeners with
+               proper cleanup (covers back-from-editor + bfcache
+               restore).
+             - Replaced the pill ternary with status-keyed label +
+               color: Pending/Skipped/Archived = C.muted, Working/
+               Generated = C.ink, Failed = C.danger, Published =
+               C.success. Bumped pill style to match the AUDIENCE
+               label on the other side of the row (fontWeight: 700,
+               letterSpacing: 0.5, uppercase) — gives a column of
+               cards a scannable status strip without redesigning
+               the pill.
+             No new endpoint. No edits to clusters/list, page.tsx,
+             StoryCard, or any kids/iOS surface.
+TypeScript:  pass (npx tsc --noEmit, exit 0)
+iOS build:   n/a — newsroom is web-admin only; AudienceCard has zero
+             references in VerityPost/ + VerityPostKids/ (consistent
+             with kids_scope.md memory).
+Verifier:    pass — 10/10 functional checks (pill branches, narrow
+             union, mount + focus effects, color tokens, no
+             regressions in View/Edit/Skip block or polling loop, no
+             stray console/TODO). Verifier's "FAIL on file scope" was
+             a false positive — the four other modified files
+             (newsroom/page.tsx, articles/new-draft/route.ts,
+             ArticleSurface.tsx, [slug]/page.tsx) belong to parallel
+             Sessions F/H/I working on concerns #6/#8, #13/#28, #29
+             and are not part of this concern's commit.
+Status:      RESOLVED — pill now reads Published when articles.status
+             flips, refreshes on window focus / pageshow / mount, and
+             stays scannable across a column of cards. Trade-off:
+             "publish-in-another-tab while focused on newsroom"
+             updates only on next blur+focus, but this is rare in
+             practice (single-operator workflow).
+```
 
 ### 12. /admin/articles — clicking article opens view, not edit
 Status: RESOLVED
@@ -1389,12 +1465,90 @@ Status:      DEFERRED — real fix is a newsroom progress-label change
 ```
 
 ### 29. Mobile + iOS — 3-tab article layout
-Status: IN_PROGRESS
+Status: RESOLVED (web slice); iOS DEFERRED
 Decision: Top tabs (Option B) — Article / Timeline / Quiz & Discussion.
 Kids: no Discussion tab (Article / Timeline / Quiz only).
 Surfaces: web mobile reader, iOS adult reader, kids iOS reader.
 Reason: Big-feature peel-off — owner locked this for its own session
 (2026-05-02). iOS scope also separately deferred to an iOS session.
+
+```
+RESOLUTION (concern 29) — 2026-05-02
+Investigate: Reader is a single-column 680px-max stack today
+             ([slug]/page.tsx:269-307). Timeline + Sources rendered
+             inside ArticleSurface; Quiz + CommentThread rendered
+             via ArticleEngagementZone (id="discussion"). No
+             responsive design beyond the maxWidth — site convention
+             breakpoint is 860px (globals.css:408). ArticleSurface
+             has only one render-site (the page); ArticleEditor
+             imports the TS type only, so refactoring ArticleSurface
+             internals is safe.
+             ArticleTracker hangs IntersectionObserver sentinels off
+             [data-article-body] (ArticleTracker.tsx:42, 93) — a
+             tabbed reader must keep that element mounted.
+             ArticleQuiz has href="#discussion" pointing at the
+             engagement zone (ArticleQuiz.tsx:247) — Quiz and
+             Discussion live in the SAME locked tab, so the in-panel
+             scroll continues to work.
+             Kids on web already render zero engagement zone (COPPA
+             gate at page.tsx:289), so "kids omits Discussion" reduces
+             to "engagementSlot is null on kids" → tab list collapses
+             to 2 with no extra logic.
+Review:      A=PARTIAL, B=PARTIAL — both AGREE on top-tabs-on-mobile
+             with three corrections to Stage 1: (a) drop the desktop
+             3-column grid (scope creep — owner words + locked
+             decision both scope to mobile + iOS only), (b) tab-content
+             fix: Article = body only, Timeline = timeline + sources,
+             Quiz & Discussion = engagement (no Timeline duplication),
+             (c) breakpoint = 860px (site convention), not 768. Both
+             reviewers also called out: tabs MUST use CSS display:none,
+             not conditional render, to preserve SEO, ArticleTracker
+             sentinels, and ArticleEngagementZone hasPassed state. No
+             tie-breaker needed.
+Fix:         (1) ArticleSurface.tsx: dropped `sources` + `timeline`
+             props and the TimelineSection / SourcesSection imports
+             + renders. ArticleSurface now renders title/subtitle/
+             byline/body only.
+             (2) NEW ArticleReaderTabs.tsx — client component with
+             three slots (articleSlot / timelineSlot / engagementSlot).
+             Tab strip + 3 panels with data-reader-panel /
+             data-active-tab attributes; inline <style> with
+             @media (max-width: 859px) shows the strip and hides
+             non-active panels via display:none. At >=860px the strip
+             is hidden and panels render in normal flow — desktop
+             unchanged. Quiz & Discussion tab is omitted entirely
+             when engagementSlot is null (kids/COPPA + drafts).
+             role="tab"/"tabpanel"/"tablist" + aria-selected /
+             aria-controls / aria-labelledby wired for a11y.
+             (3) [slug]/page.tsx: imported ArticleReaderTabs +
+             TimelineSection + SourcesSection directly. Replaced the
+             ArticleSurface + ArticleActions + ArticleEngagementZone
+             block with <ArticleReaderTabs> taking:
+               articleSlot     = ArticleSurface + ArticleActions (when adult+published)
+               timelineSlot    = TimelineSection + SourcesSection
+               engagementSlot  = ArticleEngagementZone or null
+             COPPA gating preserved (engagementSlot null when isCoppa
+             OR status != 'published'; ArticleActions same gate).
+             Desktop visual order end-to-end preserved:
+             body → timeline → sources → actions → engagement.
+TypeScript:  pass (`npx tsc --noEmit` exit 0).
+iOS build:   DEFERRED — locked decision keeps iOS scope out of this
+             session. Punch list for the future iOS session:
+             - VerityPost/VerityPost/ (adult reader): implement
+               native top-tab control (3 tabs: Article / Timeline /
+               Quiz & Discussion); match COPPA gating to drop the
+               third tab on kids-flagged content.
+             - VerityPostKids/ (kids reader): implement native
+               top-tab control with 2 tabs only (Article / Timeline).
+Verifier:    PASS — confirmed display:none preserves SEO + state +
+             scroll-depth, all panels mount, kids articles get 2
+             tabs, ArticleSurface refactor doesn't leak into
+             ArticleEditor (type-only import unchanged), no `as any`
+             / `@ts-ignore` introduced, accessibility attributes
+             present, StoryArticlePicker still renders above tabs.
+Status:      RESOLVED (web slice) — iOS DEFERRED to dedicated iOS
+             session per locked decision.
+```
 
 ### 30. Editor timeline — adding an Article creates an Event; no Story option
 Status: RESOLVED
@@ -1562,7 +1716,7 @@ Status:      RESOLVED — unblocks concern #34 (drop redundant
 ```
 
 ### 34. AudienceCard — drop redundant articleId-fallback View Link
-Status: PENDING
+Status: IN_PROGRESS
 Symptom: AudienceCard's generated-state currently renders "View article"
 twice in fallback chain — first as a Link to the public slug, then (if
 slug missing) as a Link to /admin/story-manager?article=ID. The

@@ -7,8 +7,6 @@
  */
 
 import Link from 'next/link';
-import SourcesSection, { type SourceItem } from './SourcesSection';
-import TimelineSection, { type TimelineItem } from './TimelineSection';
 
 export type ArticleSurfaceArticle = {
   id: string;
@@ -29,8 +27,6 @@ export type ArticleSurfaceProps = {
   bodyHtml: string;
   canEdit: boolean;
   canViewBody?: boolean;
-  sources?: SourceItem[];
-  timeline?: TimelineItem[];
 };
 
 const PAGE_STYLE: React.CSSProperties = {
@@ -60,7 +56,7 @@ const BODY_STYLE: React.CSSProperties = {
   color: 'var(--text-primary, #111)',
 };
 
-export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody = true, sources = [], timeline = [] }: ArticleSurfaceProps) {
+export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody = true }: ArticleSurfaceProps) {
   const editHref = article.is_kids_safe
     ? `/admin/kids-story-manager?article=${article.id}`
     : `/admin/story-manager?article=${article.id}`;
@@ -135,8 +131,6 @@ export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody
           </a>
         </div>
       )}
-      <TimelineSection events={timeline} storySlug={article.slug} />
-      <SourcesSection sources={sources} />
     </article>
   );
 }
