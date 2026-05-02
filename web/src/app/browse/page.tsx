@@ -450,7 +450,7 @@ function ActiveFilters({ filters, onChange }: { filters: FilterState; onChange: 
 
 function BrowseSkeleton() {
   return (
-    <div aria-hidden="true" style={{ paddingTop: 188 }}>
+    <div aria-hidden="true" style={{ paddingTop: 'calc(188px + var(--vp-top-bar-h, 0px))' }}>
       <style>{`@keyframes vp-sk { 0%,100%{opacity:1}50%{opacity:0.45} }`}</style>
       {[0, 1, 2, 3].map(i => (
         <div key={i} style={{ borderBottom: `1px solid ${C.border}`, padding: '18px 20px 16px', borderLeft: `${i === 0 ? 4 : 2}px solid ${i === 0 ? C.breaking : C.developing}`, background: i === 0 ? C.breakingBg : C.developingBg }}>
@@ -623,7 +623,7 @@ export default function BrowsePage() {
       </div>
 
       {/* Content */}
-      <main style={{ maxWidth: 720, margin: '0 auto', paddingTop: activeFilterCount > 0 ? 220 : 188, paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 0px))' }}>
+      <main style={{ maxWidth: 720, margin: '0 auto', paddingTop: `calc(${activeFilterCount > 0 ? 220 : 188}px + var(--vp-top-bar-h, 0px))`, paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 0px))' }}>
 
         {grouped.length === 0 && (
           <div style={{ textAlign: 'center', padding: '60px 20px' }}>

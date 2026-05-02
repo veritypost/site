@@ -969,7 +969,7 @@ export default function BrowsePage() {
       {/* Content */}
       <main style={{
         maxWidth: 720, margin: '0 auto',
-        paddingTop: activeFilterCount > 0 ? 220 : 188,
+        paddingTop: `calc(${activeFilterCount > 0 ? 220 : 188}px + var(--vp-top-bar-h, 0px))`,
         paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 0px))',
       }}>
 
