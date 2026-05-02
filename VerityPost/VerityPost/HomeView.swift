@@ -652,6 +652,7 @@ struct BrowseLanding: View {
 
     @State private var categories: [VPCategory] = []
     @State private var loading = true
+    @State private var loadError: String?
     @State private var activeStoryCounts: [String: Int] = [:]
     @State private var searchText = ""
     private let client = SupabaseManager.shared.client
@@ -700,6 +701,19 @@ struct BrowseLanding: View {
                         .foregroundColor(VP.dim)
                         .padding(.vertical, 48)
                         .frame(maxWidth: .infinity)
+                } else if let err = loadError {
+                    VStack(spacing: 12) {
+                        Text(err)
+                            .font(.system(size: 14, design: .serif))
+                            .italic()
+                            .foregroundColor(VP.dim)
+                            .multilineTextAlignment(.center)
+                        Button("Try again") { Task { await load() } }
+                            .font(.system(size: 14, weight: .medium, design: .serif))
+                            .foregroundColor(VP.accent)
+                    }
+                    .padding(.vertical, 48)
+                    .frame(maxWidth: .infinity)
                 } else if filteredCategories.isEmpty {
                     Text(searchText.isEmpty ? "No categories available." : "No results.")
                         .font(.system(size: 14, design: .serif))
@@ -765,6 +779,7 @@ struct BrowseLanding: View {
     }
 
     private func load() async {
+        loadError = nil
         do {
             let cats: [VPCategory] = try await client.from("categories")
                 .select()
@@ -779,6 +794,7 @@ struct BrowseLanding: View {
         } catch {
             Log.d("Browse load failed: \(error)")
             loading = false
+            loadError = "Couldn't load categories. Try again."
         }
     }
 

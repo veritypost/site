@@ -17,6 +17,7 @@ struct AlertsView: View {
 
     @State private var notifications: [VPNotification] = []
     @State private var loading = true
+    @State private var notificationsLoadError: String?
     @State private var navigateToSlug: String? = nil
     @State private var navigatedStory: Story? = nil
 
@@ -219,6 +220,25 @@ struct AlertsView: View {
                     ProgressView()
                         .padding(.top, 60)
                         .padding(.bottom, 100)
+                }
+            } else if let err = notificationsLoadError, notifications.isEmpty {
+                ScrollView {
+                    VStack(spacing: 12) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.largeTitle)
+                            .foregroundColor(VP.dim)
+                            .accessibilityHidden(true)
+                        Text(err)
+                            .font(.system(.callout, design: .default, weight: .semibold))
+                            .foregroundColor(VP.text)
+                            .multilineTextAlignment(.center)
+                        Button("Retry") { Task { await loadNotifications() } }
+                            .font(.system(.footnote, design: .default, weight: .semibold))
+                            .foregroundColor(VP.accent)
+                    }
+                    .padding(.top, 80)
+                    .padding(.horizontal, 40)
+                    .padding(.bottom, 100)
                 }
             } else if notifications.isEmpty {
                 ScrollView {
@@ -684,6 +704,7 @@ struct AlertsView: View {
             return
         }
 
+        notificationsLoadError = nil
         do {
             let data: [VPNotification] = try await client.from("notifications")
                 .select()
@@ -694,6 +715,7 @@ struct AlertsView: View {
             notifications = data
         } catch {
             Log.d("Failed to load notifications: \(error)")
+            notificationsLoadError = "Couldn't load notifications. Pull to refresh."
         }
         loading = false
     }

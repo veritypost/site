@@ -52,6 +52,7 @@ struct LeaderboardView: View {
     @State private var users: [VPUser] = []
     @State private var displayScores: [String: Int] = [:]
     @State private var loading = true
+    @State private var loadError: String?
     @State private var activeTab: TabKey = .topVerifiers
     @State private var activePeriod: LeaderboardPeriod = .allTime
 
@@ -182,6 +183,23 @@ struct LeaderboardView: View {
                 // List
                 if loading {
                     ProgressView().padding(.top, 60)
+                } else if let err = loadError, users.isEmpty {
+                    VStack(spacing: 8) {
+                        Text(err)
+                            .font(.footnote)
+                            .foregroundColor(VP.dim)
+                            .multilineTextAlignment(.center)
+                        Button {
+                            loading = true
+                        } label: {
+                            Text("Try again")
+                                .font(.system(.footnote, design: .default, weight: .semibold))
+                        }
+                        .buttonStyle(.bordered)
+                        .padding(.top, 4)
+                    }
+                    .padding(.horizontal, 40)
+                    .padding(.top, 40)
                 } else if users.isEmpty {
                     VStack(spacing: 8) {
                         Text("No results")
@@ -465,6 +483,7 @@ struct LeaderboardView: View {
     }
 
     private func loadLeaderboard() async {
+        loadError = nil
         displayScores = [:]
         let anonLimit = 3
         let fullLimit = 50
@@ -522,6 +541,7 @@ struct LeaderboardView: View {
             })
         } catch {
             Log.d("Category leaderboard error:", error)
+            loadError = "Couldn't load the leaderboard. Check your connection."
         }
     }
 
@@ -535,6 +555,7 @@ struct LeaderboardView: View {
             displayScores = Dictionary(uniqueKeysWithValues: data.map { ($0.id, $0.verityScore ?? 0) })
         } catch {
             Log.d("Top verifiers error:", error)
+            loadError = "Couldn't load the leaderboard. Check your connection."
         }
     }
 
@@ -552,6 +573,7 @@ struct LeaderboardView: View {
             displayScores = Dictionary(uniqueKeysWithValues: data.map { ($0.id, $0.verityScore ?? 0) })
         } catch {
             Log.d("Rising stars error:", error)
+            loadError = "Couldn't load the leaderboard. Check your connection."
         }
     }
 
@@ -587,6 +609,7 @@ struct LeaderboardView: View {
             })
         } catch {
             Log.d("Period leaderboard error:", error)
+            loadError = "Couldn't load the leaderboard. Check your connection."
         }
     }
 }

@@ -444,7 +444,10 @@ struct FamilyDashboardView: View {
                 loading = false
             }
         } catch {
-            await MainActor.run { loading = false }
+            await MainActor.run {
+                loading = false
+                self.error = "Could not load kids list. Pull to refresh."
+            }
         }
     }
 
@@ -487,6 +490,8 @@ struct KidDashboardView: View {
 
     @State private var readCount = 0
     @State private var quizCount = 0
+    @State private var loading = true
+    @State private var loadError: String?
 
     var body: some View {
         ScrollView {
@@ -510,9 +515,18 @@ struct KidDashboardView: View {
                     }
                 }
 
-                HStack(spacing: 16) {
-                    statBlock("Articles", value: readCount)
-                    statBlock("Quizzes", value: quizCount)
+                if loading {
+                    ProgressView().padding(.top, 8)
+                } else if let err = loadError {
+                    Text(err)
+                        .font(.caption)
+                        .foregroundColor(VP.dim)
+                        .padding(.top, 4)
+                } else {
+                    HStack(spacing: 16) {
+                        statBlock("Articles", value: readCount)
+                        statBlock("Quizzes", value: quizCount)
+                    }
                 }
             }
             .padding(20)
@@ -539,6 +553,7 @@ struct KidDashboardView: View {
     }
 
     private func load() async {
+        loadError = nil
         do {
             // Prompt 11 sweep: v2 has no `kid_reading_log` table; kid reads
             // live in `reading_log.kid_profile_id`. `quiz_attempts` uses the
@@ -566,7 +581,12 @@ struct KidDashboardView: View {
             // Prior integer-division %ile undercounted family-dashboard kid
             // pass totals by missing every 3/5 (60%) attempt.
             quizCount = grouped.values.filter { $0.total > 0 && $0.correct >= 3 }.count
-        } catch {}
+            loading = false
+        } catch {
+            Log.d("KidDashboardView load failed: \(error)")
+            loading = false
+            loadError = "Couldn't load quiz stats."
+        }
     }
 }
 
