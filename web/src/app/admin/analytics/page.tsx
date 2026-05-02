@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/client';
+import { friendlyError } from '@/lib/friendlyError';
 import Page, { PageHeader } from '@/components/admin/Page';
 import PageSection from '@/components/admin/PageSection';
 import StatCard from '@/components/admin/StatCard';
@@ -93,7 +94,7 @@ function AnalyticsInner() {
       const { data: resultsData, error: resultsErr } = await supabase
         .from('quiz_attempts')
         .select('quiz_id, is_correct');
-      if (resultsErr) setLoadError(resultsErr.message);
+      if (resultsErr) setLoadError(friendlyError(resultsErr.message));
       const resultsByQuiz: Record<string, { total: number; failed: number }> = {};
       type AttemptRow = { quiz_id: string | null; is_correct: boolean | null };
       ((resultsData || []) as AttemptRow[]).forEach((r) => {

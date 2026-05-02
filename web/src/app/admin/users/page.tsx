@@ -90,6 +90,8 @@ export default function UsersAdmin() {
   const [planFilter, setPlanFilter] = useState<string>('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [dialogBusy, setDialogBusy] = useState(false);
   const [destructive, setDestructive] = useState<DestructivePayload | null>(null);
@@ -164,7 +166,11 @@ export default function UsersAdmin() {
         .select('*, plans(name), user_roles!fk_user_roles_user_id(roles(name))')
         .order('created_at', { ascending: false });
 
-      if (!error && data) setUsers(data as unknown as UserRow[]);
+      if (error) {
+        setLoadError('Failed to load users. Refresh to try again.');
+      } else if (data) {
+        setUsers(data as unknown as UserRow[]);
+      }
       setLoading(false);
 
       // Load DB-live achievements for the "Award achievement" dropdown.
@@ -549,6 +555,16 @@ export default function UsersAdmin() {
           ) : undefined
         }
       />
+
+      {loadError && (
+        <div style={{
+          padding: S[2], marginBottom: S[3], borderRadius: 6,
+          background: 'rgba(239,68,68,0.08)', border: `1px solid ${ADMIN_C.danger}`,
+          color: ADMIN_C.danger, fontSize: F.sm,
+        }}>
+          {loadError}
+        </div>
+      )}
 
       <Toolbar
         left={

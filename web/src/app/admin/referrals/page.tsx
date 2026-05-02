@@ -35,6 +35,7 @@ function ReferralsInner() {
 
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [codes, setCodes] = useState<Code[]>([]);
   const [tab, setTab] = useState<'owner' | 'user'>('owner');
   const [showMint, setShowMint] = useState(false);
@@ -66,12 +67,17 @@ function ReferralsInner() {
   }, []);
 
   async function loadAll() {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('access_codes')
       .select('*')
       .eq('type', 'referral')
       .order('created_at', { ascending: false });
-    setCodes((data || []) as Code[]);
+    if (error) {
+      setLoadError('Failed to load referral codes. Refresh to try again.');
+    } else {
+      setLoadError(null);
+      setCodes((data || []) as Code[]);
+    }
   }
 
   const ownerCodes = codes.filter((c) => c.tier === 'owner');
@@ -212,6 +218,16 @@ function ReferralsInner() {
         <StatCard label="Total signups via referral" value={totalRedemptions} trend="up" />
         <StatCard label="Owner-link signups" value={ownerRedemptions} />
       </div>
+
+      {loadError && (
+        <div style={{
+          padding: S[2], marginBottom: S[3], borderRadius: 6,
+          background: 'rgba(239,68,68,0.08)', border: `1px solid ${C.danger}`,
+          color: C.danger, fontSize: F.sm,
+        }}>
+          {loadError}
+        </div>
+      )}
 
       <Toolbar
         left={

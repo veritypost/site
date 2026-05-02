@@ -36,6 +36,7 @@ function RequestsInner() {
 
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [rows, setRows] = useState<Req[]>([]);
   const [tab, setTab] = useState<'pending' | 'approved' | 'rejected' | 'all'>('pending');
   const [active, setActive] = useState<Req | null>(null);
@@ -68,11 +69,16 @@ function RequestsInner() {
   }, []);
 
   async function loadAll() {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('access_requests')
       .select('*, access_codes:access_code_id(code, expires_at, current_uses)')
       .order('created_at', { ascending: false });
-    setRows((data || []) as Req[]);
+    if (error) {
+      setLoadError('Failed to load access requests. Refresh to try again.');
+    } else {
+      setLoadError(null);
+      setRows((data || []) as Req[]);
+    }
   }
 
   const filtered = rows.filter((r) => {
@@ -309,6 +315,16 @@ function RequestsInner() {
         <StatCard label="Rejected" value={counts.rejected} />
         <StatCard label="All-time" value={counts.total} />
       </div>
+
+      {loadError && (
+        <div style={{
+          padding: S[2], marginBottom: S[3], borderRadius: 6,
+          background: 'rgba(239,68,68,0.08)', border: `1px solid ${C.danger}`,
+          color: C.danger, fontSize: F.sm,
+        }}>
+          {loadError}
+        </div>
+      )}
 
       <Toolbar
         left={

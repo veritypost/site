@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ADMIN_ROLES } from '@/lib/roles';
 import { createClient } from '@/lib/supabase/client';
+import { friendlyError } from '@/lib/friendlyError';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 import type { Tables } from '@/types/database-helpers';
 import Page, { PageHeader } from '@/components/admin/Page';
@@ -101,7 +102,7 @@ export default function WebhooksAdmin() {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (logError) { setLoadError(logError.message); setLogs([]); }
+      if (logError) { setLoadError(friendlyError(logError.message)); setLogs([]); }
       else setLogs((data || []) as WebhookLog[]);
       setLoading(false);
     }
