@@ -1100,6 +1100,8 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
         <div style={{ position: 'absolute', left: 28, top: 8, bottom: 40, width: 2, background: C.divider }} />
         {sortedEntries.map((e) => {
           const hasContent = !!e.content?.trim();
+          const isAnchor = e.type === 'story';
+          const enlarged = e.is_current || isAnchor;
           return (
             <div key={e.id} style={{ position: 'relative', marginBottom: S[6] }}>
               <div
@@ -1107,20 +1109,24 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
                   position: 'absolute',
                   left: -24,
                   top: 5,
-                  width: e.is_current ? 14 : 10,
-                  height: e.is_current ? 14 : 10,
+                  width: enlarged ? 14 : 10,
+                  height: enlarged ? 14 : 10,
                   borderRadius: '50%',
-                  background: e.is_current ? C.now : hasContent ? C.success : C.muted,
+                  background: e.is_current ? C.now : isAnchor ? C.accent : hasContent ? C.success : C.muted,
                   border: `3px solid ${C.bg}`,
                 }}
               />
-              {e.is_current && (
+              {e.is_current ? (
                 <span style={{ position: 'absolute', left: -80, top: 2, fontSize: F.xs, fontWeight: 700, color: C.now, background: C.nowBg, padding: '2px 6px', borderRadius: 4, textTransform: 'uppercase' }}>
                   Now
                 </span>
-              )}
-              <div style={{ fontSize: F.sm, fontWeight: e.is_current ? 700 : 500, color: e.is_current ? C.now : C.dim, marginBottom: 2 }}>{formatTimelineDate(e.event_date)}</div>
-              <div style={{ fontSize: F.base, fontWeight: 600, color: e.is_current ? C.ink : C.soft }}>
+              ) : isAnchor ? (
+                <span style={{ position: 'absolute', left: -80, top: 2, fontSize: F.xs, fontWeight: 700, color: C.ink, background: C.card, padding: '2px 6px', borderRadius: 4, textTransform: 'uppercase' }}>
+                  Article
+                </span>
+              ) : null}
+              <div style={{ fontSize: F.sm, fontWeight: enlarged ? 700 : 500, color: e.is_current ? C.now : C.dim, marginBottom: 2 }}>{formatTimelineDate(e.event_date)}</div>
+              <div style={{ fontSize: F.base, fontWeight: 600, color: enlarged ? C.ink : C.soft }}>
                 {e.title || 'Untitled'}
               </div>
             </div>
