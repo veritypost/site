@@ -88,6 +88,17 @@ export function AppShell({ user, tier, preview, defaultSection = 'you', sections
     [pathname, router, searchParams]
   );
 
+  // Lock body scroll while the mobile drawer is open so the background
+  // page doesn't scroll behind the overlay.
+  useEffect(() => {
+    if (drawerOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [drawerOpen]);
+
   // Keyboard: ⌘K / Ctrl+K focuses the rail search; Escape closes the
   // mobile drawer (T336). Two listeners share one keydown handler so
   // we only register/unregister once.
@@ -144,7 +155,8 @@ export function AppShell({ user, tier, preview, defaultSection = 'you', sections
             border: 'none',
             color: C.ink,
             cursor: 'pointer',
-            padding: 0,
+            padding: `${S[2]}px 0`,
+            minHeight: 44,
           }}
         >
           <Avatar user={user} size={32} />
@@ -226,6 +238,7 @@ export function AppShell({ user, tier, preview, defaultSection = 'you', sections
             </span>
             <span
               aria-hidden
+              className="redesign-rail-cmdK"
               style={{
                 position: 'absolute',
                 right: S[6],
@@ -302,7 +315,8 @@ export function AppShell({ user, tier, preview, defaultSection = 'you', sections
                               display: 'flex',
                               alignItems: 'center',
                               gap: S[3],
-                              padding: `${S[2]}px ${S[3]}px`,
+                              padding: `${S[3]}px ${S[3]}px`,
+                              minHeight: 44,
                               background: isActive ? C.surfaceRaised : 'transparent',
                               border: 'none',
                               borderRadius: R.md,
@@ -622,14 +636,15 @@ const shellCss = `
   top: 0;
   left: 0;
   bottom: 0;
-  width: 280px;
+  width: 300px;
   background: ${C.bg};
   border-right: 1px solid ${C.border};
   display: flex;
   flex-direction: column;
-  z-index: 30;
+  z-index: 9100;
   transform: translateX(-100%);
-  transition: transform 220ms ease;
+  transition: transform 260ms cubic-bezier(0.4, 0, 0.2, 1);
+  overflow-y: auto;
 }
 .redesign-shell-rail-open {
   transform: translateX(0);
@@ -637,11 +652,13 @@ const shellCss = `
 .redesign-shell-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.4);
-  z-index: 25;
+  background: rgba(0,0,0,0.45);
+  z-index: 9050;
   border: none;
   cursor: pointer;
   padding: 0;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 .redesign-shell-mobilebar {
   position: sticky;
@@ -658,18 +675,21 @@ const shellCss = `
 .redesign-shell-panel {
   flex: 1;
   min-width: 0;
-  padding: ${S[4]}px ${S[4]}px ${S[9]}px;
+  padding: ${S[5]}px ${S[5]}px ${S[9]}px;
   background: ${C.bg};
 }
 .redesign-section-header {
-  margin-bottom: ${S[4]}px;
+  margin-bottom: ${S[5]}px;
 }
 .redesign-section-h1 {
-  font-size: 24px;
+  font-size: 22px;
   margin-bottom: ${S[1]}px;
 }
 .redesign-section-reason {
   font-size: ${F.sm};
+}
+.redesign-rail-cmdK {
+  display: none;
 }
 @media (min-width: 860px) {
   .redesign-shell-mobilebar { display: none; }
@@ -680,11 +700,13 @@ const shellCss = `
     height: 100vh;
     transform: none;
     flex-shrink: 0;
-    width: 280px;
+    width: 300px;
+    overflow-y: auto;
+    z-index: 1;
   }
   .redesign-shell-grid {
     display: grid;
-    grid-template-columns: 280px 1fr;
+    grid-template-columns: 300px 1fr;
   }
   .redesign-shell-panel {
     padding: ${S[8]}px ${S[8]}px ${S[9]}px;
@@ -698,6 +720,9 @@ const shellCss = `
   }
   .redesign-section-reason {
     font-size: ${F.lg};
+  }
+  .redesign-rail-cmdK {
+    display: inline;
   }
 }
 `;
