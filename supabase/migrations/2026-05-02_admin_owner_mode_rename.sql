@@ -18,6 +18,16 @@
 
 BEGIN;
 
+-- The `permissions` and `permission_sets` tables are guarded by the
+-- `guard_system_permissions()` trigger, which forbids key renames so
+-- that callers don't accidentally invalidate downstream string lookups.
+-- The trigger ships with an explicit, transaction-scoped escape hatch
+-- (`app.allow_system_perm_edits = 'true'`) for exactly the case at hand:
+-- a one-shot, well-reviewed rename that flips every callsite at the
+-- same time. Set it for this txn only — `SET LOCAL` reverts on COMMIT
+-- so the next session is back to the protected default.
+SET LOCAL app.allow_system_perm_edits = 'true';
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 1. Rename the catalog row.
 -- ─────────────────────────────────────────────────────────────────────────────
