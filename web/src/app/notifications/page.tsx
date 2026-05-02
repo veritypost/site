@@ -5,6 +5,7 @@ import { useState, useEffect, CSSProperties } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import ErrorState from '@/components/ErrorState';
+import { useToast } from '@/components/Toast';
 import type { Tables } from '@/types/database-helpers';
 import { formatDateTime } from '@/lib/dates';
 
@@ -87,6 +88,7 @@ export default function NotificationsInbox() {
   // until the auth check resolves so we don't flash the wrong message.
   const [isAnon, setIsAnon] = useState<boolean | null>(null);
   const [markingAll, setMarkingAll] = useState<boolean>(false);
+  const toast = useToast();
 
   async function load() {
     setError(null);
@@ -146,12 +148,18 @@ export default function NotificationsInbox() {
   async function markAllRead() {
     setMarkingAll(true);
     try {
-      await fetch('/api/notifications', {
+      const res = await fetch('/api/notifications', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ all: true, mark: 'read' }),
       });
-      await load();
+      if (!res.ok) {
+        toast.error("Couldn’t mark all as read. Try again.");
+      } else {
+        await load();
+      }
+    } catch {
+      toast.error('Network error. Try again.');
     } finally {
       setMarkingAll(false);
     }

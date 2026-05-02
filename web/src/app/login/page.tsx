@@ -22,9 +22,36 @@ const C = {
   accent: 'var(--accent)',
 } as const;
 
+function LoginFallback() {
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        backgroundColor: C.bg,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '32px 16px',
+      }}
+    >
+      <div
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: '50%',
+          border: `3px solid ${C.border}`,
+          borderTopColor: C.accent,
+          animation: 'vp-spin 0.75s linear infinite',
+        }}
+      />
+      <style>{`@keyframes vp-spin { to { transform: rotate(360deg) } }`}</style>
+    </div>
+  );
+}
+
 export default function LoginPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<LoginFallback />}>
       <LoginPageInner />
     </Suspense>
   );

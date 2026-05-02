@@ -85,12 +85,38 @@ interface PostgresChangePayload<T> {
   new: T;
 }
 
+function MessagesFallback() {
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        background: '#fff',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <div
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: '50%',
+          border: '3px solid #e5e5e5',
+          borderTopColor: '#111',
+          animation: 'vp-spin 0.75s linear infinite',
+        }}
+      />
+      <style>{`@keyframes vp-spin { to { transform: rotate(360deg) } }`}</style>
+    </div>
+  );
+}
+
 export default function MessagesPage() {
   // Next 14 requires useSearchParams to be inside a Suspense boundary so
   // the prerender can bail out cleanly. The page itself is auth-gated and
   // never has anything useful to prerender, but the build still walks it.
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<MessagesFallback />}>
       <MessagesPageInner />
     </Suspense>
   );

@@ -153,7 +153,10 @@ final class KidsAppState: ObservableObject {
                 KidCategory(name: "Sports",  slug: "kids-sports",  color: K.coral,  progress: 0),
                 KidCategory(name: "Tech",    slug: "kids-tech",    color: K.sky,    progress: 0)
             ]
-            self.loadError = "Couldn't update your home screen."
+            // Fallback content is visible — suppress the error banner.
+            // The banner fires only when the kid would see a blank/broken
+            // home screen; here they see 4 working categories, so showing
+            // "Couldn't update your home screen" is misleading.
         }
     }
 

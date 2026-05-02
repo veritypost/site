@@ -246,9 +246,26 @@ struct BookmarksView: View {
             let (_, response) = try await URLSession.shared.data(for: req)
             if let http = response as? HTTPURLResponse, http.statusCode != 200 {
                 Log.d("[Bookmarks] DELETE non-200:", http.statusCode)
+                await MainActor.run {
+                    // Restore the removed row so the user doesn't lose it silently.
+                    let idx = pendingDeleteOriginalIndex ?? 0
+                    let safeIdx = min(max(0, idx), items.count)
+                    items.insert(b, at: safeIdx)
+                    pendingDelete = nil
+                    pendingDeleteOriginalIndex = nil
+                    errorText = "Couldn\u{2019}t remove bookmark. Try again."
+                }
             }
         } catch {
             Log.d("[Bookmarks] DELETE failed:", error)
+            await MainActor.run {
+                let idx = pendingDeleteOriginalIndex ?? 0
+                let safeIdx = min(max(0, idx), items.count)
+                items.insert(b, at: safeIdx)
+                pendingDelete = nil
+                pendingDeleteOriginalIndex = nil
+                errorText = "Network error. Couldn\u{2019}t remove bookmark."
+            }
         }
     }
 

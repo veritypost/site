@@ -34,6 +34,7 @@ struct AlertsView: View {
 
     @State private var showLogin = false
     @State private var showSignup = false
+    @State private var actionToast: String? = nil
     @ObservedObject private var push = PushPermission.shared
     @State private var showPushPrompt = false
 
@@ -101,6 +102,20 @@ struct AlertsView: View {
             )
         }
         .task { await push.refresh() }
+        .overlay(alignment: .top) {
+            if let msg = actionToast {
+                Text(msg)
+                    .font(.system(.footnote, design: .default, weight: .semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(VP.danger))
+                    .shadow(radius: 4)
+                    .padding(.top, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.25), value: actionToast)
         .toolbar {
             if activeSection == "Alerts" && canMarkAllRead {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -656,6 +671,7 @@ struct AlertsView: View {
             let (_, response) = try await URLSession.shared.data(for: req)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
                 Log.d("Mark read failed:", (response as? HTTPURLResponse)?.statusCode as Any)
+                await MainActor.run { flashActionToast("Couldn\u{2019}t mark as read. Try again.") }
                 return
             }
             if let idx = notifications.firstIndex(where: { $0.id == notif.id }) {
@@ -667,6 +683,7 @@ struct AlertsView: View {
             }
         } catch {
             Log.d("Mark read error:", error)
+            await MainActor.run { flashActionToast("Couldn\u{2019}t mark as read. Try again.") }
         }
     }
 
@@ -686,6 +703,7 @@ struct AlertsView: View {
             let (_, response) = try await URLSession.shared.data(for: req)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
                 Log.d("Mark all read failed:", (response as? HTTPURLResponse)?.statusCode as Any)
+                await MainActor.run { flashActionToast("Couldn\u{2019}t mark all as read. Try again.") }
                 return
             }
             notifications = notifications.map {
@@ -695,6 +713,16 @@ struct AlertsView: View {
             }
         } catch {
             Log.d("Mark all read error:", error)
+            await MainActor.run { flashActionToast("Couldn\u{2019}t mark all as read. Try again.") }
+        }
+    }
+
+    @MainActor
+    private func flashActionToast(_ text: String) {
+        actionToast = text
+        Task {
+            try? await Task.sleep(nanoseconds: 2_400_000_000)
+            if actionToast == text { actionToast = nil }
         }
     }
 

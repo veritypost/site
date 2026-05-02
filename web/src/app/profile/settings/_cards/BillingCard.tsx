@@ -56,6 +56,7 @@ export function BillingCard({ user, preview }: Props) {
   const [sub, setSub] = useState<SubscriptionRow | null>(null);
   const [plan, setPlan] = useState<PlanRow | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [busy, setBusy] = useState<'portal' | 'cancel' | 'resume' | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
 
@@ -73,6 +74,7 @@ export function BillingCard({ user, preview }: Props) {
         if (cancelled) return;
         if (sRes.error) {
           console.error('[billing] subscriptions fetch failed', sRes.error);
+          setFetchError(true);
           setLoading(false);
           return;
         }
@@ -96,6 +98,7 @@ export function BillingCard({ user, preview }: Props) {
       } catch (e) {
         if (!cancelled) {
           console.error('[billing] load error', e);
+          setFetchError(true);
           setLoading(false);
         }
       }
@@ -174,6 +177,27 @@ export function BillingCard({ user, preview }: Props) {
     return (
       <Card title="Billing" description="Loading your subscription…">
         <div style={{ height: 60 }} />
+      </Card>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <Card title="Plan" description="Couldn't load your subscription status.">
+        <div
+          style={{
+            padding: `${S[3]}px ${S[4]}px`,
+            background: C.warnSoft,
+            border: `1px solid ${C.warn}`,
+            borderRadius: R.md,
+            fontSize: F.sm,
+            color: C.warn,
+            fontFamily: FONT.sans,
+          }}
+        >
+          We couldn&rsquo;t retrieve your billing information. Please try refreshing the page. If
+          the problem persists, contact support.
+        </div>
       </Card>
     );
   }

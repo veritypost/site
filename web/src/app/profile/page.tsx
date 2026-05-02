@@ -10,10 +10,35 @@ import { PermsBoundary } from './_components/PermsBoundary';
 import { ToastProvider } from './_components/Toast';
 import { ProfileApp } from './_components/ProfileApp';
 
+function ProfileFallback() {
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <div
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: '50%',
+          border: '3px solid #e5e5e5',
+          borderTopColor: '#111',
+          animation: 'vp-spin 0.75s linear infinite',
+        }}
+      />
+      <style>{`@keyframes vp-spin { to { transform: rotate(360deg) } }`}</style>
+    </div>
+  );
+}
+
 export default function Page() {
   return (
     <ToastProvider>
-      <Suspense fallback={null}>
+      <Suspense fallback={<ProfileFallback />}>
         <PermsBoundary optional>
           <ProfileApp defaultSection="you" />
         </PermsBoundary>

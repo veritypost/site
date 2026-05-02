@@ -82,6 +82,7 @@ struct ProfileView: View {
     // Loaded data
     @State private var activity: [ActivityItem] = []
     @State private var activityLoaded = false
+    @State private var activityLoadError = false
     @State private var bookmarkItems: [BookmarkRow] = []
     @State private var categories: [VPCategory] = []
     @State private var subcategories: [VPSubcategory] = []
@@ -90,6 +91,7 @@ struct ProfileView: View {
     @State private var catUpvotes: [String: Int] = [:]
     @State private var subUpvotes: [String: Int] = [:]
     @State private var categoriesLoaded = false
+    @State private var categoriesLoadError = false
     @State private var userAchievements: [UserAchievement] = []
     /// All achievement definitions (earned + locked). The milestones grid
     /// renders both states — earned first, locked after — mirroring web's
@@ -625,10 +627,15 @@ struct ProfileView: View {
                 .buttonStyle(.plain)
             }
 
-            if !activityLoaded {
+            if !activityLoaded && !activityLoadError {
                 compactSkeletonRow()
                 compactSkeletonRow()
                 compactSkeletonRow()
+            } else if activityLoadError {
+                Text("Couldn\u{2019}t load activity. Pull to refresh.")
+                    .font(.caption)
+                    .foregroundColor(VP.danger)
+                    .padding(.vertical, 8)
             } else if top3.isEmpty {
                 Text("No activity yet. Read an article or leave a comment.")
                     .font(.caption)
@@ -1054,11 +1061,16 @@ struct ProfileView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 12)
 
-            if !activityLoaded {
+            if !activityLoaded && !activityLoadError {
                 VStack(spacing: 8) {
                     ForEach(0..<6, id: \.self) { _ in compactSkeletonRow() }
                 }
                 .padding(.horizontal, 16)
+            } else if activityLoadError {
+                emptyState(
+                    title: "Couldn\u{2019}t load activity",
+                    description: "There was a problem loading your activity. Pull to refresh."
+                )
             } else {
                 if !canViewActivityFullHistory {
                     Text("Showing last 30 days.")
@@ -1160,7 +1172,7 @@ struct ProfileView: View {
     // MARK: - Categories tab (preserves subcategory drilldown)
     private var categoriesTab: some View {
         VStack(spacing: 10) {
-            if !categoriesLoaded {
+            if !categoriesLoaded && !categoriesLoadError {
                 VStack(spacing: 8) {
                     ForEach(0..<4, id: \.self) { _ in
                         RoundedRectangle(cornerRadius: 10)
@@ -1170,6 +1182,11 @@ struct ProfileView: View {
                     }
                 }
                 .padding(.horizontal, 16)
+            } else if categoriesLoadError {
+                emptyState(
+                    title: "Couldn\u{2019}t load categories",
+                    description: "There was a problem loading your category progress. Pull to refresh."
+                )
             } else if categories.isEmpty {
                 emptyState(
                     title: "No categories yet",
@@ -1564,9 +1581,9 @@ struct ProfileView: View {
     private func loadTabData() {
         guard let userId = auth.currentUser?.id else { return }
         switch tab {
-        case .activity where !activityLoaded:
+        case .activity where !activityLoaded && !activityLoadError:
             Task { await loadActivity(userId: userId) }
-        case .categories where !categoriesLoaded:
+        case .categories where !categoriesLoaded && !categoriesLoadError:
             Task { await loadCategories(userId: userId) }
         default: break
         }
@@ -1653,7 +1670,11 @@ struct ProfileView: View {
                     time: $0.createdAt ?? Date.distantPast
                 )
             }
-        } catch { Log.d("Load activity error: \(error)") }
+        } catch {
+            Log.d("Load activity error: \(error)")
+            activityLoadError = true
+            return
+        }
         activityLoaded = true
     }
 
@@ -1729,7 +1750,11 @@ struct ProfileView: View {
             }
             catUpvotes = catU
             subUpvotes = subU
-        } catch { Log.d("Load categories error: \(error)") }
+        } catch {
+            Log.d("Load categories error: \(error)")
+            categoriesLoadError = true
+            return
+        }
         categoriesLoaded = true
     }
 
