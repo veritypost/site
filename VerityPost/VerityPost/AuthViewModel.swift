@@ -53,6 +53,7 @@ final class AuthViewModel: ObservableObject {
     @Published var isLoading = true
     @Published var currentUser: VPUser?
     @Published var authError: String?
+    @Published var userLoadError: String?
 
     /// Item 11a Phase 8 — true when the current user holds `admin.god_mode`.
     /// Drives FamilyViews seat-cap bypass and SubscriptionView "full access"
@@ -1254,6 +1255,7 @@ final class AuthViewModel: ObservableObject {
         // rows), last_login_ip, mute_level, failed_login_count,
         // password_hash, kids_pin_hash into the iOS bundle's response
         // cache. Only the VPUser-mapped fields are read by the app.
+        userLoadError = nil
         do {
             let response: VPUser = try await client.from("users")
                 .select(
@@ -1266,7 +1268,15 @@ final class AuthViewModel: ObservableObject {
             currentUser = response
         } catch {
             Log.d("Failed to load user: \(error)")
+            userLoadError = "Couldn\u{2019}t load your profile. Check your connection."
         }
+    }
+
+    /// Retry `loadUser` using the current auth session's UID. Called by
+    /// ProfileView's "Tap to retry" affordance when `userLoadError` is set.
+    func retryLoadUser() async {
+        guard let uid = (try? await client.auth.session)?.user.id.uuidString else { return }
+        await loadUser(id: uid)
     }
 }
 

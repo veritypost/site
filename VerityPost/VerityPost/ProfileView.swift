@@ -155,6 +155,27 @@ struct ProfileView: View {
                         tabContent(user)
                         logoutButton
                     }
+                } else if auth.isLoggedIn, let errMsg = auth.userLoadError {
+                    VStack(spacing: 12) {
+                        Text(errMsg)
+                            .font(.system(.subheadline, design: .default, weight: .semibold))
+                            .foregroundColor(VP.text)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 40)
+                        Button {
+                            Task { await auth.retryLoadUser() }
+                        } label: {
+                            Text("Tap to retry")
+                                .font(.system(.footnote, design: .default, weight: .semibold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .frame(minHeight: 44)
+                                .background(VP.accent)
+                                .cornerRadius(8)
+                        }
+                    }
+                    .padding(.top, 80)
                 } else {
                     anonProfileHero
                 }

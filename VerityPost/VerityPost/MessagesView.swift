@@ -26,6 +26,7 @@ struct MessagesView: View {
 
     @State private var conversations: [DMConversation] = []
     @State private var loading = true
+    @State private var loadError: String? = nil
     @State private var hasDmAccess = false
     @State private var accessChecked = false
     @State private var selectedConvo: DMConversation? = nil
@@ -256,6 +257,27 @@ struct MessagesView: View {
         ScrollView {
             if loading {
                 ProgressView().padding(.top, 60)
+            } else if let err = loadError, conversations.isEmpty {
+                VStack(spacing: 12) {
+                    Text(err)
+                        .font(.system(.subheadline, design: .default, weight: .semibold))
+                        .foregroundColor(VP.text)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
+                    Button {
+                        Task { await loadConversations() }
+                    } label: {
+                        Text("Try again")
+                            .font(.system(.footnote, design: .default, weight: .semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .frame(minHeight: 44)
+                            .background(VP.accent)
+                            .cornerRadius(8)
+                    }
+                }
+                .padding(.top, 80)
             } else if conversations.isEmpty {
                 VStack(spacing: 12) {
                     Text("No messages yet")
@@ -448,6 +470,7 @@ struct MessagesView: View {
 
     private func loadConversations() async {
         guard let userId = auth.currentUser?.id else { loading = false; return }
+        loadError = nil
 
         do {
             struct Participant: Decodable { let conversation_id: String }
@@ -501,6 +524,7 @@ struct MessagesView: View {
             conversations = result.filter { !BlockService.shared.isBlocked($0.otherUserId) }
         } catch {
             Log.d("Failed to load conversations: \(error)")
+            loadError = "Couldn\u{2019}t load messages. Check your connection."
         }
         loading = false
     }
@@ -656,6 +680,7 @@ struct MessagesView: View {
             selectedConvo = convo
         } catch {
             Log.d("Failed to create conversation: \(error)")
+            await MainActor.run { flashThreadToast("Couldn\u{2019}t start conversation. Try again.") }
         }
         showSearch = false
     }

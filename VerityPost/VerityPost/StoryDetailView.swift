@@ -3038,7 +3038,10 @@ struct StoryDetailView: View {
                     }
                 }
             }
-        } catch { Log.d("Post comment error:", error) }
+        } catch {
+            Log.d("Post comment error:", error)
+            await MainActor.run { flashModerationToast("Couldn\u{2019}t post your comment. Try again.") }
+        }
     }
 
     @MainActor
