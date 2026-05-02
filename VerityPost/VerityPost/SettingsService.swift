@@ -54,42 +54,23 @@ final class SettingsService: ObservableObject {
             Log.d("SettingsService: failed to load settings: \(error)")
         }
 
-        // Fetch comment settings from settings table (single row)
-        do {
-            struct RawRow: Decodable {
-                let id: String?
-                let quiz_required: Bool?
-                let rate_limit_comments: Bool?
-                let comment_rate_sec: Int?
-                let min_body_length: Int?
-                let max_body_length: Int?
-                let require_login: Bool?
-                let auto_approve: Bool?
-                let allow_replies: Bool?
-                let max_depth: Int?
-            }
-            let rows: [RawRow] = try await client.from("settings")
-                .select()
-                .limit(1)
-                .execute()
-                .value
-
-            if let row = rows.first {
-                var cs: [String: Any] = [:]
-                cs["quiz_required"] = row.quiz_required ?? false
-                cs["rate_limit_comments"] = row.rate_limit_comments ?? false
-                cs["comment_rate_sec"] = row.comment_rate_sec ?? 30
-                cs["min_body_length"] = row.min_body_length ?? 1
-                cs["max_body_length"] = row.max_body_length ?? 2000
-                cs["require_login"] = row.require_login ?? true
-                cs["auto_approve"] = row.auto_approve ?? true
-                cs["allow_replies"] = row.allow_replies ?? false
-                cs["max_depth"] = row.max_depth ?? 1
-                commentSettings = cs
-            }
-        } catch {
-            Log.d("SettingsService: failed to load comment settings: \(error)")
-        }
+        // Derive comment settings from the already-parsed settings dictionary.
+        // The settings table is key/value — querying it for named columns silently
+        // returns nil for everything. Use the helpers that read self.settings instead.
+        // DB comment keys confirmed: comment_max_length, comment_max_depth.
+        // Other keys (quiz_required, require_login, etc.) are not yet in the DB and
+        // fall through to the hardcoded defaults below.
+        var cs: [String: Any] = [:]
+        cs["quiz_required"] = isEnabled("quiz_required", default: false)
+        cs["rate_limit_comments"] = isEnabled("rate_limit_comments", default: false)
+        cs["comment_rate_sec"] = getNumber("comment_rate_sec", default: 30)
+        cs["min_body_length"] = getNumber("min_body_length", default: 1)
+        cs["max_body_length"] = getNumber("comment_max_length", default: 2000)
+        cs["require_login"] = isEnabled("require_login", default: true)
+        cs["auto_approve"] = isEnabled("auto_approve", default: true)
+        cs["allow_replies"] = isEnabled("allow_replies", default: false)
+        cs["max_depth"] = getNumber("comment_max_depth", default: 1)
+        commentSettings = cs
 
         lastFetch = Date()
     }

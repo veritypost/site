@@ -482,7 +482,7 @@ struct TextTabBar: View {
             }
         }
         .background(
-            Color.white.opacity(0.97)
+            VP.bg.opacity(0.97)
                 .background(.ultraThinMaterial)
                 .overlay(Rectangle().fill(VP.border).frame(height: 1), alignment: .top)
         )

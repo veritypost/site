@@ -153,7 +153,7 @@ struct HomeView: View {
                             errorState(err)
                         } else if stories.isEmpty {
                             VStack(spacing: 8) {
-                                Text("No stories match this filter")
+                                Text("Nothing published today.")
                                     .font(.system(.callout, design: .default, weight: .semibold))
                                     .foregroundColor(VP.text)
                                 Text("Check back soon for the latest news.")
@@ -219,6 +219,7 @@ struct HomeView: View {
             _ = await refreshTask?.value
         }
         .task(id: perms.changeToken) {
+            guard perms.isLoaded else { return }
             canViewBreakingBanner = await PermissionService.shared.has("home.breaking_banner.view")
             canViewBreakingBannerPaid = await PermissionService.shared.has("home.breaking_banner.view.paid")
             canSearch = await PermissionService.shared.has("search.basic")
@@ -501,11 +502,11 @@ struct HomeView: View {
     }
 
     private func loadData() async {
-        await SettingsService.shared.loadIfNeeded()
-        if Task.isCancelled { return }
         loading = true
         loadError = nil
         today = HomeView.computeToday()
+        await SettingsService.shared.loadIfNeeded()
+        if Task.isCancelled { loading = false; return }
 
         do {
             let todayStartIso = HomeView.loadDataISOFmt.string(from: today.startUtc)
@@ -610,6 +611,7 @@ struct HomeView: View {
                 }
                 .font(.footnote)
                 .foregroundColor(VP.dim)
+                .frame(minHeight: 44)
             }
             .padding(28)
             .background(RoundedRectangle(cornerRadius: VP.radiusLG).fill(VP.bg))
@@ -641,7 +643,7 @@ struct HomeView: View {
         UserDefaults.standard.set(viewed, forKey: countKey)
 
         let limit = ss.getNumber("free_article_limit", default: 3)
-        if viewed > limit {
+        if viewed >= limit {
             showRegistrationWall = true
         }
     }
@@ -675,6 +677,8 @@ struct HomeView: View {
 // (~15-20), so 2N fanout against PostgREST is acceptable and keeps each
 // query cleanly scoped to a single index.
 struct BrowseLanding: View {
+    @EnvironmentObject var auth: AuthViewModel
+
     private struct ActiveStoryRow: Decodable {
         let categoryId: String
         let storyId: String
@@ -731,12 +735,21 @@ struct BrowseLanding: View {
                 .padding(.bottom, 20)
 
                 if loading {
-                    Text("Loading…")
-                        .font(.system(size: VP.Size.base, design: .serif))
-                        .italic()
-                        .foregroundColor(VP.dim)
-                        .padding(.vertical, 48)
-                        .frame(maxWidth: .infinity)
+                    VStack(spacing: 0) {
+                        ForEach(0..<5, id: \.self) { _ in
+                            HStack {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    SkeletonBar(width: 140, height: 16)
+                                    SkeletonBar(width: 80, height: 11)
+                                }
+                                Spacer()
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 14)
+                            Rectangle().fill(VP.rule).frame(height: 1).padding(.vertical, 4)
+                        }
+                    }
+                    .accessibilityLabel("Loading categories")
                 } else if let err = loadError {
                     VStack(spacing: 12) {
                         Text(err)
@@ -775,6 +788,9 @@ struct BrowseLanding: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(for: VPCategory.self) { cat in
             CategoryDetailView(category: cat)
+        }
+        .navigationDestination(for: Story.self) { story in
+            StoryDetailView(story: story).environmentObject(auth)
         }
         .task { await load() }
     }
@@ -839,6 +855,8 @@ struct BrowseLanding: View {
             let rows: [ActiveStoryRow] = try await client
                 .from("articles")
                 .select("category_id, story_id, stories!inner(lifecycle_status)")
+                .eq("status", value: "published")
+                .eq("visibility", value: "public")
                 .in("stories.lifecycle_status", values: ["breaking", "developing"])
                 .not("story_id", operator: .is, value: "null")
                 .execute()
@@ -919,12 +937,20 @@ struct CategoryDetailView: View {
                     .padding(.bottom, 16)
 
                 if loading {
-                    Text("Loading…")
-                        .font(.system(size: VP.Size.base, design: .serif))
-                        .italic()
-                        .foregroundColor(VP.dim)
-                        .padding(.vertical, 48)
-                        .frame(maxWidth: .infinity)
+                    VStack(spacing: 0) {
+                        ForEach(0..<4, id: \.self) { _ in
+                            VStack(alignment: .leading, spacing: 8) {
+                                SkeletonBar(width: 120, height: 11)
+                                SkeletonBar(height: 15)
+                                SkeletonBar(width: 200, height: 15)
+                                SkeletonBar(width: 80, height: 11)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 14)
+                            Rectangle().fill(VP.rule).frame(height: 1)
+                        }
+                    }
+                    .accessibilityLabel("Loading stories")
                 } else if loadFailed {
                     Text("Couldn't load stories. Pull to retry.")
                         .font(.system(size: VP.Size.base, design: .serif))
@@ -993,7 +1019,8 @@ struct CategoryDetailView: View {
     private func scopeText(_ item: StoryItem) -> String {
         let n = item.articleCount
         let days = daysIn(from: item.createdAt)
-        var parts = ["\(n) \(n == 1 ? "article" : "articles")", "\(days) \(days == 1 ? "day" : "days") in"]
+        let daysLabel = days == 0 ? "started today" : "\(days) \(days == 1 ? "day" : "days") in"
+        var parts = ["\(n) \(n == 1 ? "article" : "articles")", daysLabel]
         if let date = item.mostRecentDate {
             parts.append(Self.dateFmt.string(from: date))
         }
