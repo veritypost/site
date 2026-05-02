@@ -21,6 +21,7 @@ struct PairCodeView: View {
     // requires every external action (mail, web, payments) to be gated
     // behind a parental check.
     @State private var showHelpGate: Bool = false
+    @State private var showMailUnavailable: Bool = false
     @FocusState private var focused: Bool
 
     // Ext-W5 — 8-slot grid is intentional (owner decision 2026-04-25).
@@ -51,9 +52,8 @@ struct PairCodeView: View {
         ZStack {
             K.bg.ignoresSafeArea()
 
+            ScrollView {
             VStack(spacing: 28) {
-                Spacer(minLength: 40)
-
                 VStack(spacing: 10) {
                     ZStack {
                         Circle()
@@ -65,7 +65,7 @@ struct PairCodeView: View {
                             .frame(width: 72, height: 72)
                             .shadow(color: K.teal.opacity(0.3), radius: 16, y: 6)
 
-                        Image(systemName: "number.square")
+                        Image(systemName: "newspaper.fill")
                             .font(.system(.largeTitle, weight: .bold))
                             .foregroundStyle(.white)
                     }
@@ -87,6 +87,7 @@ struct PairCodeView: View {
                             .font(.system(.caption, design: .rounded, weight: .semibold))
                             .foregroundStyle(K.coralDark)
                             .multilineTextAlignment(.center)
+                            .monospacedDigit()
                     } else if let err = errorMessage {
                         Text(err)
                             .font(.system(.caption, design: .rounded, weight: .semibold))
@@ -111,9 +112,9 @@ struct PairCodeView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(!canSubmit || isPairing || isLockedOut)
-                .opacity((canSubmit && !isLockedOut) ? 1.0 : 0.6)
+                .opacity((canSubmit && !isPairing && !isLockedOut) ? 1.0 : 0.6)
 
-                VStack(spacing: 8) {
+                VStack(spacing: 14) {
                     Text("Ask a grown-up to sign in at veritypost.com, open the kids dashboard, and tap \u{201C}Get a pair code.\u{201D} They\u{2019}ll read out an 8-character code for you to type in here.")
                         .font(.system(.caption, design: .rounded, weight: .medium))
                         .foregroundStyle(K.dim)
@@ -126,16 +127,21 @@ struct PairCodeView: View {
                         Text("Need help?")
                             .font(.system(.caption, design: .rounded, weight: .semibold))
                             .foregroundStyle(K.tealDark)
-                            .frame(minHeight: 44)
+                            .frame(maxWidth: .infinity, minHeight: 44)
                     }
                     .buttonStyle(.plain)
+                    .contentShape(Rectangle())
                     .accessibilityLabel("Need help — ask a grown-up to email support")
                 }
 
-                Spacer()
             }
             .padding(.horizontal, 28)
+            .padding(.vertical, 48)
+            .frame(maxWidth: 480)
+            .frame(maxWidth: .infinity)
         }
+        .scrollDismissesKeyboard(.interactively)
+        .scrollBounceBehavior(.basedOnSize)
         .onAppear {
             focused = true
             assertServerCodeLengthMatches()
@@ -143,20 +149,28 @@ struct PairCodeView: View {
         .parentalGate(isPresented: $showHelpGate) {
             // After grown-up passes the math check, open the mail composer.
             if let url = URL(string: "mailto:support@veritypost.com?subject=Kids%20app%20pair%20code%20help") {
-                UIApplication.shared.open(url, options: [:], completionHandler: nil)
+                UIApplication.shared.open(url, options: [:]) { opened in
+                    if !opened { showMailUnavailable = true }
+                }
             }
         }
+        .alert("No Mail App", isPresented: $showMailUnavailable) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Email support@veritypost.com for help with your pair code.")
+        }
+    }
     }
 
     // MARK: Code field
 
     private var codeField: some View {
-        TextField("XXXXXXXX", text: Binding(
+        TextField("--------", text: Binding(
             get: { code },
             set: { newValue in
                 let filtered = newValue
                     .uppercased()
-                    .filter { $0.isLetter || $0.isNumber }
+                    .filter { $0.isASCII && ($0.isLetter || $0.isNumber) }
                 code = String(filtered.prefix(codeLength))
             }
         ))
@@ -164,9 +178,10 @@ struct PairCodeView: View {
         .textInputAutocapitalization(.characters)
         .disableAutocorrection(true)
         .focused($focused)
-        .font(.system(.largeTitle, design: .rounded, weight: .black))
+        .font(.scaledSystem(size: 34, weight: .black, design: .rounded))
         .foregroundStyle(K.text)
         .kerning(6)
+        .minimumScaleFactor(0.6)
         .multilineTextAlignment(.center)
         .frame(maxWidth: .infinity, minHeight: 64)
         .padding(.horizontal, 16)
@@ -177,7 +192,7 @@ struct PairCodeView: View {
                 .strokeBorder(focused ? K.tealDark : K.border, lineWidth: focused ? 2 : 1)
         )
         .onSubmit {
-            if canSubmit { pairNow() }
+            if canSubmit && !isPairing && !isLockedOut { pairNow() }
         }
     }
 
@@ -195,9 +210,18 @@ struct PairCodeView: View {
                 await auth.adoptPair(success)
             } catch let err as PairError {
                 errorMessage = err.errorDescription
-                // T-043 — start visible countdown on rate-limit so the UI
-                // matches the server-side 60s lockout window.
-                if case .rateLimited = err { startCooldown(cooldownWindow) }
+                switch err {
+                case .rateLimited:
+                    // T-043 — start visible countdown on rate-limit so the UI
+                    // matches the server-side 60s lockout window.
+                    startCooldown(cooldownWindow)
+                case .invalidCode, .codeUsed, .codeExpired:
+                    // Code is definitively rejected — clear field so the kid
+                    // can't re-tap with the same dead code burning rate-limit slots.
+                    code = ""
+                default:
+                    break
+                }
             } catch {
                 // T-042 — don't leak raw Swift errors to a child's UI.
                 // Log the real error for debugging; show a friendly line.
@@ -209,11 +233,13 @@ struct PairCodeView: View {
     }
 
     // T-043 — 1Hz countdown timer. Clears error + count on expiry so the
-    // UI returns to the idle state automatically.
+    // UI returns to the idle state automatically. Scheduled on .common so
+    // the countdown keeps ticking while the user is interacting (matching
+    // the pattern used by ParentalGateModal.startCountdown).
     private func startCooldown(_ seconds: Int) {
         cooldownTimer?.invalidate()
         cooldownSeconds = seconds
-        cooldownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { t in
+        let t = Timer(timeInterval: 1, repeats: true) { t in
             Task { @MainActor in
                 if cooldownSeconds > 0 {
                     cooldownSeconds -= 1
@@ -224,6 +250,8 @@ struct PairCodeView: View {
                 }
             }
         }
+        RunLoop.current.add(t, forMode: .common)
+        cooldownTimer = t
     }
 }
 

@@ -52,15 +52,20 @@ struct KidsAppRoot: View {
             if auth.isBusy && auth.kid == nil {
                 launchGate
                     .environmentObject(auth)
+                    .transition(.opacity)
             } else if auth.kid != nil {
                 tabbedApp
                     .environmentObject(auth)
                     .environmentObject(state)
+                    .transition(.opacity)
             } else {
                 PairCodeView()
                     .environmentObject(auth)
+                    .transition(.opacity)
             }
         }
+        .animation(.easeInOut(duration: 0.35), value: auth.kid?.id)
+        .animation(.easeInOut(duration: 0.2), value: auth.isBusy)
         .task(id: auth.kid?.id) {
             guard let kid = auth.kid else { return }
             await state.load(forKidId: kid.id, kidName: kid.name)

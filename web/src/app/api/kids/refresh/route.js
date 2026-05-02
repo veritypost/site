@@ -20,7 +20,7 @@ import jwt from 'jsonwebtoken';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 
-const TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7; // matches /api/kids/pair
+const TOKEN_TTL_SECONDS = 60 * 60 * 24; // 24 hours — matches /api/kids/pair (T301)
 
 export async function POST(request) {
   try {

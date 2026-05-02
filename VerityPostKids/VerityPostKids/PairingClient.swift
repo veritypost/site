@@ -67,6 +67,16 @@ final class PairingClient {
     // a sibling on a shared iPad. Mismatch invalidates and clears.
     private let installIdKeychainKey = "vp.kids.pair.install_id"
 
+    // The server's toISOString() always emits fractional seconds (e.g. "…T10:00:00.000Z").
+    // Default ISO8601DateFormatter doesn't parse those — dates silently return nil,
+    // skipping expiry checks and the refreshIfNeeded threshold. One cached formatter
+    // covers both call sites.
+    private static let isoFormatter: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+
     /// Device identifier — stable per install. Sent with the pair request
     /// so the server can audit which physical device redeemed a code.
     var deviceId: String {
@@ -98,6 +108,7 @@ final class PairingClient {
 
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
+        req.timeoutInterval = 15
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = try JSONSerialization.data(withJSONObject: [
             "code": cleanCode,
@@ -147,8 +158,7 @@ final class PairingClient {
         else { return nil }
 
         // Check expiry (lenient — let server reject if really expired)
-        let formatter = ISO8601DateFormatter()
-        if let expires = formatter.date(from: expiresIso), expires < Date() {
+        if let expires = Self.isoFormatter.date(from: expiresIso), expires < Date() {
             clear()
             return nil
         }
@@ -190,8 +200,7 @@ final class PairingClient {
     /// drops back to PairCodeView.
     func refreshIfNeeded() async {
         guard let expiresIso = UserDefaults.standard.string(forKey: expiresKey) else { return }
-        let formatter = ISO8601DateFormatter()
-        guard let expires = formatter.date(from: expiresIso) else { return }
+        guard let expires = Self.isoFormatter.date(from: expiresIso) else { return }
         let secondsLeft = expires.timeIntervalSinceNow
         // <24h remaining → rotate. >24h → no-op.
         guard secondsLeft < 24 * 60 * 60 else { return }
@@ -221,6 +230,7 @@ final class PairingClient {
 
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
+        req.timeoutInterval = 15
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("Bearer \(currentToken)", forHTTPHeaderField: "Authorization")
 
@@ -259,6 +269,9 @@ final class PairingClient {
         UserDefaults.standard.removeObject(forKey: kidIdKey)
         UserDefaults.standard.removeObject(forKey: kidNameKey)
         UserDefaults.standard.removeObject(forKey: expiresKey)
+        // Clear device ID so a re-pair on a shared device starts with a fresh
+        // rate-limit bucket instead of inheriting the previous kid's quota.
+        UserDefaults.standard.removeObject(forKey: deviceKey)
         SupabaseKidsClient.shared.setBearerToken(nil)
     }
 

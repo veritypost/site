@@ -181,6 +181,7 @@ struct ParentalGateModal: View {
     // MARK: Logic
 
     private func checkAnswer() {
+        guard !answer.isEmpty else { return }
         guard let value = Int(answer), value == n1 * n2 else {
             attempts += 1
             answer = ""
@@ -277,8 +278,10 @@ extension View {
                     isPresented.wrappedValue = false
                 }
             )
+            // Must be on the sheet content, not the presenter, to prevent
+            // the swipe-to-dismiss gesture from bypassing the parental gate.
+            .interactiveDismissDisabled(true)
         }
-        .interactiveDismissDisabled(true)
     }
 }
 

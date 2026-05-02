@@ -18,12 +18,32 @@ enum K {
     static let mint      = Color(hex: "34D399")
     static let purple    = Color(hex: "A78BFA")
 
-    // Neutrals
-    static let bg        = Color(hex: "FAFAFA")
-    static let card      = Color.white
-    static let text      = Color(hex: "1A1A1A")
-    static let dim       = Color(hex: "6B7280")
-    static let border    = Color(hex: "E5E7EB")
+    // Neutrals — adaptive light/dark
+    static let bg = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0.067, green: 0.067, blue: 0.067, alpha: 1)
+            : UIColor(red: 0.980, green: 0.980, blue: 0.980, alpha: 1)
+    })
+    static let card = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0.118, green: 0.118, blue: 0.118, alpha: 1)
+            : UIColor.white
+    })
+    static let text = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0.941, green: 0.941, blue: 0.941, alpha: 1)
+            : UIColor(red: 0.102, green: 0.102, blue: 0.102, alpha: 1)
+    })
+    static let dim = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0.612, green: 0.643, blue: 0.686, alpha: 1)
+            : UIColor(red: 0.420, green: 0.447, blue: 0.502, alpha: 1)
+    })
+    static let border = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0.216, green: 0.255, blue: 0.318, alpha: 1)
+            : UIColor(red: 0.898, green: 0.906, blue: 0.922, alpha: 1)
+    })
 
     // Particle sampling pool
     static let particleColors: [Color] = [
