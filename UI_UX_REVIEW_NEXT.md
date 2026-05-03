@@ -9,8 +9,8 @@ CURRENT_TITLE: Unit 8 — Marketing bundle (/pricing, /how-it-works, /about, /co
 CURRENT_WAVE: A
 CURRENT_DOC: UI_UX_REVIEW/A-8-marketing-bundle.md
 STATUS: findings
-NEXT_BUILD_SLICE: Slice 16 (Unit 8 / Marketing bundle) — blocked on owner approval of Q1 + Q2
-ANCHOR: Review complete 2026-05-03. 29 findings logged. Q1 (Family plan web) + Q2 (annual pricing) panels dispatched — both 3/3 convergent. Presented to owner for approval. Session paused for adjudication. Next: owner approves Q1/Q2 → lock DECISIONS → open Slice 16.
+NEXT_BUILD_SLICE: Slice 16 (Unit 8 / Marketing bundle) — READY. DECISIONS #062 + #063 locked 2026-05-03. Elevated-care: NO. All 29 findings have recipes. Next session auto-detect fires (c) → execute Slice 16.
+ANCHOR: DECISIONS #062 + #063 locked 2026-05-03 (owner approved). Slice 16 unblocked. Next: execute Slice 16.
 LAST_UPDATED: 2026-05-03
 
 PARKED_UNITS:

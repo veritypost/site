@@ -551,6 +551,23 @@ Key: revenue excluded from pitch export (leaks pricing floor). Bot impressions e
 **A:** **Exempt.** Card is a deliberate, gated, opt-in paid self-disclosure act. `show_activity=false` governs ambient passive profile visibility, not explicit opt-in surfaces. A user who pays for card-share and distributes the link has overridden the passive privacy toggle. Owner chose Option A 2026-05-02.
 **Apply:** No code change to card page for this finding. Unit 7 F21 → wontfix. Slice 15 unblocked.
 
+## #062 — Family plan on web pricing page (owner-locked: Option A)
+**Date:** 2026-05-03 **Scope:** web `/pricing`
+**Q:** The Verity Family plan (`is_visible=false` in Stripe) shows a "Start Family" checkout button on the web pricing page that silently errors with "Something went wrong." How should the Family plan card be presented on web?
+**A:** Keep the Family plan card visible (discovery value for parents) but replace the dead checkout button with "Available on iOS — Download the app" linking to `/kids-app`. Do not hide the card (loses discovery); do not implement web Stripe checkout (out of scope; Apple IAP guidelines complicate parallel billing). Owner approved 2026-05-03.
+**Apply:**
+- `web/src/app/pricing/page.tsx:187` — replace `<CheckoutButton planName="verity_family_monthly">` with a plain link/button: "Available on iOS →" linking to `/kids-app`.
+- Add a brief note on the card: "Purchased through the iOS app." Remove any checkout-related props from the Family `PlanCard`.
+- Finding F05 + F29 in Unit 8 doc resolved by this decision.
+
+## #063 — Annual pricing mention without checkout path (owner-locked: Option A)
+**Date:** 2026-05-03 **Scope:** web `/pricing`
+**Q:** Annual prices ($79.99/yr, $149.99/yr) appear in pricing card footers but no annual checkout path exists in Stripe. Keep as informational or remove?
+**A:** Remove the annual pricing mention entirely until an annual checkout path is implemented. The price anchor raises purchase intent with no fulfillment, creates a trust gap, and may suppress monthly conversion. Re-add when the Stripe annual product and checkout session are wired. Owner approved 2026-05-03.
+**Apply:**
+- `web/src/app/pricing/page.tsx:169, 188` — remove `footer` props (or annual-price text) from both paid `PlanCard` instances.
+- Finding F24 in Unit 8 doc resolved by this decision.
+
 ## #061 — `/card/[username]` robots: noindex,nofollow is intentional (auto-locked)
 **Date:** 2026-05-02 **Scope:** web `/card/[username]`
 **Q:** Should the shareable profile card be indexed by search engines?

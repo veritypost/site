@@ -1,9 +1,9 @@
 # Unit 8 — Marketing bundle (`/pricing`, `/how-it-works`, `/about`, `/contact`, `/kids-app`)
 
 **Surface(s):** `web/src/app/pricing/page.tsx` (262 lines), `web/src/app/how-it-works/page.tsx` (164 lines), `web/src/app/about/page.tsx` (142 lines), `web/src/app/contact/page.tsx` (366 lines), `web/src/app/kids-app/page.tsx` (268 lines), `web/src/app/pricing/_CheckoutButton.tsx` (71 lines)
-**Status:** in-review
+**Status:** findings (Slice 16 READY — DECISIONS #062 + #063 locked 2026-05-03)
 **Date:** 2026-05-03
-**Anchor:** findings pass complete (main session + 3 independent reviewers). Panels dispatched for Q1 (Family plan web) and Q2 (annual pricing). Auto-locking clear PRINCIPLE violations. Owner adjudication pending.
+**Anchor:** All decisions locked 2026-05-03. Q1 → DECISION #062 (Family plan: iOS CTA, not checkout button). Q2 → DECISION #063 (remove annual pricing mention). Slice 16 unblocked.
 
 ---
 
