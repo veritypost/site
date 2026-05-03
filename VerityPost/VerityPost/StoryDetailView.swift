@@ -3378,9 +3378,10 @@ struct StoryDetailView: View {
     // MARK: - C3: Moderator comment actions
 
     /// C3 — hide a comment (comments.moderate permission required).
-    /// POSTs to /api/comments/[id]/hide. On success, removes the comment
-    /// from the local array (optimistic UI). No undo affordance — the
-    /// moderator dashboard is the canonical recovery path.
+    /// POSTs to /api/comments/[id]/hide with a reason in the body so the
+    /// server-side hide_comment RPC has audit context. On success, removes
+    /// the comment from the local array (optimistic UI). No undo
+    /// affordance — the moderator dashboard is the canonical recovery path.
     private func hideComment(_ comment: VPComment) async {
         let site = SupabaseManager.shared.siteURL
         guard let url = URL(string: "/api/comments/\(comment.id)/hide", relativeTo: site) else { return }
@@ -3389,15 +3390,23 @@ struct StoryDetailView: View {
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "reason": "Hidden via iOS moderator action",
+        ])
         _ = try? await URLSession.shared.data(for: req)
         // Optimistic UI: remove from local comments array.
         await MainActor.run { comments.removeAll { $0.id == comment.id } }
     }
 
-    /// C3 — flag a comment for supervisor review (comments.flag permission required).
-    /// POSTs to /api/comments/[id]/flag. No optimistic UI — the comment
+    /// C3 — flag a comment for supervisor review (comments.supervisor_flag
+    /// permission required). POSTs to /api/comments/[id]/flag with the
+    /// article's category_id (so the flag routes to the right supervisor
+    /// pool) and a fast-lane reason string. No optimistic UI — the comment
     /// stays visible; the flag is a signal to the moderation queue only.
+    /// If the article has no category_id (legacy / unbacked stories), we
+    /// can't route to a supervisor, so we no-op rather than send a 400.
     private func flagForSupervisor(_ comment: VPComment) async {
+        guard let categoryId = story.categoryId else { return }
         let site = SupabaseManager.shared.siteURL
         guard let url = URL(string: "/api/comments/\(comment.id)/flag", relativeTo: site) else { return }
         guard let session = try? await client.auth.session else { return }
@@ -3405,6 +3414,10 @@ struct StoryDetailView: View {
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "category_id": categoryId,
+            "reason": "Flagged for supervisor review via iOS",
+        ])
         _ = try? await URLSession.shared.data(for: req)
         // No optimistic UI — the comment stays visible after flagging.
     }

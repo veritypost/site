@@ -931,11 +931,25 @@ final class AuthViewModel: ObservableObject {
         wasLoggedIn = false
         sessionExpired = false
         sessionExpiredReason = nil
-        do {
-            try await client.auth.signOut()
-        } catch {
-            Log.d("signOut failed: \(error)")
+        // Route through /api/auth/logout so Supabase signOut runs with
+        // scope:'global' (revokes ALL devices, not just this one). The
+        // bare client.auth.signOut() defaults to local scope on the
+        // Supabase Swift SDK, leaving sessions on web + other devices
+        // alive after a user-initiated iOS logout. The server route
+        // also invalidates this user's push tokens.
+        let serverRevoked = await revokeServerSessionGlobally()
+        if !serverRevoked {
+            // Server unreachable — fall back to local signOut so the
+            // user's session token is at least dropped on this device.
+            do {
+                try await client.auth.signOut()
+            } catch {
+                Log.d("signOut fallback failed: \(error)")
+            }
             authError = "Signed out. Other active sessions may take a moment to sync."
+        } else {
+            // Server signed us out globally; drop the local session too.
+            try? await client.auth.signOut()
         }
         // Order: server signout → local cache purge → @Published state flip.
         // If caches were cleared first and signOut threw, we'd have wiped
@@ -954,6 +968,30 @@ final class AuthViewModel: ObservableObject {
         // inherit the previous user's bypass.
         isOwnerMode = false
         dismissDeepLinkError()
+    }
+
+    /// Logout via /api/auth/logout so Supabase signOut runs server-side
+    /// with scope:'global' — revokes the user's sessions on every device,
+    /// not just this iPhone. Returns true on a 2xx response. Returns
+    /// false on any network or status failure so the caller can fall
+    /// back to a local-only signOut.
+    private func revokeServerSessionGlobally() async -> Bool {
+        let site = SupabaseManager.shared.siteURL
+        guard let url = URL(string: "/api/auth/logout", relativeTo: site) else { return false }
+        guard let session = try? await client.auth.session else { return false }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        do {
+            let (_, resp) = try await URLSession.shared.data(for: req)
+            if let http = resp as? HTTPURLResponse, (200...299).contains(http.statusCode) {
+                return true
+            }
+        } catch {
+            Log.d("server logout call failed: \(error)")
+        }
+        return false
     }
 
     /// T3.11 — purge per-user state from singletons + the URL response cache

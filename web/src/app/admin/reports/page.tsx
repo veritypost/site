@@ -254,12 +254,13 @@ function ReportsAdminInner() {
   }
 
   async function hide() {
-    if (!targetComment || !selected) return;
+    if (!targetComment || (!selected && !selectedAi)) return;
     setBusy('hide');
+    const reason = selected?.reason ?? selectedAi?.reason ?? 'Moderator action';
     const res = await fetch(`/api/admin/moderation/comments/${targetComment.id}/hide`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reason: selected.reason }),
+      body: JSON.stringify({ reason }),
     });
     setBusy('');
     if (!res.ok) {
@@ -309,6 +310,10 @@ function ReportsAdminInner() {
 
   function penaltyLevel(level: number) {
     if (!targetComment) return;
+    if (!targetComment.user_id) {
+      toast.push({ message: 'Cannot penalise — author account is gone', variant: 'warn' });
+      return;
+    }
     const LEVELS: Record<number, string> = { 1: 'Warn', 2: '24h comment mute', 3: '7-day mute', 4: 'Ban' };
     setDestructive({
       title: `${LEVELS[level] || `Penalty ${level}`} — @${targetComment.users?.username || 'user'}?`,
