@@ -439,6 +439,7 @@ The code is unusually mature. Stripe HMAC sig + 5-minute timestamp window with o
 Severity tally: **2 P0, 5 P1, 4 P2, 1 P3.**
 
 ### [P0] Web checkout/change-plan/resubscribe never check for an active Apple subscription
+> CLOSED in Session 4 — commit 41ea524 (Stream 1 — billingPlatformGuard.ts helper + Apple precheck on 4 web routes; cancel-route precheck reverted in second pass per adversary)
 - File: `web/src/app/api/stripe/checkout/route.js:70-109`, `web/src/app/api/billing/change-plan/route.js:71-100`, `web/src/app/api/billing/resubscribe/route.js:67-96`
 - Issue: All three web billing routes pre-flight-check `comped_until` and `trial_extension_until` on `users`, but NONE checks for an active Apple-side subscription on the same user. The user-row select doesn't even pull a `subscriptions` join filtered by `platform='apple'` AND `status IN ('active','trialing','past_due')`.
 - Evidence: checkout's user select reads only `'id, stripe_customer_id, email, cohort, comped_until, trial_extension_until'` (line 73). change-plan reads `'stripe_customer_id, cohort, comped_until, trial_extension_until'`. resubscribe reads the same. Grep for `platform.*apple` / `apple_original` across all three returns zero hits.
@@ -448,6 +449,7 @@ Severity tally: **2 P0, 5 P1, 4 P2, 1 P3.**
 - Verified by: Read of all three web route files plus iOS sync route plus webhook handler; grep for any `platform`/`apple`/`stripe_subscription_id` cross-check in those files returned nothing.
 
 ### [P0] change-plan silently un-cancels a scheduled cancellation
+> CLOSED in Session 4 — commit 41ea524 (Stream 1 — `cancel_at_period_end: 'false'` dropped from `updateSubscriptionPrice`; change-plan returns 409 `cancel_pending` if existing sub has cancel scheduled)
 - File: `web/src/app/api/billing/change-plan/route.js:102-122` calling `web/src/lib/stripe.js:143-154`
 - Issue: When a user has previously clicked "Cancel subscription" and the Stripe sub is in `status='active', cancel_at_period_end=true`, the change-plan route's "find active sub" query (line 105) matches it (filter is `status === 'active'|'trialing'|'past_due'` with no cancel_at_period_end check). It then calls `updateSubscriptionPrice(active.id, item.id, plan.stripe_price_id)` which unconditionally sets `cancel_at_period_end: 'false'` in its body.
 - Evidence: stripe.js line 150 — `cancel_at_period_end: 'false'` is hardcoded into the updateSubscriptionPrice body. change-plan does not read or pass through `cancel_at_period_end` from the existing sub.
@@ -456,6 +458,7 @@ Severity tally: **2 P0, 5 P1, 4 P2, 1 P3.**
 - Verified by: Read of change-plan/route.js + stripe.js; the hardcoded 'false' in updateSubscriptionPrice body confirms unconditional un-cancel.
 
 ### [P1] iOS sync grants plan BEFORE writing the subscriptions row (no transaction)
+> CLOSED in Session 4 — commit 41ea524 (Stream 2 — 3-step ordering: pending upsert → RPC → activate UPDATE; second pass added .update() error capture + 500-on-failure for retry-safety)
 - File: `web/src/app/api/ios/subscriptions/sync/route.js:206-267`
 - Issue: `billing_change_plan` (or `billing_resubscribe`) runs at lines 207-216, then the `subscriptions` upsert runs at lines 263-267. Between those two writes, `users.plan_id` is set to the new Apple plan but the subscriptions row either does not exist or still shows the old plan. If the request fails between the RPC and the upsert (network blip, Supabase hiccup), `users.plan_id` is granted with no matching subscriptions row — the next Apple S2S notification's `lookupUserAndPlan` sees no subscriptions row to update, and the standard reconciliation paths cannot roll back the plan grant.
 - Evidence: Lines 206-216 call billing_change_plan/billing_resubscribe; lines 263-267 do the subscriptions upsert. No transaction wraps the two writes. The `webhook_log` row only flips to `processed` after both succeed (lines 269-275), so a retry CAN re-run, but the user has already been granted plan permissions in the gap.
@@ -464,6 +467,7 @@ Severity tally: **2 P0, 5 P1, 4 P2, 1 P3.**
 - Verified by: Read of sync route lines 196-275 — no transaction boundary, RPC fires before subscription row write.
 
 ### [P1] BillingCard.tsx retry loop has stale-closure read on `sub` and sets state from cleanup
+> CLOSED in Session 4 — commit 41ea524 (Stream 3 — `gotPaidSubRef` ref pattern replaces stale closure; `setRetryOnSuccess(false)` removed from cleanup return)
 - File: `web/src/app/profile/settings/_cards/BillingCard.tsx:146-173`
 - Issue: The webhook-wait retry loop fires `fetchData()` up to 6 times with 1s spacing on `?success=1` landing. The intent (per code comment lines 156-158) was to stop early when the new sub appears, but the closure cannot read post-fetch state — so it always runs all 6 attempts regardless of outcome. The cleanup function on lines 167-170 calls `setRetryOnSuccess(false)` from the unmount callback, a state-update-during-unmount pattern that React strict-mode warns about.
 - Evidence: Lines 158-160 comment — `// Re-read sub from state after fetchData settles is not reliable inside the closure; instead we schedule the next attempt and let it re-check` — confirms always-MAX-attempts. Line 169: `setRetryOnSuccess(false)` inside the cleanup return.
@@ -472,6 +476,7 @@ Severity tally: **2 P0, 5 P1, 4 P2, 1 P3.**
 - Verified by: Read of BillingCard.tsx lines 142-173.
 
 ### [P1] handleSubscriptionUpdated cancel-while-grace-already-set early-returns and skips a coincident plan change
+> CLOSED in Session 4 — commit 41ea524 (Stream 1 — early-return at line 638 dropped; cancel block falls through to plan-change branch when both occur in same event)
 - File: `web/src/app/api/stripe/webhook/route.js:612-639`
 - Issue: When `cancel_at_period_end=true` and `userRow.plan_grace_period_ends_at` already exists, the handler updates the grace marker, mirrors `subscriptions.cancel_at`, then `return`s at line 638. Stripe Portal allows multiple actions per session and consolidates them into one `customer.subscription.updated` event — if a user changes plan AND cancels in the same Portal click-through, the price-change branch (lines 700-746) never runs.
 - Evidence: Line 638 `return;` exits before the price-change block at 700. The early-return comment doesn't acknowledge the combined case.
@@ -480,6 +485,7 @@ Severity tally: **2 P0, 5 P1, 4 P2, 1 P3.**
 - Verified by: Read of webhook route.js lines 553-748.
 
 ### [P1] handleChargeRefunded auto-freeze gate parses settings.value as string 'true'/'false'
+> CLOSED in Session 4 — commit 41ea524 (Stream 1 — `String(settingRow?.value ?? '').toLowerCase() === 'true'` coercion; sweep confirmed no other instances)
 - File: `web/src/app/api/stripe/webhook/route.js:792-799`
 - Issue: `settings.value === 'true'` comparison treats the column as a string. If anyone migrates `settings.value` to JSONB or boolean (a common Postgres setting-table pattern), this comparison silently turns autofreeze OFF (because `true === 'true'` is false) and full refunds skip the freeze path, leaving users with revoked-payment-but-active-plan.
 - Evidence: line 798 `const autoFreeze = settingRow?.value === 'true';`
@@ -488,6 +494,7 @@ Severity tally: **2 P0, 5 P1, 4 P2, 1 P3.**
 - Verified by: Read of webhook route.js line 792-799.
 
 ### [P1] Pricing page metadata + plan card hardcode prices that may diverge from DB
+> CLOSED in Session 4 — commit 41ea524 (Stream 3 — RSC reading from DB with `revalidate: 300`, pricingCopy.ts shared fallbacks, BillingCard schema bug fix `monthly_price_cents`→`price_cents`. Owner action: apply migration 20260503000019 + mint Stripe price IDs)
 - File: `web/src/app/pricing/page.tsx:14-18, 166, 186, 232-251`
 - Issue: Pricing page is a server component that hardcodes `$7.99/mo`, `$14.99/mo`, `$79.99` annual, `$149.99` annual, plus a 4-row Family scaling table. None come from the `plans` table. `web/src/lib/plans.js:7-20` documents that `verity_monthly` is the legacy grandfathered $3.99 SKU, while `verity_pro_monthly` is $9.99 — but the page sells "Verity" at $7.99 with `planName="verity_monthly"`.
 - Evidence: page.tsx line 180 `planName="verity_monthly"`, line 166 `price="$7.99"`. plans.js line 7-20 calls verity_monthly the legacy $3.99 row.
@@ -1893,6 +1900,7 @@ private func handleIncomingURL(_ url: URL) {
 **Total:** 1 P0 · 8 P1 · 7 P2 · 5 P3 · 3 [DOC-DRIFT] kill-switch table rows.
 
 ### [P0] Cross-platform double-billing — same root cause, web AND iOS exposed
+> CLOSED in Session 4 — commit 41ea524 (same fix as PM-5's P0; iOS sync 409 returns `stripe_sub_active` shape consumed by SubscriptionConflictSheet on iOS)
 
 This is PM-5's [P0] re-stated through a cross-platform lens to confirm scope: the parity gap touches every cross-provider write on every platform, not just one route.
 
@@ -1912,6 +1920,7 @@ This is PM-5's [P0] re-stated through a cross-platform lens to confirm scope: th
 - **Needs treatment on:** web (4 routes) + iOS sync route (1) = 5 fix points, single shared lib helper.
 
 ### [P1] Pricing fragmentation — DM paywall hardcodes stale `$3.99/mo` while pricing page sells same plan at `$7.99/mo`
+> CLOSED in Session 4 — commit 41ea524 (Stream 3 — `messages/page.tsx` imports `FALLBACK_VERITY_MONTHLY` from `pricingCopy.ts`; pricing page reads same source from DB)
 
 - Files:
   - Web pricing page: `web/src/app/pricing/page.tsx:166` — `price="$7.99"` for `planName="verity_monthly"`
@@ -1937,6 +1946,7 @@ This is PM-5's [P0] re-stated through a cross-platform lens to confirm scope: th
 - **Needs treatment on:** web pricing page + web messages paywall = 2 fix points; iOS literals are fallback-only (correct as-is, just needs better in-code annotation).
 
 ### [P1] iOS plan-name mapping uses brittle substring match — `verity` matches `verity_lite` / `verity_pro` / `verity_family`
+> CLOSED in Session 4 — commit 41ea524 (Stream 4 — `planByProductID` static dict with exact-match lookup; values are tier-level (`verity` / `verity_family` / `verity_pro`) matching `planPriority` keys)
 
 - File: `VerityPost/VerityPost/StoreManager.swift:437-444`
 - Issue: `planName(for productID: String)` uses `productID.contains("verity_family")`, then `.contains("verity_pro")`, then `.contains("verity")` — string-contains match. Returns `"verity"` for any product ID containing the substring. If a future SKU is `com.veritypost.verity_lite.monthly` it returns `"verity"` (wrong). Web reads `plans.name` directly from the DB row keyed on Stripe price ID; no substring match.
@@ -2459,6 +2469,7 @@ Independent re-audit of the 4 elevated-care surfaces (auth, billing+iOS, kids iO
 - Verified by: file read.
 
 ### [P1] Apple S2S notifications: `signedDate` 5-minute window is checked, BUT no per-`originalTransactionId` notification-ordering enforcement → REVOKE-then-DID_RENEW reorder restores access on a refunded subscription
+> CLOSED in Session 4 — commit 41ea524 (Stream 2 — migration 20260503000020 adds `subscriptions.last_terminal_event_at` + `last_terminal_event_type`; REVOKE/REFUND/EXPIRED handlers stamp; SUBSCRIBED/DID_RENEW/REFUND_REVERSED compare `transaction.signedDate <= terminalMs` and 200-without-RPC on out-of-order; audit_log row `apple_notif_reorder_ignored`. Owner action: apply migration)
 
 - File: `web/src/app/api/ios/appstore/notifications/route.js:366-457`
 - Issue: PM-5's findings cover env-gating, JWS validation, signedDate replay, mint-on-fallback ergonomics. None of them cover **temporal ordering of notifications for the same `originalTransactionId`**. Apple's S2S delivery is best-effort — a `REVOKE` (or `REFUND`) notification can land seconds before, simultaneous with, or seconds AFTER a `DID_RENEW` for the same sub. The route's switch handles each notification independently:
