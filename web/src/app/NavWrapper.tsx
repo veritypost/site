@@ -223,6 +223,13 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
         }
         return;
       }
+      // Flip the nav-bar boolean immediately on auth presence so the bottom
+      // nav swaps "Sign up" → "Profile" in the same tick as login. Avatar /
+      // tier / permission slots fill in over the next round-trips below.
+      if (!cancelled) {
+        setLoggedIn(true);
+        setAuthLoaded(true);
+      }
       // T220 — skip the full hydrate when the same user just refreshed
       // their auth token (onAuthStateChange fires on token refresh too).
       // 60s is the same staleness window refreshIfStale() uses, so we
@@ -248,8 +255,6 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
 
       if (!cancelled) {
         setUser(profile || null);
-        setLoggedIn(true);
-        setAuthLoaded(true);
         setCanSeeAdmin(hasPermission('admin.dashboard.view'));
         setCanSearch(hasPermission('search.basic'));
         // Read after refreshAllPermissions so the cache is hot. The RPC
