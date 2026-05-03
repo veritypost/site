@@ -366,26 +366,28 @@ export default async function ArticleSlugPage({
               <p style={{ margin: '0 0 12px' }}>
                 From the Kids edition. The quiz, discussion, and reactions live in the Verity Kids iOS app.
               </p>
-              {process.env.NEXT_PUBLIC_KIDS_APP_URL ? (
-                <a
-                  href={process.env.NEXT_PUBLIC_KIDS_APP_URL}
-                  rel="noopener noreferrer"
-                  style={{
-                    display: 'inline-block',
-                    padding: '8px 16px',
-                    borderRadius: 8,
-                    background: 'var(--accent, #111)',
-                    color: '#fff',
-                    fontSize: 13,
-                    fontWeight: 600,
-                    textDecoration: 'none',
-                  }}
-                >
-                  Open in Verity Kids
-                </a>
-              ) : (
-                <span style={{ fontSize: 13 }}>Download the Verity Kids app to join.</span>
-              )}
+              <a
+                href={`veritypostkids://story/${story.slug}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  window.location.href = `veritypostkids://story/${story.slug}`;
+                  if (process.env.NEXT_PUBLIC_KIDS_APP_URL) {
+                    setTimeout(() => { window.location.href = process.env.NEXT_PUBLIC_KIDS_APP_URL!; }, 800);
+                  }
+                }}
+                style={{
+                  display: 'inline-block',
+                  padding: '8px 16px',
+                  borderRadius: 8,
+                  background: 'var(--accent, #111)',
+                  color: '#fff',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                }}
+              >
+                Open in Verity Kids
+              </a>
             </div>
           ) : (article.status === 'published' || canEdit || isOwnerModeViewer) ? (
             <ArticleEngagementZone

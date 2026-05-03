@@ -188,9 +188,16 @@ export function PublicProfileSection({ user, tier, preview, onUserUpdated }: Pro
                 ) : null}
               </div>
             ) : null}
-            {/* Public URL link intentionally omitted — /u/[username] is
-                kill-switched pending public profile launch. Re-enable
-                when PUBLIC_PROFILE_ENABLED flips to true. */}
+            {user.username && visibility === 'public' ? (
+              <div style={{ marginTop: S[3] }}>
+                <Link
+                  href={`/u/${user.username}`}
+                  style={{ fontSize: F.xs, color: C.inkMuted, textDecoration: 'underline' }}
+                >
+                  veritypost.com/u/{user.username}
+                </Link>
+              </div>
+            ) : null}
           </div>
         </div>
       </section>
@@ -282,7 +289,7 @@ export function PublicProfileSection({ user, tier, preview, onUserUpdated }: Pro
                         >
                           {v === 'public'
                             ? 'Anyone with the link can view.'
-                            : 'Only your followers can view.'}
+                            : 'Only you can view it.'}
                         </div>
                       </button>
                     );

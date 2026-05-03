@@ -5,6 +5,12 @@ import Supabase
 // Reading is logged when the kid taps "Take the quiz" — completion is recorded
 // at that point. Scroll-progress tracking is deferred.
 
+// Apple Kids 1.3 — first-party imagery only.
+private let allowedImageHosts: Set<String> = Set([
+    SupabaseKidsClient.shared.supabaseURL.host?.lowercased() ?? "",
+    "cdn.veritypost.com"
+].filter { !$0.isEmpty })
+
 struct KidReaderView: View {
     let article: KidArticle
     let categoryColor: Color
@@ -119,7 +125,12 @@ struct KidReaderView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
             Group {
-                if let urlString = article.coverImageUrl, let url = URL(string: urlString) {
+                if let urlString = article.coverImageUrl,
+                   let url = URL(string: urlString),
+                   url.scheme == "https",
+                   let host = url.host?.lowercased(),
+                   !host.isEmpty,
+                   allowedImageHosts.contains(host) {
                     AsyncImage(url: url) { phase in
                         switch phase {
                         case .success(let image):

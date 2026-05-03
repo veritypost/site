@@ -248,8 +248,7 @@ struct KidsAppRoot: View {
 
         let outcome = state.completeQuiz(
             passed: result.passed,
-            score: scoreDelta,
-            biasedSpotted: false
+            score: scoreDelta
         )
 
         var queue: [ActiveSheet] = []

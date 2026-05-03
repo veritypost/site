@@ -10,20 +10,13 @@ final class ArticleRouter: ObservableObject {
     @Published var pendingSlug: String? = nil
 
     /// Returns the slug if the URL matches a known story shape, else nil.
-    /// Recognised shapes: `https://veritypost.com/story/<slug>` (production
+    /// Recognised shape: `https://veritypost.com/story/<slug>` (production
     /// canonical, mirrors `StoryDetailView` share URL + AlertsView's
-    /// `slugFromActionUrl`) and `verityposts://story/<slug>` (custom scheme,
-    /// reserved for push payloads).
+    /// `slugFromActionUrl`).
     static func slug(from url: URL) -> String? {
         let host = url.host?.lowercased()
         let path = url.path
         let scheme = url.scheme?.lowercased()
-        // Custom scheme: verityposts://story/<slug> — host carries "story"
-        // and the slug is the first path component.
-        if scheme == "verityposts", host == "story" {
-            let slug = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-            return slug.isEmpty ? nil : slug
-        }
         // Universal link: https://veritypost.com/story/<slug>
         if (scheme == "https" || scheme == "http"),
            host == "veritypost.com" || host == "www.veritypost.com",

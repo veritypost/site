@@ -1,16 +1,21 @@
 import 'server-only';
 import { NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
+import crypto from 'crypto';
 import { createServiceClient } from '@/lib/supabase/server';
 import { verifyCronAuth } from '@/lib/cronAuth';
 import { withCronLog } from '@/lib/cronLog';
 import { logCronHeartbeat } from '@/lib/cronHeartbeat';
+import { callModel } from '@/lib/pipeline/call-model';
 
 const CRON_NAME = 'score-comments';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const maxDuration = 300;
+
+// Stable lock id for this cron. hashtext('cron_score_comments') as a JS constant
+// so we don't need a DB call to compute it.
+const SCORE_COMMENTS_LOCK_ID = 1_506_720_048; // hashtext('cron_score_comments')
 
 async function run(request: Request) {
   if (!verifyCronAuth(request).ok)
@@ -20,6 +25,16 @@ async function run(request: Request) {
 
   try {
     const service = createServiceClient();
+
+    // Advisory lock — prevent concurrent runs (Vercel retries / manual triggers).
+    // Cast to unknown first because the generated RPC type union doesn't include
+    // the advisory lock wrappers yet (migration pending owner apply).
+    const { data: lockRows } = await (service.rpc as unknown as (fn: string, args: Record<string, unknown>) => Promise<{ data: boolean | null }>)('pg_try_advisory_lock', { key: SCORE_COMMENTS_LOCK_ID });
+    const lockAcquired = lockRows === true;
+    if (!lockAcquired) {
+      await logCronHeartbeat(CRON_NAME, 'end', { skipped: 'concurrent-run' });
+      return NextResponse.json({ skipped: 'concurrent-run' });
+    }
 
     // Read settings
     const { data: settingsRows } = await service
@@ -35,48 +50,56 @@ async function run(request: Request) {
 
     const since = new Date(Date.now() - windowHours * 3600 * 1000).toISOString();
 
-    const { data: comments } = await service
+    // Per-tick budget: max 50 comments OR max 30s wall time to keep cron within maxDuration.
+    const TICK_MAX_COMMENTS = 50;
+    const TICK_MAX_MS = 30_000;
+    const CHUNK_SIZE = 5; // parallel calls per batch
+
+    const { data: commentsRaw } = await (service
       .from('comments')
-      .select('id, body')
+      .select('id, body, article_id, ai_score_attempts')
       .is('ai_toxicity_score', null)
       .eq('status', 'visible')
       .is('deleted_at', null)
       .gte('created_at', since)
-      .limit(100);
+      .lt('ai_score_attempts', 3)
+      .limit(TICK_MAX_COMMENTS) as unknown as Promise<{ data: { id: string; body: string | null; article_id: string | null; ai_score_attempts: number }[] | null }>);
+    const comments = commentsRaw;
 
     if (!comments || comments.length === 0) {
       await logCronHeartbeat(CRON_NAME, 'end', { scored: 0, flagged: 0 });
       return NextResponse.json({ scored: 0, flagged: 0, ran_at: new Date().toISOString() });
     }
 
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const runId = crypto.randomUUID();
     let scored = 0;
     let flagged = 0;
 
-    for (const comment of comments as { id: string; body: string | null }[]) {
-      if (!comment.body?.trim()) continue;
+    const MODERATION_SYSTEM =
+      'You are a content moderation system. Respond ONLY with valid JSON and nothing else. Format: {"toxicity":0.0,"sentiment":"neutral","tag":"clean"} where toxicity is 0.0-1.0, sentiment is positive|neutral|negative, tag is spam|harassment|misinformation|graphic|clean.';
+
+    async function scoreOne(comment: { id: string; body: string | null; article_id: string | null; ai_score_attempts: number }, signal: AbortSignal): Promise<void> {
+      if (!comment.body?.trim()) return;
       try {
-        const msg = await client.messages.create({
+        const res = await callModel({
+          provider: 'anthropic',
           model: 'claude-haiku-4-5-20251001',
+          system: MODERATION_SYSTEM,
+          prompt: `Score this comment:\n${comment.body.slice(0, 2000)}`,
           max_tokens: 256,
-          system:
-            'You are a content moderation system. Respond ONLY with valid JSON and nothing else. Format: {"toxicity":0.0,"sentiment":"neutral","tag":"clean"} where toxicity is 0.0-1.0, sentiment is positive|neutral|negative, tag is spam|harassment|misinformation|graphic|clean.',
-          messages: [
-            {
-              role: 'user',
-              content: `Score this comment:\n${comment.body.slice(0, 2000)}`,
-            },
-          ],
+          pipeline_run_id: runId,
+          step_name: 'score_comment',
+          article_id: comment.article_id,
+          audience: 'adult',
+          signal,
         });
 
-        const text =
-          msg.content[0]?.type === 'text' ? msg.content[0].text.trim() : '';
         let parsed: { toxicity?: number; sentiment?: string; tag?: string } = {};
         try {
-          parsed = JSON.parse(text);
+          parsed = JSON.parse(res.text.trim());
         } catch (err) {
           console.error('[score-comments] json-parse failed on comment', comment.id, err);
-          continue;
+          return;
         }
 
         const toxicity =
@@ -117,15 +140,38 @@ async function run(request: Request) {
         }
       } catch (err) {
         console.error('[score-comments] error on comment', comment.id, err);
+        await (service
+          .from('comments')
+          .update({ ai_score_attempts: comment.ai_score_attempts + 1 } as never)
+          .eq('id', comment.id));
       }
     }
 
+    const abortController = new AbortController();
+    const timeoutHandle = setTimeout(() => abortController.abort(), TICK_MAX_MS);
+
+    const eligibleComments = (comments as { id: string; body: string | null; article_id: string | null; ai_score_attempts: number }[]);
+    try {
+      for (let i = 0; i < eligibleComments.length; i += CHUNK_SIZE) {
+        if (abortController.signal.aborted) break;
+        const chunk = eligibleComments.slice(i, i + CHUNK_SIZE);
+        await Promise.all(chunk.map((c) => scoreOne(c, abortController.signal)));
+      }
+    } finally {
+      clearTimeout(timeoutHandle);
+    }
+
     await logCronHeartbeat(CRON_NAME, 'end', { scored, flagged });
+    const rpcUnlock = service.rpc as unknown as (fn: string, args: Record<string, unknown>) => Promise<unknown>;
+    await rpcUnlock('pg_advisory_unlock', { key: SCORE_COMMENTS_LOCK_ID });
     return NextResponse.json({ scored, flagged, ran_at: new Date().toISOString() });
   } catch (err) {
     await logCronHeartbeat(CRON_NAME, 'error', {
       error: (err as Error)?.message || String(err),
     });
+    const service2 = createServiceClient();
+    const rpcUnlock2 = service2.rpc as unknown as (fn: string, args: Record<string, unknown>) => Promise<unknown>;
+    await rpcUnlock2('pg_advisory_unlock', { key: SCORE_COMMENTS_LOCK_ID });
     throw err;
   }
 }

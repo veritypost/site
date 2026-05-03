@@ -46,6 +46,18 @@ struct VPUser: Codable, Identifiable {
     var avatar: AvatarRef? { metadata?.avatar }
     var createdAt: Date?
     var onboardingCompletedAt: Date?
+    // Account-state fields — mirrors the DB columns read by deriveAccountStates
+    // on the web. Used by AccountStateBannerView to show the correct banner.
+    var isBanned: Bool?
+    var banReason: String?
+    var isMuted: Bool?
+    var mutedUntil: String?
+    var verifyLockedAt: String?
+    var deletionScheduledFor: String?
+    var planGracePeriodEndsAt: String?
+    var lockedUntil: String?
+    var compedUntil: String?
+    var planProvider: String?
 
     struct AvatarRef: Codable {
         var outer: String?
@@ -85,6 +97,16 @@ struct VPUser: Codable, Identifiable {
         case avatarColor = "avatar_color"
         case createdAt = "created_at"
         case onboardingCompletedAt = "onboarding_completed_at"
+        case isBanned = "is_banned"
+        case banReason = "ban_reason"
+        case isMuted = "is_muted"
+        case mutedUntil = "muted_until"
+        case verifyLockedAt = "verify_locked_at"
+        case deletionScheduledFor = "deletion_scheduled_for"
+        case planGracePeriodEndsAt = "plan_grace_period_ends_at"
+        case lockedUntil = "locked_until"
+        case compedUntil = "comped_until"
+        case planProvider = "plan_provider"
     }
 
     /// Backwards-compat accessor — every callsite reads `user.plan`.

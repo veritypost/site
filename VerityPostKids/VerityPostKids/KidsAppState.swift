@@ -35,7 +35,8 @@ final class KidsAppState: ObservableObject {
     @Published var streakDays: Int = 0
     @Published var verityScore: Int = 0
     @Published var quizzesPassed: Int = 0
-    @Published var biasedHeadlinesSpotted: Int = 0
+
+    private var didOptimisticallyIncrementStreak: Bool = false
 
     // Home content
     @Published var categories: [KidCategory] = []
@@ -93,22 +94,35 @@ final class KidsAppState: ObservableObject {
 
     private func loadKidRow() async {
         guard !kidId.isEmpty else { return }
+        didOptimisticallyIncrementStreak = false
         struct Row: Decodable {
             let streak_current: Int?
             let reading_band: String?
+            let verity_score: Int?
+            let quizzes_completed_count: Int?
         }
         do {
             let row: Row = try await client
                 .from("kid_profiles")
-                .select("streak_current, reading_band")
+                .select("streak_current, reading_band, verity_score, quizzes_completed_count")
                 .eq("id", value: kidId)
                 .single()
                 .execute()
                 .value
-            self.streakDays = row.streak_current ?? 0
+            let incoming = row.streak_current ?? 0
+            // If the client optimistically bumped the streak, discard a lower server
+            // value (server trigger may not have fired yet). Otherwise accept the
+            // server value unconditionally — including legitimate resets to 0.
+            if didOptimisticallyIncrementStreak && incoming < self.streakDays {
+                // discard — server hasn't caught up
+            } else {
+                self.streakDays = incoming
+            }
             // Phase 3: cache the reading band so feed/article/quiz queries
             // can filter age_band locally as defense-in-depth on top of RLS.
             self.readingBand = row.reading_band ?? "kids"
+            self.verityScore = row.verity_score ?? self.verityScore
+            self.quizzesPassed = row.quizzes_completed_count ?? self.quizzesPassed
         } catch {
             self.loadError = "Couldn't update your home screen."
         }
@@ -223,7 +237,7 @@ final class KidsAppState: ObservableObject {
     // K1: streak + score + badges only advance on a passing quiz. Failed
     // quizzes previously bumped streakDays anyway (same return value, same
     // celebration path) because there was no `passed` signal on the way in.
-    func completeQuiz(passed: Bool, score scoreDelta: Int, biasedSpotted: Bool) -> QuizOutcome {
+    func completeQuiz(passed: Bool, score scoreDelta: Int) -> QuizOutcome {
         guard passed else {
             return QuizOutcome(
                 previousStreak: streakDays,
@@ -236,27 +250,14 @@ final class KidsAppState: ObservableObject {
         verityScore += scoreDelta
         quizzesPassed += 1
         let oldStreak = streakDays
+        didOptimisticallyIncrementStreak = true
         streakDays += 1
-
-        var badge: BadgeUnlockScene? = nil
-        if biasedSpotted {
-            biasedHeadlinesSpotted += 1
-            if biasedHeadlinesSpotted == 5 {
-                badge = BadgeUnlockScene(
-                    tierLabel: "Gold Badge",
-                    headline: "You spotted a biased headline five times.",
-                    subhead: "Bias Detection — Level 3",
-                    iconName: "star.fill",
-                    tint: K.gold
-                )
-            }
-        }
 
         return QuizOutcome(
             previousStreak: oldStreak,
             newStreak: streakDays,
             milestone: milestoneForCurrentStreak,
-            badge: badge
+            badge: nil
         )
     }
 }

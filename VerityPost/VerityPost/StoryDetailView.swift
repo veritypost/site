@@ -3525,7 +3525,7 @@ private struct RegistrationSheetView: View {
                 Label("Follow topics you care about", systemImage: "star")
             }
             .font(.subheadline)
-            Link("Sign up — free", destination: URL(string: "\(Bundle.main.infoDictionary?["APP_BASE_URL"] as? String ?? "https://veritypost.com")/login")!)
+            Link("Sign up — free", destination: SupabaseManager.shared.siteURL.appendingPathComponent("login"))
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 .tint(.primary)

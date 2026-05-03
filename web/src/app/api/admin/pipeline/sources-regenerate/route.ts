@@ -19,11 +19,12 @@
 import 'server-only';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import Anthropic from '@anthropic-ai/sdk';
+import crypto from 'crypto';
 import { requirePermission } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { permissionError, recordAdminAction } from '@/lib/adminMutation';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { callModel } from '@/lib/pipeline/call-model';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -92,12 +93,6 @@ function extractJSON<T = unknown>(text: string): T {
   throw new Error(`Malformed JSON in LLM output (first 500 chars): ${t.slice(0, 500)}`);
 }
 
-function getAnthropicClient(): Anthropic {
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) throw new Error('ANTHROPIC_API_KEY not set');
-  return new Anthropic({ apiKey: key });
-}
-
 export async function POST(req: Request) {
   let actor: { id: string };
   try {
@@ -150,20 +145,22 @@ export async function POST(req: Request) {
 
   const userTurn = `ARTICLE TITLE: ${(article as unknown as Record<string, unknown>).title ?? ''}\n\nARTICLE BODY:\n${body}\n\nReturn the sources JSON.`;
 
-  const anthropic = getAnthropicClient();
+  const runId = crypto.randomUUID();
 
   let llmText: string;
   try {
-    const res = await anthropic.messages.create({
+    const res = await callModel({
+      provider: 'anthropic',
       model: SONNET_MODEL,
-      max_tokens: 2000,
       system: SOURCES_SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userTurn }],
+      prompt: userTurn,
+      max_tokens: 2000,
+      pipeline_run_id: runId,
+      step_name: 'sources',
+      article_id: input.article_id,
+      audience: 'adult',
     });
-    llmText = res.content
-      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-      .map((b) => b.text)
-      .join('');
+    llmText = res.text;
   } catch (err) {
     console.error('[sources-regenerate] LLM step failed', err);
     return NextResponse.json({ error: 'Source extraction failed. Try again.' }, { status: 500 });

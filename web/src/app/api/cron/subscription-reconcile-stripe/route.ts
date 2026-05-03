@@ -28,6 +28,9 @@ import { captureMessage } from '@/lib/observability';
 
 const CRON_NAME = 'subscription-reconcile-stripe';
 
+// Stable lock id for this cron. hashtext('cron_subscription_reconcile') as a JS constant.
+const SUBSCRIPTION_RECONCILE_LOCK_ID = -1_463_085_747; // hashtext('cron_subscription_reconcile')
+
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -64,6 +67,7 @@ type SubRow = {
   user_id: string;
   stripe_subscription_id: string | null;
   kid_seats_paid: number;
+  updated_at: string | null;
 };
 
 async function handle() {
@@ -75,7 +79,7 @@ async function handle() {
 
   const { data, error } = await service
     .from('subscriptions')
-    .select('id, user_id, stripe_subscription_id, kid_seats_paid')
+    .select('id, user_id, stripe_subscription_id, kid_seats_paid, updated_at')
     .eq('platform', 'stripe')
     .in('status', ['active', 'trialing'])
     .not('stripe_subscription_id', 'is', null)
@@ -136,6 +140,11 @@ async function handle() {
       }
       if (v.expected !== v.sub.kid_seats_paid) {
         drifted++;
+        // Freshness guard: skip overwrite if the row was touched within the last
+        // 5 minutes — a webhook write may have arrived after we fetched the row.
+        const FRESHNESS_GUARD_MS = 5 * 60 * 1000;
+        const rowAge = v.sub.updated_at ? Date.now() - new Date(v.sub.updated_at).getTime() : Infinity;
+        if (rowAge < FRESHNESS_GUARD_MS) continue;
         const { error: updErr } = await service
           .from('subscriptions')
           .update({ kid_seats_paid: v.expected, updated_at: new Date().toISOString() })
@@ -164,7 +173,24 @@ export const GET = withCronLog(CRON_NAME, async (request: Request) => {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
   await logCronHeartbeat(CRON_NAME, 'start');
-  const result = await handle();
-  await logCronHeartbeat(CRON_NAME, 'end', result);
-  return NextResponse.json(result);
+
+  // Advisory lock — prevent concurrent runs.
+  // Cast to unknown: generated RPC type union won't include advisory lock
+  // wrappers until the migration is applied.
+  const lockService = createServiceClient();
+  const rpcCall = lockService.rpc as unknown as (fn: string, args: Record<string, unknown>) => Promise<{ data: boolean | null }>;
+  const { data: lockAcquired } = await rpcCall('pg_try_advisory_lock', { key: SUBSCRIPTION_RECONCILE_LOCK_ID });
+  if (!lockAcquired) {
+    await logCronHeartbeat(CRON_NAME, 'end', { skipped: 'concurrent-run' });
+    return NextResponse.json({ skipped: 'concurrent-run' });
+  }
+
+  const rpcUnlock = lockService.rpc as unknown as (fn: string, args: Record<string, unknown>) => Promise<unknown>;
+  try {
+    const result = await handle();
+    await logCronHeartbeat(CRON_NAME, 'end', result);
+    return NextResponse.json(result);
+  } finally {
+    await rpcUnlock('pg_advisory_unlock', { key: SUBSCRIPTION_RECONCILE_LOCK_ID });
+  }
 });

@@ -40,7 +40,7 @@ const ROWS: { key: ChannelKey; title: string; body: string; alwaysOn?: boolean }
   {
     key: 'push',
     title: 'Mobile push',
-    body: 'Time-sensitive notifications on the iOS app. iOS only — no web push yet.',
+    body: 'Time-sensitive notifications on the iOS app. Web is in-app and email only.',
   },
   {
     key: 'email',

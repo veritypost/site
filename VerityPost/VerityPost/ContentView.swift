@@ -250,6 +250,9 @@ struct MainTabView: View {
             if let err = auth.deepLinkError {
                 deepLinkErrorBanner(message: err)
             }
+            if let user = auth.currentUser {
+                AccountStateBannerView(user: user)
+            }
 
             adultTabView
         }

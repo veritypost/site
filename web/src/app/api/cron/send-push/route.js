@@ -15,6 +15,7 @@ const CRON_NAME = 'send-push';
 // unsent notifications whose channel isn't 'in_app' (quiet hours force
 // channel='in_app' via create_notification), honours per-user
 // alert_preferences.channel_push, and dispatches via APNs.
+// APNs-only by design — see CLAUDE.md kill-switch row 11.
 //
 // Schedule: */5 * * * * (drain-until-empty per call; respects 25s
 // wall-clock budget under the Vercel function 60s ceiling).

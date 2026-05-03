@@ -13,11 +13,12 @@
 import 'server-only';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import Anthropic from '@anthropic-ai/sdk';
+import crypto from 'crypto';
 import { requirePermission } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { permissionError, recordAdminAction } from '@/lib/adminMutation';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { callModel } from '@/lib/pipeline/call-model';
 import {
   QUIZ_PROMPT,
   KIDS_QUIZ_PROMPT,
@@ -28,7 +29,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
 
-const HAIKU_MODEL = 'claude-haiku-4-5';
+const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
 const SONNET_MODEL = 'claude-sonnet-4-6';
 
 const RequestSchema = z.object({
@@ -92,12 +93,6 @@ function extractJSON<T = unknown>(text: string): T {
     }
   }
   throw new Error(`Malformed JSON in LLM output (first 500 chars): ${t.slice(0, 500)}`);
-}
-
-function getAnthropicClient(): Anthropic {
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) throw new Error('ANTHROPIC_API_KEY not set');
-  return new Anthropic({ apiKey: key });
 }
 
 export async function POST(req: Request) {
@@ -176,21 +171,24 @@ export async function POST(req: Request) {
 }
 Each option MUST be an object with a "text" field — never a bare string.`;
 
-  const anthropic = getAnthropicClient();
+  const runId = crypto.randomUUID();
+  const audience: 'adult' | 'kid' = isKid ? 'kid' : 'adult';
 
   // Step 1 — Quiz generation
   let quizText: string;
   try {
-    const res = await anthropic.messages.create({
+    const res = await callModel({
+      provider: 'anthropic',
       model: SONNET_MODEL,
-      max_tokens: 2000,
       system: quizSystem,
-      messages: [{ role: 'user', content: quizUser }],
+      prompt: quizUser,
+      max_tokens: 2000,
+      pipeline_run_id: runId,
+      step_name: 'quiz',
+      article_id: input.article_id,
+      audience,
     });
-    quizText = res.content
-      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-      .map((b) => b.text)
-      .join('');
+    quizText = res.text;
   } catch (err) {
     console.error('[quiz-regenerate] quiz step failed', err);
     return NextResponse.json({ error: 'Quiz generation failed. Try again.' }, { status: 500 });
@@ -243,16 +241,18 @@ Each option MUST be an object with a "text" field — never a bare string.`;
 
   let verifyText: string;
   try {
-    const res = await anthropic.messages.create({
+    const res = await callModel({
+      provider: 'anthropic',
       model: HAIKU_MODEL,
-      max_tokens: 1000,
       system: verifySystem,
-      messages: [{ role: 'user', content: verifyUser }],
+      prompt: verifyUser,
+      max_tokens: 1000,
+      pipeline_run_id: runId,
+      step_name: 'quiz_verification',
+      article_id: input.article_id,
+      audience,
     });
-    verifyText = res.content
-      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-      .map((b) => b.text)
-      .join('');
+    verifyText = res.text;
   } catch (err) {
     console.error('[quiz-regenerate] verify step failed', err);
     return NextResponse.json({ error: 'Quiz verification failed. Try again.' }, { status: 500 });

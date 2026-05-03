@@ -35,7 +35,7 @@ interface Props {
   preview: boolean;
 }
 
-type Audience = 'public' | 'followers' | 'hidden';
+type Audience = 'public' | 'private' | 'hidden';
 
 interface FollowerRow {
   follower_id: string;
@@ -61,8 +61,8 @@ export function PrivacyCard({ user, preview }: Props) {
   const [audience, setAudience] = useState<Audience>(
     u.profile_visibility === 'hidden'
       ? 'hidden'
-      : u.profile_visibility === 'private'
-        ? 'followers'
+      : u.profile_visibility === 'private' || u.profile_visibility === 'followers'
+        ? 'private'
         : 'public'
   );
   const [allowMessages, setAllowMessages] = useState<boolean>(u.allow_messages ?? true);
@@ -81,8 +81,8 @@ export function PrivacyCard({ user, preview }: Props) {
     setAudience(
       u.profile_visibility === 'hidden'
         ? 'hidden'
-        : u.profile_visibility === 'private'
-          ? 'followers'
+        : u.profile_visibility === 'private' || u.profile_visibility === 'followers'
+          ? 'private'
           : 'public'
     );
     setAllowMessages(u.allow_messages ?? true);
@@ -162,7 +162,7 @@ export function PrivacyCard({ user, preview }: Props) {
       setAudience(before);
       return;
     }
-    toast.success(next === 'public' ? 'Profile is public.' : 'Profile is followers-only.');
+    toast.success(next === 'public' ? 'Profile is public.' : 'Profile is private.');
   };
 
   const lockdown = async () => {
@@ -309,11 +309,11 @@ export function PrivacyCard({ user, preview }: Props) {
             onPick={() => setAudienceTo('public')}
           />
           <AudienceOption
-            label="Followers only"
-            body="Only people who already follow you can view. New visitors see a private notice."
-            active={audience === 'followers'}
+            label="Private"
+            body="Only you can view your profile."
+            active={audience === 'private'}
             disabled={busyKey === 'audience'}
-            onPick={() => setAudienceTo('followers')}
+            onPick={() => setAudienceTo('private')}
           />
           <AudienceOption
             label="Hidden"

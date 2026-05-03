@@ -1035,6 +1035,7 @@ export async function POST(req: Request) {
         pipeline_run_id: runId,
         step_name: stepName,
         cluster_id,
+        audience,
         signal: req.signal,
       });
       totalCostUsd += result.cost_usd;
@@ -1253,6 +1254,7 @@ ${catListText}`;
         pipeline_run_id: runId,
         step_name: 'headline',
         cluster_id,
+        audience,
         signal: req.signal,
       }),
       callModel({
@@ -1264,6 +1266,7 @@ ${catListText}`;
         pipeline_run_id: runId,
         step_name: 'summary',
         cluster_id,
+        audience,
         signal: req.signal,
       }),
       hintCatRow
@@ -1277,6 +1280,7 @@ ${catListText}`;
             pipeline_run_id: runId,
             step_name: 'categorization',
             cluster_id,
+            audience,
             signal: req.signal,
           }),
     ]);
@@ -1348,6 +1352,7 @@ ${corpus}`;
       pipeline_run_id: runId,
       step_name: bodyStepName,
       cluster_id,
+      audience,
       signal: req.signal,
     });
     totalCostUsd += bodyRes.cost_usd;
@@ -1400,6 +1405,7 @@ Return JSON:
         pipeline_run_id: runId,
         step_name: groundingStepName,
         cluster_id,
+        audience,
         signal: req.signal,
       });
       totalCostUsd += groundingRes.cost_usd;
@@ -1593,6 +1599,7 @@ Return JSON:
       pipeline_run_id: runId,
       step_name: timelineStepName,
       cluster_id,
+      audience,
       signal: req.signal,
     });
     totalCostUsd += timelineRes.cost_usd;
@@ -1610,6 +1617,7 @@ Return JSON:
     // ────────────────────────────────────────────────────────────────────────
     // 9j. kid_url_sanitizer (kid only) — strip/rewrite external URLs from body
     // ────────────────────────────────────────────────────────────────────────
+    let sanitizerFailed = false;
     if (audience === 'kid') {
       const sanStart = Date.now();
       const sanStepName: Step = 'kid_url_sanitizer';
@@ -1636,14 +1644,30 @@ Return JSON:
           pipeline_run_id: runId,
           step_name: sanStepName,
           cluster_id,
+          audience: 'kid',
           signal: req.signal,
         });
         totalCostUsd += sanRes.cost_usd;
         const sanitized = extractJSON<{ body: string }>(sanRes.text);
         if (sanitized && typeof sanitized.body === 'string' && sanitized.body.length > 50) {
-          finalBodyMarkdown = sanitized.body;
+          // Post-call deterministic checks before accepting the sanitized body.
+          const hasUrlLeak = /https?:\/\/|www\./i.test(sanitized.body);
+          const lengthRatioLow = sanitized.body.length < 0.5 * finalBodyMarkdown.length;
+          if (hasUrlLeak || lengthRatioLow) {
+            sanitizerFailed = true;
+            pipelineLog.warn(`newsroom.generate.${sanStepName}`, {
+              run_id: runId,
+              cluster_id,
+              audience,
+              step: sanStepName,
+              error_type: hasUrlLeak ? 'url_leak' : 'length_ratio_low',
+            });
+          } else {
+            finalBodyMarkdown = sanitized.body;
+          }
         }
       } catch (sanErr) {
+        sanitizerFailed = true;
         pipelineLog.warn(`newsroom.generate.${sanStepName}`, {
           run_id: runId,
           cluster_id,
@@ -1700,6 +1724,7 @@ Each option MUST be an object with a "text" field — never a bare string.${free
       pipeline_run_id: runId,
       step_name: quizStepName,
       cluster_id,
+      audience,
       signal: req.signal,
     });
     totalCostUsd += quizRes.cost_usd;
@@ -1758,6 +1783,7 @@ Empty array if all correct.`;
       pipeline_run_id: runId,
       step_name: verifyStepName,
       cluster_id,
+      audience,
       signal: req.signal,
     });
     totalCostUsd += verifyRes.cost_usd;
@@ -1893,14 +1919,15 @@ Empty array if all correct.`;
       console.error('[newsroom.generate.audience_state.generated]', audErr);
     }
 
-    // M4 / Q9 — flag for manual review when plagiarism step soft-degraded.
-    if (needsManualReview || plagiarismStatus !== 'ok') {
+    // M4 / Q9 — flag for manual review when plagiarism step soft-degraded,
+    // or when kid_url_sanitizer failed (raw external URLs may remain in body).
+    if (needsManualReview || sanitizerFailed || plagiarismStatus !== 'ok') {
       // Cast: generated Database types lag behind migration 166; the
       // Trigger remains the SoT for plagiarism_status.
       const { error: flagErr } = await service
         .from('articles')
         .update({
-          needs_manual_review: needsManualReview,
+          needs_manual_review: needsManualReview || sanitizerFailed,
           plagiarism_status: plagiarismStatus,
         })
         .eq('id', articleId);
@@ -1914,7 +1941,7 @@ Empty array if all correct.`;
           step: persistStepName,
           flag_update_error: flagErr.message,
           plagiarism_status: plagiarismStatus,
-          needs_manual_review: needsManualReview,
+          needs_manual_review: needsManualReview || sanitizerFailed,
         });
       }
     }

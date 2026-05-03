@@ -61,6 +61,7 @@ export interface CallModelParams {
   step_name: string;
   article_id?: string | null;
   cluster_id?: string | null;
+  audience?: 'adult' | 'kid';
   tools?: unknown[];
   temperature?: number;
   estimated_input_tokens?: number;
@@ -294,6 +295,7 @@ async function writePipelineCost(row: {
   step: string;
   article_id: string | null;
   cluster_id: string | null;
+  audience: 'adult' | 'kid';
   usage: Usage;
   cost_usd: number;
   latency_ms: number;
@@ -304,13 +306,6 @@ async function writePipelineCost(row: {
 }): Promise<void> {
   try {
     const supabase = createServiceClient();
-    // F7 — write the dedicated columns added in migration 114
-    // (cache_read_input_tokens, cache_creation_input_tokens, cluster_id,
-    // error_type, retry_count). They were stuffed in metadata jsonb and the
-    // typed columns sat at default 0/null forever. `audience` defaults to
-    // 'adult' at the DB level so omitting it is fine for adult-side runs;
-    // kid-side wiring would need plumbing audience through CallModelParams
-    // (out of scope here — separate task).
     const { error } = await supabase.from('pipeline_costs').insert({
       pipeline_run_id: row.pipeline_run_id,
       provider: row.provider,
@@ -318,6 +313,7 @@ async function writePipelineCost(row: {
       step: row.step,
       article_id: row.article_id,
       cluster_id: row.cluster_id,
+      audience: row.audience,
       input_tokens: row.usage.input_tokens,
       output_tokens: row.usage.output_tokens,
       total_tokens: row.usage.input_tokens + row.usage.output_tokens, // NOT NULL
@@ -409,6 +405,7 @@ export async function callModel(params: CallModelParams): Promise<CallModelResul
       step: params.step_name,
       article_id: params.article_id ?? null,
       cluster_id: params.cluster_id ?? null,
+      audience: params.audience ?? 'adult',
       usage,
       cost_usd,
       latency_ms,

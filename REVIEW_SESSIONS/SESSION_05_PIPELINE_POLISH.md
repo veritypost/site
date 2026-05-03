@@ -89,4 +89,32 @@ Each PM dispatches subagents as fits its surface (Swift PMs use bug-hunter-runti
 
 ## Status
 
-(append final status block here)
+### Session 5 — SHIPPED 2026-05-03
+
+**Counts:** 1 P0 + ~21 P1 closed across 5 PMs + 1 follow-up slice (reviewer + adversary surfaced 11 must-fix items; all closed).
+
+**Files changed:** 30 (15 web + 13 iOS/Kids + 2 docs). 2 new Swift files (`AccountState.swift`, `AccountStateBannerView.swift`). 1 file deleted (`web/src/app/api/ai/generate/route.js`). 2 migrations written (need owner apply — MCP read-only).
+
+**By PM:**
+- **PM-A (pipeline cost-cap):** 1 P0 + 3 P1 closed. 5 LLM-calling routes routed through `call-model.ts`. Legacy `/api/ai/generate` deleted (only caller `KidsStoryEditor.tsx` was already broken, returning 400). HAIKU_MODEL alias corrected to `claude-haiku-4-5-20251001`. Adversary added: `audience` param threaded through `CallModelParams` + `pipeline_costs` (kid spend was being tagged adult); `score-comments` got `article_id` + AbortController + per-tick advisory lock + per-comment max-attempts deadletter (3 retries via new `comments.ai_score_attempts` column); `kid_url_sanitizer` got post-call regex + length-ratio verifier; `subscription-reconcile-stripe` got 5-min freshness guard + advisory lock.
+- **PM-B (web AppShell):** 5 P1 closed. Q08 Followers-only dropped (with legacy DB-value coercion); share-link unblocked; RegistrationWall hardened with `role="dialog"` + focus trap + Escape + `?next=` + previous-focus restore; story-page CTA `target="_blank"`; BookmarksSection toast verified pre-resolved.
+- **PM-C (iOS adult):** 3 active P1 closed (Q12c was already shipped in Session 4). Q12a dead `verityposts://` parser deleted; Q10 banner port shipped (5 severity-sorted states, chrome-level insertion, frozenAccountBanner removed); StoryDetailView force-unwrap replaced with `siteURL.appendingPathComponent`. Adversary follow-up: severity order corrected to match web (`deletion_scheduled` outranks `verify_locked`); plan_grace `nil`-provider routes to App Store on iOS.
+- **PM-D (iOS kids):** 4 P1 closed. Stats SELECT fixed; Q12d biasedHeadlinesSpotted dead path deleted; streak flicker fixed via `didOptimisticallyIncrementStreak` flag (legitimate server resets to 0 still land); Q11 2-host AsyncImage allowlist with empty-string filter.
+- **PM-E (cross-platform):** 3 P1 closed. Q09 web-push doc'd (NotificationsCard copy + CLAUDE.md kill-switch row 11); Q12b kids APNs entitlement removed; story-page CTA uses `veritypostkids://` scheme with 800ms fallback.
+
+**Verification:**
+- `cd web && npx tsc --noEmit` → clean.
+- `xcodebuild VerityPost` → only pre-existing `LeaderboardView.swift:319` error (out-of-scope, carried from S4).
+- `xcodebuild VerityPostKids` → clean.
+- Independent reviewer (state-coverage lens) + adversary on PM-A → both surfaced gaps; all 11 must-fix items closed in follow-up slice.
+
+**Open items for owner attention:**
+1. **`frozen_at` users no longer see a banner.** Q10 specified 5 states explicitly; `frozen` was not in the list. Old `frozenAccountBanner` rendered on `frozen_at != nil`. Could be intentional retirement or oversight — needs owner confirmation.
+2. **`score-comments` has no kill-switch awareness.** It's moderation not generation, so `ai.adult_generation_enabled` doesn't apply. No obvious gate to check; would need a new `ai.score_comments_enabled` setting if owner wants ops to be able to halt comment scoring during incidents.
+3. **`needs_manual_review = true` has no admin queue UI.** The flag is write-only — kid articles flagged by sanitizer failure stay as drafts (won't auto-publish to kids) but no human is signaled. Surface a queue in admin/articles or admin/moderation.
+4. **2 migrations need owner apply** (MCP is read-only):
+   - `supabase/migrations/20260503000021_add_cron_advisory_lock_helpers.sql`
+   - `supabase/migrations/20260503000022_add_comment_score_attempts.sql`
+5. **Pre-existing `LeaderboardView.swift:319` Swift compile error** still present — out of scope for S5 (carried from S4 closeout).
+
+**Phase machine:** STATE.md → `ready_for_session_6`.

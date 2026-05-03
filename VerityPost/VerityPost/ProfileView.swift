@@ -145,9 +145,6 @@ struct ProfileView: View {
                         verifyEmailGate
                         logoutButton
                     } else {
-                        if user.frozenAt != nil {
-                            frozenAccountBanner
-                        }
                         heroCard(user)
                         statRow(user)
                         socialRow(user)
@@ -354,44 +351,7 @@ struct ProfileView: View {
         .padding(.horizontal, 16)
     }
 
-    // MARK: - Frozen account banner (web parity)
-    //
-    // Mirrors the inline red notice on `web/src/app/profile/page.tsx`
-    // shown when `user.frozen_at` is non-null. Tapping the banner opens
-    // the SubscriptionView sheet so the resubscribe path is one tap.
-    private var frozenAccountBanner: some View {
-        Button {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            showSubscription = true
-        } label: {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "snowflake")
-                    .font(.system(size: VP.Size.base, weight: .semibold))
-                    .foregroundColor(VP.danger)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Your Verity Score is frozen")
-                        .font(.system(.footnote, design: .default, weight: .semibold))
-                        .foregroundColor(VP.danger)
-                    Text("Resubscribe to resume tracking progress.")
-                        .font(.caption)
-                        .foregroundColor(VP.danger.opacity(0.85))
-                }
-                Spacer(minLength: 4)
-                Image(systemName: "chevron.right")
-                    .font(.caption2)
-                    .foregroundColor(VP.danger)
-            }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(VP.danger.opacity(0.08))
-            .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.danger.opacity(0.32)))
-            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Verity Score frozen. Resubscribe to resume tracking.")
-    }
+
 
     // MARK: - Hero card (avatar + display name + verity score)
     //

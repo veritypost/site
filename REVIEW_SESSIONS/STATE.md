@@ -3,7 +3,7 @@
 **This is the source of truth.** Whoever picks up next reads this first, then acts.
 
 ## Current phase
-`ready_for_session_5`
+`ready_for_session_6`
 
 ## What's done
 - 11-PM review pass complete. 156 findings in `REVIEW_REPORT.md` (18 P0, 56 P1, 63 P2, 19 P3).
@@ -16,9 +16,11 @@
 - **Session 2 shipped 2026-05-03. 6/10 closed + 4/10 refuted in pre-impl pass + 5 reviewer-surfaced follow-ups closed in same session. 13 files touched. Q04 + Q05 owner-locked decisions applied. Smoke-test deferred (needs test inbox + live Supabase).**
 - **Session 3 shipped 2026-05-03. 8/8 P0+P1+P2 closed (2 P0 + 5 P1 + 1 P2). Q03 owner-locked decision applied. 5 migrations applied via MCP; 6 new permission keys minted. 5 reviewer follow-ups + 7 adversary follow-ups closed in same session — including a P0 truth-up where the "retry" route was cosmetic theater (honest-fix per `feedback_genuine_fixes_not_patches.md`). 6 lower-priority adversary items documented as deferred. iOS / kids N/A.**
 - **Session 4 shipped 2026-05-03. 2 P0 + 11 P1 + 6 polish closed (Q06 cross-platform precheck + Q07 pricing-source-of-truth + Q12c kill-switch + iOS S2S ordering guard + cancel-state correctness). 4-stream parallel + 1 second-pass slice on adversary follow-ups (cancel-route precheck reverted, is_active filters added, iOS sync .update() error captured, StoreManager seenConflict cleanup). 16 files modified + 5 new files (billingPlatformGuard.ts, pricingCopy.ts, SubscriptionConflictSheet.swift, 2 migrations). Owner action required: apply 2 migrations (MCP read-only blocked auto-apply) + mint Stripe price IDs for verity_monthly/verity_annual then flip is_visible=true. Pre-existing LeaderboardView.swift:319 build error unchanged (out-of-scope).**
+- **Session 5 shipped 2026-05-03. 1 P0 + ~21 P1 closed across 5 PMs + 1 follow-up slice. PM-A: 5 LLM routes routed through call-model.ts + audience param threaded + 4 cron hardening items (AbortController, deadletter, advisory locks, freshness guard). PM-B: Q08 privacy drop + share-link unblock + RegistrationWall hardening + CTA target. PM-C: Q12a dead URL parser deleted + Q10 5-state account-state banner ported (frozenAccountBanner removed). PM-D: kids stats SELECT + Q12d dead path + streak flicker + Q11 image allowlist. PM-E: Q09 web-push doc + Q12b kids APNs entitlement + story-page kids deep-link scheme. 30 files changed (2 new Swift files, 1 deleted route). Reviewer + adversary surfaced 11 must-fix items; all closed in follow-up slice. 4 owner-attention items: frozen_at users see no banner (need confirmation), score-comments has no kill-switch, needs_manual_review has no admin queue, 2 migrations pending apply (MCP read-only).**
 
 ## What's blocked
-- Owner's "fire Session 5" signal unblocks the next run (Pipeline Polish — PM-9 territory: 5 LLM routes bypassing call-model.ts, kid_url_sanitizer non-fatal, score-comments cron, plus iOS bundling for Q12c handler implementation if owner wants it now vs post-launch).
+- Owner's "fire Session 6" signal unblocks the final run (verification + remaining polish + CLAUDE.md kill-switch doc-drift cleanup + Session 5 deferrals: Q02 articles UPDATE WITH CHECK, Q02 DEFAULT PRIVILEGES, frozen_at banner question, score-comments kill-switch question, needs_manual_review queue).
+- 2 Session-5 migrations need owner apply: `20260503000021_add_cron_advisory_lock_helpers.sql`, `20260503000022_add_comment_score_attempts.sql`.
 
 ## Next action (read this carefully)
 

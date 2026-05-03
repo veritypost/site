@@ -343,11 +343,11 @@ struct BadgeUnlockScene: View {
     }
 }
 
-#Preview("Badge — Gold, Bias Detection L3") {
+#Preview("Badge — Gold, 30-Day Streak") {
     BadgeUnlockScene(
         tierLabel: "Gold Badge",
-        headline: "You spotted a biased headline five times.",
-        subhead: "Bias Detection — Level 3",
+        headline: "You've read news every day for a month.",
+        subhead: "Streak Master — Level 3",
         iconName: "star.fill",
         tint: K.gold
     )

@@ -1,6 +1,7 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from 'react';
+import { usePathname } from 'next/navigation';
 
 interface RegistrationWallContextValue {
   openWall: () => void;
@@ -27,18 +28,25 @@ export function RegistrationWallProvider({
 }: RegistrationWallProviderProps) {
   const [open, setOpen] = useState(false);
   const [suppressed, setSuppressed] = useState(initialSuppressed);
+  const pathname = usePathname();
+  const headingId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const firstFocusRef = useRef<HTMLAnchorElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
   function openWall() {
     if (!isAnon) return;
     if (suppressed) return;
+    previousFocusRef.current = document.activeElement as HTMLElement | null;
     setOpen(true);
   }
 
-  function dismiss() {
+  const dismiss = useCallback(() => {
     document.cookie = 'vp_wall_supp=1; path=/; max-age=86400; Secure; SameSite=Strict';
     setSuppressed(true);
     setOpen(false);
-  }
+    previousFocusRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     if (open && isAnon && !suppressed) {
@@ -51,7 +59,48 @@ export function RegistrationWallProvider({
     };
   }, [open, isAnon, suppressed]);
 
+  useEffect(() => {
+    if (open && isAnon && !suppressed) {
+      firstFocusRef.current?.focus();
+    }
+  }, [open, isAnon, suppressed]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        dismiss();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const focusable = Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [open, dismiss]);
+
   const showModal = open && isAnon && !suppressed;
+  const next = encodeURIComponent(pathname ?? '/');
 
   return (
     <RegistrationWallContext.Provider value={{ openWall }}>
@@ -67,8 +116,13 @@ export function RegistrationWallProvider({
             alignItems: 'center',
             justifyContent: 'center',
           }}
+          onClick={(e) => { if (e.target === e.currentTarget) dismiss(); }}
         >
           <div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={headingId}
             style={{
               maxWidth: 440,
               width: 'calc(100% - 40px)',
@@ -98,6 +152,7 @@ export function RegistrationWallProvider({
               ×
             </button>
             <h2
+              id={headingId}
               style={{
                 fontSize: 22,
                 fontWeight: 700,
@@ -147,7 +202,8 @@ export function RegistrationWallProvider({
               ))}
             </ul>
             <a
-              href="/login"
+              ref={firstFocusRef}
+              href={`/login?next=${next}`}
               style={{
                 display: 'block',
                 background: 'var(--accent, #111)',

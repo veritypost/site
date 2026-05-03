@@ -38,7 +38,7 @@ final class SupabaseKidsClient {
         #endif
     }
 
-    private let supabaseURL: URL
+    let supabaseURL: URL
     private let supabaseKey: String
 
     private init() {

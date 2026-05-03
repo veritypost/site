@@ -18,11 +18,12 @@
 import 'server-only';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import Anthropic from '@anthropic-ai/sdk';
+import crypto from 'crypto';
 import { requirePermission } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { permissionError, recordAdminAction } from '@/lib/adminMutation';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { callModel } from '@/lib/pipeline/call-model';
 import {
   TIMELINE_PROMPT,
   KIDS_TIMELINE_PROMPT,
@@ -75,12 +76,6 @@ function extractJSON<T = unknown>(text: string): T {
     }
   }
   throw new Error(`Malformed JSON in LLM output (first 500 chars): ${t.slice(0, 500)}`);
-}
-
-function getAnthropicClient(): Anthropic {
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) throw new Error('ANTHROPIC_API_KEY not set');
-  return new Anthropic({ apiKey: key });
 }
 
 export async function POST(req: Request) {
@@ -148,20 +143,23 @@ export async function POST(req: Request) {
 
   const userTurn = `ARTICLE TITLE: ${articleAny.title ?? ''}\n\nARTICLE BODY:\n${body}\n\nReturn the timeline events JSON.`;
 
-  const anthropic = getAnthropicClient();
+  const runId = crypto.randomUUID();
+  const audience: 'adult' | 'kid' = isKid ? 'kid' : 'adult';
 
   let llmText: string;
   try {
-    const res = await anthropic.messages.create({
+    const res = await callModel({
+      provider: 'anthropic',
       model: SONNET_MODEL,
-      max_tokens: 3000,
       system: timelineSystem,
-      messages: [{ role: 'user', content: userTurn }],
+      prompt: userTurn,
+      max_tokens: 3000,
+      pipeline_run_id: runId,
+      step_name: 'timeline',
+      article_id: input.article_id,
+      audience,
     });
-    llmText = res.content
-      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-      .map((b) => b.text)
-      .join('');
+    llmText = res.text;
   } catch (err) {
     console.error('[timeline-regenerate] LLM step failed', err);
     return NextResponse.json({ error: 'Timeline extraction failed. Try again.' }, { status: 500 });

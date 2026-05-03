@@ -609,6 +609,7 @@ api/cron/sweep-trial-expiry/route.ts:20              — if (!verifyCronAuth(req
 ### Findings
 
 ### [P0] LLM-calling admin routes bypass `call-model.ts` cost-cap, retry, ledger, and prompt redaction
+> CLOSED in Session 5 — all 5 routes (quiz/sources/timeline-regenerate, score-comments cron, dead `ai/generate` deleted) routed through `call-model.ts`. Adversary follow-up: `audience` param threaded through `CallModelParams` + `pipeline_costs` insert (kid spend was being mislabeled adult). HAIKU_MODEL alias corrected to `claude-haiku-4-5-20251001`.
 - File: `web/src/app/api/admin/pipeline/quiz-regenerate/route.ts:96-99` + `:170-175`
 - File: `web/src/app/api/admin/pipeline/sources-regenerate/route.ts:97` + downstream `client.messages.create`
 - File: `web/src/app/api/admin/pipeline/timeline-regenerate/route.ts:82` + downstream `client.messages.create`
@@ -663,6 +664,7 @@ api/cron/sweep-trial-expiry/route.ts:20              — if (!verifyCronAuth(req
 - Verified by: file reads above; cross-grep confirms `callModel` / `checkCostCap` / `reserveCostOrFail` are only imported by `api/admin/pipeline/generate/route.ts` and the lib itself (`grep -rn "callModel\|checkCostCap\|reserveCostOrFail" web/src/app/api`).
 
 ### [P1] `kid_url_sanitizer` step is non-fatal — kid articles can persist with raw external URLs in body
+> CLOSED in Session 5 — sanitizer catch + post-call regex (`https?://` / `www.`) + length-ratio (<0.5×) checks all set `needs_manual_review = true`. Adversary surfaced silent-strip case; deterministic verifier closes it.
 - File: `web/src/app/api/admin/pipeline/generate/route.ts:1625-1652`
 - Issue: The kid-pipeline URL-sanitizer step wraps `callModel` in a try/catch and on any failure logs a warning but **leaves `finalBodyMarkdown` untouched** (i.e., still containing the URLs the writer step emitted). The article continues through persist with raw URLs in the body, then ships as `status='draft'` with no `needs_manual_review` flag.
 - Evidence:
@@ -681,6 +683,7 @@ api/cron/sweep-trial-expiry/route.ts:20              — if (!verifyCronAuth(req
 - Verified by: file read + cross-reference to plagiarism flag-handling pattern at L1543-1546 + L1893-1916.
 
 ### [P1] `score-comments` cron has no per-tick cost ceiling AND processes up to 100 comments serially with no backoff
+> CLOSED in Session 5 — TICK_MAX_COMMENTS=50 + TICK_MAX_MS=30s + CHUNK_SIZE=5 Promise.all + AbortController on signal + per-comment `ai_score_attempts` deadletter (max 3) + advisory lock vs concurrent runs. `article_id` now passed to ledger.
 - File: `web/src/app/api/cron/score-comments/route.ts:38-121`
 - Issue: Selects 100 comments at a time (`.limit(100)` L45), iterates `for (const comment of comments)`, and inside each iteration creates an Anthropic Haiku call. No `checkCostCap`, no retry policy, no parallelism cap, no per-tick budget. Errors are caught and logged per comment but not aggregated against any ceiling.
 - Evidence:
@@ -706,6 +709,7 @@ api/cron/sweep-trial-expiry/route.ts:20              — if (!verifyCronAuth(req
 - Verified by: file read.
 
 ### [P1] `subscription-reconcile-stripe` overwrites local `kid_seats_paid` with whatever Stripe says — even when Stripe is empty
+> CLOSED in Session 5 — 5-minute freshness guard skips rows touched by recent webhook + advisory lock prevents overlapping reconcile runs.
 - File: `web/src/app/api/cron/subscription-reconcile-stripe/route.ts:107-153`
 - Issue: When `stripeRetrieveSubscription` returns `null` (network blip, 4xx, missing key), the row is counted as an error and skipped. But when Stripe responds successfully but no item matches `seat_role='extra_kid'` AND no item matches `family_base`, `expected = sub.kid_seats_paid` (line 120) — meaning the cron passes the existing value through unchanged. That branch is safe. However, if a Stripe `family_base` price loses its `seat_role='family_base'` metadata for any reason (manual product edit, migration), `isFamilyBase` becomes `false` and again `expected = sub.kid_seats_paid` — also safe.
   - The real issue: if `family_base` is correctly tagged but `extra_kid` items were temporarily removed (admin deleted then re-added a price item between webhook and cron), `expected = Math.min(4, 1 + 0) = 1`, and the cron OVERWRITES `kid_seats_paid` from (e.g.) 4 to 1. The row is written immediately (L139-142) without confirming via a second read or comparing against any audit-log freshness threshold. A webhook event that arrives the next second to restore the items would race.
@@ -784,6 +788,7 @@ api/cron/sweep-trial-expiry/route.ts:20              — if (!verifyCronAuth(req
 **Total:** 0 P0 · 4 P1 · 7 P2 · 2 P3 · 1 [KILL-SWITCHED] · 3 parity flags for PM-10.
 
 ### [P1] Custom URL scheme `verityposts://story/<slug>` is dead — Info.plist registers `verity://` not `verityposts://`
+> CLOSED in Session 5 (Q12a Option B) — dead `verityposts://` parser branch deleted from `VerityPostApp.swift`. `verity://` (Supabase OAuth) and universal-link branches preserved.
 - File: `VerityPost/VerityPost/VerityPostApp.swift:23` and `VerityPost/VerityPost/Info.plist:24-27`
 - Issue: `ArticleRouter.slug(from:)` parses `scheme == "verityposts"` for the custom-scheme deep-link branch, but `Info.plist` only registers `verity` as the URL scheme. iOS will never deliver a `verityposts://` URL to the app, so the custom-scheme branch in `slug(from:)` is unreachable. Push payloads that reference `verityposts://story/<slug>` (the comment at line 16 calls this out as "reserved for push payloads") would arrive at the app and silently fail to route.
 - Evidence — `VerityPostApp.swift:21-26`:
@@ -804,6 +809,7 @@ api/cron/sweep-trial-expiry/route.ts:20              — if (!verifyCronAuth(req
 - Verified by: `grep -n "verityposts\|verity://" VerityPostApp.swift AuthViewModel.swift Info.plist` confirmed the mismatch on disk.
 
 ### [P1] AlertsView "Manage" tab renders Add Category / Subcategory / Keyword UI but every Add button silently no-ops
+> CLOSED in Session 4 (Q12c Option A) — `manageSubscriptionsEnabled` flipped to `false`; `manageContentPlaceholder` renders kill-switched copy until handlers ship post-launch. Re-confirmed by Session 5 PM-C verification.
 - File: `VerityPost/VerityPost/AlertsView.swift:340, 786-812`
 - Issue: `manageSubscriptionsEnabled = true` (line 340) flips the Manage tab live. The picker UI renders. But `addCategorySubscription()`, `addSubcategorySubscription()`, and `addKeywordSubscription()` all discard their inputs (`_ = userId; _ = catName`) without making any API call.
 - Evidence — `AlertsView.swift:786-812`:
@@ -821,6 +827,7 @@ api/cron/sweep-trial-expiry/route.ts:20              — if (!verifyCronAuth(req
 - Verified by: file read; cross-reference to CLAUDE.md kill-switch inventory.
 
 ### [P1] `RegistrationSheetView` force-unwraps a `URL(string:)` constructed from a concatenated Info.plist value
+> CLOSED in Session 5 — replaced with `SupabaseManager.shared.siteURL.appendingPathComponent("login")` (the safe pattern from `SubscriptionView.swift:128`).
 - File: `VerityPost/VerityPost/StoryDetailView.swift:3528`
 - Issue: `Link("Sign up — free", destination: URL(string: "\(Bundle.main.infoDictionary?["APP_BASE_URL"] as? String ?? "https://veritypost.com")/login")!)`. Only force-unwrap on a constructed URL in the entire codebase. The fallback `https://veritypost.com/login` is RFC-clean, but the build-time `APP_BASE_URL` could be set with whitespace or an invalid character that fails URL parsing → crash on registration-sheet present.
 - Evidence — `StoryDetailView.swift:3528`:
@@ -1406,6 +1413,7 @@ Scope: public/anonymous + auth-entry surfaces of the web app (login, signup, for
 **Note on kill-switch state:** Per `CLAUDE.md` the `/u/[username]` and `/profile/[id]` routes are listed as kill-switched, but `PUBLIC_PROFILE_ENABLED` at `web/src/app/u/[username]/page.tsx:22` is set to `true` and `web/src/app/profile/[id]/page.tsx` does not reference the flag (it's a thin redirect). Treating these surfaces as **live** for the review per the actual code state.
 
 ### [P1] Privacy "Followers-only" setting silently saves as fully-private — runtime treats followers as random visitors
+> CLOSED in Session 5 (Q08 Option B) — middle `AudienceOption` removed; enum now Public ↔ Private; toast + sublabel updated. Adversary follow-up: legacy DB `'followers'` value coerced to `'private'` on read so existing users aren't silently overwritten.
 - File: `web/src/app/profile/settings/_cards/PrivacyCard.tsx:158,165` and `web/src/app/u/[username]/page.tsx:207-218`
 - Issue: PrivacyCard exposes a tri-state audience picker — Public / **Followers** / Hidden. Picking "Followers" persists `profile_visibility = 'private'` and toasts "Profile is followers-only." But `/u/[username]` blocks `'private'` for *every* non-self viewer — followers get the same dead-end as randoms.
 - Evidence: `PrivacyCard.tsx:158`: `const dbValue = next === 'public' ? 'public' : 'private';`; `:165`: `toast.success(next === 'public' ? 'Profile is public.' : 'Profile is followers-only.');`. Paired with `/u/[username]/page.tsx:207-218`: `if ((targetRow.profile_visibility === 'private' || targetRow.profile_visibility === 'hidden') && user.id !== targetRow.id) { … setPrivateProfile(true); … return; }` — no follow-relationship check.
@@ -1414,6 +1422,7 @@ Scope: public/anonymous + auth-entry surfaces of the web app (login, signup, for
 - Verified by: end-to-end read of both files; no other branch in `/u/[username]` softens the private gate.
 
 ### [P1] PublicProfileSection share-link block suppressed by stale kill-switch comment though `/u/[username]` is live
+> CLOSED in Session 5 — share-link Link block re-enabled (renders `veritypost.com/u/{username}` when visibility is public + username exists). Stale kill-switch comment removed.
 - File: `web/src/app/profile/_sections/PublicProfileSection.tsx:191-193`
 - Issue: Inline comment claims `Public URL link intentionally omitted — /u/[username] is kill-switched pending public profile launch. Re-enable when PUBLIC_PROFILE_ENABLED flips to true.` But `web/src/app/u/[username]/page.tsx:22` already has `const PUBLIC_PROFILE_ENABLED = true;` — flag flipped, public profile is live, share-link affordance was never re-enabled.
 - Evidence: comment at `PublicProfileSection.tsx:191-193`; flag definition at `u/[username]/page.tsx:22` set to `true`.
@@ -1422,6 +1431,7 @@ Scope: public/anonymous + auth-entry surfaces of the web app (login, signup, for
 - Verified by: grep `PUBLIC_PROFILE_ENABLED`; both files read.
 
 ### [P1] RegistrationWall "Sign up — free" CTA goes to `/login` and drops `next` param; modal lacks aria/focus-trap/Escape
+> CLOSED in Session 5 — `role="dialog"` + `aria-modal="true"` + `aria-labelledby` + Tab/Shift+Tab focus trap + Escape handler + `?next=<encoded-pathname>` on /login link. Adversary follow-up: previous-focus capture/restore on open/close.
 - File: `web/src/components/RegistrationWall.tsx:38-186`
 - Issue: Modal is opened from anon flows on the article page (via `openWall` in `BookmarkButton`, `ArticleQuiz`). Two issues:
   1. Primary CTA is `<a href="/login">` with no `next` param. After auth, the user lands on `/` instead of returning to the article they were reading.
@@ -1432,6 +1442,7 @@ Scope: public/anonymous + auth-entry surfaces of the web app (login, signup, for
 - Verified by: full file read; cross-reference to `AnonArticleCtaBanner` which does pass `next`.
 
 ### [P1] Story page "Open in Verity Kids" CTA has `rel="noopener noreferrer"` but no `target` — navigates current tab
+> CLOSED in Session 5 — `target="_blank"` added; CTA rewritten to use `veritypostkids://story/<slug>` deep-link with 800ms web-URL fallback (covers users without app installed).
 - File: `web/src/app/[slug]/page.tsx:369-385`
 - Issue: COPPA articles render an "Open in Verity Kids" CTA with `<a rel="noopener noreferrer">` but no `target="_blank"`. `rel` is a no-op without `target`; the link will navigate the current tab to whatever `NEXT_PUBLIC_KIDS_APP_URL` points at.
 - Evidence: `[slug]/page.tsx:370-388`: `<a href={process.env.NEXT_PUBLIC_KIDS_APP_URL} rel="noopener noreferrer" style={{ … }}>Open in Verity Kids</a>` — no `target`.
@@ -1440,6 +1451,7 @@ Scope: public/anonymous + auth-entry surfaces of the web app (login, signup, for
 - Verified by: file read.
 
 ### [P1] BookmarksSection imports `useToast` but never invokes it; failure path is dead-end
+> CLOSED in Session 5 — verified pre-resolved: `toast.error()` is invoked on the `queryError` path at `BookmarksSection.tsx:54`. Finding stale.
 - File: `web/src/app/profile/_sections/BookmarksSection.tsx:15,28,50-54,64-68`
 - Issue: Component imports `useToast` and calls `const toast = useToast();` but the error branch on the bookmarks query just sets `setError(true)` and renders fallback copy with no Retry CTA — every other surface in this app surfaces a Retry via `ErrorState`.
 - Evidence: line 28: `const toast = useToast();` (unused — grep confirmed no `toast.` invocations); lines 50-54: `if (queryError) { setError(true); setLoading(false); return; }`; lines 64-68 render dead-end copy.
@@ -1655,6 +1667,7 @@ private func handleIncomingURL(_ url: URL) {
 ### P1 findings
 
 ### [P1] Profile stats render stale 0 instead of server values until kid completes a quiz this session
+> CLOSED in Session 5 — `KidsAppState.loadKidRow()` SELECT extended with `verity_score`, `quizzes_completed_count`; populated into `verityScore` + `quizzesPassed` on load.
 - File: `VerityPostKids/VerityPostKids/KidsAppState.swift:36-37,90-115` and `VerityPostKids/VerityPostKids/ProfileView.swift:152-157`
 - Issue: `verityScore` and `quizzesPassed` are `@Published` in-memory counters initialized to 0. `KidsAppState.loadKidRow()` selects only `streak_current, reading_band` — `verity_score`, `quizzes_completed_count`, and `articles_read_count` are never fetched. ProfileView binds the 2x2 stats grid to `state.verityScore` and `state.quizzesPassed`, so a paired kid who has 87 score + 14 passed quizzes server-side sees `0 Score / 0 Quizzes` on every cold launch until they finish a quiz this session, then `+10 / 1`.
 - Evidence:
@@ -1681,6 +1694,7 @@ private func handleIncomingURL(_ url: URL) {
 - Verified by: read of `KidsAppState.swift`, `ProfileView.swift`, `LeaderboardView.swift` on disk; `grep` for `verity_score` confirmed the column is selected in `loadGlobal` (LeaderboardView line 209) but never in KidsAppState.
 
 ### [P1] `biasedHeadlinesSpotted` badge cannot fire (always passed `false`)
+> CLOSED in Session 5 (Q12d Option B) — dead path deleted: state field, `completeQuiz` param, branch, `KidsAppRoot` call-site arg. `BadgeUnlockScene` view + slot retained; preview block replaced with streak-tier example.
 - File: `VerityPostKids/VerityPostKids/KidsAppRoot.swift:249-253` and `VerityPostKids/VerityPostKids/KidsAppState.swift:241-253`
 - Issue: `KidsAppRoot.handleQuizComplete` calls `state.completeQuiz(passed: result.passed, score: scoreDelta, biasedSpotted: false)` — third argument is hardcoded `false`. `KidsAppState.completeQuiz` only increments `biasedHeadlinesSpotted` and returns the Bias Detection Level 3 badge when `biasedSpotted == true`. The badge never fires; `biasedHeadlinesSpotted` never increments; the only path to a `BadgeUnlockScene` from quiz completion is dead code.
 - Evidence:
@@ -1705,6 +1719,7 @@ private func handleIncomingURL(_ url: URL) {
 - Verified by: read of both files on disk; `grep "biasedSpotted" VerityPostKids/` returns only the call site (always `false`) and the function signature.
 
 ### [P1] Streak count flickers down on foreground re-load before server trigger lands
+> CLOSED in Session 5 — `didOptimisticallyIncrementStreak` flag added; flicker suppressed only within session after optimistic bump; legitimate server resets to 0 still land (adversary follow-up).
 - File: `VerityPostKids/VerityPostKids/KidsAppRoot.swift:79-95` and `VerityPostKids/VerityPostKids/KidsAppState.swift:226-240`
 - Issue: `completeQuiz(passed: true, …)` does `streakDays += 1` (in-memory). The server-side streak is recomputed by a trigger on `reading_log` insert. On scenePhase → active, KidsAppRoot calls `state.load(forKidId:kidName:)` which calls `loadKidRow()` and *overwrites* `streakDays` with `kid_profiles.streak_current`. If the trigger hasn't fired yet (replication lag, transient connectivity, server-side trigger ordering), the foreground reload pulls the old value and the kid sees: 5 → animate to 6 (StreakScene celebrates) → background app → return → streak shows 5 again. Kids background the app right after a celebration scene constantly — that's the natural flow.
 - Evidence:
@@ -1726,6 +1741,7 @@ private func handleIncomingURL(_ url: URL) {
 - Verified by: read of both files on disk; the comment at line 232-238 of KidsAppRoot.swift names this exact concern but the mitigation is incomplete.
 
 ### [P1] AsyncImage loads `cover_image_url` from arbitrary external hosts (ATS / privacy)
+> CLOSED in Session 5 (Q11) — 2-host first-party allowlist (Supabase host + `cdn.veritypost.com`) on `KidReaderView.swift:122`. Apple Kids 1.3 compliant. Adversary follow-up: empty-host strings filtered out of allowlist.
 - File: `VerityPostKids/VerityPostKids/KidReaderView.swift:122-132`
 - Issue: Article cover images are loaded via `AsyncImage(url:)` from `article.coverImageUrl` (any URL string from `articles.cover_image_url`). No scheme allowlist, no host allowlist, no per-request cache-control. This means: (a) `http://` URLs would hit Apple's ATS exception path and either fail or — if a future Info.plist exception lands — leak unencrypted traffic from a kid device; (b) cover URLs pointing to third-party CDNs (Unsplash, Imgur, news-source CDNs) leak the kid's device IP + network fingerprint to those hosts every time the article list/reader renders. Apple Kids Category review (App Store Review Guidelines 1.3 / 5.1.4) prohibits third-party tracking from kid surfaces; even passive image loads from non-allowlisted domains are scrutinized.
 - Evidence:
@@ -1968,6 +1984,7 @@ This is PM-5's [P0] re-stated through a cross-platform lens to confirm scope: th
 - **Needs treatment on:** iOS-adult only (web doesn't have this pattern; kids has no IAP).
 
 ### [P1] Account-state banner asymmetry — iOS-adult surfaces `frozenAccountBanner` only; web has 15 banner states
+> CLOSED in Session 5 (Q10) — 5 states ported (`muted`, `verify_locked`+`unverified_email` paired, `plan_grace`, `deletion_scheduled`, `banned`). New: `AccountState.swift` + `AccountStateBannerView.swift`. Inserted at `ContentView.swift:253`; old `frozenAccountBanner` deleted from `ProfileView.swift`. Adversary follow-up: severity order swapped to match web (`deletion_scheduled` outranks `verify_locked`); plan_grace `nil`-provider routes to App Store on iOS. **Open: `frozen_at` users no longer see a banner — Q10 didn't list `frozen` as a state. Owner check needed.**
 
 - Files:
   - Web: `web/src/app/profile/_components/AccountStateBanner.tsx:30-210` — 15 cases (`banned`, `locked_login`, `verify_locked`, `unverified_email`, `deletion_scheduled`, `frozen`, `muted`, `shadow_banned`, `expert_rejected`, `plan_grace`, `expert_pending`, `comped`, `trial-ending-week`, `trial-ending-day`, `trial_extended`, `beta_cohort_welcome`)
@@ -1993,6 +2010,7 @@ This is PM-5's [P0] re-stated through a cross-platform lens to confirm scope: th
 - **Needs treatment on:** iOS-adult only (web complete, kids N/A — kids app has no adult account states).
 
 ### [P1] Web has no push-notification surface at all; iOS-adult ships full APNs registration + delivery
+> CLOSED in Session 5 (Q09 Path B) — documented iOS-only. NotificationsCard copy rewritten ("Web is in-app and email only"); CLAUDE.md kill-switch row 11 added; `cron/send-push/route.js` annotated APNs-only.
 
 - Files:
   - iOS-adult: `VerityPost/VerityPost/PushRegistration.swift` (108 lines), `PushPermission.swift`, `PushPromptSheet.swift`, `AlertsView.swift:92` (registers user)
@@ -2016,6 +2034,7 @@ This is PM-5's [P0] re-stated through a cross-platform lens to confirm scope: th
 - **Needs treatment on:** web only (iOS-adult complete, iOS-kids appropriately N/A — Apple Kids Category disallows targeted push from kid surfaces).
 
 ### [P1] iOS-kids has APNs entitlement but no registration code — entitlement drift
+> CLOSED in Session 5 (Q12b Option B) — `aps-environment` key removed from `VerityPostKids.entitlements`; `associated-domains` block preserved.
 
 - Files:
   - `VerityPostKids/VerityPostKids/VerityPostKids.entitlements` — has `aps-environment` (per PM-7 audit table)
@@ -2028,6 +2047,7 @@ This is PM-5's [P0] re-stated through a cross-platform lens to confirm scope: th
 - **Needs treatment on:** iOS-kids only.
 
 ### [P1] `verityposts://` push deep-link scheme not registered — iOS push payloads silently fail to route
+> CLOSED in Session 5 (Q12a Option B) — same fix as PM-6: dead `verityposts://` parser deleted. The unregistered scheme question is moot once the consumer is gone.
 
 This is PM-6's [P1] re-stated as a parity finding because it's specifically a push-flow gap.
 
@@ -2052,6 +2072,7 @@ This is PM-6's [P1] re-stated as a parity finding because it's specifically a pu
 - **Needs treatment on:** iOS-adult only (web side is the push sender; kids correctly registered).
 
 ### [P1] `[slug]/page.tsx:369` "Open in Verity Kids" CTA uses web URL only — does not invoke the `veritypostkids://` deep-link
+> CLOSED in Session 5 — href changed to `veritypostkids://story/${slug}`; onClick falls back to `NEXT_PUBLIC_KIDS_APP_URL` after 800ms.
 
 This extends PM-2's P1 finding ("Open in Verity Kids" CTA has rel without target, navigates current tab) with a parity dimension: the standalone `OpenKidsAppButton` component DOES use the deep-link, but the COPPA-article CTA on the story page does not.
 
@@ -2084,6 +2105,7 @@ This extends PM-2's P1 finding ("Open in Verity Kids" CTA has rel without target
 - **Needs treatment on:** web only.
 
 ### [P1] Privacy "Followers-only" copy lies; iOS settings has no privacy-visibility surface at all
+> CLOSED in Session 5 (Q08 Option B) — web side: option dropped + copy fixed (see PM-2 closure). iOS side: confirmed N/A (no settings UI to update).
 
 - Files:
   - Web: `web/src/app/profile/settings/_cards/PrivacyCard.tsx:158,165` — saves `'private'` for the "Followers" choice; `web/src/app/u/[username]/page.tsx:207-218` — blocks `'private'` for every non-self viewer
