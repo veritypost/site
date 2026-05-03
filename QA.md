@@ -21,11 +21,11 @@ NOTES:   <one line — anything the next turn needs to know>
 **Active:**
 
 ```
-CURRENT: Admin/owner backstage-pass for /profile — implemented + diff-reviewed + static-checked + bug-hunted; awaiting commit+push then owner prod confirm
+CURRENT: Admin/owner backstage-pass for /profile — pushed ee9ea19; Vercel deploying; awaiting owner prod confirm → then §8.4 lock
 SHAPE:   role
 TARGET:  /profile + iOS adult PermissionService + 1 supabase migration · iOS kids N/A
-STATUS:  committing
-NOTES:   Steps 1-6 complete. Diff peer review PASS 5/5. TSC clean, ESLint 1 pre-existing warning (line 193 — predates fix). Bug-hunter caught 1 real bug (is_owner_mode_user missing expires_at filter) — fixed + re-applied + verified. Migration tested: helper returns true for admin@veritypost.com, false for bogus user. Local smoke: /profile + section queries return 302 (auth redirect, expected). Next: commit, push, owner prod confirm, §8.4 lock.
+STATUS:  pushed (pending-prod-confirm)
+NOTES:   commit ee9ea19 pushed to main. Vercel project veritypost-site auto-deploys web/ (~2 min). DB migration already applied to fyiwulqphgmoqullmrfn. Owner verifies at verityposts.com/profile: every section unlocked, "Admin view" pill on Expert queue + Expert profile, Plan section shows "Full access (no subscription required)". Once confirmed, owner writes LOCKED line in §8.4.
 ```
 
 **Parking lot** (intent the owner mentioned but didn't switch to — pulled from here after CURRENT closes):
