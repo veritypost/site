@@ -5,17 +5,18 @@ Single-line state for the review system. Updated automatically at session end.
 ```
 CURRENT_PHASE: auto-detect
 CURRENT_UNIT: pending
-CURRENT_TITLE: Unit 3 — Browse (/browse)
+CURRENT_TITLE: Unit 4 — Search (/search)
 CURRENT_WAVE: A
-CURRENT_DOC: UI_UX_REVIEW/A-3-browse.md
+CURRENT_DOC: UI_UX_REVIEW/A-4-search.md
 STATUS: pending
-NEXT_BUILD_SLICE: Unit 3 review → Slice 11 (Browse fix)
-ANCHOR: Slice 9 (Cross-platform parity bridges) shipped 2026-05-02. UpNextSheet (90% scroll + post-comment), ReadingProgressRibbon, MidBodyQuizTeaser, Timeline NOW marker, iOS comment sort/denial/mod — all 3 streams clean; commit c9a1837 pushed. DECISION #052 locked. All Wave A cross-cutting slices (1-9) now shipped. Next: review Wave A units 3-11 to build Slices 11-19, then Slice 10 (Wave A verification). Starting with Unit 3 (Browse).
+NEXT_BUILD_SLICE: Unit 4 review → Slice 12 (Search fix)
+ANCHOR: Slice 11 (Browse fix) shipped 2026-05-02. All 38 findings fixed. tsc clean, smoke PASS. Auto-detect next: (e) advance to Unit 4 review.
 LAST_UPDATED: 2026-05-02
 
 PARKED_UNITS:
 - Unit 1 (Home) — status: fixed (Slice 3 shipped 2026-05-02). HomeBrokenPinBanner admin signal TODO in page.tsx.
 - Unit 2 (Article reader) — status: fixed (Slices 4+5 shipped 2026-05-02). All 128 findings resolved.
+- Unit 3 (Browse) — status: fixed (Slice 11 shipped 2026-05-02). All 38 findings resolved.
 
 EXECUTION_PLAN: UI_UX_REVIEW_SLICES.md
 SLICE_NAMING: sequential numbers (Slice 1, 2, 3, ...). See SLICES.md tracking table for type (Foundation / Unit fix / Cross-cutting / Verification) and dependencies.

@@ -522,12 +522,93 @@ Seed `ad_placements` rows + add `<Ad placement="..."/>` calls:
 | Slice 8 — iOS CSAM-trio bridge | Cross-cutting | shipped 2026-05-02 (BlockService.swift enum extended; adversary clean; pre-existing union-enum divergence logged to drift bin) | — | #047 | 1 |
 | Slice 9 — Cross-platform parity bridges | Cross-cutting | shipped 2026-05-02 (3-stream parallel; UpNextSheet+ribbon+teaser+NOW marker web; iOS sort+denial+mod; tsc clean; commit c9a1837 pushed) | 4 | #052 | 1 |
 | Slice 10 — Wave A verification sweep | Verification | not started | all Wave A unit-fix slices | — | 1 |
+| Slice 11 — Unit 3 / Browse (38 findings) | Unit fix | shipped 2026-05-02 (2-stream parallel; tsc + build clean; smoke PASS; all 38 findings fixed) | 1 + 2 | #029, #053, #054 | 1 |
+
+---
+
+## Slice 11 — Unit 3 / Browse (38 findings)
+
+**Status:** ready to build
+**Prerequisite:** Slices 1 + 2 done (both shipped 2026-05-02).
+**Elevated-care:** NO (no RBAC / payments / kid-safety / migration). Adversary pass recommended but not mandatory.
+
+**Decisions consumed:** #029, #053, #054, PRINCIPLE §1.1, §2.1, §3.2, §6
+
+**Scope summary (38 findings, organized by stream):**
+
+### Stream A — Accessibility + ARIA (Findings #1–#9)
+- **#1 (FilterSheet dialog):** Add `role="dialog"` `aria-modal="true"` `aria-labelledby="filter-sheet-title"` to the sheet container. Add `id="filter-sheet-title"` to the "Advanced Filters" heading. Add focus-trap (on open: `focus()` the first focusable element; on Escape keydown: `onClose()`). Add `onKeyDown` to backdrop div: `if (e.key === 'Escape') onClose()`.
+- **#2 (search input):** Add `aria-label="Search stories and headlines"` to `<input>` at line 597.
+- **#3 (Filters button):** Add `aria-label="Open filters"` and `aria-expanded={filterOpen}` to the filters button at line 600.
+- **#4 (FilterSheet close button):** Add `aria-label="Close filters"` to the × button at line 374. Increase its hit area to ≥44×44px (change width/height from 28 to 44, or add padding).
+- **#5 (search clear button):** Add `aria-label="Clear search"` to the × button at line 598.
+- **#6 (touch targets):** `PillToggle` → `minHeight: 44`. Category chips → `minHeight: 44`. Active-pill × dismiss buttons → add `padding: '8px'` + `aria-label={`Remove filter: ${p.label}`}`.
+- **#7 (reduced motion — breaking dot):** Wrap `vp-live-pulse` in `@media (prefers-reduced-motion: no-preference)` in the `<style>` block at line 575.
+- **#8 (reduced motion — skeleton):** Wrap both `vp-sk` instances (page.tsx:455 and loading.tsx:11) in `@media (prefers-reduced-motion: no-preference)`.
+- **#9 (SectionHeader heading):** Change `<div>` inside `SectionHeader` to `<h2>` at line 315. Apply existing uppercase/muted/sans styles to the `<h2>`.
+
+### Stream B — Filter functionality (Findings #10–#15, #38 + DECISION #054)
+- **#10 (quiz dead code):** Remove `quiz: QuizKey` from `FilterState`, `DEFAULT_FILTERS`, `hasFilters` check. Remove `QuizKey` type (unused). Clean `activeFilterCount` and `ActiveFilters` (already don't reference quiz). Leave a TODO comment: `// quiz filter: add FilterSection here when quiz data is available on clusters`.
+- **#11 (CoverageTimeline touch):** Add `onTouchMove={handleMove}` and `onTouchEnd={() => setTip(null)}` to the container `<div>` at line 181.
+- **#12 (date range validation):** Add guard in FilterSheet before applying: if `filters.dateTo && filters.dateFrom && filters.dateTo < filters.dateFrom`, render inline error: "End date must be after start date." Disable "Show N stories" button until valid.
+- **#13 (date range semantics):** Document the current semantic (story overlaps range) in a comment. The existing behavior is actually reasonable — a story that spans 3 months IS relevant to a date range inside it. Keep as-is; add a comment.
+- **#14 (retry race):** Extract `doLoad` as a stable function; add `abortRef.current?.abort()` before each fetch; use `AbortController`. Reset `stories` to `[]` before retry at line 566.
+- **#15 (empty state CTA):** When `stories.length === 0` (genuine empty, not filtered), add CTA: `<Link href="/">← Back to front page</Link>` styled as primary button. Separately: the filtered empty state already has "Clear all filters" — keep it.
+- **#38 (URL params — DECISION #054):** On every filter + sort + category + query change: `router.replace(\`/browse?${buildParams(filters, category, query)}\`, { scroll: false })`. On mount: read `useSearchParams()` to initialize state. Helper `buildParams` serializes all dimensions, omits defaults. Note: requires `import { useSearchParams, useRouter, usePathname } from 'next/navigation'`.
+
+### Stream C — Dark mode + visual polish (Findings #17–#22, #29)
+- **#17 (C.soft, C.muted, C.resolved):** Replace hardcoded hex with CSS variable equivalents: `soft: 'var(--text-secondary, #444444)'`, `muted: 'var(--dim-more, #999999)'`, `resolved: 'var(--dim, #9ca3af)'`. (Use the actual token names from the design system — verify against `globals.css`.)
+- **#18 (header background):** Replace `rgba(255,255,255,0.97)` with `var(--bg-opaque, rgba(var(--bg-rgb, 255,255,255),0.97))`. If the CSS variable doesn't exist yet, use `var(--bg, #ffffff)` with `opacity: 0.97` applied on an inner div.
+- **#19 (tooltip white text):** Replace hardcoded `color: '#fff'` in tooltip with `color: 'var(--bg, #ffffff)'` (the light/dark-mode-aware background color for reversed text).
+- **#20 (button white text):** Same fix for "Show N stories" button and "Clear all" button.
+- **#21 (tap highlight):** Keep `* { -webkit-tap-highlight-color: transparent }` but add a `:focus-visible` outline rule: `button:focus-visible { outline: 2px solid var(--text, #111); outline-offset: 2px; }` to the same `<style>` block.
+- **#22 (global scrollbar hide):** Change `::-webkit-scrollbar { display: none }` to only apply to the category chip container and the FilterSheet content area. Add a class name to those containers and scope the CSS.
+- **#29 (relTime hybrid):** Update `relTime` function to match DECISION #029: if `h < 24` return relative; else return `Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(ms))`. This is consistent with `fmtDate` already in the file.
+
+### Stream D — Skeleton + loading parity + metadata (Findings #30–#32, #37)
+- **#30 (BrowseSkeleton vs loading.tsx):** Align the two skeletons: (a) both render 5 rows, (b) `BrowseSkeleton` uses `var(--card)` (not `C.border`) for bones, (c) `BrowseSkeleton` drops lifecycle-colored borders (loading.tsx doesn't have them — match it), (d) animation class names identical.
+- **#31 (loading.tsx paddingTop):** Change `paddingTop: 188` to `paddingTop: 'calc(188px + var(--vp-top-bar-h, 0px))'`.
+- **#32 (loading.tsx safe-area):** Change `paddingBottom: 80` to `paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 0px))'`.
+- **#37 (metadata):** Create `web/src/app/browse/layout.tsx` (new server component) that exports: `export const metadata = { title: 'Browse stories · Verity Post', description: 'Browse breaking, developing, and resolved news stories on Verity Post.', openGraph: { title: 'Browse stories · Verity Post' } }`. No other changes.
+
+### Stream E — Remaining polish (Findings #23–#28, #33–#36)
+- **#23 (body scroll lock):** On FilterSheet open: `document.body.style.overflow = 'hidden'`; on close: `document.body.style.overflow = ''`. Add to `useEffect` inside FilterSheet keyed on `open` prop.
+- **#24 (active pill labels):** In `ActiveFilters`, replace raw key with human labels: `coverage` map: `{ light: 'Light (<5)', medium: 'In Depth (5–15)', heavy: 'Major (15+)' }`; `sort` map: `{ coverage: 'Most Coverage', duration: 'Longest Running' }`.
+- **#25 (search min-char):** Add `aria-describedby="search-hint"` to the input and render `<span id="search-hint" className="sr-only">Type at least 2 characters to search</span>` below. Also show a subtle "Type 2+ characters to search" hint inline when `query.length === 1`.
+- **#26 (slug-less card):** Apply DECISION #022 fix at query layer: in `loadStories`, add `.not('feed_cluster_articles.articles.stories.slug', 'is', null)` filter OR in `toStory`, set `slug` to `null` and check in render — already done. The visual fix: on slug-less cards, add `cursor: 'default'` to the card container, and a subtle `opacity: 0.7` to signal non-interactivity.
+- **#27 (aria-live for count):** Wrap the `{totalMatching} stories` span in `<span aria-live="polite" aria-atomic="true">`.
+- **#28 (maskImage "All" clip):** Remove `maskImage` on the category chip container (or change to `linear-gradient(to right, black, black 100%, transparent)` only fading the RIGHT edge). The fade is primarily useful on the right to indicate more chips. Left edge doesn't need a fade since "All" is always first.
+- **#33 (getDisplayGroup time drift):** Recompute `displayGroup` on the client at render time rather than at fetch time: update `grouped` memo to re-apply `getDisplayGroup(row.updated_at)` to each story before grouping. Since stories are already in state with their `updated_at` strings, this is a small change to the `grouped` memo.
+- **#34 (StoryCard slug):** Remove slug re-derivation in `StoryCard` (line 248). Use `story.slug` directly.
+- **#35 (latestHeadline sort):** `toStory` sorts articles by `a.date` (string). Change to sort by `new Date(a.date).getTime()` for correct temporal order. Since `a.date` is `YYYY-MM-DD` format, string sort is correct for day resolution — this is actually fine. Add a comment noting day-resolution sort is intentional.
+- **#36 ("Earlier" cutoff):** Rename `GROUP_LABELS.earlier` from `'EARLIER'` to `'EARLIER (90 DAYS)'` OR add a footer note below the earlier section. Simpler: in `SectionHeader` for the `earlier` group only, append `· 90 day window` to the count. Owner decides — default: add to section label.
+
+**Files touched:**
+- `web/src/app/browse/page.tsx` (streams A-E)
+- `web/src/app/browse/loading.tsx` (stream D)
+- `web/src/app/browse/layout.tsx` (new — stream D)
+
+**Test plan:**
+- Keyboard: Tab through the page, confirm focus visible on all buttons. Open FilterSheet, confirm ESC closes it, confirm focus trapped inside.
+- VoiceOver: search input announced as "Search stories and headlines, search field". Filters button announced with expanded state. Result count announces on change.
+- Touch targets: all interactive elements ≥44px on mobile viewport.
+- Dark mode: toggle dark mode, confirm header background, skeleton bones, tooltip, card backgrounds all adapt.
+- Reduced motion: enable in OS settings, confirm no animations play.
+- Filters → navigate to story → Back: confirm filters are restored from URL params.
+- Share: copy URL with filters applied, paste in new tab, confirm filters match.
+- Date range: set dateTo before dateFrom, confirm error shown, button disabled.
+- Retry: on load error, rapid-tap Retry, confirm only one fetch in flight.
+- Skeleton: hard-refresh, confirm loading.tsx and client skeleton match.
+- `build/lint`: `bun --cwd web tsc` clean; no `quiz` references in dead state.
+
+**Owner-input not needed** — DECISIONS #053 and #054 locked; all other fixes are clear.
+
+---
 
 **Future Wave A unit-fix slices (added when their reviews complete):**
 
 | Slice # | Surface | Added when |
 |---|---|---|
-| Slice 11 | Unit 3 / Browse (`/browse`) | Unit 3 review concludes |
 | Slice 12 | Unit 4 / Search (`/search`) | Unit 4 review concludes |
 | Slice 13 | Unit 5 / Category (`/category/[id]`) | Unit 5 review concludes |
 | Slice 14 | Unit 6 / Leaderboard (`/leaderboard`) | Unit 6 review concludes |

@@ -4,8 +4,8 @@ export default function BrowseLoading() {
       style={{
         maxWidth: 720,
         margin: '0 auto',
-        paddingTop: 188,
-        paddingBottom: 80,
+        paddingTop: 'calc(188px + var(--vp-top-bar-h, 0px))',
+        paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 0px))',
       }}
     >
       <style>{`@keyframes vp-sk { 0%,100%{opacity:1}50%{opacity:0.45} }`}</style>
