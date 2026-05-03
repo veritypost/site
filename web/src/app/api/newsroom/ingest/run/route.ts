@@ -59,7 +59,7 @@ interface FlatItem {
   raw_title: string | null;
   excerpt: string;
   pubDate: string | null;
-  outlet: string;
+  outlet: string | null;
 }
 
 // ----------------------------------------------------------------------------
@@ -235,7 +235,7 @@ export async function POST(req: Request) {
             const text = `${item.title ?? ''} ${item.contentSnippet ?? ''}`.toLowerCase();
             if (!allowedSlugs.some((slug) => text.includes(slug.toLowerCase()))) continue;
           }
-          const outlet = feed.source_name || feed.name || 'Unknown';
+          const outlet = feed.source_name || feed.name || null;
           allItems.push({
             feed_id: feed.id,
             raw_url: item.link,

@@ -477,13 +477,22 @@ struct SourceLink: Codable, Identifiable {
     var title: String?
     var articleId: String?
 
-    var outletName: String? { publisher }
+    var outletName: String? {
+        if let p = publisher, !p.isEmpty { return p }
+        if let t = title, !t.isEmpty { return t }
+        return hostFromURLString(url)
+    }
     var headline: String? { title }
 
     enum CodingKeys: String, CodingKey {
         case id, url, title, publisher
         case articleId = "article_id"
     }
+}
+
+private func hostFromURLString(_ urlString: String?) -> String? {
+    guard let s = urlString, !s.isEmpty, let u = URL(string: s), let host = u.host else { return nil }
+    return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
 }
 
 // MARK: - Timeline Event

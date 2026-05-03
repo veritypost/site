@@ -89,28 +89,38 @@ export default function SourcesSection({ sources, showTease = false, articleCoun
     <section style={SECTION_STYLE}>
       <h2 style={HEADING_STYLE}>Sources</h2>
       <ul style={LIST_STYLE}>
-        {sorted.map((s, i) => (
-          <li key={i} style={ITEM_STYLE}>
-            {s.url ? (
-              <a
-                href={s.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={LINK_STYLE}
-              >
-                {s.title || s.publisher || s.url}
-              </a>
-            ) : (
-              <span style={{ ...LINK_STYLE, textDecoration: 'none' }}>
-                {s.title || s.publisher || 'Source'}
-              </span>
-            )}
-            {s.publisher && s.title && (
-              <span style={PUB_STYLE}>— {s.publisher}</span>
-            )}
-          </li>
-        ))}
+        {sorted.map((s, i) => {
+          const label = s.title || s.publisher || hostFromUrl(s.url) || s.url || 'Source';
+          return (
+            <li key={i} style={ITEM_STYLE}>
+              {s.url ? (
+                <a
+                  href={s.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={LINK_STYLE}
+                >
+                  {label}
+                </a>
+              ) : (
+                <span style={{ ...LINK_STYLE, textDecoration: 'none' }}>{label}</span>
+              )}
+              {s.publisher && s.title && s.publisher !== s.title && (
+                <span style={PUB_STYLE}>— {s.publisher}</span>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </section>
   );
+}
+
+function hostFromUrl(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return null;
+  }
 }

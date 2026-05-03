@@ -1165,16 +1165,20 @@ export async function POST(req: Request) {
     }
 
     // 9d. Corpus assembly — prompt-injection wrap (invariant #8)
-    const sourceTexts: Array<{ outlet: string; url: string; text: string }> = [];
+    // Outlet may be null when the upstream feed has no source_name; we
+    // persist that null so render layers can derive a hostname fallback,
+    // but the LLM-prompt path still gets a literal placeholder string.
+    const sourceTexts: Array<{ outlet: string | null; url: string; text: string }> = [];
     for (const it of scrapedItems) {
       if (!it.raw_body) continue;
-      const outlet =
-        (typeof it.metadata === 'object' && it.metadata !== null
-          ? ((it.metadata as { outlet?: string }).outlet ?? 'Unknown')
-          : 'Unknown') || 'Unknown';
+      const rawOutlet =
+        typeof it.metadata === 'object' && it.metadata !== null
+          ? (it.metadata as { outlet?: string | null }).outlet ?? null
+          : null;
+      const outlet = rawOutlet && rawOutlet.trim() ? rawOutlet.trim() : null;
       sourceTexts.push({ outlet, url: it.raw_url, text: it.raw_body });
     }
-    const corpus = sourceTexts.map((s) => wrapSource(s.outlet, s.url, s.text)).join('\n\n---\n\n');
+    const corpus = sourceTexts.map((s) => wrapSource(s.outlet ?? 'Unknown', s.url, s.text)).join('\n\n---\n\n');
     const freeformBlock = freeform_instructions
       ? `\n\n<user_instructions>\n${escapeFreeform(freeform_instructions)}\n</user_instructions>`
       : '';
@@ -1439,7 +1443,7 @@ Return JSON:
     });
     const plagResult = checkPlagiarism(
       finalBodyMarkdown,
-      sourceTexts.map((s) => ({ outlet: s.outlet, text: s.text })),
+      sourceTexts.map((s) => ({ outlet: s.outlet ?? 'Unknown', text: s.text })),
       settings.plagiarism_ngram_size,
       settings.plagiarism_flag_pct
     );
@@ -1508,7 +1512,7 @@ Return JSON:
       }
       const rewriteRes = await rewriteForPlagiarism({
         body: finalBodyMarkdown,
-        sourceTexts: sourceTexts.map((s) => ({ outlet: s.outlet, text: s.text })),
+        sourceTexts: sourceTexts.map((s) => ({ outlet: s.outlet ?? 'Unknown', text: s.text })),
         flaggedOutlets,
         model: HAIKU_MODEL,
         pipeline_run_id: runId,
@@ -1522,7 +1526,7 @@ Return JSON:
       } else if (rewriteRes.rewritten) {
         const secondCheck = checkPlagiarism(
           rewriteRes.body,
-          sourceTexts.map((s) => ({ outlet: s.outlet, text: s.text })),
+          sourceTexts.map((s) => ({ outlet: s.outlet ?? 'Unknown', text: s.text })),
           settings.plagiarism_ngram_size,
           settings.plagiarism_flag_pct
         );
