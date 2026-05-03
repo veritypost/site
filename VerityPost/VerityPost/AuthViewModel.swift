@@ -720,8 +720,26 @@ final class AuthViewModel: ObservableObject {
     /// the user didn't receive the first email.
     func resendVerificationEmail() async -> Bool {
         guard let email = pendingVerificationEmail else { return false }
+        let url = SupabaseManager.shared.siteURL.appendingPathComponent("api/auth/resend-verification")
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        struct Body: Encodable { let email: String }
+        req.httpBody = try? JSONEncoder().encode(Body(email: email))
         do {
-            try await client.auth.resend(email: email, type: .signup)
+            let (_, response) = try await URLSession.shared.data(for: req)
+            guard let http = response as? HTTPURLResponse else {
+                authError = "Could not resend verification email."
+                return false
+            }
+            if http.statusCode == 429 {
+                authError = "Too many requests. Please try again later."
+                return false
+            }
+            if !(200...299).contains(http.statusCode) {
+                authError = "Could not resend verification email."
+                return false
+            }
             return true
         } catch {
             authError = "Could not resend verification email."
@@ -826,6 +844,7 @@ final class AuthViewModel: ObservableObject {
                 // confirm, or reauthentication — treat as a normal login.
                 await loadUser(id: session.user.id.uuidString)
                 isLoggedIn = true
+                wasLoggedIn = true
                 needsEmailVerification = false
                 pendingVerificationEmail = nil
             }
@@ -864,12 +883,14 @@ final class AuthViewModel: ObservableObject {
     func updatePassword(_ newPassword: String) async -> Bool {
         do {
             _ = try await client.auth.update(user: UserAttributes(password: newPassword))
-            isRecoveringPassword = false
-            // Session is active from the recovery link — load the user row
-            // so the app state reflects a full sign-in.
-            if let session = try? await client.auth.session {
+            do {
+                let session = try await client.auth.session
                 await loadUser(id: session.user.id.uuidString)
                 isLoggedIn = true
+                isRecoveringPassword = false
+            } catch {
+                authError = error.localizedDescription
+                return false
             }
             return true
         } catch {
@@ -1080,10 +1101,13 @@ final class AuthViewModel: ObservableObject {
                         nonce: nonce
                     )
                 )
-                if let session = try? await client.auth.session {
+                do {
+                    let session = try await client.auth.session
                     await loadUser(id: session.user.id.uuidString)
                     isLoggedIn = true
                     wasLoggedIn = true
+                } catch {
+                    authError = error.localizedDescription
                 }
             } catch {
                 Log.d("Native SIWA token exchange failed:", error)
@@ -1145,9 +1169,12 @@ final class AuthViewModel: ObservableObject {
                 provider: .google,
                 redirectTo: URL(string: "verity://login")
             )
-            if let session = try? await client.auth.session {
+            do {
+                let session = try await client.auth.session
                 await loadUser(id: session.user.id.uuidString)
                 isLoggedIn = true
+            } catch {
+                authError = error.localizedDescription
             }
         } catch {
             authError = "Sign in with Google failed. Try again."

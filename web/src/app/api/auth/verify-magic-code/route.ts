@@ -102,6 +102,28 @@ export async function POST(request: NextRequest) {
     return genericOk();
   }
 
+  const ipPolicy = getRateLimitPolicy('AUTH_VERIFY_MAGIC_CODE_PER_IP');
+  const ipHit = await checkRateLimit(service, {
+    key: `otp_verify_ip:${ipTruncated || rawIp}`,
+    policyKey: 'auth_verify_magic_code_per_ip',
+    ...ipPolicy,
+  });
+  if (ipHit.limited) {
+    await writeAuditRow(service, { email, reason: 'rate_limited_ip', ipTruncated });
+    return genericOk();
+  }
+
+  const codePolicy = getRateLimitPolicy('AUTH_VERIFY_MAGIC_CODE_ATTEMPTS_PER_CODE');
+  const codeHit = await checkRateLimit(service, {
+    key: `verify_magic_code:code:${rawToken}`,
+    policyKey: 'auth_verify_magic_code_attempts_per_code',
+    ...codePolicy,
+  });
+  if (codeHit.limited) {
+    await writeAuditRow(service, { email, reason: 'rate_limited_code', ipTruncated });
+    return genericOk();
+  }
+
   // Verify the OTP. type='magiclink' matches the token issued by
   // admin.generateLink({ type: 'magiclink' }) in send-magic-link.
   const supabase = createOtpClient();
@@ -153,6 +175,11 @@ export async function POST(request: NextRequest) {
         await service.auth.admin.deleteUser(user.id);
       } catch (e) {
         console.error('[verify-magic-code] gate-deny: deleteUser failed:', e);
+      }
+      try {
+        await supabase.auth.signOut();
+      } catch (e) {
+        console.error('[verify-magic-code] gate-deny: signOut failed:', e);
       }
       await writeAuditRow(service, {
         email,

@@ -75,6 +75,12 @@ export const RATE_LIMITS = {
   // Per-code attempt cap. A single OTP token may only be tried 5 times
   // in a 30-minute window regardless of email-level limits.
   AUTH_VERIFY_MAGIC_CODE_ATTEMPTS_PER_CODE: { windowSec: 1800, max: 5 },
+  // Per-IP OTP verify cap. 30/hr allows legitimate use from shared IPs
+  // (offices, NAT) while blocking automated probing from a single origin.
+  AUTH_VERIFY_MAGIC_CODE_PER_IP: { windowSec: 3600, max: 30 },
+  // Per-IP magic-link click cap. 20/hr prevents click-loop abuse while
+  // allowing normal browser retries.
+  AUTH_MAGIC_LINK_CLICK_PER_IP: { windowSec: 3600, max: 20 },
 
   // Beta access-request intake. Per IP cap is loose enough for a normal
   // visitor retrying on a flaky connection but tight enough that one IP

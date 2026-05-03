@@ -55,6 +55,18 @@ export async function POST(request) {
     } catch {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
+    if (claims && typeof claims === 'object') {
+      if (claims.aud && claims.aud !== 'authenticated') {
+        return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+      }
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+      if (claims.iss && supabaseUrl) {
+        const expectedIss = `${supabaseUrl.replace(/\/+$/, '')}/auth/v1`;
+        if (claims.iss !== expectedIss) {
+          return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+        }
+      }
+    }
     const sub = typeof claims?.sub === 'string' ? claims.sub : '';
     if (!sub || sub !== userId) {
       return NextResponse.json({ error: 'Token / user_id mismatch' }, { status: 403 });
@@ -68,11 +80,20 @@ export async function POST(request) {
     // auth.signUp success and the public.users upsert failure —
     // nothing else should have happened yet. If activity exists, the
     // account is established and rollback is not the right tool.
-    const { count: activityCount } = await service
-      .from('comments')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId);
-    if (activityCount && activityCount > 0) {
+    const activityTables = ['comments', 'bookmarks', 'reading_log', 'follows', 'quiz_attempts'];
+    let totalActivity = 0;
+    for (const table of activityTables) {
+      const { count: activityCount, error: countError } = await service
+        .from(table)
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId);
+      if (countError) {
+        console.error(`[auth.signup_rollback] activity count query failed on ${table}`, countError);
+        return NextResponse.json({ error: 'Could not verify account activity' }, { status: 500 });
+      }
+      totalActivity += activityCount || 0;
+    }
+    if (totalActivity > 0) {
       return NextResponse.json(
         { error: 'Account has activity — rollback refused' },
         {

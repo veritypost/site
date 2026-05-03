@@ -186,13 +186,12 @@ export async function POST(request) {
   // not deliver a magic link — but the response shape stays generic.
   // Real reason captured in audit_log for ops review.
   try {
-    const { data: banned } = await service
+    const { data: blocked } = await service
       .from('users')
-      .select('id')
+      .select('id, is_banned, frozen_at, deleted_at')
       .ilike('email', email)
-      .eq('is_banned', true)
       .maybeSingle();
-    if (banned) {
+    if (blocked && (blocked.is_banned || blocked.frozen_at != null || blocked.deleted_at != null)) {
       await writeAuditRow(service, { email, reason: 'banned_email', ipTruncated });
       return genericOk();
     }

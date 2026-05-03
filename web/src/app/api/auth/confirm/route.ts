@@ -10,6 +10,12 @@ import {
   runSignupBookkeeping,
   runReturningUserBookkeeping,
 } from '@/lib/auth/postLoginBookkeeping';
+import { checkSignupGate, isApprovedEmail } from '@/lib/betaGate';
+import { REF_COOKIE_NAME } from '@/lib/referralCookie';
+import { cookies } from 'next/headers';
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { getRateLimitPolicy } from '@/lib/rateLimits';
+import { truncateIpV4 } from '@/lib/apiErrors';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -20,6 +26,19 @@ export async function GET(request: NextRequest) {
 
   if (!t || !e) {
     return NextResponse.redirect(`${siteUrl}/login?error=missing_params`);
+  }
+
+  const service = createServiceClient();
+  const rawIp = await getClientIp();
+  const ipTruncated = truncateIpV4(rawIp);
+  const clickIpPolicy = getRateLimitPolicy('AUTH_MAGIC_LINK_CLICK_PER_IP');
+  const clickIpHit = await checkRateLimit(service, {
+    key: `magic_link_click_ip:${ipTruncated || rawIp}`,
+    policyKey: 'auth_magic_link_click_per_ip',
+    ...clickIpPolicy,
+  });
+  if (clickIpHit.limited) {
+    return NextResponse.redirect(`${siteUrl}/login?error=too_many_requests`);
   }
 
   // Verify the token and establish the session. createOtpClient() has
@@ -37,7 +56,6 @@ export async function GET(request: NextRequest) {
   }
 
   const user = data.user;
-  const service = createServiceClient();
 
   const { data: existing } = await service
     .from('users')
@@ -50,9 +68,38 @@ export async function GET(request: NextRequest) {
   const redirectResponse = NextResponse.redirect(resolveNextForRedirect(siteUrl, rawNext, '/'));
 
   if (!existing) {
+    const cookieJar = await cookies();
+    const refCookie = cookieJar.get(REF_COOKIE_NAME)?.value;
+    let approvedBypass = false;
+    try {
+      approvedBypass = await isApprovedEmail(service, user.email!);
+    } catch (err) {
+      console.error('[auth.confirm] approvedEmail check threw:', err);
+    }
+    if (!approvedBypass) {
+      const gate = await checkSignupGate(service, refCookie);
+      if (!gate.allowed) {
+        try {
+          await service.auth.admin.deleteUser(user.id);
+        } catch (err) {
+          console.error('[auth.confirm] gate-deny: deleteUser failed:', err);
+        }
+        try {
+          await otpClient.auth.signOut();
+        } catch (err) {
+          console.error('[auth.confirm] gate-deny: signOut failed:', err);
+        }
+        return NextResponse.redirect(`${siteUrl}/login?error=invite_required`);
+      }
+    }
+
     const provider = (user.app_metadata?.provider as string | undefined) || 'email';
     const meta = (user.user_metadata || {}) as Record<string, unknown>;
-    await runSignupBookkeeping(service, user, provider, meta, request, redirectResponse);
+    try {
+      await runSignupBookkeeping(service, user, provider, meta, request, redirectResponse);
+    } catch (err) {
+      console.error('[auth.confirm] runSignupBookkeeping failed (non-fatal):', err);
+    }
   } else {
     await runReturningUserBookkeeping(service, user, existing, request);
   }

@@ -65,9 +65,13 @@ function LoginPageInner() {
   const [notice, setNotice] = useState<string | null>(null);
   useEffect(() => {
     const toastParam = searchParams?.get('toast') ?? null;
-    if (!toastParam) return;
+    const errorParam = searchParams?.get('error') ?? null;
     if (toastParam === 'session_expired') {
       setNotice('Your session expired. Enter your email to sign back in.');
+    } else if (errorParam === 'link_expired') {
+      setNotice('Your sign-in link has expired. Enter your email below for a new one.');
+    } else if (errorParam === 'missing_params') {
+      setNotice('This sign-in link is invalid. Enter your email below to request a new one.');
     }
   }, [searchParams]);
 

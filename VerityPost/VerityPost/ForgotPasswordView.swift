@@ -176,8 +176,8 @@ struct ForgotPasswordView: View {
 
     private func sendLink() {
         guard canSubmit else { return }
-        loading = true
         Task {
+            loading = true
             let ok = await auth.resetPassword(email: email)
             // Pass 17 / UJ-515 parity: present the same success state
             // regardless of whether the account exists. We flip `sent`

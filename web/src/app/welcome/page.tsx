@@ -22,6 +22,7 @@ const C = {
 export default function WelcomePage() {
   const router = useRouter();
   const [graduationToken, setGraduationToken] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const t = new URLSearchParams(window.location.search).get('graduation_token');
@@ -30,7 +31,11 @@ export default function WelcomePage() {
     } else {
       router.replace('/');
     }
+    setReady(true);
   }, [router]);
+  if (!ready) {
+    return <div>Loading…</div>;
+  }
   if (graduationToken) {
     return <GraduationClaim token={graduationToken} />;
   }
@@ -47,7 +52,7 @@ function GraduationClaim({ token }: { token: string }) {
   const [confirm, setConfirm] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<{ display_name: string | null } | null>(null);
+  const [done, setDone] = useState<{ display_name: string | null; email: string } | null>(null);
 
   const submit = async () => {
     setBusy(true);
@@ -79,7 +84,7 @@ function GraduationClaim({ token }: { token: string }) {
         setBusy(false);
         return;
       }
-      setDone({ display_name: j.display_name ?? null });
+      setDone({ display_name: j.display_name ?? null, email: email.trim().toLowerCase() });
     } catch (err) {
       setError(friendlyError(err, 'Could not complete setup. Try again.'));
       setBusy(false);
@@ -116,8 +121,11 @@ function GraduationClaim({ token }: { token: string }) {
             Your account is ready. Your kid-app reading history stays attached to your old profile
             (parent can review it). Your saved categories carried over.
           </p>
+          <p style={{ color: C.dim, fontSize: 13, lineHeight: 1.5, marginBottom: 12 }}>
+            Check your email for a sign-in link, or enter your email below to request one.
+          </p>
           <a
-            href="/login"
+            href={`/login${done.email ? `?email=${encodeURIComponent(done.email)}` : ''}`}
             style={{
               display: 'inline-block',
               padding: '12px 18px',

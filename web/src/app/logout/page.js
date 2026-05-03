@@ -2,7 +2,7 @@
 // @feature-verified system_auth 2026-04-18
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '../../lib/supabase/client';
 import { COPY } from '@/lib/copy';
@@ -24,6 +24,7 @@ export default function LogoutPage() {
   const [status, setStatus] = useState('signing_out'); // signing_out | done | error
   const [recentReads, setRecentReads] = useState([]);
   const [retrying, setRetrying] = useState(false);
+  const hasLoggedOut = useRef(false);
 
   // T101 — once the signout succeeds, fire a delayed redirect to home
   // so the user doesn't end up sitting on a dead-end page. The manual
@@ -59,6 +60,8 @@ export default function LogoutPage() {
   };
 
   useEffect(() => {
+    if (hasLoggedOut.current) return;
+    hasLoggedOut.current = true;
     doLogout();
   }, []);
 

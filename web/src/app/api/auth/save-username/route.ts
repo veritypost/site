@@ -107,7 +107,13 @@ export async function PATCH(request: Request) {
     .eq('id', user.id)
     .maybeSingle();
   if (existing?.username && existing.username !== '') {
-    const { data: isAdmin } = await service.rpc('is_admin_or_above');
+    const { data: isAdmin, error: adminCheckError } = await userClient.rpc('is_admin_or_above');
+    if (adminCheckError) {
+      return NextResponse.json(
+        { error: 'Could not verify account permissions. Please try again.' },
+        { status: 500, headers: NO_STORE }
+      );
+    }
     if (!isAdmin) {
       return new Response(
         JSON.stringify({ error: 'Username already set on this account.' }),

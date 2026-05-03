@@ -90,7 +90,7 @@ export default async function BetaLockedPage({
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 32 }}>
           <Link
-            href="/request-access"
+            href="/login?mode=request"
             style={{
               display: 'inline-block',
               padding: '12px 20px',

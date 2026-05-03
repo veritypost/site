@@ -29,9 +29,10 @@ export default function SingleDoorForm({ notice }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const rawNext = searchParams?.get('next') ?? null;
+  const prefillEmail = searchParams?.get('email') ?? '';
 
   const [stage, setStage] = useState<Stage>('email');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(prefillEmail);
   const [code, setCode] = useState('');
   const [emailBusy, setEmailBusy] = useState(false);
   const [codeBusy, setCodeBusy] = useState(false);
@@ -201,7 +202,7 @@ export default function SingleDoorForm({ notice }: Props) {
 
         {notice && (
           <div
-            role="status"
+            role="alert"
             style={{
               padding: '10px 14px',
               borderRadius: 10,

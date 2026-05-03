@@ -1,7 +1,7 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified shared_pages 2026-04-18
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createClient } from '../../lib/supabase/client';
 import type { Tables } from '@/types/database-helpers';
 import { formatDateTime } from '@/lib/dates';
@@ -35,12 +35,14 @@ export default function AppealPage() {
   const [error, setError] = useState<string>('');
   const [hasPenalty, setHasPenalty] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<string | null>(null);
+  const mountedRef = useRef(true);
 
   async function load() {
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser();
+      if (!mountedRef.current) return;
       if (!user) {
         setLoading(false);
         return;
@@ -54,6 +56,7 @@ export default function AppealPage() {
         .select('is_banned, is_muted, muted_until')
         .eq('id', user.id)
         .maybeSingle<PenaltyProfile>();
+      if (!mountedRef.current) return;
       if (profileErr) {
         console.error('[appeal] profile fetch failed', profileErr);
         setError('Could not load your account status. Try refreshing.');
@@ -69,6 +72,7 @@ export default function AppealPage() {
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
+      if (!mountedRef.current) return;
       if (warnErr) {
         console.error('[appeal] warnings fetch failed', warnErr);
         setError('Could not load your warnings. Try refreshing.');
@@ -79,12 +83,15 @@ export default function AppealPage() {
       setLoading(false);
     } catch (e) {
       console.error('[appeal] load error', e);
+      if (!mountedRef.current) return;
       setError('Something went wrong. Try refreshing.');
       setLoading(false);
     }
   }
   useEffect(() => {
+    mountedRef.current = true;
     load();
+    return () => { mountedRef.current = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -115,6 +122,8 @@ export default function AppealPage() {
         return n;
       });
       load();
+    } catch {
+      setError('Something went wrong. Please try again.');
     } finally {
       setSubmitting(null);
     }

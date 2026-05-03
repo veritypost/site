@@ -139,15 +139,13 @@ function applyCors(request, response) {
   response.headers.append('Vary', 'Origin');
 }
 
-// CSP enforcement is env-gated. CSP_ENFORCE=true flips from Report-Only
-// to the enforcing header name. The owner can enable in production once
-// /api/csp-report has zero violations for a day. Leaving it Report-Only
-// by default means a stray violation in a pre-rendered page doesn't
-// break rendering; the report endpoint still collects signal for tuning.
+// CSP enforcement is env-gated. CSP_ENFORCE=false flips from enforcing
+// to Report-Only. Default is enforced so production ships with enforcement
+// unless explicitly opted out.
 const CSP_HEADER_NAME =
-  process.env.CSP_ENFORCE === 'true'
-    ? 'Content-Security-Policy'
-    : 'Content-Security-Policy-Report-Only';
+  process.env.CSP_ENFORCE === 'false'
+    ? 'Content-Security-Policy-Report-Only'
+    : 'Content-Security-Policy';
 function setCspHeader(res, csp) {
   res.headers.set(CSP_HEADER_NAME, csp);
 }
@@ -319,7 +317,6 @@ export async function middleware(request) {
     pathname === '/request-access' ||
     pathname === '/preview' ||
     pathname === '/welcome' ||
-    pathname === '/browse' ||
     pathname.startsWith('/r/') ||
     pathname.startsWith('/api/') ||
     pathname.startsWith('/_next/') ||
@@ -347,9 +344,11 @@ export async function middleware(request) {
     pathname.startsWith('/kids/') ||
     (betaGateEnabled && !betaGateAllowed);
   let user = null;
+  let getUserRan = false;
   if (needsUser) {
     try {
       user = (await supabase.auth.getUser()).data.user ?? null;
+      getUserRan = true;
     } catch {
       if (isProtected(pathname)) {
         const dest = new URL('/login', request.url);
@@ -431,7 +430,7 @@ export async function middleware(request) {
       request.cookies.get(_authCookieBase) ||
       request.cookies.get(`${_authCookieBase}.0`) // chunked token (Supabase SSR splits large JWTs)
     );
-    if (_hasAuthCookie) {
+    if (_hasAuthCookie && getUserRan) {
       loginUrl.searchParams.set('toast', 'session_expired');
     }
     const redirect = NextResponse.redirect(loginUrl, { status: 302 });

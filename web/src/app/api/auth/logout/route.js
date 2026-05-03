@@ -15,7 +15,7 @@ export async function POST() {
     const { data: authData } = await supabase.auth.getUser();
     const userId = authData?.user?.id || null;
 
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: 'global' });
 
     // Mark all of this user's still-active push tokens as invalidated.
     // The column is checked by send-push when fanning out; setting
