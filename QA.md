@@ -21,11 +21,11 @@ NOTES:   <one line — anything the next turn needs to know>
 **Active:**
 
 ```
-CURRENT: Admin/owner backstage-pass for /profile — pushed ee9ea19; Vercel deploying; awaiting owner prod confirm → then §8.4 lock
+CURRENT: Admin/owner backstage-pass for /profile — LOCKED in §8.4 by owner direction 2026-05-03 (commit ee9ea19); browser-side prod-confirm still pending but lock secured per owner request
 SHAPE:   role
 TARGET:  /profile + iOS adult PermissionService + 1 supabase migration · iOS kids N/A
-STATUS:  pushed (pending-prod-confirm)
-NOTES:   commit ee9ea19 pushed to main. Vercel project veritypost-site auto-deploys web/ (~2 min). DB migration already applied to fyiwulqphgmoqullmrfn. Owner verifies at verityposts.com/profile: every section unlocked, "Admin view" pill on Expert queue + Expert profile, Plan section shows "Full access (no subscription required)". Once confirmed, owner writes LOCKED line in §8.4.
+STATUS:  locked (owner-directed)
+NOTES:   §8.4 LOCKED line added. Owner-mode = full edit, regardless of profile state, plan, expert flag, family membership. Contract spans web permissions.js + ProfileApp + AppShell, iOS PermissionService, DB is_owner_mode_user + claim_queue_item + post_expert_answer. Lock is binding on every future session/agent. Browser greyed-out diagnosis still open (likely tab cache); does not affect lock validity.
 ```
 
 **Parking lot** (intent the owner mentioned but didn't switch to — pulled from here after CURRENT closes):
@@ -986,6 +986,18 @@ LOCKED 2026-05-03: Beta-gate allowlist includes /terms + /privacy. Legal pages m
 LOCKED 2026-05-03: T&C consent — iOS LoginView mirrors web (markdown link to /terms + /privacy below submit, tinted with VP.accent). iOS SignupView already has the COPPA-gated checkbox with Terms + Privacy links (lines 151-176) — DO NOT add a second consent line on signup. Kids iOS has no login surface (child profile under parent's adult account); permanently N/A for any login-parity work.
   Files: VerityPost/VerityPost/LoginView.swift, VerityPost/VerityPost/SignupView.swift
   Roles: all iOS adult; kids = permanent N/A
+
+LOCKED 2026-05-03: Owner-mode backstage pass for /profile (Finding #10 — owner-directed lock at owner request, commit ee9ea19). Any user holding `admin.owner_mode` permission has FULL EDIT ACCESS to every section of /profile (web) AND every PermissionService-gated UI on iOS adult, regardless of plan tier, expert flag (`is_expert`), family membership, plan_status, account state, or profile completeness. Owner-mode users can claim/decline/answer expert queue items, post back-channel messages, edit family seats, modify expert credentials, and use any section's write paths. The `permissions.js` short-circuit at lines 179/187/206/217, the `PermissionService.swift:69-87` short-circuit, and the `is_owner_mode_user(uuid)` SQL helper used by `claim_queue_item` + `post_expert_answer` together form a single coherent contract. DO NOT WEAKEN ANY PART of this contract:
+  - Do NOT remove or narrow `permissions.js` `admin.owner_mode` short-circuits (4 sites).
+  - Do NOT remove the `isOwnerMode` derivation in `ProfileApp.tsx` or its OR'd-in bypass on the four `locked:` predicates (messages, family, expert-queue, expert-profile).
+  - Do NOT remove the `bypassed?: boolean` field on `SectionDef` or the "Admin view" pill rendering in `AppShell.tsx`. The pill is the operator's signal that they're seeing a section they normally would not.
+  - Do NOT remove or narrow the `cache.contains("admin.owner_mode")` short-circuit in `PermissionService.swift` `has(_:)` and `get(_:)`. The `granted_via:"owner_mode"` attribution in `get(_:)` must stay.
+  - Do NOT remove or narrow `is_owner_mode_user(uuid)` (must filter `expires_at`) or the owner-mode bypass branches inside `claim_queue_item` and `post_expert_answer`. Those RPCs MUST allow owner-mode through `is_user_expert` AND through the target-expert / target-category guards in `claim_queue_item`. The "must claim before answer" guard in `post_expert_answer` IS preserved (owner claims first, same as an expert).
+  - Do NOT add a `preview={true}` or "read-only" rail to Expert / Family / Plan sections under owner-mode (owner override 2026-05-03 explicitly stripped that safety rail; "owner mode can do it all").
+  - Do NOT leave BillingCard's owner-mode branch returning empty UI when the owner has a real subscription — Finding #14 follow-up; do NOT pre-emptively hide cancel from a paying owner.
+  - Owner-mode is ASSIGNABLE to other users via existing `/admin/users/[id]/permissions` page — assignment surface stays as-is. Privilege escalation risk on the assign endpoint is tracked separately as Finding #11; that fix MUST land before any second user is granted owner-mode.
+  Files: web/src/lib/permissions.js (lines 177-181, 185-189, 205-211, 216-222), web/src/app/profile/_components/ProfileApp.tsx (isOwnerMode useMemo + 4 sections' locked/bypassed predicates), web/src/app/profile/_components/AppShell.tsx (SectionDef.bypassed + section header pill), VerityPost/VerityPost/PermissionService.swift (has(_:) + get(_:)), supabase/migrations/20260503000008_owner_mode_expert_rpcs.sql + the live `is_owner_mode_user` / `claim_queue_item` / `post_expert_answer` functions in `fyiwulqphgmoqullmrfn`
+  Roles: any user holding `admin.owner_mode` (currently admin@veritypost.com only); does NOT change behavior for any other role
 ```
 
 Each of the locks above awaits prod confirmation per §7.5 (`[FIXED]` → `[PROD]` → `[LOCKED]`). When owner confirms each on `verityposts.com`, append `confirmed prod YYYY-MM-DD by owner` to the entry.
