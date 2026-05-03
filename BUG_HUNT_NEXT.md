@@ -4,7 +4,7 @@ Single-line state for the bug-hunt track. Updated automatically at session end. 
 
 ```
 CURRENT_PHASE: fix-pass-pending
-ANCHOR: Billing fix-pass complete 2026-05-03. 46 findings + 10 adversary gaps surfaced; 55 [fixed], 1 [deferred] (A2-008 orphaned-row reclaim — needs cron infra). Smoke PASS. Next: fix-pass for Moderation (32 findings).
+ANCHOR: Billing fix-pass complete 2026-05-03 (commit 4154f9c). 46 findings + 10 adversary gaps surfaced; 55 [fixed], 1 [deferred] (A2-008 orphaned-row reclaim — needs cron infra). Smoke PASS. Next: fix-pass for Moderation (32 findings).
 LAST_UPDATED: 2026-05-03
 
 PER_SURFACE_STATUS:
