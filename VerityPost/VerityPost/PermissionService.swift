@@ -66,14 +66,33 @@ final actor PermissionService {
     /// Synchronous (to the actor) membership check. Returns `false` when
     /// the cache has not loaded yet — callers that need load-on-demand
     /// semantics should `await loadAll()` first.
+    ///
+    /// Owner-mode short-circuit mirrors `web/src/lib/permissions.js:179`:
+    /// any user holding `admin.owner_mode` passes every key check.
     func has(_ key: String) -> Bool {
-        cache.contains(key)
+        if cache.contains("admin.owner_mode") { return true }
+        return cache.contains(key)
     }
 
     /// Row lookup for callers that need `granted_via` / `lock_message`.
     /// Returns a synthesized row (granted=true) when the key is in the cache;
     /// nil when absent. Extra fields are nil placeholders.
+    ///
+    /// Owner-mode short-circuit mirrors `has(_:)` and the web parity at
+    /// `permissions.js:187` — synthesized row carries `granted_via:"owner_mode"`
+    /// so UI surfaces can render an "Admin view" indicator.
     func get(_ key: String) -> PermissionRow? {
+        if cache.contains("admin.owner_mode") {
+            return PermissionRow(
+                permission_key: key,
+                granted: true,
+                granted_via: "owner_mode",
+                source_detail: nil,
+                deny_mode: nil,
+                requires_verified: nil,
+                lock_message: nil
+            )
+        }
         guard cache.contains(key) else { return nil }
         return PermissionRow(
             permission_key: key,

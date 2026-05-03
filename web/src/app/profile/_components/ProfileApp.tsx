@@ -193,6 +193,14 @@ export function ProfileApp({ defaultSection }: Props) {
     [permsTick]
   );
 
+  // Owner-mode short-circuit. When the user holds `admin.owner_mode`,
+  // every section unlocks regardless of plan / role / expert flag.
+  // Sections that would have been locked render a small "Admin view"
+  // pill in the section header (see AppShell.bypassed). The boolean
+  // mirrors the hasPermission cache short-circuit at permissions.js:179.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- permsTick read indirectly via the hasPermission cache
+  const isOwnerMode = useMemo(() => hasPermission('admin.owner_mode'), [permsTick]);
+
   const accountStates = useMemo(
     () =>
       deriveAccountStates(user, {
@@ -308,7 +316,8 @@ export function ProfileApp({ defaultSection }: Props) {
       glyph: '✉',
       group: 'Library',
       title: 'Messages',
-      locked: !perms.messagesInbox,
+      locked: !isOwnerMode && !perms.messagesInbox,
+      bypassed: isOwnerMode && !perms.messagesInbox,
       badge:
         unreadMessages > 0 ? (unreadMessages > 99 ? '99+' : String(unreadMessages)) : undefined,
       reason: 'Direct conversations with readers and experts.',
@@ -340,7 +349,8 @@ export function ProfileApp({ defaultSection }: Props) {
       glyph: '◓',
       group: 'Family & expert',
       title: 'Family & kids',
-      locked: !perms.family,
+      locked: !isOwnerMode && !perms.family,
+      bypassed: isOwnerMode && !perms.family,
       reason: 'Manage kid accounts, seats, and supervisors on your plan.',
       keywords: ['kid', 'kids', 'children', 'seats', 'pin', 'parental', 'supervisor'],
       render: () => (
@@ -360,7 +370,8 @@ export function ProfileApp({ defaultSection }: Props) {
       glyph: '✦',
       group: 'Family & expert',
       title: 'Expert queue',
-      locked: !(perms.expertQueue && u.is_expert),
+      locked: !isOwnerMode && !(perms.expertQueue && u.is_expert),
+      bypassed: isOwnerMode && !(perms.expertQueue && u.is_expert),
       reason:
         'Questions waiting on a verified answer in your areas — plus the back-channel for experts in those areas.',
       keywords: ['expert', 'queue', 'questions', 'answer', 'back-channel', 'backchannel'],
@@ -371,7 +382,8 @@ export function ProfileApp({ defaultSection }: Props) {
       glyph: '✎',
       group: 'Family & expert',
       title: 'Expert profile',
-      locked: !(u.is_expert || expertStatus === 'pending'),
+      locked: !isOwnerMode && !(u.is_expert || expertStatus === 'pending'),
+      bypassed: isOwnerMode && !(u.is_expert || expertStatus === 'pending'),
       reason: 'Your credentials, verified areas, and vacation status.',
       keywords: ['credentials', 'watchlist', 'vacation', 'application', 'areas'],
       render: () => <ExpertProfileSection preview={false} />,

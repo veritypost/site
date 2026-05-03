@@ -35,9 +35,13 @@ export interface SectionDef {
   group?: string;
   // Hidden = section exists but isn't on the rail (e.g. legal pages,
   // back-doors). Locked = visible but dimmed and the panel renders an
-  // upgrade message.
+  // upgrade message. Bypassed = owner-mode is unlocking a section that
+  // would have been locked for any other user; renders an "Admin view"
+  // pill in the section header so the operator knows they're seeing a
+  // section they normally would not be allowed to see.
   hidden?: boolean;
   locked?: boolean;
+  bypassed?: boolean;
   // Optional inline badge text (e.g. unread count) shown right-aligned in
   // the rail row.
   badge?: string;
@@ -379,19 +383,41 @@ export function AppShell({ user, tier, preview, defaultSection = 'you', sections
           {active ? (
             <article key={active.id} className="redesign-section-fade" style={{ maxWidth: 720 }}>
               <header className="redesign-section-header">
-                <h1
-                  id="redesign-section-title"
-                  className="redesign-section-h1"
-                  style={{
-                    fontFamily: FONT.serif,
-                    fontWeight: 600,
-                    color: C.ink,
-                    margin: 0,
-                    letterSpacing: '-0.02em',
-                  }}
-                >
-                  {active.title}
-                </h1>
+                <div style={{ display: 'flex', alignItems: 'center', gap: S[3], flexWrap: 'wrap' }}>
+                  <h1
+                    id="redesign-section-title"
+                    className="redesign-section-h1"
+                    style={{
+                      fontFamily: FONT.serif,
+                      fontWeight: 600,
+                      color: C.ink,
+                      margin: 0,
+                      letterSpacing: '-0.02em',
+                    }}
+                  >
+                    {active.title}
+                  </h1>
+                  {active.bypassed ? (
+                    <span
+                      title="You're seeing this section because you hold owner-mode permission. Other users in this state would see an upgrade prompt."
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        background: C.surfaceSunken,
+                        color: C.inkFaint,
+                        border: `1px solid ${C.border}`,
+                        borderRadius: R.pill,
+                        padding: '2px 8px',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        letterSpacing: '0.02em',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      Admin view
+                    </span>
+                  ) : null}
+                </div>
                 <p
                   className="redesign-section-reason"
                   style={{

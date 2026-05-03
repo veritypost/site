@@ -21,11 +21,11 @@ NOTES:   <one line — anything the next turn needs to know>
 **Active:**
 
 ```
-CURRENT: <not started>
-SHAPE:
-TARGET:
-STATUS:
-NOTES:
+CURRENT: Admin/owner backstage-pass for /profile — implemented + diff-reviewed + static-checked + bug-hunted; awaiting commit+push then owner prod confirm
+SHAPE:   role
+TARGET:  /profile + iOS adult PermissionService + 1 supabase migration · iOS kids N/A
+STATUS:  committing
+NOTES:   Steps 1-6 complete. Diff peer review PASS 5/5. TSC clean, ESLint 1 pre-existing warning (line 193 — predates fix). Bug-hunter caught 1 real bug (is_owner_mode_user missing expires_at filter) — fixed + re-applied + verified. Migration tested: helper returns true for admin@veritypost.com, false for bogus user. Local smoke: /profile + section queries return 302 (auth redirect, expected). Next: commit, push, owner prod confirm, §8.4 lock.
 ```
 
 **Parking lot** (intent the owner mentioned but didn't switch to — pulled from here after CURRENT closes):
@@ -775,6 +775,114 @@ Keep ≤8 lines. If investigation grows, spin a finding doc under `UI_UX_REVIEW/
 - **Status:** **shipped 2026-05-03 `ce3e72f`**.
 - **Ready for fix:** n/a — shipped.
 - **Notes for next agent:** do NOT move `setLoggedIn(true)` back below the `users` SELECT or `refreshAllPermissions()` await — the lag returns. Deduping (`lastHydrateRef.current` 60s window) still lives below the early flip; that's intentional.
+
+#### 10. Admin/owner can't see every profile section (expert + role-gated locks apply)
+
+- **Cluster:** admin / rbac / profile
+- **What was seen:** Logged in as admin@veritypost.com (role=`owner`, perm sets `owner_mode` + `admin` + `owner` + family/pro/free via plan). Some profile sections still render the "Upgrade to unlock — paid plans / See plans" lock, e.g. Expert queue + Expert profile (gated on `is_expert`, not perms). Owner intent: as admin/owner I should be able to access ANY view in /profile — backstage pass, no lock gates apply.
+- **Surface:** `web/src/app/profile/_components/ProfileApp.tsx:176-194` (per-section `locked: !perms.X` / `!u.is_expert` checks); `web/src/app/profile/_components/AppShell.tsx:573-617` (LockedSection — wrong copy "This section is part of paid plans" + wrong CTA "See plans" for any role-gated section).
+- **Associated:** every `_sections/*Section.tsx` consumer; `web/src/lib/permissions.js` (`hasPermission`); admin/owner role detection (no current helper — `users.role`/`user_roles` join needed). Plan section also misleading for owner (no real subscription).
+- **Cross-platform parity:** web — affected. iOS adult — same pattern in `ProfileView.swift` / `SettingsView.swift`; needs parity check before fix. iOS kids — N/A (no admin).
+- **Known context:** DB confirms admin@veritypost.com has `owner` role + `owner_mode`+`admin`+`owner` permission sets, plus family/pro/free via `verity_family_monthly` plan. All 11 ProfileApp-gated perm keys ARE granted. Only `is_expert=false` + section-internal gates would still lock. Memory: kill-switched surfaces stay disabled even for admin; this finding does not override kill switches.
+- **Confirmed:** yes (2026-05-03 — DB queried, perm sets verified, ProfileApp + AppShell source read).
+- **Owner decision:** **LOCKED 2026-05-03 — owner override** of panel safety rails. Owner-mode = full edit access (NOT read-only); owner-mode is assignable to other users via existing `/admin/users/[id]/permissions` page; "owner mode can do it all."
+- **Status:** decision-locked, ready-for-fix.
+- **Ready for fix:** yes — runs §7 fix gate (cite reverify → 4-agent pre-impl → downstream map → implement → diff peer review → static check → smoke → owner prod confirm → lock).
+- **Notes for next agent / locked decisions + 4-agent panel convergence (2026-05-03):**
+
+  **Scope is MUCH smaller than originally documented — most of the fix is already shipped.** Panel of 4 (investigator + planner + edge-cases reviewer + adversary) read the actual code and converged 4/4 on the narrow scope below.
+
+  **Already-shipped (do NOT redo):**
+  - `web/src/lib/permissions.js:179,187,206,217` — `admin.owner_mode` short-circuit on `hasPermission`, `getPermission`, `hasPermissionViaRpc`, `hasPermissionFor`. Every `hasPermission(any.key)` already returns true for owner-mode holders.
+  - `web/src/app/profile/settings/_cards/BillingCard.tsx:318-328` — owner-mode branch returns `<Card title="Plan" description="Full access (no subscription required).">{null}</Card>`. All billing CTAs already suppressed.
+  - `web/src/components/NavWrapper.tsx:264` + `BillingCard.tsx:59` — both already consume `useAuth().isOwnerMode`.
+  - `web/src/app/admin/users/[id]/permissions/page.tsx` — already lists every permission_set incl. `owner_mode` and grants per user via `user_permission_sets`.
+
+  **Genuinely needs fix this session (5-file scope, Option A approved by owner 2026-05-03):**
+  1. **`web/src/app/profile/_components/ProfileApp.tsx:363,374`** — Two `locked:` lines AND-gate on raw `u.is_expert` column which the perms short-circuit cannot reach. Add `isOwnerMode = hasPermission('admin.owner_mode')` derivation; rewrite both predicates to OR in `isOwnerMode`. Also compute per-section `bypassed: isOwnerMode && (un-overridden lock would have been true)` for badge display.
+  2. **`web/src/app/profile/_components/AppShell.tsx`** — Extend `SectionDef` with `bypassed?: boolean`. In the section header (around L381-405), render a small inline "Admin view" pill (11px, muted) when `active.bypassed === true`. Non-owners never see it. LockedSection (L573-617) stays as-is (dead path for owners, used by other roles).
+  3. **`VerityPost/VerityPost/PermissionService.swift:69-87`** — Mirror the web short-circuit. Prepend `if cache.contains("admin.owner_mode") { return true }` in `has(_:)`. In `get(_:)`, return synthesized row with `granted: true, granted_via: "owner_mode"` when cache contains the key. (Note: investigator says DB RPC `my_permission_keys` may already inject all keys; the explicit short-circuit is still needed for `granted_via` attribution and for any future "Admin view" badge logic on iOS.)
+  4. **`web/src/app/profile/settings/_cards/BillingCard.tsx:322-328`** — Already correct; no change. (Adversary flagged that an owner with a real Stripe subscription cannot cancel — separate Finding #14 below; not blocking this fix.)
+  5. **NEW — `supabase/migrations/<timestamp>_owner_mode_expert_rpcs.sql`** — Step 3 downstream map caught: SECURITY DEFINER RPCs `claim_queue_item(p_user_id, p_queue_item_id)` and `post_expert_answer(...)` hard-code `is_user_expert(p_user_id)` which only checks roles `(expert|educator|journalist)`. Owner-mode user clicks Claim/Answer → 400 "only experts can claim queue items". Fix: extend the pre-check in BOTH RPCs to `IF NOT (is_user_expert(p_user_id) OR EXISTS (SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=p_user_id AND r.name='owner')) THEN RAISE...`. Back-channel writes already include `owner` in `expert_can_see_back_channel()` — no change needed there. Apply via `mcp__claude_ai_Supabase__apply_migration` (writable). RLS policies on `expert_queue_items` already allow `is_admin_or_above()` reads — owner reads succeed without further changes.
+
+  **iOS kids — permanent N/A.** No admin role; children cannot hold `admin.owner_mode`.
+
+  **Test surfaces post-impl (smoke):**
+  - admin@veritypost.com on `/profile` → every rail row clickable; Messages/Family/Expert queue/Expert profile all render real content; "Admin view" pill in header on Expert queue + Expert profile (the only sections owner is bypassing-to-see); Plan section shows muted "Full access (no subscription required)" with no CTAs.
+  - Free user on `/profile` → no behavior change.
+  - Expert (non-owner) user on `/profile` → no behavior change; pill absent.
+  - Admin user on iOS adult → /profile equivalent shows everything; PermissionService.shared.get("foo")?.granted_via == "owner_mode" returns true.
+
+  **Migration / DB:** none (client-only).
+  **Rollback:** revert four files (ProfileApp.tsx, AppShell.tsx, PermissionService.swift; BillingCard untouched). Perm system itself unchanged.
+
+  **Adversary P0/P1 spillover findings (filed separately, NOT blocking #10):**
+  - **Finding #11 (P0)** — Privilege escalation in `/api/admin/users/[id]/permissions/route.js`. Self-grant `admin.owner_mode` allowed for any `admin.permissions.scope_override` holder.
+  - **Finding #12 (P0)** — Client kid-session cache cascade. `permissions.js` short-circuit doesn't check `active_kid` context; client gates skip during a parent's kid session even though server denies.
+  - **Finding #13 (P1)** — No audit-log marker on owner-mode bypass writes. Owner expert/family writes attribute to owner with no `via=owner_mode` flag.
+  - **Finding #14 (P2)** — BillingCard owner-mode branch suppresses cancel even when owner has a real Stripe subscription. Edge case for dogfooding accounts.
+
+  **Do NOT (binding constraints from the panel):**
+  - Don't change LockedSection copy (dead path for owners, correct path for other roles).
+  - Don't inject a fake `is_expert=true` anywhere (existing `expert.queue.oversight_all_categories` perm already feeds the right data via the short-circuit).
+  - Don't widen the iOS short-circuit beyond `PermissionService` (parental gate, kid PIN, content filters must keep their own checks — see Finding #12).
+  - Don't ship the BillingCard cancel-when-real-sub fix in this session (Finding #14, separate cycle).
+
+#### 11. Privilege escalation — admin can self-grant `admin.owner_mode` via permissions UI
+
+- **Cluster:** rbac / security / admin
+- **What was seen:** `/api/admin/users/[id]/permissions/route.js:77` only requires the caller to hold `admin.permissions.scope_override` plus pass `requireAdminOutranks`. There is no key-level deny preventing `permission_key === 'admin.owner_mode'` from being granted via the `grant` action, and no enumeration of permission_set members preventing assignment of a set containing `admin.owner_mode` via `assign_set`. An admin can target their own user id (the rank guard's "self-edit allowed" comment at L98 explicitly permits self-edits) and one-click escalate to full owner-mode bypass.
+- **Surface:** API: `web/src/app/api/admin/users/[id]/permissions/route.js:77,98`. UI: `web/src/app/admin/users/[id]/permissions/page.tsx:316-326,451,678` (`assignableSets` includes `owner_mode` because the page filters on `is_active` only).
+- **Associated:** `permissions.js:179` short-circuit (any holder of `admin.owner_mode` passes every UI gate); `compute_effective_perms` SQL function; `bump_user_perms_version` propagation.
+- **Cross-platform parity:** web — affected. iOS adult — same risk if iOS exposes any "grant permission" admin surface (none found yet — confirm during fix). iOS kids — N/A.
+- **Known context:** discovered by the §7.1 Step 2 adversary in the Finding #10 panel (2026-05-03). Owner override on #10 (full edit access) makes this MORE acute — an escalated admin gets all the write paths #10 enables, not just read access.
+- **Confirmed:** yes (2026-05-03 — file read at `/api/admin/users/[id]/permissions/route.js:77,98` + UI assign-set filter confirmed).
+- **Owner decision needed:** yes — three calls: (a) hard-deny `permission_key === 'admin.owner_mode'` on grant action AND enumerate set members on assign_set/remove_set to reject any set containing it, OR (b) introduce a separate `admin.owner_mode.assign` permission held only by the seeded owner role (more flexible but more code), OR (c) restrict the entire `/api/admin/users/[id]/permissions` surface to owner-mode holders only (simplest but kills admin's ability to manage non-owner perms).
+- **Status:** confirmed (decision-pending) — separate session before granting `owner_mode` to any second user.
+- **Ready for fix:** no — owner decision required on (a)/(b)/(c); fix this BEFORE granting `owner_mode` to anyone besides admin@veritypost.com.
+- **Notes for next agent:** do NOT block Finding #10 on this; #10 only changes what owner-mode holders SEE, not who can BECOME owner-mode. Currently only one user holds `owner_mode` (admin@veritypost.com); risk is latent until a second admin is created. Migration history may include a previous owner-mode rename — check `supabase/migrations/2026-05-02_admin_owner_mode_rename.sql` for context.
+
+#### 12. Client kid-session cascade — `permissions.js` short-circuit bypasses kid-protective UI gates
+
+- **Cluster:** rbac / coppa / kids / security
+- **What was seen:** `permissions.js:179,187,206,217` short-circuit `hasPermission` to true for any key when the cache contains `admin.owner_mode`. The DB RPC at `supabase/migrations/2026-05-02_admin_owner_mode_rename.sql:130` correctly excludes owner-mode when `active_kid IS NOT NULL` (server-side denies). But the client-side `allPermsCache` was loaded outside the kid-session context and still satisfies every key. UI gates (parental gate prompts, kid PIN re-entry chrome, content filters) skip locally even though the server would still deny. Result: owner-as-parent enters a kid session and the parental gate / PIN chrome may visually skip.
+- **Surface:** `web/src/lib/permissions.js:177-181,185-189,205-211,216-222` (4 short-circuit sites). RPC: `supabase/migrations/2026-05-02_admin_owner_mode_rename.sql:130` (server-side excludes when `active_kid` is set; client cache has no symmetrical guard).
+- **Associated:** every kid-related component checking `hasPermission` on the client; parental gate flow; kid PIN modal; content-rating filters; `active_kid` cookie / session var (find by grep `active_kid`).
+- **Cross-platform parity:** web — confirmed. iOS adult — `PermissionService.swift` short-circuit (per Finding #10 implementation) MUST NOT cascade to kid surfaces; in practice iOS kids = separate app so the cache lives in a different process — this is web-only risk. iOS kids — N/A.
+- **Known context:** discovered by Finding #10 panel adversary (2026-05-03). Server denies correctly so this is "client UI bypasses" not "data exposed" — but visible UI bypass undermines the parental-gate UX promise even if reads/writes are still blocked.
+- **Confirmed:** partial (2026-05-03 — short-circuit confirmed at the 4 cited lines; the active_kid cascade chain needs runtime trace to confirm exact UI surfaces affected). Server-side guard confirmed in migration RPC.
+- **Owner decision needed:** yes — two calls: (a) in `permissions.js` short-circuit, ALSO check for `active_kid` set (in cookie / session) and skip the bypass when in kid context — or (b) invalidate / rebuild `allPermsCache` on every kid-session enter/exit.
+- **Status:** confirmed (decision-pending).
+- **Ready for fix:** no — owner decision; needs runtime trace of which kid UI gates are affected before scoping (a) vs (b).
+- **Notes for next agent:** do NOT block Finding #10 on this; the short-circuit predates this session. But fix this BEFORE expanding owner-mode to additional users (Finding #11 makes this more acute too). When implementing, capture exhaustive list of kid UI gates that read `hasPermission` to guarantee all are covered.
+
+#### 13. No audit-log marker on owner-mode bypass writes
+
+- **Cluster:** observability / rbac / audit
+- **What was seen:** When owner-mode user performs writes through routes that have `if (isOwnerMode)` branches (e.g. expert queue claim/answer, family seat add, alert subscriptions), only `add-kid-with-seat` writes `owner_mode: true` in the response payload (`web/src/app/api/family/add-kid-with-seat/route.ts:368`). No write paths write a persistent audit row marking `via=owner_mode`. Result: expert reputation, family seat usage logs, parent-supervisor logs all attribute owner-mode activity as ordinary user activity.
+- **Surface:** `web/src/app/api/expert/ask/route.js`, `web/src/app/api/comments/route.js`, `web/src/app/api/family/seats/route.ts`, `web/src/app/api/alerts/subscriptions/route.js`, plus any other route taking an `isOwnerMode` branch. No `admin_audit_log` (or equivalent) row written.
+- **Associated:** future analytics/metrics queries that segment by user type; expert reputation scoring; family supervisor compliance logs.
+- **Cross-platform parity:** web — confirmed. iOS adult — needs check (any iOS-specific write endpoints with isOwnerMode branches). iOS kids — N/A.
+- **Known context:** discovered by Finding #10 adversary (2026-05-03). Low urgency pre-launch (only one owner-mode user); higher urgency once owner-mode is granted to any team member or moderator.
+- **Confirmed:** yes (2026-05-03 — file inspection of cited routes).
+- **Owner decision needed:** yes — (a) which audit table (existing one, or new `admin_audit_log`)? (b) write a row for every owner-mode bypass write, or only for high-blast-radius writes (expert claim/answer, family seat changes, perm grants)?
+- **Status:** confirmed (decision-pending).
+- **Ready for fix:** no — owner decision; small fix once table chosen.
+- **Notes for next agent:** check `supabase/migrations/` for any existing `admin_audit_log` / `audit_log` table; reuse if present.
+
+#### 14. BillingCard owner-mode branch suppresses cancel even when owner has a real Stripe subscription
+
+- **Cluster:** billing / edge-case
+- **What was seen:** `BillingCard.tsx:322-328` short-circuits ALL billing UI when `isOwnerMode`. If the owner ALSO has a real Stripe subscription (test purchase, dogfooding, accidentally), the cancel button vanishes — owner cannot cancel through the UI, must go through Stripe portal externally.
+- **Surface:** `web/src/app/profile/settings/_cards/BillingCard.tsx:322-328`.
+- **Associated:** `current_subscription_id` field on the user; Stripe portal at `/api/stripe/portal` (if exists).
+- **Cross-platform parity:** web — confirmed. iOS adult — `SubscriptionView.swift` likely has its own `isOwnerMode` branch; check during fix. iOS kids — N/A.
+- **Known context:** discovered by Finding #10 adversary (2026-05-03). P2 because real owner won't subscribe; only matters if dogfooding test buys happen. Owner-override on #10 said "owner mode can do it all" which would imply showing cancel when there's something to cancel.
+- **Confirmed:** yes (2026-05-03 — direct file read).
+- **Owner decision needed:** yes — small one-liner: when `isOwnerMode && current_subscription_id != null`, render a minimal "You have an active subscription. Manage it in the Stripe portal." card with a single Cancel button, instead of the empty `<Card>{null}</Card>`?
+- **Status:** confirmed (decision-pending; P2).
+- **Ready for fix:** no — owner decision; small fix.
+- **Notes for next agent:** do NOT touch in Finding #10's fix session. Schedule when convenient. Memory: `feedback_genuine_fixes_not_patches` — if shipping, also confirm Stripe portal returns the user back to /profile?section=plan with success/cancel toast handling intact.
 
 #### 8. Dark mode: article body text stays dark (illegible on dark surface)
 
