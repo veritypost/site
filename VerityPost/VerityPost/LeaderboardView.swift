@@ -60,7 +60,6 @@ struct LeaderboardView: View {
     // Permission state (populated from PermissionService on appear).
     @State private var canViewFull = false      // leaderboard.view
     @State private var canViewCategories = false // leaderboard.category.view
-    @State private var canFilterTime = false     // leaderboard.filter.time
 
     // Category filter
     @State private var categories: [VPCategory] = []
@@ -68,6 +67,12 @@ struct LeaderboardView: View {
 
     // Expansion (tap chevron to toggle stats panel; tap row navigates to profile).
     @State private var expanded: String? = nil
+
+    // Block-list: union of users the viewer blocked + users who blocked the viewer.
+    @State private var blockedIds: Set<String> = []
+
+    // Retry token: reassigning triggers a new .task execution.
+    @State private var reloadToken = UUID()
 
     private var isLoggedIn: Bool { auth.currentUser != nil }
 
@@ -78,7 +83,7 @@ struct LeaderboardView: View {
     }
 
     private var visiblePeriods: [LeaderboardPeriod] {
-        canFilterTime ? LeaderboardPeriod.allCases : [.allTime]
+        canViewFull ? LeaderboardPeriod.allCases : [.allTime]
     }
 
     var body: some View {
@@ -139,7 +144,7 @@ struct LeaderboardView: View {
                 }
 
                 // Period filter — Top Verifiers / no category. Gated on
-                // `leaderboard.filter.time` (anon / free see All Time only).
+                // `leaderboard.view` (same permission that unlocks the full list).
                 if isLoggedIn && activeTab == .topVerifiers && activeCategory == nil && visiblePeriods.count > 1 {
                     HStack(spacing: 6) {
                         ForEach(visiblePeriods, id: \.self) { p in
@@ -192,6 +197,7 @@ struct LeaderboardView: View {
                             .multilineTextAlignment(.center)
                         Button {
                             loading = true
+                            reloadToken = UUID()
                         } label: {
                             Text("Try again")
                                 .font(.system(.footnote, design: .default, weight: .semibold))
@@ -310,8 +316,11 @@ struct LeaderboardView: View {
         .task {
             await refreshPermissions()
             await loadCategories()
+            if let uid = auth.currentUser?.id.uuidString {
+                await loadBlockList(userId: uid)
+            }
         }
-        .task(id: "\(activeTab.rawValue)|\(activePeriod.rawValue)|\(activeCategory ?? "")|\(permStore.changeToken)") {
+        .task(id: "\(activeTab.rawValue)|\(activePeriod.rawValue)|\(activeCategory ?? "")|\(permStore.changeToken)|\(reloadToken)") {
             await loadLeaderboard()
         }
     }
@@ -458,7 +467,6 @@ struct LeaderboardView: View {
         await PermissionService.shared.refreshIfStale()
         canViewFull = await PermissionService.shared.has("leaderboard.view")
         canViewCategories = await PermissionService.shared.has("leaderboard.category.view")
-        canFilterTime = await PermissionService.shared.has("leaderboard.filter.time")
     }
 
     // MARK: - Data loading
@@ -480,6 +488,24 @@ struct LeaderboardView: View {
         }
     }
 
+    private func loadBlockList(userId: String) async {
+        do {
+            struct BlockedRow: Decodable { let blocked_id: String }
+            struct BlockerRow: Decodable { let blocker_id: String }
+            let outbound: [BlockedRow] = try await client.from("blocked_users")
+                .select("blocked_id")
+                .eq("blocker_id", value: userId)
+                .execute().value
+            let inbound: [BlockerRow] = try await client.from("blocked_users")
+                .select("blocker_id")
+                .eq("blocked_id", value: userId)
+                .execute().value
+            blockedIds = Set(outbound.map { $0.blocked_id }).union(inbound.map { $0.blocker_id })
+        } catch {
+            Log.d("Load block list error:", error)
+        }
+    }
+
     private func loadLeaderboard() async {
         loadError = nil
         displayScores = [:]
@@ -492,13 +518,12 @@ struct LeaderboardView: View {
         } else {
             switch activeTab {
             case .topVerifiers:
-                if activePeriod == .allTime || !canFilterTime {
+                if activePeriod == .allTime || !canViewFull {
                     await loadTopVerifiers(limit: limit)
                 } else {
                     await loadPeriodLeaderboard(period: activePeriod, limit: limit)
                 }
             case .risingStars:  await loadRisingStars(limit: limit)
-            case .weekly:       await loadPeriodLeaderboard(period: .thisWeek, limit: limit)
             }
         }
         loading = false
@@ -532,10 +557,11 @@ struct LeaderboardView: View {
                 .execute().value
             let map = Dictionary(uniqueKeysWithValues: fetched.map { ($0.id, $0) })
             // Preserve score ordering from category_scores; drop users that
-            // got filtered out by the privacy predicates on the second query.
-            users = rows.compactMap { r in map[r.user_id] }
+            // got filtered out by the privacy predicates on the second query,
+            // and exclude any user on the viewer's block list.
+            users = rows.compactMap { r in map[r.user_id] }.filter { !blockedIds.contains($0.id) }
             displayScores = Dictionary(uniqueKeysWithValues: rows.compactMap { r in
-                map[r.user_id] != nil ? (r.user_id, r.score) : nil
+                map[r.user_id] != nil && !blockedIds.contains(r.user_id) ? (r.user_id, r.score) : nil
             })
         } catch {
             Log.d("Category leaderboard error:", error)
@@ -549,8 +575,9 @@ struct LeaderboardView: View {
                 .order("verity_score", ascending: false)
                 .limit(limit)
                 .execute().value
-            users = data
-            displayScores = Dictionary(uniqueKeysWithValues: data.map { ($0.id, $0.verityScore ?? 0) })
+            let filtered = data.filter { !blockedIds.contains($0.id) }
+            users = filtered
+            displayScores = Dictionary(uniqueKeysWithValues: filtered.map { ($0.id, $0.verityScore ?? 0) })
         } catch {
             Log.d("Top verifiers error:", error)
             loadError = "Couldn't load the leaderboard. Check your connection."
@@ -564,11 +591,13 @@ struct LeaderboardView: View {
             let sinceStr = leaderboardISO8601.string(from: since)
             let data: [VPUser] = try await usersQueryBase()
                 .gte("created_at", value: sinceStr)
+                .is("deletion_scheduled_for", value: nil)
                 .order("verity_score", ascending: false)
                 .limit(limit)
                 .execute().value
-            users = data
-            displayScores = Dictionary(uniqueKeysWithValues: data.map { ($0.id, $0.verityScore ?? 0) })
+            let filtered = data.filter { !blockedIds.contains($0.id) }
+            users = filtered
+            displayScores = Dictionary(uniqueKeysWithValues: filtered.map { ($0.id, $0.verityScore ?? 0) })
         } catch {
             Log.d("Rising stars error:", error)
             loadError = "Couldn't load the leaderboard. Check your connection."
@@ -601,9 +630,9 @@ struct LeaderboardView: View {
                 .in("id", values: orderedIds)
                 .execute().value
             let map = Dictionary(uniqueKeysWithValues: fetched.map { ($0.id, $0) })
-            users = orderedIds.compactMap { map[$0] }
+            users = orderedIds.compactMap { map[$0] }.filter { !blockedIds.contains($0.id) }
             displayScores = Dictionary(uniqueKeysWithValues: counts.compactMap { c in
-                map[c.user_id] != nil ? (c.user_id, c.reads_count) : nil
+                map[c.user_id] != nil && !blockedIds.contains(c.user_id) ? (c.user_id, c.reads_count) : nil
             })
         } catch {
             Log.d("Period leaderboard error:", error)
@@ -617,13 +646,11 @@ struct LeaderboardView: View {
 private enum TabKey: String, CaseIterable, Hashable {
     case topVerifiers = "top_verifiers"
     case risingStars = "rising_stars"
-    case weekly = "weekly"
 
     var label: String {
         switch self {
         case .topVerifiers: return "Top Verifiers"
         case .risingStars:  return "Rising Stars"
-        case .weekly:       return "Weekly"
         }
     }
 }

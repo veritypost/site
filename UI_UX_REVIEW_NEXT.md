@@ -3,14 +3,14 @@
 Single-line state for the review system. Updated automatically at session end.
 
 ```
-CURRENT_PHASE: auto-detect
-CURRENT_UNIT: pending
-CURRENT_TITLE: Unit 6 — Leaderboard (/leaderboard)
+CURRENT_PHASE: owner-adjudication
+CURRENT_UNIT: 7
+CURRENT_TITLE: Unit 7 — Public profile + card (/u/[username], /card/[username])
 CURRENT_WAVE: A
-CURRENT_DOC: UI_UX_REVIEW/A-6-leaderboard.md
-STATUS: pending
-NEXT_BUILD_SLICE: Slice 14 (Unit 6 / Leaderboard) — after Unit 6 review completes
-ANCHOR: Slice 13 (Category) shipped 2026-05-02. 36 findings fixed (F33 refuted). Adversary: 2 blocking gaps closed (deleted_at filter + is_kids_safe guard). Unit 5 status: fixed. Auto-detect next: (e) Unit 6 (Leaderboard) at pending → run Unit 6 review.
+CURRENT_DOC: UI_UX_REVIEW/A-7-public-profile.md
+STATUS: findings
+NEXT_BUILD_SLICE: Slice 14 (Unit 6 / Leaderboard) — READY, execute immediately. Slice 15 (Unit 7) blocked on DECISION #060 (Q1: show_activity on card).
+ANCHOR: Unit 7 review complete 2026-05-02. 44 findings logged (25 crit, 19 polish). Elevated-care: F01 (CSAM escalation), F15 (targetType injection), F16 (wrong permission) — adversary required in Slice 15. Panel Q1 (show_activity on card) 2-1 divergent — owner adjudication required. DECISIONs #059+#061 auto-locked. Next session auto-detect fires (c) → execute Slice 14 (all decisions locked).
 LAST_UPDATED: 2026-05-02
 
 PARKED_UNITS:
@@ -19,6 +19,8 @@ PARKED_UNITS:
 - Unit 3 (Browse) — status: fixed (Slice 11 shipped 2026-05-02). All 38 findings resolved.
 - Unit 4 (Search) — status: fixed (Slice 12 shipped 2026-05-02). 29 findings fixed.
 - Unit 5 (Category) — status: fixed (Slice 13 shipped 2026-05-02). 36 findings fixed (F33 refuted). 2 non-blocking adversary gaps deferred.
+- Unit 6 (Leaderboard) — status: findings (Slice 14 READY). 46 findings. All decisions locked (DECISION #057 C, #058).
+- Unit 7 (Public profile + card) — status: findings (Slice 15 blocked on DECISION #060). 44 findings. 3 elevated-care (adversary req'd). DECISIONs #059+#061 auto-locked.
 
 EXECUTION_PLAN: UI_UX_REVIEW_SLICES.md
 SLICE_NAMING: sequential numbers (Slice 1, 2, 3, ...). See SLICES.md tracking table for type (Foundation / Unit fix / Cross-cutting / Verification) and dependencies.

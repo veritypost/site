@@ -15,8 +15,8 @@ Findings docs live at `UI_UX_REVIEW/<wave>-<n>-<slug>.md`.
 | 3  | Browse | `/browse` | fixed (Slice 11 shipped 2026-05-02) |
 | 4  | Search | `/search` | fixed (Slice 12 shipped 2026-05-02) |
 | 5  | Category | `/category/[id]` | fixed (Slice 13 shipped 2026-05-02) |
-| 6  | Leaderboard | `/leaderboard` | pending |
-| 7  | Public profile + card | `/u/[username]`, `/card/[username]` *(KILL-SWITCHED — chrome only)* | pending |
+| 6  | Leaderboard | `/leaderboard` | findings (46 findings; Slice 14 ready — DECISION #057 locked 2026-05-02) |
+| 7  | Public profile + card | `/u/[username]`, `/card/[username]` *(flag is live — full review applied)* | findings (44 findings; Slice 15 blocked on DECISION #060 / Q1) |
 | 8  | Marketing bundle | `/pricing`, `/how-it-works`, `/about`, `/contact`, `/kids-app` | pending |
 | 9  | Legal/info sweep | `/privacy`, `/privacy/kids`, `/terms`, `/cookies`, `/dmca`, `/corrections`, `/editorial-standards`, `/methodology`, `/help`, `/accessibility` | pending |
 | 10 | Auth flow | `/login`, `/signup` (redirect), `/request-access` (redirect), `/welcome`, `/beta-locked` | pending |
@@ -134,7 +134,7 @@ Active slice plan (as of 2026-05-02):
 | 12 | Unit 4 / Search UX fix (29 findings) | Unit fix | 1 + 2 | shipped 2026-05-02 |
 | 13 | Unit 5 / Category fix (37 findings) | Unit fix | 1 + 2 | shipped 2026-05-02 |
 
-**Future slices** (added when reviews complete): Slice 14 (Unit 6 / Leaderboard), Slice 15 (Unit 7 / Public profile chrome), Slice 16 (Unit 8 / Marketing bundle), Slice 17 (Unit 9 / Legal/info sweep), Slice 18 (Unit 10 / Auth flow), Slice 19 (Unit 11 / Logout). Wave B onward continues numbering.
+**Future slices** (added when reviews complete): Slice 14 (Unit 6 / Leaderboard — 46 findings, READY), Slice 15 (Unit 7 / Public profile chrome), Slice 16 (Unit 8 / Marketing bundle), Slice 17 (Unit 9 / Legal/info sweep), Slice 18 (Unit 10 / Auth flow), Slice 19 (Unit 11 / Logout). Wave B onward continues numbering.
 
 See `UI_UX_REVIEW_SLICES.md` for per-slice scope, file paths, test plans, decisions consumed, and ready-state.
 

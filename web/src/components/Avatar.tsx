@@ -43,7 +43,7 @@ export default function Avatar({ user, size = 32 }: AvatarProps) {
   // Up to 3 characters, alphanumeric (letters or numbers). Letters
   // upper-cased for visual weight; numbers pass through as-is.
   const raw = (user?.avatar?.initials || firstChar || '?').toString();
-  const initials = raw.slice(0, 3).toUpperCase();
+  const initials = Array.from(raw).slice(0, 3).join('').toUpperCase();
   const fontSize = Math.max(
     8,
     Math.round(size * (initials.length >= 3 ? 0.30 : initials.length >= 2 ? 0.34 : 0.36))

@@ -2,22 +2,23 @@
 // @feature-verified home_feed 2026-04-18
 'use client';
 import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '../../lib/supabase/client';
 import Avatar from '../../components/Avatar';
 import VerifiedBadge from '../../components/VerifiedBadge';
 import ErrorState from '../../components/ErrorState';
-import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
+import { hasPermission, refreshAllPermissions } from '@/lib/permissions';
 import { usePageViewTrack } from '@/lib/useTrack';
 import { PERIOD_LABELS, periodSince, type Period } from '@/lib/leaderboardPeriod';
 import type { Tables } from '@/types/database-helpers';
 
-// T-092 — podium accent colors for ranks 1 / 2 / 3. Desaturated enough to
-// stay coherent with the monochrome accent system; all pass WCAG AA on white.
+// T-092 — podium accent colors for ranks 1 / 2 / 3. CSS variables allow
+// dark-mode overrides without JS; see globals.css --rank-* tokens.
 function rankAccentColor(rank: number): string {
-  if (rank === 1) return '#B8860B'; // dark gold
-  if (rank === 2) return '#6B7280'; // silver-gray
-  if (rank === 3) return '#92400E'; // bronze-brown
+  if (rank === 1) return 'var(--rank-gold)';
+  if (rank === 2) return 'var(--rank-silver)';
+  if (rank === 3) return 'var(--rank-bronze)';
   return 'var(--dim)';
 }
 
@@ -48,7 +49,7 @@ function stripKidsTag(name: string | null | undefined): string {
   return String(name)
     .replace(/\s*\(kids?\)\s*$/i, '')
     .replace(/\s+kids?\s*$/i, '')
-    .replace(/^kids?\s+/i, '')
+    .replace(/^Kids\s+/, '')
     .trim();
 }
 
@@ -79,7 +80,7 @@ type LeaderUser = Pick<
   | 'comment_count'
 > & { displayScore?: number };
 
-type MeRow = LeaderUser & Pick<Tables<'users'>, 'email_verified' | 'plan_status'>;
+type MeRow = LeaderUser & Pick<Tables<'users'>, 'is_banned' | 'frozen_at'>;
 
 // Nested shape from the `category_scores` join used for the category path.
 interface CategoryScoreRow {
@@ -105,13 +106,20 @@ interface CategoryScoreRow {
 
 export default function LeaderboardPage() {
   const supabase = createClient();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   usePageViewTrack('leaderboard');
 
-  const [activeTab, setActiveTab] = useState<TabKey>('Top Verifiers');
-  const [period, setPeriod] = useState<PeriodKey>('All time');
+  const [activeTab, setActiveTabState] = useState<TabKey>(() =>
+    searchParams.get('tab') === 'rising' ? 'Rising Stars' : 'Top Verifiers'
+  );
+  const [period, setPeriodState] = useState<PeriodKey>(() => {
+    const p = searchParams.get('period');
+    return p === 'week' ? 'This Week' : p === 'month' ? 'This Month' : p === 'year' ? 'This Year' : 'All time';
+  });
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [subcats, setSubcats] = useState<SubcatRow[]>([]);
-  const [activeCat, setActiveCat] = useState<string | null>(null);
+  const [activeCat, setActiveCatState] = useState<string | null>(() => searchParams.get('cat'));
   const [activeSub, setActiveSub] = useState<string | null>(null);
 
   const [users, setUsers] = useState<LeaderUser[]>([]);
@@ -131,6 +139,28 @@ export default function LeaderboardPage() {
   const [fullAccess, setFullAccess] = useState<boolean>(false);
   const [canCategories, setCanCategories] = useState<boolean>(false);
   const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent' | 'rate-limited' | 'error'>('idle');
+  const [meLoaded, setMeLoaded] = useState<boolean>(false);
+
+  // URL-synced setters — router.replace keeps history clean (Back exits the page).
+  const setActiveTab = (tab: TabKey) => {
+    setActiveTabState(tab);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', tab === 'Rising Stars' ? 'rising' : 'top');
+    router.replace(`?${params.toString()}`, { scroll: false });
+  };
+  const setPeriod = (p: PeriodKey) => {
+    setPeriodState(p);
+    const params = new URLSearchParams(searchParams.toString());
+    const key = p === 'This Week' ? 'week' : p === 'This Month' ? 'month' : p === 'This Year' ? 'year' : 'all';
+    params.set('period', key);
+    router.replace(`?${params.toString()}`, { scroll: false });
+  };
+  const setActiveCat = (cat: string | null) => {
+    setActiveCatState(cat);
+    const params = new URLSearchParams(searchParams.toString());
+    if (cat) params.set('cat', cat); else params.delete('cat');
+    router.replace(`?${params.toString()}`, { scroll: false });
+  };
 
   useEffect(() => {
     (async () => {
@@ -155,8 +185,11 @@ export default function LeaderboardPage() {
 
       // Hydrate the permission cache once up front. This replaces the
       // former `email_verified === true` read and the `plans.tier` join.
-      await refreshAllPermissions();
-      await refreshIfStale();
+      try {
+        await refreshAllPermissions();
+      } catch (err) {
+        console.error('Failed to refresh permissions:', err);
+      }
       setFullAccess(hasPermission('leaderboard.view'));
       setCanCategories(hasPermission('leaderboard.category.view'));
 
@@ -164,11 +197,12 @@ export default function LeaderboardPage() {
         const { data: meRow } = await supabase
           .from('users')
           .select(
-            'id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert, verity_score, quizzes_completed_count, comment_count, email_verified, plan_status'
+            'id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert, verity_score, quizzes_completed_count, comment_count, is_banned, frozen_at'
           )
           .eq('id', authRes.data.user.id)
           .single<MeRow>();
         setMe(meRow || null);
+        setMeLoaded(true);
 
         // T282 — load bidirectional block set. Anonymous viewers don't
         // have a block list to apply, so the fetch is gated on auth.
@@ -183,13 +217,18 @@ export default function LeaderboardPage() {
           if (row.blocked_id === viewerId && row.blocker_id) blocks.add(row.blocker_id);
         });
         setBlockedIds(blocks);
+      } else {
+        setMeLoaded(true);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
+    const controller = new AbortController();
+
     async function load() {
+      if (!meLoaded) return;
       setLoading(true);
       setLoadError('');
 
@@ -205,8 +244,10 @@ export default function LeaderboardPage() {
           .eq('users.is_banned', false)
           .eq('users.show_on_leaderboard', true)
           .is('users.frozen_at', null)
+          .is('users.deletion_scheduled_for', null)
           .order('score', { ascending: false })
           .limit(50);
+        if (controller.signal.aborted) return;
         if (csErr) {
           console.error('[leaderboard] category_scores load failed', csErr);
           setUsers([]);
@@ -224,7 +265,7 @@ export default function LeaderboardPage() {
       // Weekly tab is always a 7-day rolling window regardless of `period`
       // (the picker is hidden on Weekly; only Top Verifiers exposes it).
       let periodCutoff: string | null = null;
-      if (activeTab === 'Top Verifiers' && period !== 'All time') {
+      if (activeTab === 'Top Verifiers' && period !== 'All time' && me && fullAccess) {
         const cutoff = periodSince(period);
         periodCutoff = cutoff ? cutoff.toISOString() : null;
       }
@@ -247,6 +288,7 @@ export default function LeaderboardPage() {
           .gte('created_at', thirty.toISOString())
           .order('verity_score', { ascending: false })
           .limit(50);
+        if (controller.signal.aborted) return;
         if (rsErr) {
           console.error('[leaderboard] rising stars load failed', rsErr);
           setUsers([]);
@@ -279,6 +321,7 @@ export default function LeaderboardPage() {
           'leaderboard_period_counts' as never,
           { p_since: periodCutoff, p_limit: 50 } as never
         );
+        if (controller.signal.aborted) return;
         if (rpcErr) {
           console.error('[leaderboard] leaderboard_period_counts failed', rpcErr);
           setUsers([]);
@@ -308,7 +351,9 @@ export default function LeaderboardPage() {
           .select(
             'id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert, verity_score, quizzes_completed_count, comment_count'
           )
-          .in('id', ids);
+          .in('id', ids)
+          .eq('show_on_leaderboard', true);
+        if (controller.signal.aborted) return;
         const rows = (data as LeaderUser[] | null) || [];
         const sorted = rows.slice().sort((a, b) => (counts[b.id] || 0) - (counts[a.id] || 0));
         setUsers(sorted.map((u) => ({ ...u, displayScore: counts[u.id] || 0 })));
@@ -317,7 +362,7 @@ export default function LeaderboardPage() {
       }
 
       // Default: rank by verity_score. Anonymous viewers see only top 3 per D31.
-      const pageLimit = me ? 50 : 3;
+      const pageLimit = fullAccess ? 50 : 3;
       // T300 — read via public_profiles_v. is_banned + deletion already
       // pre-filtered by the view; `is_frozen` derived boolean filters
       // frozen users without exposing the timestamp.
@@ -330,7 +375,9 @@ export default function LeaderboardPage() {
         .eq('show_on_leaderboard', true)
         .eq('is_frozen', false)
         .order('verity_score', { ascending: false })
+        .order('id', { ascending: true })
         .limit(pageLimit);
+      if (controller.signal.aborted) return;
       if (defErr) {
         console.error('[leaderboard] default load failed', defErr);
         setUsers([]);
@@ -343,8 +390,9 @@ export default function LeaderboardPage() {
       setLoading(false);
     }
     load();
+    return () => { controller.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, period, activeCat, me, reloadKey]);
+  }, [activeTab, period, activeCat, me, reloadKey, meLoaded]);
 
   // T282 — bidirectional block filter applied post-fetch. The viewer's
   // own row is NEVER filtered (self can't appear in their own block set,
@@ -356,13 +404,13 @@ export default function LeaderboardPage() {
   // needs a server side count). Uses visibleUsers so blocked users don't
   // shift the viewer's perceived rank.
   useEffect(() => {
-    if (!me || visibleUsers.length === 0) {
+    if (!me || users.length === 0) {
       setMyRank(null);
       return;
     }
-    const i = visibleUsers.findIndex((u) => u.id === me.id);
+    const i = users.findIndex((u) => u.id === me.id);
     setMyRank(i >= 0 ? i + 1 : null);
-  }, [me, visibleUsers]);
+  }, [me, users]);
 
   const activeSubs = activeCat ? subcats.filter((s) => s.category_id === activeCat) : [];
   // Permission-driven: replaces the former `plan_status === 'active' &&
@@ -387,6 +435,9 @@ export default function LeaderboardPage() {
     }
   }
 
+  const myRow = users.find((u) => u.id === me?.id);
+  const displayMetric = myRow?.displayScore ?? me?.verity_score ?? 0;
+
   return (
     // Ext-NN1 — main landmark for screen readers.
     <main className="vp-dark">
@@ -394,8 +445,11 @@ export default function LeaderboardPage() {
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 20px', letterSpacing: '-0.02em' }}>
           Most Informed
         </h1>
-        {/* Your rank */}
-        {me && (
+        <h2 style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }}>
+          Your ranking
+        </h2>
+        {/* Your rank — hidden on Rising Stars when user is unranked */}
+        {me && fullAccess && !me.is_banned && !me.frozen_at && !(activeTab === 'Rising Stars' && !myRank) && (
           <div
             style={{
               padding: '12px 16px',
@@ -425,7 +479,7 @@ export default function LeaderboardPage() {
               </div>
             </div>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)' }}>
-              {(me.verity_score || 0).toLocaleString()}
+              {displayMetric.toLocaleString()}
             </div>
           </div>
         )}
@@ -436,6 +490,8 @@ export default function LeaderboardPage() {
             only Top Verifiers + top 3 (D31). */}
         {me && (
           <div
+            role="tablist"
+            aria-label="Leaderboard views"
             style={{
               display: 'flex',
               gap: 6,
@@ -447,6 +503,8 @@ export default function LeaderboardPage() {
             {TABS.filter((t) => fullAccess || t === 'Top Verifiers').map((t) => (
               <button
                 key={t}
+                role="tab"
+                aria-selected={activeTab === t}
                 onClick={() => {
                   setActiveTab(t);
                   setActiveCat(null);
@@ -457,7 +515,7 @@ export default function LeaderboardPage() {
                   borderRadius: 20,
                   border: 'none',
                   minHeight: 44,
-                  background: activeTab === t ? 'rgba(0,0,0,0.08)' : 'var(--card)',
+                  background: activeTab === t ? 'var(--tab-active-bg)' : 'var(--card)',
                   color: activeTab === t ? 'var(--accent)' : 'var(--dim)',
                   fontSize: 13,
                   fontWeight: 500,
@@ -478,6 +536,7 @@ export default function LeaderboardPage() {
             {PERIODS.filter((p) => fullAccess || p === 'All time').map((p) => (
               <button
                 key={p}
+                aria-pressed={period === p}
                 onClick={() => setPeriod(p)}
                 style={{
                   padding: '5px 12px',
@@ -487,7 +546,7 @@ export default function LeaderboardPage() {
                   color: period === p ? 'var(--bg)' : 'var(--dim)',
                   fontSize: 11,
                   fontWeight: 500,
-                  minHeight: 36,
+                  minHeight: 44,
                   cursor: 'pointer',
                   fontFamily: 'var(--font-sans)',
                 }}
@@ -497,9 +556,12 @@ export default function LeaderboardPage() {
             ))}
           </div>
         )}
+        {activeCat && (
+          <span style={{ fontSize: 12, color: 'var(--dim)', marginLeft: 8 }}>(All time)</span>
+        )}
 
-        {/* Categories — D5/D31: paid only. Invisible to free/anon. */}
-        {canCategories && (
+        {/* Categories — D5/D31: paid only. Invisible to free/anon. Top Verifiers only. */}
+        {canCategories && activeTab === 'Top Verifiers' && (
           <div
             style={{
               display: 'flex',
@@ -560,25 +622,39 @@ export default function LeaderboardPage() {
             the query (category_scores has no subcategory_id yet). Hiding
             the false affordance until Section C lands the data backbone. */}
 
+        <h2 style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }}>
+          {activeTab === 'Rising Stars' ? 'Rising Stars' : 'Top Verifiers'}
+        </h2>
         {/* List */}
         <div style={{ borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' }}>
           {loading && (
-            <div style={{ padding: 30, textAlign: 'center', color: 'var(--dim)', fontSize: 12 }}>
-              Loading...
-            </div>
+            <>
+              {[0,1,2,3,4].map((i) => (
+                <div key={i} style={{
+                  height: 56,
+                  background: 'var(--card)',
+                  borderRadius: 8,
+                  marginBottom: 4,
+                  opacity: 0.5,
+                  animation: 'pulse 1.5s ease-in-out infinite'
+                }} />
+              ))}
+            </>
           )}
           {!loading && loadError && (
             <ErrorState message={loadError} onRetry={() => setReloadKey((k) => k + 1)} />
           )}
           {!loading && !loadError && visibleUsers.length === 0 && (
             <div style={{ padding: 30, textAlign: 'center' }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#111', marginBottom: 6 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
                 No results
               </div>
               <div style={{ fontSize: 12, color: 'var(--dim)', marginBottom: 12, lineHeight: 1.5 }}>
-                No one has earned points with these filters yet.
+                {activeTab === 'Rising Stars'
+                  ? 'No new accounts in the past 30 days.'
+                  : 'No one has earned points with these filters yet.'}
               </div>
-              {(activeCat || activeSub) && (
+              {activeCat && (
                 <button
                   onClick={() => {
                     setActiveCat(null);
@@ -587,8 +663,8 @@ export default function LeaderboardPage() {
                   aria-label="Clear category and subcategory filters"
                   style={{
                     padding: '8px 16px',
-                    background: '#111',
-                    color: '#fff',
+                    background: 'var(--accent)',
+                    color: 'var(--bg)',
                     border: 'none',
                     borderRadius: 8,
                     fontSize: 12,
@@ -606,6 +682,11 @@ export default function LeaderboardPage() {
               Rows 4+ render blurred behind a sign-up CTA so anon visitors
               know there's more to see. Previously every row rendered
               blurred, which contradicted the comment and the spec. */}
+          {!me && (
+            <p style={{ fontSize: 13, color: 'var(--dim)', marginBottom: 12, textAlign: 'center' }}>
+              Top readers by Verity Score — sign in to see the full ranking.
+            </p>
+          )}
           {!me && visibleUsers.length > 0 && (
             <>
               {visibleUsers.slice(0, 3).map((u, i) => (
@@ -618,7 +699,7 @@ export default function LeaderboardPage() {
                   isLast={i === Math.min(2, visibleUsers.length - 1) && visibleUsers.length <= 3}
                 />
               ))}
-              {visibleUsers.length > 3 && (
+              {!me && (
                 <div style={{ position: 'relative', overflow: 'hidden' }}>
                   <div style={{ filter: 'blur(6px)', pointerEvents: 'none', userSelect: 'none' }}>
                     {visibleUsers.slice(3, 8).map((u, i) => (
@@ -677,7 +758,7 @@ export default function LeaderboardPage() {
                       alignItems: 'center',
                       justifyContent: 'center',
                       background:
-                        'linear-gradient(to bottom, rgba(255,255,255,0.3), rgba(255,255,255,0.95) 70%)',
+                        `linear-gradient(to bottom, rgba(var(--bg-rgb), 0.3), rgba(var(--bg-rgb), 0.95) 70%)`,
                     }}
                   >
                     <p
@@ -691,7 +772,7 @@ export default function LeaderboardPage() {
                       Sign up to see the full leaderboard
                     </p>
                     <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--dim)' }}>
-                      Free account unlocks ranks beyond top 3.
+                      Sign up and verify your email to see the full ranking.
                     </p>
                     <a
                       href="/signup"
@@ -725,6 +806,7 @@ export default function LeaderboardPage() {
                   rank={i + 1}
                   rankColor={rankAccentColor(i + 1)}
                   isPodium
+                  isSelf={me?.id === u.id}
                 />
               ))}
 
@@ -738,8 +820,9 @@ export default function LeaderboardPage() {
                     user={u}
                     rank={i + 4}
                     rankColor="var(--dim)"
-                    isLast={i === visibleUsers.length - 4 - 1}
+                    isLast={i === visibleUsers.length - 4}
                     showVerityScore
+                    isSelf={me?.id === u.id}
                   />
                 ))
             : me &&
@@ -803,7 +886,7 @@ export default function LeaderboardPage() {
                       alignItems: 'center',
                       justifyContent: 'center',
                       background:
-                        'linear-gradient(to bottom, rgba(255,255,255,0.3), rgba(255,255,255,0.95) 70%)',
+                        `linear-gradient(to bottom, rgba(var(--bg-rgb), 0.3), rgba(var(--bg-rgb), 0.95) 70%)`,
                     }}
                   >
                     <p
@@ -825,9 +908,26 @@ export default function LeaderboardPage() {
                         You've already requested a verification email recently. Check your inbox.
                       </p>
                     ) : resendState === 'error' ? (
-                      <p style={{ marginTop: 8, fontSize: 14, color: 'var(--dim)' }}>
-                        Something went wrong. Try again in a moment.
-                      </p>
+                      <>
+                        <p style={{ marginTop: 8, fontSize: 14, color: 'var(--dim)' }}>
+                          Something went wrong. Try again in a moment.
+                        </p>
+                        <button
+                          onClick={() => setResendState('idle')}
+                          style={{
+                            marginTop: 8,
+                            padding: '8px 16px',
+                            background: 'var(--accent)',
+                            color: 'var(--bg)',
+                            border: 'none',
+                            borderRadius: 6,
+                            cursor: 'pointer',
+                            fontSize: 13,
+                          }}
+                        >
+                          Try again
+                        </button>
+                      </>
                     ) : (
                       <button
                         onClick={handleResendVerification}
@@ -845,7 +945,7 @@ export default function LeaderboardPage() {
                           cursor: resendState === 'sending' ? 'not-allowed' : 'pointer',
                         }}
                       >
-                        {resendState === 'sending' ? 'Sending…' : 'Verify email'}
+                        {resendState === 'sending' ? 'Sending…' : 'Resend verification link'}
                       </button>
                     )}
                   </div>
@@ -858,7 +958,7 @@ export default function LeaderboardPage() {
           when the current user has a computed rank in the loaded list.
           The 80px bottom padding on the scroll container ensures list
           content scrolls clear of this bar without manual offset logic. */}
-      {me && myRank !== null && (
+      {me && myRank !== null && fullAccess && !me.is_banned && !me.frozen_at && (
         <div
           style={{
             position: 'fixed',
@@ -891,7 +991,7 @@ export default function LeaderboardPage() {
                 #{myRank}
               </span>
               <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)' }}>
-                {(me.verity_score || 0).toLocaleString()}
+                {displayMetric.toLocaleString()}
               </span>
             </div>
           </div>
@@ -912,6 +1012,7 @@ interface LeaderRowProps {
   isLast?: boolean;
   showVerityScore?: boolean;
   isPodium?: boolean;
+  isSelf?: boolean;
 }
 
 function LeaderRow({
@@ -921,6 +1022,7 @@ function LeaderRow({
   isLast = false,
   showVerityScore = false,
   isPodium = false,
+  isSelf = false,
 }: LeaderRowProps) {
   const profileHref = u.username ? `/card/${u.username}` : null;
   return (
@@ -931,6 +1033,7 @@ function LeaderRow({
         alignItems: 'center',
         gap: 12,
         borderBottom: isLast ? 'none' : '1px solid var(--rule)',
+        background: isSelf ? 'var(--accent-subtle)' : undefined,
       }}
     >
       <span
@@ -970,7 +1073,9 @@ function LeaderRow({
           ) : (
             u.username
           )}
-          <VerifiedBadge user={u} />
+          {isSelf && (
+            <span style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 500 }}>You</span>
+          )}
         </div>
         {showVerityScore && (
           <div style={{ fontSize: 11, color: 'var(--dim)' }}>

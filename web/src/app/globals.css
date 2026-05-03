@@ -72,6 +72,12 @@
 
   --font-serif: var(--font-source-serif), Georgia, serif;
   --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  --bg-rgb: 255, 255, 255;
+  --rank-gold: #B8860B;
+  --rank-silver: #6B7280;
+  --rank-bronze: #92400E;
+  --tab-active-bg: rgba(0, 0, 0, 0.08);
 }
 
 /* Profile redesign tokens — mirrors palette.ts C.* constants.
@@ -158,6 +164,12 @@
     /* Focus ring */
     --p-ring: rgba(77, 143, 255, 0.35);
     --p-ring-strong: rgba(77, 143, 255, 0.65);
+
+    --bg-rgb: 18, 18, 18;
+    --rank-gold: #F5C842;
+    --rank-silver: #A0AEC0;
+    --rank-bronze: #ED8936;
+    --tab-active-bg: rgba(255, 255, 255, 0.12);
   }
 }
 
@@ -201,6 +213,12 @@
   /* Focus ring */
   --p-ring: rgba(77, 143, 255, 0.35);
   --p-ring-strong: rgba(77, 143, 255, 0.65);
+
+  --bg-rgb: 18, 18, 18;
+  --rank-gold: #F5C842;
+  --rank-silver: #A0AEC0;
+  --rank-bronze: #ED8936;
+  --tab-active-bg: rgba(255, 255, 255, 0.12);
 }
 
 /* Explicit light override — allows OS-dark users who chose "Light"

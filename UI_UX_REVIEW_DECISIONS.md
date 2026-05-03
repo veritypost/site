@@ -513,3 +513,50 @@ Key: revenue excluded from pitch export (leaks pricing floor). Bot impressions e
 ---
 
 *New decisions append below. Never delete — supersede with a follow-up entry referencing the prior number.*
+
+## #057 — No credential badges on leaderboard rows (owner-locked)
+**Date:** 2026-05-02 **Scope:** web leaderboard + iOS adult leaderboard
+**Q:** Should `is_expert` and `is_verified_public_figure` credential badges render publicly on leaderboard rows?
+**A:** No. Remove `<VerifiedBadge>` from `LeaderRow` entirely (Option C — suppress both). The leaderboard is a purely score-based competition surface; role/credential markers on a top-50 public list add no information beyond the score and create a role-enumeration surface. Consistent with DECISION #001 (no visual identity for tiers/roles on public surfaces). Other surfaces (comments, profile card, article byline) are unaffected — this ruling is leaderboard-row-specific.
+**Apply:**
+- Remove `<VerifiedBadge user={u} />` from `LeaderRow` (`page.tsx:973`).
+- Remove `is_verified_public_figure` and `is_expert` from `LeaderUser` type Pick if no longer read anywhere in this component.
+- iOS: do NOT add `is_expert` to `USER_COLUMNS` in `LeaderboardView.swift` (F41 closes without code change — iOS already matches by omission).
+- No change to other surfaces. `VerifiedBadge` continues to render on comments, profile, card, byline.
+
+## #058 — URL state for leaderboard filters (auto-locked, extends #054/#055)
+**Date:** 2026-05-02 **Scope:** web leaderboard
+**Q:** Should leaderboard tab, period, and category filter state be URL-persisted?
+**A:** Yes — same reasoning as DECISIONS #054 (Browse) and #055 (Category). Back-button restore and shareable filtered views are the core reasons. URL params via `router.replace` + `useSearchParams()`.
+**Apply:**
+- On every tab/period/category change: `router.replace(\`/leaderboard?${params}\`, { scroll: false })`.
+- On mount: read `useSearchParams()` → init `activeTab` from `?tab=` (`top` → `'Top Verifiers'`, `rising` → `'Rising Stars'`; absent → default); `period` from `?period=` (`week` / `month` / `all`; absent → `'All time'`); `activeCat` from `?cat=<uuid>` (absent → null).
+- If `?cat=` UUID doesn't match any loaded category, treat as null.
+- `visibleUsers.length` is NOT persisted — always resets on load.
+- Auto-locked: direct extension of #054/#055 pattern; 0 divergence.
+
+## #059 — Private profile shows "This profile is private" page, not 404 (auto-locked)
+**Date:** 2026-05-02 **Scope:** web `/u/[username]`
+**Q:** When a non-self viewer reaches a private/hidden profile, should the page 404 or show a "This profile is private" state?
+**A:** Show a "This profile is private" rendered state — not a 404. A 404 gives no signal that the account exists but is private; it is indistinguishable from a non-existent username. PRINCIPLE §3.2 (empty states need copy when no action exists) + industry standard (Twitter, LinkedIn, Instagram all use a privacy page, not a 404).
+**Apply:**
+- `web/src/app/u/[username]/page.tsx:201` — replace `notFound()` for `profile_visibility='private'/'hidden'` with a rendered page: `<main><h1>This profile is private.</h1><p>This account has limited its profile visibility.</p><a href="/browse">Browse Verity Post →</a></main>`.
+- Keep `notFound()` only for genuinely non-existent usernames (row not found in `public_profiles_v`).
+- `layout.js` `generateMetadata`: return `{ robots: 'noindex,nofollow', title: 'Private profile · Verity Post' }` for private profiles.
+- Auto-locked: direct application of PRINCIPLE §3.2 + §7.1 (don't 404 gated-but-real surfaces).
+
+## #060 — `show_activity` on shareable card (pending owner answer)
+**Date:** PENDING — awaiting owner answer **Scope:** web `/card/[username]`
+**Q:** Should `show_activity=false` suppress stats on the `/card/[username]` shareable card?
+**Panel result:** 2-1 divergent. Experts 1+3 (product UX + product consistency) voted exempt: card is a deliberate, gated, opt-in paid share — `show_activity=false` governs ambient passive profile visibility, not explicit opt-in surfaces. Expert 2 (privacy) voted respect + warn: `show_activity=false` is a blanket privacy baseline; opt-in sharing ≠ specific consent to override it; warn at generation time, default to suppression.
+**Owner options:** A = Exempt | B = Respect + warn at card-generation | C = Suppress silently
+**A:** No code change to card page. F21 → wontfix.
+**B:** In `/profile/card/page.js` — when `show_activity=false` on the logged-in user's own row, render a one-line warning before the card share link: "Your activity is hidden — stats won't show on your card. [Update privacy settings →]". Card page (`/card/[username]`) suppresses verity_score + streak_current when `show_activity=false`.
+**C:** Card page suppresses stats when `show_activity=false`; no warning in profile/card. F21 closed; users may not understand why their card appears blank.
+**Apply:** Implements F21 recipe. Slice 15 uses whichever option is chosen.
+
+## #061 — `/card/[username]` robots: noindex,nofollow is intentional (auto-locked)
+**Date:** 2026-05-02 **Scope:** web `/card/[username]`
+**Q:** Should the shareable profile card be indexed by search engines?
+**A:** No — `noindex,nofollow` is correct. The card is designed for social sharing via OG link preview (Twitter/X, iMessage, Slack). Search-engine indexing of individual user stat cards is unwanted (exposes personal stats to crawlers, creates stale Google results for user data that changes frequently). Social crawlers (Twitterbot, facebookexternalhit) honor OG tags regardless of robots meta.
+**Apply:** Do not change robots meta on `/card/[username]/layout.js`. Auto-locked.

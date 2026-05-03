@@ -525,6 +525,7 @@ Seed `ad_placements` rows + add `<Ad placement="..."/>` calls:
 | Slice 11 — Unit 3 / Browse (38 findings) | Unit fix | shipped 2026-05-02 (2-stream parallel; tsc + build clean; smoke PASS; all 38 findings fixed) | 1 + 2 | #029, #053, #054 | 1 |
 | Slice 12 — Unit 4 / Search (32 findings) | Unit fix | shipped 2026-05-02 (2-stream parallel; Suspense boundary fix post-smoke; tsc + smoke PASS; 29 findings fixed; F20 refuted; F28/F32 deferred) | none | #022, #029, #031, #032, #043, #053, #054 | 1 |
 | Slice 13 — Unit 5 / Category (37 findings) | Unit fix | shipped 2026-05-02 (2-stream parallel + adversary 5 gaps (2 blocking fixed: deleted_at filter + is_kids_safe guard); tsc + build clean; smoke PASS; 36 findings fixed; F33 refuted) | 1 + 2 | #022, #029, #043, #053, #055, #056 | 2 + adversary |
+| Slice 14 — Unit 6 / Leaderboard (46 findings) | Unit fix | ready | 1 + 2 | #057, #058 | — |
 
 ---
 
@@ -1236,5 +1237,105 @@ Import `Link` from `next/link`. Replace:
 Note: numbering is contiguous; sub-slice splits (like Slice 4 + 5 for Unit 2) only happen for big unit fixes and are noted at slice-creation time.
 
 **Total Wave A session estimate so far:** ~17–20 sessions for the 10 locked slices above. Will grow as Slices 11–19 reviews surface their fix scope. Owner cadence sets actual wall time.
+
+---
+
+## Slice 14 — Unit 6 / Leaderboard (46 findings)
+
+**Status:** ready to build
+**Prerequisite:** Slices 1 + 2 done (both shipped 2026-05-02).
+**Elevated-care:** YES — F01 (unverified user receives 50-row data response), F02 (gated rank information exposed), F03 (rank card + sticky bar render for non-`fullAccess` users). Adversary pass mandatory.
+
+**Decisions consumed:** #057 (no credential badges on leaderboard rows), #058 (URL state for leaderboard), PRINCIPLE §1.1 (dark mode), §2.1 (44px touch targets), §3.1-3.3 (states), §6 (a11y)
+
+**Scope summary (46 findings organized into 4 streams):**
+
+### Stream A — Security / Data gate (F01–F14, F18) — Elevated-care
+
+- **F01:** Change `pageLimit = me ? 50 : 3` → `pageLimit = fullAccess ? 50 : 3` at `page.tsx:320`. Unverified-auth users now receive 3-row responses, same as anon.
+- **F02:** Anon blur wall: (a) always show a sign-up CTA block for `!me` users regardless of `visibleUsers.length`; (b) optionally fetch one extra row (`pageLimit = 4`) for anon so the blur renders with visual "more exists" signal. Simplest fix: extract the blur+CTA block into its own `{!me && (<AnonGate />)}` component rendered unconditionally below the 3-row list.
+- **F03:** Gate "Your rank" card (line 398) and sticky bar (line 861) on `fullAccess`, not just `me`. Both hidden for unverified users (they don't have `leaderboard.view`).
+- **F04:** Add `activeTab === 'Top Verifiers'` guard to category pills container (line 502). On tab switch to Rising Stars: `setActiveCat(null); setActiveSub(null)`.
+- **F05:** Replace both blur-wall gradients (lines 679 + 799) with `linear-gradient(to bottom, rgba(var(--bg-rgb), 0.3), rgba(var(--bg-rgb), 0.95) 70%)` using a CSS variable `--bg-rgb` added to `globals.css`. If `--bg-rgb` not viable: use `var(--bg)` as a solid background-color on a semi-transparent overlay div.
+- **F06:** Verify `rankAccentColor` hex values against `var(--card)` dark bg. Expected: #B8860B (gold) and #92400E (bronze) are both dark and will fail on a dark card. Replace with lighter tints or add a `data-mode` variant: `--rank-gold`, `--rank-silver`, `--rank-bronze` tokens in `globals.css` with dark-mode overrides.
+- **F07:** Add `.is('users.deletion_scheduled_for', null)` to the category-scores query join filter at `page.tsx:201`.
+- **F08:** Wire URL params per DECISION #058 — `router.replace` on state changes; `useSearchParams()` on mount. Param keys: `tab` (`top`/`rising`), `period` (`week`/`month`/`year`/`all`), `cat` (UUID). Replace `useState` initializers with URL-param reads.
+- **F09:** (a) Wrap tab `<div>` at line 438 in `<div role="tablist" aria-label="Leaderboard views">`; add `role="tab"` + `aria-selected={activeTab === t}` to each tab `<button>`. (b) Add `aria-pressed={period === p}` to each period pill button.
+- **F10:** Add one-line context for anon above the 3-row list: `<p style={{ fontSize: 12, color: 'var(--dim)', marginBottom: 12 }}>Top readers by Verity Score — sign in to see the full ranking.</p>` shown only when `!me`.
+- **F11:** Create `web/src/app/leaderboard/error.tsx` — standard Next.js error boundary with "Something went wrong" copy + retry button. Wrap `refreshAllPermissions()` call in the init effect in a `try/catch`.
+- **F12:** Add a "Try again" `<button>` inside the `resendState === 'error'` branch that calls `setResendState('idle')`.
+- **F13:** Add `AbortController` to the data-load `useEffect`: create at top of `load()`, pass `{ signal: controller.signal }` to Supabase queries (or check `!controller.signal.aborted` before each `setUsers`/`setLoading` call), return `() => controller.abort()`.
+- **F14:** Add `|| !me` to the `periodCutoff` condition: `if (activeTab === 'Top Verifiers' && period !== 'All time' && me && fullAccess)`. Ensures anon and unverified users always hit the default path regardless of `period` state.
+- **F18:** Add `is_banned, frozen_at` to the me-row SELECT at `page.tsx:167`. Hide "Your rank" card and sticky bar if `me.is_banned || me.frozen_at`.
+
+### Stream B — iOS parity (F39–F44)
+
+- **F39 (Weekly tab):** Web is source of truth. Remove `TabKey.weekly` from `LeaderboardView.swift` OR add a "This week" period filter to align with web's period-picker model. No Slice 14 blocker — treated as parity polish.
+- **F40:** Mirror the bidirectional block-list fetch from web `page.tsx:175-185` into `LeaderboardView.swift`. Query `blocked_users`, build `blockedIds`, filter before display.
+- **F41:** Closed without code change — DECISION #057 (Option C) means web removes `VerifiedBadge` from `LeaderRow`; iOS already omits `is_expert` from `USER_COLUMNS`. No iOS change needed.
+- **F42:** Align permission key — either add `leaderboard.filter.time` guard to web period filter (preferred: parity with iOS), or remove the separate iOS key and rely on `leaderboard.view` alone.
+- **F43:** Add `deletion_scheduled_for IS NULL` filter to `loadRisingStars` in `LeaderboardView.swift`.
+- **F44:** Fix iOS retry: use a `@State var reloadToken: UUID` as the `.task(id:)` trigger; reset on retry.
+
+### Stream C — UX / state / copy (F15–F17, F19–F38, F45–F46)
+
+- **F15:** Add `.eq('show_on_leaderboard', true)` to the period-RPC re-fetch at `page.tsx:307`.
+- **F16:** Add `, id: 'asc'` to the `.order('verity_score', ...)` call at line 332 as a stable tiebreaker.
+- **F17:** Compute `myRank` from the unfiltered `users` array (pre-block), not `visibleUsers`. Apply block filter only to the rendered list.
+- **F19:** Add `displayMetric` derived from `activeTab` + `period`: for period paths use `me.quizzes_completed_count` or better, re-fetch the viewer's reads count. Simplest: show `displayScore` (which already carries the correct ranked metric) rather than hardcoded `verity_score` in the rank card and sticky bar.
+- **F20:** When `activeCat` is set, show a static `"(All time)"` tag beside or in place of the period picker.
+- **F21:** Replace the "Loading..." text (line 566) with 5 skeleton `<LeaderRow>` placeholders matching real row height.
+- **F22:** Branch empty-state copy by `activeTab` — Rising Stars: "No new accounts in the past 30 days."
+- **F23:** Fix anon blur copy (line 693): "Verify your email to see the full ranking." → actually this fires only for anon. Keep as-is for anon ("Free account unlocks ranks beyond top 3"). The confusion is that anon reads it but the gate is email verification — update to clarify: "Sign up and verify your email to see the full ranking."
+- **F24:** Change "Verify email" → "Resend verification link" at `page.tsx:847`.
+- **F25:** Add a `meLoaded` ref to defer the initial data load until the auth effect completes and sets `me`. Pattern: `useRef(false)` → set true in auth effect → `if (!meLoaded.current) return` at load effect top on first render.
+- **F26:** Remove `activeSub` from the empty-state condition (line 581) and the active-styling check. Keep `setActiveSub(null)` calls for future compatibility but stop using `activeSub` in any conditional render until subcategory queries are wired.
+- **F27:** Remove the `refreshIfStale()` call at line 159. `refreshAllPermissions()` alone is sufficient.
+- **F28:** Add viewer self-highlight to `LeaderRow`: if `u.id === me?.id`, add `background: 'var(--accent-subtle)'` to the row div and a small "You" `<span>` beside the username.
+- **F29:** Suppress the "Your rank" card when `activeTab === 'Rising Stars'` and viewer is not in the Rising Stars list.
+- **F30:** Add `<h2 className="sr-only">{activeTab === 'Rising Stars' ? 'Rising Stars' : 'Top Verifiers'}</h2>` before the list container; add `<h2 className="sr-only">Your ranking</h2>` before the rank card.
+- **F31:** Replace `color: '#111'` at line 575 with `var(--text-primary)`. Replace `background: '#111', color: '#fff'` at lines 590-591 with `background: 'var(--accent)', color: 'var(--bg)'`.
+- **F32:** Replace `rgba(0,0,0,0.08)` active-tab background (line 460) with a token: add `--tab-active-bg` to `globals.css` with light/dark values.
+- **F33:** Remove `email_verified` and `plan_status` from the me-row SELECT at line 168. Update `MeRow` type to omit these fields.
+- **F34:** Change period pill `minHeight` from 36 to 44 at `page.tsx:490`.
+- **F35:** Change `var(--right)` → `var(--p-verified)` in `VerifiedBadge.tsx:23`.
+- **F36:** Fix `stripKidsTag` regex: change `^kids?\s+` → `^Kids\s+` (capital K, no `?`) or add explicit `'Kids '` prefix check.
+- **F37:** Add `openGraph` and `twitter` metadata to `layout.js`.
+- **F38:** Rename `layout.js` → `layout.tsx`; add `import type { Metadata } from 'next'` and type the export.
+- **F45:** Fix `isLast` off-by-one: change `i === visibleUsers.length - 4 - 1` → `i === visibleUsers.length - 4` at line 741.
+- **F46:** Fix `Avatar.tsx:46` initials truncation: `raw.slice(0, 3)` → `Array.from(raw).slice(0, 3).join('')`.
+
+**Also — DECISION #057 fix (F41 on web side):**
+- Remove `<VerifiedBadge user={u} />` from `LeaderRow` at `page.tsx:973`.
+- Remove `is_verified_public_figure` and `is_expert` from `LeaderUser` Pick if only `VerifiedBadge` consumed them.
+- Verify the `users` query select for `LeaderUser` fields drops these columns.
+
+### Stream D — Metadata / layout (F37–F38)
+*(rolled into Stream C above; no separate stream needed — 2 files only)*
+
+---
+
+### File ownership
+
+| Stream | Files |
+|--------|-------|
+| A | `web/src/app/leaderboard/page.tsx` (data/gate changes) |
+| B | `VerityPost/VerityPost/LeaderboardView.swift` |
+| C | `web/src/app/leaderboard/page.tsx` (UX/copy/state), `web/src/components/Avatar.tsx`, `web/src/components/VerifiedBadge.tsx`, `web/globals.css` (new CSS vars) |
+| D | `web/src/app/leaderboard/layout.js` → `layout.tsx` |
+
+Streams A + C both touch `page.tsx` — run sequentially or split by line range (A owns lines 1–400 + query logic; C owns line 400+ + render tree). Streams B + D are independent and can run in parallel with A/C.
+
+### Test plan
+
+1. **Anon:** visit `/leaderboard` — see 3 rows, see sign-up CTA below row 3, no blur wall (or blur wall with CTA visible).
+2. **Unverified auth:** sign in without verifying — 3 rows only, no rank card, no sticky bar, verify-email upsell visible, "Resend verification link" button works.
+3. **Verified free (has `leaderboard.view`, no `leaderboard.category.view`):** full list, rank card + sticky bar, period picker visible, no category pills.
+4. **Verified paid (has both):** category pills visible, pick a category, see category scores, period picker hides, "(All time)" label shows.
+5. **URL persistence:** select Rising Stars, navigate to an article, press Back — Rising Stars still selected. Pick a category, share URL, open in incognito — category pre-selected.
+6. **Race condition:** click 3 different categories rapidly — final state matches last clicked, no stale data.
+7. **Dark mode:** check blur overlays, active-tab indicator, empty-state button — all readable.
+8. **WCAG:** tab and period pills announce correct state via screen reader.
+9. **iOS (F40, F43, F44):** blocked users absent, deleted-scheduled absent from Rising Stars, retry works.
 
 **Slice ready-state:** every locked slice has decisions confirmed, file paths cited, test plans defined. None block on owner judgment except the small per-slice items called out. Slice 3 (Home) is a placeholder — fix recipes populated when the slice opens.
