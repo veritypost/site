@@ -69,7 +69,7 @@ export async function POST(request) {
 
   const { data: me } = await service
     .from('users')
-    .select('id, stripe_customer_id, email, cohort, comped_until')
+    .select('id, stripe_customer_id, email, cohort, comped_until, trial_extension_until')
     .eq('id', user.id)
     .maybeSingle();
 
@@ -88,6 +88,21 @@ export async function POST(request) {
         comped_until: me.comped_until,
         message:
           "You're on the beta cohort until your comp expires; upgrades are paused until then.",
+      },
+      { status: 409 }
+    );
+  }
+
+  // T304-ext — also block checkout when an admin-granted trial extension is
+  // active. The trial sweeper only flips DB state, never cancels a Stripe sub,
+  // so creating a real subscription on top of a trial results in double-billing
+  // when the trial expires.
+  if (me?.trial_extension_until && new Date(me.trial_extension_until) > new Date()) {
+    return NextResponse.json(
+      {
+        error: 'active_trial_extension',
+        trial_extension_until: me.trial_extension_until,
+        message: 'You have an active trial extension; upgrades are paused until it expires.',
       },
       { status: 409 }
     );
@@ -120,7 +135,7 @@ export async function POST(request) {
       successUrl: `${origin}/profile/settings/billing?success=1`,
       cancelUrl: `${origin}/profile/settings/billing?canceled=1`,
     });
-    return NextResponse.json({ url: session.url, session_id: session.id });
+    return NextResponse.json({ url: session.url });
   } catch (err) {
     console.error('[stripe.checkout]', err);
     return NextResponse.json({ error: 'Checkout failed' }, { status: err.status || 500 });

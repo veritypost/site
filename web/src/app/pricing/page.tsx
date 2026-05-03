@@ -8,6 +8,7 @@
 
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { createClient } from '@/lib/supabase/server';
 import { CheckoutButton } from './_CheckoutButton';
 
 export const metadata: Metadata = {
@@ -114,7 +115,19 @@ function PlanCard({
   );
 }
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  // Check auth server-side to personalise the Free plan CTA.
+  const supabase = createClient();
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+  const isLoggedIn = !!authUser;
+
+  // Free plan CTA: logged-in users already have an account — hide the
+  // sign-up button and show a "You're on the free plan" note instead
+  // by using ctaHref without planName (rendered as a Link).
+  // Anonymous users get /login?redirect=/pricing for round-trip return.
+  const freeCta = isLoggedIn ? 'You\'re on the free plan' : 'Sign up free';
+  const freeCtaHref = isLoggedIn ? '/profile/settings?section=plan' : '/login?redirect=/pricing';
+
   return (
     <div
       style={{
@@ -144,8 +157,8 @@ export default function PricingPage() {
             '10 bookmarks',
             'One breaking-news alert per day',
           ]}
-          cta="Sign up free"
-          ctaHref="/login"
+          cta={freeCta}
+          ctaHref={freeCtaHref}
         />
 
         <PlanCard
@@ -166,7 +179,6 @@ export default function PricingPage() {
           cta="Start Verity"
           planName="verity_monthly"
           highlight
-          footer="$79.99/yr — save ~16%."
         />
 
         <PlanCard
@@ -183,9 +195,9 @@ export default function PricingPage() {
             'Kid expert sessions (COPPA-safe)',
             'Parent dashboard + parental controls',
           ]}
-          cta="Start Family"
-          planName="verity_family_monthly"
-          footer="$149.99/yr — save ~16%. Each extra kid: $49.99/yr."
+          cta="Available on iOS →"
+          ctaHref="/kids-app"
+          footer="Purchased through the iOS app."
         />
       </div>
 

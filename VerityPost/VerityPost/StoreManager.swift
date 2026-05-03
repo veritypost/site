@@ -51,6 +51,11 @@ final class StoreManager: ObservableObject {
 
     @Published var products: [Product] = []
     @Published var purchasedProductIDs: Set<String> = []
+    /// S-012 — authoritative entitlement cache populated ONLY by 2xx server
+    /// sync responses. `hasAccess(to:)` reads this set, not `purchasedProductIDs`,
+    /// so a StoreKit-only local entitlement cannot bypass the server's RBAC check.
+    /// Cleared on `AppStore.sync()` failure so the gate defaults-closed.
+    @Published var serverConfirmedProductIDs: Set<String> = []
     @Published var isLoading = false
     @Published var errorMessage: String?
 
@@ -179,7 +184,11 @@ final class StoreManager: ObservableObject {
         switch result {
         case .success(let verification):
             let transaction = try checkVerified(verification)
-            purchasedProductIDs.insert(product.id)
+            // R-010 / GAP-010 — do NOT insert into purchasedProductIDs until
+            // the server confirms. Inserting before sync means a non-2xx
+            // response leaves the local cache in "paid" state while the DB
+            // has no record, so hasAccess() returns true for the rest of the
+            // session despite no server-confirmed entitlement.
             // C18 — only finish the transaction if the server confirmed.
             // If sync fails (4xx/5xx/network), leave the transaction un-
             // finished so StoreKit re-delivers it to
@@ -195,9 +204,15 @@ final class StoreManager: ObservableObject {
                 price: product.price
             )
             if ok {
+                serverConfirmedProductIDs.insert(product.id)
+                purchasedProductIDs.insert(product.id)
                 await transaction.finish()
             } else {
+                // Ensure the product is NOT in the local cache if sync failed.
+                purchasedProductIDs.remove(product.id)
+                serverConfirmedProductIDs.remove(product.id)
                 Log.d("StoreManager: keeping transaction un-finished for retry on next launch")
+                errorMessage = "Your purchase didn't fully register. Tap Restore Purchases to retry."
             }
             return true
 
@@ -223,9 +238,8 @@ final class StoreManager: ObservableObject {
                 do {
                     let transaction = try self.checkVerified(result)
                     let product = await self.products.first(where: { $0.id == transaction.productID })
-                    await MainActor.run {
-                        self.purchasedProductIDs.insert(transaction.productID)
-                    }
+                    // R-010 / GAP-010 — do NOT insert into purchasedProductIDs
+                    // before server sync. See purchase() for rationale.
                     // C18 — same gate as purchase(): only finish on
                     // server-confirmed sync. Un-synced re-deliveries
                     // bounce back through this listener on next launch.
@@ -236,7 +250,16 @@ final class StoreManager: ObservableObject {
                         price: product?.price
                     )
                     if ok {
+                        await MainActor.run {
+                            self.serverConfirmedProductIDs.insert(transaction.productID)
+                            self.purchasedProductIDs.insert(transaction.productID)
+                        }
                         await transaction.finish()
+                    } else {
+                        await MainActor.run {
+                            self.purchasedProductIDs.remove(transaction.productID)
+                            self.serverConfirmedProductIDs.remove(transaction.productID)
+                        }
                     }
                 } catch {
                     Log.d("Transaction update verification failed:", error)
@@ -367,16 +390,32 @@ final class StoreManager: ObservableObject {
                let tx = try? await product.latestTransaction,
                case .verified(let transaction) = tx {
                 let receipt = transaction.jsonRepresentation.base64EncodedString()
-                await syncPurchaseToServer(
+                let ok = await syncPurchaseToServer(
                     productID: transaction.productID,
                     transactionID: transaction.id,
                     receipt: receipt,
                     price: product.price
                 )
+                if ok {
+                    await MainActor.run {
+                        serverConfirmedProductIDs.insert(transaction.productID)
+                        purchasedProductIDs.insert(transaction.productID)
+                    }
+                    await transaction.finish()
+                } else {
+                    errorMessage = "Couldn't confirm your subscription with the server. Check your connection and try again."
+                }
             } else {
                 NotificationCenter.default.post(name: .vpSubscriptionDidChange, object: nil)
             }
         } catch {
+            // R-010 — AppStore.sync() threw before checkEntitlements() could
+            // re-derive state. Clear the local cache so hasAccess() doesn't
+            // report stale paid entitlements from a prior session. The user
+            // needs to retry; the StoreKit transaction is still un-finished so
+            // the next successful restore will re-populate from the real state.
+            purchasedProductIDs.removeAll()
+            serverConfirmedProductIDs.removeAll()
             errorMessage = "Couldn't restore purchases. Check your connection and try again."
         }
     }
@@ -475,20 +514,28 @@ final class StoreManager: ObservableObject {
     @available(*, deprecated, renamed: "isPaid", message: "Use isPaid — v2 has no 'premium' tier.")
     var isPremium: Bool { isPaid }
 
-    /// Convenience to check plan-level access. Prefer deriving from
-    /// auth.currentUser.plan in views — StoreKit state may lag the
-    /// server after a purchase.
+    /// Convenience to check plan-level access.
+    ///
+    /// - Important: Use `PermissionService` in views instead. This method now
+    ///   reads `serverConfirmedProductIDs` (populated only by 2xx server sync
+    ///   responses) to prevent local StoreKit state from bypassing the server's
+    ///   authoritative RBAC check. Returns `false` when no server confirmation
+    ///   exists for the requested feature — defaults-closed on missing data.
+    @available(*, deprecated, message: "Use PermissionService for feature gating. StoreKit local state may lag the server after a purchase or cancellation.")
     func hasAccess(to feature: String) -> Bool {
+        // S-012 — read from serverConfirmedProductIDs only. If no server
+        // confirmation exists (empty set) this returns false for all paid
+        // features, defaulting-closed rather than defaulting-open.
         switch feature {
         case "bookmarks_unlimited", "collections", "dms", "mentions", "follows",
              "tts", "advanced_search", "category_leaderboards", "recap",
              "profile_banner", "profile_card":
-            return isPaid
+            return !serverConfirmedProductIDs.isEmpty
         case "ask_expert", "streak_freeze", "ad_free":
             // Phase 2 retired Pro tier. These features now travel with
             // any paid plan (Verity solo or Family). Grandfathered Pro
             // subs continue resolving through the legacy product IDs.
-            for pid in purchasedProductIDs {
+            for pid in serverConfirmedProductIDs {
                 let plan = planName(for: pid)
                 if ["verity", "verity_pro", "verity_family"].contains(plan) {
                     return true
@@ -496,7 +543,7 @@ final class StoreManager: ObservableObject {
             }
             return false
         case "kids_profiles", "family_leaderboard":
-            for pid in purchasedProductIDs {
+            for pid in serverConfirmedProductIDs {
                 let plan = planName(for: pid)
                 if plan == "verity_family" { return true }
             }

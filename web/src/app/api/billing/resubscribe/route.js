@@ -55,7 +55,7 @@ export async function POST(request) {
   // when iOS StoreKit mints it, but the web surface can't revive into it."
   const { data: plan, error: planErr } = await service
     .from('plans')
-    .select('id, tier')
+    .select('id, tier, stripe_price_id')
     .eq('name', planName)
     .eq('is_active', true)
     .eq('is_visible', true)
@@ -64,24 +64,65 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Unknown plan' }, { status: 404 });
   }
 
-  const { data: me } = await service
+  const { data: me, error: meErr } = await service
     .from('users')
-    .select('stripe_customer_id')
+    .select('stripe_customer_id, cohort, comped_until, trial_extension_until')
     .eq('id', user.id)
     .maybeSingle();
+
+  if (meErr) {
+    console.error('[billing.resubscribe] users lookup failed:', meErr.message);
+    return NextResponse.json(
+      { error: 'Could not load account. Try again in a moment.' },
+      { status: 500 }
+    );
+  }
+
+  // T304 — mirror the checkout route guard. A beta user with an active comp
+  // or trial extension must not resubscribe via this route either; the sweeper
+  // only mutates local state at expiry and never cancels an upstream Stripe
+  // sub, so creating a Stripe sub on top risks double-billing.
+  if (me?.cohort === 'beta' && me?.comped_until && new Date(me.comped_until) > new Date()) {
+    return NextResponse.json(
+      { error: 'comp_or_trial_active', redirectTo: '/profile/settings?section=plan' },
+      { status: 409 }
+    );
+  }
+  if (me?.trial_extension_until && new Date(me.trial_extension_until) > new Date()) {
+    return NextResponse.json(
+      { error: 'comp_or_trial_active', redirectTo: '/profile/settings?section=plan' },
+      { status: 409 }
+    );
+  }
 
   if (me?.stripe_customer_id) {
     try {
       const subs = await listCustomerSubscriptions(me.stripe_customer_id, { status: 'all' });
-      // Prefer a subscription that's still active-with-cancel-pending.
+      // Prefer a subscription that's still active-with-cancel-pending
+      // AND on the same plan the user is requesting to resume.
       const cancelling = subs?.data?.find(
-        (s) => (s.status === 'active' || s.status === 'trialing') && s.cancel_at_period_end === true
+        (s) =>
+          (s.status === 'active' || s.status === 'trialing') &&
+          s.cancel_at_period_end === true
       );
       if (cancelling) {
+        // Only resume the Stripe sub when it matches the requested plan.
+        // Cross-plan resume must go through checkout.
+        const cancellingPriceId = cancelling.items?.data?.[0]?.price?.id;
+        if (cancellingPriceId !== plan.stripe_price_id) {
+          return NextResponse.json(
+            { error: 'no_active_subscription', redirectTo: '/pricing' },
+            { status: 409 }
+          );
+        }
         await resumeSubscription(cancelling.id);
+      } else {
+        // No cancelling sub: user must re-checkout. Do not write DB state.
+        return NextResponse.json(
+          { error: 'no_active_subscription', redirectTo: '/pricing' },
+          { status: 409 }
+        );
       }
-      // No cancelling sub: user must re-checkout. Local RPC still
-      // updates DB state; the UI is expected to push them to checkout.
     } catch (err) {
       console.error('[billing.resubscribe] stripe', err?.message);
       return NextResponse.json(
@@ -89,6 +130,12 @@ export async function POST(request) {
         { status: 502 }
       );
     }
+  } else {
+    // No Stripe customer at all — must go through checkout.
+    return NextResponse.json(
+      { error: 'no_active_subscription', redirectTo: '/pricing' },
+      { status: 409 }
+    );
   }
 
   const { data, error } = await service.rpc('billing_resubscribe', {

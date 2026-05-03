@@ -148,12 +148,23 @@ export function ProfileApp({ defaultSection }: Props) {
   // Post-checkout landing: Stripe redirects to /profile/settings?section=plan&success=1
   // (via /profile/settings/billing which preserves the param). Show a toast and
   // trigger a perms refresh so newly-granted plan gates reflect immediately rather
-  // than waiting for the 60s poll. Strip the param so back/reload don't re-toast.
+  // than waiting for the 60s poll. Also dispatch verity:billing-refresh so BillingCard
+  // re-fetches the subscription row. Strip the param so back/reload don't re-toast.
   useEffect(() => {
     if (!resolved) return;
     if (searchParams.get('success') !== '1') return;
     toast.success('Subscription updated.');
     void refreshAllPermissions().then(() => setPermsTick((t) => t + 1));
+    setTimeout(() => window.dispatchEvent(new CustomEvent('verity:billing-refresh', { detail: { fromSuccess: true } })), 0);
+    router.replace('/profile/settings?section=plan');
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- toast is stable singleton
+  }, [resolved, searchParams, router]);
+
+  // Checkout-cancelled landing: show a toast so the user knows nothing changed.
+  useEffect(() => {
+    if (!resolved) return;
+    if (searchParams.get('canceled') !== '1') return;
+    toast.info('Checkout cancelled — your plan was not changed.');
     router.replace('/profile/settings?section=plan');
     // eslint-disable-next-line react-hooks/exhaustive-deps -- toast is stable singleton
   }, [resolved, searchParams, router]);

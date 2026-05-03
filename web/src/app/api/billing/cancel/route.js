@@ -66,18 +66,31 @@ export async function POST(request) {
   // subscription upstream. If the user has never paid (no customer
   // id), skip the Stripe call — there's nothing to cancel — and let
   // the local RPC clean up whatever state survived.
-  const { data: me } = await service
+  const { data: me, error: meErr } = await service
     .from('users')
     .select('stripe_customer_id')
     .eq('id', user.id)
     .maybeSingle();
 
+  if (meErr || !me?.stripe_customer_id) {
+    if (meErr) {
+      console.error('[billing.cancel] users lookup failed:', meErr.message);
+      return NextResponse.json(
+        { error: 'Could not load account. Try again in a moment.' },
+        { status: 500 }
+      );
+    }
+    // No customer id — nothing to cancel upstream; fall through to local RPC.
+  }
+
   if (me?.stripe_customer_id) {
     try {
-      const subs = await listCustomerSubscriptions(me.stripe_customer_id, { status: 'active' });
-      const active = subs?.data?.find((s) => s.status === 'active' || s.status === 'trialing');
+      const subs = await listCustomerSubscriptions(me.stripe_customer_id, { status: 'all' });
+      const active = subs?.data?.find(
+        (s) => s.status === 'active' || s.status === 'trialing' || s.status === 'past_due'
+      );
       if (active && !active.cancel_at_period_end) {
-        await cancelSubscriptionAtPeriodEnd(active.id);
+        await cancelSubscriptionAtPeriodEnd(active.id, active.current_period_end);
       }
     } catch (err) {
       console.error('[billing.cancel] stripe', err?.message);

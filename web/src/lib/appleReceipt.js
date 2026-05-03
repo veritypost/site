@@ -251,6 +251,34 @@ export function verifyNotificationJWS(signedPayload) {
   return { notification, transaction, renewal };
 }
 
+// S-001 / S-008 — receipt expiry gate.
+//
+// `verifyTransactionJWS` already validates the `signedDate` replay window,
+// but a receipt signed within the 24-hour window may describe a subscription
+// that expired days ago. Without this check an attacker with a captured JWS
+// can re-submit it on any account lacking a prior subscriptions row and have
+// their plan re-activated at the server for free.
+//
+// Call this BEFORE setting status='active' or calling any billing RPC.
+// Throws with a descriptive message when the subscription is expired (past
+// `expiresDate` + graceMs). Callers should map the thrown error to 410.
+//
+// `graceMs` (default 0) accommodates small clock skew between the Apple
+// signing server and our server. 60 000 ms (60 s) is generous for skew
+// while still being a real security gate.
+export function assertReceiptStillActive(payload, { graceMs = 0 } = {}) {
+  const expires = typeof payload.expiresDate === 'number' ? payload.expiresDate : null;
+  if (expires === null) {
+    // No expiresDate — non-auto-renewing or consumable product; nothing to gate.
+    return;
+  }
+  if (Date.now() > expires + graceMs) {
+    throw new Error(
+      `receipt_expired: expiresDate=${expires} is more than ${graceMs}ms in the past`
+    );
+  }
+}
+
 // Resolve the StoreKit product ID to the plans row. plans.apple_product_id
 // is seeded by migration schema/036_ios_subscription_plans.sql.
 export async function resolvePlanByAppleProductId(service, productId) {

@@ -105,18 +105,31 @@ export async function listCustomerSubscriptions(customerId, { status = 'all', li
 // Cancel at period end (Apple-friendly: user keeps access until paid
 // period expires; Stripe handles the actual cancellation event which
 // our webhook then reconciles into freeze_profile).
-export async function cancelSubscriptionAtPeriodEnd(subscriptionId) {
+// Idempotency key is stable per subscription so network retries within
+// the Stripe 24h window dedupe without double-cancelling.
+export async function cancelSubscriptionAtPeriodEnd(subscriptionId, periodEnd) {
+  // GAP-BILL-A2-010 — fail loudly rather than collapsing to a
+  // `cancel-{id}-undefined` idempotency key that would deduplicate
+  // two distinct cancel calls on the same subscription.
+  if (periodEnd == null) {
+    throw new Error('cancelSubscriptionAtPeriodEnd requires periodEnd for stable idempotency');
+  }
+  const idempotencyKey = `cancel-${subscriptionId}-${periodEnd}`;
   return stripeFetch(`/subscriptions/${subscriptionId}`, {
     method: 'POST',
     body: { cancel_at_period_end: 'true' },
+    idempotencyKey,
   });
 }
 
 // Remove the cancellation flag — the Stripe-side resume.
+// Idempotency key is stable per subscription so retries dedupe.
 export async function resumeSubscription(subscriptionId) {
+  const idempotencyKey = `resume-${subscriptionId}`;
   return stripeFetch(`/subscriptions/${subscriptionId}`, {
     method: 'POST',
     body: { cancel_at_period_end: 'false' },
+    idempotencyKey,
   });
 }
 
@@ -124,7 +137,11 @@ export async function resumeSubscription(subscriptionId) {
 // Stripe needs the existing item id to update in-place; pass it in.
 // proration_behavior=create_prorations is the default and matches
 // what the user expects when changing tiers mid-cycle.
+// Idempotency key is stable per (subscription, target price) so a retry
+// within 24h dedupes, but a follow-up change to a *different* price
+// generates a new key and goes through correctly.
 export async function updateSubscriptionPrice(subscriptionId, itemId, newPriceId) {
+  const idempotencyKey = `change-plan-${subscriptionId}-${newPriceId}`;
   return stripeFetch(`/subscriptions/${subscriptionId}`, {
     method: 'POST',
     body: {
@@ -132,6 +149,7 @@ export async function updateSubscriptionPrice(subscriptionId, itemId, newPriceId
       proration_behavior: 'create_prorations',
       cancel_at_period_end: 'false',
     },
+    idempotencyKey,
   });
 }
 
@@ -250,7 +268,18 @@ export function verifyWebhook(rawBody, signatureHeader) {
   // Accept small future-skew (up to 30s, covers NTP drift) but reject
   // anything older than 5 minutes.
   if (ageSec < -30) throw new Error('timestamp too far in the future');
-  if (ageSec > 300) throw new Error('timestamp too old');
+  if (ageSec > 300) {
+    // Distinct log so a search for '[CRIT] webhook timestamp rejected' unambiguously
+    // finds catastrophic NTP drift rather than per-event signature mismatches.
+    console.error(
+      `[CRIT] webhook timestamp rejected — possible NTP drift; age=${Math.round(ageSec)}s`
+    );
+    throw new Error('timestamp too old');
+  }
 
-  return JSON.parse(rawBody);
+  try {
+    return JSON.parse(rawBody);
+  } catch {
+    throw new Error('webhook body not valid JSON');
+  }
 }

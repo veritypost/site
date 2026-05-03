@@ -126,8 +126,15 @@ export async function POST(request) {
   } else if (vercelEnv === 'preview' || vercelEnv === 'development' || nodeEnv === 'development') {
     expectedEnv = 'Sandbox';
   } else {
-    // Both VERCEL_ENV and NODE_ENV unset/unknown — fail closed.
-    expectedEnv = null;
+    // S-007 — neither VERCEL_ENV nor NODE_ENV is set. Defaulting to null would
+    // reject every Production payload silently (all Apple S2S events dropped)
+    // and surface no alert. Default to 'Production' so legitimate traffic still
+    // flows, and emit a CRIT log so the misconfiguration is surfaced.
+    console.error(
+      '[CRIT] ios.appstore.notifications: env-gate misconfigured — ' +
+        'neither VERCEL_ENV nor NODE_ENV set; defaulting expectedEnv to Production'
+    );
+    expectedEnv = 'Production';
   }
   if (!claimedEnv || claimedEnv !== expectedEnv) {
     await service.from('audit_log').insert({
@@ -182,6 +189,23 @@ export async function POST(request) {
   ) {
     const ageMs = prior.created_at ? Date.now() - Date.parse(prior.created_at) : 0;
     if (ageMs < 5 * 60 * 1000) {
+      return NextResponse.json({ received: true, concurrent: true });
+    }
+    // S-006 — mirror the Stripe webhook's conditional UPDATE for the reclaim
+    // path. Two concurrent invocations that both find the same stuck row older
+    // than 5 min would otherwise both set logId = prior.id and both execute
+    // the billing RPCs, creating a double-freeze / double-plan-change.
+    // Use an UPDATE ... WHERE processing_status IN (...) RETURNING id so only
+    // one invocation wins the race; the other gets an empty result and returns
+    // the idempotent 200 below.
+    const { data: claimed } = await service
+      .from('webhook_log')
+      .update({ processing_status: 'processing', claimed_at: new Date().toISOString() })
+      .eq('id', prior.id)
+      .in('processing_status', ['processing', 'received'])
+      .select('id');
+    if (!claimed || claimed.length === 0) {
+      // Another concurrent invocation already claimed this row.
       return NextResponse.json({ received: true, concurrent: true });
     }
   }
@@ -271,7 +295,11 @@ export async function POST(request) {
         .select('id')
         .eq('id', candidate)
         .maybeSingle();
-      if (ownerRow?.id) {
+      // S-011 — assert the returned row's id matches the candidate UUID before
+      // using it. A hypothetical RLS bypass or ID collision could cause the
+      // query to return a row owned by a different user; without this check the
+      // notification would be silently bound to the wrong account.
+      if (ownerRow?.id && String(ownerRow.id) === String(candidate)) {
         // Mint a minimal pending row so the handler below can update it in
         // place. plan_id stays NULL here; the per-type branches below call
         // resolvePlanByAppleProductId + set plan_id when the notification
@@ -284,6 +312,7 @@ export async function POST(request) {
             apple_original_transaction_id: originalTxId,
             status: 'pending',
             source: 'apple',
+            platform: 'apple',
           })
           .select('id, user_id, plan_id, status')
           .single();

@@ -2,7 +2,7 @@
 // @feature-verified system_auth 2026-04-18
 import { NextResponse } from 'next/server';
 import { createClientFromToken, createServiceClient } from '@/lib/supabase/server';
-import { verifyTransactionJWS, resolvePlanByAppleProductId } from '@/lib/appleReceipt';
+import { verifyTransactionJWS, resolvePlanByAppleProductId, assertReceiptStillActive } from '@/lib/appleReceipt';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 
 // Auth: dual — user Supabase bearer token (so we know WHICH user is syncing)
@@ -183,6 +183,17 @@ export async function POST(request) {
       return NextResponse.json({ received: true, revoked: true });
     }
 
+    // S-001 / S-008 — reject lapsed receipts before any DB write.
+    // A receipt with a valid JWS signature but an expired expiresDate must not
+    // reactivate a subscription. Allow 60 s of clock skew. Auto-renewing
+    // receipts where Apple hasn't yet updated expiresDate are handled by the
+    // regular S2S DID_RENEW notification, so this gate is safe.
+    try {
+      assertReceiptStillActive(payload, { graceMs: 60_000 });
+    } catch {
+      return NextResponse.json({ error: 'receipt_expired' }, { status: 410 });
+    }
+
     const plan = await resolvePlanByAppleProductId(service, productId);
 
     const { data: userRow } = await service
@@ -226,11 +237,23 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Receipt belongs to a different user' }, { status: 403 });
     }
 
+    // S-002 — when the receipt carries no appAccountToken (layer-1 bypass path)
+    // AND there is no pre-existing subscriptions row bound to this user, reject.
+    // Without this check any authenticated user can submit a no-token receipt
+    // (purchased before the field shipped or on an uncommon path) and claim
+    // premium access as long as the transactionId matches the JWS payload.
+    // The legitimate no-token recovery path is allowed only when a prior row
+    // already exists AND is owned by the current user (verified above).
+    if (!payload.appAccountToken && !existingSub) {
+      return NextResponse.json({ error: 'receipt_missing_user_binding' }, { status: 400 });
+    }
+
     const subRow = {
       user_id: userId,
       plan_id: plan.id,
       status: 'active',
       source: 'apple',
+      platform: 'apple',
       apple_original_transaction_id: originalTxId,
       current_period_start: periodStart,
       current_period_end: periodEnd,

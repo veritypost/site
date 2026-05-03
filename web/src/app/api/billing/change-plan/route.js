@@ -68,11 +68,36 @@ export async function POST(request) {
     );
   }
 
-  const { data: me } = await service
+  const { data: me, error: meErr } = await service
     .from('users')
-    .select('stripe_customer_id')
+    .select('stripe_customer_id, cohort, comped_until, trial_extension_until')
     .eq('id', user.id)
     .maybeSingle();
+
+  if (meErr) {
+    console.error('[billing.change_plan] users lookup failed:', meErr.message);
+    return NextResponse.json(
+      { error: 'Could not load account. Try again in a moment.' },
+      { status: 500 }
+    );
+  }
+
+  // T304 — mirror the checkout route guard. A beta user with an active comp
+  // or trial extension must not escalate via change-plan either; the sweeper
+  // only mutates local state at expiry and never cancels an upstream Stripe
+  // sub, so creating/modifying a Stripe sub on top risks double-billing.
+  if (me?.cohort === 'beta' && me?.comped_until && new Date(me.comped_until) > new Date()) {
+    return NextResponse.json(
+      { error: 'comp_or_trial_active', redirectTo: '/profile/settings?section=plan' },
+      { status: 409 }
+    );
+  }
+  if (me?.trial_extension_until && new Date(me.trial_extension_until) > new Date()) {
+    return NextResponse.json(
+      { error: 'comp_or_trial_active', redirectTo: '/profile/settings?section=plan' },
+      { status: 409 }
+    );
+  }
 
   if (me?.stripe_customer_id) {
     try {

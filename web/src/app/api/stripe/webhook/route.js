@@ -252,13 +252,21 @@ export async function POST(request) {
     console.error('[stripe.webhook] processing failed:', err);
     // Server-side audit row stores the raw message for debugging; response
     // to Stripe stays generic.
-    await service
-      .from('webhook_log')
-      .update({
-        processing_status: 'failed',
-        processing_error: err?.message || 'unknown',
-      })
-      .eq('id', logId);
+    if (logId == null) {
+      console.error('[stripe.webhook] CRIT: logId is null in error handler — cannot mark webhook_log row failed', {
+        event_type: event.type,
+        event_id: event.id,
+        error_message: err?.message,
+      });
+    } else {
+      await service
+        .from('webhook_log')
+        .update({
+          processing_status: 'failed',
+          processing_error: err?.message || 'unknown',
+        })
+        .eq('id', logId);
+    }
 
     // B18: mirror to audit_log so admin surfaces (op dashboards, compliance
     // review) see handler failures alongside other billing actions. webhook_log
@@ -470,6 +478,13 @@ async function handleCheckoutCompleted(service, session) {
   const sub = await retrieveSubscription(subId);
   const priceId = sub.items?.data?.[0]?.price?.id;
 
+  if (!priceId) {
+    console.warn('[stripe.webhook] checkout.session.completed: no price id on subscription items', {
+      stripe_subscription_id: subId,
+    });
+    return;
+  }
+
   const { data: plan } = await service
     .from('plans')
     .select('id, name, tier')
@@ -478,16 +493,42 @@ async function handleCheckoutCompleted(service, session) {
   if (!plan) throw new Error(`no plan row for stripe_price_id=${priceId}`);
 
   if (userRow.frozen_at) {
-    await service.rpc('billing_resubscribe', {
+    const { error: rpcErr } = await service.rpc('billing_resubscribe', {
       p_user_id: userRow.id,
       p_new_plan_id: plan.id,
     });
+    if (rpcErr) throw new Error(`checkout.completed: billing_resubscribe failed: ${rpcErr.message}`);
   } else {
-    await service.rpc('billing_change_plan', {
+    const { error: rpcErr } = await service.rpc('billing_change_plan', {
       p_user_id: userRow.id,
       p_new_plan_id: plan.id,
     });
+    if (rpcErr) throw new Error(`checkout.completed: billing_change_plan failed: ${rpcErr.message}`);
   }
+
+  await service
+    .from('subscriptions')
+    .upsert(
+      {
+        user_id: userRow.id,
+        stripe_subscription_id: subId,
+        stripe_customer_id: customerId,
+        plan_id: plan.id,
+        status: 'active',
+        platform: 'stripe',
+        current_period_end: sub.current_period_end
+          ? new Date(sub.current_period_end * 1000).toISOString()
+          : null,
+        // GAP-BILL-A2-009 — clear any stale cancel markers from a prior
+        // cancelled subscription row so the UI does not show
+        // 'cancel-scheduled' state after a re-subscribe checkout.
+        cancel_at: null,
+        cancelled_at: null,
+        cancel_reason: null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'stripe_subscription_id' }
+    );
 
   // T322 — subscribe_complete pairs with subscribe_start fired by
   // /api/stripe/checkout. Fire only AFTER the authoritative billing RPC
@@ -556,22 +597,44 @@ async function handleSubscriptionUpdated(service, sub) {
         .update({
           kid_seats_paid: kidSeatsPaid,
           platform: 'stripe',
-          stripe_subscription_id: sub.id,
           updated_at: new Date().toISOString(),
         })
         .eq('user_id', userRow.id)
-        .in('status', ['active', 'trialing']);
+        .eq('stripe_subscription_id', sub.id)
+        .in('status', ['active', 'trialing', 'past_due']);
     } catch (seatErr) {
       console.error('[stripe.webhook.kid_seats_persist]', seatErr?.message || seatErr);
     }
   }
 
   // `cancel_at_period_end=true` means user clicked cancel in portal.
-  if (sub.cancel_at_period_end && !userRow.plan_grace_period_ends_at) {
-    await service.rpc('billing_cancel_subscription', {
-      p_user_id: userRow.id,
-      p_reason: 'stripe: cancel_at_period_end',
-    });
+  // GAP-BILL-007: also update grace date on a second cancel so state machine stays current.
+  if (sub.cancel_at_period_end) {
+    if (!userRow.plan_grace_period_ends_at) {
+      const { error: cancelErr } = await service.rpc('billing_cancel_subscription', {
+        p_user_id: userRow.id,
+        p_reason: 'stripe: cancel_at_period_end',
+      });
+      if (cancelErr) throw new Error(`subscription.updated: billing_cancel_subscription failed: ${cancelErr.message}`);
+    } else if (sub.cancel_at) {
+      const { error: updateErr } = await service
+        .from('users')
+        .update({ plan_grace_period_ends_at: new Date(sub.cancel_at * 1000).toISOString() })
+        .eq('id', userRow.id);
+      if (updateErr) throw new Error(`subscription.updated: grace period update failed: ${updateErr.message}`);
+    }
+    // GAP-BILL-A2-006 — mirror cancel_at on the subscriptions row so
+    // BillingCard's cancel_at-based tri-state can detect 'cancel-scheduled'.
+    if (sub.cancel_at) {
+      await service
+        .from('subscriptions')
+        .update({
+          cancel_at: new Date(sub.cancel_at * 1000).toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', userRow.id)
+        .eq('stripe_subscription_id', sub.id);
+    }
     return;
   }
 
@@ -581,11 +644,10 @@ async function handleSubscriptionUpdated(service, sub) {
   // cancel_at_period_end=false. We clear the grace marker so the
   // nightly sweeper does not freeze the account when the grace elapses.
   if (!sub.cancel_at_period_end && userRow.plan_grace_period_ends_at) {
-    try {
-      await service.rpc('billing_uncancel_subscription', {
-        p_user_id: userRow.id,
-      });
-    } catch (rpcErr) {
+    const { error: rpcErr } = await service.rpc('billing_uncancel_subscription', {
+      p_user_id: userRow.id,
+    });
+    if (rpcErr) {
       // RPC may not exist in older DBs yet. Fall back to a direct
       // column clear so un-cancel still works before the next schema
       // migration. Audit the fallback for observability.
@@ -617,24 +679,69 @@ async function handleSubscriptionUpdated(service, sub) {
           metadata: { source: 'stripe_webhook', customer_id: customerId },
         });
       } else {
-        throw rpcErr;
+        throw new Error(`subscription.updated: billing_uncancel_subscription failed: ${rpcErr.message}`);
       }
     }
+    // GAP-BILL-A2-006 — clear cancel_at on the subscriptions row when the
+    // user un-cancels so BillingCard no longer shows 'cancel-scheduled' state.
+    await service
+      .from('subscriptions')
+      .update({
+        cancel_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', userRow.id)
+      .eq('stripe_subscription_id', sub.id);
     // Fall through to plan-change branch in case the same event also
     // carries a price change.
   }
 
   // Plan change.
+  if (priceId && !planRow) {
+    throw new Error(`subscription.updated: no plan row for stripe_price_id=${priceId} — unmapped Stripe price`);
+  }
   if (planRow && planRow.id !== userRow.plan_id) {
     if (userRow.frozen_at) {
-      await service.rpc('billing_resubscribe', {
+      const { error: rpcErr } = await service.rpc('billing_resubscribe', {
         p_user_id: userRow.id,
         p_new_plan_id: planRow.id,
       });
+      if (rpcErr) throw new Error(`subscription.updated: billing_resubscribe failed: ${rpcErr.message}`);
     } else {
-      await service.rpc('billing_change_plan', {
+      const { error: rpcErr } = await service.rpc('billing_change_plan', {
         p_user_id: userRow.id,
         p_new_plan_id: planRow.id,
+      });
+      if (rpcErr) throw new Error(`subscription.updated: billing_change_plan failed: ${rpcErr.message}`);
+    }
+
+    const { data: existingRow } = await service
+      .from('subscriptions')
+      .select('id')
+      .eq('stripe_subscription_id', sub.id)
+      .maybeSingle();
+
+    if (existingRow) {
+      await service
+        .from('subscriptions')
+        .update({
+          plan_id: planRow.id,
+          status: 'active',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('stripe_subscription_id', sub.id);
+    } else {
+      await service.from('subscriptions').insert({
+        user_id: userRow.id,
+        stripe_subscription_id: sub.id,
+        stripe_customer_id: sub.customer,
+        plan_id: planRow.id,
+        status: 'active',
+        platform: 'stripe',
+        current_period_end: sub.current_period_end
+          ? new Date(sub.current_period_end * 1000).toISOString()
+          : null,
+        updated_at: new Date().toISOString(),
       });
     }
   }
@@ -918,7 +1025,8 @@ async function handleSubscriptionDeleted(service, sub) {
   if (!userRow) return;
   // Skip if already frozen (replay).
   if (userRow.frozen_at) return;
-  await service.rpc('billing_freeze_profile', { p_user_id: userRow.id });
+  const { error: rpcError } = await service.rpc('billing_freeze_profile', { p_user_id: userRow.id });
+  if (rpcError) throw new Error(`subscription.deleted: billing_freeze_profile failed: ${rpcError.message}`);
 }
 
 // B11 tail — charge.refund.updated with status='reversed' means the refund
@@ -1051,7 +1159,22 @@ async function handlePaymentSucceeded(service, invoice) {
   const customerId = invoice.customer;
   if (!customerId) return;
 
-  const { userRow } = await lookupUserAndPlan(service, customerId, null);
+  let { userRow } = await lookupUserAndPlan(service, customerId, null);
+  if (!userRow && invoice.subscription) {
+    const { data: subRow } = await service
+      .from('subscriptions')
+      .select('user_id')
+      .eq('stripe_subscription_id', invoice.subscription)
+      .maybeSingle();
+    if (subRow?.user_id) {
+      const { data } = await service
+        .from('users')
+        .select('id, plan_id, plan_status, frozen_at, plan_grace_period_ends_at')
+        .eq('id', subRow.user_id)
+        .maybeSingle();
+      if (data) userRow = data;
+    }
+  }
   if (!userRow) return;
 
   // Only clear if something needs clearing.
@@ -1204,8 +1327,16 @@ async function handleCustomerDeleted(service, customer) {
   // Step 2: freeze the user — same RPC customer.subscription.deleted uses.
   // Skip if already frozen (e.g., a parallel subscription.deleted handler
   // already fired). The RPC itself is idempotent; the guard here just
-  // skips the round-trip.
-  if (!userRow.frozen_at && cancelledIds.length > 0) {
+  // skips the round-trip. Fire whenever the user is on a non-free plan,
+  // regardless of whether live subscription rows existed.
+  const freePlanId = userRow.plan_id;
+  const { data: freePlan } = await service
+    .from('plans')
+    .select('id')
+    .eq('tier', 'free')
+    .maybeSingle();
+  const isFreePlan = freePlan ? freePlanId === freePlan.id : false;
+  if (!userRow.frozen_at && !isFreePlan) {
     const { error: freezeErr } = await service.rpc('billing_freeze_profile', {
       p_user_id: userRow.id,
     });
