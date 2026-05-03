@@ -1,9 +1,9 @@
 # Unit 5 — Category (`/category/[id]`)
 
 **Surface(s):** `web/src/app/category/[id]/page.js`, `web/src/app/category/[id]/layout.js`
-**Status:** findings
+**Status:** fixed (Slice 13 shipped 2026-05-02)
 **Date:** 2026-05-02
-**Anchor:** Full review pass complete. 37 findings logged. Decisions #055–#056 locked. No owner-adjudication questions. Ready for Slice 13 fix pass.
+**Anchor:** Slice 13 shipped 2026-05-02. 36 findings fixed (F33 refuted — ad placement was already correct). Adversary: 5 gaps found; 2 blocking fixed (deleted_at filter on all category queries, is_kids_safe column used as authoritative kids guard). Non-blocking gaps 3+4 noted below. tsc clean. Smoke PASS. Unit status: fixed → awaiting Wave A verification (Slice 10).
 
 ---
 
@@ -77,7 +77,7 @@
 
 32. [polish] `formatDate(null)` produces empty span — `page.js:494` — when `published_at` is null, the date slot is blank, creating a ragged card layout. Fix: render `{story.published_at ? hybridDate(story.published_at) : ''}` (or omit the span when null).
 
-33. [polish] In-feed ad placed above the 5th card, not between cards 4 and 5 — `page.js:454` — `{idx === 4 && <Ad .../>}` inside the Fragment renders the ad before the card at position 4, not after it. Move the Ad render to after the `<a>` element or change condition to `idx === 3` (after the 4th card).
+33. [REFUTED] In-feed ad placement — `page.js:454` — pre-flight verifier confirmed `idx === 4` correctly places ad between cards 4 and 5 (0-indexed). No fix needed.
 
 34. [polish] Kids-category copy identical to missing-category copy — `page.js:56` — the `kids-*` slug path calls `setCategory(null)` which shows "Category not found / renamed or removed", which is confusing. The category exists but is iOS-only. Differentiate copy: "This category is available in the Verity Post Kids app."
 
@@ -109,11 +109,16 @@ No dedicated iOS Category detail unit is in the current review plan. When Wave D
 
 ---
 
-## Slice 13 — fix scope
+## Slice 13 — shipped 2026-05-02
 
 **Prerequisite:** Slices 1 + 2 done (both shipped 2026-05-02).
-**Elevated-care:** NO (no RBAC / payments / kid-safety). Standard adversary pass recommended.
+**Elevated-care:** NO. Standard adversary pass ran; 5 gaps found, 2 blocking closed.
 **File count:** 2 files (`page.js`, `layout.js` → `layout.tsx`)
+
+## Non-blocking adversary gaps (deferred)
+
+- Gap 3: Stale `?sub=` URL param not stripped when subcat ID is invalid — cosmetic UX; fix in next pass.
+- Gap 4: `bookmarkingId` scalar races on rapid multi-card clicks — UX cosmetic; upgrade to Set<string> in next pass.
 
 **Streams:** Can run as a single stream (file count is low). Alternatively split:
 - Stream A: `layout.tsx` (new, F12 / DECISION #056) + all data-layer fixes (F2, F3, F6, F7, F8, F9, F10, F22, F32)

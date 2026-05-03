@@ -1,22 +1,32 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified home_feed 2026-04-18
 'use client';
-import React, { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { createClient } from '../../../lib/supabase/client';
-import { formatDate } from '../../../lib/dates';
+import { timeAgo, formatDate } from '../../../lib/dates';
 import { Z } from '../../../lib/zIndex';
 import Ad from '../../../components/Ad';
 
 const SORT_OPTIONS = ['Latest', 'Trending'];
 
-export default function CategoryPage() {
+function hybridDate(ts) {
+  if (!ts) return '';
+  const diff = Date.now() - new Date(ts).getTime();
+  return diff < 24 * 60 * 60 * 1000 ? timeAgo(ts) : formatDate(ts);
+}
+
+function CategoryPageInner() {
   const { id } = useParams();
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const supabase = createClient();
 
   const [category, setCategory] = useState(null);
   const [stories, setStories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [sort, setSort] = useState('Latest');
   // Q7 (verified clean 2026-04-18): category-follow feature is not shipping
   // — see Decision Q7. Prior placeholder Follow button + hardcoded follower
@@ -25,119 +35,185 @@ export default function CategoryPage() {
   const [visibleCount, setVisibleCount] = useState(5);
   const [subcategories, setSubcategories] = useState([]);
   const [activeSubcat, setActiveSubcat] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [kidsCategoryBlocked, setKidsCategoryBlocked] = useState(false);
+  const [bookmarkingId, setBookmarkingId] = useState(null);
+  const toastTimerRef = useRef(null);
 
-  useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
-      setActiveSubcat(null);
-      setSubcategories([]);
+  async function fetchData() {
+    setCategory(null);
+    setStories([]);
+    setActiveSubcat(null);
+    setSubcategories([]);
+    setLoading(true);
 
-      // Try fetching category by id first, then by slug
-      let { data: categoryData, error: categoryError } = await supabase
-        .from('categories')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (categoryError || !categoryData) {
-        const { data: categoryBySlug } = await supabase
+    try {
+        // Try fetching category by id first, then by slug
+        let { data: categoryData, error: categoryError } = await supabase
           .from('categories')
           .select('*')
-          .eq('slug', id)
-          .single();
-        categoryData = categoryBySlug;
-      }
-
-      if (categoryData) {
-        // Kid-only categories (slug `kids-*`) no longer have a web-side
-        // renderer — the VerityPostKids iOS app owns that surface. Render
-        // the standard not-found state instead of leaking kid-safe articles
-        // into the adult feed.
-        if (typeof categoryData.slug === 'string' && categoryData.slug.startsWith('kids-')) {
-          setCategory(null);
-          setLoading(false);
-          return;
-        }
-        setCategory(categoryData);
-
-        const { data: subcatData } = await supabase
-          .from('categories')
-          .select('id, name')
-          .eq('parent_id', categoryData.id)
+          .eq('id', id)
           .eq('is_active', true)
-          .order('name', { ascending: true });
-        setSubcategories(subcatData ?? []);
+          .is('deleted_at', null)
+          .single();
 
-        const { data: storiesData } = await supabase
-          .from('articles')
-          .select('*, stories(slug)')
-          .eq('category_id', categoryData.id)
-          .eq('status', 'published')
-          .eq('visibility', 'public');
-
-        const articles = storiesData ?? [];
-        const {
-          data: { user: authUser },
-        } = await supabase.auth.getUser();
-        if (authUser && articles.length > 0) {
-          const ids = articles.map((a) => a.id);
-          const { data: bms } = await supabase
-            .from('bookmarks')
-            .select('id, article_id')
-            .eq('user_id', authUser.id)
-            .in('article_id', ids);
-          const map = new Map();
-          (bms || []).forEach((b) => map.set(b.article_id, b.id));
-          setStories(
-            articles.map((a) =>
-              map.has(a.id) ? { ...a, bookmarked: true, bookmark_id: map.get(a.id) } : a
-            )
-          );
-        } else {
-          setStories(articles);
+        if (categoryError || !categoryData) {
+          const { data: categoryBySlug } = await supabase
+            .from('categories')
+            .select('*')
+            .eq('slug', id)
+            .eq('is_active', true)
+            .is('deleted_at', null)
+            .single();
+          categoryData = categoryBySlug;
         }
-      }
 
+        if (categoryData) {
+          // Kid-only categories (slug `kids-*`) no longer have a web-side
+          // renderer — the VerityPostKids iOS app owns that surface. Show a
+          // dedicated blocked screen instead of leaking kid-safe articles
+          // into the adult feed.
+          if (categoryData.is_kids_safe === true) {
+            setKidsCategoryBlocked(true);
+            setLoading(false);
+            return;
+          }
+          setCategory(categoryData);
+
+          const { data: subcatData, error: subcatErr } = await supabase
+            .from('categories')
+            .select('id, name')
+            .eq('parent_id', categoryData.id)
+            .eq('is_active', true)
+            .is('deleted_at', null)
+            .order('name', { ascending: true });
+          if (subcatErr) console.error('Subcategory fetch error:', subcatErr);
+          setSubcategories(subcatData ?? []);
+
+          const { data: storiesData, error: storiesErr } = await supabase
+            .from('articles')
+            .select('*, stories(slug)')
+            .eq('category_id', categoryData.id)
+            .eq('status', 'published')
+            .eq('visibility', 'public')
+            .is('deleted_at', null)
+            .not('stories.slug', 'is', null)
+            .limit(100);
+          if (storiesErr) { setError('Could not load articles.'); return; }
+
+          const articles = (storiesData ?? []).filter(a => a.stories?.slug);
+
+          const { data: authData, error: authErr } = await supabase.auth.getUser();
+          const authUser = authErr ? null : authData?.user ?? null;
+          setCurrentUser(authUser);
+
+          if (authUser && articles.length > 0) {
+            const ids = articles.map((a) => a.id).slice(0, 100);
+            const { data: bms, error: bmsErr } = await supabase
+              .from('bookmarks')
+              .select('id, article_id')
+              .eq('user_id', authUser.id)
+              .in('article_id', ids);
+            if (bmsErr) console.error('Bookmarks fetch error:', bmsErr);
+            const map = new Map();
+            (bms || []).forEach((b) => map.set(b.article_id, b.id));
+            setStories(
+              articles.map((a) =>
+                map.has(a.id) ? { ...a, bookmarked: true, bookmark_id: map.get(a.id) } : a
+              )
+            );
+          } else {
+            setStories(articles);
+          }
+        }
+    } catch (err) {
+      setError('Could not load category. Please try again.');
+    } finally {
       setLoading(false);
     }
+  }
 
+  useEffect(() => {
     if (id) fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  // F35: initialize sort + activeSubcat from URL params on mount
+  useEffect(() => {
+    const urlSort = searchParams.get('sort');
+    if (urlSort && SORT_OPTIONS.includes(urlSort)) setSort(urlSort);
+    // subcategory param is validated against loaded subcategories in a separate effect
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // F35: validate and apply sub param once subcategories are loaded
+  useEffect(() => {
+    if (subcategories.length > 0) {
+      const urlSub = searchParams.get('sub');
+      if (urlSub) {
+        const match = subcategories.find((sc) => sc.id === urlSub);
+        setActiveSubcat(match ? urlSub : null);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subcategories]);
+
   const [toast, setToast] = useState('');
 
+  // F28: race-safe toast helper
+  const showToast = (msg) => {
+    clearTimeout(toastTimerRef.current);
+    setToast(msg);
+    toastTimerRef.current = setTimeout(() => setToast(''), 2400);
+  };
+
+  // F35: URL param builder
+  const buildParams = (newSort, newSub) => {
+    const params = new URLSearchParams();
+    if (newSort && newSort !== 'Latest') params.set('sort', newSort);
+    if (newSub) params.set('sub', newSub);
+    return params.toString();
+  };
+
   const toggleBookmark = async (storyId) => {
-    const story = stories.find((s) => s.id === storyId);
-    if (!story) return;
-    if (story.bookmarked && story.bookmark_id) {
-      const res = await fetch(`/api/bookmarks/${story.bookmark_id}`, { method: 'DELETE' });
-      if (res.ok) {
-        setStories((prev) =>
-          prev.map((s) => (s.id === storyId ? { ...s, bookmarked: false, bookmark_id: null } : s))
-        );
-      } else {
-        setToast('Could not remove bookmark.');
-        setTimeout(() => setToast(''), 2400);
-      }
+    // F4: anon registration wall redirect
+    if (!currentUser) {
+      window.location.href = `/login?return=/category/${id}`;
       return;
     }
-    const res = await fetch('/api/bookmarks', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ article_id: storyId }),
-    });
-    if (res.ok) {
-      const body = await res.json().catch(() => ({}));
-      setStories((prev) =>
-        prev.map((s) =>
-          s.id === storyId ? { ...s, bookmarked: true, bookmark_id: body?.id || null } : s
-        )
-      );
-    } else {
-      const body = await res.json().catch(() => ({}));
-      setToast(body?.error || 'Could not save bookmark.');
-      setTimeout(() => setToast(''), 2400);
+    const story = stories.find((s) => s.id === storyId);
+    if (!story) return;
+    setBookmarkingId(storyId);
+    try {
+      if (story.bookmarked && story.bookmark_id) {
+        const res = await fetch(`/api/bookmarks/${story.bookmark_id}`, { method: 'DELETE' });
+        if (res.ok) {
+          setStories((prev) =>
+            prev.map((s) => (s.id === storyId ? { ...s, bookmarked: false, bookmark_id: null } : s))
+          );
+        } else {
+          showToast('Could not remove bookmark.');
+        }
+        return;
+      }
+      const res = await fetch('/api/bookmarks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ article_id: storyId }),
+      });
+      if (res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setStories((prev) =>
+          prev.map((s) =>
+            s.id === storyId ? { ...s, bookmarked: true, bookmark_id: body?.id || null } : s
+          )
+        );
+      } else {
+        const body = await res.json().catch(() => ({}));
+        showToast(body?.error || 'Could not save bookmark.');
+      }
+    } finally {
+      setBookmarkingId(null);
     }
   };
 
@@ -162,6 +238,8 @@ export default function CategoryPage() {
           color: '#111111',
         }}
       >
+        {/* F17: loading skeleton announcement */}
+        <div role="status" aria-live="polite" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap' }}>Loading category...</div>
         <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px 80px' }}>
           <div
             style={{
@@ -219,6 +297,26 @@ export default function CategoryPage() {
     );
   }
 
+  if (error) {
+    return (
+      <div style={{ maxWidth: 680, margin: '80px auto', textAlign: 'center', padding: '0 16px' }}>
+        <p style={{ fontSize: 16, color: '#444' }}>{error}</p>
+        <button onClick={fetchData} style={{ marginTop: 16, padding: '10px 20px', cursor: 'pointer' }}>Try again</button>
+      </div>
+    );
+  }
+
+  // F34: kids category blocked screen
+  if (kidsCategoryBlocked) {
+    return (
+      <div style={{ maxWidth: 680, margin: '80px auto', textAlign: 'center', padding: '0 16px' }}>
+        <h1 style={{ fontSize: 24, marginBottom: 12 }}>Kids category</h1>
+        <p style={{ fontSize: 16, color: '#444', marginBottom: 24 }}>Browse this category in the Verity Post Kids app.</p>
+        <Link href="/browse" style={{ color: '#0369a1', textDecoration: 'underline' }}>Browse all categories</Link>
+      </div>
+    );
+  }
+
   if (!category) {
     return (
       <div
@@ -238,7 +336,7 @@ export default function CategoryPage() {
           <p style={{ color: '#666666', fontSize: 14, margin: '0 0 24px', lineHeight: 1.5 }}>
             We couldn&rsquo;t find that category. It may have been renamed or removed.
           </p>
-          <a
+          <Link
             href="/browse"
             style={{
               display: 'inline-block',
@@ -252,7 +350,7 @@ export default function CategoryPage() {
             }}
           >
             Browse all categories
-          </a>
+          </Link>
         </div>
       </div>
     );
@@ -269,6 +367,9 @@ export default function CategoryPage() {
     >
       {toast && (
         <div
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
           style={{
             position: 'fixed',
             left: '50%',
@@ -288,6 +389,7 @@ export default function CategoryPage() {
         </div>
       )}
 
+      <main>
       {/* Category Header */}
       <div
         style={{
@@ -298,24 +400,27 @@ export default function CategoryPage() {
       >
         <div style={{ maxWidth: 800, margin: '0 auto' }}>
           <div style={{ marginBottom: 12 }}>
-            <a
-              href="/browse"
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                color: '#111111',
-                fontWeight: 700,
-                fontSize: 13,
-                padding: 0,
-                textDecoration: 'none',
-              }}
-            >
-              Back to browse
-            </a>
+            <nav aria-label="Breadcrumb">
+              <Link
+                href="/browse"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#111111',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  padding: '8px 0',
+                  textDecoration: 'none',
+                }}
+              >
+                ← Back to browse
+              </Link>
+            </nav>
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
             <div
+              aria-hidden="true"
               style={{
                 width: 64,
                 height: 64,
@@ -345,9 +450,11 @@ export default function CategoryPage() {
               >
                 {category.name}
               </h1>
-              <p style={{ margin: '0 0 12px', fontSize: 13, color: '#666666', lineHeight: 1.5 }}>
-                {category.description}
-              </p>
+              {category.description && (
+                <p style={{ margin: '0 0 12px', fontSize: 13, color: '#666666', lineHeight: 1.5 }}>
+                  {category.description}
+                </p>
+              )}
               {/* Q7 (Decision): category-follow feature is not shipping.
                   No follower count, no Follow button. */}
             </div>
@@ -360,11 +467,12 @@ export default function CategoryPage() {
           {/* Stories column */}
           <div style={{ flex: '1 1 420px', minWidth: 0 }}>
             {/* Sort options */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+            <div role="group" aria-label="Sort by" style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
               {SORT_OPTIONS.map((s) => (
                 <button
                   key={s}
-                  onClick={() => setSort(s)}
+                  aria-pressed={sort === s}
+                  onClick={() => { setSort(s); setVisibleCount(5); router.replace(`/category/${id}?${buildParams(s, activeSubcat)}`, { scroll: false }); }}
                   style={{
                     padding: '6px 14px',
                     borderRadius: 8,
@@ -374,6 +482,7 @@ export default function CategoryPage() {
                     fontSize: 13,
                     fontWeight: 600,
                     cursor: 'pointer',
+                    minHeight: 44,
                   }}
                 >
                   {s}
@@ -383,9 +492,10 @@ export default function CategoryPage() {
 
             {/* Subcategory filter — only renders when this category has subs */}
             {subcategories.length > 0 && (
-              <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+              <div role="group" aria-label="Filter by topic" style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
                 <button
-                  onClick={() => { setActiveSubcat(null); setVisibleCount(5); }}
+                  aria-pressed={activeSubcat === null}
+                  onClick={() => { setActiveSubcat(null); setVisibleCount(5); router.replace(`/category/${id}?${buildParams(sort, null)}`, { scroll: false }); }}
                   style={{
                     padding: '6px 14px',
                     borderRadius: 8,
@@ -395,6 +505,7 @@ export default function CategoryPage() {
                     fontSize: 13,
                     fontWeight: 600,
                     cursor: 'pointer',
+                    minHeight: 44,
                   }}
                 >
                   All
@@ -402,7 +513,8 @@ export default function CategoryPage() {
                 {subcategories.map((sc) => (
                   <button
                     key={sc.id}
-                    onClick={() => { setActiveSubcat(sc.id); setVisibleCount(5); }}
+                    aria-pressed={activeSubcat === sc.id}
+                    onClick={() => { setActiveSubcat(sc.id); setVisibleCount(5); router.replace(`/category/${id}?${buildParams(sort, sc.id)}`, { scroll: false }); }}
                     style={{
                       padding: '6px 14px',
                       borderRadius: 8,
@@ -412,6 +524,7 @@ export default function CategoryPage() {
                       fontSize: 13,
                       fontWeight: 600,
                       cursor: 'pointer',
+                      minHeight: 44,
                     }}
                   >
                     {sc.name}
@@ -422,6 +535,11 @@ export default function CategoryPage() {
 
             {/* category_top: above article list */}
             <Ad placement="category_top" page="category" position="top" />
+
+            {/* F18: aria-live article count announcement */}
+            <div aria-live="polite" aria-atomic="true" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap' }}>
+              Showing {Math.min(visibleCount, sorted.length)} of {sorted.length} articles
+            </div>
 
             {/* Article Cards */}
             {stories.length === 0 && (
@@ -441,9 +559,9 @@ export default function CategoryPage() {
                 </div>
                 <div>
                   Check back soon, or{' '}
-                  <a href="/" style={{ color: '#111', fontWeight: 700 }}>
+                  <Link href="/" style={{ color: '#111', fontWeight: 700 }}>
                     browse the home feed
-                  </a>
+                  </Link>
                   .
                 </div>
               </div>
@@ -454,109 +572,126 @@ export default function CategoryPage() {
                 {idx === 4 && (
                   <Ad placement="category_in_feed_1" page="category" position="in_feed_1" />
                 )}
-              <a
-                href={story.stories?.slug ? `/${story.stories.slug}` : '#'}
+              {/* F1: position:relative on card container so bookmark button can be positioned absolutely outside the <Link> */}
+              <div
                 style={{
+                  position: 'relative',
                   background: '#f7f7f7',
                   border: '1px solid #e5e5e5',
                   borderRadius: 12,
                   marginBottom: 10,
-                  display: 'flex',
                   overflow: 'hidden',
-                  cursor: 'pointer',
-                  textDecoration: 'none',
-                  color: 'inherit',
                 }}
               >
-                <div
+                <Link
+                  href={story.stories?.slug ? `/${story.stories.slug}` : '/browse'}
                   style={{
-                    width: 6,
-                    minWidth: 6,
-                    background: 'linear-gradient(180deg, #111111, #333333)',
-                    borderRadius: '3px 0 0 3px',
+                    display: 'flex',
+                    cursor: 'pointer',
+                    textDecoration: 'none',
+                    color: 'inherit',
                   }}
-                />
-                <div style={{ flex: 1, padding: '12px 14px', minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                    <span
-                      style={{
-                        background: '#e0f2fe',
-                        color: '#0369a1',
-                        fontSize: 11,
-                        fontWeight: 700,
-                        padding: '2px 8px',
-                        borderRadius: 99,
-                      }}
-                    >
-                      {category.name}
-                    </span>
-                    <span style={{ fontSize: 11, color: '#666666' }}>
-                      {formatDate(story.published_at)}
-                    </span>
-                  </div>
-                  <p
-                    style={{
-                      margin: '0 0 6px',
-                      fontWeight: 700,
-                      fontSize: 14,
-                      lineHeight: 1.4,
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    {story.title}
-                  </p>
+                >
                   <div
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
+                      width: 6,
+                      minWidth: 6,
+                      background: 'linear-gradient(180deg, #111111, #333333)',
+                      borderRadius: '3px 0 0 3px',
                     }}
-                  >
-                    <span style={{ fontSize: 12, color: '#666666', fontWeight: 500 }}>
-                      {story.excerpt ? story.excerpt.slice(0, 60) + '...' : ''}
-                    </span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleBookmark(story.id);
-                        }}
-                        aria-label={story.bookmarked ? 'Remove bookmark' : 'Save article'}
+                  />
+                  <div style={{ flex: 1, padding: '12px 14px 36px', minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                      <span
                         style={{
-                          background: 'none',
-                          border: '1px solid #e5e5e5',
-                          borderRadius: 6,
-                          cursor: 'pointer',
-                          padding: '2px 8px',
+                          background: '#e0f2fe',
+                          color: '#025a8e',
                           fontSize: 11,
                           fontWeight: 700,
-                          color: story.bookmarked ? '#fff' : '#111',
-                          backgroundColor: story.bookmarked ? '#111' : 'transparent',
-                          lineHeight: 1.4,
+                          padding: '2px 8px',
+                          borderRadius: 99,
+                          maxWidth: 120,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
                         }}
                       >
-                        {story.bookmarked ? 'Saved' : 'Save'}
-                      </button>
+                        {category.name}
+                      </span>
+                      {story.published_at && <span style={{ fontSize: 11, color: '#666666' }}>{hybridDate(story.published_at)}</span>}
                     </div>
+                    <p
+                      style={{
+                        margin: '0 0 6px',
+                        fontWeight: 700,
+                        fontSize: 14,
+                        lineHeight: 1.4,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {story.title}
+                    </p>
+                    <span style={{ fontSize: 12, color: '#666666', fontWeight: 500 }}>
+                      {story.excerpt
+                        ? story.excerpt.length > 60
+                          ? story.excerpt.slice(0, 60) + '…'
+                          : story.excerpt
+                        : ''}
+                    </span>
                   </div>
-                </div>
-              </a>
+                </Link>
+                {/* F1: bookmark button positioned absolutely outside the <Link> */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleBookmark(story.id);
+                  }}
+                  disabled={bookmarkingId === story.id}
+                  aria-label={story.bookmarked ? 'Remove bookmark' : 'Save article'}
+                  style={{
+                    position: 'absolute',
+                    right: 12,
+                    bottom: 12,
+                    zIndex: 1,
+                    background: 'none',
+                    border: '1px solid #e5e5e5',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    padding: '8px 12px',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: story.bookmarked ? '#fff' : '#111',
+                    backgroundColor: story.bookmarked ? '#111' : 'transparent',
+                    lineHeight: 1.4,
+                    minHeight: 44,
+                  }}
+                >
+                  {bookmarkingId === story.id ? '…' : story.bookmarked ? 'Saved' : 'Save'}
+                </button>
+              </div>
               </React.Fragment>
             ))}
 
             {activeSubcat !== null && filtered.length === 0 && stories.length > 0 && (
               <div
+                role="status"
+                aria-live="polite"
                 style={{
-                  padding: '32px 20px',
+                  padding: '40px 20px',
                   textAlign: 'center',
+                  background: '#f7f7f7',
+                  border: '1px solid #e5e5e5',
+                  borderRadius: 12,
                   color: '#666666',
                   fontSize: 13,
                 }}
               >
-                No articles in this subcategory yet.
+                <div style={{ fontWeight: 700, fontSize: 15, color: '#111', marginBottom: 4 }}>
+                  No articles in this subcategory yet.
+                </div>
               </div>
             )}
 
@@ -584,6 +719,15 @@ export default function CategoryPage() {
 
         </div>
       </div>
+      </main>
     </div>
+  );
+}
+
+export default function CategoryPage() {
+  return (
+    <Suspense>
+      <CategoryPageInner />
+    </Suspense>
   );
 }

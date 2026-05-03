@@ -14,7 +14,7 @@ Findings docs live at `UI_UX_REVIEW/<wave>-<n>-<slug>.md`.
 | 2  | Article reader | `/[slug]` (+ `?a=` multi-article, `/story/[slug]` redirect) | fixed (Slices 4 + 5 shipped 2026-05-02) |
 | 3  | Browse | `/browse` | fixed (Slice 11 shipped 2026-05-02) |
 | 4  | Search | `/search` | fixed (Slice 12 shipped 2026-05-02) |
-| 5  | Category | `/category/[id]` | findings (Slice 13 ready) |
+| 5  | Category | `/category/[id]` | fixed (Slice 13 shipped 2026-05-02) |
 | 6  | Leaderboard | `/leaderboard` | pending |
 | 7  | Public profile + card | `/u/[username]`, `/card/[username]` *(KILL-SWITCHED — chrome only)* | pending |
 | 8  | Marketing bundle | `/pricing`, `/how-it-works`, `/about`, `/contact`, `/kids-app` | pending |
@@ -130,8 +130,11 @@ Active slice plan (as of 2026-05-02):
 | 8 | iOS CSAM-trio bridge | Cross-cutting | — |
 | 9 | Cross-platform parity bridges | Cross-cutting | 4 |
 | 10 | Wave A verification sweep | Verification | all Wave A unit-fix slices |
+| 11 | Unit 3 / Browse cleanup (38 findings) | Unit fix | 1 + 2 | shipped 2026-05-02 |
+| 12 | Unit 4 / Search UX fix (29 findings) | Unit fix | 1 + 2 | shipped 2026-05-02 |
+| 13 | Unit 5 / Category fix (37 findings) | Unit fix | 1 + 2 | shipped 2026-05-02 |
 
-**Future slices** (added when reviews complete): Slice 11 (Unit 3 / Browse), Slice 12 (Unit 4 / Search), Slice 13 (Unit 5 / Category), Slice 14 (Unit 6 / Leaderboard), Slice 15 (Unit 7 / Public profile chrome), Slice 16 (Unit 8 / Marketing bundle), Slice 17 (Unit 9 / Legal/info sweep), Slice 18 (Unit 10 / Auth flow), Slice 19 (Unit 11 / Logout). Wave B onward continues numbering.
+**Future slices** (added when reviews complete): Slice 14 (Unit 6 / Leaderboard), Slice 15 (Unit 7 / Public profile chrome), Slice 16 (Unit 8 / Marketing bundle), Slice 17 (Unit 9 / Legal/info sweep), Slice 18 (Unit 10 / Auth flow), Slice 19 (Unit 11 / Logout). Wave B onward continues numbering.
 
 See `UI_UX_REVIEW_SLICES.md` for per-slice scope, file paths, test plans, decisions consumed, and ready-state.
 

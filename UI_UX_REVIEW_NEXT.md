@@ -9,8 +9,8 @@ CURRENT_TITLE: Unit 6 — Leaderboard (/leaderboard)
 CURRENT_WAVE: A
 CURRENT_DOC: UI_UX_REVIEW/A-6-leaderboard.md
 STATUS: pending
-NEXT_BUILD_SLICE: Slice 13 (Category fix, 37 findings) — OR — Unit 6 review (auto-detect picks whichever is next)
-ANCHOR: Unit 5 (Category) review complete 2026-05-02. 37 findings logged. DECISIONS #055-#056 locked. Slice 13 ready. Auto-detect next: (c) Slice 13 is unblocked (prereqs 1+2 done) → run Slice 13 fix pass.
+NEXT_BUILD_SLICE: Slice 14 (Unit 6 / Leaderboard) — after Unit 6 review completes
+ANCHOR: Slice 13 (Category) shipped 2026-05-02. 36 findings fixed (F33 refuted). Adversary: 2 blocking gaps closed (deleted_at filter + is_kids_safe guard). Unit 5 status: fixed. Auto-detect next: (e) Unit 6 (Leaderboard) at pending → run Unit 6 review.
 LAST_UPDATED: 2026-05-02
 
 PARKED_UNITS:
@@ -18,7 +18,7 @@ PARKED_UNITS:
 - Unit 2 (Article reader) — status: fixed (Slices 4+5 shipped 2026-05-02). All 128 findings resolved.
 - Unit 3 (Browse) — status: fixed (Slice 11 shipped 2026-05-02). All 38 findings resolved.
 - Unit 4 (Search) — status: fixed (Slice 12 shipped 2026-05-02). 29 findings fixed.
-- Unit 5 (Category) — status: findings (Slice 13 ready 2026-05-02). 37 findings logged. DECISIONS #055-#056 locked.
+- Unit 5 (Category) — status: fixed (Slice 13 shipped 2026-05-02). 36 findings fixed (F33 refuted). 2 non-blocking adversary gaps deferred.
 
 EXECUTION_PLAN: UI_UX_REVIEW_SLICES.md
 SLICE_NAMING: sequential numbers (Slice 1, 2, 3, ...). See SLICES.md tracking table for type (Foundation / Unit fix / Cross-cutting / Verification) and dependencies.

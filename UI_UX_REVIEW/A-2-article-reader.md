@@ -11,9 +11,9 @@
 - Footer: `web/src/components/{ArticleActions,ShareButton,BookmarkButton,NextStoryFooter}.tsx`
 - Analytics: `web/src/components/article/ArticleTracker.tsx`, `web/src/components/JsonLd.tsx`
 
-**Status:** findings (build-ready — execution sliced)
+**Status:** fixed (Slices 4+5 shipped 2026-05-02)
 **Date:** 2026-05-02
-**Anchor:** 128 findings logged + 22-of-23 broken-claim cluster verified against live code (1 refuted: #76). 7 panels (21 experts) ran. All decisions locked to DECISIONS.md #030–#047. Execution plan written to `UI_UX_REVIEW_SLICES.md`. Foundation slices (Slice 1 god_mode rename + Slice 2 subcategory schema) are the next concrete build steps. This unit's fix slices are **Slice 4** (layout) and **Slice 5** (broken-state cleanup).
+**Anchor:** Slices 4+5 shipped 2026-05-02. 128 findings fixed (1 refuted: #76). All decisions locked to DECISIONS.md #030–#047. Unit status: fixed. Awaiting Wave A verification (Slice 10).
 
 ---
 
