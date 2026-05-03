@@ -7,11 +7,12 @@ import { getSettings } from '@/lib/settings';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { assertReportReason, isUrgentReason } from '@/lib/reportReasons';
 import { captureMessage } from '@/lib/observability';
+import { sendEmail } from '@/lib/email';
 
 export async function POST(request) {
   try {
     const supabase = await createClient();
-    const user = await requirePermission('article.report');
+    const user = await requirePermission(['article.report', 'profile.report']);
 
     // Auth'd users can flood reports → auto-hide at threshold. 10/hr per
     // user is comfortably above legitimate use while closing that vector.
@@ -30,11 +31,17 @@ export async function POST(request) {
 
     const { targetType, targetId, reason, description } = await request.json();
 
+    // Null-check first so every required field has a clear error message.
     if (!targetType || !targetId || !reason) {
       return NextResponse.json(
         { error: 'targetType, targetId, and reason are required' },
         { status: 400 }
       );
+    }
+
+    // Allowlist after null-check so targetType is guaranteed non-empty here.
+    if (!['article', 'comment', 'user'].includes(targetType)) {
+      return NextResponse.json({ error: 'Invalid target type' }, { status: 400 });
     }
     // T278 — Server-side enum validation. The article-level reports
     // route used to accept any string; now we lock it to the same
@@ -89,6 +96,11 @@ export async function POST(request) {
     }
 
     if (urgent) {
+      // Track whether at least one escalation channel succeeded.
+      // If none do, we mark the report so a sweep cron can retry.
+      let escalationSucceeded = false;
+
+      // Channel 1: Sentry / observability (when configured)
       try {
         await captureMessage('urgent report submitted', 'error', {
           report_id: report.id,
@@ -97,8 +109,74 @@ export async function POST(request) {
           reason,
           reporter_user_id: user.id,
         });
+        escalationSucceeded = true;
       } catch (obsErr) {
         console.error('[reports] observability_failed', obsErr);
+      }
+
+      // Channel 2: admin_alerts table (always attempted, independent of Sentry).
+      // Table created in migration 20260503000006. Uses service client so
+      // the insert is not gated by reporter's RLS context.
+      try {
+        const service = createServiceClient();
+        await service.from('admin_alerts').insert({
+          alert_type: 'escalated_report',
+          report_id: report.id,
+          severity: 'critical',
+          metadata: {
+            target_type: targetType,
+            target_id: targetId,
+            reason,
+            reporter_user_id: user.id,
+            legal_basis: '18_usc_2258a',
+          },
+        });
+        escalationSucceeded = true;
+      } catch (alertErr) {
+        console.error('[reports] admin_alerts_insert_failed', alertErr);
+      }
+
+      // Channel 3: email to ESCALATION_EMAIL (always attempted when configured).
+      const escalationEmail = process.env.ESCALATION_EMAIL;
+      if (escalationEmail) {
+        try {
+          await sendEmail({
+            to: escalationEmail,
+            subject: `URGENT: Escalated report — ${reason} (${targetType})`,
+            html: `<p><strong>An urgent content report requires immediate human review.</strong></p>
+<ul>
+  <li>Report ID: ${report.id}</li>
+  <li>Reason: ${reason}</li>
+  <li>Target type: ${targetType}</li>
+  <li>Target ID: ${targetId}</li>
+  <li>Reporter: ${user.id}</li>
+  <li>Legal basis: 18 U.S.C. § 2258A</li>
+</ul>
+<p>Review in the admin moderation queue immediately.</p>`,
+            text: `URGENT: Escalated report\nReport ID: ${report.id}\nReason: ${reason}\nTarget: ${targetType}/${targetId}\nReporter: ${user.id}\nLegal basis: 18 U.S.C. § 2258A\n\nReview in admin moderation queue immediately.`,
+            fromName: 'Verity Post Alerts',
+            fromEmail: process.env.EMAIL_FROM || 'no-reply@veritypost.com',
+          });
+          escalationSucceeded = true;
+        } catch (emailErr) {
+          console.error('[reports] escalation_email_failed', emailErr);
+        }
+      }
+
+      // Fail-safe: if ALL channels failed, mark the report for sweep cron.
+      // Returns 200 (report is saved) but leaves a durable marker.
+      if (!escalationSucceeded) {
+        console.error('[reports] ALL_ESCALATION_CHANNELS_FAILED report_id:', report.id, '— urgent report requires manual review');
+        try {
+          const service = createServiceClient();
+          await service
+            .from('reports')
+            .update({ metadata: { ...insertRow.metadata, escalation_failed: true, escalation_failed_at: new Date().toISOString() } })
+            .eq('id', report.id);
+        } catch (markErr) {
+          // Best-effort — the base report row is already saved.
+          console.error('[reports] escalation_mark_failed', markErr);
+        }
       }
     }
 

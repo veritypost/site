@@ -38,7 +38,26 @@ export default function FollowButton({
   }, []);
 
   if (!viewerUserId || viewerUserId === targetUserId) return null;
-  if (!permsReady || !canFollow) return null;
+  if (!permsReady) {
+    return (
+      <button
+        disabled
+        style={{
+          opacity: 0.4,
+          pointerEvents: 'none',
+          padding: '8px 20px',
+          borderRadius: 20,
+          background: 'var(--card)',
+          border: '1px solid var(--border)',
+          fontSize: 14,
+          cursor: 'default',
+        }}
+      >
+        Follow
+      </button>
+    );
+  }
+  if (!canFollow) return null;
 
   async function toggle() {
     if (busy) return;

@@ -1339,3 +1339,91 @@ Streams A + C both touch `page.tsx` — run sequentially or split by line range 
 9. **iOS (F40, F43, F44):** blocked users absent, deleted-scheduled absent from Rising Stars, retry works.
 
 **Slice ready-state:** every locked slice has decisions confirmed, file paths cited, test plans defined. None block on owner judgment except the small per-slice items called out. Slice 3 (Home) is a placeholder — fix recipes populated when the slice opens.
+
+---
+
+## Slice 15 — Unit 7 / Public profile + card (44 findings → 43 fixes, F21 wontfix)
+
+**Status:** ready to build (added 2026-05-02)
+**Prerequisite:** Slices 1 + 2 done (both shipped 2026-05-02).
+**Elevated-care:** YES — F01 (CSAM escalation — legal: 18 U.S.C. § 2258A), F15 (targetType injection — security), F16 (wrong permission domain — security). Adversary pass mandatory.
+**Decisions consumed:** #003 (no future-delivery copy — F34), #020 (Owner Mode label on own profile — F17), #025 (stats on own profile — F06/F23), #059 (private profile → custom page, not 404 — F05), #060 (card exempt from show_activity — F21 wontfix), #061 (card noindex intentional — no change needed).
+**Per-finding recipes:** see `UI_UX_REVIEW/A-7-public-profile.md` (each finding entry includes exact line cites + fix text). This section captures stream breakdown only.
+
+### Stream A — Security / API gate (Elevated-care — adversary mandatory)
+
+**Files:** `web/src/app/api/reports/route.js`, `web/src/lib/reportReasons.js`
+
+- **F01** (`api/reports/route.js:91`): Add non-Sentry fallback for `is_escalated=true` reports. Insert a row into `admin_alerts` AND send an email via the existing email service to `process.env.ESCALATION_EMAIL`. Guard with `if (!process.env.SENTRY_DSN || ...)` so the fallback fires when Sentry is absent. Fix the `reportReasons.js:8` comment: "a human is paged via Sentry when configured, otherwise via admin_alerts email."
+- **F15** (`api/reports/route.js:31`): Add allowlist validation immediately after body parse: `if (!['article', 'comment', 'user'].includes(targetType)) return NextResponse.json({ error: 'Invalid target type' }, { status: 400 })`.
+- **F16** (`api/reports/route.js:14`): Expand gate from `article.report` to `article.report || profile.report`. Accept either perm for now — when `profile.report` is provisioned it naturally starts working.
+- **F36** (`reportReasons.js:55`): Change `value: 'hate'` → `value: 'hate_speech'` in `PROFILE_REPORT_REASONS` to match `ARTICLE_REPORT_REASONS`.
+
+### Stream B — Profile page / Follow / Block logic
+
+**Files:** `web/src/app/u/[username]/page.tsx`, `web/src/components/FollowButton.tsx`, `web/src/app/api/users/[id]/block/route.js`, `web/src/app/profile/[id]/page.tsx`
+
+- **F02** (`page.tsx:211`): Extend `blocked_users` query to OR-cover both directions (blocker→target AND target→blocker). Treat either direction as "restricted."
+- **F03** (`page.tsx:494`): Add `&& !blocked` guard to the `canSendDm` condition.
+- **F04** (`page.tsx:142`): Wrap main data-fetch IIFE in try/catch; on catch call `setError(true)`; render `<ErrorState>` with a Retry button.
+- **F05** (`page.tsx:201`): Replace `notFound()` for private/hidden non-self profiles with a rendered "This profile is private" state + "Browse Verity Post →" CTA. Keep `notFound()` only for non-existent usernames. Add `robots: 'noindex,nofollow'` in `generateMetadata` for private profiles.
+- **F06** (`page.tsx:606`): Add `|| (me && me.id === target.id)` bypass for the `show_activity` gate so self-view always shows stats.
+- **F07** (`page.tsx:234`): Wrap follower/following refetch in try/catch; show retry link on failure.
+- **F08** (`FollowButton.tsx:41`): Render a disabled skeleton button (opacity 0.4, `pointer-events: none`) while `!permsReady` instead of returning null.
+- **F09** (`page.tsx:655`): Add `role="tablist"` wrapper; add `role="tab"` + `aria-selected` to each tab button.
+- **F10** (`page.tsx:634`): Make clipboard write async: `try { await navigator.clipboard.writeText(url); toast.success('Link copied'); } catch { toast.error('Copy failed — paste the URL manually.'); }`.
+- **F12** (`page.tsx:476`): Fetch `frozen_at` in the me-row SELECT; if `me.frozen_at IS NOT NULL`, hide Follow/DM/Report buttons (keep Block visible).
+- **F13** (`page.tsx:511`): Gate Block button on `hasPermission('settings.privacy.blocked_users.manage')`; gate Report on `hasPermission('article.report') || hasPermission('profile.report')`.
+- **F14** (`page.tsx:139`): Init `reportReason` to `PROFILE_REPORT_REASONS[0].value` (`'csam'`).
+- **F17** (`page.tsx` self-view section): In the self-view section (`me.id === target.id`), check `hasPermission('admin.owner_mode')`; if true, render small inline `"Owner Mode"` label near username.
+- **F18** (`page.tsx:189`): Normalize: `.eq('username', username.toLowerCase())`.
+- **F20** (`profile/[id]/page.tsx:14`): When `username` is null, redirect to `/profile` or show "Profile not available" page — don't call `notFound()`.
+- **F22** (`api/users/[id]/block/route.js:` after block insert): `DELETE FROM follows WHERE (follower_id=blocked AND followee_id=blocker) OR (follower_id=blocker AND followee_id=blocked)` to clean up both follow directions.
+- **F23** (`page.tsx:626`): Add `|| (me && me.id === target.id)` to the score-visibility condition.
+- **F24** (`page.tsx:606`): Gate stat block on `hasPermission('profile.view.follower_count') || hasPermission('profile.view.reading_stats') || (me && me.id === target.id)` in addition to `show_activity`.
+- **F27** (`page.tsx:494`): When `canSendDm` is false, render a disabled "Message" button with tooltip: "Messaging is a Verity Plus feature." + link to `/pricing`.
+- **F28** (`page.tsx:695`): Branch `UserList` empty state by list type: followers → "No followers yet." / following → "Not following anyone yet."
+- **F29** (`page.tsx:469`): Add `|| (me && me.id === target.id && targetRow.is_expert)` to the expert-badge condition.
+- **F30** (`page.tsx:300`): Fix anon CTA copy → "Profiles show Verity Scores, achievements, and more."
+- **F31** (`page.tsx:466` + 3 occurrences): Null-guard username renders: `@{target.username ?? '[no username]'}`.
+- **F32** (`page.tsx:638`): Don't render share link block when `!target.username`.
+- **Dark mode F37–F43** (`page.tsx:260`, `533`, `699`, `610`, `664`, `470`, `599`; `FollowButton.tsx:76`): Replace all hardcoded hex values with CSS vars (`var(--dim)`, `var(--card)`, `var(--border)`, `var(--text)`, `var(--accent)`, `var(--p-verified)`). See unit doc F37–F43 for exact line-by-line replacements.
+
+### Stream C — Card / OG image / Profile-card pages / Score tiers
+
+**Files:** `web/src/app/card/[username]/page.js`, `web/src/app/card/[username]/layout.js`, `web/src/app/card/[username]/opengraph-image.js`, `web/src/app/profile/card/page.js`, `web/src/lib/scoreTiers.ts`
+
+- **F11** (`card/page.js:91`): Only set `setCopied(true)` on clipboard success; set `copyFailed` state on catch with copy "Couldn't copy — try selecting the URL manually."
+- **F19** (`card/page.js:53`, `layout.js:14`, `opengraph-image.js:28`): Add `.toLowerCase()` to all three username lookups.
+- **F25** (`profile/card/page.js:36`): Add "Try again" button (`onClick={() => router.refresh()}`); update copy: "Your profile is still setting up — refresh in a moment."
+- **F26** (`scoreTiers.ts:42`): Treat empty array as cache miss (don't cache empty results). Add `null` fallback tier name when `tierFor()` returns null.
+- **F33** (`opengraph-image.js:26`): Fetch `avatar_url` from `public_profiles_v`; render real avatar `<img>` when present instead of letter tile.
+- **F34** (`profile/card/page.js:72`): Change "Shareable profile cards are available on paid plans." → "Shareable profile cards are a Verity Plus feature."
+- **F35** (`card/page.js:97`): Add `<h1>` + "Browse Verity Post →" recovery link to `not_found` and `private` states.
+- **F44** (`card/page.js:200`): Change Verity Score + Streak stat tile `background: '#fff'` → `background: 'var(--card)'`.
+- **F45** (`profile/card/page.js:67, 102`): Normalize `var(--text-primary)` → `var(--text)`.
+
+### File ownership
+
+| Stream | Files |
+|--------|-------|
+| A | `web/src/app/api/reports/route.js`, `web/src/lib/reportReasons.js` |
+| B | `web/src/app/u/[username]/page.tsx`, `web/src/components/FollowButton.tsx`, `web/src/app/api/users/[id]/block/route.js`, `web/src/app/profile/[id]/page.tsx` |
+| C | `web/src/app/card/[username]/page.js`, `web/src/app/card/[username]/layout.js`, `web/src/app/card/[username]/opengraph-image.js`, `web/src/app/profile/card/page.js`, `web/src/lib/scoreTiers.ts` |
+
+### Test plan
+
+1. **CSAM escalation:** simulate a report with `is_escalated=true` and `SENTRY_DSN` unset — confirm `admin_alerts` row inserted + email sent.
+2. **targetType injection:** POST to `/api/reports` with `targetType: 'admin_audit_log'` — confirm 400 response.
+3. **Reverse block:** User A blocks User B; User A visits User B's profile — sees restricted state, no Follow/DM buttons. User B visits User A — ALSO sees restricted state.
+4. **Frozen viewer:** Log in as frozen account → Follow/DM/Report hidden; Block still visible.
+5. **Private profile:** Visit `/u/<private-user>` as non-self authenticated → "This profile is private" page (not 404).
+6. **Self-view stats:** Set `show_activity=false` on own profile; visit own `/u/` page → stats still visible (self bypass).
+7. **Owner Mode label:** Log in as owner → "Owner Mode" label visible on own public profile.
+8. **Username case:** Visit `/u/Alice` where DB stores `alice` → correct profile loads.
+9. **Card avatar:** User with uploaded avatar photo — OG image shows real photo, not letter tile.
+10. **Dark mode:** Report panel, UserList rows, tab toggle, expert badge, bio text — all readable in dark mode.
+11. **Clipboard:** Copy link button → success toast only when clipboard writes successfully; error toast otherwise.
+12. **DM button disabled state:** Free-tier viewer with `canSendDm=false` → disabled "Message" button with tooltip.
+13. **`tsc` clean:** `bun --cwd web tsc` exits 0.
+14. **Build:** `bun --cwd web build` exits 0.

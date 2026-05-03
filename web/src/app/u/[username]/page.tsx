@@ -64,7 +64,7 @@ type TargetRow = Pick<
   | 'created_at'
 >;
 
-type MeRow = Pick<Tables<'users'>, 'id'>;
+type MeRow = Pick<Tables<'users'>, 'id' | 'frozen_at'>;
 
 interface UserListItem {
   id: string;
@@ -127,6 +127,7 @@ export default function ProfilePage() {
   // to take (avoids a flash of loading into the wrong UI).
   const [isAnon, setIsAnon] = useState<boolean>(false);
   const [checkedAuth, setCheckedAuth] = useState<boolean>(false);
+  const [privateProfile, setPrivateProfile] = useState<boolean>(false);
 
   // Block / Report state — both surfaces sit next to Follow + DM. Block
   // gates behind a confirm dialog (irreversible-feeling action even though
@@ -136,12 +137,17 @@ export default function ProfilePage() {
   const [blockBusy, setBlockBusy] = useState<boolean>(false);
   const [confirmBlockOpen, setConfirmBlockOpen] = useState<boolean>(false);
   const [reportOpen, setReportOpen] = useState<boolean>(false);
-  const [reportReason, setReportReason] = useState<string>('spam');
+  const [reportReason, setReportReason] = useState<string>(PROFILE_REPORT_REASONS[0]?.value ?? '');
   const [reportBusy, setReportBusy] = useState<boolean>(false);
+  const [loadError, setLoadError] = useState<boolean>(false);
+  const [followListError, setFollowListError] = useState<boolean>(false);
+  const [followListRetry, setFollowListRetry] = useState<number>(0);
+  const [copyFailed, setCopyFailed] = useState<boolean>(false);
 
   useEffect(() => {
     if (!username) return;
     (async () => {
+      try {
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -150,7 +156,7 @@ export default function ProfilePage() {
       if (user) {
         const { data: meRow } = await supabase
           .from('users')
-          .select('id')
+          .select('id, frozen_at')
           .eq('id', user.id)
           .maybeSingle<MeRow>();
         setMe(meRow || null);
@@ -186,7 +192,7 @@ export default function ProfilePage() {
         .select(
           'id, username, display_name, bio, avatar_url, avatar_color, banner_url, verity_score, followers_count, following_count, quizzes_completed_count, comment_count, profile_visibility, show_activity, is_expert, expert_title, expert_organization, is_verified_public_figure, created_at'
         )
-        .eq('username', username)
+        .eq('username', username.toLowerCase())
         .maybeSingle<TargetRow>();
       if (!targetRow) {
         setNotFoundFlag(true);
@@ -202,7 +208,11 @@ export default function ProfilePage() {
         (targetRow.profile_visibility === 'private' || targetRow.profile_visibility === 'hidden') &&
         user.id !== targetRow.id
       ) {
-        setNotFoundFlag(true);
+        setTarget(null);
+        setIsAnon(false);
+        setCheckedAuth(true);
+        // Signal private profile (not 404) via a dedicated flag
+        setPrivateProfile(true);
         setLoading(false);
         return;
       }
@@ -219,45 +229,68 @@ export default function ProfilePage() {
           supabase
             .from('blocked_users')
             .select('id')
-            .eq('blocker_id', user.id)
-            .eq('blocked_id', targetRow.id)
-            .maybeSingle(),
+            .or(`and(blocker_id.eq.${user.id},blocked_id.eq.${targetRow.id}),and(blocker_id.eq.${targetRow.id},blocked_id.eq.${user.id})`)
+            .limit(1),
         ]);
         setFollowing(!!f);
-        setBlocked(!!b);
+        const isBlocked = (b?.length ?? 0) > 0;
+        setBlocked(isBlocked);
       }
 
       setLoading(false);
+      } catch (err) {
+        console.error('Profile load error:', err);
+        setLoadError(true);
+        setLoading(false);
+      }
     })();
   }, [username, supabase]);
 
   useEffect(() => {
     (async () => {
       if (!target) return;
-      if (tab === 'followers') {
-        const { data, error } = await supabase
-          .from('follows')
-          .select('users!fk_follows_follower_id(id, username, avatar_color, avatar_url)')
-          .eq('following_id', target.id)
-          .limit(100);
-        if (error) console.error('[u/profile] followers load failed', error);
-        const rows = (data as unknown as FollowerRowShape[] | null) || [];
-        setFollowers(rows.map((r) => r.users).filter((u): u is UserListItem => !!u));
-      } else if (tab === 'following') {
-        const { data, error } = await supabase
-          .from('follows')
-          .select('users!fk_follows_following_id(id, username, avatar_color, avatar_url)')
-          .eq('follower_id', target.id)
-          .limit(100);
-        if (error) console.error('[u/profile] following load failed', error);
-        const rows = (data as unknown as FollowingRowShape[] | null) || [];
-        setFollowingList(rows.map((r) => r.users).filter((u): u is UserListItem => !!u));
+      setFollowListError(false);
+      try {
+        if (tab === 'followers') {
+          const { data, error } = await supabase
+            .from('follows')
+            .select('users!fk_follows_follower_id(id, username, avatar_color, avatar_url)')
+            .eq('following_id', target.id)
+            .limit(100);
+          if (error) throw error;
+          const rows = (data as unknown as FollowerRowShape[] | null) || [];
+          setFollowers(rows.map((r) => r.users).filter((u): u is UserListItem => !!u));
+        } else if (tab === 'following') {
+          const { data, error } = await supabase
+            .from('follows')
+            .select('users!fk_follows_following_id(id, username, avatar_color, avatar_url)')
+            .eq('follower_id', target.id)
+            .limit(100);
+          if (error) throw error;
+          const rows = (data as unknown as FollowingRowShape[] | null) || [];
+          setFollowingList(rows.map((r) => r.users).filter((u): u is UserListItem => !!u));
+        }
+      } catch (err) {
+        console.error('Followers/following load error:', err);
+        setFollowListError(true);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, target?.id]);
+  }, [tab, target?.id, followListRetry]);
 
   if (loading) return <div style={{ padding: 40, color: '#666' }}>Loading…</div>;
+  if (loadError)
+    return (
+      <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--dim)' }}>
+        <p style={{ marginBottom: 16 }}>Something went wrong loading this profile.</p>
+        <button
+          onClick={() => { if (typeof window !== 'undefined') window.location.reload(); }}
+          style={{ padding: '8px 18px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)', cursor: 'pointer', fontSize: 13 }}
+        >
+          Retry
+        </button>
+      </div>
+    );
   if (checkedAuth && isAnon) {
     // Q1 / R13 — in-page sign-up CTA for anon visitors. No redirect to
     // /login: profiles are a primary nav destination and bouncing users
@@ -298,8 +331,7 @@ export default function ProfilePage() {
           Sign up to see @{username}&apos;s profile
         </h1>
         <p style={{ fontSize: 14, color: C.dim, margin: '0 0 22px', lineHeight: 1.55 }}>
-          Profiles show reading history, Verity Score, comments, and more. Join free to view this
-          profile and build your own.
+          Profiles show Verity Scores, achievements, and more.
         </p>
         <a
           href={`/signup?next=${nextEnc}`}
@@ -328,6 +360,20 @@ export default function ProfilePage() {
       </div>
     );
   }
+  if (privateProfile)
+    return (
+      <main style={{ padding: '60px 20px', textAlign: 'center' }}>
+        <h1 style={{ fontSize: 20, marginBottom: 12, color: 'var(--text)' }}>
+          This profile is private
+        </h1>
+        <p style={{ color: 'var(--dim)', marginBottom: 24 }}>
+          This user has set their profile to private.
+        </p>
+        <a href="/browse" style={{ color: 'var(--accent)', textDecoration: 'none' }}>
+          Browse Verity Post →
+        </a>
+      </main>
+    );
   if (notFoundFlag) return notFound();
   if (!target) return notFound();
 
@@ -389,7 +435,7 @@ export default function ProfilePage() {
       });
       if (!res.ok) throw new Error(`status ${res.status}`);
       setReportOpen(false);
-      setReportReason('spam');
+      setReportReason(PROFILE_REPORT_REASONS[0]?.value ?? '');
       toast.success('Report filed. Thanks — moderators will review.');
     } catch (err) {
       console.error('[u/profile] report failed', err);
@@ -461,12 +507,26 @@ export default function ProfilePage() {
                   {tierInfo.display_name}
                 </span>
               )}
+              {me && me.id === target.id && hasPermission('admin.owner_mode') && (
+                <span style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: 'var(--accent)',
+                  background: 'var(--accent-subtle)',
+                  borderRadius: 4,
+                  padding: '2px 6px',
+                  marginLeft: 8,
+                  letterSpacing: '0.03em',
+                }}>
+                  Owner Mode
+                </span>
+              )}
             </div>
             <div style={{ fontSize: 13, color: C.dim }}>
               @{target.username}
               {target.created_at ? ` · Member since ${formatMemberSince(target.created_at)}` : ''}
             </div>
-            {target.is_expert && canSeeExpert && (
+            {target.is_expert && (canSeeExpert || (me && me.id === target.id)) && (
               <div style={{ fontSize: 12, color: '#16a34a', fontWeight: 700, marginTop: 2 }}>
                 {target.expert_title ? `${target.expert_title}` : 'Expert'}
                 {target.expert_organization ? ` · ${target.expert_organization}` : ''}
@@ -475,7 +535,7 @@ export default function ProfilePage() {
           </div>
           {showFollowControls && (
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              {canFollow && me && (
+              {canFollow && me && !me.frozen_at && (
                 <FollowButton
                   targetUserId={target.id}
                   initialFollowing={following}
@@ -491,33 +551,41 @@ export default function ProfilePage() {
                 />
               )}
               {/* Pass 17 / UJ-609: Send message gated on DM compose permission. */}
-              {canSendDm && (
+              {canSendDm && !me?.frozen_at ? (
                 <a href={`/messages?to=${target.id}`} style={dmLinkStyle}>
                   Send message
                 </a>
+              ) : !canSendDm && me && !blocked ? (
+                <button
+                  disabled
+                  title="Messaging is a Verity Plus feature."
+                  style={{ ...dmLinkStyle, opacity: 0.5, cursor: 'default' } as CSSProperties}
+                >
+                  Message
+                </button>
+              ) : null}
+              {/* Block / Unblock — gated on settings.privacy.blocked_users.manage. */}
+              {hasPermission('settings.privacy.blocked_users.manage') && (
+                <button
+                  type="button"
+                  onClick={() => (blocked ? handleUnblock() : setConfirmBlockOpen(true))}
+                  disabled={blockBusy}
+                  style={secondaryActionStyle(blockBusy)}
+                >
+                  {blockBusy ? 'Working…' : blocked ? 'Unblock' : 'Block'}
+                </button>
               )}
-              {/* Block / Unblock — uses /api/users/[id]/block (POST/DELETE).
-                  No permission gate at the UI; the API enforces
-                  settings.privacy.blocked_users.manage and email verification. */}
-              <button
-                type="button"
-                onClick={() => (blocked ? handleUnblock() : setConfirmBlockOpen(true))}
-                disabled={blockBusy}
-                style={secondaryActionStyle(blockBusy)}
-              >
-                {blockBusy ? 'Working…' : blocked ? 'Unblock' : 'Block'}
-              </button>
-              {/* Report — opens an inline reason picker. The /api/reports
-                  route requires `article.report` permission; if the viewer
-                  lacks it the request 403s and the toast surfaces a generic
-                  error (real reason logged server-side). */}
-              <button
-                type="button"
-                onClick={() => setReportOpen((v) => !v)}
-                style={secondaryActionStyle(false)}
-              >
-                Report
-              </button>
+              {/* Report — gated on article.report or profile.report; frozen
+                  viewers cannot report. */}
+              {!me?.frozen_at && (hasPermission('article.report') || hasPermission('profile.report')) && (
+                <button
+                  type="button"
+                  onClick={() => setReportOpen((v) => !v)}
+                  style={secondaryActionStyle(false)}
+                >
+                  Report
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -603,7 +671,14 @@ export default function ProfilePage() {
          *  own profile, and iOS public profile. Hidden when the target
          *  has flipped `show_activity` off. Verity Score sits below as a
          *  separate optional readout gated on `profile.score.view.other.total`. */}
-        {target.show_activity !== false && (
+        {(() => {
+          const showActivity = target.show_activity !== false || (me && me.id === target.id);
+          const canSeeStat =
+            hasPermission('profile.view.reading_stats') ||
+            hasPermission('profile.view.follower_count') ||
+            (me && me.id === target.id);
+          return canSeeStat && showActivity;
+        })() && (
           <div style={{ display: 'flex', gap: 18, marginTop: 14, fontSize: 13, flexWrap: 'wrap' }}>
             <div>
               <b>{(target.quizzes_completed_count ?? 0).toLocaleString()}</b>{' '}
@@ -623,7 +698,7 @@ export default function ProfilePage() {
             </div>
           </div>
         )}
-        {canSeeVerityScore && (
+        {(canSeeVerityScore || (me && me.id === target.id)) && (
           <div style={{ marginTop: 8, fontSize: 13 }}>
             <b>{(target.verity_score ?? 0).toLocaleString()}</b>{' '}
             <span style={{ color: '#666' }}>Verity Score</span>
@@ -636,26 +711,43 @@ export default function ProfilePage() {
           <div style={{ marginTop: 12, fontSize: 12 }}>
             <a
               href={`/card/${target.username || ''}`}
-              onClick={(e) => {
+              onClick={async (e) => {
                 e.preventDefault();
                 if (typeof window !== 'undefined' && target.username) {
-                  navigator.clipboard?.writeText(
-                    `${window.location.origin}/card/${target.username}`
-                  );
+                  try {
+                    await navigator.clipboard.writeText(
+                      `${window.location.origin}/card/${target.username}`
+                    );
+                    setCopyFailed(false);
+                    toast.success('Profile card link copied.');
+                  } catch {
+                    setCopyFailed(true);
+                  }
                 }
-                toast.success('Profile card link copied.');
               }}
               style={{ color: '#111', fontWeight: 700 }}
             >
               Copy shareable profile card link
             </a>
+            {copyFailed && (
+              <span style={{ display: 'block', marginTop: 4, color: 'var(--dim)' }}>
+                Copy failed — paste the URL manually:{' '}
+                <span style={{ userSelect: 'all', color: 'var(--text)' }}>
+                  {typeof window !== 'undefined' && target.username
+                    ? `${window.location.origin}/card/${target.username}`
+                    : ''}
+                </span>
+              </span>
+            )}
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: 6, margin: '20px 0 12px' }}>
+        <div role="tablist" aria-label="Profile sections" style={{ display: 'flex', gap: 6, margin: '20px 0 12px' }}>
           {(['followers', 'following'] as const).map((t) => (
             <button
               key={t}
+              role="tab"
+              aria-selected={tab === t}
               onClick={() => setTab(t)}
               style={{
                 padding: '6px 14px',
@@ -673,8 +765,22 @@ export default function ProfilePage() {
           ))}
         </div>
 
-        {tab === 'followers' && <UserList users={followers} />}
-        {tab === 'following' && <UserList users={followingList} />}
+        {followListError ? (
+          <p style={{ color: 'var(--dim)', fontSize: 13, padding: '16px 0' }}>
+            Couldn&apos;t load —{' '}
+            <button
+              onClick={() => { setFollowListError(false); setFollowListRetry((c) => c + 1); }}
+              style={{ color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, padding: 0, textDecoration: 'underline' }}
+            >
+              try again
+            </button>
+          </p>
+        ) : (
+          <>
+            {tab === 'followers' && <UserList users={followers} listType="followers" />}
+            {tab === 'following' && <UserList users={followingList} listType="following" />}
+          </>
+        )}
       </div>
 
       <ConfirmDialog
@@ -692,12 +798,12 @@ export default function ProfilePage() {
   );
 }
 
-function UserList({ users }: { users: UserListItem[] }) {
+function UserList({ users, listType }: { users: UserListItem[]; listType: FollowsTab }) {
   if (!users?.length) {
     return (
-      <div style={{ padding: 30, textAlign: 'center', color: '#666', fontSize: 13 }}>
-        Nobody here.
-      </div>
+      <p style={{ color: 'var(--dim)', fontSize: 14, padding: '20px 0' }}>
+        {listType === 'followers' ? 'No followers yet.' : 'Not following anyone yet.'}
+      </p>
     );
   }
   return (

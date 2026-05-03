@@ -5,7 +5,7 @@
 // apparent child sexual exploitation material to NCMEC's CyberTipline.
 // Urgent reports bypass per-target rate limits, set is_escalated=true,
 // stamp metadata.severity='urgent', and emit an observability signal so
-// a human is paged.
+// is_escalated=true reports are paged via Sentry (when configured) and admin_alerts row insert + email fallback.
 //
 // Keep the iOS enum at VerityPost/VerityPost/BlockService.swift in sync
 // when this list changes. Server-side enum validation lives in
@@ -52,7 +52,7 @@ export const PROFILE_REPORT_REASONS = Object.freeze([
   { value: 'spam', label: 'Spam' },
   { value: 'harassment', label: 'Harassment' },
   { value: 'impersonation', label: 'Impersonation' },
-  { value: 'hate', label: 'Hate speech' },
+  { value: 'hate_speech', label: 'Hate speech' },
   { value: 'other', label: 'Other' },
 ]);
 

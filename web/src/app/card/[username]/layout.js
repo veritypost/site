@@ -11,7 +11,7 @@ export async function generateMetadata({ params }) {
   const { data: target } = await supabase
     .from('public_profiles_v')
     .select('username, display_name, bio, verity_score, profile_visibility')
-    .eq('username', username)
+    .eq('username', username.toLowerCase())
     .maybeSingle();
 
   // Q1 — card is a public share surface. The viewer-side permission check

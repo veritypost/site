@@ -39,9 +39,12 @@ export async function getScoreTiers(supabase: SupabaseClient): Promise<ScoreTier
     .eq('is_active', true)
     .is('deleted_at', null)
     .order('sort_order', { ascending: true });
-  _cache = (data as ScoreTier[] | null) || [];
-  _cacheTime = Date.now();
-  return _cache;
+  const result = (data as ScoreTier[] | null) || [];
+  if (result.length > 0) {
+    _cache = result; // only cache non-empty results
+    _cacheTime = Date.now();
+  }
+  return result;
 }
 
 // Resolve a user's score to their current tier. Expects `tiers` in

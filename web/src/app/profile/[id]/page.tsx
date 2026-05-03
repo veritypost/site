@@ -11,7 +11,9 @@ export default async function ProfileByIdPage({ params }: { params: Promise<{ id
     .eq('id', id)
     .maybeSingle();
 
-  if (!data?.username) notFound();
+  if (!data?.username) {
+    redirect('/profile');
+  }
 
   redirect(`/u/${data.username}`);
 }

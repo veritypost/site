@@ -85,6 +85,13 @@ export async function POST(request, { params }) {
     }
     return NextResponse.json({ error: 'Could not block user' }, { status: 500 });
   }
+
+  // Clean up follows in both directions
+  await service
+    .from('follows')
+    .delete()
+    .or(`and(follower_id.eq.${user.id},following_id.eq.${params.id}),and(follower_id.eq.${params.id},following_id.eq.${user.id})`);
+
   return NextResponse.json({ blocked: true });
 }
 

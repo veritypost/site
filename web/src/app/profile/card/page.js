@@ -2,6 +2,7 @@
 // @feature-verified shared_components 2026-04-18
 'use client';
 import { useEffect, useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/client';
 import { hasPermission, refreshAllPermissions } from '@/lib/permissions';
 
@@ -13,6 +14,7 @@ import { hasPermission, refreshAllPermissions } from '@/lib/permissions';
 
 export default function MyCardPage() {
   const supabase = useMemo(() => createClient(), []);
+  const router = useRouter();
   const [state, setState] = useState('loading');
 
   useEffect(() => {
@@ -64,12 +66,12 @@ export default function MyCardPage() {
     return (
       <div style={{ maxWidth: 480, margin: '0 auto', padding: '48px 16px', textAlign: 'center' }}>
         <h1
-          style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 8px' }}
+          style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', margin: '0 0 8px' }}
         >
           Profile Card
         </h1>
         <p style={{ fontSize: 14, color: 'var(--dim)', margin: '0 0 20px' }}>
-          Shareable profile cards are available on paid plans.
+          Shareable profile cards are a Verity Plus feature.
         </p>
         <a
           href="/profile/settings?section=plan"
@@ -99,7 +101,7 @@ export default function MyCardPage() {
     return (
       <div style={{ maxWidth: 480, margin: '0 auto', padding: '48px 16px', textAlign: 'center' }}>
         <h1
-          style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 8px' }}
+          style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', margin: '0 0 8px' }}
         >
           Set a username first
         </h1>
@@ -121,6 +123,12 @@ export default function MyCardPage() {
         >
           Set username
         </a>
+        <button
+          onClick={() => router.refresh()}
+          style={{ marginTop: 12, padding: '8px 16px', background: 'var(--accent)', color: 'var(--bg)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}
+        >
+          Try again
+        </button>
       </div>
     );
   }

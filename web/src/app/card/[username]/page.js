@@ -34,6 +34,7 @@ export default function CardPage() {
   const [roles, setRoles] = useState([]);
   const [state, setState] = useState('loading');
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -50,7 +51,7 @@ export default function CardPage() {
         .select(
           'id, username, display_name, bio, avatar_url, avatar_color, verity_score, streak_current, is_expert, expert_title, expert_organization, profile_visibility'
         )
-        .eq('username', username)
+        .eq('username', username.toLowerCase())
         .maybeSingle();
 
       if (!targetRow) {
@@ -91,7 +92,9 @@ export default function CardPage() {
       await navigator.clipboard.writeText(window.location.href);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {}
+    } catch {
+      setCopyFailed(true);
+    }
   };
 
   if (state === 'loading') {
@@ -197,7 +200,7 @@ export default function CardPage() {
               style={{
                 flex: 1,
                 padding: '10px 12px',
-                background: '#fff',
+                background: 'var(--card)',
                 border: `1px solid ${C.border}`,
                 borderRadius: 10,
               }}
@@ -212,7 +215,7 @@ export default function CardPage() {
                 style={{
                   flex: 1,
                   padding: '10px 12px',
-                  background: '#fff',
+                  background: 'var(--card)',
                   border: `1px solid ${C.border}`,
                   borderRadius: 10,
                 }}
@@ -275,6 +278,11 @@ export default function CardPage() {
           >
             {copied ? 'Link copied' : 'Copy card link'}
           </button>
+          {copyFailed && (
+            <div style={{ marginTop: 8, fontSize: 12, color: C.dim, textAlign: 'center' }}>
+              Couldn&apos;t copy — try selecting the URL manually.
+            </div>
+          )}
 
           <div
             style={{

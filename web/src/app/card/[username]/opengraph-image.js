@@ -23,9 +23,9 @@ export default async function Image({ params }) {
   const { data: target } = await supabase
     .from('public_profiles_v')
     .select(
-      'id, username, display_name, bio, avatar_color, verity_score, streak_current, profile_visibility'
+      'id, username, display_name, bio, avatar_url, avatar_color, verity_score, streak_current, profile_visibility'
     )
-    .eq('username', username)
+    .eq('username', username.toLowerCase())
     .maybeSingle();
 
   // Q1 — OG is the social preview for a public share surface. No viewer
@@ -104,22 +104,31 @@ export default async function Image({ params }) {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 28, marginTop: 40 }}>
-        <div
-          style={{
-            width: 140,
-            height: 140,
-            borderRadius: 70,
-            background: target.avatar_color || '#999',
-            color: '#fff',
-            fontSize: 72,
-            fontWeight: 700,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          {initial(name)}
-        </div>
+        {target.avatar_url ? (
+          <img
+            src={target.avatar_url}
+            width={140}
+            height={140}
+            style={{ borderRadius: 70, objectFit: 'cover' }}
+          />
+        ) : (
+          <div
+            style={{
+              width: 140,
+              height: 140,
+              borderRadius: 70,
+              background: target.avatar_color || '#999',
+              color: '#fff',
+              fontSize: 72,
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {initial(name)}
+          </div>
+        )}
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <div style={{ fontSize: 54, fontWeight: 800, lineHeight: 1.05 }}>{name}</div>
           <div style={{ fontSize: 26, color: '#666', marginTop: 6 }}>@{target.username}</div>
