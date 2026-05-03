@@ -252,12 +252,11 @@ export default function SingleDoorForm({ notice, rawNext = null, prefillEmail = 
             }}
           >
             <p style={{ margin: '0 0 4px 0', fontSize: '13px', color: C.text, fontWeight: 600 }}>
-              Verity Post is invite-only right now.
+              Don't have an account?
             </p>
             <p style={{ margin: 0, fontSize: '13px', color: C.dim }}>
-              Have an invite? Use your link to get in.{' '}
-              <a href="/login?mode=waitlist" style={{ color: C.accent, fontWeight: 600 }}>
-                Join the waitlist →
+              <a href="/request-access" style={{ color: C.accent, fontWeight: 600 }}>
+                Request access →
               </a>
             </p>
           </div>
