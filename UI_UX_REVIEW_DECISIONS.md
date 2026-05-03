@@ -470,6 +470,46 @@ Key: revenue excluded from pitch export (leaks pricing floor). Bot impressions e
 **A:** 90%. 3-expert panel unanimous: 90% targets the seam between article body and discussion zone, catching readers at natural exit intent without interrupting reading. 95% fires too late (reader deep in discussion); 85% risks clipping the body on short articles. Post-comment-send is the primary high-intent trigger; scroll-90% is the fallback for non-commenters. Auto-locked: 3/3 convergence.
 **Apply:** UpNextSheet fires when `window.scrollY / (document.body.scrollHeight - window.innerHeight) >= 0.90`. Also fires immediately after a successful comment POST. Fires once per article-page-load — set a ref to prevent double-fire.
 
+## #053 — Browse SSR vs. client-only (auto-locked, 3/3 convergent)
+**Date:** 2026-05-02 **Scope:** web Browse (`/browse`)
+**Q:** Should `/browse` be refactored to a React Server Component (server fetch + client island for filters) for SEO indexability, or is client-only rendering acceptable at launch?
+**A:** Defer RSC refactor post-launch. (1) Google News authority is zero at launch regardless of SSR — domain authority and Publisher Center acceptance precede meaningful search placement; SSR has no measurable lift in the pre-authority window. (2) Splitting the 663-line `'use client'` page into RSC + island right before Apple/AdSense review introduces regression risk at the worst moment. (3) The skeleton loading UX is acceptable for the early-adopter cohort.
+**Apply:**
+- Ship client-only at launch as-is.
+- Schedule RSC refactor for first post-launch sprint, tied to Google News Publisher Center submission milestone.
+- Improve `loading.tsx` skeleton quality in Slice 11 (see findings #30-32) as the low-effort perceived-performance bridge.
+- Metadata (DECISION #053 finding #37): add a server-side `layout.tsx` that exports `metadata` for Browse — this does NOT require an RSC refactor of the page, just a wrapping layout file.
+
+## #054 — Browse filter state persistence (auto-locked, 3/3 convergent)
+**Date:** 2026-05-02 **Scope:** web Browse (`/browse`)
+**Q:** Should Browse filter state (category, lifecycle, date range, coverage, sort, query) be persisted to URL query params, sessionStorage, or remain in-memory only?
+**A:** URL query params via `router.replace` + `useSearchParams()`. (1) `router.replace` (not `push`) keeps history clean — Back exits the page, not back through filter states. (2) URL params solve Back-button restore AND shareable filtered views in one pass. (3) Engineering cost ≈ 1 day; sessionStorage gives ≈ half the benefit at ≈ 60% of the cost, but leaves a permanent sharing gap that requires a second implementation pass. (4) On a browse surface, filters are the core navigation gesture — reset on back-nav directly erodes the trust that drives return visits.
+**Apply:**
+- On every filter or sort change: `router.replace(\`/browse?${params}\`, { scroll: false })`.
+- On mount: read `useSearchParams()` to initialize all 6 filter dimensions. Absent params → `DEFAULT_FILTERS`.
+- Shareable link: user navigating to `/browse?cat=Politics&lc=breaking&sort=coverage` sees pre-filtered results.
+- Include: `cat`, `lc` (comma-joined lifecycle array), `from`, `to`, `cov`, `sort`, `q`. Omit `quiz` until quiz filter is implemented.
+
+## #055 — Category page filter/sort URL state persistence (auto-locked, extends #054)
+**Date:** 2026-05-02 **Scope:** web Category (`/category/[id]`)
+**Q:** Should sort mode and subcategory filter selection on `/category/[id]` be persisted to URL params?
+**A:** Yes — same reasoning as DECISION #054. URL params via `router.replace` + `useSearchParams()`. (1) Enables Back-button restore after article navigation. (2) Enables shareable filtered category views. (3) Filter is the key navigation gesture on this surface — reset on back-nav erodes return-visit behaviour.
+**Apply:**
+- On sort or subcategory change: `router.replace(\`/category/${id}?${buildParams(sort, activeSubcat)}\`, { scroll: false })`.
+- On mount: read `useSearchParams()` → init `sort` from `?sort=` (default `'Latest'`), `activeSubcat` from `?sub=<uuid>` (default `null`). If `?sub=` UUID doesn't match any loaded subcategory, treat as `null`.
+- `visibleCount` is NOT persisted to URL (it is always 5 on page load; "Load more" is session-only).
+- Auto-locked: direct extension of #054, 0 divergence.
+
+## #056 — Category page dynamic metadata (auto-locked, extends #053)
+**Date:** 2026-05-02 **Scope:** web Category (`/category/[id]`)
+**Q:** Should `/category/[id]` layout export a static `metadata` object or dynamic `generateMetadata` per category?
+**A:** Dynamic `generateMetadata` in the layout. The category name is fetchable from the DB at request time (same `categories` query, by `id` or `slug`). Returns `title: \`${category.name} · Verity Post\`` and a description derived from `category.description` (or a fallback). This matches DECISION #053's pattern: a server-side layout wraps a `'use client'` page — no RSC refactor of the page needed.
+**Apply:**
+- Convert `layout.js` to `layout.tsx` (server component, no `'use client'`).
+- Export `generateMetadata({ params })` that fetches the category row and returns `{ title, description, openGraph }`.
+- Fallback when fetch fails or category not found: `title: 'Category · Verity Post'`.
+- `robots`: index/follow (category pages are canonical, linkable surfaces — opposite of search results).
+
 ---
 
 *New decisions append below. Never delete — supersede with a follow-up entry referencing the prior number.*

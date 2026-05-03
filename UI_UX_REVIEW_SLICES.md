@@ -524,6 +524,7 @@ Seed `ad_placements` rows + add `<Ad placement="..."/>` calls:
 | Slice 10 — Wave A verification sweep | Verification | not started | all Wave A unit-fix slices | — | 1 |
 | Slice 11 — Unit 3 / Browse (38 findings) | Unit fix | shipped 2026-05-02 (2-stream parallel; tsc + build clean; smoke PASS; all 38 findings fixed) | 1 + 2 | #029, #053, #054 | 1 |
 | Slice 12 — Unit 4 / Search (32 findings) | Unit fix | shipped 2026-05-02 (2-stream parallel; Suspense boundary fix post-smoke; tsc + smoke PASS; 29 findings fixed; F20 refuted; F28/F32 deferred) | none | #022, #029, #031, #032, #043, #053, #054 | 1 |
+| Slice 13 — Unit 5 / Category (37 findings) | Unit fix | ready | 1 + 2 | #022, #029, #043, #053, #055, #056 | — |
 
 ---
 
@@ -879,12 +880,352 @@ Also add client-side constraint: set `min={from}` on the `to` date input so the 
 
 ---
 
+---
+
+## Slice 13 — Unit 5 / Category (`/category/[id]`) — 37 findings
+
+**Status:** ready to build
+**Prerequisite:** Slices 1 + 2 done (both shipped 2026-05-02).
+**Elevated-care:** NO. No RBAC rename, no payments, no kid-safety, no schema migration. Standard adversary pass recommended.
+**Unit doc:** `UI_UX_REVIEW/A-5-category.md`
+**Decisions consumed:** #022, #029, #043, #053, #055, #056.
+
+### Why two streams
+
+Split on the layout file boundary — zero file overlap:
+- **Stream A** owns: `web/src/app/category/[id]/layout.tsx` (rename from layout.js; new `generateMetadata`) + data-layer fixes in `page.js`
+- **Stream B** owns: `web/src/app/category/[id]/page.js` — all interaction, accessibility, and UX fixes
+
+Both streams can run in parallel. Verification pass runs after both complete.
+
+---
+
+### Stream A — Layout + data layer (`layout.tsx` + data fixes in `page.js`)
+
+**Files:** `web/src/app/category/[id]/layout.tsx` (rename + rewrite of layout.js), `web/src/app/category/[id]/page.js` (data-layer lines only)
+
+**F12 / DECISION #056 — Dynamic metadata (`layout.js` → `layout.tsx`):**
+Convert to a server component with `generateMetadata`:
+```tsx
+import type { Metadata } from 'next';
+import { createClient } from '../../../lib/supabase/server';
+
+export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+  const supabase = createClient();
+  let { data } = await supabase.from('categories').select('name, description').eq('id', params.id).single();
+  if (!data) {
+    const { data: bySlug } = await supabase.from('categories').select('name, description').eq('slug', params.id).single();
+    data = bySlug;
+  }
+  const name = data?.name ?? 'Category';
+  const description = data?.description ?? `Browse ${name} news on Verity Post.`;
+  return {
+    title: `${name} · Verity Post`,
+    description,
+    openGraph: { title: `${name} · Verity Post` },
+    // robots: index/follow — category pages are canonical linkable surfaces
+  };
+}
+
+export default function CategoryLayout({ children }: { children: React.ReactNode }) {
+  return <>{children}</>;
+}
+```
+Delete `layout.js` after creating `layout.tsx`.
+
+**F3 — Stale state on id change (`page.js:31`):**
+At the very start of `fetchData`, before any awaits, reset both category and stories:
+```js
+setCategory(null);
+setStories([]);
+setActiveSubcat(null);
+setSubcategories([]);
+```
+
+**F6 — No try/catch in `fetchData` (`page.js:30`):**
+Wrap the entire `fetchData` body in `try { ... } catch (err) { setError('Could not load category. Please try again.'); } finally { setLoading(false); }`. Add `const [error, setError] = useState(null)` state, and render the error state before the not-found check.
+
+**F7 — `supabase.auth.getUser()` crash (`page.js:79`):**
+```js
+const { data: authData, error: authErr } = await supabase.auth.getUser();
+const authUser = authErr ? null : authData?.user ?? null;
+```
+
+**F8 — Soft-deleted articles (`page.js:71`):**
+Add `.is('deleted_at', null)` to the articles query:
+```js
+const { data: storiesData } = await supabase
+  .from('articles')
+  .select('*, stories(slug)')
+  .eq('category_id', categoryData.id)
+  .eq('status', 'published')
+  .eq('visibility', 'public')
+  .is('deleted_at', null)
+  .limit(100);
+```
+
+**F9 — Inactive categories (`page.js:36`):**
+Add `.eq('is_active', true)` to both category lookup branches (UUID and slug fallback).
+
+**F10 — Unbounded fetch (`page.js:71`):**
+Already handled by `.limit(100)` in F8 recipe above. For the bookmark `.in()` call, cap the IDs: `const ids = articles.map(a => a.id).slice(0, 100)` (already at most 100 from the limit).
+
+**F2 — `href="#"` null-slug cards (`page.js:71`):**
+Add `.not('stories.slug', 'is', null)` to the articles select OR filter client-side after the fetch:
+```js
+const articles = (storiesData ?? []).filter(a => a.stories?.slug);
+```
+Both guards: server-side filter in the query (preferred) AND client-side filter as belt-and-suspenders.
+
+**F5 — Fetch errors swallowed (`page.js:63-88`):**
+Check each query's `error` return:
+- Subcategories: `const { data: subcatData, error: subcatErr } = ...` — if `subcatErr`, log to console but proceed (non-blocking; filter strip just won't show).
+- Articles: `const { data: storiesData, error: storiesErr } = ...` — if `storiesErr`, `setError('Could not load articles.')` and return early.
+- Bookmarks: `const { data: bms, error: bmsErr } = ...` — if `bmsErr`, proceed without bookmark state (non-blocking; save button still works; user sees un-bookmarked state).
+
+**F22 / DECISION #029 — Hybrid timestamps (`page.js:494`):**
+```js
+import { timeAgo, formatDate } from '../../../lib/dates';
+
+function hybridDate(ts) {
+  if (!ts) return '';
+  const diff = Date.now() - new Date(ts).getTime();
+  return diff < 24 * 60 * 60 * 1000 ? timeAgo(ts) : formatDate(ts);
+}
+```
+Replace `{formatDate(story.published_at)}` with `{hybridDate(story.published_at)}`.
+
+**F32 — `formatDate(null)` empty span (`page.js:494`):**
+Handled by `hybridDate` above which returns `''` for null — wrap the span: `{story.published_at && <span style={...}>{hybridDate(story.published_at)}</span>}`.
+
+---
+
+### Stream B — `page.js` interaction + accessibility + UX fixes
+
+**Files:** `web/src/app/category/[id]/page.js` only.
+
+**F1 — Button nested in `<a>` (`page.js:522`):**
+The `<a>` card wrapper and the bookmark `<button>` cannot nest. Fix: make the card container `position: relative`. The `<a>` covers the full card (styled absolutely or as the block container). The bookmark button sits outside the `<a>` with `position: absolute; right: 12px; bottom: 12px; z-index: 1`. Pattern:
+```tsx
+<div style={{ position: 'relative', background: '#f7f7f7', ... }}>
+  <a href={...} style={{ display: 'block', ... }}>
+    {/* all card content except bookmark button */}
+  </a>
+  <button
+    onClick={(e) => { e.stopPropagation(); toggleBookmark(story.id); }}
+    aria-label={...}
+    style={{ position: 'absolute', right: 12, bottom: 12 }}
+  >
+    {story.bookmarked ? 'Saved' : 'Save'}
+  </button>
+</div>
+```
+
+**F4 — Anon bookmark → registration wall (`page.js:110`):**
+Check auth state before the API call. The `authUser` is already available in component state via the fetch flow — add `const [currentUser, setCurrentUser] = useState(null)` and set it in `fetchData` alongside the bookmark fetch. In `toggleBookmark`:
+```js
+if (!currentUser) {
+  // fire registration wall (per Slice 6 / DECISION #043)
+  setShowRegistrationWall(true);
+  return;
+}
+```
+If the registration wall component (`RegistrationWall`) from Slice 6 is available, import and use it; otherwise, navigate to `/login?return=/category/${id}`.
+
+**F13 — Sort buttons `aria-pressed` (`page.js:364`):**
+Add `aria-pressed={sort === s}` to each sort button.
+
+**F14 — Subcategory buttons `aria-pressed` (`page.js:387`):**
+Add `aria-pressed={activeSubcat === null}` to "All" button. Add `aria-pressed={activeSubcat === sc.id}` to each subcategory button.
+
+**F15 — No `<main>` landmark (`page.js:261`):**
+Wrap the main content area (below the header) in `<main>`. The category header can stay outside or inside — put both inside:
+```tsx
+<main>
+  {/* Category Header */}
+  {/* Sort + Subcategory + Articles + Load more */}
+</main>
+```
+
+**F16 — Toast no `aria-live` (`page.js:271`):**
+Add `role="status" aria-live="polite" aria-atomic="true"` to the toast `<div>`.
+
+**F17 — Loading skeleton no `role="status"` (`page.js:156`):**
+Add a visually-hidden status element:
+```tsx
+<div role="status" aria-live="polite" className="sr-only">Loading category...</div>
+```
+above the skeleton divs. Requires `sr-only` CSS class (add to globals.css if not present: `.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }`).
+
+**F18 — "Load more" count not announced (`page.js:563`):**
+Add an `aria-live="polite"` counter that updates with `visibleCount`:
+```tsx
+<div aria-live="polite" aria-atomic="true" className="sr-only">
+  Showing {Math.min(visibleCount, sorted.length)} of {sorted.length} articles
+</div>
+```
+Place above the article list so it's in the DOM tree consistently.
+
+**F19 — Subcategory filtered-empty not announced (`page.js:550`):**
+Add `role="status" aria-live="polite"` to the "No articles in this subcategory yet." container.
+
+**F20 — Touch targets < 44px (multiple):**
+- Sort buttons: add `style={{ ..., minHeight: 44 }}` (keep existing padding, add minHeight).
+- Subcategory buttons: same `minHeight: 44`.
+- Bookmark button: change `padding: '2px 8px'` to `padding: '8px 12px'`.
+- "Back to browse" link: add `padding: '8px 0'`.
+- "Load more" button: change `padding: '13px'` to `padding: '14px'` (≥44px with standard line height).
+
+**F21 — Category badge contrast (`page.js:482`):**
+Change `color: '#0369a1'` to `color: '#025a8e'` (darkened to achieve ≥4.5:1 on `#e0f2fe` background).
+
+**F23 — `visibleCount` not reset on sort change (`page.js:364`):**
+```js
+<button key={s} onClick={() => { setSort(s); setVisibleCount(5); }} ...>
+```
+
+**F24 — Sort/subcat groups no `role="group"` (`page.js:363`):**
+```tsx
+<div role="group" aria-label="Sort by" style={{ display: 'flex', gap: 8, ... }}>
+  {SORT_OPTIONS.map(...)}
+</div>
+{subcategories.length > 0 && (
+  <div role="group" aria-label="Filter by topic" style={{ display: 'flex', gap: 8, ... }}>
+    <button>All</button>
+    {subcategories.map(...)}
+  </div>
+)}
+```
+
+**F25 — Category letter-avatar not `aria-hidden` (`page.js:318`):**
+Add `aria-hidden="true"` to the icon `<div>`.
+
+**F26 — Empty state condition wrong (`page.js:427`):**
+Change condition from `{stories.length === 0 && (...)}` to:
+```tsx
+{stories.length === 0 && !loading && (
+  <div style={{ ... }}>
+    <div>No articles in this category yet.</div>
+    <div>Check back soon, or <Link href="/">browse the home feed</Link>.</div>
+  </div>
+)}
+```
+The subcategory filtered-empty remains as a separate check (since `stories` is non-empty, the subcategory-filtered state needs its own path). Add a styled card treatment to the subcategory-empty state at line 550 matching the category-empty card (background, border, radius).
+
+**F27 — `category.description` null empty `<p>` (`page.js:348`):**
+```tsx
+{category.description && (
+  <p style={{ margin: '0 0 12px', fontSize: 13, color: '#666666', lineHeight: 1.5 }}>
+    {category.description}
+  </p>
+)}
+```
+
+**F28 — Toast timer race (`page.js:120, 139`):**
+```js
+const toastTimerRef = useRef(null);
+const showToast = (msg) => {
+  clearTimeout(toastTimerRef.current);
+  setToast(msg);
+  toastTimerRef.current = setTimeout(() => setToast(''), 2400);
+};
+```
+Replace direct `setToast(...)` + `setTimeout` calls with `showToast(...)`.
+
+**F29 — Excerpt `'...'` always appended (`page.js:519`):**
+```tsx
+{story.excerpt
+  ? story.excerpt.length > 60
+    ? story.excerpt.slice(0, 60) + '…'
+    : story.excerpt
+  : ''}
+```
+
+**F30 — Category name badge no overflow (`page.js:481`):**
+Add `maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'` to the badge span.
+
+**F31 — No bookmark in-flight state (`page.js:110`):**
+Add `const [bookmarkingId, setBookmarkingId] = useState(null)`. At start of `toggleBookmark`: `setBookmarkingId(storyId)`. In finally: `setBookmarkingId(null)`. In the button render: `disabled={bookmarkingId === story.id}`, label: `bookmarkingId === story.id ? '…' : story.bookmarked ? 'Saved' : 'Save'`.
+
+**F33 — In-feed ad placement off-by-one (`page.js:454`):**
+Move the `<Ad>` element to after the `<a>` card within the Fragment:
+```tsx
+<React.Fragment key={story.id}>
+  <a href={...}>{/* card */}</a>
+  {idx === 3 && <Ad placement="category_in_feed_1" page="category" position="in_feed_1" />}
+</React.Fragment>
+```
+`idx === 3` = after the 4th card (0-indexed), placing the ad between card 4 and card 5.
+
+**F34 — Kids-category copy (`page.js:56`):**
+```js
+if (typeof categoryData.slug === 'string' && categoryData.slug.startsWith('kids-')) {
+  setKidsCategoryBlocked(true);  // new state flag
+  setLoading(false);
+  return;
+}
+```
+Add `const [kidsCategoryBlocked, setKidsCategoryBlocked] = useState(false)`. In the render, before `if (!category)`:
+```tsx
+if (kidsCategoryBlocked) {
+  return (
+    <div style={{ /* same container as not-found */ }}>
+      <h1>This is a kids category</h1>
+      <p>Browse it in the Verity Post Kids app.</p>
+      <a href="/browse">Browse all categories</a>
+    </div>
+  );
+}
+```
+
+**F35 / DECISION #055 — URL state for sort + subcat (`page.js:364`):**
+Add `useSearchParams` and `useRouter` imports. On mount, initialize `sort` from `searchParams.get('sort') ?? 'Latest'` and `activeSubcat` from `searchParams.get('sub') ?? null` (if `sub` UUID not in loaded subcategories list, default to null). On sort/subcat change, call `router.replace(\`/category/${id}?${buildParams()}\`, { scroll: false })` where `buildParams` serializes non-default sort and active subcat. `visibleCount` is not persisted.
+
+**F36 — `<a>` not `<Link>` (`page.js:457`):**
+Import `Link` from `next/link`. Replace:
+- Article card `<a href={story.stories?.slug ? ...}>` → `<Link href={...}>`
+- "Back to browse" `<a href="/browse">` → `<Link href="/browse">`
+- "browse the home feed" `<a href="/">` → `<Link href="/">`
+- "Browse all categories" in not-found `<a href="/browse">` → `<Link href="/browse">`
+
+**F37 — No `<nav>` landmark for breadcrumb (`page.js:301`):**
+```tsx
+<nav aria-label="Breadcrumb">
+  <Link href="/browse" style={{ ... }}>Back to browse</Link>
+</nav>
+```
+
+---
+
+### Verification pass (after both streams)
+
+- **Static metadata:** `curl -s localhost:3000/category/<id> | grep 'og:title'` → shows actual category name.
+- **Stale content:** Navigate `/category/A`, then `/category/B` — confirm skeleton shows, no flash of A's header.
+- **Not-found state:** Navigate `/category/does-not-exist` — "Category not found" screen, not stale content.
+- **Kids category:** Navigate `/category/kids-science` (or any `kids-*` slug) → differentiated copy.
+- **Null-slug cards:** Confirm no `href="#"` links in DOM via devtools.
+- **Soft-deleted articles:** (Skip if no test data; note in verification log.)
+- **Inactive category:** Navigate to an inactive category slug — should show not-found.
+- **Hybrid timestamp:** Confirm recently-published article shows relative time ("2h ago"), older shows absolute.
+- **Sort reset:** Scroll "Load more" to 8 items, switch sort — confirm back to 5.
+- **URL persistence:** Apply sort + subcategory filter, copy URL, open in new tab — same filters applied.
+- **Anon bookmark:** Without logging in, click Save — registration wall fires (or sign-in redirect).
+- **Bookmark in-flight:** Click Save on slow connection — button shows "…", disabled.
+- **Toast a11y:** With VoiceOver on, trigger a bookmark error — toast is announced.
+- **Focus rings:** Tab through sort/subcat/bookmark/back buttons — all visible.
+- **Touch targets:** On mobile viewport, sort/subcat buttons visually ≥44px tall.
+- **`tsc` clean:** `bun --cwd web tsc` exits 0.
+
+---
+
+**Owner-input not needed** — all decisions locked (#055 and #056 auto-locked above; all other fixes reference existing decisions).
+
 **Future Wave A unit-fix slices (added when their reviews complete):**
 
 | Slice # | Surface | Added when |
 |---|---|---|
 | Slice 12 | Unit 4 / Search (`/search`) | Unit 4 review concludes |
-| Slice 13 | Unit 5 / Category (`/category/[id]`) | Unit 5 review concludes | 
+| Slice 13 | Unit 5 / Category (`/category/[id]`) | Unit 5 review concludes |
 | Slice 14 | Unit 6 / Leaderboard (`/leaderboard`) | Unit 6 review concludes |
 | Slice 15 | Unit 7 / Public profile chrome (kill-switched) | Unit 7 review concludes |
 | Slice 16 | Unit 8 / Marketing bundle | Unit 8 review concludes |

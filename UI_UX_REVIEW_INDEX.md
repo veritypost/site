@@ -13,8 +13,8 @@ Findings docs live at `UI_UX_REVIEW/<wave>-<n>-<slug>.md`.
 | 1  | Home | `/` | fixed (Slice 3 shipped 2026-05-02) |
 | 2  | Article reader | `/[slug]` (+ `?a=` multi-article, `/story/[slug]` redirect) | fixed (Slices 4 + 5 shipped 2026-05-02) |
 | 3  | Browse | `/browse` | fixed (Slice 11 shipped 2026-05-02) |
-| 4  | Search | `/search` | pending |
-| 5  | Category | `/category/[id]` | pending |
+| 4  | Search | `/search` | fixed (Slice 12 shipped 2026-05-02) |
+| 5  | Category | `/category/[id]` | findings (Slice 13 ready) |
 | 6  | Leaderboard | `/leaderboard` | pending |
 | 7  | Public profile + card | `/u/[username]`, `/card/[username]` *(KILL-SWITCHED — chrome only)* | pending |
 | 8  | Marketing bundle | `/pricing`, `/how-it-works`, `/about`, `/contact`, `/kids-app` | pending |
