@@ -88,6 +88,24 @@ struct AccountStateBannerView: View {
                 Task { await cancelDeletion() }
             }
 
+        case .frozen(_, let frozenScore):
+            AccountBannerRow(
+                glyph: "snowflake",
+                sfSymbol: true,
+                title: "Verity Score is paused",
+                body: frozenScore.map { "Your score is held at \($0.formatted()) while your subscription is inactive. Resubscribe to start earning again." }
+                    ?? "Your score is paused while your subscription is inactive. Resubscribe to start earning again.",
+                ctaLabel: "Resubscribe",
+                tone: .warning
+            ) {
+                Task {
+                    if let windowScene = UIApplication.shared.connectedScenes
+                        .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene {
+                        try? await AppStore.showManageSubscriptions(in: windowScene)
+                    }
+                }
+            }
+
         case .planGrace(let endsAt, let provider):
             AccountBannerRow(
                 glyph: "clock",

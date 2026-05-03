@@ -41,6 +41,9 @@ struct KidsAppRoot: View {
     }
 
     var body: some View {
+        if !SupabaseKidsClient.shared.configValid {
+            KidsConfigErrorView()
+        } else {
         Group {
             // A39 — gate the auth-state branch on KidsAuth.isBusy so the
             // launch path doesn't flash PairCodeView for the 200-500ms
@@ -94,6 +97,7 @@ struct KidsAppRoot: View {
                 await state.load(forKidId: kid.id, kidName: kid.name)
             }
         }
+        } // end configValid else
     }
 
     // MARK: Tab-bar app
@@ -358,6 +362,27 @@ struct KidsAppRoot: View {
 
 extension BadgeUnlockScene: Identifiable {
     public var id: String { tierLabel + headline }
+}
+
+struct KidsConfigErrorView: View {
+    var body: some View {
+        ZStack {
+            Color(.systemBackground).ignoresSafeArea()
+            VStack(spacing: 16) {
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.system(size: 48, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Text("This app needs to be set up before it can run.")
+                    .font(.headline)
+                    .multilineTextAlignment(.center)
+                Text("Please reinstall from TestFlight or contact support.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(32)
+        }
+    }
 }
 
 #Preview {

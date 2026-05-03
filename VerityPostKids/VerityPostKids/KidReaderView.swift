@@ -6,10 +6,15 @@ import Supabase
 // at that point. Scroll-progress tracking is deferred.
 
 // Apple Kids 1.3 — first-party imagery only.
-private let allowedImageHosts: Set<String> = Set([
-    SupabaseKidsClient.shared.supabaseURL.host?.lowercased() ?? "",
-    "cdn.veritypost.com"
-].filter { !$0.isEmpty })
+private let allowedImageHosts: Set<String> = {
+    var hosts: [String] = ["cdn.veritypost.com"]
+    if SupabaseKidsClient.shared.configValid,
+       let supabaseHost = SupabaseKidsClient.shared.supabaseURL.host?.lowercased(),
+       !supabaseHost.isEmpty {
+        hosts.append(supabaseHost)
+    }
+    return Set(hosts)
+}()
 
 struct KidReaderView: View {
     let article: KidArticle

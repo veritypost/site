@@ -1299,6 +1299,56 @@ final class AuthViewModel: ObservableObject {
         }
     }
 
+    // MARK: - OTP verification (S9-Q2-iOS code stage)
+
+    /// POST /api/auth/verify-magic-code with the user's email + 8-digit code.
+    /// Returns true when a session was successfully minted. Mirrors the web
+    /// SingleDoorForm `submitCode` path: call the route, then confirm a
+    /// live session exists before treating the sign-in as complete.
+    func verifyMagicCode(email: String, token: String) async -> Bool {
+        authError = nil
+        let url = SupabaseManager.shared.siteURL.appendingPathComponent("api/auth/verify-magic-code")
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        struct Body: Encodable { let email: String; let token: String }
+        req.httpBody = try? JSONEncoder().encode(Body(email: email, token: token))
+        do {
+            let (data, response) = try await URLSession.shared.data(for: req)
+            guard let http = response as? HTTPURLResponse else {
+                authError = "Network error. Try again."
+                return false
+            }
+            if http.statusCode == 400 {
+                authError = "Invalid code. Please try again."
+                return false
+            }
+            if !(200...299).contains(http.statusCode) {
+                authError = "Invalid code. Please try again."
+                return false
+            }
+            struct OTPResponse: Decodable { let ok: Bool? }
+            if let parsed = try? JSONDecoder().decode(OTPResponse.self, from: data),
+               parsed.ok == false {
+                authError = "Invalid code. Please try again."
+                return false
+            }
+            guard let session = try? await client.auth.session else {
+                authError = "Invalid code. Please try again or request a new one."
+                return false
+            }
+            await loadUser(id: session.user.id.uuidString)
+            isLoggedIn = true
+            wasLoggedIn = true
+            needsEmailVerification = false
+            pendingVerificationEmail = nil
+            return true
+        } catch {
+            authError = "Network error. Try again."
+            return false
+        }
+    }
+
     // MARK: - Reset password
 
     func resetPassword(email: String) async -> Bool {
@@ -1335,7 +1385,7 @@ final class AuthViewModel: ObservableObject {
         do {
             let response: VPUser = try await client.from("users")
                 .select(
-                    "id, email, email_verified, username, display_name, bio, avatar_color, metadata, is_expert, expert_title, is_verified_public_figure, frozen_at, verity_score, quizzes_completed_count, comment_count, followers_count, following_count, show_activity, created_at, onboarding_completed_at, is_banned, ban_reason, is_muted, muted_until, verify_locked_at, deletion_scheduled_for, plan_grace_period_ends_at, locked_until, comped_until, plan_provider, plans(tier)"
+                    "id, email, email_verified, username, display_name, bio, avatar_color, metadata, is_expert, expert_title, is_verified_public_figure, frozen_at, frozen_verity_score, verity_score, quizzes_completed_count, comment_count, followers_count, following_count, show_activity, created_at, onboarding_completed_at, is_banned, ban_reason, is_muted, muted_until, verify_locked_at, deletion_scheduled_for, plan_grace_period_ends_at, locked_until, comped_until, plan_provider, plans(tier)"
                 )
                 .eq("id", value: id)
                 .single()

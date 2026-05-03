@@ -11,6 +11,7 @@ enum AccountState {
     case verifyLocked
     case unverifiedEmail(email: String?)
     case deletionScheduled(scheduledFor: String?)
+    case frozen(frozenAt: String?, frozenScore: Int?)
     case planGrace(endsAt: String?, provider: String?)
     case muted(until: String?)
 }
@@ -20,6 +21,7 @@ enum AccountState {
 private let severityOrder: [String] = [
     "banned",
     "deletion_scheduled",
+    "frozen",
     "verify_locked",
     "unverified_email",
     "plan_grace",
@@ -34,6 +36,7 @@ private func severityIndex(_ state: AccountState) -> Int {
     case .verifyLocked:       key = "verify_locked"
     case .unverifiedEmail:    key = "unverified_email"
     case .deletionScheduled:  key = "deletion_scheduled"
+    case .frozen:             key = "frozen"
     case .planGrace:          key = "plan_grace"
     case .muted:              key = "muted"
     case .ok:                 key = "ok"
@@ -57,6 +60,10 @@ func deriveAccountStates(user: VPUser) -> [AccountState] {
     }
     if let scheduledFor = user.deletionScheduledFor, !scheduledFor.isEmpty {
         states.append(.deletionScheduled(scheduledFor: scheduledFor))
+    }
+    if let frozenDate = user.frozenAt {
+        let frozenAt = ISO8601DateFormatter().string(from: frozenDate)
+        states.append(.frozen(frozenAt: frozenAt, frozenScore: user.frozenVerityScore))
     }
     if let endsAt = user.planGracePeriodEndsAt, isFutureOrNow(endsAt) {
         states.append(.planGrace(endsAt: endsAt, provider: user.planProvider))

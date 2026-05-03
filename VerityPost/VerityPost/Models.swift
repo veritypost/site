@@ -19,6 +19,7 @@ struct VPUser: Codable, Identifiable {
     /// tracking (cancelled paid plan, grace expired). Profile shows a red
     /// banner with a Resubscribe CTA, mirroring the web inline notice.
     var frozenAt: Date?
+    var frozenVerityScore: Int?
     var verityScore: Int?
     var quizzesCompletedCount: Int?
     var commentCount: Int?
@@ -86,6 +87,7 @@ struct VPUser: Codable, Identifiable {
         case isVerifiedPublicFigure = "is_verified_public_figure"
         case emailVerified = "email_verified"
         case frozenAt = "frozen_at"
+        case frozenVerityScore = "frozen_verity_score"
         case verityScore = "verity_score"
         case quizzesCompletedCount = "quizzes_completed_count"
         case commentCount = "comment_count"

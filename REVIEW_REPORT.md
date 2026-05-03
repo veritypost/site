@@ -31,11 +31,26 @@ Architect-led review. Each PM appends findings under their own `## PM-N — <nam
 
 # Architect synthesis
 
+**Last updated:** 2026-05-03, post-Session-6 cleanup verification.
+
+## Post-cleanup status (Session 6 final)
+
+| Outcome | Count |
+|---|---|
+| Original findings | 156 (18 P0 / 56 P1 / 63 P2 / 19 P3) |
+| Closed across Sessions 0–5 | **54** (re-verified 54/54 against current code in Session 6 Pass 1) |
+| Refuted as stale during cleanup | 4 (Session 2) + a handful of Session-3 deferrals — see individual session docs |
+| Regressed since closure | **0** |
+| Net-new from Session 6 Pass 2 (5 VPMs) | **57** (5 P0 / 18 P1 / 19 P2 / 15 P3) |
+| CLAUDE.md kill-switch corrections | 5 (rows #1/#2/#3 removed, #4 + #6 updated) |
+
+**Recommendation:** the original sweep was effective — zero regressions, all closures verified — but Session 6 surfaced **5 NEW P0s** that warrant a Session 7 hardening pass before ship. See the `## Session 6 — Net-new findings` block below.
+
 **Cleanup plan:** 6 sequential sessions in `/Users/veritypost/Desktop/verity-post/REVIEW_SESSIONS/`. To start a session, open a fresh Claude conversation and type `start session N` (1-6). Each session doc is self-contained.
 
-**Review pass:** 11 PMs (9 Tier-A in parallel + 2 Tier-B sequential), each with their own subagent team. Every finding was verified on disk by the owning PM and quoted from current code or live `pg_catalog`.
+**Review pass (original):** 11 PMs (9 Tier-A in parallel + 2 Tier-B sequential), each with their own subagent team. Every finding was verified on disk by the owning PM and quoted from current code or live `pg_catalog`.
 
-**Aggregate counts (deduped, treating PM-10 confirmations and PM-11 extensions correctly):**
+**Original aggregate counts (deduped, treating PM-10 confirmations and PM-11 extensions correctly):**
 
 | Severity | Count | Notes |
 |---|---|---|
@@ -123,6 +138,297 @@ PM-10 audited every row. Stale rows requiring edits to `/Users/veritypost/Deskto
 ## Recommended next step
 
 Open a fix-implementation session with the same orchestration pattern but focused on Tier 1 (DB hardening) first, since it's the broadest blast radius and most surgical to apply. Each Tier 1 item is a single migration. After Tier 1 lands and is verified via Supabase MCP, move to Tier 2 (user-visible broken flows), then Tier 3 (money), then Tier 4/5.
+
+---
+
+# Session 6 — Net-new findings
+
+5 VPMs re-reviewed the cleaned codebase. Each was capped at 25 findings; only NEW issues (not in the original 156) were logged. **57 net-new + 5 CLAUDE.md row corrections.** Pass 1 separately re-verified all 54 CLOSED markers against current code — zero regressions.
+
+## Session 6 — Top-priority NEW P0 list (recommended fix order)
+
+These are exploitable now and were not in the original sweep. Two are mass-impersonation regressions Session 1 should have caught.
+
+1. **`toggle_follow` RPC missed by Session 1 REVOKE** (VPM-3). Created 2026-05-02 (one day before Session 1) at `supabase/migrations/20260502000000_add_missing_rpcs.sql:32-91`. SECURITY DEFINER, accepts caller-supplied `p_follower_id` with no `auth.uid()` check, default EXECUTE-to-PUBLIC. Any anon-key holder can force any user to follow/unfollow anyone. **One-line REVOKE + RPC body fix.**
+2. **`system_apply_dob_correction` no auth gate AND missed REVOKE** (VPM-3). `supabase/migrations/20260503000011_session1_drop_gucs_extend_users_protect.sql:562-627`. Session 1's GUC-drop migration redefined the function (CREATE OR REPLACE preserves prior PUBLIC EXECUTE), then never REVOKE'd it. Any anon can rewrite kid DOBs and reading_band. **COPPA-touching; same fix shape.**
+3. **iOS `frozen_at` users get no banner** (VPM-4). `VerityPost/VerityPost/AccountState.swift` enum missing `.frozen` case despite `VPUser.frozenAt` already loaded. Web shows red Resubscribe banner; iOS users see nothing. Session 5 attention item, now confirmed.
+4. **iOS LeaderboardView pre-existing build break** (VPM-4). `VerityPost/VerityPost/LeaderboardView.swift:319` — `auth.currentUser?.id.uuidString` but `VPUser.id` is `String`. Adult iOS bundle does not compile. Carried since Session 4. **One-line fix: drop `.uuidString`.**
+5. **Kids `SupabaseKidsClient` fatalError on missing config** (VPM-4). `VerityPostKids/VerityPostKids/SupabaseKidsClient.swift:46,49,52` — three `fatalError` calls; adult app uses graceful `configValid: Bool` fallback. TestFlight build with unwired xcconfig crashes on launch — Apple Kids 1.3 review hard-rejects.
+
+## Session 6 — Top-priority NEW P1 list
+
+- **iOS auth dead-end after Q05 OTP-only redesign** (VPM-5). `LoginView.swift:170` + `SignupView.swift:209` still tell users to "Tap" a link, but the email no longer contains one. iOS sign-in/signup is fully broken for fresh OTPs; iOS has no OTP code-input UI. Port web's stage='code' view.
+- **Pipeline regenerate routes silently lose cost-tracking via FK violation** (VPM-2). 4 routes (sources/timeline/quiz-regenerate + score-comments cron) call `callModel({ pipeline_run_id })` without inserting a parent `pipeline_runs` row. FK fails, write swallowed at `call-model.ts:329-338`. Every regenerate disappears from the cost ledger.
+- **Admin plan-PATCH bypasses billing RPCs and orphans Stripe sub** (VPM-2). `web/src/app/api/admin/users/[id]/plan/route.js:79` raw-updates `users.plan_id`, doesn't cancel upstream Stripe sub or update `subscriptions.status`. Admin demoting a paying user keeps them paying.
+- **Stripe checkout missing same-platform precheck** (VPM-3). `web/src/app/api/stripe/checkout/route.js:112-119` — Q06 closed cross-platform half but not same-platform; Stripe-on-Stripe double-billing path open.
+- **Webhook list page returns zero rows** (VPM-3). `webhook_log` has RLS enabled + UPDATE policy but no SELECT policy. Admin retry route works (service-role) but admins can't see what to retry.
+- **Ticket trigger harden silently overwritten** (VPM-3). Migration sort order: `2026-05-03_session_3_ticket_trigger_harden.sql` runs BEFORE `20260503000015_session3_webhook_ticket_rbac.sql` (hyphen sorts before digit), so the older role-name JOIN version is final. Renumber harden file to `20260503000016_*`.
+- **`/admin/plans` plan_features mutates from browser** (VPM-1). No API route, no audit row, no rate limit. Same anti-pattern Session 3 closed for /admin/access.
+- **Inline theme-no-flash script in root layout has no CSP nonce** (VPM-1). Dark-mode flash returns under default enforce CSP.
+- **`/signup → /login` drops `next` param** (VPM-1). Beta-gate deep-links lost across the redirect.
+- **`/welcome` graduation flow collects a password the user can never use** (VPM-1). Web sign-in is OTP-only (Q05); password is dead UX.
+- **Broadcast notifications truncate to 1000 rows** (VPM-2). `service.from('users').select('id')` no `.range()` paging; PostgREST default cap silently drops the rest. Also no kids/banned/frozen filter.
+- **Kids quiz `explanation` field leaks correct answer in wire payload** (VPM-2). Strip explanation from `SafeQuestion` projection; return only after grade RPC.
+- **score-comments cron infinite-loops on parse-fail / empty-body comments** (VPM-2). `ai_score_attempts` not incremented on those paths; same comments re-picked every tick burning LLM cost.
+- **DEFAULT PRIVILEGES omits `supabase_admin` role** (VPM-3). Q01 deny-by-default guarantee for future SECURITY DEFINER fns is partial; functions applied via dashboard land with PUBLIC EXECUTE.
+- **Kids deep-link `veritypostkids://story/<slug>` silently dropped by kids app** (VPM-5). `VerityPostKidsApp.swift:13-27` is a stub. Either route to story view or remove the CTA from web.
+- **Web `/pricing` 409 conflict shows raw error string** (VPM-5). `_CheckoutButton.tsx:49-51` renders `data.error` literal "apple_sub_active"; ignores `data.message` + `data.manage_url`. iOS has rich SubscriptionConflictSheet — asymmetric.
+- **Kids app entitlement claims `applinks:veritypost.com`** (VPM-4 + VPM-5). Apex Universal Link can route a kid's tap of an adult article into the kids app where it's silently dropped. Drop `applinks:veritypost.com` from kids entitlements.
+- **iOS COPPA: `kid_profile_id` leaked over `veritypostkids://` URL scheme** (VPM-4). `KidsAppLauncher.swift:23-38` passes raw kid UUID over a custom scheme that the kids app's handler ignores anyway. Strip the param.
+
+## VPM-1 — Web (public + appshell + admin)
+
+**Headline:** cleanup was effective — no P0s, 4 P1s, paper-cut UX/auth-flow drift. **Total: 0 P0 / 4 P1 / 6 P2 / 5 P3.**
+
+### [P1] Inline theme-no-flash script in root layout has no CSP nonce — blocked under default enforce
+- File: `web/src/app/layout.js:118`
+- Issue: Inline `<script dangerouslySetInnerHTML>` in `<head>` reads localStorage to set `data-theme` before paint. CSP is `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`; CSP_ENFORCE defaults to enforce. Inline script without `nonce={...}` is blocked.
+- Impact: Theme flash returns on every cold load on dark theme.
+- Suggested fix: Read nonce via `headers().get('x-nonce')` (set by middleware.js:184) and pass `nonce={nonce}`.
+
+### [P1] `/signup → /login` redirect drops `next` param set by middleware beta-gate
+- File: `web/src/app/signup/page.tsx:6`
+- Issue: `redirect('/login')` ignores searchParams. middleware.js:400 sets `?next=<path>` when redirecting beta-gated anon to /signup; that param is destroyed at the /signup hop.
+- Suggested fix: Forward searchParams: `redirect(\`/login${qs ? '?' + qs : ''}\`)`.
+
+### [P1] `/admin/plans` plan_features mutates from browser — no API route, no audit, no rate limit
+- File: `web/src/app/admin/plans/page.tsx:234,289,312`
+- Issue: `upsertFeature`, `addFeature`, `removeFeature` call `.from('plan_features')` directly from the client. Same anti-pattern Session 3 closed for /admin/access, /admin/reader, /admin/support.
+- Suggested fix: Add `POST/DELETE /api/admin/plans/[id]/features` matching adminMutation skeleton.
+
+### [P1] `/welcome` graduation flow collects a password the user can never use to sign in
+- File: `web/src/app/welcome/page.tsx:60-92,126`
+- Issue: GraduationClaim asks for password; web sign-in is OTP-only (Q05). Success screen says "we'll email you an 8-digit code." Password is dead data.
+- Suggested fix: Drop password fields; create user without `password`.
+
+### [P2] Pricing page ISR `revalidate: 300` defeated by cookie-based auth.getUser — every request hits DB
+- File: `web/src/app/pricing/page.tsx:24 + 162`
+- Suggested fix: Move `getUser()` to a client island.
+
+### [P2] `/admin/cohorts` inserts campaign rows from browser
+- File: `web/src/app/admin/cohorts/page.tsx:85-97`
+
+### [P2] `/billing` redirect uses `#billing` hash but settings shell only opens sections via `?section=plan`
+- File: `web/src/app/billing/page.tsx:10`
+
+### [P2] `/verify-email` forwards `?notice=email_changed` and `?error=email_change_failed` but settings shell never reads them
+- File: `web/src/app/verify-email/route.ts:25,31,34,37`
+
+### [P2] No UI to toggle adult `show_on_leaderboard`; default true with no opt-out
+- Files: `web/src/app/leaderboard/page.tsx` (filter); no PrivacyCard surface
+
+### [P2] Article body sanitizer allows `target` attribute on anchors without enforcing `rel="noopener noreferrer"`
+- File: `web/src/app/[slug]/page.tsx:269`
+
+### [P3] AdSense publisher-id meta tag in root layout fires before consent
+- File: `web/src/app/layout.js:92`
+
+### [P3] Middleware rewrites `:3333/profile/*` → `/redesign/profile/*` but no `/redesign` route tree exists
+- File: `web/src/middleware.js:463-478`
+
+### [P3] Dead/empty directories under `web/src/app/` (7)
+- Paths: `forgot-password/`, `reset-password/`, `signup/expert/`, `request-access/confirmed/`, `api/auth/signup/`, `api/access-request/confirm/`, `api/ai/generate/`
+
+### [P3] `/signup` orphan components `_AccessFlow.tsx` + `_FeaturedArticle.tsx` are dead
+
+### [P3] `/kids-app` waitlist copy implies a launch timeline — violates `feedback_no_user_facing_timelines.md`
+- File: `web/src/app/kids-app/page.tsx:130,156`
+
+## VPM-2 — Web APIs + pipeline + cron
+
+**Headline:** healthy on signature/auth/RBAC; remaining issues are second-order. **Total: 0 P0 / 5 P1 / 4 P2 / 5 P3.**
+
+### [P1] Pipeline regenerate routes silently lose cost-tracking via FK violation
+- Files: `web/src/app/api/admin/pipeline/sources-regenerate/route.ts:148`, `timeline-regenerate/route.ts:146`, `quiz-regenerate/route.ts:174`, `web/src/app/api/cron/score-comments/route.ts:74`
+- Issue: Each route generates `runId = crypto.randomUUID()` and passes to `callModel({ pipeline_run_id: runId })` WITHOUT first inserting a parent `pipeline_runs` row. FK fails; write swallowed in `call-model.ts:329-338`.
+- Impact: F7 invariant #4 violated; admin cost dashboards undercount silently.
+- Suggested fix: Insert a `pipeline_runs` row before first callModel + mark complete in finally.
+
+### [P1] `/api/admin/users/[id]/plan` PATCH bypasses billing RPCs and orphans Stripe sub
+- File: `web/src/app/api/admin/users/[id]/plan/route.js:79`
+- Suggested fix: Route through `billing_change_plan` (or `billing_freeze_profile`); cancel live Stripe sub.
+
+### [P1] `/api/admin/notifications/broadcast` truncates "all users" to PostgREST default 1000 rows
+- File: `web/src/app/api/admin/notifications/broadcast/route.ts:73`
+- Suggested fix: Page in 1000-row chunks or use server-side `INSERT … SELECT` RPC. Add WHERE filter on `is_banned=false`, exclude kids.
+
+### [P1] `/api/kids/quiz/[id]` returns `explanation` field that leaks the correct answer
+- File: `web/src/app/api/kids/quiz/[id]/route.ts:223`
+- Suggested fix: Drop `explanation` from SafeQuestion; return only in grade RPC response.
+
+### [P1] score-comments cron infinite-loops on parse-fail and empty-body comments
+- File: `web/src/app/api/cron/score-comments/route.ts:82, 100-102`
+- Suggested fix: Increment `ai_score_attempts` on every non-success path; sentinel-write `ai_tag='parse_failed'` so the row exits SELECT.
+
+### [P2] `/api/admin/articles/[id]` DELETE has no rate limit + audit_log written before RPC
+- File: `web/src/app/api/admin/articles/[id]/route.ts:821`
+
+### [P2] `/api/admin/access-codes` mints codes via Math.random() — non-CSPRNG
+- File: `web/src/app/api/admin/access-codes/route.ts:47`
+
+### [P2] pipeline-cleanup cluster_expiry sweep does unbounded SELECT on articles
+- File: `web/src/app/api/cron/pipeline-cleanup/route.ts:267`
+
+### [P2] Comments report NCMEC submission writes broken `/story/<UUID>` URL
+- File: `web/src/app/api/comments/[id]/report/route.js:173`
+
+### [P3] `/api/support/public` ticket_number derived from Date.now() hex
+- File: `web/src/app/api/support/public/route.js:71`
+
+### [P3] Several crons lack advisory locks (process-deletions, send-emails, freeze-grace)
+
+### [P3] `/api/admin/recap/[id]` PATCH accepts unbounded value sizes for whitelisted fields
+
+### [P3] subscription-reconcile-stripe cron has no per-call AbortController
+
+### [P3] `/api/events/batch` IP hashing uses single global salt
+
+## VPM-3 — Billing + iOS bridge + DB/RLS
+
+**Headline:** **NOT healthy** — 2 P0 mass-impersonation-class regressions Session 1 should have caught. **Total: 2 P0 / 4 P1 / 3 P2 / 1 P3.**
+
+### [P0] `toggle_follow` RPC bypassed Session 1 REVOKE — mass impersonation
+- File: `supabase/migrations/20260502000000_add_missing_rpcs.sql:32-91`
+- Issue: SECURITY DEFINER, accepts caller-supplied `p_follower_id` with no `auth.uid()` check, default EXECUTE-to-PUBLIC. Created day before Session 1; not in REVOKE inventory at `20260503000010`.
+- Impact: Any anon-key holder can POST `/rest/v1/rpc/toggle_follow` with any user's UUID and force them to follow/unfollow anyone, mutating `users.followers_count` / `following_count` on both sides.
+- Suggested fix: `REVOKE EXECUTE ON FUNCTION public.toggle_follow(uuid, uuid) FROM PUBLIC, anon, authenticated; GRANT TO service_role;` + add `auth.uid() = p_follower_id` check in body.
+
+> CLOSED in Session 7 — migration `20260503000023_session7_hardening.sql` REVOKEs PUBLIC/anon/authenticated, GRANTs service_role, and CREATE OR REPLACE adds a service-role JWT-claim gate inside the body. (auth.uid() check rejected: route uses createServiceClient() so auth.uid() is NULL — broke the flow. Adopted same gate as Fix 2.) Pending owner apply.
+
+### [P0] `system_apply_dob_correction` has no auth gate AND was not REVOKE'd
+- File: `supabase/migrations/20260503000011_session1_drop_gucs_extend_users_protect.sql:562-627`
+- Issue: SECURITY DEFINER with no permission check (only validates `direction='younger'`). Redefined by Session 1 GUC migration which runs AFTER the REVOKE migration; CREATE OR REPLACE preserves prior PUBLIC EXECUTE.
+- Impact: Anon submits DOB-correction request via PostgREST, then auto-approves it. Any kid's official DOB and reading_band can be rewritten.
+- Suggested fix: REVOKE EXECUTE FROM PUBLIC + GRANT to service_role; OR add `IF current_user <> 'postgres' AND v_jwt_role <> 'service_role' THEN RAISE EXCEPTION '42501' END IF;` at top of body.
+
+> CLOSED in Session 7 — migration `20260503000023_session7_hardening.sql` REVOKEs PUBLIC/anon/authenticated, GRANTs service_role, and CREATE OR REPLACE adds the service-role gate (`current_user IN ('postgres','supabase_admin')` OR jwt role='service_role') at top of body. search_path expanded to `'public','pg_temp'` for parity per adversary review. Pending owner apply.
+
+### [P1] check_ticket_message_is_staff harden silently overwritten by older role-name version
+- Files: `supabase/migrations/2026-05-03_session_3_ticket_trigger_harden.sql` vs `supabase/migrations/20260503000015_session3_webhook_ticket_rbac.sql:17-40`
+- Suggested fix: Renumber harden file to `20260503000016_*` so it runs after `_000015`.
+
+### [P1] webhook_log has RLS enabled + UPDATE policy only — admin Webhooks page returns zero rows
+- File: `supabase/migrations/20260503000015_session3_webhook_ticket_rbac.sql:6-12` vs `web/src/app/admin/webhooks/page.tsx:84-90`
+- Suggested fix: `CREATE POLICY webhook_log_admin_select ON public.webhook_log FOR SELECT TO authenticated USING (public.is_admin_or_above());`
+
+### [P1] ALTER DEFAULT PRIVILEGES omits FOR ROLE supabase_admin
+- File: `supabase/migrations/20260503000010_session1_revoke_public_execute_security_definer.sql:22-35`
+- Suggested fix: Add `ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated;`.
+
+### [P1] `/api/stripe/checkout` missing same-platform precheck — Stripe-on-Stripe double-billing
+- File: `web/src/app/api/stripe/checkout/route.js:112-119`
+- Suggested fix: After activeSub fetch, add `if (activeSub.platform === 'stripe') return 409` matching the Apple branch.
+
+### [P2] handleSubscriptionUpdated kid_seats_paid drops on first-event family subs
+- File: `web/src/app/api/stripe/webhook/route.js:593-608, 722-750`
+
+### [P2] admin_alerts SELECT policy uses brittle role-name JOIN
+- File: `supabase/migrations/20260503000006_create_admin_alerts.sql:18-25`
+- Suggested fix: Rewrite USING clause as `public.is_admin_or_above()`.
+
+### [P2] iOS sync route allows a second Apple subscription on a user with an existing Apple sub
+- File: `web/src/app/api/ios/subscriptions/sync/route.js:214-218 + 232-251`
+
+### [P3] `pg_try_advisory_lock` / `pg_advisory_unlock` public wrappers shadow pg_catalog builtins
+- File: `supabase/migrations/20260503000021_add_cron_advisory_lock_helpers.sql:5-21`
+
+## VPM-4 — iOS adult + iOS kids
+
+**Headline:** borderline — 3 P0s. Two are Session-attention items prior runs flagged but didn't close; third is a structural inconsistency latent since the kids app was built. **Total: 3 P0 / 2 P1 / 3 P2 / 3 P3.**
+
+### [P0] `frozen_at` users get no banner — `frozen` AccountState case missing on iOS
+- File: `VerityPost/VerityPost/AccountState.swift:8-16, 20-28, 46-70`
+- Issue: VPUser already loads `frozen_at` (Models.swift:21, AuthViewModel.swift:1338). Web counterpart `web/src/app/profile/_lib/states.ts:23,53,124` includes `frozen` between `deletion_scheduled` and `muted`. iOS has no `.frozen` case, severity entry, or banner branch. Q10 attention item; confirmed.
+- Suggested fix: Add `case frozen(frozenAt: String?, frozenScore: Int?)` to AccountState; render with red Resubscribe CTA matching `AccountStateBanner.tsx:90-100`.
+
+> CLOSED in Session 7 — `.frozen(frozenAt:frozenScore:)` case added to AccountState.swift; severityOrder + severityIndex + deriveAccountStates updated; `frozenVerityScore: Int?` added to VPUser (Models.swift) + `frozen_verity_score` added to AuthViewModel.loadUser select. AccountStateBannerView.swift renders red Resubscribe CTA targeting `AppStore.showManageSubscriptions` (mirrors planGrace).
+
+### [P0] LeaderboardView pre-existing build break still un-fixed
+- File: `VerityPost/VerityPost/LeaderboardView.swift:319`
+- Issue: `auth.currentUser?.id.uuidString` — `VPUser.id` is `String` (Models.swift:6), not `UUID`. Adult app does not compile. Carried since Session 4.
+- Suggested fix: Drop `.uuidString` (id is already a String).
+
+> CLOSED in Session 7 — `.uuidString` dropped at line 319. Removing this exposed a second pre-existing break at StoryDetailView.swift:3232,3252 (`.stroke(VP.border, lineWidth: 1, style: StrokeStyle(...))` is invalid SwiftUI — `lineWidth` and `style` are mutually exclusive); fixed inline by moving lineWidth into StrokeStyle. iOS adult `xcodebuild ... build` now reports `** BUILD SUCCEEDED **`.
+
+### [P0] SupabaseKidsClient fatalError on missing config — kids app crashes where adult app shows graceful error
+- File: `VerityPostKids/VerityPostKids/SupabaseKidsClient.swift:46, 49, 52`
+- Issue: Three `fatalError` calls; adult `SupabaseManager.swift:113-148` handles same misconfig with `configValid: Bool` flag + placeholder URL fallback. `KidReaderView.swift:9-12` initializes `allowedImageHosts` from `SupabaseKidsClient.shared.supabaseURL.host`, so first KidReaderView access trips the fatalError chain.
+- Impact: Apple Kids 1.3 review will hard-reject any TestFlight build with unwired env vars.
+- Suggested fix: Mirror SupabaseManager — `configValid: Bool`, fallback URL, render error UI in KidsAppRoot.
+
+> CLOSED in Session 7 — 3 fatalError calls replaced with `var ok` pattern + Logger fault + placeholderURL (`https://placeholder.invalid`); `configValid: Bool` exposed on shared client. KidReaderView allowedImageHosts gated to skip Supabase host when !configValid (cdn.veritypost.com always present). KidsAppRoot.body wraps content in `if !configValid { KidsConfigErrorView() }`. iOS kids `xcodebuild ... build` reports `** BUILD SUCCEEDED **`.
+
+### [P1] KidsAppLauncher leaks `kid_profile_id` over `veritypostkids://` URL scheme to a handler that ignores it
+- Files: `VerityPost/VerityPost/KidsAppLauncher.swift:23-38`, `VerityPostKids/VerityPostKids/VerityPostKidsApp.swift:13-27`
+- Suggested fix: Drop `kid` query param; use a one-time short-lived token if pairing is needed later.
+
+### [P1] Kids app entitlement claims `applinks:veritypost.com` but onOpenURL drops every link
+- File: `VerityPostKids/VerityPostKids/VerityPostKids.entitlements:7`, `VerityPostKidsApp.swift:13-27`
+- Suggested fix: Drop `applinks:veritypost.com` from kids entitlements; keep only `applinks:kids.veritypost.com`.
+
+### [P2] StoreManager force-unwrap of `best!.1` inside loop
+- File: `VerityPost/VerityPost/StoreManager.swift:623`
+
+### [P2] StoryDetailView ShareLink hardcoded to veritypost.com — staging shares break
+- File: `VerityPost/VerityPost/StoryDetailView.swift:369`
+- Suggested fix: `SupabaseManager.shared.siteURL.appendingPathComponent("story/\(slug)")`.
+
+### [P2] AccountStateBannerView "Contact support" CTA hardcoded URL — same staging bug
+- File: `VerityPost/VerityPost/AccountStateBannerView.swift:50`
+
+### [P3] AuthViewModel.magicLinkCooldownTask not cancelled in deinit
+- File: `VerityPost/VerityPost/AuthViewModel.swift:74, deinit at 182-189`
+
+### [P3] KidsAppState.loadProgressCounts unbounded `articleIds`
+- File: `VerityPostKids/VerityPostKids/KidsAppState.swift:194-209`
+
+### [P3] AuthViewModel.loadUser fragment parsing splits on `&` without handling URL-encoded ampersands
+- File: `VerityPost/VerityPost/AuthViewModel.swift:797-803`
+
+## VPM-5 — Cross-platform parity + CLAUDE.md kill-switch audit
+
+**Headline:** parity mostly disciplined post-Sessions 4–5, but Q05 OTP-only redesign was never propagated to iOS — iOS auth is broken end-to-end. **Total: 0 P0 / 3 P1 / 3 P2 / 1 P3 + 5 CLAUDE.md fixes.**
+
+### [P1] iOS magic-link sign-in/signup says "tap the link" but email contains no link
+- Files: `VerityPost/VerityPost/LoginView.swift:170`, `VerityPost/VerityPost/SignupView.swift:209`, `web/src/lib/magicLinkEmail.ts:23-24`
+- Issue: Q05 dropped the clickable link; email is OTP-only. iOS LoginView/SignupView still tell users to "Tap" a link, with no OTP input UI. Web `_SingleDoorForm.tsx:355` correctly tells the user to enter the code.
+- Impact: iOS sign-in/signup is fully dead-end on the new email template. Affects every iOS user attempting first auth or re-auth.
+- Suggested fix: Port web's `stage='code'` OTP-input view to iOS LoginView/SignupView.
+
+> CLOSED in Session 7 — `verifyMagicCode(email:token:)` added to AuthViewModel posting to /api/auth/verify-magic-code; LoginView + SignupView sentCard replaced with 8-digit OTP TextField + Sign in button + Resend (reuses existing `magicLinkCooldownSec`) + "Use a different email" reset link. Both files mirror web's `stage='code'` UX.
+
+### [P1] Web `/pricing` checkout shows raw 409 error string, no equivalent of iOS conflict sheet
+- File: `web/src/app/pricing/_CheckoutButton.tsx:49-51`
+- Issue: Q06 sub-decision was hard-block 409 with `code` + `manage_url`. iOS implementation is rich (sheet, primary CTA opens manage_url, secondary refund CTA). Web checkout button just sets `setError(data.error)` rendering "apple_sub_active" literally; ignores `data.message` and `manage_url`.
+- Suggested fix: Handle 409 separately in `_CheckoutButton.tsx`; render `data.message` + button linking to `data.manage_url`.
+
+### [P1] Kids deep-link `veritypostkids://story/<slug>` from web is silently dropped by kids app
+- Files: `web/src/app/[slug]/page.tsx:370,373`, `VerityPostKids/VerityPostKids/VerityPostKidsApp.swift:13-27`
+- Suggested fix: Either route the URL through KidsAppState to load the article (filter `is_kids_safe = true`), or remove the `veritypostkids://` button from web until routing exists.
+
+### [P2] Kids app entitlements declare `applinks:kids.veritypost.com` but no AASA file is published at that subdomain
+- Files: `VerityPostKids/VerityPostKids/VerityPostKids.entitlements:8`, `web/public/.well-known/apple-app-site-association`
+
+### [P2] AASA file routes `/story/*` to BOTH adult + kids apps — undefined which opens
+- File: `web/public/.well-known/apple-app-site-association:5-22`
+
+### [P2] iOS account-state banner missing 3 web banner states (frozen, locked_login, trial-ending)
+- File: `VerityPost/VerityPost/AccountState.swift:8-16` vs `web/src/app/profile/_lib/states.ts:15-32`
+- (Frozen overlaps with VPM-4 P0; locked_login + trial-ending are separate gaps.)
+
+### [P3] `/login/page.tsx` top comment says "6-digit code" but live form says "8-digit code"
+- File: `web/src/app/login/page.tsx:3`
+
+### CLAUDE.md kill-switch row corrections (applied in Pass 3)
+
+| Row | Action | Reason |
+|---|---|---|
+| #1 PUBLIC_PROFILE_ENABLED | REMOVE | Flag is `true` at `web/src/app/u/[username]/page.tsx:22`; surface live |
+| #2 /profile/[id] | REMOVE | Pure redirect; never referenced flag |
+| #3 share-link block | REMOVE | Session 5 closed unblock; comment gone |
+| #4 OAUTH_ENABLED | UPDATE | Line 9→10; iOS counterpart `VPOAuthEnabled` at `AuthViewModel.swift:48` added |
+| #5 manageSubscriptionsEnabled | KEEP | Line 340 + value `false` correct |
+| #6 /ideas/* | UPDATE | Was described as "admin-gate"; actually middleware passthrough at line 164 (no auth/DB) |
 
 ---
 

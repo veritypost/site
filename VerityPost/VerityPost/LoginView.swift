@@ -16,8 +16,11 @@ struct LoginView: View {
     @Environment(\.dismiss) var dismiss
     @State private var email = ""
     @State private var loading = false
+    @State private var otpCode = ""
+    @State private var otpLoading = false
     @State private var showSignup = false
     @FocusState private var emailFocused: Bool
+    @FocusState private var otpFocused: Bool
 
     var body: some View {
         NavigationStack {
@@ -155,52 +158,101 @@ struct LoginView: View {
         .disabled(!canSubmit)
     }
 
-    // MARK: - "Check your inbox" card
+    // MARK: - OTP code card
 
     @ViewBuilder
     private func sentCard(email: String) -> some View {
-        VStack(spacing: 14) {
-            Image(systemName: "envelope.circle")
-                .font(.largeTitle)
-                .foregroundColor(VP.accent)
-                .accessibilityHidden(true)
-            Text("Check your inbox")
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Enter your 8-digit code")
                 .font(.system(.title3, design: .default, weight: .bold))
                 .foregroundColor(VP.text)
-            Text("We sent a sign-in link to \(email). Tap it to finish signing in.")
+                .padding(.bottom, 8)
+
+            Text("We sent a code to \(email). Enter it below to sign in.")
                 .font(.footnote)
                 .foregroundColor(VP.dim)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 8)
+                .multilineTextAlignment(.leading)
+                .padding(.bottom, 22)
 
-            Button(action: resend) {
+            if let err = auth.authError {
+                Text(err)
+                    .font(.system(.footnote, design: .default, weight: .medium))
+                    .foregroundColor(VP.danger)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.bottom, 14)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Sign-in code")
+                    .font(.footnote)
+                    .foregroundColor(VP.dim)
+                TextField("12345678", text: $otpCode)
+                    .keyboardType(.numberPad)
+                    .textContentType(.oneTimeCode)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled(true)
+                    .focused($otpFocused)
+                    .foregroundColor(VP.text)
+                    .padding(12)
+                    .frame(minHeight: 44)
+                    .background(VP.card)
+                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: VP.radiusMD)
+                            .stroke(otpFocused ? VP.accent : VP.border, lineWidth: 1.5)
+                    )
+                    .onChange(of: otpCode) { _, newValue in
+                        otpCode = String(newValue.filter(\.isNumber).prefix(8))
+                    }
+            }
+            .padding(.bottom, 18)
+
+            Button(action: submitOtp) {
                 Group {
+                    if otpLoading {
+                        ProgressView().tint(.white)
+                    } else {
+                        Text("Sign in")
+                            .font(.system(.subheadline, design: .default, weight: .semibold))
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 48)
+                .background(otpCode.count == 8 && !otpLoading ? VP.accent : VP.muted)
+                .foregroundColor(.white)
+                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+            }
+            .disabled(otpCode.count < 8 || otpLoading)
+            .padding(.bottom, 20)
+
+            HStack {
+                Button("Use a different email") {
+                    auth.clearMagicLinkState()
+                    self.email = ""
+                    otpCode = ""
+                }
+                .font(.footnote)
+                .foregroundColor(VP.dim)
+                .frame(minHeight: 44)
+
+                Spacer()
+
+                Button(action: resend) {
                     if auth.magicLinkCooldownSec > 0 {
                         Text("Resend in \(auth.magicLinkCooldownSec)s")
-                    } else if loading {
-                        ProgressView()
                     } else {
-                        Text("Resend link")
+                        Text("Resend code")
                     }
                 }
                 .font(.system(.footnote, design: .default, weight: .semibold))
                 .foregroundColor(canResend ? VP.accent : VP.dim)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 10)
                 .frame(minHeight: 44)
+                .disabled(!canResend)
             }
-            .disabled(!canResend)
-
-            Button("Use a different email") {
-                auth.clearMagicLinkState()
-                self.email = ""
-            }
-            .font(.footnote)
-            .foregroundColor(VP.dim)
-            .frame(minHeight: 44)
         }
-        .padding(.vertical, 24)
         .frame(maxWidth: .infinity)
+        .onAppear { otpFocused = true }
     }
 
     @ViewBuilder
@@ -296,10 +348,20 @@ struct LoginView: View {
 
     private func resend() {
         guard let target = auth.magicLinkSentTo, canResend else { return }
+        otpCode = ""
         loading = true
         Task {
             _ = await auth.sendMagicLink(email: target)
             loading = false
+        }
+    }
+
+    private func submitOtp() {
+        guard let target = auth.magicLinkSentTo, otpCode.count == 8, !otpLoading else { return }
+        otpLoading = true
+        Task {
+            _ = await auth.verifyMagicCode(email: target, token: otpCode)
+            otpLoading = false
         }
     }
 }

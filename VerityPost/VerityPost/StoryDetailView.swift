@@ -3229,7 +3229,7 @@ struct StoryDetailView: View {
                     .foregroundColor(VP.dim.opacity(0.7))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
-                    .overlay(RoundedRectangle(cornerRadius: 5).stroke(VP.border, lineWidth: 1, style: StrokeStyle(dash: [4])))
+                    .overlay(RoundedRectangle(cornerRadius: 5).stroke(VP.border, style: StrokeStyle(lineWidth: 1, dash: [4])))
             }
             .buttonStyle(.plain)
         } else {
@@ -3249,7 +3249,7 @@ struct StoryDetailView: View {
                                 .foregroundColor(VP.dim.opacity(0.7))
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
-                                .overlay(RoundedRectangle(cornerRadius: 5).stroke(VP.border, lineWidth: 1, style: StrokeStyle(dash: [4])))
+                                .overlay(RoundedRectangle(cornerRadius: 5).stroke(VP.border, style: StrokeStyle(lineWidth: 1, dash: [4])))
                         }
                         .buttonStyle(.plain)
                     }

@@ -1,4 +1,5 @@
 import Foundation
+import os
 import Supabase
 
 // Kids-app-local Supabase client. Same project as adult app.
@@ -14,6 +15,10 @@ import Supabase
 
 final class SupabaseKidsClient {
     static let shared = SupabaseKidsClient()
+
+    private static let log = Logger(subsystem: "com.veritypost.kids", category: "SupabaseKidsClient")
+
+    let configValid: Bool
 
     private(set) var client: SupabaseClient
 
@@ -38,23 +43,48 @@ final class SupabaseKidsClient {
         #endif
     }
 
+    private static let placeholderURL: URL = URL(string: "https://placeholder.invalid")!
+
     let supabaseURL: URL
     private let supabaseKey: String
 
     private init() {
-        guard let rawURL = SupabaseKidsClient.resolve("SUPABASE_URL") else {
-            fatalError("[SupabaseKidsClient] SUPABASE_URL not set. Configure INFOPLIST_KEY_SUPABASE_URL or set SUPABASE_URL env var in DEBUG.")
-        }
-        guard let url = URL(string: rawURL) else {
-            fatalError("[SupabaseKidsClient] SUPABASE_URL malformed: \(rawURL)")
-        }
-        guard let key = SupabaseKidsClient.resolve("SUPABASE_KEY") else {
-            fatalError("[SupabaseKidsClient] SUPABASE_KEY not set.")
+        var ok = true
+
+        let resolvedURL: URL
+        if let rawURL = SupabaseKidsClient.resolve("SUPABASE_URL") {
+            if let url = URL(string: rawURL) {
+                resolvedURL = url
+            } else {
+                SupabaseKidsClient.log.fault(
+                    "SUPABASE_URL malformed; using placeholder. Configure INFOPLIST_KEY_SUPABASE_URL in xcconfig."
+                )
+                resolvedURL = SupabaseKidsClient.placeholderURL
+                ok = false
+            }
+        } else {
+            SupabaseKidsClient.log.fault(
+                "SUPABASE_URL not set; using placeholder. Configure INFOPLIST_KEY_SUPABASE_URL in xcconfig."
+            )
+            resolvedURL = SupabaseKidsClient.placeholderURL
+            ok = false
         }
 
-        self.supabaseURL = url
-        self.supabaseKey = key
-        self.client = SupabaseKidsClient.makeClient(url: url, anonKey: key, bearer: nil)
+        let resolvedKey: String
+        if let key = SupabaseKidsClient.resolve("SUPABASE_KEY") {
+            resolvedKey = key
+        } else {
+            SupabaseKidsClient.log.fault(
+                "SUPABASE_KEY not set; using empty key. Configure INFOPLIST_KEY_SUPABASE_KEY in xcconfig."
+            )
+            resolvedKey = ""
+            ok = false
+        }
+
+        self.supabaseURL = resolvedURL
+        self.supabaseKey = resolvedKey
+        self.configValid = ok
+        self.client = SupabaseKidsClient.makeClient(url: resolvedURL, anonKey: resolvedKey, bearer: nil)
     }
 
     /// Reconfigure the shared client with a bearer token (the kid JWT).

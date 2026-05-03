@@ -316,7 +316,7 @@ struct LeaderboardView: View {
         .task {
             await refreshPermissions()
             await loadCategories()
-            if let uid = auth.currentUser?.id.uuidString {
+            if let uid = auth.currentUser?.id {
                 await loadBlockList(userId: uid)
             }
         }
