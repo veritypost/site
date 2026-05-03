@@ -1,8 +1,9 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified search 2026-04-18
 'use client';
-import { useState, useEffect, CSSProperties } from 'react';
+import { useState, useEffect, useRef, Suspense, CSSProperties } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '../../lib/supabase/client';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import { usePageViewTrack } from '@/lib/useTrack';
@@ -34,16 +35,24 @@ interface SearchResponse {
   articles?: ArticleHit[];
   mode?: string;
   error?: string;
+  ignored_filters?: string[];
 }
 
-export default function SearchPage() {
+function SearchPageContent() {
   const supabase = createClient();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   usePageViewTrack('search');
-  const [canView, setCanView] = useState<boolean>(true);
+  // F7: null until perms hydrate so we can show a skeleton instead of flash
+  const [canView, setCanView] = useState<boolean | null>(null);
   const [canAdvanced, setCanAdvanced] = useState<boolean>(false);
   const [canFilterCategory, setCanFilterCategory] = useState<boolean>(false);
   const [canFilterDate, setCanFilterDate] = useState<boolean>(false);
   const [canFilterSource, setCanFilterSource] = useState<boolean>(false);
+  // F14: track auth state separately so tease copy branches correctly
+  const [isAuthed, setIsAuthed] = useState<boolean | null>(null);
+  // F27: only show tease after the user has interacted with the search field
+  const [hasInteracted, setHasInteracted] = useState<boolean>(false);
   const [q, setQ] = useState<string>('');
   const [category, setCategory] = useState<string>('');
   const [from, setFrom] = useState<string>('');
@@ -53,6 +62,26 @@ export default function SearchPage() {
   const [results, setResults] = useState<ArticleHit[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
+  // F8: surface ignored_filters from the API response
+  const [ignoredFilters, setIgnoredFilters] = useState<string[]>([]);
+  const [ignoredFiltersDismissed, setIgnoredFiltersDismissed] = useState<boolean>(false);
+  // F19: AbortController ref to cancel in-flight requests
+  const abortRef = useRef<AbortController | null>(null);
+
+  // F4: initialize state from URL on mount
+  useEffect(() => {
+    const urlQ = searchParams.get('q') || '';
+    const urlCat = searchParams.get('cat') || '';
+    const urlFrom = searchParams.get('from') || '';
+    const urlTo = searchParams.get('to') || '';
+    const urlSrc = searchParams.get('src') || '';
+    if (urlQ) { setQ(urlQ); setHasInteracted(true); }
+    if (urlCat) setCategory(urlCat);
+    if (urlFrom) setFrom(urlFrom);
+    if (urlTo) setTo(urlTo);
+    if (urlSrc) setSource(urlSrc);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -60,13 +89,16 @@ export default function SearchPage() {
       // The resolver applies any paid/role inheritance.
       await refreshAllPermissions();
       await refreshIfStale();
-      // search.view: page-level capability. Anon users still see the
-      // page (they have search.articles.free via the anon set), so we
-      // default-true and only flip off if the resolver says no.
+
+      // F18: anon bypass — anon users always see the search page
+      const { data: { user } } = await supabase.auth.getUser();
+      const isAnon = !user;
+      setIsAuthed(!isAnon);
       setCanView(
+        isAnon ||
         hasPermission('search.view') ||
-          hasPermission('search.basic') ||
-          hasPermission('search.articles.free')
+        hasPermission('search.basic') ||
+        hasPermission('search.articles.free')
       );
       setCanAdvanced(hasPermission('search.advanced'));
       setCanFilterCategory(hasPermission('search.advanced.category'));
@@ -85,10 +117,43 @@ export default function SearchPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // F4: push active filter state to URL
+  function pushUrlState(overrides?: { q?: string; category?: string; from?: string; to?: string; source?: string }) {
+    const activeQ = overrides?.q !== undefined ? overrides.q : q;
+    const activeCat = overrides?.category !== undefined ? overrides.category : category;
+    const activeFrom = overrides?.from !== undefined ? overrides.from : from;
+    const activeTo = overrides?.to !== undefined ? overrides.to : to;
+    const activeSrc = overrides?.source !== undefined ? overrides.source : source;
+    const params = new URLSearchParams();
+    if (activeQ.trim()) params.set('q', activeQ.trim());
+    if (activeCat) params.set('cat', activeCat);
+    if (activeFrom) params.set('from', activeFrom);
+    if (activeTo) params.set('to', activeTo);
+    if (activeSrc) params.set('src', activeSrc);
+    router.replace('/search?' + params.toString(), { scroll: false });
+  }
+
   async function runSearch() {
-    if (!q.trim()) return;
+    // F23: clear stale results on empty query
+    if (!q.trim()) { setResults([]); setIgnoredFilters([]); return; }
+    // F31: date range validation
+    if (from && to && from > to) {
+      setError('End date must be after start date.');
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError('');
+    // F8: clear ignored filters at start of each search
+    setIgnoredFilters([]);
+    setIgnoredFiltersDismissed(false);
+    // F24: clear stale results before each new search
+    setResults([]);
+    // F19: abort any in-flight request
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     const params = new URLSearchParams({ q: q.trim() });
     if (canAdvanced) {
       if (category && canFilterCategory) params.set('category', category);
@@ -97,14 +162,29 @@ export default function SearchPage() {
       if (source && canFilterSource) params.set('source', source);
     }
     try {
-      const res = await fetch(`/api/search?${params.toString()}`);
+      const res = await fetch(`/api/search?${params.toString()}`, { signal: controller.signal });
       const data = (await res.json().catch(() => ({}))) as SearchResponse;
       if (!res.ok) {
         if (data?.error) console.error('[search]', data.error);
         throw new Error('Search failed');
       }
-      setResults(data.articles || []);
-    } catch {
+      // F1: filter out articles with null slug before setting results
+      setResults((data.articles || []).filter((a: ArticleHit) => a.stories?.slug));
+      // F8: surface ignored_filters if any
+      if (data.ignored_filters && data.ignored_filters.length > 0) {
+        setIgnoredFilters(data.ignored_filters);
+      }
+      // F4: update URL after successful search
+      const activeParams = new URLSearchParams();
+      if (q.trim()) activeParams.set('q', q.trim());
+      if (canAdvanced && category && canFilterCategory) activeParams.set('cat', category);
+      if (canAdvanced && from && canFilterDate) activeParams.set('from', from);
+      if (canAdvanced && to && canFilterDate) activeParams.set('to', to);
+      if (canAdvanced && source && canFilterSource) activeParams.set('src', source);
+      router.replace('/search?' + activeParams.toString(), { scroll: false });
+    } catch (e) {
+      // F19: ignore AbortError
+      if (e instanceof DOMException && e.name === 'AbortError') return;
       setError('Search failed. Try again.');
     } finally {
       setLoading(false);
@@ -116,17 +196,29 @@ export default function SearchPage() {
     borderRadius: 8,
     border: '1px solid #e5e5e5',
     fontSize: 13,
-    outline: 'none',
+    // F6: removed outline: 'none' so browser default focus ring shows
     background: '#fff',
   };
+
+  // F15: skeleton while canView is null (perms not yet hydrated)
+  if (canView === null) {
+    return (
+      <div style={{ maxWidth: 820, margin: '0 auto', padding: '24px 16px 80px' }}>
+        <h1 style={{ fontSize: 24, fontWeight: 800, margin: '0 0 16px' }}>Search</h1>
+        <div style={{ height: 44, background: 'var(--card, #f0f0f0)', borderRadius: 10, marginBottom: 16 }} />
+      </div>
+    );
+  }
 
   if (!canView) {
     return (
       <div style={{ maxWidth: 520, margin: '64px auto', padding: '0 16px', textAlign: 'center' }}>
         <h1 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 12px' }}>Search unavailable</h1>
-        <p style={{ fontSize: 13, color: '#666' }}>
-          Search is disabled on your account. Contact support if you think this is a mistake.
-        </p>
+        {/* F16: branch copy on auth state */}
+        {!isAuthed
+          ? <p style={{ fontSize: 13, color: '#666' }}>Sign in to use search.</p>
+          : <p style={{ fontSize: 13, color: '#666' }}>Search is unavailable on your account. <a href="/appeal">Contact support →</a></p>
+        }
       </div>
     );
   }
@@ -135,123 +227,192 @@ export default function SearchPage() {
     <div style={{ maxWidth: 820, margin: '0 auto', padding: '24px 16px 80px' }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, margin: '0 0 16px' }}>Search</h1>
 
-      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && runSearch()}
-          placeholder="Search by keyword"
-          aria-label="Search articles"
-          style={{
-            flex: 1,
-            padding: '10px 14px',
-            borderRadius: 10,
-            border: '1px solid #e5e5e5',
-            fontSize: 14,
-            outline: 'none',
-          }}
-        />
-        <button
-          onClick={runSearch}
-          disabled={!q.trim() || loading}
-          style={{
-            padding: '10px 18px',
-            minHeight: 44,
-            borderRadius: 10,
-            border: 'none',
-            background: q.trim() && !loading ? '#111' : '#ccc',
-            color: '#fff',
-            fontSize: 14,
-            fontWeight: 700,
-            cursor: q.trim() && !loading ? 'pointer' : 'default',
-          }}
-        >
-          {loading ? 'Searching…' : 'Search'}
-        </button>
-      </div>
+      {/* F11: visually-hidden live region for screen readers */}
+      <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap' }} aria-live="polite" aria-atomic="true">
+        {loading ? 'Searching…' : results.length > 0 ? `${results.length} results found` : q ? 'No results' : ''}
+      </span>
+
+      {/* F17: form wrapper so Enter and submit button both trigger runSearch */}
+      <form role="search" onSubmit={(e) => { e.preventDefault(); runSearch(); }}>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+          <input
+            value={q}
+            onChange={(e) => { setQ(e.target.value); setHasInteracted(true); }}
+            placeholder="Search by keyword"
+            aria-label="Search articles"
+            style={{
+              flex: 1,
+              padding: '10px 14px',
+              borderRadius: 10,
+              border: '1px solid #e5e5e5',
+              fontSize: 14,
+              // F6: removed outline: 'none' so browser default focus ring shows
+            }}
+          />
+          {/* F17: type="submit" + F25: aria-disabled */}
+          <button
+            type="submit"
+            disabled={!q.trim() || loading}
+            aria-disabled={!q.trim() || loading}
+            style={{
+              padding: '10px 18px',
+              minHeight: 44,
+              borderRadius: 10,
+              border: 'none',
+              background: q.trim() && !loading ? '#111' : '#ccc',
+              color: '#fff',
+              fontSize: 14,
+              fontWeight: 700,
+              cursor: q.trim() && !loading ? 'pointer' : 'default',
+            }}
+          >
+            {loading ? 'Searching…' : 'Search'}
+          </button>
+        </div>
+      </form>
 
       {canAdvanced ? (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-            gap: 8,
-            marginBottom: 16,
-          }}
-        >
-          {canFilterCategory && (
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              style={filterStyle}
-            >
-              <option value="">All categories</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          )}
-          {canFilterDate && (
-            <>
-              <input
-                type="date"
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
+        // F12: fieldset/legend wrapping the filter grid
+        <fieldset style={{ border: 'none', padding: 0, margin: '0 0 16px 0' }}>
+          <legend style={{ fontSize: 11, color: '#999', marginBottom: 6, fontWeight: 600 }}>Advanced filters</legend>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+              gap: 8,
+            }}
+          >
+            {canFilterCategory && (
+              // F10: aria-label for category select
+              <select
+                value={category}
+                onChange={(e) => { setCategory(e.target.value); pushUrlState({ category: e.target.value }); }}
                 style={filterStyle}
-                aria-label="From date"
-              />
+                aria-label="Filter by category"
+              >
+                <option value="">All categories</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            {canFilterDate && (
+              <>
+                <input
+                  type="date"
+                  value={from}
+                  onChange={(e) => { setFrom(e.target.value); pushUrlState({ from: e.target.value }); }}
+                  // F29: Enter triggers search
+                  onKeyDown={(e) => e.key === 'Enter' && runSearch()}
+                  style={filterStyle}
+                  aria-label="From date"
+                />
+                <input
+                  type="date"
+                  value={to}
+                  // F31: min attribute prevents browser from picking a date before 'from'
+                  min={from}
+                  onChange={(e) => { setTo(e.target.value); pushUrlState({ to: e.target.value }); }}
+                  // F29: Enter triggers search
+                  onKeyDown={(e) => e.key === 'Enter' && runSearch()}
+                  style={filterStyle}
+                  aria-label="To date"
+                />
+              </>
+            )}
+            {canFilterSource && (
+              // F10: aria-label for source input
               <input
-                type="date"
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
+                value={source}
+                onChange={(e) => { setSource(e.target.value); pushUrlState({ source: e.target.value }); }}
+                // F29: Enter triggers search
+                onKeyDown={(e) => e.key === 'Enter' && runSearch()}
+                placeholder="Source publisher…"
                 style={filterStyle}
-                aria-label="To date"
+                aria-label="Filter by source publisher"
               />
-            </>
-          )}
-          {canFilterSource && (
-            <input
-              value={source}
-              onChange={(e) => setSource(e.target.value)}
-              placeholder="Source publisher…"
-              style={filterStyle}
-            />
-          )}
-        </div>
+            )}
+          </div>
+        </fieldset>
       ) : (
-        <div
-          style={{
-            background: '#f7f7f7',
-            border: '1px solid #e5e5e5',
-            borderRadius: 10,
-            padding: '10px 14px',
-            marginBottom: 16,
-            fontSize: 12,
-            color: '#666',
-          }}
-        >
-          Advanced filters (date range, category, source) are available on paid plans.{' '}
-          <a href="/profile/settings#billing" style={{ color: '#111', fontWeight: 700 }}>
-            View plans →
-          </a>
-        </div>
+        // F27: only show tease after user has interacted; F3/F14: branch copy on auth state
+        !canAdvanced && hasInteracted && (
+          <div
+            style={{
+              background: '#f7f7f7',
+              border: '1px solid #e5e5e5',
+              borderRadius: 10,
+              padding: '10px 14px',
+              marginBottom: 16,
+              fontSize: 12,
+              color: '#666',
+            }}
+          >
+            {isAuthed === false
+              ? <>Advanced filters (date range, category, source) are available to signed-in users.{' '}<Link href="/login">Sign in →</Link></>
+              : <>Advanced filters are a Verity Plus perk.{' '}<Link href="/pricing">See plans →</Link></>
+            }
+          </div>
+        )
       )}
 
       {error && (
         <ErrorState inline message={error} onRetry={runSearch} style={{ marginBottom: 10 }} />
       )}
 
-      <div style={{ fontSize: 11, color: '#999', marginBottom: 6 }}>
+      {/* F8: ignored_filters inline notice */}
+      {ignoredFilters.length > 0 && !ignoredFiltersDismissed && (
+        <div
+          style={{
+            background: '#fffbe6',
+            border: '1px solid #ffe58f',
+            borderRadius: 8,
+            padding: '8px 12px',
+            marginBottom: 10,
+            fontSize: 12,
+            color: '#666',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 8,
+          }}
+        >
+          <span>
+            {ignoredFilters.includes('source_partial')
+              ? 'Source filter matched too many articles — try a more specific term.'
+              : `Some filters were not applied: ${ignoredFilters.join(', ')}.`
+            }
+          </span>
+          <button
+            type="button"
+            onClick={() => setIgnoredFiltersDismissed(true)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#888', padding: 0 }}
+            aria-label="Dismiss notice"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* F13: fontSize 12 instead of 11; F11: aria-live on result count */}
+      <div style={{ fontSize: 12, color: '#999', marginBottom: 6 }} aria-live="polite" aria-atomic="true">
         {results.length > 0 ? `${results.length} result${results.length === 1 ? '' : 's'}` : null}
       </div>
+
+      {/* F30: pre-search blank state */}
+      {!q && !loading && (
+        <div style={{ padding: '32px 0', textAlign: 'center', color: '#666', fontSize: 13 }}>
+          Search Verity Post articles by keyword.
+        </div>
+      )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {results.map((a) => (
           <Link
             key={a.id}
-            href={a.stories?.slug ? `/${a.stories.slug}` : '#'}
+            href={`/${a.stories!.slug}`}
             prefetch={false}
             style={{
               display: 'block',
@@ -270,7 +431,13 @@ export default function SearchPage() {
             <div style={{ fontSize: 11, color: '#666' }}>
               {a.categories?.name}
               {a.categories?.name && a.published_at ? ' · ' : ''}
-              {formatDate(a.published_at)}
+              {/* F5: hybrid timestamp — relative if <24h, absolute otherwise */}
+              {a.published_at && (() => {
+                const diffMs = Date.now() - new Date(a.published_at).getTime();
+                return diffMs < 24 * 60 * 60 * 1000
+                  ? new Intl.RelativeTimeFormat('en', { numeric: 'auto' }).format(-Math.round(diffMs / 60000), 'minute')
+                  : formatDate(a.published_at);
+              })()}
             </div>
           </Link>
         ))}
@@ -284,7 +451,7 @@ export default function SearchPage() {
             </div>
             <Link
               href="/browse"
-              aria-label="Browse all categories"
+              aria-label="Browse categories"
               style={{
                 display: 'inline-block',
                 padding: '9px 18px',
@@ -348,5 +515,18 @@ export default function SearchPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={
+      <div style={{ maxWidth: 820, margin: '0 auto', padding: '24px 16px 80px' }}>
+        <h1 style={{ fontSize: 24, fontWeight: 800, margin: '0 0 16px' }}>Search</h1>
+        <div style={{ height: 44, background: 'var(--card, #f0f0f0)', borderRadius: 10, marginBottom: 16 }} />
+      </div>
+    }>
+      <SearchPageContent />
+    </Suspense>
   );
 }

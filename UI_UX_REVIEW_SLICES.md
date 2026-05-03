@@ -523,6 +523,7 @@ Seed `ad_placements` rows + add `<Ad placement="..."/>` calls:
 | Slice 9 — Cross-platform parity bridges | Cross-cutting | shipped 2026-05-02 (3-stream parallel; UpNextSheet+ribbon+teaser+NOW marker web; iOS sort+denial+mod; tsc clean; commit c9a1837 pushed) | 4 | #052 | 1 |
 | Slice 10 — Wave A verification sweep | Verification | not started | all Wave A unit-fix slices | — | 1 |
 | Slice 11 — Unit 3 / Browse (38 findings) | Unit fix | shipped 2026-05-02 (2-stream parallel; tsc + build clean; smoke PASS; all 38 findings fixed) | 1 + 2 | #029, #053, #054 | 1 |
+| Slice 12 — Unit 4 / Search (32 findings) | Unit fix | shipped 2026-05-02 (2-stream parallel; Suspense boundary fix post-smoke; tsc + smoke PASS; 29 findings fixed; F20 refuted; F28/F32 deferred) | none | #022, #029, #031, #032, #043, #053, #054 | 1 |
 
 ---
 
@@ -605,12 +606,285 @@ Seed `ad_placements` rows + add `<Ad placement="..."/>` calls:
 
 ---
 
+---
+
+## Slice 12 — Unit 4 / Search (`/search`) — 32 findings
+
+**Status:** ready
+**Prerequisite:** None (Search page is standalone; Slices 1+2 foundations do not block this slice).
+**Elevated-care:** NO. No RBAC rename, no payments, no kid safety, no schema migration. Standard adversary pass recommended.
+**Unit doc:** `UI_UX_REVIEW/A-4-search.md`
+**Decisions consumed:** #022, #029, #031, #032, #043, #053, #054.
+
+### Why two streams
+
+Findings split cleanly across two file groups with no overlap:
+- **Stream A** owns new + API files: `web/src/app/search/layout.tsx` (new) + `web/src/app/api/search/route.js`
+- **Stream B** owns the page: `web/src/app/search/page.tsx`
+
+Both streams can run in parallel. Verification pass runs after both complete.
+
+---
+
+### Stream A — New layout file + API route fixes
+
+**Files:** `web/src/app/search/layout.tsx` (create), `web/src/app/api/search/route.js`
+
+**F2 — Create `layout.tsx` with metadata:**
+Create `web/src/app/search/layout.tsx`:
+```tsx
+import type { Metadata } from 'next';
+export const metadata: Metadata = {
+  title: 'Search · Verity Post',
+  description: 'Search Verity Post articles by keyword.',
+  robots: { index: false, follow: false },
+  openGraph: { title: 'Search · Verity Post', type: 'website' },
+};
+export default function SearchLayout({ children }: { children: React.ReactNode }) {
+  return <>{children}</>;
+}
+```
+`robots: { index: false }` because search-result pages are thin-content — no permanent canonical page exists. Matches DECISION #053 pattern.
+
+**F20 — `to` date filter drops same-day articles (`route.js:96`):**
+`published_at` is `timestamptz`. A bare `YYYY-MM-DD` in `.lte()` compares against midnight UTC, silently excluding articles published that day. Fix:
+```js
+if (to) query = query.lte('published_at', to + 'T23:59:59.999Z');
+```
+
+**F21 — `sanitizeIlikeTerm` strips double-quotes, breaking phrase search (`route.js:22-26`):**
+The advanced path uses `websearch_to_tsquery` which treats `"..."` as a phrase. Stripping `"` from `q` before passing it breaks paid users' phrase searches. The ilike path (basic/free) doesn't use `"` semantics so stripping is fine there.
+
+Fix: separate the sanitization. Create two sanitizer variants:
+```js
+function sanitizeIlikeTerm(s) {
+  return String(s || '').replace(/[,.%*()"\\]/g, ' ').trim();
+}
+function sanitizeWebsearchTerm(s) {
+  // Preserve double-quotes for phrase matching; strip other PostgREST-breaking chars
+  return String(s || '').replace(/[,.%*()'\\]/g, ' ').trim();
+}
+```
+In `GET`: apply `sanitizeWebsearchTerm(q)` for the `textSearch` call on the advanced path; keep `sanitizeIlikeTerm(q)` for the `.ilike` fallback path. Also add single-quote stripping to `sanitizeIlikeTerm` since it was missing.
+
+**F22 — Source sub-query `.in()` unbounded, can exceed URL limit (`route.js:108`):**
+500 UUIDs in a PostgREST `.in()` generates a URL that can exceed nginx/PostgREST defaults. Fix: cap the lookup at 200 IDs and return a `partial_results: true` flag when truncated, OR switch the source filter to a server-side JOIN instead of two queries.
+
+Simplest correct fix: replace the sub-query with a join via PostgREST's embedded resource syntax:
+```js
+// Replace the sub-query with a direct ilike join
+query = query.ilike('sources.publisher', `%${source}%`);
+// This requires 'sources' to be included in the select; update select to add sources(publisher)
+```
+But since the select chain starts before this block, the safer mechanical fix is the cap + flag:
+```js
+const ids = (srcArticleIds || []).map((r) => r.article_id).slice(0, 200);
+if ((srcArticleIds || []).length > 200) {
+  ignoredFilters.push('source_partial');
+}
+```
+Add `source_partial` to the `ignored_filters` shape so the client can surface "Source filter matched too many articles — refine your search."
+
+---
+
+### Stream B — `page.tsx` fixes
+
+**Files:** `web/src/app/search/page.tsx` only.
+
+**F1 — `href="#"` on null slug (`page.tsx:254`):**
+DECISION #022: filter at query layer. The API already only returns published articles but a story's slug could still be null. The API should filter null slugs server-side. Update the select in `route.js` to add `.not('stories.slug', 'is', null)` — but since Stream A owns route.js, Stream B handles the client-side defense:
+In `runSearch`, after setting `results`, filter client-side as a belt: `setResults((data.articles || []).filter(a => a.stories?.slug));`. This is a secondary guard — the primary fix belongs in route.js. Implementer note: also ask route.js stream (A) to add `.not('stories.slug', 'is', null)` to the `.select()` query chain at route.js:46-53.
+*(Coordination note: Stream A implementer adds the route-level filter; Stream B adds the client-side guard.)*
+
+**F3 — Filter tease links to wrong URL (`page.tsx:236-237`):**
+Change `<a href="/profile/settings#billing">` to `<Link href="/pricing">` with text "See plans →" per DECISION #031. Import `Link` from `next/link` (already imported at top of file).
+
+**F4 — No URL state persistence (`page.tsx:47-51`):**
+Add `useSearchParams` and `useRouter` imports. On mount, read `searchParams` to initialize `q`, `category`, `from`, `to`, `source` state. On `runSearch`, call `router.replace('/search?' + new URLSearchParams(activeParams).toString(), { scroll: false })` where `activeParams` includes non-empty values only. On filter change (onChange handlers), update URL immediately (same `router.replace` call) so Back button restores state. Include only: `q`, `cat` (mapped from `category`), `from`, `to`, `src` (mapped from `source`). Omit `subcategory` (server-side only, F28).
+
+**F5 — `formatDate` always absolute (`page.tsx:271`):**
+Replace `formatDate(a.published_at)` with a static hybrid inline:
+```tsx
+{a.published_at && (() => {
+  const diffMs = Date.now() - new Date(a.published_at).getTime();
+  return diffMs < 24 * 60 * 60 * 1000
+    ? timeAgo(a.published_at)  // use existing timeAgo helper if available
+    : formatDate(a.published_at);
+})()}
+```
+Check if `timeAgo` or equivalent exists in `@/lib/dates`; use it. If only `formatDate` exists, check what browse or home uses for relative time and match. Emit static server-render-safe values: no `Date.now()` on client-only island since this page is `'use client'` — static hybrid is still correct here, just no ticking (DECISION #029 prohibits client-side ticking anyway).
+
+**F6 — `outline: 'none'` kills all focus rings (`page.tsx:119, 150`):**
+Replace `outline: 'none'` in `filterStyle` and in the search input's inline style with a custom focus ring:
+```tsx
+':focus-visible': { outline: '2px solid var(--accent, #111)', outlineOffset: 2 }
+```
+But since these are inline CSSProperties (not emotion/CSS modules), inline styles can't do `:focus-visible`. The correct fix: remove `outline: 'none'` entirely and instead add a CSS class or use a `<style>` JSX tag for focus ring customization. Simplest: replace `outline: 'none'` with `outline: 'none'` only on `:focus:not(:focus-visible)` — but inline styles can't do pseudo. **Correct fix:** Remove `outline: 'none'` from both locations. Let the browser's default focus ring show. The search page uses a rounded border already, so a browser ring is acceptable. Full custom styling can wait for the design-token pass.
+
+**F7 — `canView` init `true` then flips (flash of UI for restricted users) (`page.tsx:42`):**
+Change `useState<boolean>(true)` to `useState<boolean | null>(null)`. In the JSX, when `canView === null`, render a skeleton (a neutral loading state — e.g., the search bar + a pulse rect for the filter area). When `canView === false`, render the "unavailable" branch. When `canView === true`, render the search UI. This eliminates the flash.
+
+**F8 — `ignored_filters` not surfaced (`page.tsx:106`):**
+Update `SearchResponse` to include `ignored_filters?: string[]`. In `runSearch`, after setting `results`, check if `data.ignored_filters?.length > 0` and surface an inline note below the filter row: "Some filters were not applied: {list}. Upgrade for full access." or for partial source results: "Source filter matched too many articles — try a more specific term." Use a small `<div>` above the results list. Dismiss on next search.
+
+**F10 — Filter inputs missing `aria-label` (`page.tsx:183, 215`):**
+Add `aria-label="Filter by category"` to the `<select>`. Add `aria-label="Filter by source publisher"` to the source `<input>`.
+
+**F11 — No `aria-live` for result count / state (`page.tsx:246-248`):**
+Add `aria-live="polite" aria-atomic="true"` to the result count `<div>`. Also ensure the loading state ("Searching…") is announced. Add a visually-hidden but `aria-live="polite"` status element that announces: "Searching…" when `loading=true`, "N results found" when results land, "No results for [query]" on empty.
+
+**F12 — No `fieldset`/`legend` on filter group (`page.tsx:173-245`):**
+For the `canAdvanced` branch, wrap the filter grid in:
+```tsx
+<fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
+  <legend style={{ fontSize: 11, color: '#999', marginBottom: 6, fontWeight: 600 }}>
+    Advanced filters
+  </legend>
+  {/* filter controls */}
+</fieldset>
+```
+This also handles F12 and partially F27 (fieldset visible legend acts as context label before search).
+
+**F13 — Result count `fontSize: 11` (`page.tsx:246`):**
+Change to `fontSize: 12`.
+
+**F14 — Filter tease copy wrong for anon vs paid (`page.tsx:235-238`):**
+The tease must branch on auth state per DECISION #032 + #043. Add auth state tracking:
+```tsx
+const [isAuthed, setIsAuthed] = useState<boolean | null>(null);
+// in useEffect after refreshAllPermissions:
+const { data: { user } } = await supabase.auth.getUser();
+setIsAuthed(!!user);
+```
+Then in the tease block:
+```tsx
+{isAuthed === false
+  ? <>Advanced filters (date range, category, source) are available to signed-in users.{' '}<Link href="/login" style={...}>Sign in →</Link></>
+  : <>Advanced filters are a Verity Plus perk.{' '}<Link href="/pricing" style={...}>See plans →</Link></>
+}
+```
+
+**F15 — No loading skeleton during perm hydrate (`page.tsx:57`):**
+When `canView === null` (per F7 fix), render a skeleton:
+```tsx
+if (canView === null) {
+  return (
+    <div style={{ maxWidth: 820, margin: '0 auto', padding: '24px 16px 80px' }}>
+      <h1 style={{ fontSize: 24, fontWeight: 800, margin: '0 0 16px' }}>Search</h1>
+      <div style={{ height: 44, background: '#f0f0f0', borderRadius: 10, marginBottom: 16 }} />
+    </div>
+  );
+}
+```
+
+**F16 — `canView=false` copy conflates restriction with anon (`page.tsx:123-131`):**
+Apply DECISION #032 branch. Since we now have `isAuthed` state:
+```tsx
+{!isAuthed
+  ? <p>Sign in to use search.</p>
+  : <p>Search is unavailable on your account. <a href="/appeal">Contact support →</a></p>
+}
+```
+
+**F17 — No `<form>` wrapper, search button no `type` (`page.tsx:138-169`):**
+Wrap the search row (input + button) in `<form role="search" onSubmit={(e) => { e.preventDefault(); runSearch(); }}>`. Change the `<button>` to `type="submit"`. Remove the `onKeyDown` Enter handler from the input (the form submit handles it). This also makes Enter from any filter input inside the form trigger search — but filter inputs are outside this form, so add `onKeyDown={(e) => e.key === 'Enter' && runSearch()}` to the date and source filter inputs (F29).
+
+**F18 — Anon "Search unavailable" if `search.articles.free` not seeded (`page.tsx:67`):**
+The comment says anon users should pass the `canView` check. Verify in the anon permission set that `search.articles.free` OR `search.view` OR `search.basic` is granted. The fix belongs in the DB seed, not the component. However, the component logic should be defensive: if all three perms return false, before concluding `canView=false`, check if the user is anon and if so, default to `true` for the page gate (anon basic search is always permitted per the API's intentional anon-passthrough). Update the check:
+```tsx
+const user = supabase.auth.getUser();
+const isAnon = !(await user).data.user;
+setCanView(
+  isAnon ||  // anon users always get the search page
+  hasPermission('search.view') ||
+  hasPermission('search.basic') ||
+  hasPermission('search.articles.free')
+);
+```
+File a follow-up note: confirm `search.articles.free` is in the `anon` permission set via MCP before ship (check `permission_set_items` where `set_name = 'anon'`).
+
+**F19 — No AbortController: concurrent searches race (`page.tsx:100`):**
+Add an abort controller ref:
+```tsx
+const abortRef = useRef<AbortController | null>(null);
+```
+In `runSearch`, at start: `abortRef.current?.abort(); const controller = new AbortController(); abortRef.current = controller;`. Pass `{ signal: controller.signal }` to `fetch`. On catch, check `if (e instanceof DOMException && e.name === 'AbortError') return;` to skip setting error state for intentional aborts.
+
+**F23 — `runSearch` doesn't clear stale results on empty `q` (`page.tsx:89`):**
+Before the `if (!q.trim()) return;` guard, add `setResults([]);` and `setError('');` so clearing the input and pressing Enter/Submit clears the previous results. Change the guard to:
+```tsx
+if (!q.trim()) { setResults([]); return; }
+```
+
+**F24 — Stale results persist on error + stale count (`page.tsx:91`):**
+At the start of `runSearch` (after the empty-q guard), add `setResults([]);` to clear before each new search. The result count will naturally clear since it's derived from `results.length`. The error state is already cleared at start (`setError('')`).
+
+**F25 — Disabled button missing `aria-disabled` (`page.tsx:154`):**
+Add `aria-disabled={!q.trim() || loading}` to the `<button>`.
+
+**F26 — `aria-label` mismatch on Browse button (`page.tsx:287`):**
+Change `aria-label="Browse all categories"` to `aria-label="Browse categories"` (match visible text).
+
+**F27 — Filter tease shown before any search attempted (`page.tsx:223`):**
+Show the tease only after the user has interacted (either typed something or the upgrade state is relevant). Add state: `const [hasInteracted, setHasInteracted] = useState(false);`. On `setQ` change, set `setHasInteracted(true)`. In the tease render, add `{!canAdvanced && hasInteracted && <div>...tease...</div>}`. This prevents the upsell from being the first thing a user sees. Exception: if they arrive via URL with `?q=` params (from URL persistence), treat that as having interacted.
+
+**F29 — Enter key not wired on filter inputs (`page.tsx:197-220`):**
+Add `onKeyDown={(e) => e.key === 'Enter' && runSearch()}` to:
+- From date input (line ~197)
+- To date input (line ~205)
+- Source publisher input (line ~215)
+
+**F30 — Pre-search blank state (`page.tsx:277`):**
+The zero-results block only renders when `q` is truthy and results are empty. Add a pre-search state above the results list, visible when `!q && !loading`:
+```tsx
+{!q && !loading && (
+  <div style={{ padding: '32px 0', textAlign: 'center', color: '#666', fontSize: 13 }}>
+    Search Verity Post articles by keyword.
+  </div>
+)}
+```
+
+**F31 — Date range: no `from ≤ to` validation (`page.tsx:197`):**
+Add validation in `runSearch` before the fetch:
+```tsx
+if (from && to && from > to) {
+  setError('End date must be after start date.');
+  setLoading(false);
+  return;
+}
+```
+Also add client-side constraint: set `min={from}` on the `to` date input so the browser picker prevents inverted selection.
+
+**Deferred (no fix needed this slice):**
+- F28: Subcategory client UI is a future slice; server-side support already exists. Log as out-of-scope enhancement.
+- F32: `?kids=1` scope — web search doesn't serve kid-profile accounts; flag as a future access-control check if kid accounts can reach `/search`.
+
+---
+
+### Verification pass (after both streams)
+
+- **Slug filter:** Search a query, inspect results — no `href="#"` links in DOM.
+- **Metadata:** `curl -s localhost:3000/search | grep 'og:title'` → "Search · Verity Post".
+- **URL persistence:** Search "climate", apply category filter. Copy URL, open in new tab — same results appear.
+- **Pricing link:** Inspect filter tease link — href is `/pricing` not `/profile/settings`.
+- **Timestamps:** Search yields articles both <24h and older. Check that recent articles show "Xm ago" and older show "May 2" format.
+- **Focus rings:** Tab through search input, date inputs, source input, submit button — all show visible focus ring.
+- **Mobile keyboard:** On a mobile viewport, focus the source input, press the Go key — confirm search fires.
+- **Abort race:** Type "a", click Search, immediately type "b", click Search. Confirm only the "b" results display (no flash of "a" results).
+- **Date range:** Set from=2025-01-01, to=2024-01-01, press Search — error message appears, no fetch.
+- **Same-day articles:** In test data, publish an article today. Search for it with `to=today's date`. Confirm it appears.
+- **Phrase search (paid user):** Log in as Verity Plus user. Search `"climate change"` (with quotes). Confirm results are phrase-matched, not single-term.
+- **`tsc` clean:** `bun --cwd web tsc` exits 0.
+- **`ignored_filters` display:** With a paid user in basic mode (manually downgrade perm in dev), pass `?source=reuters` via URL — confirm the UI surfaces "Some filters were not applied."
+
+---
+
 **Future Wave A unit-fix slices (added when their reviews complete):**
 
 | Slice # | Surface | Added when |
 |---|---|---|
 | Slice 12 | Unit 4 / Search (`/search`) | Unit 4 review concludes |
-| Slice 13 | Unit 5 / Category (`/category/[id]`) | Unit 5 review concludes |
+| Slice 13 | Unit 5 / Category (`/category/[id]`) | Unit 5 review concludes | 
 | Slice 14 | Unit 6 / Leaderboard (`/leaderboard`) | Unit 6 review concludes |
 | Slice 15 | Unit 7 / Public profile chrome (kill-switched) | Unit 7 review concludes |
 | Slice 16 | Unit 8 / Marketing bundle | Unit 8 review concludes |

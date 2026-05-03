@@ -20,15 +20,19 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // Strip PostgREST filter-delimiter chars + wildcards so user input
 // can't break out of the enclosing .or()/.ilike() pattern.
 function sanitizeIlikeTerm(s) {
-  return String(s || '')
-    .replace(/[,.%*()"\\]/g, ' ')
-    .trim();
+  return String(s || '').replace(/[,.%*()"'\\]/g, ' ').trim();
+}
+function sanitizeWebsearchTerm(s) {
+  // Preserve double-quotes for phrase matching; strip other PostgREST-breaking chars
+  return String(s || '').replace(/[,.%*()'\\]/g, ' ').trim();
 }
 
 export async function GET(request) {
   const url = new URL(request.url);
-  const q = sanitizeIlikeTerm(url.searchParams.get('q') || '');
-  if (!q) return NextResponse.json({ articles: [] });
+  const rawQ = url.searchParams.get('q') || '';
+  const q = sanitizeIlikeTerm(rawQ);
+  const qAdvanced = sanitizeWebsearchTerm(rawQ);
+  if (!q && !qAdvanced) return NextResponse.json({ articles: [] });
 
   // Permission-driven tier check. For anon callers this returns false
   // and we stay on the basic title-only path.
@@ -49,6 +53,7 @@ export async function GET(request) {
       'id, title, stories(slug), excerpt, published_at, category_id, is_kids_safe, categories!fk_articles_category_id(name)'
     )
     .eq('status', 'published')
+    .not('stories.slug', 'is', null)
     .limit(50)
     .order('published_at', { ascending: false });
 
@@ -73,7 +78,7 @@ export async function GET(request) {
     // Migration 046 added articles.search_tsv (generated from title + excerpt + body)
     // with a GIN index. websearch handles bare keywords + quoted phrases + AND/OR the
     // way users expect, so we hand the sanitized q straight through.
-    query = query.textSearch('search_tsv', q, { type: 'websearch', config: 'english' });
+    query = query.textSearch('search_tsv', qAdvanced, { type: 'websearch', config: 'english' });
     // Per-filter gates so an admin can revoke one field without
     // disabling the whole advanced experience.
     if (category) {
@@ -106,7 +111,10 @@ export async function GET(request) {
           .select('article_id')
           .ilike('publisher', `%${source}%`)
           .limit(500);
-        const ids = (srcArticleIds || []).map((r) => r.article_id);
+        const ids = (srcArticleIds || []).map((r) => r.article_id).slice(0, 200);
+        if ((srcArticleIds || []).length > 200) {
+          ignoredFilters.push('source_partial');
+        }
         if (ids.length === 0) {
           return NextResponse.json({
             articles: [],
