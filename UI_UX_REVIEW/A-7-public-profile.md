@@ -1,34 +1,16 @@
 # Unit 7 — Public profile + card (`/u/[username]`, `/card/[username]`)
 
 **Surface(s):** `web/src/app/u/[username]/page.tsx` (766 lines), `web/src/app/u/[username]/layout.js`, `web/src/app/card/[username]/page.js` (295 lines), `web/src/app/card/[username]/layout.js`, `web/src/app/card/[username]/opengraph-image.js` (200 lines), `web/src/app/profile/card/page.js` (136 lines), `web/src/app/profile/[id]/page.tsx`, `web/src/components/FollowButton.tsx`, `web/src/lib/scoreTiers.ts`, `web/src/lib/reportReasons.js`, `web/src/app/api/users/[id]/block/route.js`, `web/src/app/api/reports/route.js`
-**Status:** findings (awaiting owner adjudication on Q1 before Slice 15 can open)
+**Status:** findings (Slice 15 READY — DECISION #060 locked 2026-05-02, all decisions locked)
 **Date:** 2026-05-02
 **Note on kill-switch:** INDEX previously labelled this "(KILL-SWITCHED — chrome only)". `PUBLIC_PROFILE_ENABLED` is currently `true` — surface is live. Full review applied.
-**Anchor:** Review complete. 3 independent reviewers merged. 45 findings logged (25 crit, 19 polish, 1 data). Owner-decision Q1 (show_activity on shareable card) panel returned 2-1 divergent — surfaced for adjudication. 2 decisions auto-locked (#059 private profile page, #061 card noindex). Elevated-care items: F01 (CSAM escalation), F15 (targetType injection), F16 (wrong permission for reports) — adversary pass required for Slice 15.
+**Anchor:** All decisions locked 2026-05-02. DECISION #060 owner answer: A (exempt). F21 → wontfix. Slice 15 now unblocked. Elevated-care: F01 (CSAM escalation), F15 (targetType injection), F16 (wrong permission) — adversary mandatory.
 
 ---
 
-## ⚠️ STOP FOR OWNER ADJUDICATION — Q1
+## DECISION #060 — locked (owner: Option A)
 
-**Q1: Does `show_activity=false` suppress stats on the shareable card (`/card/[username]`)?**
-
-Background: Users can set `show_activity=false` to hide their stats on their public profile. The shareable card at `/card/[username]` is an opt-in, paid (`profile.card_share`) surface that always shows `verity_score` and `streak_current` regardless of `show_activity`. Currently the card does not check the setting at all.
-
-Three domain experts polled:
-
-| Expert | Verdict | Key argument |
-|--------|---------|--------------|
-| Product UX | **Exempt** | Card is a deliberate, gated, paid act of self-disclosure. `show_activity=false` means "don't surface stats passively"; a link you actively share is different intent. |
-| Product consistency | **Exempt** | Card is a separate surface with its own visibility model. A user who pays for card-share and distributes the link has overridden the passive privacy toggle. |
-| Privacy | **Respect it — warn at generation** | `show_activity=false` is a blanket privacy baseline. Opt-in sharing ≠ specific consent to override it. Correct UX: warn at card-generation time if `show_activity=false`, let user flip it, default to suppression if they don't. |
-
-**Panel: 2-1 divergent. Owner must choose:**
-
-- **(A) Exempt** — card always shows stats; `show_activity` applies only to the passive public profile. No code change needed for this finding (F21 → wontfix).
-- **(B) Respect + warn** — if `show_activity=false` when user generates/views their card link in `/profile/card`, show a one-line warning: "Your activity is hidden — stats won't show on your card. [Update privacy settings]." Card page itself still suppresses stats when `show_activity=false`. Closes F21.
-- **(C) Suppress silently** — card respects `show_activity=false` with no explanation. Closes F21 but creates confusing blank card for paid users who forgot the setting.
-
-**Reply A / B / C to unlock Slice 15.**
+Card is exempt from `show_activity`. Stats always show on the shareable card — it is a deliberate, gated, opt-in paid surface. F21 → wontfix. Locked 2026-05-02.
 
 ---
 

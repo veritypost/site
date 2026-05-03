@@ -545,15 +545,11 @@ Key: revenue excluded from pitch export (leaks pricing floor). Bot impressions e
 - `layout.js` `generateMetadata`: return `{ robots: 'noindex,nofollow', title: 'Private profile · Verity Post' }` for private profiles.
 - Auto-locked: direct application of PRINCIPLE §3.2 + §7.1 (don't 404 gated-but-real surfaces).
 
-## #060 — `show_activity` on shareable card (pending owner answer)
-**Date:** PENDING — awaiting owner answer **Scope:** web `/card/[username]`
+## #060 — `show_activity` on shareable card (owner-locked: Option A)
+**Date:** 2026-05-02 **Scope:** web `/card/[username]`
 **Q:** Should `show_activity=false` suppress stats on the `/card/[username]` shareable card?
-**Panel result:** 2-1 divergent. Experts 1+3 (product UX + product consistency) voted exempt: card is a deliberate, gated, opt-in paid share — `show_activity=false` governs ambient passive profile visibility, not explicit opt-in surfaces. Expert 2 (privacy) voted respect + warn: `show_activity=false` is a blanket privacy baseline; opt-in sharing ≠ specific consent to override it; warn at generation time, default to suppression.
-**Owner options:** A = Exempt | B = Respect + warn at card-generation | C = Suppress silently
-**A:** No code change to card page. F21 → wontfix.
-**B:** In `/profile/card/page.js` — when `show_activity=false` on the logged-in user's own row, render a one-line warning before the card share link: "Your activity is hidden — stats won't show on your card. [Update privacy settings →]". Card page (`/card/[username]`) suppresses verity_score + streak_current when `show_activity=false`.
-**C:** Card page suppresses stats when `show_activity=false`; no warning in profile/card. F21 closed; users may not understand why their card appears blank.
-**Apply:** Implements F21 recipe. Slice 15 uses whichever option is chosen.
+**A:** **Exempt.** Card is a deliberate, gated, opt-in paid self-disclosure act. `show_activity=false` governs ambient passive profile visibility, not explicit opt-in surfaces. A user who pays for card-share and distributes the link has overridden the passive privacy toggle. Owner chose Option A 2026-05-02.
+**Apply:** No code change to card page for this finding. Unit 7 F21 → wontfix. Slice 15 unblocked.
 
 ## #061 — `/card/[username]` robots: noindex,nofollow is intentional (auto-locked)
 **Date:** 2026-05-02 **Scope:** web `/card/[username]`

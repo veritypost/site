@@ -3,14 +3,14 @@
 Single-line state for the review system. Updated automatically at session end.
 
 ```
-CURRENT_PHASE: owner-adjudication
+CURRENT_PHASE: fix-slice
 CURRENT_UNIT: 7
 CURRENT_TITLE: Unit 7 — Public profile + card (/u/[username], /card/[username])
 CURRENT_WAVE: A
 CURRENT_DOC: UI_UX_REVIEW/A-7-public-profile.md
 STATUS: findings
-NEXT_BUILD_SLICE: Slice 15 (Unit 7 / Public profile chrome) — BLOCKED on DECISION #060 (Q1: show_activity on card). Owner adjudication required before Slice 15 can proceed.
-ANCHOR: Slice 14 shipped 2026-05-02. 46 findings fixed; adversary closed 4 gaps (Rising Stars/category data leaks via URL bypass, useSearchParams Suspense, sign-out race). tsc clean, smoke PASS. Auto-detect fires owner-adjudication → surface DECISION #060 Q1 to owner.
+NEXT_BUILD_SLICE: Slice 15 (Unit 7 / Public profile chrome) — READY. DECISION #060 locked 2026-05-02 (owner: A). All decisions locked. Elevated-care: F01 (CSAM escalation), F15 (targetType injection), F16 (wrong permission) — adversary pass mandatory.
+ANCHOR: DECISION #060 locked 2026-05-02 (Option A: card exempt from show_activity). F21 → wontfix. Slice 15 unblocked. Next session auto-detect fires (c) → execute Slice 15.
 LAST_UPDATED: 2026-05-02
 
 PARKED_UNITS:
@@ -20,7 +20,7 @@ PARKED_UNITS:
 - Unit 4 (Search) — status: fixed (Slice 12 shipped 2026-05-02). 29 findings fixed.
 - Unit 5 (Category) — status: fixed (Slice 13 shipped 2026-05-02). 36 findings fixed (F33 refuted). 2 non-blocking adversary gaps deferred.
 - Unit 6 (Leaderboard) — status: fixed (Slice 14 shipped 2026-05-02). 46 findings fixed. 4 adversary gaps closed.
-- Unit 7 (Public profile + card) — status: findings (Slice 15 blocked on DECISION #060). 44 findings. 3 elevated-care (adversary req'd). DECISIONs #059+#061 auto-locked.
+- Unit 7 (Public profile + card) — status: findings (Slice 15 READY — all decisions locked). 44 findings. F21 wontfix. 3 elevated-care (adversary req'd). DECISIONs #059+#060+#061 locked.
 
 EXECUTION_PLAN: UI_UX_REVIEW_SLICES.md
 SLICE_NAMING: sequential numbers (Slice 1, 2, 3, ...). See SLICES.md tracking table for type (Foundation / Unit fix / Cross-cutting / Verification) and dependencies.
