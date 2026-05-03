@@ -85,6 +85,7 @@ function GraduationClaim({ token }: { token: string }) {
         return;
       }
       setDone({ display_name: j.display_name ?? null, email: email.trim().toLowerCase() });
+      setBusy(false);
     } catch (err) {
       setError(friendlyError(err, 'Could not complete setup. Try again.'));
       setBusy(false);
@@ -122,7 +123,7 @@ function GraduationClaim({ token }: { token: string }) {
             (parent can review it). Your saved categories carried over.
           </p>
           <p style={{ color: C.dim, fontSize: 13, lineHeight: 1.5, marginBottom: 12 }}>
-            Check your email for a sign-in link, or enter your email below to request one.
+            Sign in below — we&apos;ll email you an 8-digit code.
           </p>
           <a
             href={`/login${done.email ? `?email=${encodeURIComponent(done.email)}` : ''}`}

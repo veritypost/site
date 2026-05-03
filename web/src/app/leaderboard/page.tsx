@@ -133,7 +133,7 @@ function LeaderboardPageContent() {
   // `canCategories` → leaderboard.category.view.
   const [fullAccess, setFullAccess] = useState<boolean>(false);
   const [canCategories, setCanCategories] = useState<boolean>(false);
-  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent' | 'rate-limited' | 'error'>('idle');
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent' | 'rate-limited' | 'error' | 'no-pending'>('idle');
   const [meLoaded, setMeLoaded] = useState<boolean>(false);
 
   // URL-synced setters — router.replace keeps history clean (Back exits the page).
@@ -445,7 +445,12 @@ function LeaderboardPageContent() {
       } else if (res.ok) {
         setResendState('sent');
       } else {
-        setResendState('error');
+        const j = await res.json().catch(() => ({}));
+        if (j?.error === 'no_pending_change') {
+          setResendState('no-pending');
+        } else {
+          setResendState('error');
+        }
       }
     } catch {
       setResendState('error');
@@ -800,6 +805,10 @@ function LeaderboardPageContent() {
                   ) : resendState === 'rate-limited' ? (
                     <p style={{ marginTop: 8, fontSize: 14, color: 'var(--dim)' }}>
                       You&apos;ve already requested a verification email recently. Check your inbox.
+                    </p>
+                  ) : resendState === 'no-pending' ? (
+                    <p style={{ marginTop: 8, fontSize: 14, color: 'var(--dim)' }}>
+                      Your email is already up to date. Sign out and back in to refresh your status.
                     </p>
                   ) : resendState === 'error' ? (
                     <>

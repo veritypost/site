@@ -234,6 +234,21 @@ export async function requireVerifiedEmail(client) {
   return user;
 }
 
+// Reads `public.users.last_login_at` (set by `runReturningUserBookkeeping`
+// on every sign-in / OTP-confirm) rather than the JWT `last_sign_in_at`,
+// which is unavailable on the profile row that `getUser` returns and would
+// leave the gate trivially open (NaN > 900_000 → false). A stolen
+// long-lived session cannot bypass this by refreshing tokens — refresh
+// does not re-stamp `last_login_at`.
+export function assertRecentAuth(user, maxAgeMs = 900_000) {
+  const stamp = user?.last_login_at;
+  if (!stamp || Date.now() - new Date(stamp).getTime() > maxAgeMs) {
+    const err = new Error('recent_auth_required');
+    err.status = 401;
+    throw err;
+  }
+}
+
 export async function requireNotBanned(client) {
   const user = await requireAuth(client);
   if (user.is_banned) {

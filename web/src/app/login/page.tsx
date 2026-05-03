@@ -72,6 +72,8 @@ function LoginPageInner() {
       setNotice('Your sign-in link has expired. Enter your email below for a new one.');
     } else if (errorParam === 'missing_params') {
       setNotice('This sign-in link is invalid. Enter your email below to request a new one.');
+    } else if (errorParam === 'link_deprecated') {
+      setNotice('Sign-in links are no longer used. Enter your email below and we’ll send you a code.');
     }
   }, [searchParams]);
 

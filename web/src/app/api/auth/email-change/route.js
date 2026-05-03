@@ -1,7 +1,7 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified system_auth 2026-04-23
 import { NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth';
+import { requireAuth, assertRecentAuth } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import { isAsciiEmail } from '@/lib/emailNormalize';
@@ -54,11 +54,12 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
 
-  // Use last_sign_in_at (only updated on real auth events, not token refreshes)
-  // to enforce the recent-auth gate. Stolen long-lived sessions that have
-  // refreshed tokens cannot bypass this by having a fresh JWT iat.
-  if (!user.last_sign_in_at ||
-    (Date.now() - new Date(user.last_sign_in_at).getTime()) > 900_000) {
+  // Recent-auth gate via assertRecentAuth (reads public.users.last_login_at).
+  // Prior version read user.last_sign_in_at, which doesn't exist on the
+  // public.users profile row, so the gate always opened.
+  try {
+    assertRecentAuth(user);
+  } catch {
     return NextResponse.json({ error: 'recent_auth_required' }, { status: 401 });
   }
 

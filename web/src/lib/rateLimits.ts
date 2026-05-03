@@ -93,6 +93,11 @@ export const RATE_LIMITS = {
 
   COMMENT_POST_PER_USER: { windowSec: 60, max: 10 },
   COMMENT_VOTE_PER_USER: { windowSec: 60, max: 30 },
+
+  // CSP violation reports — per-IP cap so a single misbehaving page can't
+  // burst-flood the sink. 30/min is generous for a normal page; storms
+  // exceed this and silently drop. Replaces the old per-instance counter.
+  CSP_REPORT_PER_IP: { windowSec: 60, max: 30 },
 } as const satisfies Record<string, RateLimitPolicy>;
 
 export type RateLimitKey = keyof typeof RATE_LIMITS;

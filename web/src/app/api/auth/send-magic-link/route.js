@@ -65,8 +65,6 @@ import { createOtpClient, createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import { getRateLimitPolicy } from '@/lib/rateLimits';
 import { isAsciiEmail } from '@/lib/emailNormalize';
-import { getSiteUrl } from '@/lib/siteUrl';
-import { resolveNext } from '@/lib/authRedirect';
 import { truncateIpV4 } from '@/lib/apiErrors';
 import { checkSignupGate, isApprovedEmail } from '@/lib/betaGate';
 import { REF_COOKIE_NAME } from '@/lib/referralCookie';
@@ -139,7 +137,6 @@ export async function POST(request) {
   }
 
   const rawEmail = typeof payload?.email === 'string' ? payload.email.trim() : '';
-  const rawNext = typeof payload?.next === 'string' ? payload.next : null;
   // Format gate. Reject anything that doesn't look like local@domain
   // with ASCII-only codepoints. isAsciiEmail handles the homoglyph
   // guard (T299) so a Cyrillic-bypass attempt 400s here, identical to
@@ -256,7 +253,6 @@ export async function POST(request) {
   // Step 1: Create auth.users row for new emails. generateLink throws
   // "User not found" if the row doesn't exist yet. Silently skip errors
   // that mean the row already exists (race or trigger beat us here).
-  const siteUrl = getSiteUrl();
   if (!existingUserId) {
     try {
       const { error: createErr } = await service.auth.admin.createUser({
@@ -279,25 +275,20 @@ export async function POST(request) {
     }
   }
 
-  // Step 2: Generate the magic link. We build our own confirm URL from
-  // hashed_token so the button lands directly on our Route Handler
-  // without a Supabase redirect in between (avoids implicit-flow hash
-  // fragment issues and gives us full control over the URL params).
-  let actionLink = null;
+  // Step 2: Generate the OTP. Q05: OTP-only — no clickable link in email.
+  // URL prefetchers were burning single-use tokens. email_otp is extracted
+  // from the generateLink response; hashed_token is discarded.
   let emailOtp = null;
   try {
     const { data: linkData, error: linkErr } = await service.auth.admin.generateLink({
       type: 'magiclink',
       email,
-      options: { redirectTo: `${siteUrl}/api/auth/confirm` },
     });
-    if (linkErr || !linkData?.properties?.hashed_token || !linkData?.properties?.email_otp) {
-      console.error('[auth.send-magic-link] generateLink error:', linkErr?.message || 'missing fields');
+    if (linkErr || !linkData?.properties?.email_otp) {
+      console.error('[auth.send-magic-link] generateLink error:', linkErr?.message || 'missing email_otp');
       await writeAuditRow(service, { email, reason: 'generate_link_error', ipTruncated });
       return genericOk();
     }
-    const safeNext = resolveNext(rawNext, null);
-    actionLink = `${siteUrl}/api/auth/confirm?t=${encodeURIComponent(linkData.properties.hashed_token)}&e=${encodeURIComponent(email)}${safeNext ? `&next=${encodeURIComponent(safeNext)}` : ''}`;
     emailOtp = linkData.properties.email_otp;
   } catch (err) {
     console.error('[auth.send-magic-link] generateLink threw:', err?.message || err);
@@ -330,7 +321,7 @@ export async function POST(request) {
   try {
     const { html, text, subject, fromName, fromEmail } = renderTemplate(
       MAGIC_LINK_TEMPLATE,
-      buildMagicLinkVars({ action_link: actionLink, email_otp: emailOtp, days_on_list: daysOnList })
+      buildMagicLinkVars({ email_otp: emailOtp, days_on_list: daysOnList })
     );
     const mailRes = await sendEmail({ to: email, subject, html, text, fromName, fromEmail });
     console.log('MAIL_OK id=' + mailRes?.id + ' to=' + email + ' from=' + fromEmail);

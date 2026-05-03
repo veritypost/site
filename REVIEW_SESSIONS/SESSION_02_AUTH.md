@@ -79,4 +79,73 @@ After fixing the email-change endpoint, check whether the iOS adult app's email-
 
 ## Status
 
-(append final status block here)
+**Session 2 shipped 2026-05-03. 6/10 closed, 4/10 refuted in pre-impl pass.**
+
+### Closed (6)
+
+| # | Finding | File:line | Fix |
+|---|---|---|---|
+| P0-A | Q04 email-change recent-auth gate always opens (reads non-existent column) | `web/src/app/api/auth/email-change/route.js:57-63` | New `assertRecentAuth(user)` helper in `web/src/lib/auth.js`; reads `public.users.last_login_at`; route catches throw and 401s. |
+| P1-#3 | `auth.resend({type:'signup'})` 400s for OTP user base | `web/src/app/api/auth/resend-verification/route.js:39` | Switched to `auth.resend({type:'email_change', email: <pending new email>})`. New email read via service-role `auth.admin.getUserById`. Returns `no_pending_change` 400 when no pending change exists. |
+| P1-#4 | Gate-deny may leave session cookie if `signOut` errors | `web/src/app/api/auth/verify-magic-code/route.ts:191-195` | Added explicit `cookies().delete()` of `sb-<ref>-auth-token` + `.0`–`.4` chunks regardless of signOut outcome. |
+| P1-#7 | Welcome graduation form leaves `busy=true` after success | `web/src/app/welcome/page.tsx:87` | Added `setBusy(false)` immediately before `setDone({...})`. |
+| P1-#8 | `/api/csp-report` rate limit per-instance not per-IP | `web/src/app/api/csp-report/route.js` | Replaced module-level counter with shared `checkRateLimit` keyed on IP. New `CSP_REPORT_PER_IP` policy in `web/src/lib/rateLimits.ts`. |
+| P1-#9 (Q05) | Magic-link button being prefetched by URL scanners | `web/src/lib/magicLinkEmail.ts`, `web/src/app/api/auth/send-magic-link/route.js`, `web/src/app/api/auth/confirm/route.ts` | Dropped `action_link` from template + signature; stopped building actionLink in send-magic-link route; `/api/auth/confirm` is now a stale-link redirect to `/login?error=link_deprecated` (TODO: delete after 2026-05-17 grace window). |
+
+### Reviewer-surfaced follow-ups closed in same session
+
+| # | Finding | Fix |
+|---|---|---|
+| CRIT-1 | Brand-new signup → `last_login_at=NULL` → `assertRecentAuth` permanently 401s for users who haven't done a second sign-in | `runSignupBookkeeping` in `web/src/lib/auth/postLoginBookkeeping.ts` now stamps `last_login_at: now()` at signup. |
+| Polish | login page didn't handle new `?error=link_deprecated` query param | Added a `link_deprecated` notice branch in `web/src/app/login/page.tsx`. |
+| Polish | welcome.tsx success copy still said "sign-in link" after Q05 | Rewrote to "we'll email you an 8-digit code." |
+| Polish | leaderboard handled `no_pending_change` 400 as generic "Something went wrong" | Added `no-pending` resend state with specific copy. |
+| Polish | `csp_report_per_ip` was inline-only, not in `rateLimits.ts` registry | Added `CSP_REPORT_PER_IP` to `RATE_LIMITS` registry. |
+
+### Refuted in pre-impl verification (4)
+
+| # | Finding | Why refuted |
+|---|---|---|
+| P0-B | Wrong OTP code silently redirects to home as anon | Already closed by an in-tree session-existence check at `_SingleDoorForm.tsx:130-138` (post-OTP `getSession()` with explicit `setCodeError` if null). |
+| P1 | `/preview` token uses `!==` not `timingSafeEqual` | Already using `timingSafeEqual` (`web/src/app/preview/route.ts:21`). |
+| P1 | OTP audit-log row pastes raw upstream error | Already wrapped via `classifyOtpError()` mapping (`web/src/app/api/auth/verify-magic-code/route.ts:38`). |
+| P1 | `/api/auth/check-username` GET+POST enables cross-origin rate-limit denial | Auth gate (`getUser()` → 401) runs before the rate-limit hit, so unauthenticated cross-origin GETs cannot consume an authenticated user's rate-limit budget. |
+
+### Reviewer findings noted but not actioned this session
+
+- `auth.resend({type:'email_change', email: newEmail})`: the reviewer flagged that GoTrue may expect the *current* email rather than the new email. Confirmed via supabase-auth-js types (`SignUpEmailRedirect.email: string`) that the field is the new email; if GoTrue rejects, behaviour is no worse than the previous broken state. Flagged for owner smoke-test.
+- `/api/auth/confirm` GET-only signature: HEAD/POST/etc. Next.js handles automatically; non-GET methods 405 cleanly.
+- The `TODO: delete this route after the two-week grace window (2026-05-17)` is intentional grace-window, not a hidden tech-debt item.
+
+### Verification
+
+- `npx tsc --noEmit` — clean.
+- `npx eslint <13 touched files>` — 0 errors, 1 pre-existing warning (`createOtpClient` unused — not introduced this session).
+- Sentinel greps:
+  - `actionLink|action_link` in magicLinkEmail.ts + send-magic-link/route.js → 0 hits.
+  - `windowStart|windowCount` in csp-report/route.js → 0 hits.
+  - `auth.resend.*type.*signup` under web/src/app/api/auth/ → 0 hits.
+  - `user.last_sign_in_at` in web/src/app/api → 0 hits except a backwards-reference comment.
+- Smoke-test deferred — full OTP/email-change flow needs test inbox + live Supabase. Flagged for owner.
+
+### Cross-platform
+
+- iOS adult: email change uses Supabase SDK directly; no analog wired against this endpoint. **N/A.**
+- iOS adult: `AuthViewModel.swift:handleDeepLink` magiclink branch retained as stale-link safety net per owner decision.
+- Kids iOS: no auth surface affected. **N/A.**
+
+### Files touched (13)
+
+- `web/src/lib/auth.js` — new `assertRecentAuth` helper
+- `web/src/lib/auth/postLoginBookkeeping.ts` — `last_login_at` stamped at signup
+- `web/src/lib/magicLinkEmail.ts` — drop button, drop `action_link` from signature/types
+- `web/src/lib/rateLimits.ts` — add `CSP_REPORT_PER_IP`
+- `web/src/app/api/auth/email-change/route.js` — use `assertRecentAuth`
+- `web/src/app/api/auth/resend-verification/route.js` — switch to `email_change` type
+- `web/src/app/api/auth/send-magic-link/route.js` — stop building actionLink
+- `web/src/app/api/auth/verify-magic-code/route.ts` — explicit cookie clear on gate-deny
+- `web/src/app/api/auth/confirm/route.ts` — stale-link redirect
+- `web/src/app/api/csp-report/route.js` — per-IP shared limiter
+- `web/src/app/welcome/page.tsx` — busy+copy fixes
+- `web/src/app/leaderboard/page.tsx` — `no-pending` resend state + copy
+- `web/src/app/login/page.tsx` — `link_deprecated` notice

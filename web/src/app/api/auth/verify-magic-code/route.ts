@@ -193,6 +193,25 @@ export async function POST(request: NextRequest) {
       } catch (e) {
         console.error('[verify-magic-code] gate-deny: signOut failed:', e);
       }
+      // Explicitly clear the session cookies regardless of whether signOut
+      // succeeded. Without this, a signOut error leaves the sb-*-auth-token
+      // cookie alive for a deleted account. Supabase SSR splits large JWTs
+      // across .0/.1/.2 chunks so we clear the base + first 5 chunk slots
+      // (real-world JWT fits in ≤2; 5 is defensive).
+      try {
+        const supabaseRef = (() => {
+          try { return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || '').hostname.split('.')[0]; }
+          catch { return ''; }
+        })();
+        if (supabaseRef) {
+          const cookieJarForClear = await cookies();
+          const base = `sb-${supabaseRef}-auth-token`;
+          cookieJarForClear.delete(base);
+          for (let i = 0; i < 5; i++) cookieJarForClear.delete(`${base}.${i}`);
+        }
+      } catch (e) {
+        console.error('[verify-magic-code] gate-deny: cookie-clear failed:', e);
+      }
       await writeAuditRow(service, {
         email,
         reason: `gate_denied:${gate.reason || 'unknown'}`,
